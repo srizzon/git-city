@@ -316,6 +316,7 @@ interface Props {
 }
 
 export default function Building3D({ building, colors, focused, dimmed, accentColor }: Props) {
+  const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const spriteRef = useRef<THREE.Sprite>(null);
 
@@ -416,10 +417,34 @@ export default function Building3D({ building, colors, focused, dimmed, accentCo
       mat.emissiveIntensity = dimmed ? 0.3 : (mat.map ? 2.0 : 1.5);
     }
     labelMaterial.opacity = dimmed ? 0.15 : 1;
+    // Reset group visibility when un-dimming
+    if (!dimmed && groupRef.current) {
+      groupRef.current.visible = true;
+    }
   }, [dimmed, materials, labelMaterial]);
 
+  // Camera proximity fade: hide dimmed buildings too close to camera
+  useFrame(({ camera }) => {
+    if (!groupRef.current || !dimmed) return;
+
+    const dx = camera.position.x - building.position[0];
+    const dz = camera.position.z - building.position[2];
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    const FADE_START = 150;
+    const FADE_END = 50;
+    const t = Math.max(0, Math.min(1, (dist - FADE_END) / (FADE_START - FADE_END)));
+
+    groupRef.current.visible = t > 0.01;
+
+    for (const mat of materials) {
+      mat.opacity = t * 0.55;
+    }
+    labelMaterial.opacity = t * 0.15;
+  });
+
   return (
-    <group position={[building.position[0], 0, building.position[2]]}>
+    <group ref={groupRef} position={[building.position[0], 0, building.position[2]]}>
       <mesh ref={meshRef} material={materials} scale-y={0.001}>
         <boxGeometry
           args={[building.width, building.height, building.depth]}

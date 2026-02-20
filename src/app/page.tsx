@@ -418,9 +418,12 @@ function HomeContent() {
                   {claiming ? "..." : "Claim"}
                 </button>
               )}
-              <span className="text-[9px] text-cream normal-case">
+              <Link
+                href={`/dev/${authLogin}`}
+                className="text-[9px] text-cream normal-case transition-colors hover:text-accent"
+              >
                 @{authLogin}
-              </span>
+              </Link>
               <button
                 onClick={handleSignOut}
                 className="border-[2px] border-border bg-bg/80 px-2 py-1 text-[9px] text-muted backdrop-blur-sm transition-colors hover:text-cream hover:border-border-light"
