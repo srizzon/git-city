@@ -56,8 +56,18 @@ export default async function ShopPage({ params }: Props) {
 
   if (!dev) notFound();
 
-  // Not claimed — show message
-  if (!dev.claimed) {
+  // Check if the logged-in user owns this building
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  const authLogin = (
+    user?.user_metadata?.user_name ??
+    user?.user_metadata?.preferred_username ??
+    ""
+  ).toLowerCase();
+  const isOwner = !!user && authLogin === dev.github_login.toLowerCase();
+
+  // Not the owner or not claimed — show message
+  if (!dev.claimed || !isOwner) {
     return (
       <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
         <div className="mx-auto max-w-2xl px-3 py-6 sm:px-4 sm:py-10">
@@ -71,8 +81,9 @@ export default async function ShopPage({ params }: Props) {
           <div className="border-[3px] border-border bg-bg-raised p-6 text-center sm:p-10">
             <h1 className="text-lg text-cream">Shop Locked</h1>
             <p className="mt-3 text-[10px] text-muted normal-case">
-              @{dev.github_login} needs to claim their building before the shop
-              is available.
+              {!dev.claimed
+                ? `@${dev.github_login} needs to claim their building before the shop is available.`
+                : "Only the building owner can customize it. Sign in with the matching GitHub account."}
             </p>
             <Link
               href={`/dev/${dev.github_login}`}

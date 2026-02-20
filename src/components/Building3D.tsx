@@ -313,9 +313,10 @@ interface Props {
   focused?: boolean;
   dimmed?: boolean;
   accentColor?: string;
+  onClick?: (building: CityBuilding) => void;
 }
 
-export default function Building3D({ building, colors, focused, dimmed, accentColor }: Props) {
+export default function Building3D({ building, colors, focused, dimmed, accentColor, onClick }: Props) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const spriteRef = useRef<THREE.Sprite>(null);
@@ -445,7 +446,17 @@ export default function Building3D({ building, colors, focused, dimmed, accentCo
 
   return (
     <group ref={groupRef} position={[building.position[0], 0, building.position[2]]}>
-      <mesh ref={meshRef} material={materials} scale-y={0.001}>
+      <mesh
+        ref={meshRef}
+        material={materials}
+        scale-y={0.001}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.(building);
+        }}
+        onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { document.body.style.cursor = "auto"; }}
+      >
         <boxGeometry
           args={[building.width, building.height, building.depth]}
         />

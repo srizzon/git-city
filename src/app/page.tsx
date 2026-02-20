@@ -58,6 +58,7 @@ function HomeContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [purchasedItem, setPurchasedItem] = useState<string | null>(null);
+  const [selectedBuilding, setSelectedBuilding] = useState<CityBuilding | null>(null);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -89,19 +90,20 @@ function HomeContent() {
     ""
   ).toLowerCase();
 
-  // ESC exits share modal / explore mode / clears focus
+  // ESC exits share modal / profile card / explore mode / clears focus
   useEffect(() => {
-    if (!exploreMode && !focusedBuilding && !shareData) return;
+    if (!exploreMode && !focusedBuilding && !shareData && !selectedBuilding) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
         if (shareData) setShareData(null);
+        else if (selectedBuilding) { setSelectedBuilding(null); setFocusedBuilding(null); }
         else if (focusedBuilding) setFocusedBuilding(null);
         else if (exploreMode) { setExploreMode(false); setFocusedBuilding(savedFocusRef.current); savedFocusRef.current = null; }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [exploreMode, focusedBuilding, shareData]);
+  }, [exploreMode, focusedBuilding, shareData, selectedBuilding]);
 
   const reloadCity = useCallback(async () => {
     const res = await fetch("/api/city?from=0&to=500");
@@ -257,6 +259,10 @@ function HomeContent() {
         focusedBuilding={focusedBuilding}
         accentColor={theme.accent}
         onClearFocus={() => setFocusedBuilding(null)}
+        onBuildingClick={(b) => {
+          setSelectedBuilding(b);
+          setFocusedBuilding(b.login);
+        }}
       />
 
       {/* ─── Fly Mode HUD ─── */}
@@ -649,6 +655,93 @@ function HomeContent() {
             }}
           >
             Item purchased! Effect applied to your building.
+          </div>
+        </div>
+      )}
+
+      {/* ─── Building Profile Card ─── */}
+      {selectedBuilding && !flyMode && (
+        <div className="pointer-events-auto fixed bottom-3 left-3 z-40 sm:bottom-6 sm:left-6">
+          <div className="relative border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm w-[280px] sm:w-[320px]">
+            {/* Close */}
+            <button
+              onClick={() => { setSelectedBuilding(null); setFocusedBuilding(null); }}
+              className="absolute top-2 right-2 text-[10px] text-muted transition-colors hover:text-cream z-10"
+            >
+              ESC
+            </button>
+
+            {/* Header with avatar + name */}
+            <div className="flex items-center gap-3 p-4 pb-3">
+              {selectedBuilding.avatar_url && (
+                <img
+                  src={selectedBuilding.avatar_url}
+                  alt={selectedBuilding.login}
+                  width={48}
+                  height={48}
+                  className="border-[2px] border-border flex-shrink-0"
+                  style={{ imageRendering: "pixelated" }}
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                {selectedBuilding.name && (
+                  <p className="truncate text-sm text-cream">{selectedBuilding.name}</p>
+                )}
+                <p className="truncate text-[10px] text-muted">@{selectedBuilding.login}</p>
+                {selectedBuilding.claimed && (
+                  <span
+                    className="mt-1 inline-block px-1.5 py-0.5 text-[8px] text-bg"
+                    style={{ backgroundColor: theme.accent }}
+                  >
+                    Claimed
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-px bg-border/30 mx-4 mb-3 border border-border/50">
+              {[
+                { label: "Rank", value: `#${selectedBuilding.rank}` },
+                { label: "Contribs", value: selectedBuilding.contributions.toLocaleString() },
+                { label: "Repos", value: selectedBuilding.public_repos.toLocaleString() },
+                { label: "Stars", value: selectedBuilding.total_stars.toLocaleString() },
+              ].map((s) => (
+                <div key={s.label} className="bg-bg-card p-2 text-center">
+                  <div className="text-xs" style={{ color: theme.accent }}>{s.value}</div>
+                  <div className="text-[8px] text-muted mt-0.5">{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Language */}
+            {selectedBuilding.primary_language && (
+              <div className="mx-4 mb-3 text-[10px] text-muted">
+                Language: <span className="text-cream">{selectedBuilding.primary_language}</span>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2 p-4 pt-0">
+              <Link
+                href={`/dev/${selectedBuilding.login}`}
+                className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
+                style={{
+                  backgroundColor: theme.accent,
+                  boxShadow: `2px 2px 0 0 ${theme.shadow}`,
+                }}
+              >
+                View Profile
+              </Link>
+              <a
+                href={`https://github.com/${selectedBuilding.login}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+              >
+                GitHub
+              </a>
+            </div>
           </div>
         </div>
       )}

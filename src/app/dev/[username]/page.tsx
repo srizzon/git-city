@@ -74,6 +74,16 @@ export default async function DevPage({ params }: Props) {
   const topRepos: TopRepo[] = dev.top_repos ?? [];
   const ownedItems = await getOwnedItems(dev.id);
 
+  // Check if the logged-in user owns this building
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  const authLogin = (
+    user?.user_metadata?.user_name ??
+    user?.user_metadata?.preferred_username ??
+    ""
+  ).toLowerCase();
+  const isOwner = !!user && authLogin === dev.github_login.toLowerCase() && dev.claimed;
+
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
       <div className="mx-auto max-w-2xl px-3 py-6 sm:px-4 sm:py-10">
@@ -129,16 +139,26 @@ export default async function DevPage({ params }: Props) {
           )}
         </div>
 
-        {/* Customize Building link */}
-        {dev.claimed && (
-          <div className="mt-5">
+        {/* View in City (prominent) */}
+        <div className="mt-5">
+          <Link
+            href={`/?user=${dev.github_login}`}
+            className="btn-press flex w-full items-center justify-center gap-2 px-6 py-3.5 text-sm text-bg"
+            style={{
+              backgroundColor: accent,
+              boxShadow: "4px 4px 0 0 #5a7a00",
+            }}
+          >
+            View in City
+          </Link>
+        </div>
+
+        {/* Customize Building — only for the logged-in owner */}
+        {isOwner && (
+          <div className="mt-3">
             <Link
               href={`/shop/${dev.github_login}`}
-              className="btn-press flex w-full items-center justify-center gap-2 px-6 py-3.5 text-sm text-bg"
-              style={{
-                backgroundColor: accent,
-                boxShadow: "4px 4px 0 0 #5a7a00",
-              }}
+              className="btn-press flex w-full items-center justify-center gap-2 border-[3px] border-border px-6 py-3 text-sm text-cream transition-colors hover:border-border-light"
             >
               Customize Building
             </Link>
@@ -211,19 +231,8 @@ export default async function DevPage({ params }: Props) {
           </div>
         )}
 
-        {/* Actions */}
-        <div className="mt-10 flex flex-col items-center gap-4">
-          <Link
-            href={`/?user=${dev.github_login}`}
-            className="btn-press inline-block px-8 py-4 text-base text-bg"
-            style={{
-              backgroundColor: accent,
-              boxShadow: "4px 4px 0 0 #5a7a00",
-            }}
-          >
-            View in City
-          </Link>
-
+        {/* Share */}
+        <div className="mt-10 flex justify-center">
           <ShareButtons
             login={dev.github_login}
             contributions={dev.contributions}

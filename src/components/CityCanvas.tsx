@@ -214,8 +214,10 @@ function CameraFocus({
   controlsRef: React.RefObject<any>;
 }) {
   const { camera } = useThree();
-  const targetPos = useRef(new THREE.Vector3());
-  const targetLook = useRef(new THREE.Vector3());
+  const startPos = useRef(new THREE.Vector3());
+  const startLook = useRef(new THREE.Vector3());
+  const endPos = useRef(new THREE.Vector3());
+  const endLook = useRef(new THREE.Vector3());
   const progress = useRef(1);
   const active = useRef(false);
 
@@ -227,47 +229,47 @@ function CameraFocus({
     );
     if (!b) return;
 
-    targetPos.current.set(
-      b.position[0] + 120,
-      b.height + 80,
-      b.position[2] + 120
+    // Capture current camera state as start
+    startPos.current.copy(camera.position);
+    if (controlsRef.current) {
+      startLook.current.copy(controlsRef.current.target);
+    }
+
+    endPos.current.set(
+      b.position[0] + 80,
+      b.height + 60,
+      b.position[2] + 80
     );
-    targetLook.current.set(
+    endLook.current.set(
       b.position[0],
-      b.height * 0.6,
+      b.height + 15,
       b.position[2]
     );
     progress.current = 0;
     active.current = true;
 
-    // Disable autoRotate during focus
     if (controlsRef.current) {
       controlsRef.current.autoRotate = false;
     }
   }, [focusedBuilding, buildings, camera, controlsRef]);
 
   useFrame((_, delta) => {
-    // Fly-in animation
-    if (active.current && progress.current < 1) {
-      progress.current = Math.min(1, progress.current + delta * 0.8);
-      const t = 1 - Math.pow(1 - progress.current, 3);
+    if (!active.current || progress.current >= 1) return;
 
-      camera.position.lerp(targetPos.current, t * 0.1);
+    progress.current = Math.min(1, progress.current + delta * 0.7);
+    // Ease-out cubic
+    const t = 1 - Math.pow(1 - progress.current, 3);
 
-      if (controlsRef.current) {
-        controlsRef.current.target.lerp(targetLook.current, t * 0.1);
-        controlsRef.current.update();
-      }
+    // Direct A→B interpolation
+    camera.position.lerpVectors(startPos.current, endPos.current, t);
 
-      if (progress.current >= 1) {
-        active.current = false;
-      }
+    if (controlsRef.current) {
+      controlsRef.current.target.lerpVectors(startLook.current, endLook.current, t);
+      controlsRef.current.update();
     }
 
-    // Keep orbit target locked on building while focused
-    if (focusedBuilding && controlsRef.current) {
-      controlsRef.current.target.lerp(targetLook.current, 0.1);
-      controlsRef.current.update();
+    if (progress.current >= 1) {
+      active.current = false;
     }
   });
 
@@ -718,7 +720,7 @@ function OrbitScene({ buildings, focusedBuilding }: { buildings: CityBuilding[];
         ref={controlsRef}
         enableDamping
         dampingFactor={0.06}
-        minDistance={120}
+        minDistance={40}
         maxDistance={800}
         maxPolarAngle={Math.PI / 2.1}
         target={[0, 30, 0]}
@@ -743,9 +745,10 @@ interface Props {
   focusedBuilding?: string | null;
   accentColor?: string;
   onClearFocus?: () => void;
+  onBuildingClick?: (building: CityBuilding) => void;
 }
 
-export default function CityCanvas({ buildings, plazas, decorations, flyMode, onExitFly, themeIndex, onHud, onPause, focusedBuilding, accentColor, onClearFocus }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, flyMode, onExitFly, themeIndex, onHud, onPause, focusedBuilding, accentColor, onClearFocus, onBuildingClick }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
 
   return (
@@ -779,6 +782,7 @@ export default function CityCanvas({ buildings, plazas, decorations, flyMode, on
           focused={focusedBuilding?.toLowerCase() === b.login.toLowerCase()}
           dimmed={!!focusedBuilding && focusedBuilding.toLowerCase() !== b.login.toLowerCase()}
           accentColor={accentColor}
+          onClick={onBuildingClick}
         />
       ))}
 
