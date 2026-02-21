@@ -23,9 +23,10 @@ export async function GET(request: Request) {
     ""
   ).toLowerCase();
 
+  const admin = getSupabaseAdmin();
+
   if (githubLogin) {
     // Auto-claim: if building exists and not yet claimed, claim it
-    const admin = getSupabaseAdmin();
     await admin
       .from("developers")
       .update({
@@ -41,6 +42,18 @@ export async function GET(request: Request) {
   // Support ?next= param for post-login redirect (e.g. /shop)
   const next = searchParams.get("next");
   if (next === "/shop" && githubLogin) {
+    // Ensure developer exists in the database before redirecting to shop
+    const { data: dev } = await admin
+      .from("developers")
+      .select("github_login")
+      .eq("github_login", githubLogin)
+      .single();
+
+    if (!dev) {
+      // Developer not in the city yet — redirect to homepage to create their building first
+      return NextResponse.redirect(`${origin}/?user=${githubLogin}`);
+    }
+
     return NextResponse.redirect(`${origin}/shop/${githubLogin}`);
   }
 

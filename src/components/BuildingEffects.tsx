@@ -19,9 +19,12 @@ export function NeonOutline({
   color?: string;
 }) {
   const lineRef = useRef<THREE.LineSegments>(null);
+  const frameCount = useRef(0);
 
   useFrame((state) => {
     if (!lineRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
     const mat = lineRef.current.material as THREE.LineBasicMaterial;
     mat.opacity = 0.6 + Math.sin(state.clock.elapsedTime * 3) * 0.2;
   });
@@ -153,7 +156,6 @@ export function SpotlightEffect({
           depthWrite={false}
         />
       </mesh>
-      <pointLight position={[0, height + 5, 0]} color={color} intensity={20} distance={60} />
     </group>
   );
 }
@@ -229,7 +231,6 @@ export function RooftopFire({
           sizeAttenuation
         />
       </points>
-      <pointLight position={[0, height + 10, 0]} color="#ff4400" intensity={30} distance={50} />
     </group>
   );
 }
@@ -281,9 +282,6 @@ export function Helipad({
           emissiveIntensity={1}
         />
       </mesh>
-      {/* Edge lights */}
-      <pointLight position={[padSize / 2, 1, 0]} color="#ffaa00" intensity={5} distance={20} />
-      <pointLight position={[-padSize / 2, 1, 0]} color="#ffaa00" intensity={5} distance={20} />
     </group>
   );
 }
@@ -297,9 +295,12 @@ export function AntennaArray({
   height: number;
 }) {
   const lightRef = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
 
   useFrame((state) => {
     if (!lightRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
     const t = state.clock.elapsedTime;
     lightRef.current.children.forEach((child, i) => {
       if ((child as THREE.Mesh).material) {
@@ -426,12 +427,6 @@ export function Spire({
         <meshStandardMaterial color="#aaaabb" metalness={0.8} roughness={0.2} />
       </mesh>
       {/* Tip light */}
-      <pointLight
-        position={[0, spireHeight + 4, 0]}
-        color="#ff4444"
-        intensity={10}
-        distance={40}
-      />
       <mesh position={[0, spireHeight + 3, 0]}>
         <sphereGeometry args={[0.6, 8, 8]} />
         <meshStandardMaterial
@@ -544,12 +539,6 @@ function BillboardSingle({
           />
         )}
       </mesh>
-      <pointLight
-        position={[0, billH / 2 + 3, 3]}
-        color={tex ? "#ffffff" : color}
-        intensity={8}
-        distance={25}
-      />
     </group>
   );
 }

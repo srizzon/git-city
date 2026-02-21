@@ -229,7 +229,16 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(upserted);
+    // Recalculate ranks so this developer gets a fresh rank immediately
+    await sb.rpc("recalculate_ranks");
+
+    const { data: withRank } = await sb
+      .from("developers")
+      .select("*")
+      .eq("github_login", record.github_login)
+      .single();
+
+    return NextResponse.json(withRank ?? upserted);
   } catch (err) {
     console.error("Dev route error:", err);
     return NextResponse.json(

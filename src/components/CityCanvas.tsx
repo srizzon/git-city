@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import Building3D from "./Building3D";
+import CityScene from "./CityScene";
 import type { CityBuilding, CityPlaza, CityDecoration } from "@/lib/github";
 import { seededRandom } from "@/lib/github";
 
@@ -222,7 +222,13 @@ function CameraFocus({
   const active = useRef(false);
 
   useEffect(() => {
-    if (!focusedBuilding) return;
+    if (!focusedBuilding) {
+      // Re-enable auto-rotate when focus is cleared
+      if (controlsRef.current) {
+        controlsRef.current.autoRotate = true;
+      }
+      return;
+    }
 
     const b = buildings.find(
       (b) => b.login.toLowerCase() === focusedBuilding.toLowerCase()
@@ -282,7 +288,7 @@ const DEFAULT_FLY_SPEED = 60;
 const MIN_FLY_SPEED = 20;
 const MAX_FLY_SPEED = 160;
 const MIN_ALT = 25;
-const MAX_ALT = 350;
+const MAX_ALT = 900;
 const TURN_RATE = 2.0;
 const CLIMB_RATE = 30;
 const MAX_BANK = 0.55;
@@ -307,7 +313,7 @@ const _idealLook = new THREE.Vector3();
 const _blendedPos = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 
-function AirplaneFlight({ onExit, onHud, onPause }: { onExit: () => void; onHud: (s: number, a: number) => void; onPause: (paused: boolean) => void }) {
+function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false }: { onExit: () => void; onHud: (s: number, a: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean }) {
   const { camera } = useThree();
   const ref = useRef<THREE.Group>(null);
   const orbitRef = useRef<any>(null);
@@ -338,9 +344,32 @@ function AirplaneFlight({ onExit, onHud, onPause }: { onExit: () => void; onHud:
 
   const hudTimer = useRef(0);
 
+  // Initialize flight from current camera position and direction
   useEffect(() => {
-    camera.position.set(0, 140, 450);
-    camera.lookAt(0, 120, 400);
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+
+    // Derive yaw from camera look direction (projected onto XZ plane)
+    const initialYaw = Math.atan2(-camDir.x, -camDir.z);
+    yaw.current = initialYaw;
+
+    // Place airplane ahead of camera in the look direction
+    const startPos = camera.position.clone();
+    // Clamp altitude to flight range
+    startPos.y = Math.max(MIN_ALT, Math.min(MAX_ALT, startPos.y));
+    pos.current.copy(startPos);
+
+    // Camera follow position: behind and above the airplane
+    const behindOffset = new THREE.Vector3(
+      Math.sin(initialYaw) * 50,
+      20,
+      Math.cos(initialYaw) * 50
+    );
+    camPos.current.copy(startPos).add(behindOffset);
+    camLook.current.copy(startPos);
+
+    camera.position.copy(camPos.current);
+    camera.lookAt(camLook.current);
   }, [camera]);
 
   // Mouse tracking for flight steering
@@ -364,38 +393,64 @@ function AirplaneFlight({ onExit, onHud, onPause }: { onExit: () => void; onHud:
     };
   }, []);
 
-  // Keyboard
+  // External pause (triggered by parent, e.g. building click)
+  const prevSignal = useRef(pauseSignal);
   useEffect(() => {
-    const togglePause = () => {
-      const newPaused = !paused.current;
-      paused.current = newPaused;
-      setIsPaused(newPaused);
-
-      if (newPaused) {
-        // Pausing: OrbitControls will mount via React state
-        // Camera stays where it is, orbit target = plane position
-      } else {
-        // Resuming: transition camera back to flight follow position
-        wasJustUnpaused.current = true;
-        transitionProgress.current = 0;
-        transitionFrom.current.copy(camera.position);
-        transitionLookFrom.current.copy(camLook.current);
+    if (pauseSignal !== prevSignal.current) {
+      prevSignal.current = pauseSignal;
+      if (!paused.current) {
+        paused.current = true;
+        setIsPaused(true);
+        onPause(true);
       }
-      onPause(newPaused);
+    }
+  }, [pauseSignal, onPause]);
+
+  // Keyboard
+  const hasOverlayRef = useRef(hasOverlay);
+  hasOverlayRef.current = hasOverlay;
+
+  useEffect(() => {
+    const doPause = () => {
+      if (paused.current) return;
+      paused.current = true;
+      setIsPaused(true);
+      onPause(true);
     };
+
+    const doResume = () => {
+      if (!paused.current) return;
+      paused.current = false;
+      setIsPaused(false);
+      wasJustUnpaused.current = true;
+      transitionProgress.current = 0;
+      transitionFrom.current.copy(camera.position);
+      transitionLookFrom.current.copy(camLook.current);
+      onPause(false);
+    };
+
+    const FLIGHT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight"]);
 
     const down = (e: KeyboardEvent) => {
       keys.current[e.code] = true;
       if (e.code === "Escape") {
-        if (paused.current) {
-          togglePause(); // unpause first
+        if (!paused.current) {
+          // Flying → pause
+          doPause();
+        } else if (hasOverlayRef.current) {
+          // Paused + overlay showing → let page.tsx close it
+          return;
         } else {
+          // Paused + no overlay → exit fly mode
           onExit();
         }
-      }
-      if (e.code === "KeyP" || e.code === "Space") {
+      } else if (e.code === "KeyP" || e.code === "Space") {
         e.preventDefault();
-        togglePause();
+        if (paused.current) doResume();
+        else doPause();
+      } else if (paused.current && FLIGHT_KEYS.has(e.code)) {
+        // Any flight key while paused → resume flying
+        doResume();
       }
     };
     const up = (e: KeyboardEvent) => { keys.current[e.code] = false; };
@@ -593,9 +648,8 @@ function StreetLamp({ position }: { position: [number, number, number] }) {
       </mesh>
       <mesh position={[0, 18.5, 0]}>
         <boxGeometry args={[1.5, 0.8, 1.5]} />
-        <meshStandardMaterial color="#f0d870" emissive="#f0d870" emissiveIntensity={0.8} />
+        <meshStandardMaterial color="#f0d870" emissive="#f0d870" emissiveIntensity={2.0} toneMapped={false} />
       </mesh>
-      <pointLight position={[0, 17.5, 0]} color="#f0d870" intensity={15} distance={60} />
     </group>
   );
 }
@@ -663,9 +717,8 @@ function Fountain({ position }: { position: [number, number, number] }) {
       </mesh>
       <mesh position={[0, 7.2, 0]}>
         <cylinderGeometry args={[1.8, 2, 1.2, 10]} />
-        <meshStandardMaterial color="#4090d0" emissive="#2060a0" emissiveIntensity={0.5} transparent opacity={0.7} />
+        <meshStandardMaterial color="#4090d0" emissive="#2060a0" emissiveIntensity={2.0} toneMapped={false} transparent opacity={0.7} />
       </mesh>
-      <pointLight position={[0, 8, 0]} color="#4090d0" intensity={8} distance={40} />
     </group>
   );
 }
@@ -697,6 +750,171 @@ function Decorations({ items }: { items: CityDecoration[] }) {
           default: return null;
         }
       })}
+    </>
+  );
+}
+
+// ─── Instanced Decorations (single draw call per type) ───────
+
+const _dMatrix = new THREE.Matrix4();
+const _dPos = new THREE.Vector3();
+const _dQuat = new THREE.Quaternion();
+const _dScale = new THREE.Vector3();
+const _dEuler = new THREE.Euler();
+
+function InstancedDecorations({ items }: { items: CityDecoration[] }) {
+  const trees = useMemo(() => items.filter(d => d.type === 'tree'), [items]);
+  const lamps = useMemo(() => items.filter(d => d.type === 'streetLamp'), [items]);
+  const cars = useMemo(() => items.filter(d => d.type === 'car'), [items]);
+
+  const treeTrunkRef = useRef<THREE.InstancedMesh>(null);
+  const treeCanopyRef = useRef<THREE.InstancedMesh>(null);
+  const lampPoleRef = useRef<THREE.InstancedMesh>(null);
+  const lampLightRef = useRef<THREE.InstancedMesh>(null);
+  const carBodyRef = useRef<THREE.InstancedMesh>(null);
+  const carCabinRef = useRef<THREE.InstancedMesh>(null);
+
+  // Shared geometries
+  const geos = useMemo(() => ({
+    treeTrunk: new THREE.CylinderGeometry(1, 1.3, 1, 6),
+    treeCanopy: new THREE.ConeGeometry(1, 1, 8),
+    lampPole: new THREE.CylinderGeometry(0.3, 0.45, 18, 6),
+    lampLight: new THREE.BoxGeometry(1.5, 0.8, 1.5),
+    carBody: new THREE.BoxGeometry(8, 2.5, 3.5),
+    carCabin: new THREE.BoxGeometry(5, 2, 3.2),
+  }), []);
+
+  // Shared materials
+  const mats = useMemo(() => ({
+    treeTrunk: new THREE.MeshStandardMaterial({ color: "#5a3a1e" }),
+    treeCanopy: new THREE.MeshStandardMaterial({ color: "#2d5a1e" }),
+    lampPole: new THREE.MeshStandardMaterial({ color: "#4a4a4a" }),
+    lampLight: new THREE.MeshStandardMaterial({
+      color: "#f0d870", emissive: "#f0d870", emissiveIntensity: 2.0, toneMapped: false,
+    }),
+    carBody: new THREE.MeshStandardMaterial({ color: "#808080" }),
+    carCabin: new THREE.MeshStandardMaterial({ color: "#808080" }),
+  }), []);
+
+  // Set up tree instances
+  useEffect(() => {
+    if (!treeTrunkRef.current || !treeCanopyRef.current || trees.length === 0) return;
+    const greens = [new THREE.Color('#2d5a1e'), new THREE.Color('#1e6b2e'), new THREE.Color('#3a7a2a')];
+
+    for (let i = 0; i < trees.length; i++) {
+      const d = trees[i];
+      const trunkH = 8 + d.variant * 1.5;
+      const canopyH = 10 + d.variant * 2;
+      const canopyR = 6 + d.variant * 0.8;
+
+      _dQuat.identity();
+      _dPos.set(d.position[0], d.position[1] + trunkH / 2, d.position[2]);
+      _dScale.set(1, trunkH, 1);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      treeTrunkRef.current.setMatrixAt(i, _dMatrix);
+
+      _dPos.set(d.position[0], d.position[1] + trunkH + canopyH / 2 - 1, d.position[2]);
+      _dScale.set(canopyR, canopyH, canopyR);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      treeCanopyRef.current.setMatrixAt(i, _dMatrix);
+      treeCanopyRef.current.setColorAt(i, greens[d.variant % greens.length]);
+    }
+
+    treeTrunkRef.current.instanceMatrix.needsUpdate = true;
+    treeCanopyRef.current.instanceMatrix.needsUpdate = true;
+    if (treeCanopyRef.current.instanceColor) treeCanopyRef.current.instanceColor.needsUpdate = true;
+  }, [trees]);
+
+  // Set up lamp instances
+  useEffect(() => {
+    if (!lampPoleRef.current || !lampLightRef.current || lamps.length === 0) return;
+    _dQuat.identity();
+    _dScale.set(1, 1, 1);
+
+    for (let i = 0; i < lamps.length; i++) {
+      const d = lamps[i];
+      _dPos.set(d.position[0], d.position[1] + 9, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      lampPoleRef.current.setMatrixAt(i, _dMatrix);
+
+      _dPos.set(d.position[0], d.position[1] + 18.5, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      lampLightRef.current.setMatrixAt(i, _dMatrix);
+    }
+
+    lampPoleRef.current.instanceMatrix.needsUpdate = true;
+    lampLightRef.current.instanceMatrix.needsUpdate = true;
+  }, [lamps]);
+
+  // Set up car instances
+  useEffect(() => {
+    if (!carBodyRef.current || !carCabinRef.current || cars.length === 0) return;
+    const carColors = [
+      new THREE.Color('#c03030'), new THREE.Color('#3050a0'),
+      new THREE.Color('#d0d0d0'), new THREE.Color('#2a2a2a'),
+    ];
+
+    for (let i = 0; i < cars.length; i++) {
+      const d = cars[i];
+      _dEuler.set(0, d.rotation, 0);
+      _dQuat.setFromEuler(_dEuler);
+      _dScale.set(1, 1, 1);
+
+      _dPos.set(d.position[0], d.position[1] + 1.25, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      carBodyRef.current.setMatrixAt(i, _dMatrix);
+      carBodyRef.current.setColorAt(i, carColors[d.variant % carColors.length]);
+
+      _dPos.set(d.position[0], d.position[1] + 3.1, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      carCabinRef.current.setMatrixAt(i, _dMatrix);
+      carCabinRef.current.setColorAt(i, carColors[d.variant % carColors.length]);
+    }
+
+    carBodyRef.current.instanceMatrix.needsUpdate = true;
+    carCabinRef.current.instanceMatrix.needsUpdate = true;
+    if (carBodyRef.current.instanceColor) carBodyRef.current.instanceColor.needsUpdate = true;
+    if (carCabinRef.current.instanceColor) carCabinRef.current.instanceColor.needsUpdate = true;
+  }, [cars]);
+
+  // Dispose
+  useEffect(() => {
+    return () => {
+      Object.values(geos).forEach(g => g.dispose());
+      Object.values(mats).forEach(m => m.dispose());
+    };
+  }, [geos, mats]);
+
+  return (
+    <>
+      {trees.length > 0 && (
+        <>
+          <instancedMesh ref={treeTrunkRef} args={[geos.treeTrunk, mats.treeTrunk, trees.length]} />
+          <instancedMesh ref={treeCanopyRef} args={[geos.treeCanopy, mats.treeCanopy, trees.length]} />
+        </>
+      )}
+      {lamps.length > 0 && (
+        <>
+          <instancedMesh ref={lampPoleRef} args={[geos.lampPole, mats.lampPole, lamps.length]} />
+          <instancedMesh ref={lampLightRef} args={[geos.lampLight, mats.lampLight, lamps.length]} />
+        </>
+      )}
+      {cars.length > 0 && (
+        <>
+          <instancedMesh ref={carBodyRef} args={[geos.carBody, mats.carBody, cars.length]} />
+          <instancedMesh ref={carCabinRef} args={[geos.carCabin, mats.carCabin, cars.length]} />
+        </>
+      )}
+      {/* Benches, fountains, sidewalks: keep as individual components (usually few) */}
+      {items.filter(d => d.type === 'bench').map((d, i) => (
+        <ParkBench key={`bench-${i}`} position={d.position} rotation={d.rotation} />
+      ))}
+      {items.filter(d => d.type === 'fountain').map((d, i) => (
+        <Fountain key={`fountain-${i}`} position={d.position} />
+      ))}
+      {items.filter(d => d.type === 'sidewalk').map((d, i) => (
+        <Sidewalk key={`walk-${i}`} position={d.position} size={d.size!} />
+      ))}
     </>
   );
 }
@@ -746,9 +964,11 @@ interface Props {
   accentColor?: string;
   onClearFocus?: () => void;
   onBuildingClick?: (building: CityBuilding) => void;
+  flyPauseSignal?: number;
+  flyHasOverlay?: boolean;
 }
 
-export default function CityCanvas({ buildings, plazas, decorations, flyMode, onExitFly, themeIndex, onHud, onPause, focusedBuilding, accentColor, onClearFocus, onBuildingClick }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, flyMode, onExitFly, themeIndex, onHud, onPause, focusedBuilding, accentColor, onClearFocus, onBuildingClick, flyPauseSignal, flyHasOverlay }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
 
   return (
@@ -770,23 +990,19 @@ export default function CityCanvas({ buildings, plazas, decorations, flyMode, on
         <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} />
       )}
 
-      {flyMode && <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => {})} onPause={onPause ?? (() => {})} />}
+      {flyMode && <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => {})} onPause={onPause ?? (() => {})} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} />}
 
       <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />
 
-      {buildings.map((b) => (
-        <Building3D
-          key={`${b.login}-${themeIndex}`}
-          building={b}
-          colors={t.building}
-          focused={focusedBuilding?.toLowerCase() === b.login.toLowerCase()}
-          dimmed={!!focusedBuilding && focusedBuilding.toLowerCase() !== b.login.toLowerCase()}
-          accentColor={accentColor}
-          onClick={onBuildingClick}
-        />
-      ))}
+      <CityScene
+        buildings={buildings}
+        colors={t.building}
+        focusedBuilding={focusedBuilding}
+        accentColor={accentColor}
+        onBuildingClick={onBuildingClick}
+      />
 
-{/* decorations removed for performance */}
+      <InstancedDecorations items={decorations} />
     </Canvas>
   );
 }

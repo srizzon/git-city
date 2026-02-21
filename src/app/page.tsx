@@ -47,6 +47,7 @@ function HomeContent() {
   const [themeIndex, setThemeIndex] = useState(0);
   const [hud, setHud] = useState({ speed: 0, altitude: 0 });
   const [flyPaused, setFlyPaused] = useState(false);
+  const [flyPauseSignal, setFlyPauseSignal] = useState(0);
   const [stats, setStats] = useState<CityStats>({ total_developers: 0, total_contributions: 0 });
   const [focusedBuilding, setFocusedBuilding] = useState<string | null>(null);
   const [shareData, setShareData] = useState<{
@@ -59,6 +60,8 @@ function HomeContent() {
   const [claiming, setClaiming] = useState(false);
   const [purchasedItem, setPurchasedItem] = useState<string | null>(null);
   const [selectedBuilding, setSelectedBuilding] = useState<CityBuilding | null>(null);
+  const [giftClaimed, setGiftClaimed] = useState(false);
+  const [claimingGift, setClaimingGift] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -90,24 +93,33 @@ function HomeContent() {
     ""
   ).toLowerCase();
 
-  // ESC exits share modal / profile card / explore mode / clears focus
+  // ESC: layered dismissal
+  // During fly mode: only close overlays (profile card) — AirplaneFlight handles pause/exit
+  // Outside fly mode: share modal → profile card → focus → explore mode
   useEffect(() => {
-    if (!exploreMode && !focusedBuilding && !shareData && !selectedBuilding) return;
+    if (flyMode && !selectedBuilding) return;
+    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
-        if (shareData) setShareData(null);
-        else if (selectedBuilding) { setSelectedBuilding(null); setFocusedBuilding(null); }
-        else if (focusedBuilding) setFocusedBuilding(null);
-        else if (exploreMode) { setExploreMode(false); setFocusedBuilding(savedFocusRef.current); savedFocusRef.current = null; }
+        if (flyMode && selectedBuilding) {
+          setSelectedBuilding(null);
+          setFocusedBuilding(null);
+        } else if (!flyMode) {
+          if (giftClaimed) setGiftClaimed(false);
+          else if (shareData) setShareData(null);
+          else if (selectedBuilding) { setSelectedBuilding(null); setFocusedBuilding(null); }
+          else if (focusedBuilding) setFocusedBuilding(null);
+          else if (exploreMode) { setExploreMode(false); setFocusedBuilding(savedFocusRef.current); savedFocusRef.current = null; }
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [exploreMode, focusedBuilding, shareData, selectedBuilding]);
+  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed]);
 
   const reloadCity = useCallback(async () => {
     const res = await fetch("/api/city?from=0&to=500");
-    if (!res.ok) return;
+    if (!res.ok) return null;
     const data = await res.json();
     setStats(data.stats);
     if (data.developers.length > 0) {
@@ -115,7 +127,9 @@ function HomeContent() {
       setBuildings(layout.buildings);
       setPlazas(layout.plazas);
       setDecorations(layout.decorations);
+      return layout.buildings;
     }
+    return null;
   }, []);
 
   // Load city from Supabase on mount
@@ -137,11 +151,20 @@ function HomeContent() {
   }, [reloadCity]);
 
   // Focus on building from ?user= query param
+  const didFocusUserParam = useRef(false);
   useEffect(() => {
-    if (userParam && buildings.length > 0) {
+    if (userParam && buildings.length > 0 && !didFocusUserParam.current) {
+      didFocusUserParam.current = true;
       setFocusedBuilding(userParam);
+      const found = buildings.find(
+        (b) => b.login.toLowerCase() === userParam.toLowerCase()
+      );
+      if (found) {
+        setSelectedBuilding(found);
+        setExploreMode(true);
+      }
     }
-  }, [userParam, buildings.length]);
+  }, [userParam, buildings]);
 
   // Detect post-purchase redirect (?purchased=item_id)
   const purchasedParam = searchParams.get("purchased");
@@ -180,19 +203,28 @@ function HomeContent() {
       }
 
       // Reload entire city to get updated ranks
-      await reloadCity();
+      const updatedBuildings = await reloadCity();
 
       // Focus camera on the searched building
       setFocusedBuilding(devData.github_login);
 
-      // Only show share modal for newly added devs
       if (isNew) {
+        // New developer: show the share modal
         setShareData({
           login: devData.github_login,
           contributions: devData.contributions,
           rank: devData.rank,
         });
         setCopied(false);
+      } else {
+        // Existing developer: enter explore mode and show profile card (like a click)
+        const foundBuilding = updatedBuildings?.find(
+          (b: CityBuilding) => b.login.toLowerCase() === trimmed
+        );
+        if (foundBuilding) {
+          setSelectedBuilding(foundBuilding);
+          setExploreMode(true);
+        }
       }
       setUsername("");
     } catch {
@@ -200,7 +232,7 @@ function HomeContent() {
     } finally {
       setLoading(false);
     }
-  }, [username]);
+  }, [username, buildings, reloadCity]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,6 +261,19 @@ function HomeContent() {
       }
     } finally {
       setClaiming(false);
+    }
+  };
+
+  const handleClaimFreeGift = async () => {
+    setClaimingGift(true);
+    try {
+      const res = await fetch("/api/claim-free-item", { method: "POST" });
+      if (res.ok) {
+        await reloadCity();
+        setGiftClaimed(true);
+      }
+    } finally {
+      setClaimingGift(false);
     }
   };
 
@@ -265,9 +310,17 @@ function HomeContent() {
         focusedBuilding={focusedBuilding}
         accentColor={theme.accent}
         onClearFocus={() => setFocusedBuilding(null)}
+        flyPauseSignal={flyPauseSignal}
+        flyHasOverlay={!!selectedBuilding}
         onBuildingClick={(b) => {
           setSelectedBuilding(b);
           setFocusedBuilding(b.login);
+          if (flyMode) {
+            // Auto-pause flight to show profile card
+            setFlyPauseSignal(s => s + 1);
+          } else if (!exploreMode) {
+            setExploreMode(true);
+          }
         }}
       />
 
@@ -323,7 +376,7 @@ function HomeContent() {
                   <span className="text-cream">Scroll</span> zoom
                 </div>
                 <div>
-                  <span style={{ color: theme.accent }}>P</span> resume
+                  <span className="text-cream">WASD</span> resume
                 </div>
                 <div>
                   <span style={{ color: theme.accent }}>ESC</span> exit
@@ -347,7 +400,7 @@ function HomeContent() {
                   <span style={{ color: theme.accent }}>P</span> pause
                 </div>
                 <div>
-                  <span style={{ color: theme.accent }}>ESC</span> exit
+                  <span style={{ color: theme.accent }}>ESC</span> pause
                 </div>
               </>
             )}
@@ -462,6 +515,22 @@ function HomeContent() {
           {/* Center - Explore buttons + Shop + Auth */}
           {buildings.length > 0 && (
             <div className="pointer-events-auto flex flex-col items-center gap-3">
+              {/* Free Gift CTA — above primary actions */}
+              {hasFreeGift && (
+                <button
+                  onClick={handleClaimFreeGift}
+                  disabled={claimingGift}
+                  className="gift-cta btn-press px-7 py-3 text-xs sm:py-3.5 sm:text-sm text-bg disabled:opacity-60"
+                  style={{
+                    backgroundColor: theme.accent,
+                    ["--gift-glow-color" as string]: theme.accent + "66",
+                    ["--gift-shadow-color" as string]: theme.shadow,
+                  }}
+                >
+                  {claimingGift ? "Opening..." : "\uD83C\uDF81 Open Free Gift!"}
+                </button>
+              )}
+
               {/* Primary actions */}
               <div className="flex items-center gap-3 sm:gap-4">
                 <button
@@ -492,15 +561,10 @@ function HomeContent() {
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <Link
                   href={shopHref}
-                  className={`btn-press border-[3px] bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light ${hasFreeGift ? "animate-pulse" : ""}`}
-                  style={{
-                    color: hasFreeGift ? "#0d0d0f" : theme.accent,
-                    backgroundColor: hasFreeGift ? theme.accent : undefined,
-                    borderColor: hasFreeGift ? theme.accent : undefined,
-                    boxShadow: hasFreeGift ? `3px 3px 0 0 ${theme.shadow}` : undefined,
-                  }}
+                  className="btn-press border-[3px] border-border bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+                  style={{ color: theme.accent }}
                 >
-                  {hasFreeGift ? "1 Free Gift!" : "Shop"}
+                  Shop
                 </Link>
                 {!session ? (
                   <button
@@ -673,7 +737,7 @@ function HomeContent() {
       )}
 
       {/* ─── Navigation Hints (bottom-right, when building selected) ─── */}
-      {selectedBuilding && !flyMode && (
+      {selectedBuilding && (!flyMode || flyPaused) && (
         <div className="pointer-events-none fixed bottom-3 right-3 z-30 text-right text-[8px] leading-loose text-muted sm:bottom-6 sm:right-6 sm:text-[9px]">
           <div><span className="text-cream">Drag</span> orbit</div>
           <div><span className="text-cream">Scroll</span> zoom</div>
@@ -683,7 +747,7 @@ function HomeContent() {
       )}
 
       {/* ─── Building Profile Card ─── */}
-      {selectedBuilding && !flyMode && (
+      {selectedBuilding && (!flyMode || flyPaused) && (
         <div className="pointer-events-auto fixed bottom-3 left-3 z-40 sm:bottom-6 sm:left-6">
           <div className="relative border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm w-[280px] sm:w-[320px]">
             {/* Close */}
@@ -836,6 +900,107 @@ function HomeContent() {
             >
               View full profile &rarr;
             </a>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Free Gift Celebration Modal ─── */}
+      {giftClaimed && !flyMode && !exploreMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-bg/70 backdrop-blur-sm"
+            onClick={() => setGiftClaimed(false)}
+          />
+
+          {/* Modal */}
+          <div
+            className="relative mx-3 border-[3px] border-border bg-bg-raised p-5 text-center sm:mx-0 sm:p-7 animate-[gift-bounce_0.5s_ease-out]"
+            style={{ borderColor: theme.accent + "60" }}
+          >
+            {/* Close */}
+            <button
+              onClick={() => setGiftClaimed(false)}
+              className="absolute top-2 right-3 text-[10px] text-muted transition-colors hover:text-cream"
+            >
+              ESC
+            </button>
+
+            <div className="text-3xl sm:text-4xl mb-3">{"\uD83C\uDF89"}</div>
+
+            <p className="text-sm text-cream sm:text-base">Gift Unlocked!</p>
+
+            <div
+              className="mt-4 inline-flex items-center gap-3 border-[2px] border-border bg-bg-card px-5 py-3"
+            >
+              <span className="text-2xl">{"\uD83C\uDFC1"}</span>
+              <div className="text-left">
+                <p className="text-xs text-cream">Flag</p>
+                <p className="text-[9px] text-muted normal-case">
+                  A flag on top of your building
+                </p>
+              </div>
+            </div>
+
+            {/* Upsell strip */}
+            <div className="mt-5 w-full max-w-[280px]">
+              <p className="mb-2 text-[9px] tracking-widest text-muted uppercase">
+                Upgrade your building
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { emoji: "\uD83C\uDF3F", name: "Garden", price: "$0.50" },
+                  { emoji: "\u2728", name: "Neon", price: "$0.75" },
+                  { emoji: "\uD83D\uDD25", name: "Fire", price: "$1.00" },
+                ].map((item) => (
+                  <Link
+                    key={item.name}
+                    href={shopHref}
+                    onClick={() => setGiftClaimed(false)}
+                    className="flex flex-col items-center gap-1 border-[2px] border-border bg-bg-card px-2 py-2.5 transition-colors hover:border-border-light"
+                  >
+                    <span className="text-xl">{item.emoji}</span>
+                    <span className="text-[8px] text-cream leading-tight">
+                      {item.name}
+                    </span>
+                    <span
+                      className="text-[9px] font-bold"
+                      style={{ color: theme.accent }}
+                    >
+                      {item.price}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-3">
+              <button
+                onClick={() => {
+                  setGiftClaimed(false);
+                  if (myBuilding) {
+                    setFocusedBuilding(myBuilding.login);
+                    setSelectedBuilding(myBuilding);
+                    setExploreMode(true);
+                  }
+                }}
+                className="btn-press px-5 py-2.5 text-[10px] text-bg"
+                style={{
+                  backgroundColor: theme.accent,
+                  boxShadow: `3px 3px 0 0 ${theme.shadow}`,
+                }}
+              >
+                View in City
+              </button>
+              <Link
+                href={shopHref}
+                onClick={() => setGiftClaimed(false)}
+                className="btn-press border-[3px] border-border px-5 py-2 text-[10px] text-cream transition-colors hover:border-border-light"
+              >
+                Visit Shop {"→"}
+              </Link>
+            </div>
           </div>
         </div>
       )}

@@ -21,6 +21,9 @@ import {
 // Shared constants
 const WHITE = new THREE.Color("#ffffff");
 
+// Shared unit box geometry — scaled per building, prevents 300+ geometry allocations
+const SHARED_BOX_GEO = new THREE.BoxGeometry(1, 1, 1);
+
 function createWindowTexture(
   rows: number,
   cols: number,
@@ -76,11 +79,13 @@ function createWindowTexture(
 
 function ClaimedGlow({ height, width, depth }: { height: number; width: number; depth: number }) {
   const trimRef = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
 
   useFrame((state) => {
     if (!trimRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
     const t = state.clock.elapsedTime;
-    // Gentle pulse on the neon trim
     trimRef.current.children.forEach((child) => {
       if ((child as THREE.Mesh).material) {
         const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
@@ -121,8 +126,6 @@ function ClaimedGlow({ height, width, depth }: { height: number; width: number; 
         </mesh>
       </group>
 
-      {/* Roof glow light */}
-      <pointLight position={[0, height + 3, 0]} color={accent} intensity={40} distance={80} />
     </group>
   );
 }
@@ -130,8 +133,8 @@ function ClaimedGlow({ height, width, depth }: { height: number; width: number; 
 // ─── Label as CanvasTexture Sprite (no DOM, no useFrame) ─────
 
 function createLabelTexture(building: CityBuilding): THREE.CanvasTexture {
-  const W = 1024;
-  const H = 256;
+  const W = 512;
+  const H = 128;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -140,60 +143,60 @@ function createLabelTexture(building: CityBuilding): THREE.CanvasTexture {
   // Background
   ctx.fillStyle = "rgba(10, 10, 14, 0.88)";
   ctx.beginPath();
-  ctx.roundRect(8, 8, W - 16, H - 16, 12);
+  ctx.roundRect(4, 4, W - 8, H - 8, 6);
   ctx.fill();
 
   // Border
   ctx.strokeStyle = building.claimed ? "rgba(200, 230, 74, 0.6)" : "rgba(100, 100, 120, 0.5)";
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.roundRect(8, 8, W - 16, H - 16, 12);
+  ctx.roundRect(4, 4, W - 8, H - 8, 6);
   ctx.stroke();
 
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
 
   // Username
-  ctx.font = 'bold 52px "Silkscreen", monospace';
+  ctx.font = 'bold 26px "Silkscreen", monospace';
   ctx.fillStyle = "#e8dcc8";
   ctx.shadowColor = "rgba(200, 230, 74, 0.4)";
-  ctx.shadowBlur = 16;
-  ctx.fillText(`@${building.login.toUpperCase()}`, W / 2, 22);
+  ctx.shadowBlur = 8;
+  ctx.fillText(`@${building.login.toUpperCase()}`, W / 2, 11);
 
   // Reset shadow
   ctx.shadowColor = "rgba(0,0,0,0.8)";
-  ctx.shadowBlur = 4;
+  ctx.shadowBlur = 2;
 
   // Rank + contributions
-  ctx.font = '36px "Silkscreen", monospace';
+  ctx.font = '18px "Silkscreen", monospace';
   ctx.fillStyle = "#a0a0b0";
   ctx.fillText(
     `#${building.rank} · ${building.contributions.toLocaleString()} CONTRIBUTIONS`,
     W / 2,
-    90
+    45
   );
 
   // Repos + stars + claimed badge
   let repoLine = `${building.public_repos} REPOS`;
   if (building.total_stars > 0) repoLine += ` · ${building.total_stars} ★`;
-  ctx.fillText(repoLine, W / 2, 145);
+  ctx.fillText(repoLine, W / 2, 72);
 
   // Claimed badge
   if (building.claimed) {
     const badgeText = "CLAIMED";
-    ctx.font = 'bold 28px "Silkscreen", monospace';
+    ctx.font = 'bold 14px "Silkscreen", monospace';
     const metrics = ctx.measureText(badgeText);
-    const bw = metrics.width + 20;
-    const bh = 34;
+    const bw = metrics.width + 10;
+    const bh = 17;
     const bx = W / 2 - bw / 2;
-    const by = 196;
+    const by = 98;
     ctx.fillStyle = "#c8e64a";
     ctx.beginPath();
-    ctx.roundRect(bx, by, bw, bh, 4);
+    ctx.roundRect(bx, by, bw, bh, 2);
     ctx.fill();
     ctx.fillStyle = "#0d0d0f";
     ctx.textBaseline = "top";
-    ctx.fillText(badgeText, W / 2, by + 4);
+    ctx.fillText(badgeText, W / 2, by + 2);
   }
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -224,7 +227,7 @@ function BuildingRiseAnimation({
     const t = 1 - Math.pow(1 - progress.current, 3);
 
     if (meshRef.current) {
-      meshRef.current.scale.y = Math.max(0.001, t);
+      meshRef.current.scale.y = Math.max(0.001, t * height);
       meshRef.current.position.y = (height * t) / 2;
     }
     if (spriteRef.current) {
@@ -294,13 +297,8 @@ function FocusBeacon({ height, width, depth, accentColor }: { height: number; wi
           <octahedronGeometry args={[6, 0]} />
           <meshBasicMaterial color={accentColor} transparent opacity={0.15} />
         </mesh>
-        <pointLight color={accentColor} intensity={50} distance={120} />
+        <pointLight color={accentColor} intensity={80} distance={150} />
       </group>
-
-      {/* Illuminate the building */}
-      <pointLight position={[0, height + 10, 0]} color={accentColor} intensity={80} distance={100} />
-      <pointLight position={[30, height / 2, 0]} color={accentColor} intensity={30} distance={60} />
-      <pointLight position={[-30, height / 2, 0]} color={accentColor} intensity={30} distance={60} />
     </group>
   );
 }
@@ -424,43 +422,21 @@ export default function Building3D({ building, colors, focused, dimmed, accentCo
     }
   }, [dimmed, materials, labelMaterial]);
 
-  // Camera proximity fade: hide dimmed buildings too close to camera
-  useFrame(({ camera }) => {
-    if (!groupRef.current || !dimmed) return;
-
-    const dx = camera.position.x - building.position[0];
-    const dz = camera.position.z - building.position[2];
-    const dist = Math.sqrt(dx * dx + dz * dz);
-
-    const FADE_START = 150;
-    const FADE_END = 50;
-    const t = Math.max(0, Math.min(1, (dist - FADE_END) / (FADE_START - FADE_END)));
-
-    groupRef.current.visible = t > 0.01;
-
-    for (const mat of materials) {
-      mat.opacity = t * 0.55;
-    }
-    labelMaterial.opacity = t * 0.15;
-  });
-
   return (
     <group ref={groupRef} position={[building.position[0], 0, building.position[2]]}>
       <mesh
         ref={meshRef}
         material={materials}
-        scale-y={0.001}
+        geometry={SHARED_BOX_GEO}
+        scale={[building.width, 0.001, building.depth]}
+        dispose={null}
         onClick={(e) => {
           e.stopPropagation();
           onClick?.(building);
         }}
         onPointerOver={() => { document.body.style.cursor = "pointer"; }}
         onPointerOut={() => { document.body.style.cursor = "auto"; }}
-      >
-        <boxGeometry
-          args={[building.width, building.height, building.depth]}
-        />
-      </mesh>
+      />
 
       <sprite
         ref={spriteRef}
