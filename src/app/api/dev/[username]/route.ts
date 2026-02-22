@@ -42,18 +42,109 @@ function ghHeaders(): HeadersInit {
   return h;
 }
 
-async function fetchContributions(login: string): Promise<number> {
+interface ExpandedGitHubData {
+  contributions: number;
+  contributions_total: number;
+  contribution_years: number[];
+  total_prs: number;
+  total_reviews: number;
+  total_issues: number;
+  repos_contributed_to: number;
+  followers: number;
+  following: number;
+  organizations_count: number;
+  account_created_at: string | null;
+  current_streak: number;
+  longest_streak: number;
+  active_days_last_year: number;
+}
+
+function buildYearAliases(): string {
+  const currentYear = new Date().getFullYear();
+  const lines: string[] = [];
+  for (let y = currentYear; y >= currentYear - 9; y--) {
+    lines.push(`y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { contributionCalendar { totalContributions } }`);
+  }
+  return lines.join("\n    ");
+}
+
+function computeStreaks(weeks: Array<{ contributionDays: Array<{ contributionCount: number; date: string }> }>): {
+  current_streak: number;
+  longest_streak: number;
+  active_days_last_year: number;
+} {
+  // Flatten all days in chronological order
+  const allDays: { count: number; date: string }[] = [];
+  for (const week of weeks) {
+    for (const day of week.contributionDays) {
+      allDays.push({ count: day.contributionCount, date: day.date });
+    }
+  }
+  allDays.sort((a, b) => a.date.localeCompare(b.date));
+
+  let active_days_last_year = 0;
+  let longest_streak = 0;
+  let currentRun = 0;
+
+  for (const day of allDays) {
+    if (day.count > 0) {
+      active_days_last_year++;
+      currentRun++;
+      if (currentRun > longest_streak) longest_streak = currentRun;
+    } else {
+      currentRun = 0;
+    }
+  }
+
+  // Current streak: consecutive days ending today or yesterday
+  let current_streak = 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  for (let i = allDays.length - 1; i >= 0; i--) {
+    const day = allDays[i];
+    if (i === allDays.length - 1 && day.date !== today && day.date !== yesterday) break;
+    if (i === allDays.length - 1 && day.count === 0 && day.date === today) continue; // today with 0, check yesterday
+    if (day.count > 0) {
+      current_streak++;
+    } else {
+      break;
+    }
+  }
+
+  return { current_streak, longest_streak, active_days_last_year };
+}
+
+async function fetchExpandedGitHubData(login: string): Promise<ExpandedGitHubData | null> {
   const token = process.env.GITHUB_TOKEN;
-  if (!token) return 0;
+  if (!token) return null;
+
+  const yearAliases = buildYearAliases();
 
   const query = `
     query($login: String!) {
       user(login: $login) {
-        contributionsCollection {
+        createdAt
+        followers { totalCount }
+        following { totalCount }
+        organizations(first: 1) { totalCount }
+        repositoriesContributedTo(first: 1, contributionTypes: [COMMIT, PULL_REQUEST]) {
+          totalCount
+        }
+
+        current: contributionsCollection {
           contributionCalendar {
             totalContributions
+            weeks {
+              contributionDays { contributionCount, date }
+            }
           }
+          totalPullRequestContributions
+          totalIssueContributions
+          totalPullRequestReviewContributions
         }
+
+        ${yearAliases}
       }
     }
   `;
@@ -68,15 +159,48 @@ async function fetchContributions(login: string): Promise<number> {
       body: JSON.stringify({ query, variables: { login } }),
     });
 
-    if (!res.ok) return 0;
+    if (!res.ok) return null;
 
     const json = await res.json();
-    return (
-      json?.data?.user?.contributionsCollection?.contributionCalendar
-        ?.totalContributions ?? 0
-    );
+    const user = json?.data?.user;
+    if (!user) return null;
+
+    const currentCollection = user.current;
+    const contributions = currentCollection?.contributionCalendar?.totalContributions ?? 0;
+
+    // Sum historical years
+    const currentYear = new Date().getFullYear();
+    let contributions_total = 0;
+    const contribution_years: number[] = [];
+    for (let y = currentYear; y >= currentYear - 9; y--) {
+      const yearData = user[`y${y}`];
+      const yearContribs = yearData?.contributionCalendar?.totalContributions ?? 0;
+      if (yearContribs > 0) {
+        contributions_total += yearContribs;
+        contribution_years.push(y);
+      }
+    }
+
+    // Streaks from current year calendar
+    const weeks = currentCollection?.contributionCalendar?.weeks ?? [];
+    const streaks = computeStreaks(weeks);
+
+    return {
+      contributions,
+      contributions_total,
+      contribution_years,
+      total_prs: currentCollection?.totalPullRequestContributions ?? 0,
+      total_reviews: currentCollection?.totalPullRequestReviewContributions ?? 0,
+      total_issues: currentCollection?.totalIssueContributions ?? 0,
+      repos_contributed_to: user.repositoriesContributedTo?.totalCount ?? 0,
+      followers: user.followers?.totalCount ?? 0,
+      following: user.following?.totalCount ?? 0,
+      organizations_count: user.organizations?.totalCount ?? 0,
+      account_created_at: user.createdAt ?? null,
+      ...streaks,
+    };
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -127,16 +251,19 @@ export async function GET(
   try {
     const headers = ghHeaders();
 
-    const [userRes, reposRes] = await Promise.all([
-      fetch(
-        `https://api.github.com/users/${encodeURIComponent(username)}`,
-        { headers }
-      ),
-      fetch(
-        `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100`,
-        { headers }
-      ),
-    ]);
+    type RepoItem = {
+      name: string;
+      stargazers_count: number;
+      language: string | null;
+      html_url: string;
+      fork: boolean;
+      size: number;
+    };
+
+    const userRes = await fetch(
+      `https://api.github.com/users/${encodeURIComponent(username)}`,
+      { headers }
+    );
 
     if (!userRes.ok) {
       if (userRes.status === 404) {
@@ -159,7 +286,7 @@ export async function GET(
 
     const ghUser = await userRes.json();
 
-    // Reject organizations — only individual users have contributions
+    // Reject organizations
     if (ghUser.type === "Organization") {
       return NextResponse.json(
         { error: "Organizations are not supported. Search for a user profile instead." },
@@ -167,17 +294,16 @@ export async function GET(
       );
     }
 
-    const repos: Array<{
-      name: string;
-      stargazers_count: number;
-      language: string | null;
-      html_url: string;
-      fork: boolean;
-      size: number;
-    }> = reposRes.ok ? await reposRes.json() : [];
+    // Fetch expanded GitHub data (GraphQL) and first page of repos in parallel
+    const [expanded, reposPage1Res] = await Promise.all([
+      fetchExpandedGitHubData(ghUser.login),
+      fetch(
+        `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=1`,
+        { headers }
+      ),
+    ]);
 
-    // Fetch contributions via GraphQL
-    const contributions = await fetchContributions(ghUser.login);
+    const contributions = expanded?.contributions ?? 0;
 
     // Reject users with zero public activity
     if (contributions === 0 && ghUser.public_repos === 0) {
@@ -185,6 +311,24 @@ export async function GET(
         { error: "This user has no public activity on GitHub yet." },
         { status: 400 }
       );
+    }
+
+    // Paginated repo fetching: page 1 already fetched, fetch 2-5 if needed
+    let repos: RepoItem[] = reposPage1Res.ok ? await reposPage1Res.json() : [];
+
+    if (repos.length >= 100) {
+      const extraPages = await Promise.all(
+        [2, 3, 4, 5].map((page) =>
+          fetch(
+            `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=${page}`,
+            { headers }
+          ).then((r) => (r.ok ? r.json() as Promise<RepoItem[]> : []))
+        )
+      );
+      for (const page of extraPages) {
+        if (page.length === 0) break;
+        repos = repos.concat(page);
+      }
     }
 
     // Derived fields
@@ -196,10 +340,12 @@ export async function GET(
 
     // Primary language by total repo size
     const langCounts: Record<string, number> = {};
+    const uniqueLanguages = new Set<string>();
     for (const repo of ownRepos) {
       if (repo.language) {
         langCounts[repo.language] =
           (langCounts[repo.language] || 0) + repo.size;
+        uniqueLanguages.add(repo.language);
       }
     }
     const primaryLanguage =
@@ -230,6 +376,23 @@ export async function GET(
       primary_language: primaryLanguage,
       top_repos: topRepos,
       fetched_at: new Date().toISOString(),
+      // v2 fields
+      ...(expanded ? {
+        contributions_total: expanded.contributions_total,
+        contribution_years: expanded.contribution_years,
+        total_prs: expanded.total_prs,
+        total_reviews: expanded.total_reviews,
+        total_issues: expanded.total_issues,
+        repos_contributed_to: expanded.repos_contributed_to,
+        followers: expanded.followers,
+        following: expanded.following,
+        organizations_count: expanded.organizations_count,
+        account_created_at: expanded.account_created_at,
+        current_streak: expanded.current_streak,
+        longest_streak: expanded.longest_streak,
+        active_days_last_year: expanded.active_days_last_year,
+        language_diversity: uniqueLanguages.size,
+      } : {}),
     };
 
     const { data: upserted, error: upsertError } = await sb

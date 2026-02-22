@@ -136,18 +136,24 @@ export async function POST(request: Request) {
     // Fetch building dimensions to calculate max slots
     const { data: devFull } = await sb
       .from("developers")
-      .select("contributions, public_repos, rank")
+      .select("github_login, contributions, public_repos, total_stars, rank, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, longest_streak, active_days_last_year, language_diversity, top_repos")
       .eq("id", dev.id)
       .single();
 
     if (devFull) {
-      // Replicate dimension calculation from github.ts
-      const repoFactor = Math.min(1, devFull.public_repos / 100);
-      const baseW = 14 + repoFactor * 16;
-      const w = Math.round(baseW + 5); // approximate mid-seed
-      const d = Math.round(12 + 10);   // approximate mid-seed
-      // Height: simplified — use rank-based estimate
-      const h = Math.max(30, 12 + Math.sqrt(devFull.contributions) * 3);
+      const { calcBuildingDims } = await import("@/lib/github");
+      const dims = calcBuildingDims(
+        devFull.github_login,
+        devFull.contributions,
+        devFull.public_repos,
+        devFull.total_stars,
+        20_000, // maxContrib estimate
+        200_000, // maxStars estimate
+        (devFull.contributions_total ?? 0) > 0 ? devFull : undefined,
+      );
+      const w = dims.width;
+      const d = dims.depth;
+      const h = dims.height;
 
       const minBillArea = 10 * 8;
       const totalFaceArea = 2 * (w + d) * h;

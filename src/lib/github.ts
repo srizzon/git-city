@@ -21,6 +21,21 @@ export interface DeveloperRecord {
   owned_items?: string[];
   custom_color?: string | null;
   billboard_images?: string[];
+  // v2 fields (optional for backward compat)
+  contributions_total?: number;
+  contribution_years?: number[];
+  total_prs?: number;
+  total_reviews?: number;
+  total_issues?: number;
+  repos_contributed_to?: number;
+  followers?: number;
+  following?: number;
+  organizations_count?: number;
+  account_created_at?: string | null;
+  current_streak?: number;
+  longest_streak?: number;
+  active_days_last_year?: number;
+  language_diversity?: number;
 }
 
 export interface TopRepo {
@@ -145,6 +160,100 @@ function calcHeight(
   return { height, composite };
 }
 
+// ─── V2 Detection & Formulas ────────────────────────────────
+
+function isV2Dev(dev: DeveloperRecord): boolean {
+  return (dev.contributions_total ?? 0) > 0;
+}
+
+function calcHeightV2(
+  dev: DeveloperRecord,
+  maxContribV2: number,
+  maxStars: number,
+): { height: number; composite: number } {
+  const contribs = dev.contributions_total! > 0 ? dev.contributions_total! : dev.contributions;
+
+  const cNorm = contribs / Math.max(1, Math.min(maxContribV2, 50_000));
+  const sNorm = dev.total_stars / Math.max(1, Math.min(maxStars, 200_000));
+  const prNorm = ((dev.total_prs ?? 0) + (dev.total_reviews ?? 0)) / 5_000;
+  const extNorm = (dev.repos_contributed_to ?? 0) / 100;
+  const fNorm = Math.log10(Math.max(1, dev.followers ?? 0)) / Math.log10(50_000);
+
+  // Consistency: years active / account age
+  const accountAgeYears = Math.max(1,
+    (Date.now() - new Date(dev.account_created_at || dev.created_at).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+  );
+  const yearsActive = dev.contribution_years?.length || 1;
+  const consistencyRaw = (yearsActive / accountAgeYears) * Math.min(1, contribs / (accountAgeYears * 200));
+  const consistencyNorm = Math.min(1, consistencyRaw);
+
+  const cScore = Math.pow(Math.min(cNorm, 3), 0.55);
+  const sScore = Math.pow(Math.min(sNorm, 3), 0.45);
+  const prScore = Math.pow(Math.min(prNorm, 2), 0.5);
+  const extScore = Math.pow(Math.min(extNorm, 2), 0.5);
+  const fScore = Math.pow(Math.min(fNorm, 2), 0.5);
+  const cnsScore = Math.pow(consistencyNorm, 0.6);
+
+  const composite =
+    cScore  * 0.35 +
+    sScore  * 0.20 +
+    prScore * 0.15 +
+    extScore * 0.10 +
+    cnsScore * 0.10 +
+    fScore  * 0.10;
+
+  const height = Math.min(MAX_BUILDING_HEIGHT, MIN_BUILDING_HEIGHT + composite * HEIGHT_RANGE);
+  return { height, composite };
+}
+
+function calcWidthV2(dev: DeveloperRecord): number {
+  const repoNorm = Math.min(1, dev.public_repos / 200);
+  const langNorm = Math.min(1, (dev.language_diversity ?? 1) / 10);
+  const topStarNorm = Math.min(1, (dev.top_repos?.[0]?.stars ?? 0) / 50_000);
+
+  const score =
+    Math.pow(repoNorm, 0.5) * 0.50 +
+    Math.pow(langNorm, 0.6) * 0.30 +
+    Math.pow(topStarNorm, 0.4) * 0.20;
+
+  const jitter = (seededRandom(hashStr(dev.github_login)) - 0.5) * 4;
+  return Math.round(14 + score * 24 + jitter);
+}
+
+function calcDepthV2(dev: DeveloperRecord): number {
+  const extNorm = Math.min(1, (dev.repos_contributed_to ?? 0) / 100);
+  const orgNorm = Math.min(1, (dev.organizations_count ?? 0) / 10);
+  const prNorm = Math.min(1, (dev.total_prs ?? 0) / 1_000);
+  const ratioNorm = (dev.followers ?? 0) > 0
+    ? Math.min(1, ((dev.followers ?? 0) / Math.max(1, dev.following ?? 1)) / 10)
+    : 0;
+
+  const score =
+    Math.pow(extNorm, 0.5) * 0.40 +
+    Math.pow(orgNorm, 0.5) * 0.25 +
+    Math.pow(prNorm, 0.5) * 0.20 +
+    Math.pow(ratioNorm, 0.5) * 0.15;
+
+  const jitter = (seededRandom(hashStr(dev.github_login) + 99) - 0.5) * 4;
+  return Math.round(12 + score * 20 + jitter);
+}
+
+function calcLitPercentageV2(dev: DeveloperRecord): number {
+  const activeDaysNorm = Math.min(1, (dev.active_days_last_year ?? 0) / 300);
+  const streakNorm = Math.min(1, (dev.current_streak ?? 0) / 100);
+
+  const avgPerYear = (dev.contributions_total ?? 0) / Math.max(1, dev.contribution_years?.length ?? 1);
+  const trendRaw = avgPerYear > 0 ? dev.contributions / avgPerYear : 1;
+  const trendNorm = Math.min(2, Math.max(0, trendRaw)) / 2;
+
+  const score =
+    activeDaysNorm * 0.60 +
+    streakNorm * 0.25 +
+    trendNorm * 0.15;
+
+  return 0.05 + score * 0.90;
+}
+
 export interface CityRiver {
   x: number;
   width: number;
@@ -171,6 +280,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   const decorations: CityDecoration[] = [];
   const maxContrib = devs[0]?.contributions || 1;
   const maxStars = devs.reduce((max, d) => Math.max(max, d.total_stars), 1);
+  const maxContribV2 = devs.reduce((max, d) => Math.max(max, d.contributions_total ?? 0), 1);
 
   // River runs along Z axis, cutting through X
   const blockSpacing0 = CELL_SPACING * BLOCK_SIZE_DOWNTOWN + STREET_WIDTH;
@@ -233,23 +343,29 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       // Skip buildings that overlap the river
       if (posX + 20 > riverMinX && posX - 20 < riverMaxX) continue;
 
-      // Height with composite score (contributions + stars + repos)
-      const { height, composite } = calcHeight(dev.contributions, dev.total_stars, dev.public_repos, maxContrib, maxStars);
+      let height: number, composite: number, w: number, d: number, litPercentage: number;
 
-      // Width/depth: base from repos, variance from seed
-      const seed1 = hashStr(dev.github_login);
-      const repoFactor = Math.min(1, dev.public_repos / 100); // 0-1 based on repos
-      const baseW = 14 + repoFactor * 12; // 14-26 based on repos
-      const w = Math.round(baseW + seededRandom(seed1) * 8);
-      const d = Math.round(12 + seededRandom(seed1 + 99) * 16); // 12-28, independent of w
+      if (isV2Dev(dev)) {
+        // V2 path: multidimensional formulas
+        ({ height, composite } = calcHeightV2(dev, maxContribV2, maxStars));
+        w = calcWidthV2(dev);
+        d = calcDepthV2(dev);
+        litPercentage = calcLitPercentageV2(dev);
+      } else {
+        // V1 path: original formulas (unchanged)
+        ({ height, composite } = calcHeight(dev.contributions, dev.total_stars, dev.public_repos, maxContrib, maxStars));
+        const seed1 = hashStr(dev.github_login);
+        const repoFactor = Math.min(1, dev.public_repos / 100);
+        const baseW = 14 + repoFactor * 12;
+        w = Math.round(baseW + seededRandom(seed1) * 8);
+        d = Math.round(12 + seededRandom(seed1 + 99) * 16);
+        litPercentage = 0.2 + composite * 0.7;
+      }
 
       const floorH = 6;
       const floors = Math.max(3, Math.floor(height / floorH));
       const windowsPerFloor = Math.max(3, Math.floor(w / 5));
       const sideWindowsPerFloor = Math.max(3, Math.floor(d / 5));
-
-      // Lit percentage proportional to composite importance score
-      const litPercentage = 0.2 + composite * 0.7;
 
       buildings.push({
         login: dev.github_login,
@@ -497,7 +613,23 @@ export function calcBuildingDims(
   totalStars: number,
   maxContrib: number,
   maxStars: number,
+  v2Data?: Partial<DeveloperRecord>,
 ): { width: number; height: number; depth: number } {
+  // V2 path when expanded data is available
+  if (v2Data && (v2Data.contributions_total ?? 0) > 0) {
+    const dev: DeveloperRecord = {
+      id: 0, github_login: githubLogin, github_id: null, name: null,
+      avatar_url: null, bio: null, contributions, public_repos: publicRepos,
+      total_stars: totalStars, primary_language: null, top_repos: [],
+      rank: null, fetched_at: '', created_at: '', claimed: false,
+      fetch_priority: 0, claimed_at: null,
+      ...v2Data,
+    };
+    const { height } = calcHeightV2(dev, maxContrib, maxStars);
+    return { width: calcWidthV2(dev), height, depth: calcDepthV2(dev) };
+  }
+
+  // V1 fallback
   const { height } = calcHeight(contributions, totalStars, publicRepos, maxContrib, maxStars);
   const seed1 = hashStr(githubLogin);
   const repoFactor = Math.min(1, publicRepos / 100);
