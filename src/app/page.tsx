@@ -27,8 +27,8 @@ const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
 });
 
 const THEMES = [
-  { name: "Sunset",   accent: "#c8e64a", shadow: "#5a7a00" },
   { name: "Midnight", accent: "#6090e0", shadow: "#203870" },
+  { name: "Sunset",   accent: "#c8e64a", shadow: "#5a7a00" },
   { name: "Neon",     accent: "#e040c0", shadow: "#600860" },
   { name: "Emerald",  accent: "#f0c060", shadow: "#806020" },
 ];
@@ -320,6 +320,8 @@ function HomeContent() {
     raw?: string;
   } | null>(null);
   const [flyMode, setFlyMode] = useState(false);
+  const [introMode, setIntroMode] = useState(false);
+  const [introPhase, setIntroPhase] = useState(-1); // -1 = not started, 0-3 = text phases, 4 = done
   const [exploreMode, setExploreMode] = useState(false);
   const [themeIndex, setThemeIndex] = useState(0);
   const [hud, setHud] = useState({ speed: 0, altitude: 0 });
@@ -432,7 +434,7 @@ function HomeContent() {
     let cancelled = false;
     const fetchFeed = async () => {
       try {
-        const res = await fetch("/api/feed?limit=20&today=1");
+        const res = await fetch("/api/feed?limit=50&today=1");
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled) setFeedEvents(data.events ?? []);
@@ -622,11 +624,54 @@ function HomeContent() {
         // City might be empty, that's ok
       } finally {
         setInitialLoading(false);
+        // Start intro if first visit (no deep-link params)
+        const hasDeepLink = searchParams.get("user") || searchParams.get("compare");
+        if (!localStorage.getItem("gitcity_intro_seen") && !hasDeepLink) {
+          setIntroMode(true);
+        }
       }
     }
 
     loadCity();
   }, [reloadCity]);
+
+  // ─── Intro text phase timing (14s total) ─────────────────────
+  // Phase 0: "Somewhere in the internet..."   0.8s → fade out ~3.8s
+  // Phase 1: "Developers became buildings"    4.2s → fade out ~7.2s
+  // Phase 2: "And commits became floors"      7.6s → fade out ~10.6s
+  // Phase 3: "Welcome to Git City"            11.0s → confetti + hold until end
+  const INTRO_TEXT_SCHEDULE = [800, 4200, 7600, 11000];
+  const [introConfetti, setIntroConfetti] = useState(false);
+
+  useEffect(() => {
+    if (!introMode) {
+      setIntroPhase(-1);
+      setIntroConfetti(false);
+      return;
+    }
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 0; i < INTRO_TEXT_SCHEDULE.length; i++) {
+      timers.push(setTimeout(() => setIntroPhase(i), INTRO_TEXT_SCHEDULE[i]));
+    }
+    // Confetti shortly after "Welcome to Git City"
+    timers.push(setTimeout(() => setIntroConfetti(true), INTRO_TEXT_SCHEDULE[3] + 500));
+
+    return () => timers.forEach(clearTimeout);
+  }, [introMode]);
+
+  const endIntro = useCallback(() => {
+    setIntroMode(false);
+    setIntroPhase(-1);
+    setIntroConfetti(false);
+    localStorage.setItem("gitcity_intro_seen", "true");
+  }, []);
+
+  const replayIntro = useCallback(() => {
+    setIntroMode(true);
+    setIntroPhase(-1);
+    setIntroConfetti(false);
+  }, []);
 
   // Focus on building from ?user= query param
   const didFocusUserParam = useRef(false);
@@ -880,6 +925,8 @@ function HomeContent() {
           setClickedAd(ad);
         }}
         onAdViewed={(adId) => trackAdEvent(adId, "impression", authLogin || undefined)}
+        introMode={introMode}
+        onIntroEnd={endIntro}
         onFocusInfo={() => {}}
         onBuildingClick={(b) => {
           // Compare pick mode: clicking a second building completes the pair
@@ -908,6 +955,103 @@ function HomeContent() {
           }
         }}
       />
+
+      {/* ─── Intro Flyover Overlay ─── */}
+      {introMode && (
+        <div className="pointer-events-none fixed inset-0 z-50">
+          {/* Cinematic letterbox bars */}
+          <div
+            className="absolute inset-x-0 top-0 bg-black/80 transition-all duration-1000"
+            style={{ height: introPhase >= 0 ? "12%" : "0%" }}
+          />
+          <div
+            className="absolute inset-x-0 bottom-0 bg-black/80 transition-all duration-1000"
+            style={{ height: introPhase >= 0 ? "18%" : "0%" }}
+          />
+
+          {/* Text in the lower bar area */}
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center" style={{ height: "18%" }}>
+            {/* Narrative texts (phases 0-2) */}
+            {[
+              "Somewhere in the internet...",
+              "Developers became buildings",
+              "And commits became floors",
+            ].map((text, i) => (
+              <p
+                key={i}
+                className="absolute text-center font-pixel normal-case text-cream"
+                style={{
+                  fontSize: "clamp(0.85rem, 3vw, 1.5rem)",
+                  letterSpacing: "0.05em",
+                  opacity: introPhase === i ? 1 : 0,
+                  transition: "opacity 0.7s ease-in-out",
+                }}
+              >
+                {text}
+              </p>
+            ))}
+
+            {/* Welcome to Git City (phase 3) */}
+            <div
+              className="absolute flex flex-col items-center gap-1"
+              style={{
+                opacity: introPhase === 3 ? 1 : 0,
+                transform: introPhase === 3 ? "scale(1)" : "scale(0.95)",
+                transition: "opacity 0.8s ease-out, transform 0.8s ease-out",
+              }}
+            >
+              <p
+                className="text-center font-pixel uppercase text-cream"
+                style={{ fontSize: "clamp(1.2rem, 5vw, 2.8rem)" }}
+              >
+                Welcome to{" "}
+                <span style={{ color: theme.accent }}>Git City</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Confetti burst */}
+          {introConfetti && (
+            <div className="absolute inset-0 overflow-hidden">
+              {Array.from({ length: 60 }).map((_, i) => {
+                const colors = [theme.accent, "#fff", theme.shadow, "#f0c060", "#e040c0", "#60c0f0"];
+                const color = colors[i % colors.length];
+                const left = 10 + Math.random() * 80;
+                const delay = Math.random() * 0.6;
+                const duration = 2.5 + Math.random() * 1.5;
+                const w = 3 + Math.random() * 5;
+                const h = Math.random() > 0.5 ? w : w * 0.35;
+                const drift = (Math.random() - 0.5) * 80;
+                const rotation = Math.random() * 720;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      position: "absolute",
+                      left: `${left}%`,
+                      top: "-8px",
+                      width: `${w}px`,
+                      height: `${h}px`,
+                      backgroundColor: color,
+                      animation: `introConfettiFall ${duration}s ${delay}s ease-in forwards`,
+                      transform: `rotate(${rotation}deg) translateX(${drift}px)`,
+                      opacity: 0,
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+
+          {/* Skip button - top right, outside the cinematic bars */}
+          <button
+            className="pointer-events-auto absolute top-4 right-4 font-pixel text-[10px] uppercase text-cream/40 transition-colors hover:text-cream sm:text-xs"
+            onClick={endIntro}
+          >
+            Skip &gt;
+          </button>
+        </div>
+      )}
 
       {/* ─── Fly Mode HUD ─── */}
       {flyMode && (
@@ -1019,17 +1163,15 @@ function HomeContent() {
             </button>
           </div>
 
-          {/* Theme switcher (bottom-left) */}
-          <div className="pointer-events-auto absolute bottom-3 left-3 sm:bottom-4 sm:left-4">
+          {/* Theme switcher (bottom-left) — same position as main controls */}
+          <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex items-center gap-2 sm:left-4">
             <button
               onClick={() => setThemeIndex((i) => (i + 1) % THEMES.length)}
-              className="flex items-center gap-2 border-[3px] border-border bg-bg/70 px-3 py-1.5 text-[10px] backdrop-blur-sm transition-colors"
-              style={{ borderColor: undefined }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = theme.accent + "80")}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "")}
+              className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
             >
               <span style={{ color: theme.accent }}>&#9654;</span>
               <span className="text-cream">{theme.name}</span>
+              <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
           </div>
 
@@ -1064,7 +1206,7 @@ function HomeContent() {
       {/* Shop & Auth moved to center buttons area */}
 
       {/* ─── GitHub Badge (mobile: top-center, desktop: top-right) ─── */}
-      {!flyMode && (
+      {!flyMode && !introMode && (
         <div className="pointer-events-auto fixed top-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 sm:left-auto sm:right-4 sm:top-4 sm:translate-x-0">
           <a
             href="https://github.com/srizzon/git-city"
@@ -1088,7 +1230,7 @@ function HomeContent() {
       )}
 
       {/* ─── Main UI Overlay ─── */}
-      {!flyMode && !exploreMode && (
+      {!flyMode && !exploreMode && !introMode && (
         <div
           className="pointer-events-none fixed inset-0 z-20 flex flex-col items-center justify-between pt-12 pb-4 px-3 sm:py-8 sm:px-4"
           style={{
@@ -1119,6 +1261,14 @@ function HomeContent() {
                 >
                   @samuelrizzondev
                 </a>
+                {" "}·{" "}
+                <Link
+                  href="/advertise"
+                  className="transition-colors hover:text-cream"
+                  style={{ color: theme.accent }}
+                >
+                  Advertise
+                </Link>
               </p>
             </div>
 
@@ -1208,8 +1358,8 @@ function HomeContent() {
                 )}
               </div>
 
-              {/* Secondary actions: Shop + Auth */}
-              <div className="flex flex-wrap items-center justify-center gap-2">
+              {/* Nav links */}
+              <div className="flex items-center justify-center gap-2">
                 <Link
                   href={shopHref}
                   className="btn-press border-[3px] border-border bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
@@ -1217,6 +1367,17 @@ function HomeContent() {
                 >
                   Shop
                 </Link>
+                <Link
+                  href="/leaderboard"
+                  className="btn-press border-[3px] border-border bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+                  style={{ color: theme.accent }}
+                >
+                  &#9819; Leaderboard
+                </Link>
+              </div>
+
+              {/* Auth */}
+              <div className="flex items-center justify-center gap-2">
                 {!session ? (
                   <button
                     onClick={handleSignIn}
@@ -1255,16 +1416,6 @@ function HomeContent() {
                   </>
                 )}
               </div>
-
-              {isMobile && (
-                <a
-                  href="/leaderboard"
-                  className="btn-press border-[3px] border-border bg-bg-raised px-5 py-2 text-[10px] backdrop-blur-sm"
-                  style={{ color: theme.accent }}
-                >
-                  &#9819; Leaderboard
-                </a>
-              )}
             </div>
           )}
 
@@ -2035,7 +2186,7 @@ function HomeContent() {
       )}
 
       {/* ─── Bottom-left controls: Theme + Radio ─── */}
-      {!flyMode && (
+      {!flyMode && !introMode && !exploreMode && (
         <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex items-center gap-2 sm:left-4">
           <button
             onClick={() => setThemeIndex((i) => (i + 1) % THEMES.length)}
@@ -2046,6 +2197,14 @@ function HomeContent() {
             <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
           </button>
           <LofiRadio accent={theme.accent} shadow={theme.shadow} flyMode={flyMode} />
+          <button
+            onClick={replayIntro}
+            className="btn-press flex items-center gap-1 border-[3px] border-border bg-bg/70 px-2 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+            title="Replay intro"
+          >
+            <span style={{ color: theme.accent }}>&#9654;</span>
+            <span className="text-cream">Intro</span>
+          </button>
         </div>
       )}
       {flyMode && (
@@ -2056,7 +2215,7 @@ function HomeContent() {
 
 
       {/* ─── Activity Ticker ─── */}
-      {!flyMode && feedEvents.length >= 1 && (
+      {!flyMode && !introMode && feedEvents.length >= 1 && (
         <ActivityTicker
           events={feedEvents}
           onEventClick={(evt) => {

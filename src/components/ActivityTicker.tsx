@@ -43,6 +43,25 @@ function formatEvent(e: FeedEvent): string {
       return `\u{1F4C8} ${meta.login ? `@${meta.login}` : actor} climbed to #${meta.new_rank ?? "?"}`;
     case "leaderboard_change":
       return `\u{1F451} ${meta.login ? `@${meta.login}` : actor} entered top ${meta.position ?? 3}!`;
+    case "dev_highlight": {
+      const login = meta.login ? `@${meta.login}` : actor;
+      switch (meta.highlight) {
+        case "contributions":
+          return `#  ${login}'s building has ${Number(meta.value).toLocaleString()} contributions`;
+        case "stars":
+          return `*  ${login} has ${Number(meta.value).toLocaleString()} stars across their repos`;
+        case "rank":
+          return `>>  ${login} is ranked #${meta.value} in the city`;
+        case "streak":
+          return `~  ${login} is on a ${meta.value}-day commit streak`;
+        case "language":
+          return `<>  ${login} builds with ${meta.value}`;
+        case "repos":
+          return `{}  ${login} has ${meta.value} public repos`;
+        default:
+          return `${login} is in the city`;
+      }
+    }
     default:
       return `${actor} did something cool`;
   }
@@ -59,7 +78,7 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Pr
     return events.map((e) => ({ id: e.id, text: formatEvent(e), event: e }));
   }, [events]);
 
-  if (events.length < 3) return null;
+  if (events.length < 1) return null;
 
   return (
     <div

@@ -395,6 +395,14 @@ export async function GET(
       } : {}),
     };
 
+    // Check if this dev already exists (to detect new buildings)
+    const { data: existing } = await sb
+      .from("developers")
+      .select("id")
+      .eq("github_login", record.github_login)
+      .maybeSingle();
+    const isNewDev = !existing;
+
     const { data: upserted, error: upsertError } = await sb
       .from("developers")
       .upsert(record, { onConflict: "github_login" })
@@ -409,8 +417,17 @@ export async function GET(
       );
     }
 
-    // Snapshot current rank + top 3 before recalculation
+    // New building added to the city → feed event
     const devId = upserted?.id;
+    if (isNewDev && devId) {
+      await sb.from("activity_feed").insert({
+        event_type: "dev_joined",
+        actor_id: devId,
+        metadata: { login: record.github_login },
+      });
+    }
+
+    // Snapshot current rank + top 3 before recalculation
     const oldRank = upserted?.rank as number | null;
     const { data: oldTop3 } = await sb
       .from("developers")

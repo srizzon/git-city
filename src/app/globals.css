@@ -161,6 +161,12 @@ body {
   background: var(--color-border);
 }
 
+/* ─── Intro Confetti ─── */
+@keyframes introConfettiFall {
+  0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(100vh) rotate(720deg); }
+}
+
 .gift-cta {
   animation:
     gift-glow 2s ease-in-out infinite,

@@ -15,7 +15,7 @@ const LED_H = 48;
 const LED_DOT = 4;
 const LED_FONT = 32;
 const LED_VISIBLE = 256;
-const SCROLL_SPEED = 0.06;
+const SCROLL_SPEED = 0.25;
 
 function createLedTexture(text: string, color: string, bgColor: string) {
   const tmp = document.createElement("canvas");

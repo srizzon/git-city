@@ -14,8 +14,8 @@ import type { SkyAd } from "@/lib/skyAds";
 // ─── Theme Definitions ───────────────────────────────────────
 
 export const THEME_NAMES = [
-  "Sunset",
   "Midnight",
+  "Sunset",
   "Neon",
   "Emerald",
 ] as const;
@@ -56,7 +56,28 @@ interface CityTheme {
 }
 
 const THEMES: CityTheme[] = [
-  // 0 – Sunset
+  // 0 – Midnight
+  {
+    sky: [
+      [0, "#000206"], [0.15, "#020814"], [0.30, "#061428"], [0.45, "#0c2040"],
+      [0.55, "#102850"], [0.65, "#0c2040"], [0.80, "#061020"], [1, "#020608"],
+    ],
+    fogColor: "#0a1428", fogNear: 500, fogFar: 3500,
+    ambientColor: "#4060b0", ambientIntensity: 0.35,
+    sunColor: "#6080c0", sunIntensity: 0.45, sunPos: [300, 120, -200],
+    fillColor: "#304080", fillIntensity: 0.15, fillPos: [-200, 60, 200],
+    hemiSky: "#406080", hemiGround: "#182028", hemiIntensity: 0.3,
+    groundColor: "#242c38", grid1: "#344050", grid2: "#2c3848",
+    roadMarkingColor: "#8090a0",
+    sidewalkColor: "#484c58",
+    building: {
+      windowLit: ["#a0c0f0", "#80a0e0", "#6080c8", "#c0d8f8", "#e0e8ff"],
+      windowOff: "#0c0e18", face: "#101828", roof: "#2a3858",
+      accent: "#6090e0",
+    },
+    waterColor: "#0a1830", waterEmissive: "#0a2050", dockColor: "#3a2818",
+  },
+  // 1 – Sunset
   {
     sky: [
       [0, "#0c0614"], [0.15, "#1c0e30"], [0.28, "#3a1850"], [0.38, "#6a3060"],
@@ -77,27 +98,6 @@ const THEMES: CityTheme[] = [
       accent: "#c8e64a",
     },
     waterColor: "#1a2040", waterEmissive: "#102060", dockColor: "#4a3020",
-  },
-  // 1 – Midnight
-  {
-    sky: [
-      [0, "#000206"], [0.15, "#020814"], [0.30, "#061428"], [0.45, "#0c2040"],
-      [0.55, "#102850"], [0.65, "#0c2040"], [0.80, "#061020"], [1, "#020608"],
-    ],
-    fogColor: "#0a1428", fogNear: 500, fogFar: 3500,
-    ambientColor: "#4060b0", ambientIntensity: 0.35,
-    sunColor: "#6080c0", sunIntensity: 0.45, sunPos: [300, 120, -200],
-    fillColor: "#304080", fillIntensity: 0.15, fillPos: [-200, 60, 200],
-    hemiSky: "#406080", hemiGround: "#182028", hemiIntensity: 0.3,
-    groundColor: "#242c38", grid1: "#344050", grid2: "#2c3848",
-    roadMarkingColor: "#8090a0",
-    sidewalkColor: "#484c58",
-    building: {
-      windowLit: ["#a0c0f0", "#80a0e0", "#6080c8", "#c0d8f8", "#e0e8ff"],
-      windowOff: "#0c0e18", face: "#101828", roof: "#2a3858",
-      accent: "#6090e0",
-    },
-    waterColor: "#0a1830", waterEmissive: "#0a2050", dockColor: "#3a2818",
   },
   // 2 – Neon
   {
@@ -196,6 +196,90 @@ function PlaneModel() {
 }
 
 useGLTF.preload("/models/paper-plane.glb");
+
+// ─── Intro Flyover ──────────────────────────────────────────
+
+const INTRO_DURATION = 14; // seconds
+
+// Arc sweep: camera arcs ~180° around the city
+// Far left in fog -> descends through buildings -> rises for panoramic reveal
+const INTRO_WAYPOINTS: [number, number, number][] = [
+  [-1400, 400, 1600],  // WP0: Far, high, left - city hidden in fog
+  [-900,  320, 1100],  // WP1: Descending, silhouette appears
+  [-550,  280, 800],   // WP2: Ad plane level, buildings becoming clear
+  [-250,  240, 550],   // WP3: Skirting the city edge, above rooftops
+  [50,    220, 450],   // WP4: Alongside buildings, above skyline
+  [250,   330, 520],   // WP5: Rising, crossing to the right
+  [350,   400, 560],   // WP6: Dramatic pullback, city revealing
+  [400,   450, 600],   // WP7: Final orbit position (high panorama)
+];
+
+// Look targets smoothly converge toward city center
+const INTRO_LOOK_TARGETS: [number, number, number][] = [
+  [100,  60,  -200],  // WP0: Toward distant city center
+  [60,   50,  -100],  // WP1: Tracking center on approach
+  [30,   45,  -50],   // WP2: Narrowing in on buildings
+  [10,   40,  -20],   // WP3: Almost centered
+  [0,    35,  0],     // WP4: Dead center, between buildings
+  [0,    35,  0],     // WP5: Holding center as we rise
+  [0,    30,  0],     // WP6: Slight down for reveal drama
+  [0,    30,  0],     // WP7: Final orbit look target
+];
+
+// Smootherstep (Perlin): zero velocity AND zero acceleration at both ends
+function introEase(t: number): number {
+  const s = Math.max(0, Math.min(1, t));
+  return s * s * s * (s * (s * 6 - 15) + 10);
+}
+
+// Pre-allocated temp vectors for IntroFlyover (avoid GC in useFrame)
+const _introPos = new THREE.Vector3();
+const _introLook = new THREE.Vector3();
+
+function IntroFlyover({ onEnd }: { onEnd: () => void }) {
+  const { camera } = useThree();
+  const elapsed = useRef(0);
+  const ended = useRef(false);
+
+  // Build CatmullRom curves once; centripetal = no cusps on uneven spacing
+  const { posCurve, lookCurve } = useMemo(() => {
+    const posPoints = INTRO_WAYPOINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z));
+    const lookPoints = INTRO_LOOK_TARGETS.map(([x, y, z]) => new THREE.Vector3(x, y, z));
+    const posCurve = new THREE.CatmullRomCurve3(posPoints, false, 'centripetal');
+    const lookCurve = new THREE.CatmullRomCurve3(lookPoints, false, 'centripetal');
+    // Pre-compute arc-length tables so getPointAt() doesn't stutter on first call
+    posCurve.getLength();
+    lookCurve.getLength();
+    return { posCurve, lookCurve };
+  }, []);
+
+  useEffect(() => {
+    camera.position.set(...INTRO_WAYPOINTS[0]);
+    camera.lookAt(...INTRO_LOOK_TARGETS[0]);
+  }, [camera]);
+
+  useFrame((_, delta) => {
+    if (ended.current) return;
+    elapsed.current += delta;
+
+    const rawT = Math.min(elapsed.current / INTRO_DURATION, 1);
+    const t = introEase(rawT);
+
+    // getPointAt = arc-length parameterized = visually constant speed
+    posCurve.getPointAt(t, _introPos);
+    lookCurve.getPointAt(t, _introLook);
+
+    camera.position.copy(_introPos);
+    camera.lookAt(_introLook);
+
+    if (elapsed.current >= INTRO_DURATION && !ended.current) {
+      ended.current = true;
+      onEnd();
+    }
+  });
+
+  return null;
+}
 
 // ─── Camera Focus (controls OrbitControls target) ───────────
 
@@ -639,7 +723,7 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
 function CameraReset() {
   const { camera } = useThree();
   useEffect(() => {
-    camera.position.set(400, 350, 500);
+    camera.position.set(400, 450, 600);
     camera.lookAt(0, 30, 0);
   }, [camera]);
   return null;
@@ -1159,7 +1243,7 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB }: { building
 
   // Reset camera on mount
   useEffect(() => {
-    camera.position.set(400, 350, 500);
+    camera.position.set(400, 450, 600);
     camera.lookAt(0, 30, 0);
   }, [camera]);
 
@@ -1205,9 +1289,11 @@ interface Props {
   skyAds?: SkyAd[];
   onAdClick?: (ad: SkyAd) => void;
   onAdViewed?: (adId: string) => void;
+  introMode?: boolean;
+  onIntroEnd?: () => void;
 }
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
 
   const cityRadius = useMemo(() => {
@@ -1221,7 +1307,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
   return (
     <Canvas
-      camera={{ position: [400, 350, 500], fov: 55, near: 0.5, far: 4000 }}
+      camera={{ position: [400, 450, 600], fov: 55, near: 0.5, far: 4000 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
@@ -1234,11 +1320,13 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
 
-      {!flyMode && (
+      {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => {})} />}
+
+      {!introMode && !flyMode && (
         <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} />
       )}
 
-      {flyMode && <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => {})} onPause={onPause ?? (() => {})} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} />}
+      {!introMode && flyMode && <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => {})} onPause={onPause ?? (() => {})} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} />}
 
       <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />
 

@@ -104,7 +104,7 @@ export const DEFAULT_SKY_ADS: SkyAd[] = [
     description: "Want your brand flying over Git City? Planes, blimps, your colors. Get in touch!",
     color: "#f8d880",
     bgColor: "#1a1018",
-    link: "mailto:samuelrizzondev@gmail.com?subject=Git%20City%20Sky%20Ad",
+    link: "https://thegitcity.com/advertise",
     vehicle: "plane",
     priority: 10,
   },
