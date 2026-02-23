@@ -23,6 +23,7 @@ import {
   LightningAura,
   LEDBanner,
 } from "./BuildingEffects";
+import { ClaimedGlow } from "./Building3D";
 import type { BuildingDims } from "./ShopClient";
 import { ZONE_ITEMS } from "@/lib/zones";
 
@@ -31,44 +32,70 @@ const ACCENT = "#c8e64a";
 // Fallback dims if none provided
 const DEFAULT_DIMS: BuildingDims = { width: 20, height: 40, depth: 16 };
 
-// ─── Procedural window texture (pixel look) ──────────────────
+// ─── City-matching theme colors (Midnight) ───────────────────
+const THEME = {
+  windowLit: ["#a0c0f0", "#80a0e0", "#6080c8", "#c0d8f8", "#e0e8ff"],
+  windowOff: "#0c0e18",
+  face: "#101828",
+  roof: "#2a3858",
+  fogColor: "#0a1428",
+  ambientColor: "#4060b0",
+  sunColor: "#6080c0",
+  fillColor: "#304080",
+  groundColor: "#242c38",
+};
 
-function useWindowTexture() {
-  return useMemo(() => {
-    const size = 64;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d")!;
+// ─── Procedural window texture (matching city style) ─────────
 
-    ctx.fillStyle = "#2a2a3e";
-    ctx.fillRect(0, 0, size, size);
+function createPreviewWindowTexture(
+  rows: number,
+  cols: number,
+  seed: number,
+  faceColor?: string | null
+): THREE.CanvasTexture {
+  const WS = 6;
+  const GAP = 2;
+  const PAD = 3;
 
-    const cols = 4;
-    const rows = 8;
-    const winW = 6;
-    const winH = 4;
-    const gapX = (size - cols * winW) / (cols + 1);
-    const gapY = (size - rows * winH) / (rows + 1);
+  const w = PAD * 2 + cols * WS + Math.max(0, cols - 1) * GAP;
+  const h = PAD * 2 + rows * WS + Math.max(0, rows - 1) * GAP;
 
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const lit = Math.random() > 0.35;
-        ctx.fillStyle = lit ? "#e8e8a0" : "#1a1a2a";
-        const x = gapX + c * (winW + gapX);
-        const y = gapY + r * (winH + gapY);
-        ctx.fillRect(Math.round(x), Math.round(y), winW, winH);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = faceColor || THEME.face;
+  ctx.fillRect(0, 0, w, h);
+
+  let s = seed;
+  const rand = () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+
+  const litPct = 0.65;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = PAD + c * (WS + GAP);
+      const y = PAD + r * (WS + GAP);
+      if (rand() < litPct) {
+        ctx.fillStyle = THEME.windowLit[Math.floor(rand() * THEME.windowLit.length)];
+      } else {
+        ctx.fillStyle = THEME.windowOff;
       }
+      ctx.fillRect(x, y, WS, WS);
     }
+  }
 
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.magFilter = THREE.NearestFilter;
-    tex.minFilter = THREE.NearestFilter;
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    return tex;
-  }, []);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
+
+const WHITE = new THREE.Color("#ffffff");
 
 // ─── Effect renderer map ─────────────────────────────────────
 
@@ -121,13 +148,13 @@ function EffectForItem({
   }
 }
 
-// ─── Ground grid ─────────────────────────────────────────────
+// ─── Ground ──────────────────────────────────────────────────
 
 function Ground({ y, size }: { y: number; size: number }) {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} receiveShadow>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]}>
       <planeGeometry args={[size, size]} />
-      <meshStandardMaterial color="#111118" />
+      <meshStandardMaterial color={THEME.groundColor} />
     </mesh>
   );
 }
@@ -157,14 +184,51 @@ function ShopPreviewScene({
 }) {
   const { width: W, height: H, depth: D } = dims;
   const groupRef = useRef<THREE.Group>(null);
-  const texture = useWindowTexture();
 
-  // Custom color: use picked/saved color, or accent demo on hover, or no tint
-  const tint = useMemo(() => {
+  // Compute window grid from building dims (matching city logic)
+  const floors = Math.max(2, Math.round(H / 5));
+  const windowsPerFloor = Math.max(2, Math.round(W / 5));
+  const sideWindowsPerFloor = Math.max(2, Math.round(D / 5));
+
+  // Custom color: baked into the texture face color (same as city)
+  const faceColor = useMemo(() => {
     if (customColor) return customColor;
     if (highlightItemId === "custom_color") return ACCENT;
-    return "#ffffff";
+    return null;
   }, [highlightItemId, customColor]);
+
+  // City-matching per-face textures (regenerated when custom color changes)
+  const textures = useMemo(() => {
+    const seed = 42 * 137; // deterministic for preview
+    const front = createPreviewWindowTexture(floors, windowsPerFloor, seed, faceColor);
+    const side = createPreviewWindowTexture(floors, sideWindowsPerFloor, seed + 7919, faceColor);
+    return { front, side };
+  }, [floors, windowsPerFloor, sideWindowsPerFloor, faceColor]);
+
+  // 6-material array matching city Building3D: [side, side, roof, roof, front, front]
+  const materials = useMemo(() => {
+    const roofColor = new THREE.Color(THEME.roof);
+    const roof = new THREE.MeshStandardMaterial({
+      color: roofColor,
+      emissive: roofColor,
+      emissiveIntensity: 1.5,
+      roughness: 0.6,
+    });
+
+    const makeFace = (tex: THREE.CanvasTexture) =>
+      new THREE.MeshStandardMaterial({
+        map: tex,
+        emissive: WHITE.clone(),
+        emissiveMap: tex,
+        emissiveIntensity: 2.0,
+        roughness: 0.85,
+        metalness: 0,
+      });
+
+    const side = makeFace(textures.side);
+    const front = makeFace(textures.front);
+    return [side, side, roof, roof, front, front];
+  }, [textures]);
 
   // Gentle idle bob
   useFrame((state) => {
@@ -176,9 +240,13 @@ function ShopPreviewScene({
 
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[30, 60, 20]} intensity={1.2} />
-      <directionalLight position={[-20, 30, -10]} intensity={0.3} color="#6677aa" />
+      {/* City-matching lighting (Midnight theme, multiplied like CityCanvas) */}
+      <ambientLight intensity={0.35 * 3} color={THEME.ambientColor} />
+      <directionalLight position={[300, 120, -200]} intensity={0.45 * 3.5} color={THEME.sunColor} />
+      <directionalLight position={[-200, 60, 200]} intensity={0.15 * 3} color={THEME.fillColor} />
+
+      {/* Subtle fog for atmosphere */}
+      <fog attach="fog" args={[THEME.fogColor, 200, 600]} />
 
       <OrbitControls
         autoRotate
@@ -195,22 +263,21 @@ function ShopPreviewScene({
       <Ground y={-H / 2} size={groundSize} />
 
       <group ref={groupRef}>
-        {/* Building centered at origin */}
-        <mesh position={[0, 0, 0]}>
+        {/* Building centered at origin, multi-material like city */}
+        <mesh position={[0, 0, 0]} material={materials}>
           <boxGeometry args={[W, H, D]} />
-          <meshStandardMaterial
-            key={tint}
-            map={texture}
-            color={tint}
-          />
         </mesh>
+
+        {/* Claimed glow (neon trim around roofline) */}
+        <group position={[0, -H / 2, 0]}>
+          <ClaimedGlow height={H} width={W} depth={D} />
+        </group>
 
         {/* Effects use y=0 as ground, so offset them */}
         <group position={[0, -H / 2, 0]}>
           {/* Zone items: highlight replaces equipped item in the same zone */}
           {(["crown", "roof", "aura"] as const).map((zone) => {
             const equipped = loadout[zone];
-            // If highlight belongs to this zone, show it instead of equipped
             const highlightInZone = highlightItemId && ZONE_ITEMS[zone]?.includes(highlightItemId);
             const showId = highlightInZone ? highlightItemId : equipped;
             return showId ? <EffectForItem key={zone} itemId={showId} dims={dims} /> : null;
@@ -251,12 +318,13 @@ export default function ShopPreview({
   const camDist = Math.max(60, dims.height * 1.5);
 
   return (
-    <div className="relative border-[3px] border-border bg-bg-card">
+    <div className="relative border-[3px] border-border" style={{ backgroundColor: THEME.fogColor }}>
       <div className="h-[280px] sm:h-[360px] lg:h-[520px]">
         <Canvas
           camera={{ position: [0, camDist * 0.4, camDist], fov: 45 }}
           gl={{ antialias: false }}
         >
+          <color attach="background" args={[THEME.fogColor]} />
           <ShopPreviewScene
             loadout={loadout}
             ownedFacesItems={ownedFacesItems}

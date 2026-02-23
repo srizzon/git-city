@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { autoEquipIfSolo } from "@/lib/items";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,10 @@ export async function POST(request: Request) {
             .single();
 
           if (fullPurchase) {
+            // Auto-equip if solo item in zone
+            const itemOwner = fullPurchase.gifted_to ?? fullPurchase.developer_id;
+            await autoEquipIfSolo(itemOwner, fullPurchase.item_id);
+
             const { data: dev } = await sb
               .from("developers")
               .select("github_login")

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { autoEquipIfSolo } from "@/lib/items";
 import type Stripe from "stripe";
 
 // Disable body parsing — Stripe needs raw body for signature verification
@@ -65,9 +66,13 @@ export async function POST(request: Request) {
             })
             .eq("id", pending.id);
 
+          // Auto-equip if solo item in zone
+          const giftedTo = session.metadata?.gifted_to;
+          const ownerId = giftedTo ? Number(giftedTo) : Number(developerId);
+          await autoEquipIfSolo(ownerId, itemId);
+
           // Insert feed event
           const githubLogin = session.metadata?.github_login;
-          const giftedTo = session.metadata?.gifted_to;
           if (giftedTo) {
             // Fetch receiver login for feed event
             const { data: receiver } = await sb
@@ -113,6 +118,7 @@ export async function POST(request: Request) {
               currency: session.currency ?? "usd",
               status: "completed",
             });
+            await autoEquipIfSolo(ownerId, itemId);
           }
         }
         break;

@@ -352,7 +352,7 @@ function HomeContent() {
   const [comparePair, setComparePair] = useState<[CityBuilding, CityBuilding] | null>(null);
   const [compareSelfHint, setCompareSelfHint] = useState(false);
   const [giftModalOpen, setGiftModalOpen] = useState(false);
-  const [giftItems, setGiftItems] = useState<{ id: string; price_usd_cents: number }[] | null>(null);
+  const [giftItems, setGiftItems] = useState<{ id: string; price_usd_cents: number; owned: boolean }[] | null>(null);
   const [giftBuying, setGiftBuying] = useState<string | null>(null);
   const [compareCopied, setCompareCopied] = useState(false);
   const [compareLang, setCompareLang] = useState<"en" | "pt">("en");
@@ -504,7 +504,8 @@ function HomeContent() {
       const receiverOwned = new Set(selectedBuilding.owned_items ?? []);
       const NON_GIFTABLE = new Set(["flag", "custom_color"]);
       const available = (items as { id: string; price_usd_cents: number; category: string }[])
-        .filter((i) => i.price_usd_cents > 0 && !receiverOwned.has(i.id) && !NON_GIFTABLE.has(i.id));
+        .filter((i) => i.price_usd_cents > 0 && !NON_GIFTABLE.has(i.id))
+        .map((i) => ({ ...i, owned: receiverOwned.has(i.id) }));
       setGiftItems(available);
     } catch { /* ignore */ }
   }, [selectedBuilding, session]);
@@ -633,6 +634,17 @@ function HomeContent() {
     }
 
     loadCity();
+  }, [reloadCity]);
+
+  // Reload city with cache bust when returning from another page (e.g. shop)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && didInit.current) {
+        reloadCity(true);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [reloadCity]);
 
   // ─── Intro text phase timing (14s total) ─────────────────────
@@ -2262,7 +2274,7 @@ function HomeContent() {
               </p>
             ) : giftItems.length === 0 ? (
               <p className="py-8 text-center text-[9px] text-dim normal-case">
-                Already owns everything!
+                No items available
               </p>
             ) : (
               <div className="max-h-72 overflow-y-auto scrollbar-thin">
@@ -2271,16 +2283,16 @@ function HomeContent() {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => handleGiftCheckout(item.id)}
-                      disabled={!!giftBuying}
-                      className="flex w-full items-center gap-3 border-b border-border/30 px-4 py-2.5 text-left transition-colors hover:bg-bg-card/80 disabled:opacity-40"
+                      onClick={() => !item.owned && handleGiftCheckout(item.id)}
+                      disabled={!!giftBuying || item.owned}
+                      className={`flex w-full items-center gap-3 border-b border-border/30 px-4 py-2.5 text-left transition-colors ${item.owned ? "opacity-35 cursor-not-allowed" : "hover:bg-bg-card/80 disabled:opacity-40"}`}
                     >
                       <span className="text-base shrink-0">{ITEM_EMOJIS[item.id] ?? "🎁"}</span>
                       <span className="flex-1 text-[10px] text-cream">
                         {ITEM_NAMES[item.id] ?? item.id}
                       </span>
-                      <span className="text-[10px] shrink-0" style={{ color: theme.accent }}>
-                        {isBuying ? "..." : `$${(item.price_usd_cents / 100).toFixed(2)}`}
+                      <span className="text-[10px] shrink-0" style={{ color: item.owned ? undefined : theme.accent }}>
+                        {item.owned ? "Owned" : isBuying ? "..." : `$${(item.price_usd_cents / 100).toFixed(2)}`}
                       </span>
                     </button>
                   );

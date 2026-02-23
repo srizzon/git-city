@@ -306,43 +306,51 @@ function PixModal({
 function ColorPickerPanel({
   currentColor,
   isOwned,
-  onColorChange,
-  onSaved,
+  onPreview,
+  onSave,
+  onRemove,
 }: {
   currentColor: string | null;
   isOwned: boolean;
-  onColorChange: (color: string) => void;
-  onSaved: (color: string) => void;
+  onPreview: (color: string | null) => void;
+  onSave: (color: string) => Promise<boolean>;
+  onRemove: () => Promise<boolean>;
 }) {
   const [color, setColor] = useState(currentColor || ACCENT);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [feedback, setFeedback] = useState<"saved" | "removed" | null>(null);
+
+  // Sync internal state when saved color changes externally (e.g. after remove)
+  useEffect(() => {
+    setColor(currentColor || ACCENT);
+  }, [currentColor]);
 
   const handleChange = (newColor: string) => {
     setColor(newColor);
-    onColorChange(newColor);
+    onPreview(newColor);
   };
 
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     setSaving(true);
-    setSaved(false);
-    try {
-      const res = await fetch("/api/customizations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ item_id: "custom_color", color }),
-      });
-      if (res.ok) {
-        onSaved(color);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setSaving(false);
+    setFeedback(null);
+    const ok = await onSave(color);
+    setSaving(false);
+    if (ok) {
+      setFeedback("saved");
+      setTimeout(() => setFeedback(null), 2000);
     }
-  }, [color, onSaved]);
+  };
+
+  const handleRemove = async () => {
+    setSaving(true);
+    setFeedback(null);
+    const ok = await onRemove();
+    setSaving(false);
+    if (ok) {
+      setFeedback("removed");
+      setTimeout(() => setFeedback(null), 2000);
+    }
+  };
 
   return (
     <div className="mt-2 flex items-center gap-3 border-[2px] border-border/50 bg-bg/50 px-3 py-2">
@@ -354,17 +362,28 @@ function ColorPickerPanel({
       />
       <span className="text-[10px] text-muted normal-case">{color}</span>
       {isOwned ? (
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="btn-press ml-auto px-3 py-1 text-[10px] text-bg disabled:opacity-40"
-          style={{
-            backgroundColor: saved ? "#39d353" : ACCENT,
-            boxShadow: `2px 2px 0 0 ${SHADOW}`,
-          }}
-        >
-          {saving ? "..." : saved ? "Saved!" : "Save"}
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          {currentColor && (
+            <button
+              onClick={handleRemove}
+              disabled={saving}
+              className="border-[2px] border-border px-2 py-1 text-[10px] text-muted hover:text-cream disabled:opacity-40"
+            >
+              {feedback === "removed" ? "Removed!" : "Remove"}
+            </button>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-press px-3 py-1 text-[10px] text-bg disabled:opacity-40"
+            style={{
+              backgroundColor: feedback === "saved" ? "#39d353" : ACCENT,
+              boxShadow: `2px 2px 0 0 ${SHADOW}`,
+            }}
+          >
+            {saving ? "..." : feedback === "saved" ? "Saved!" : "Save"}
+          </button>
+        </div>
       ) : (
         <span className="ml-auto text-[9px] text-dim normal-case">Preview only</span>
       )}
@@ -1175,8 +1194,37 @@ export default function ShopClient({
               <ColorPickerPanel
                 currentColor={customColor}
                 isOwned={owned.includes("custom_color")}
-                onColorChange={(c) => setPreviewColor(c)}
-                onSaved={(c) => { setCustomColor(c); setPreviewColor(null); }}
+                onPreview={(c) => setPreviewColor(c)}
+                onSave={async (c) => {
+                  try {
+                    const res = await fetch("/api/customizations", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ item_id: "custom_color", color: c }),
+                    });
+                    if (res.ok) {
+                      setCustomColor(c);
+                      setPreviewColor(null);
+                      return true;
+                    }
+                  } catch { /* ignore */ }
+                  return false;
+                }}
+                onRemove={async () => {
+                  try {
+                    const res = await fetch("/api/customizations", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ item_id: "custom_color", color: null }),
+                    });
+                    if (res.ok) {
+                      setCustomColor(null);
+                      setPreviewColor(null);
+                      return true;
+                    }
+                  } catch { /* ignore */ }
+                  return false;
+                }}
               />
             )}
 

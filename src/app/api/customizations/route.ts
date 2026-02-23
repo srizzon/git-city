@@ -86,7 +86,7 @@ export async function POST(request: Request) {
   }
 
   // Parse body
-  let body: { item_id: string; color?: string };
+  let body: { item_id: string; color?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -118,12 +118,33 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate hex color
-  if (!color || !/^#[0-9a-fA-F]{6}$/.test(color)) {
-    return NextResponse.json(
-      { error: "Invalid hex color (use #RRGGBB)" },
-      { status: 400 }
-    );
+  // null = remove color, otherwise validate hex
+  if (color !== null && color !== undefined) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+      return NextResponse.json(
+        { error: "Invalid hex color (use #RRGGBB)" },
+        { status: 400 }
+      );
+    }
+  }
+
+  if (color === null) {
+    // Remove customization
+    const { error: deleteError } = await sb
+      .from("developer_customizations")
+      .delete()
+      .eq("developer_id", dev.id)
+      .eq("item_id", "custom_color");
+
+    if (deleteError) {
+      console.error("Delete error:", deleteError);
+      return NextResponse.json(
+        { error: "Failed to remove customization" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, color: null });
   }
 
   // Upsert customization

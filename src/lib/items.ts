@@ -80,6 +80,61 @@ export async function grantFreeClaimItem(
   return true;
 }
 
+/**
+ * Auto-equip an item if the developer has only one item in its zone.
+ * Called after a purchase is completed (buy or gift).
+ */
+export async function autoEquipIfSolo(
+  developerId: number,
+  itemId: string
+): Promise<void> {
+  const { ZONE_ITEMS } = await import("./zones");
+
+  // Find which zone this item belongs to
+  let zone: string | null = null;
+  for (const [z, ids] of Object.entries(ZONE_ITEMS)) {
+    if (ids.includes(itemId)) { zone = z; break; }
+  }
+  if (!zone) return; // faces or unknown zone, skip
+
+  const sb = getSupabaseAdmin();
+
+  // Get all owned items in this zone
+  const { data: purchases } = await sb
+    .from("purchases")
+    .select("item_id")
+    .eq("developer_id", developerId)
+    .eq("status", "completed");
+
+  const zoneItems = ZONE_ITEMS[zone];
+  const ownedInZone = (purchases ?? [])
+    .map((p) => p.item_id)
+    .filter((id) => zoneItems.includes(id));
+
+  if (ownedInZone.length !== 1) return; // 0 or 2+ items, don't auto-equip
+
+  // Get current loadout
+  const { data: existing } = await sb
+    .from("developer_customizations")
+    .select("config")
+    .eq("developer_id", developerId)
+    .eq("item_id", "loadout")
+    .maybeSingle();
+
+  const config = (existing?.config ?? { crown: null, roof: null, aura: null }) as Record<string, string | null>;
+  config[zone] = itemId;
+
+  await sb.from("developer_customizations").upsert(
+    {
+      developer_id: developerId,
+      item_id: "loadout",
+      config,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "developer_id,item_id" }
+  );
+}
+
 export async function getOwnedItemsForDevelopers(
   developerIds: number[]
 ): Promise<Record<number, string[]>> {

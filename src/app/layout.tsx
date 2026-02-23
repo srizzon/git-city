@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
@@ -96,6 +97,21 @@ export default function RootLayout({
         {children}
         <Analytics />
         <SpeedInsights />
+        <Script
+          src="https://cdn.himetrica.com/tracker.js"
+          data-api-key="hm_6d3bb5506afa0eb4ad5f2081eb6fdc1888573a7b60e2938e"
+          strategy="afterInteractive"
+        />
+        <Script
+          src="https://cdn.himetrica.com/vitals.js"
+          data-api-key="hm_6d3bb5506afa0eb4ad5f2081eb6fdc1888573a7b60e2938e"
+          strategy="afterInteractive"
+        />
+        <Script
+          src="https://cdn.himetrica.com/errors.js"
+          data-api-key="hm_6d3bb5506afa0eb4ad5f2081eb6fdc1888573a7b60e2938e"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
