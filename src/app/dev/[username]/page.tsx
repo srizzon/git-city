@@ -11,6 +11,7 @@ import ClaimButton from "@/components/ClaimButton";
 import ShareButtons from "@/components/ShareButtons";
 import CompareChallenge from "@/components/CompareChallenge";
 import ReferralCTA from "@/components/ReferralCTA";
+import ProfileTracker from "@/components/ProfileTracker";
 
 export const revalidate = 3600; // ISR: regenerate every 1 hour
 
@@ -135,6 +136,7 @@ export default async function DevPage({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
+      <ProfileTracker login={dev.github_login} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(profileJsonLd) }}

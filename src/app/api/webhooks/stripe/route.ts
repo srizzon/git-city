@@ -118,7 +118,7 @@ export async function POST(request: Request) {
               currency: session.currency ?? "usd",
               status: "completed",
             });
-            await autoEquipIfSolo(ownerId, itemId);
+            await autoEquipIfSolo(Number(developerId), itemId);
           }
         }
         break;

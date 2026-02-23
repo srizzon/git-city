@@ -12,6 +12,14 @@ import {
   FACES_ITEMS,
   ACHIEVEMENT_ITEMS,
 } from "@/lib/zones";
+import {
+  trackShopPageView,
+  trackShopItemViewed,
+  trackCheckoutStarted,
+  trackPurchaseCompleted,
+  trackFreeItemClaimed,
+  trackItemEquipped,
+} from "@/lib/himetrica";
 
 /** Must match FREE_CLAIM_ITEM in lib/items.ts */
 const FREE_CLAIM_ITEM = "flag";
@@ -157,6 +165,7 @@ function PixModal({
         if (!res.ok) return;
         const json = await res.json();
         if (json.status === "completed") {
+          trackPurchaseCompleted(data.itemId, 0, "abacatepay");
           setStatus("completed");
         }
       } catch {
@@ -601,9 +610,16 @@ export default function ShopClient({
   const [autoUploading, setAutoUploading] = useState(false);
   const [purchaseToast, setPurchaseToast] = useState<string | null>(purchasedItem);
 
+  // Track shop page view on mount
+  useEffect(() => {
+    trackShopPageView();
+  }, []);
+
   // Post-purchase: show toast + auto-equip if zone is empty
   useEffect(() => {
     if (!purchasedItem) return;
+    const shopItem = items.find((i) => i.id === purchasedItem);
+    trackPurchaseCompleted(purchasedItem, shopItem?.price_usd_cents ?? 0, "stripe");
     // Clear toast after 5s
     const timer = setTimeout(() => setPurchaseToast(null), 5000);
     // Auto-equip if the item belongs to a zone and that zone is empty
@@ -685,6 +701,7 @@ export default function ShopClient({
   // ─── Handlers ─────────────────────────────────────────────
 
   const handleEquip = useCallback((zone: keyof Loadout, itemId: string) => {
+    trackItemEquipped(itemId, zone);
     setLoadout((prev) => ({ ...prev, [zone]: itemId }));
     setHasChanges(true);
     setSaved(false);
@@ -743,6 +760,7 @@ export default function ShopClient({
         return;
       }
 
+      trackFreeItemClaimed();
       setOwned((prev) =>
         prev.includes(FREE_CLAIM_ITEM) ? prev : [...prev, FREE_CLAIM_ITEM]
       );
@@ -758,6 +776,9 @@ export default function ShopClient({
       if (buyingItem) return;
       setBuyingItem(itemId);
       setError(null);
+
+      const shopItem = items.find((i) => i.id === itemId);
+      trackCheckoutStarted(itemId, "stripe", shopItem?.price_usd_cents ?? 0, false);
 
       try {
         const res = await fetch("/api/checkout", {
@@ -1008,10 +1029,9 @@ export default function ShopClient({
                       } else if (isFreeItem) {
                         claimFreeItem();
                       } else if (shopItem && shopItem.price_usd_cents > 0) {
-                        // Toggle confirm popover instead of going straight to checkout
+                        if (!isConfirming) trackShopItemViewed(itemId, zone, shopItem.price_usd_cents);
                         setConfirmBuyItem(isConfirming ? null : itemId);
                       }
-                      // Achievement-only locked items: no action (just hint)
                     };
 
                     return (

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { AdvertisePageTracker, AdvertiseCtaLink } from "./tracking";
 
 const ACCENT = "#c8e64a";
 const SHADOW = "#5a7a00";
@@ -59,6 +60,8 @@ export default async function AdvertisePage() {
           &larr; Back to City
         </Link>
 
+        <AdvertisePageTracker />
+
         {/* Hero */}
         <section className="mt-10 text-center">
           <h1 className="text-3xl text-cream md:text-4xl">
@@ -69,7 +72,7 @@ export default async function AdvertisePage() {
             {devCount.toLocaleString()}+ developers see your brand flying over
             the city. Planes, blimps, LED banners, full analytics.
           </p>
-          <a
+          <AdvertiseCtaLink
             href={MAILTO}
             className="btn-press mt-6 inline-block px-7 py-3.5 text-sm text-bg"
             style={{
@@ -78,7 +81,7 @@ export default async function AdvertisePage() {
             }}
           >
             Get Started
-          </a>
+          </AdvertiseCtaLink>
         </section>
 
         {/* How it works */}
@@ -227,7 +230,7 @@ export default async function AdvertisePage() {
           <p className="mt-3 text-[10px] text-muted normal-case">
             Send us an email and we&apos;ll get your brand in the sky.
           </p>
-          <a
+          <AdvertiseCtaLink
             href={MAILTO}
             className="btn-press mt-6 inline-block px-7 py-3.5 text-sm text-bg"
             style={{
@@ -236,7 +239,7 @@ export default async function AdvertisePage() {
             }}
           >
             Get in Touch
-          </a>
+          </AdvertiseCtaLink>
           <p className="mt-4 text-[10px] text-muted normal-case">
             samuelrizzondev@gmail.com
           </p>

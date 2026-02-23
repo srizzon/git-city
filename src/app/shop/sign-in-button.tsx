@@ -1,9 +1,11 @@
 "use client";
 
 import { createBrowserSupabase } from "@/lib/supabase";
+import { trackSignInClicked } from "@/lib/himetrica";
 
 export default function SignInButton({ accent }: { accent: string }) {
   const handleSignIn = async () => {
+    trackSignInClicked("shop");
     const supabase = createBrowserSupabase();
     await supabase.auth.signInWithOAuth({
       provider: "github",

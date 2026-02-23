@@ -21,6 +21,20 @@ import LofiRadio from "@/components/LofiRadio";
 import { ITEM_NAMES, ITEM_EMOJIS } from "@/lib/zones";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
+import {
+  identifyUser,
+  trackSignInClicked,
+  trackBuildingClaimed,
+  trackFreeItemClaimed,
+  trackBuildingClicked,
+  trackKudosSent,
+  trackSearchUsed,
+  trackSkyAdImpression,
+  trackSkyAdClick,
+  trackSkyAdCtaClick,
+  trackReferralLinkLanded,
+  trackShareClicked,
+} from "@/lib/himetrica";
 
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
   ssr: false,
@@ -387,9 +401,19 @@ function HomeContent() {
   // Auth state listener
   useEffect(() => {
     const supabase = createBrowserSupabase();
-    supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => setSession(s));
+    supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
+      setSession(s);
+      if (s) {
+        const login = (s.user?.user_metadata?.user_name ?? s.user?.user_metadata?.preferred_username ?? "").toLowerCase();
+        if (login) identifyUser({ github_login: login, email: s.user?.email ?? undefined });
+      }
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, s: Session | null) => {
       setSession(s);
+      if (s) {
+        const login = (s.user?.user_metadata?.user_name ?? s.user?.user_metadata?.preferred_username ?? "").toLowerCase();
+        if (login) identifyUser({ github_login: login, email: s.user?.email ?? undefined });
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -404,6 +428,7 @@ function HomeContent() {
   useEffect(() => {
     const ref = searchParams.get("ref");
     if (ref) {
+      trackReferralLinkLanded(ref);
       try {
         localStorage.setItem("gc_ref", JSON.stringify({ login: ref, expires: Date.now() + 7 * 86400000 }));
       } catch { /* ignore */ }
@@ -412,6 +437,7 @@ function HomeContent() {
 
   // Forward ref from localStorage to auth callback URL
   const handleSignInWithRef = useCallback(async () => {
+    trackSignInClicked("city");
     const supabase = createBrowserSupabase();
     let redirectTo = `${window.location.origin}/auth/callback`;
     try {
@@ -477,6 +503,7 @@ function HomeContent() {
         body: JSON.stringify({ receiver_login: selectedBuilding.login }),
       });
       if (res.ok) {
+        trackKudosSent(selectedBuilding.login);
         setKudosSent(true);
         // Increment kudos_count locally
         const newCount = (selectedBuilding.kudos_count ?? 0) + 1;
@@ -756,6 +783,8 @@ function HomeContent() {
     const trimmed = username.trim().toLowerCase();
     if (!trimmed) return;
 
+    trackSearchUsed(trimmed);
+
     // Check if this username already failed with a permanent error
     const cachedError = failedUsernamesRef.current.get(trimmed);
     if (cachedError) {
@@ -873,6 +902,7 @@ function HomeContent() {
     try {
       const res = await fetch("/api/claim", { method: "POST" });
       if (res.ok) {
+        trackBuildingClaimed(authLogin);
         await reloadCity();
       }
     } finally {
@@ -885,6 +915,7 @@ function HomeContent() {
     try {
       const res = await fetch("/api/claim-free-item", { method: "POST" });
       if (res.ok) {
+        trackFreeItemClaimed();
         await reloadCity();
         setGiftClaimed(true);
       }
@@ -934,13 +965,19 @@ function HomeContent() {
         skyAds={skyAds}
         onAdClick={(ad) => {
           trackAdEvent(ad.id, "click", authLogin || undefined);
+          trackSkyAdClick(ad.id, ad.vehicle, ad.link);
           setClickedAd(ad);
         }}
-        onAdViewed={(adId) => trackAdEvent(adId, "impression", authLogin || undefined)}
+        onAdViewed={(adId) => {
+          trackAdEvent(adId, "impression", authLogin || undefined);
+          const ad = skyAds.find(a => a.id === adId);
+          if (ad) trackSkyAdImpression(ad.id, ad.vehicle, ad.brand);
+        }}
         introMode={introMode}
         onIntroEnd={endIntro}
         onFocusInfo={() => {}}
         onBuildingClick={(b) => {
+          trackBuildingClicked(b.login);
           // Compare pick mode: clicking a second building completes the pair
           if (compareBuilding && !comparePair) {
             if (b.login.toLowerCase() === compareBuilding.login.toLowerCase()) {
@@ -2084,6 +2121,7 @@ function HomeContent() {
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackShareClicked("x")}
                 className="btn-press border-[3px] border-border px-4 py-2 text-[10px] text-cream transition-colors hover:border-border-light"
               >
                 Share on X
@@ -2091,6 +2129,7 @@ function HomeContent() {
 
               <button
                 onClick={() => {
+                  trackShareClicked("copy_link");
                   navigator.clipboard.writeText(
                     `${window.location.origin}/dev/${shareData.login}`
                   );
@@ -2182,6 +2221,7 @@ function HomeContent() {
                       onClick={() => {
                         track("sky_ad_click", { ad_id: clickedAd.id, vehicle: clickedAd.vehicle, brand: clickedAd.brand ?? "" });
                         trackAdEvent(clickedAd.id, "cta_click", authLogin || undefined);
+                        trackSkyAdCtaClick(clickedAd.id, clickedAd.vehicle);
                       }}
                     >
                       {isMailto
