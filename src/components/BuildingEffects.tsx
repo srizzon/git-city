@@ -64,6 +64,7 @@ export function ParticleAura({
   color?: string;
 }) {
   const pointsRef = useRef<THREE.Points>(null);
+  const frameCount = useRef(0);
 
   const { positions, speeds } = useMemo(() => {
     const pos = new Float32Array(AURA_COUNT * 3);
@@ -83,16 +84,17 @@ export function ParticleAura({
 
   useFrame((state) => {
     if (!pointsRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 2 !== 0) return;
     const posAttr = pointsRef.current.geometry.attributes.position;
     const arr = posAttr.array as Float32Array;
     const t = state.clock.elapsedTime;
 
     for (let i = 0; i < AURA_COUNT; i++) {
-      arr[i * 3 + 1] += speeds[i] * 0.016;
+      arr[i * 3 + 1] += speeds[i] * 0.032; // 2x dt to compensate skip
       if (arr[i * 3 + 1] > height * 1.2) {
         arr[i * 3 + 1] = 0;
       }
-      // Gentle horizontal drift
       arr[i * 3] += Math.sin(t + i) * 0.02;
       arr[i * 3 + 2] += Math.cos(t + i * 0.7) * 0.02;
     }
@@ -135,14 +137,16 @@ export function SpotlightEffect({
 }) {
   const beam1 = useRef<THREE.Group>(null);
   const beam2 = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
 
   const beamH = height * 3;
   const topR = Math.max(width, depth) * 0.4;
   const spread = Math.max(width, depth) * 0.25;
 
   useFrame((state) => {
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
     const t = state.clock.elapsedTime;
-    // Beams sway slightly like real searchlights
     if (beam1.current) {
       beam1.current.rotation.x = Math.sin(t * 0.4) * 0.08;
       beam1.current.rotation.z = Math.cos(t * 0.3) * 0.06;
@@ -230,13 +234,15 @@ export function RooftopFire({
   depth: number;
 }) {
   const flamesRef = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
 
   useFrame((state) => {
     if (!flamesRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 2 !== 0) return;
     const t = state.clock.elapsedTime;
     flamesRef.current.children.forEach((child, i) => {
       const mesh = child as THREE.Mesh;
-      // Blocky flame animation: scale Y wobble + slight Y bob
       const phase = i * 1.3;
       mesh.scale.y = 0.7 + Math.sin(t * 4 + phase) * 0.3;
       mesh.position.y = mesh.userData.baseY + Math.sin(t * 3 + phase) * 1;
@@ -300,10 +306,13 @@ export function Helipad({
   depth: number;
 }) {
   const borderRef = useRef<THREE.Mesh>(null);
+  const frameCount = useRef(0);
   const padSize = Math.min(width, depth) * 0.35;
 
   useFrame((state) => {
     if (!borderRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
     const mat = borderRef.current.material as THREE.MeshStandardMaterial;
     mat.emissiveIntensity = 2 + Math.sin(state.clock.elapsedTime * 2) * 0.8;
   });
@@ -871,9 +880,12 @@ export function Flag({
   color?: string;
 }) {
   const flagRef = useRef<THREE.Mesh>(null);
+  const frameCount = useRef(0);
 
   useFrame((state) => {
     if (!flagRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
     const t = state.clock.elapsedTime;
     flagRef.current.rotation.y = Math.sin(t * 2) * 0.2;
     flagRef.current.position.x = Math.sin(t * 3) * 0.2 + 2.5;
@@ -923,6 +935,7 @@ export function NeonTrim({
 }) {
   const edgesRef = useRef<THREE.Group>(null);
   const scanRef = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
 
   const w2 = width / 2;
   const d2 = depth / 2;
@@ -949,6 +962,8 @@ export function NeonTrim({
   }, [w2, d2, width, depth, height]);
 
   useFrame((state) => {
+    frameCount.current++;
+    if (frameCount.current % 2 !== 0) return;
     const t = state.clock.elapsedTime;
     const pulse = 0.45 + Math.sin(t * 1.8) * 0.2;
 
@@ -962,7 +977,6 @@ export function NeonTrim({
       });
     }
 
-    // Sweep scan band upward
     if (scanRef.current) {
       const phase = (t / 3.5) % 1;
       scanRef.current.position.y = phase * height;
@@ -1050,9 +1064,12 @@ export function SatelliteDish({
   color?: string;
 }) {
   const dishRef = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
 
   useFrame((state) => {
     if (!dishRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
     dishRef.current.rotation.y = state.clock.elapsedTime * 0.3;
   });
 
@@ -1098,14 +1115,16 @@ export function CrownItem({
   focused?: boolean;
 }) {
   const crownRef = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
   // Above label when not focused, closer to roof when focused (label hidden)
   const targetY = focused ? height + 14 : height + 24;
 
   useFrame((state) => {
     if (!crownRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
     const t = state.clock.elapsedTime;
-    // Smooth lerp to target
-    crownRef.current.position.y += (targetY + Math.sin(t * 1.5) * 1.5 - crownRef.current.position.y) * 0.05;
+    crownRef.current.position.y += (targetY + Math.sin(t * 1.5) * 1.5 - crownRef.current.position.y) * 0.15;
     crownRef.current.rotation.y = t * 0.5;
   });
 
@@ -1175,9 +1194,12 @@ export function PoolParty({
   depth: number;
 }) {
   const waterRef = useRef<THREE.Mesh>(null);
+  const frameCount = useRef(0);
 
   useFrame((state) => {
     if (!waterRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
     const mat = waterRef.current.material as THREE.MeshStandardMaterial;
     mat.emissiveIntensity = 1.5 + Math.sin(state.clock.elapsedTime * 2) * 0.3;
   });
@@ -1239,6 +1261,7 @@ export function HologramRing({
   const dataRing1 = useRef<THREE.Mesh>(null);
   const dataRing2 = useRef<THREE.Mesh>(null);
   const haloRef = useRef<THREE.Mesh>(null);
+  const frameCount = useRef(0);
 
   // Shield must enclose the building — use diagonal + padding
   const diag = Math.sqrt(width * width + depth * depth) * 0.5;
@@ -1246,18 +1269,17 @@ export function HologramRing({
   const ringR = shieldR + 2;
 
   useFrame((state) => {
+    frameCount.current++;
+    if (frameCount.current % 2 !== 0) return;
     const t = state.clock.elapsedTime;
-    // Pulse shield
     if (shieldRef.current) {
       const pulse = 1 + Math.sin(t * 2) * 0.015;
       shieldRef.current.scale.set(pulse, pulse, pulse);
       const mat = shieldRef.current.material as THREE.MeshBasicMaterial;
       mat.opacity = 0.12 + Math.sin(t * 3) * 0.04;
     }
-    // Orbit data rings
     if (dataRing1.current) dataRing1.current.rotation.y = t * 0.7;
     if (dataRing2.current) dataRing2.current.rotation.y = -t * 0.5;
-    // Halo pulse
     if (haloRef.current) {
       const mat = haloRef.current.material as THREE.MeshBasicMaterial;
       mat.opacity = 0.03 + Math.sin(t * 1.5) * 0.015;
@@ -1428,20 +1450,28 @@ export function LightningAura({
     }
   };
 
+  const accDelta = useRef(0);
+  const frameCount = useRef(0);
+
   useFrame((state, delta) => {
+    accDelta.current += delta;
+    frameCount.current++;
+    if (frameCount.current % 2 !== 0) return;
+    const dt = accDelta.current;
+    accDelta.current = 0;
     const t = state.clock.elapsedTime;
 
     // Cloud bob
     if (cloudsRef.current) cloudsRef.current.position.y = Math.sin(t * 0.3) * 0.5;
 
-    // Rain
+    // Rain (using accumulated delta for correct speed)
     if (rainRef.current) {
       const ch = rainRef.current.children;
       for (let i = 0; i < RAIN_COUNT; i++) {
         const d = drops[i];
         const m = ch[i] as THREE.Mesh;
         if (!m) continue;
-        d.y -= d.speed * delta;
+        d.y -= d.speed * dt;
         if (d.y < rainBot) {
           d.y = rainTop;
           d.x = (Math.random() - 0.5) * spread * 2;
@@ -1562,6 +1592,7 @@ export function LEDBanner({
   color?: string;
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
 
   const bannerH = 3;
   const y = height * 0.45;
@@ -1578,6 +1609,8 @@ export function LEDBanner({
 
   useFrame((state) => {
     if (!groupRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 2 !== 0) return;
     const t = state.clock.elapsedTime;
     const children = groupRef.current.children;
     let idx = 0;
@@ -1588,11 +1621,9 @@ export function LEDBanner({
         const mesh = children[idx] as THREE.Mesh;
         if (!mesh) { idx++; continue; }
         const mat = mesh.material as THREE.MeshStandardMaterial;
-        // Scrolling wave: each segment lights up in sequence
         const phase = (s / LED_SEGS + f * 0.25 + t * 0.4) % 1;
         const brightness = 0.3 + Math.pow(Math.sin(phase * Math.PI), 2) * 2.5;
         mat.emissiveIntensity = brightness;
-        // Slight scale pulse on bright segments
         const scale = 1 + (brightness > 2 ? 0.05 : 0);
         mesh.scale.y = scale;
         idx++;

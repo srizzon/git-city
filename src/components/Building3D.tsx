@@ -162,7 +162,7 @@ function createWindowTexture(
 
 // ─── Claimed Glow (neon trim + roof light) ────────────────────
 
-function ClaimedGlow({ height, width, depth }: { height: number; width: number; depth: number }) {
+export function ClaimedGlow({ height, width, depth }: { height: number; width: number; depth: number }) {
   const trimRef = useRef<THREE.Group>(null);
   const frameCount = useRef(0);
 
@@ -307,7 +307,7 @@ function BuildingRiseAnimation({
 const BEACON_HEIGHT = 500;
 const SPOTLIGHT_Y = 400; // cone origin high above
 
-function FocusBeacon({ height, width, depth, accentColor }: { height: number; width: number; depth: number; accentColor: string }) {
+export function FocusBeacon({ height, width, depth, accentColor }: { height: number; width: number; depth: number; accentColor: string }) {
   const coneRef = useRef<THREE.Mesh>(null);
   const markerRef = useRef<THREE.Group>(null);
 
@@ -367,7 +367,7 @@ function FocusBeacon({ height, width, depth, accentColor }: { height: number; wi
 
 // ─── Loadout-Aware Effect Rendering ──────────────────────────
 
-function BuildingItemEffects({ building, accentColor, focused }: { building: CityBuilding; accentColor: string; focused?: boolean }) {
+export function BuildingItemEffects({ building, accentColor, focused }: { building: CityBuilding; accentColor: string; focused?: boolean }) {
   const { height, width, depth, owned_items, loadout, billboard_images } = building;
   const items = owned_items ?? [];
 
@@ -482,6 +482,7 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const spriteRef = useRef<THREE.Sprite>(null);
+  const pointerDown = useRef<{ x: number; y: number } | null>(null);
 
   const textures = useMemo(() => {
     const seed =
@@ -613,8 +614,15 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
         geometry={SHARED_BOX_GEO}
         scale={[building.width, 0.001, building.depth]}
         dispose={null}
+        onPointerDown={introMode ? undefined : (e) => {
+          pointerDown.current = { x: e.clientX, y: e.clientY };
+        }}
         onClick={introMode ? undefined : (e) => {
           e.stopPropagation();
+          if (!pointerDown.current) return;
+          const dx = e.clientX - pointerDown.current.x;
+          const dy = e.clientY - pointerDown.current.y;
+          if (dx * dx + dy * dy > 25) return; // >5px = drag, not click
           onClick?.(building);
         }}
         onPointerOver={introMode ? undefined : () => { document.body.style.cursor = "pointer"; }}

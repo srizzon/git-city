@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, useGLTF } from "@react-three/drei";
+import { OrbitControls, useGLTF, Stats } from "@react-three/drei";
 import * as THREE from "three";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
@@ -302,6 +302,10 @@ function CameraFocus({
   const progress = useRef(1);
   const active = useRef(false);
 
+  // Use ref for buildings to avoid re-triggering animation on array changes
+  const buildingsRef = useRef(buildings);
+  buildingsRef.current = buildings;
+
   useEffect(() => {
     if (!focusedBuilding) {
       // Re-enable auto-rotate when focus is cleared
@@ -311,7 +315,7 @@ function CameraFocus({
       return;
     }
 
-    const bA = buildings.find(
+    const bA = buildingsRef.current.find(
       (b) => b.login.toLowerCase() === focusedBuilding.toLowerCase()
     );
     if (!bA) return;
@@ -324,7 +328,7 @@ function CameraFocus({
 
     // Dual focus: compute midpoint + separation-based backoff
     const bB = focusedBuildingB
-      ? buildings.find((b) => b.login.toLowerCase() === focusedBuildingB.toLowerCase())
+      ? buildingsRef.current.find((b) => b.login.toLowerCase() === focusedBuildingB.toLowerCase())
       : null;
 
     if (bB) {
@@ -384,7 +388,8 @@ function CameraFocus({
     if (controlsRef.current) {
       controlsRef.current.autoRotate = false;
     }
-  }, [focusedBuilding, focusedBuildingB, buildings, camera, controlsRef]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedBuilding, focusedBuildingB, camera, controlsRef]);
 
   useFrame((_, delta) => {
     if (!active.current || progress.current >= 1) return;
@@ -411,13 +416,13 @@ function CameraFocus({
 
 // ─── Mouse-Driven Flight ─────────────────────────────────────
 
-const DEFAULT_FLY_SPEED = 25;
-const MIN_FLY_SPEED = 20;
-const MAX_FLY_SPEED = 160;
+const DEFAULT_FLY_SPEED = 55;
+const MIN_FLY_SPEED = 30;
+const MAX_FLY_SPEED = 200;
 const MIN_ALT = 25;
 const MAX_ALT = 900;
 const TURN_RATE = 2.0;
-const CLIMB_RATE = 30;
+const CLIMB_RATE = 55;
 const MAX_BANK = 0.55;
 const MAX_PITCH = 0.7;
 const DEADZONE = 0.08;
@@ -470,6 +475,8 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
   const wasJustUnpaused = useRef(false);
 
   const hudTimer = useRef(0);
+  const lastHudSpeed = useRef(-1);
+  const lastHudAlt = useRef(-1);
 
   // Initialize flight from current camera position and direction
   useEffect(() => {
@@ -604,9 +611,15 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
       }
 
       hudTimer.current += dt;
-      if (hudTimer.current > 0.1) {
+      if (hudTimer.current > 0.25) {
         hudTimer.current = 0;
-        onHud(0, pos.current.y);
+        const s = 0;
+        const a = Math.round(pos.current.y);
+        if (s !== lastHudSpeed.current || a !== lastHudAlt.current) {
+          lastHudSpeed.current = s;
+          lastHudAlt.current = a;
+          onHud(s, pos.current.y);
+        }
       }
       return;
     }
@@ -651,9 +664,6 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     _fwd.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     pos.current.addScaledVector(_fwd, actualSpeed * dt);
 
-    const bob = (1 - Math.abs(turnInput)) * Math.sin(t * 1.5) * 0.15;
-    pos.current.y += bob;
-
     const targetBank = -turnInput * MAX_BANK;
     bank.current += (targetBank - bank.current) * 5 * dt;
 
@@ -690,9 +700,15 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     camera.lookAt(camLook.current);
 
     hudTimer.current += dt;
-    if (hudTimer.current > 0.1) {
+    if (hudTimer.current > 0.25) {
       hudTimer.current = 0;
-      onHud(flySpeed.current, pos.current.y);
+      const s = Math.round(flySpeed.current);
+      const a = Math.round(pos.current.y);
+      if (s !== lastHudSpeed.current || a !== lastHudAlt.current) {
+        lastHudSpeed.current = s;
+        lastHudAlt.current = a;
+        onHud(flySpeed.current, pos.current.y);
+      }
     }
   });
 
@@ -1295,6 +1311,7 @@ interface Props {
 
 export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
+  const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
 
   const cityRadius = useMemo(() => {
     let max = 200;
@@ -1311,6 +1328,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
+      {showPerf && <Stats />}
       <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
 
       <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
@@ -1350,6 +1368,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         onBuildingClick={onBuildingClick}
         onFocusInfo={onFocusInfo}
         introMode={introMode}
+        flyMode={flyMode}
       />
 
       <InstancedDecorations items={decorations} roadMarkingColor={t.roadMarkingColor} sidewalkColor={t.sidewalkColor} />

@@ -1790,8 +1790,7 @@ function HomeContent() {
 
         return (
         <>
-          {/* Backdrop - click to close (desktop only, mobile needs canvas interaction) */}
-          <div className="pointer-events-auto fixed inset-0 z-30 hidden sm:block" onClick={closeCompare} />
+          {/* No fullscreen backdrop — let the user orbit the camera freely */}
           <div className="pointer-events-auto fixed z-40
             bottom-0 left-0 right-0
             sm:bottom-auto sm:left-auto sm:right-5 sm:top-1/2 sm:-translate-y-1/2"

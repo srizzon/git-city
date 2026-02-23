@@ -85,7 +85,10 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Pr
       className="fixed bottom-0 left-0 right-0 z-30 flex h-7 items-center overflow-hidden border-t border-border/30 bg-bg/90 backdrop-blur-sm cursor-pointer"
       onClick={onOpenPanel}
     >
-      <div className="ticker-scroll flex whitespace-nowrap">
+      <div
+        className="ticker-scroll flex whitespace-nowrap"
+        style={{ "--ticker-duration": `${Math.max(30, tickerText.length * 2)}s` } as React.CSSProperties}
+      >
         {/* Duplicate for seamless loop */}
         {[...tickerText, ...tickerText].map((item, i) => (
           <span
@@ -103,7 +106,7 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Pr
 
       <style jsx>{`
         .ticker-scroll {
-          animation: ticker 60s linear infinite;
+          animation: ticker var(--ticker-duration, 60s) linear infinite;
         }
         .ticker-scroll:hover {
           animation-play-state: paused;

@@ -117,10 +117,17 @@ function BannerPlane({
     [tex, ad.color]
   );
 
-  // Rope
+  // Banner dimensions
+  const BANNER_LENGTH = 45;
+  const BANNER_HEIGHT = 10;
+  const ROPE_GAP = 18;
+  const BANNER_DROP = 5;
+
+  // Rope (static geometry, set once)
   const ropeLine = useMemo(() => {
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
+    const ropeVerts = new Float32Array([0, -2, 5, 0, -BANNER_DROP, ROPE_GAP]);
+    geo.setAttribute("position", new THREE.BufferAttribute(ropeVerts, 3));
     const mat = new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.5 });
     return new THREE.Line(geo, mat);
   }, []);
@@ -133,12 +140,6 @@ function BannerPlane({
       (ropeLine.material as THREE.Material).dispose();
     };
   }, [tex, ledMat, ropeLine]);
-
-  // Banner dimensions
-  const BANNER_LENGTH = 45;
-  const BANNER_HEIGHT = 10;
-  const ROPE_GAP = 18;
-  const BANNER_DROP = 5;
 
   // Flight
   const rx = cityRadius * 0.55;
@@ -172,13 +173,6 @@ function BannerPlane({
     if (needsScroll) {
       tex.offset.x = (t * SCROLL_SPEED) % 1;
     }
-
-    // Rope
-    const ra = ropeLine.geometry.getAttribute("position") as THREE.BufferAttribute;
-    const arr = ra.array as Float32Array;
-    arr[0] = 0; arr[1] = -2; arr[2] = 5;
-    arr[3] = 0; arr[4] = -BANNER_DROP; arr[5] = ROPE_GAP;
-    ra.needsUpdate = true;
   });
 
   const handleClick = (e: any) => {
