@@ -139,9 +139,23 @@ function SortButton({
   );
 }
 
+const STORAGE_KEY = "admin-ads-filters";
+
+function loadFilters() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AdminAdsPage() {
+  const saved = useMemo(() => loadFilters(), []);
+
   const [ads, setAds] = useState<AdStats[]>([]);
-  const [period, setPeriod] = useState<"7d" | "30d" | "all">("30d");
+  const [period, setPeriod] = useState<"7d" | "30d" | "all">(saved?.period ?? "30d");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -152,14 +166,22 @@ export default function AdminAdsPage() {
   const [editForm, setEditForm] = useState<AdForm>(EMPTY_FORM);
 
   // Sorting
-  const [sortKey, setSortKey] = useState<SortKey>("impressions");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortKey, setSortKey] = useState<SortKey>(saved?.sortKey ?? "impressions");
+  const [sortDir, setSortDir] = useState<SortDir>(saved?.sortDir ?? "desc");
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>("all");
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(saved?.statusFilter ?? "all");
+  const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>(saved?.vehicleFilter ?? "all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(saved?.sourceFilter ?? "all");
+  const [searchQuery, setSearchQuery] = useState(saved?.searchQuery ?? "");
+
+  // Persist filters to localStorage
+  useEffect(() => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ period, sortKey, sortDir, statusFilter, vehicleFilter, sourceFilter, searchQuery })
+    );
+  }, [period, sortKey, sortDir, statusFilter, vehicleFilter, sourceFilter, searchQuery]);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);

@@ -123,7 +123,7 @@ export function AdPurchaseForm() {
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] text-muted normal-case">Format</p>
             <p className="text-[9px] text-dim normal-case">
-              {isSky ? "flies over the city" : "on the tallest buildings"}
+              {isSky ? "flies across the entire city skyline" : "mounted on the tallest buildings (top contributors)"}
             </p>
           </div>
           <div className="flex gap-1.5">
@@ -274,18 +274,17 @@ export function AdPurchaseForm() {
           </div>
         </div>
 
-        {/* Error */}
-        {error && (
-          <p
-            className="mt-3 text-center text-[10px] normal-case"
-            style={{ color: "#ff6b6b" }}
-          >
-            {error}
-          </p>
-        )}
-
         {/* Row 5: Buy button */}
         <div className="mt-5">
+          {/* Error banner */}
+          {error && (
+            <div
+              className="mb-3 border-[3px] px-4 py-3 text-center text-xs normal-case"
+              style={{ borderColor: "#ff6b6b", color: "#ff6b6b", backgroundColor: "#ff6b6b10" }}
+            >
+              {error}
+            </div>
+          )}
           <button
             type="button"
             onClick={handleSubmit}

@@ -10,11 +10,11 @@ const SHADOW = "#5a7a00";
 export const metadata: Metadata = {
   title: "Advertise on Git City",
   description:
-    "Put your brand in the sky and on buildings of a 3D city of GitHub developers. Planes, blimps, billboards, LED wraps, impression tracking, and click analytics.",
+    "Advertise on the tallest buildings and across the sky of a 3D city with 1,000+ GitHub developers. Billboards, LED wraps, planes, blimps. Full analytics.",
   openGraph: {
     title: "Advertise on Git City",
     description:
-      "Your brand on 1,000+ developer buildings. Sky ads, building billboards, rooftop signs, LED wraps with full analytics.",
+      "Advertise on the tallest buildings and across the sky of a 3D city with 1,000+ GitHub developers. Billboards, LED wraps, planes, blimps. Full analytics.",
     siteName: "Git City",
     type: "website",
     locale: "en_US",
@@ -65,7 +65,7 @@ export default async function AdvertisePage() {
           >
             &larr; Back to City
           </Link>
-          <div className="flex items-center gap-4 text-[9px] text-muted normal-case">
+          <div className="flex items-center gap-4 text-[11px] text-muted normal-case">
             <span>
               <span style={{ color: ACCENT }}>
                 {devCount.toLocaleString()}+
@@ -84,10 +84,13 @@ export default async function AdvertisePage() {
         {/* Hero text */}
         <div className="mt-8 text-center">
           <h1 className="text-2xl text-cream sm:text-3xl">
-            Your brand in the <span style={{ color: ACCENT }}>city</span>
+            Your brand in the{" "}
+            <span style={{ color: ACCENT }}>skyline</span>
           </h1>
-          <p className="mt-2 text-[10px] text-muted normal-case">
-            Pick a format, write your message, see it live. Pay when ready.
+          <p className="mt-2 text-xs text-muted normal-case">
+            Planes and blimps in the sky, billboards and LEDs on the tallest
+            buildings. <br />
+            Pick a format, preview in 3D, go live in minutes.
           </p>
         </div>
 
@@ -109,17 +112,17 @@ export default async function AdvertisePage() {
           {/* How it works */}
           <div className="grid gap-6 sm:grid-cols-4">
             {[
-              { n: "01", t: "Pick", d: "Choose sky or building format" },
-              { n: "02", t: "Write", d: "Set your text and brand colors" },
-              { n: "03", t: "Pay", d: "Instant Stripe checkout" },
-              { n: "04", t: "Live", d: "Ad activates immediately" },
+              { n: "01", t: "Pick", d: "Sky ads or building ads, 5 formats" },
+              { n: "02", t: "Design", d: "Write your message, pick your colors, preview in 3D" },
+              { n: "03", t: "Pay", d: "Secure checkout, no account needed" },
+              { n: "04", t: "Live", d: "Your ad goes live instantly across the city" },
             ].map((s) => (
               <div key={s.n}>
                 <span className="text-xl" style={{ color: ACCENT }}>
                   {s.n}
                 </span>
-                <h3 className="mt-1 text-xs text-cream">{s.t}</h3>
-                <p className="mt-1 text-[9px] leading-relaxed text-muted normal-case">
+                <h3 className="mt-1 text-sm text-cream">{s.t}</h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted normal-case">
                   {s.d}
                 </p>
               </div>
@@ -128,20 +131,20 @@ export default async function AdvertisePage() {
 
           {/* Included features */}
           <div className="mt-12 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-            <p className="mb-2 text-xs text-cream sm:col-span-2">
+            <p className="mb-2 text-sm text-cream sm:col-span-2">
               Every ad includes
             </p>
             {[
-              "Custom text up to 80 characters",
-              "Your brand colors on the LED panel",
+              "Displayed on the tallest buildings or flying across the skyline",
+              "Custom text up to 80 characters with your brand colors",
+              "Live 3D preview before you buy",
               "Clickable link with UTM tracking",
-              "Impression + click analytics",
-              "Instant activation after payment",
-              "Runs for the full paid duration",
+              "Real-time impression and click analytics",
+              "Goes live instantly after payment",
             ].map((f) => (
               <p
                 key={f}
-                className="flex items-center gap-2 text-[10px] text-muted normal-case"
+                className="flex items-center gap-2 text-xs text-muted normal-case"
               >
                 <span style={{ color: ACCENT }}>+</span>
                 {f}
@@ -151,16 +154,16 @@ export default async function AdvertisePage() {
 
           {/* FAQ */}
           <div className="mt-12">
-            <p className="mb-4 text-xs text-cream">FAQ</p>
+            <p className="mb-4 text-sm text-cream">FAQ</p>
             <div className="space-y-3">
               {[
                 {
                   q: "How many people will see my ad?",
-                  a: `The city has ${devCount.toLocaleString()}+ developer buildings and growing. Every visitor sees ads as they explore.`,
+                  a: `The city has ${devCount.toLocaleString()}+ developer buildings and growing. Building ads are placed on the tallest towers, which are the first thing visitors see. Sky ads fly across the entire skyline. Every visitor who explores the city sees your ad.`,
                 },
                 {
                   q: "What formats are available?",
-                  a: "Sky: planes with LED banners, blimps with LED screens. Building: billboards, rotating rooftop signs, LED wraps. All dot-matrix LED style.",
+                  a: "Sky: planes trailing LED banners, blimps with scrolling LED screens. Building: billboards mounted on tower faces, rotating rooftop signs, full LED wraps. All rendered in dot-matrix LED style.",
                 },
                 {
                   q: "Can I change my ad text?",
@@ -180,8 +183,8 @@ export default async function AdvertisePage() {
                 },
               ].map((item) => (
                 <div key={item.q} className="border-[2px] border-border p-4">
-                  <h3 className="text-[10px] text-cream">{item.q}</h3>
-                  <p className="mt-1.5 text-[9px] leading-relaxed text-muted normal-case">
+                  <h3 className="text-xs text-cream">{item.q}</h3>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-muted normal-case">
                     {item.a}
                   </p>
                 </div>
@@ -191,17 +194,17 @@ export default async function AdvertisePage() {
 
           {/* Footer */}
           <div className="mt-12 text-center">
-            <Link
-              href="/"
+            <a
+              href="#"
               className="btn-press inline-block px-7 py-3.5 text-sm text-bg"
               style={{
                 backgroundColor: ACCENT,
                 boxShadow: `4px 4px 0 0 ${SHADOW}`,
               }}
             >
-              Enter the City
-            </Link>
-            <p className="mt-4 text-[9px] text-muted normal-case">
+              Browse Ad Formats
+            </a>
+            <p className="mt-4 text-[11px] text-muted normal-case">
               Questions?{" "}
               <a
                 href="mailto:samuelrizzondev@gmail.com"
@@ -211,7 +214,7 @@ export default async function AdvertisePage() {
                 samuelrizzondev@gmail.com
               </a>
             </p>
-            <p className="mt-4 text-[9px] text-muted normal-case">
+            <p className="mt-4 text-[11px] text-muted normal-case">
               built by{" "}
               <a
                 href="https://x.com/samuelrizzondev"

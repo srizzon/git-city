@@ -489,7 +489,11 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
       building.login.split("").reduce((a, c) => a + c.charCodeAt(0), 0) * 137;
 
     // Custom color buildings: per-building canvas textures (rare, <5%)
+    // Blend custom color 50% with theme face color to prevent glaring brightness
     if (building.custom_color) {
+      const blended = new THREE.Color(colors.face)
+        .lerp(new THREE.Color(building.custom_color), 0.5);
+      const blendedHex = '#' + blended.getHexString();
       const front = createWindowTexture(
         building.floors,
         building.windowsPerFloor,
@@ -497,7 +501,7 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
         seed,
         colors.windowLit,
         colors.windowOff,
-        building.custom_color
+        blendedHex
       );
       const side = createWindowTexture(
         building.floors,
@@ -506,7 +510,7 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
         seed + 7919,
         colors.windowLit,
         colors.windowOff,
-        building.custom_color
+        blendedHex
       );
       return { front, side };
     }
@@ -542,12 +546,13 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
       emissiveIntensity: 1.5,
       roughness: 0.6,
     });
+    const emIntensity = building.custom_color ? 1.5 : 2.0;
     const make = (tex: THREE.CanvasTexture) =>
       new THREE.MeshStandardMaterial({
         map: tex,
         emissive: WHITE,
         emissiveMap: tex,
-        emissiveIntensity: 2.0,
+        emissiveIntensity: emIntensity,
         roughness: 0.85,
         metalness: 0,
       });
