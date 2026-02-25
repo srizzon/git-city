@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
 import { ClaimedGlow, BuildingItemEffects } from "./Building3D";
+import { StreakFlame } from "./BuildingEffects";
 
 // ─── Spatial Grid (same structure as CityScene) ────────────────
 
@@ -92,7 +93,7 @@ export default function EffectsLayer({
       const b = buildings[idx];
 
       // Only buildings that have something to render
-      const hasEffects = b.claimed || (b.owned_items && b.owned_items.length > 0);
+      const hasEffects = b.claimed || (b.owned_items && b.owned_items.length > 0) || (b.app_streak > 0);
       if (!hasEffects) continue;
 
       const dx = cx - b.position[0];
@@ -146,6 +147,9 @@ export default function EffectsLayer({
               accentColor={accentColor}
               focused={isFocused}
             />
+            {b.app_streak > 0 && (
+              <StreakFlame height={b.height} width={b.width} depth={b.depth} streakDays={b.app_streak} color={accentColor} />
+            )}
           </group>
         );
       })}

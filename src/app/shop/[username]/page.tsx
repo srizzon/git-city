@@ -224,6 +224,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
           purchasedItem={purchasedItem ?? null}
           giftedItem={giftedItem ?? null}
           giftedTo={giftedTo ?? null}
+          streakFreezesAvailable={dev.streak_freezes_available ?? 0}
         />
 
         {/* Back links */}

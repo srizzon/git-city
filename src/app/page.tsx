@@ -19,6 +19,7 @@ import ActivityTicker, { type FeedEvent } from "@/components/ActivityTicker";
 import ActivityPanel from "@/components/ActivityPanel";
 import LofiRadio from "@/components/LofiRadio";
 import { ITEM_NAMES, ITEM_EMOJIS } from "@/lib/zones";
+import { useStreakCheckin } from "@/lib/useStreakCheckin";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
 import {
@@ -60,6 +61,10 @@ const ACHIEVEMENT_TIERS_MAP: Record<string, string> = {
   grinder: "silver", architect: "silver", patron: "silver", beloved: "silver", admired: "silver",
   first_push: "bronze", committed: "bronze", builder: "bronze", rising_star: "bronze",
   recruiter: "bronze", generous: "bronze", gifted: "bronze", appreciated: "bronze",
+  on_fire: "bronze", generous_streak: "bronze",
+  dedicated: "silver",
+  obsessed: "gold",
+  no_life: "diamond",
 };
 const ACHIEVEMENT_NAMES_MAP: Record<string, string> = {
   god_mode: "God Mode", legend: "Legend", famous: "Famous", mayor: "Mayor",
@@ -69,6 +74,8 @@ const ACHIEVEMENT_NAMES_MAP: Record<string, string> = {
   philanthropist: "Philanthropist", patron: "Patron", generous: "Generous",
   icon: "Icon", beloved: "Beloved", gifted: "Gifted",
   legendary: "Legendary", admired: "Admired", appreciated: "Appreciated",
+  on_fire: "On Fire", dedicated: "Dedicated", obsessed: "Obsessed",
+  no_life: "No Life", generous_streak: "Generous Streak",
 };
 
 // Dev "class" — funny RPG-style title, deterministic per username
@@ -322,6 +329,15 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
   );
 }
 
+// ─── Streak Pill (HUD element, inline next to @username) ────
+function getStreakTierColor(streak: number) {
+  if (streak >= 30) return "#aa44ff";
+  if (streak >= 14) return "#ff2222";
+  if (streak >= 7) return "#ff8833";
+  return "#4488ff";
+}
+
+
 function HomeContent() {
   const searchParams = useSearchParams();
   const userParam = searchParams.get("user");
@@ -369,6 +385,7 @@ function HomeContent() {
   const [feedPanelOpen, setFeedPanelOpen] = useState(false);
   const [kudosSending, setKudosSending] = useState(false);
   const [kudosSent, setKudosSent] = useState(false);
+  const [kudosError, setKudosError] = useState<string | null>(null);
   const [focusDist, setFocusDist] = useState(999);
   const visitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [compareBuilding, setCompareBuilding] = useState<CityBuilding | null>(null);
@@ -530,6 +547,7 @@ function HomeContent() {
     if (!selectedBuilding || kudosSending || kudosSent || !session) return;
     if (selectedBuilding.login.toLowerCase() === authLogin) return;
     setKudosSending(true);
+    setKudosError(null);
     try {
       const res = await fetch("/api/interactions/kudos", {
         method: "POST",
@@ -548,6 +566,11 @@ function HomeContent() {
           )
         );
         setTimeout(() => setKudosSent(false), 3000);
+      } else {
+        const body = await res.json().catch(() => null);
+        const msg = body?.error || "Could not send kudos";
+        setKudosError(msg);
+        setTimeout(() => setKudosError(null), 3000);
       }
     } catch { /* ignore */ }
     finally { setKudosSending(false); }
@@ -634,7 +657,8 @@ function HomeContent() {
 
   const reloadCity = useCallback(async (bustCache = false) => {
     const cacheBust = bustCache ? `&_t=${Date.now()}` : "";
-    const res = await fetch(`/api/city?from=0&to=500${cacheBust}`);
+    const CHUNK = 1000;
+    const res = await fetch(`/api/city?from=0&to=${CHUNK}${cacheBust}`);
     if (!res.ok) return null;
     const data = await res.json();
     setStats(data.stats);
@@ -649,19 +673,22 @@ function HomeContent() {
     setBridges(layout.bridges);
 
     const total = data.stats?.total_developers ?? 0;
-    if (total <= 500) return layout.buildings;
+    if (total <= CHUNK) return layout.buildings;
 
-    // Background-fetch remaining developers in chunks
-    let allDevs = [...data.developers];
-    const CHUNK = 500;
-    for (let from = 500; from < total; from += CHUNK) {
-      const chunkRes = await fetch(
-        `/api/city?from=${from}&to=${from + CHUNK}${cacheBust}`
+    // Fetch remaining chunks in parallel
+    const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
+    for (let from = CHUNK; from < total; from += CHUNK) {
+      promises.push(
+        fetch(`/api/city?from=${from}&to=${from + CHUNK}${cacheBust}`)
+          .then(r => r.ok ? r.json() : null)
       );
-      if (!chunkRes.ok) break;
-      const chunk = await chunkRes.json();
-      if (chunk.developers.length === 0) break;
-      allDevs = [...allDevs, ...chunk.developers];
+    }
+    const results = await Promise.all(promises);
+    let allDevs = [...data.developers];
+    for (const chunk of results) {
+      if (chunk?.developers?.length) {
+        allDevs = [...allDevs, ...chunk.developers];
+      }
     }
 
     // Regenerate full layout with all developers
@@ -749,16 +776,24 @@ function HomeContent() {
   // Focus on building from ?user= query param (skip if gift redirect, handled separately)
   const didFocusUserParam = useRef(false);
   useEffect(() => {
-    if (userParam && !giftedParam && buildings.length > 0 && !didFocusUserParam.current) {
+    if (!userParam || giftedParam || buildings.length === 0) return;
+
+    const found = buildings.find(
+      (b) => b.login.toLowerCase() === userParam.toLowerCase()
+    );
+    if (!found) return; // Not loaded yet, wait for next chunk
+
+    if (!didFocusUserParam.current) {
+      // First focus: enter explore mode
       didFocusUserParam.current = true;
       setFocusedBuilding(userParam);
-      const found = buildings.find(
-        (b) => b.login.toLowerCase() === userParam.toLowerCase()
+      setSelectedBuilding(found);
+      setExploreMode(true);
+    } else {
+      // Buildings array was replaced (full layout loaded) — keep selectedBuilding in sync
+      setSelectedBuilding(prev =>
+        prev && prev.login.toLowerCase() === userParam.toLowerCase() ? found : prev
       );
-      if (found) {
-        setSelectedBuilding(found);
-        setExploreMode(true);
-      }
     }
   }, [userParam, giftedParam, buildings]);
 
@@ -998,6 +1033,9 @@ function HomeContent() {
     !!myBuilding?.claimed &&
     !myBuilding.owned_items.includes("flag");
 
+  // Streak auto check-in (1x per browser session)
+  const { streakData } = useStreakCheckin(session, !!myBuilding?.claimed);
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-bg font-pixel uppercase text-warm">
       {/* 3D Canvas */}
@@ -1050,6 +1088,8 @@ function HomeContent() {
 
           setSelectedBuilding(b);
           setFocusedBuilding(b.login);
+          setKudosSent(false);
+          setKudosError(null);
           lastDistRef.current = 999;
           setFocusDist(999);
           if (flyMode) {
@@ -1549,9 +1589,16 @@ function HomeContent() {
                     )}
                     <Link
                       href={`/dev/${authLogin}`}
-                      className="border-[3px] border-border bg-bg/80 px-3 py-1.5 text-[10px] text-cream normal-case backdrop-blur-sm transition-colors hover:border-border-light"
+                      className="flex items-center gap-1.5 border-[3px] border-border bg-bg/80 px-3 py-1.5 text-[10px] text-cream normal-case backdrop-blur-sm transition-colors hover:border-border-light"
+                      style={streakData && streakData.streak > 0 && streakData.checked_in ? { animation: "streak-pulse 1.5s ease-in-out 2" } : undefined}
                     >
                       @{authLogin}
+                      {streakData && streakData.streak > 0 && (
+                        <span className="flex items-center gap-0.5" style={{ color: getStreakTierColor(streakData.streak) }}>
+                          <span className="text-[9px] leading-none">🔥</span>
+                          <span className="font-bold">{streakData.streak}</span>
+                        </span>
+                      )}
                     </Link>
                     <button
                       onClick={handleSignOut}
@@ -1744,20 +1791,24 @@ function HomeContent() {
                   )}
                   <button
                     onClick={handleGiveKudos}
-                    disabled={kudosSending || kudosSent}
+                    disabled={kudosSending || kudosSent || !!kudosError}
                     className={[
                       "btn-press w-full py-2 text-[10px] text-bg transition-all duration-300",
                       kudosSent ? "scale-[1.02]" : "",
                     ].join(" ")}
                     style={{
-                      backgroundColor: kudosSent ? "#39d353" : theme.accent,
-                      boxShadow: kudosSent
+                      backgroundColor: kudosError ? "#ff4444" : kudosSent ? "#39d353" : theme.accent,
+                      boxShadow: kudosError
+                        ? "0 0 12px rgba(255,68,68,0.4)"
+                        : kudosSent
                         ? "0 0 12px rgba(57,211,83,0.4)"
                         : `2px 2px 0 0 ${theme.shadow}`,
                     }}
                   >
                     {kudosSending ? (
                       <span className="animate-pulse">Sending...</span>
+                    ) : kudosError ? (
+                      <span>{kudosError}</span>
                     ) : kudosSent ? (
                       <span>+1 Kudos!</span>
                     ) : (
@@ -2579,6 +2630,8 @@ function HomeContent() {
           </div>
         </div>
       )}
+
+      {/* Mark streak achievements as seen on check-in */}
     </main>
   );
 }

@@ -167,6 +167,11 @@ body {
   100% { opacity: 0; transform: translateY(100vh) rotate(720deg); }
 }
 
+@keyframes streak-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 8px 2px currentColor; }
+}
+
 .gift-cta {
   animation:
     gift-glow 2s ease-in-out infinite,

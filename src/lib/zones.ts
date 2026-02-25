@@ -32,6 +32,7 @@ export const ITEM_NAMES: Record<string, string> = {
   led_banner: "LED Banner",
   neon_outline: "Neon Outline",
   particle_aura: "Particle Aura",
+  streak_freeze: "Streak Freeze",
 };
 
 // Correct mapping: item_id → achievement that unlocks it (from migration 007 seed)
@@ -51,6 +52,7 @@ export const ITEM_EMOJIS: Record<string, string> = {
   neon_trim: "💡", spotlight: "🔦", hologram_ring: "💫", lightning_aura: "⚡",
   custom_color: "🎨", billboard: "📺", led_banner: "🪧",
   neon_outline: "🔮", particle_aura: "✨",
+  streak_freeze: "🧊",
 };
 
 export const FACES_ITEMS = ["custom_color", "billboard", "led_banner"];

@@ -45,6 +45,8 @@ interface DevStats {
   kudos_count: number;
   gifts_sent: number;
   gifts_received: number;
+  app_streak?: number;
+  kudos_streak?: number;
 }
 
 /**
@@ -95,6 +97,10 @@ export async function checkAchievements(
         return stats.gifts_sent >= a.threshold;
       case "gifts_received":
         return stats.gifts_received >= a.threshold;
+      case "streak":
+        return (stats.app_streak ?? 0) >= a.threshold;
+      case "kudos_streak":
+        return (stats.kudos_streak ?? 0) >= a.threshold;
       default:
         return false;
     }

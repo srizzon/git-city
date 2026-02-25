@@ -24,6 +24,7 @@ import {
   HologramRing,
   LightningAura,
   LEDBanner,
+  StreakFlame,
 } from "./BuildingEffects";
 
 // Shared constants
@@ -656,6 +657,10 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
 
       {!introMode && (
         <BuildingItemEffects building={building} accentColor={accentColor ?? colors.accent ?? "#c8e64a"} focused={focused} />
+      )}
+
+      {!introMode && building.app_streak > 0 && (
+        <StreakFlame height={building.height} width={building.width} depth={building.depth} streakDays={building.app_streak} color={accentColor ?? colors.accent ?? "#c8e64a"} />
       )}
     </group>
   );

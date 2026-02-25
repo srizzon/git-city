@@ -139,6 +139,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Item not found or inactive" }, { status: 404 });
   }
 
+  // Streak freeze: consumable with max 2 stored
+  if (item_id === "streak_freeze") {
+    const { data: freezeDev } = await sb
+      .from("developers")
+      .select("streak_freezes_available")
+      .eq("id", dev.id)
+      .single();
+
+    if ((freezeDev?.streak_freezes_available ?? 0) >= 2) {
+      return NextResponse.json(
+        { error: "Maximum 2 streak freezes stored" },
+        { status: 409 }
+      );
+    }
+  }
+
   // Billboard allows multiple purchases (Times Square style)
   if (item_id === "billboard") {
     // Count existing completed billboard purchases

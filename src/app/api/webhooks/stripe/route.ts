@@ -133,6 +133,21 @@ export async function POST(request: Request) {
             })
             .eq("id", pending.id);
 
+          // Streak freeze: grant via RPC instead of normal item flow
+          if (itemId === "streak_freeze") {
+            await sb.rpc("grant_streak_freeze", { p_developer_id: Number(developerId) });
+            await sb.from("streak_freeze_log").insert({
+              developer_id: Number(developerId),
+              action: "purchased",
+            });
+            await sb.from("activity_feed").insert({
+              event_type: "item_purchased",
+              actor_id: Number(developerId),
+              metadata: { login: session.metadata?.github_login, item_id: "streak_freeze" },
+            });
+            break;
+          }
+
           // Auto-equip if solo item in zone
           const giftedTo = session.metadata?.gifted_to;
           const ownerId = giftedTo ? Number(giftedTo) : Number(developerId);

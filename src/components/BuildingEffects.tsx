@@ -1658,3 +1658,80 @@ export function LEDBanner({
     </group>
   );
 }
+
+// ─── Streak Glow ──────────────────────────────────────────
+// Vertical neon strips on building edges. Height scales with streak.
+// Uses theme accent color. No conflict with roof/crown items.
+
+export function StreakFlame({
+  height,
+  width,
+  depth,
+  streakDays,
+  color = "#c8e64a",
+}: {
+  height: number;
+  width: number;
+  depth: number;
+  streakDays: number;
+  color?: string;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
+
+  // Streak determines how far up the strips go (10% to 100%)
+  const fillPct = Math.min(1, streakDays <= 1 ? 0.1 : streakDays < 7 ? streakDays / 30 : streakDays < 14 ? 0.5 : streakDays < 30 ? 0.75 : 1);
+  const stripH = height * fillPct;
+  const intensity = streakDays >= 30 ? 5 : streakDays >= 14 ? 4 : streakDays >= 7 ? 3 : 2;
+  const stripW = 1.2;
+
+  // 4 corner positions
+  const corners = useMemo(() => {
+    const hw = width / 2;
+    const hd = depth / 2;
+    return [
+      { x: -hw, z: -hd },
+      { x: hw, z: -hd },
+      { x: hw, z: hd },
+      { x: -hw, z: hd },
+    ];
+  }, [width, depth]);
+
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    frameCount.current++;
+    if (frameCount.current % 3 !== 0) return;
+    const t = state.clock.elapsedTime;
+    groupRef.current.children.forEach((child) => {
+      const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+      if (mat?.emissiveIntensity !== undefined) {
+        mat.emissiveIntensity = intensity + Math.sin(t * 2) * 0.8;
+      }
+    });
+  });
+
+  return (
+    <group ref={groupRef}>
+      {corners.map((c, i) => (
+        <mesh key={i} position={[c.x, stripH / 2, c.z]}>
+          <boxGeometry args={[stripW, stripH, stripW]} />
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={intensity}
+            toneMapped={false}
+            transparent
+            opacity={0.85}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+      <pointLight
+        position={[0, stripH, 0]}
+        color={color}
+        intensity={intensity * 8}
+        distance={60}
+      />
+    </group>
+  );
+}

@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     sb
       .from("developers")
       .select(
-        "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, longest_streak, active_days_last_year, language_diversity, top_repos"
+        "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, longest_streak, active_days_last_year, language_diversity, top_repos, app_streak"
       )
       .order("rank", { ascending: true })
       .range(from, to - 1),
@@ -114,6 +114,7 @@ export async function GET(request: Request) {
     billboard_images: billboardImagesMap[dev.id] ?? [],
     achievements: achievementsMap[dev.id] ?? [],
     loadout: loadoutMap[dev.id] ?? null,
+    app_streak: dev.app_streak ?? 0,
   }));
 
   return NextResponse.json(

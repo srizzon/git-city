@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from "./supabase";
 
 export interface ShopItem {
   id: string;
-  category: "effect" | "structure" | "identity";
+  category: "effect" | "structure" | "identity" | "consumable";
   name: string;
   description: string | null;
   price_usd_cents: number;

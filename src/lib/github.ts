@@ -62,6 +62,7 @@ export interface CityBuilding {
   kudos_count: number;
   visit_count: number;
   loadout?: { crown: string | null; roof: string | null; aura: string | null } | null;
+  app_streak: number;
   position: [number, number, number];
   width: number;
   depth: number;
@@ -388,6 +389,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
         kudos_count: (dev as unknown as Record<string, unknown>).kudos_count as number ?? 0,
         visit_count: (dev as unknown as Record<string, unknown>).visit_count as number ?? 0,
         loadout: (dev as unknown as Record<string, unknown>).loadout as CityBuilding["loadout"] ?? null,
+        app_streak: (dev as unknown as Record<string, unknown>).app_streak as number ?? 0,
         position: [posX, 0, posZ],
         width: w,
         depth: d,

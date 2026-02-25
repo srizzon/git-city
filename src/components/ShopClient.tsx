@@ -52,6 +52,7 @@ interface Props {
   purchasedItem?: string | null;
   giftedItem?: string | null;
   giftedTo?: string | null;
+  streakFreezesAvailable?: number;
 }
 
 interface PixModalData {
@@ -588,6 +589,7 @@ export default function ShopClient({
   purchasedItem = null,
   giftedItem = null,
   giftedTo = null,
+  streakFreezesAvailable = 0,
 }: Props) {
   // Loadout state
   const [loadout, setLoadout] = useState<Loadout>(
@@ -597,6 +599,7 @@ export default function ShopClient({
   loadoutRef.current = loadout;
 
   const [owned, setOwned] = useState<string[]>(ownedItems);
+  const [freezeCount, setFreezeCount] = useState(streakFreezesAvailable);
   const [buyingItem, setBuyingItem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -629,6 +632,10 @@ export default function ShopClient({
     trackPurchaseCompleted(purchasedItem, shopItem?.price_usd_cents ?? 0, "stripe");
     // Clear toast after 5s
     const timer = setTimeout(() => setPurchaseToast(null), 5000);
+    // Streak freeze: increment local count
+    if (purchasedItem === "streak_freeze") {
+      setFreezeCount((prev) => Math.min(prev + 1, 2));
+    }
     // Auto-equip if the item belongs to a zone and that zone is empty
     for (const [zone, zoneItems] of Object.entries(ZONE_ITEMS)) {
       if (zoneItems.includes(purchasedItem)) {
@@ -1290,6 +1297,85 @@ export default function ShopClient({
               />
             )}
           </div>
+
+          {/* Consumables section */}
+          {(() => {
+            const freezeItem = getShopItem("streak_freeze");
+            if (!freezeItem) return null;
+            const atMax = freezeCount >= 2;
+            const isBuying = buyingItem === "streak_freeze";
+            const isConfirming = confirmBuyItem === "streak_freeze";
+            return (
+              <div className="border-[3px] border-border bg-bg-raised p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm" style={{ color: ACCENT }}>
+                    Consumables
+                  </h3>
+                  <span className="text-[9px] text-muted normal-case">
+                    one-time use items
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
+                  <div className="relative" data-buy-popover>
+                    <button
+                      onClick={() => {
+                        if (atMax) return;
+                        if (!isConfirming) trackShopItemViewed("streak_freeze", "consumable", freezeItem.price_usd_cents);
+                        setConfirmBuyItem(isConfirming ? null : "streak_freeze");
+                      }}
+                      disabled={isBuying || atMax}
+                      className={[
+                        "flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
+                        "border-[2px]",
+                        isConfirming ? "border-[var(--color-border-light)]" : "border-border",
+                        "bg-bg-card",
+                        atMax ? "opacity-40" : "",
+                        "hover:border-border-light",
+                      ].join(" ")}
+                    >
+                      <span className="text-2xl">{ITEM_EMOJIS.streak_freeze}</span>
+                      <span className="mt-1 text-[9px] text-cream truncate w-full text-center">
+                        {ITEM_NAMES.streak_freeze}
+                      </span>
+                      <span className="mt-0.5 text-[8px]" style={{ color: atMax ? "#ff4444" : "#a0a0b0" }}>
+                        {isBuying ? "..." : atMax ? "MAX (2/2)" : `${freezeCount}/2 stored`}
+                      </span>
+                    </button>
+
+                    {isConfirming && (
+                      <div data-buy-popover className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                        <p className="text-[9px] text-cream text-center mb-1.5">
+                          {ITEM_NAMES.streak_freeze}
+                        </p>
+                        <p className="text-[8px] text-muted text-center mb-1 normal-case">
+                          Protects 1 day of absence
+                        </p>
+                        <p className="text-[10px] text-center mb-2" style={{ color: ACCENT }}>
+                          {formatPrice(freezeItem)}
+                        </p>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }}
+                            className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout("streak_freeze"); }}
+                            disabled={isBuying}
+                            className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40"
+                            style={{ backgroundColor: ACCENT, boxShadow: `1px 1px 0 0 ${SHADOW}` }}
+                          >
+                            {isBuying ? "..." : "Buy"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Payment note */}
           <p className="text-center text-[10px] text-dim normal-case">
