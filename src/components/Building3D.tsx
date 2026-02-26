@@ -164,22 +164,6 @@ function createWindowTexture(
 // ─── Claimed Glow (neon trim + roof light) ────────────────────
 
 export function ClaimedGlow({ height, width, depth }: { height: number; width: number; depth: number }) {
-  const trimRef = useRef<THREE.Group>(null);
-  const frameCount = useRef(0);
-
-  useFrame((state) => {
-    if (!trimRef.current) return;
-    frameCount.current++;
-    if (frameCount.current % 3 !== 0) return;
-    const t = state.clock.elapsedTime;
-    trimRef.current.children.forEach((child) => {
-      if ((child as THREE.Mesh).material) {
-        const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-        mat.emissiveIntensity = 3 + Math.sin(t * 2) * 0.8;
-      }
-    });
-  });
-
   const trimThickness = 1.2;
   const trimHeight = 2;
   const accent = "#c8e64a";
@@ -189,7 +173,7 @@ export function ClaimedGlow({ height, width, depth }: { height: number; width: n
   return (
     <group>
       {/* Neon trim — 4 bars around the roofline */}
-      <group ref={trimRef} position={[0, height - trimHeight / 2, 0]}>
+      <group position={[0, height - trimHeight / 2, 0]}>
         {/* Front */}
         <mesh position={[0, 0, hd]}>
           <boxGeometry args={[width + trimThickness * 2, trimHeight, trimThickness]} />

@@ -492,8 +492,10 @@ export default function InstancedBuildings({
       }
     };
 
+    // Hover raycast for cursor:pointer — skip on touch devices (no cursor)
+    const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     let lastMoveTime = 0;
-    const onPointerMove = (e: PointerEvent) => {
+    const onPointerMove = isTouch ? null : (e: PointerEvent) => {
       if (introRef.current) {
         document.body.style.cursor = "auto";
         return;
@@ -508,12 +510,12 @@ export default function InstancedBuildings({
 
     canvas.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("pointerup", onPointerUp);
-    canvas.addEventListener("pointermove", onPointerMove);
+    if (onPointerMove) canvas.addEventListener("pointermove", onPointerMove);
 
     return () => {
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointerup", onPointerUp);
-      canvas.removeEventListener("pointermove", onPointerMove);
+      if (onPointerMove) canvas.removeEventListener("pointermove", onPointerMove);
       document.body.style.cursor = "auto";
     };
   }, [gl, camera]);
