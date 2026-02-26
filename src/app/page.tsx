@@ -41,6 +41,9 @@ import {
   trackSkyAdCtaClick,
   trackReferralLinkLanded,
   trackShareClicked,
+  trackSignInPromptShown,
+  trackSignInPromptClicked,
+  trackDisabledButtonClicked,
 } from "@/lib/himetrica";
 
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
@@ -411,11 +414,18 @@ function HomeContent() {
   const [caCopied, setCaCopied] = useState(false);
   const [pillModalOpen, setPillModalOpen] = useState(false);
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
-  const [rabbitFlash, setRabbitFlash] = useState(false);
+  const [rabbitCinematic, setRabbitCinematic] = useState(false);
+  const [rabbitCinematicPhase, setRabbitCinematicPhase] = useState(-1);
   const [rabbitProgress, setRabbitProgress] = useState(0);
   const [rabbitSighting, setRabbitSighting] = useState<number | null>(null);
   const [rabbitCompletion, setRabbitCompletion] = useState(false);
   const [rabbitHintFlash, setRabbitHintFlash] = useState<string | null>(null);
+
+  // Growth optimization (A1: sign-in prompt, A5: ad direct open)
+  const buildingClickCountRef = useRef(0);
+  const signInPromptShownRef = useRef(false);
+  const [signInPromptVisible, setSignInPromptVisible] = useState(false);
+  const [adToast, setAdToast] = useState<string | null>(null);
 
   // Raid system
   const [raidState, raidActions] = useRaidSequence();
@@ -685,17 +695,24 @@ function HomeContent() {
 
   const lastDistRef = useRef(999);
 
+  const endRabbitCinematic = useCallback(() => {
+    setRabbitCinematic(false);
+    setRabbitCinematicPhase(-1);
+  }, []);
+
   // ESC: layered dismissal
   // During fly mode: only close overlays (profile card) — AirplaneFlight handles pause/exit
   // Outside fly mode: compare → share modal → profile card → focus → explore mode
   useEffect(() => {
     if (flyMode && !selectedBuilding) return;
-    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && raidState.phase === "idle") return;
+    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !rabbitCinematic && raidState.phase === "idle") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
         // Founder modals take highest priority
         if (founderMessageOpen) { setFounderMessageOpen(false); return; }
         if (pillModalOpen) { setPillModalOpen(false); return; }
+        // Rabbit cinematic
+        if (rabbitCinematic) { endRabbitCinematic(); return; }
         // Raid takes priority
         if (raidState.phase !== "idle") {
           if (raidState.phase === "preview") {
@@ -736,19 +753,21 @@ function HomeContent() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, raidState.phase, raidActions]);
+  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions]);
 
-  // Auto-dismiss rabbit flash, then spawn rabbit
+  // Rabbit cinematic text phase timing (8s total flyover)
   useEffect(() => {
-    if (!rabbitFlash) return;
-    const t = setTimeout(() => {
-      setRabbitFlash(false);
-      if (rabbitProgress < 5) {
-        setRabbitSighting(rabbitProgress + 1);
-      }
-    }, 4000);
-    return () => clearTimeout(t);
-  }, [rabbitFlash, rabbitProgress]);
+    if (!rabbitCinematic) {
+      setRabbitCinematicPhase(-1);
+      return;
+    }
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    // Phase 0: "Follow the white rabbit..." at 0.5s
+    timers.push(setTimeout(() => setRabbitCinematicPhase(0), 500));
+    // Phase 1: "It hides among the plazas..." at 4.0s
+    timers.push(setTimeout(() => setRabbitCinematicPhase(1), 4000));
+    return () => timers.forEach(clearTimeout);
+  }, [rabbitCinematic]);
 
   // Fetch rabbit progress on login
   useEffect(() => {
@@ -1203,7 +1222,27 @@ function HomeContent() {
         onAdClick={(ad) => {
           trackAdEvent(ad.id, "click", authLogin || undefined);
           trackSkyAdClick(ad.id, ad.vehicle, ad.link);
-          setClickedAd(ad);
+          // A5: Direct open for ads with links (skip modal)
+          if (ad.link) {
+            const ctaHref = buildAdLink(ad) ?? ad.link;
+            const isMailto = ad.link.startsWith("mailto:");
+            trackAdEvent(ad.id, "cta_click", authLogin || undefined);
+            trackSkyAdCtaClick(ad.id, ad.vehicle);
+            track("sky_ad_click", { ad_id: ad.id, vehicle: ad.vehicle, brand: ad.brand ?? "" });
+            if (isMailto) {
+              window.location.href = ctaHref;
+            } else {
+              const a = document.createElement("a");
+              a.href = ctaHref;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              a.click();
+            }
+            try { setAdToast(ad.brand || new URL(ad.link).hostname.replace("www.", "")); } catch { setAdToast(ad.brand || "link"); }
+            setTimeout(() => setAdToast(null), 2500);
+          } else {
+            setClickedAd(ad);
+          }
         }}
         onAdViewed={(adId) => {
           trackAdEvent(adId, "impression", authLogin || undefined);
@@ -1221,8 +1260,21 @@ function HomeContent() {
         onLandmarkClick={() => { setPillModalOpen(true); setSelectedBuilding(null); }}
         rabbitSighting={rabbitSighting}
         onRabbitCaught={onRabbitCaught}
+        rabbitCinematic={rabbitCinematic}
+        onRabbitCinematicEnd={endRabbitCinematic}
+        rabbitCinematicTarget={rabbitSighting ?? undefined}
         onBuildingClick={(b) => {
           trackBuildingClicked(b.login);
+          // A1: Sign-in prompt after 3 building clicks without session
+          if (!session && !signInPromptShownRef.current) {
+            buildingClickCountRef.current += 1;
+            if (buildingClickCountRef.current >= 3) {
+              signInPromptShownRef.current = true;
+              setSignInPromptVisible(true);
+              trackSignInPromptShown();
+              setTimeout(() => setSignInPromptVisible(false), 8000);
+            }
+          }
           // Compare pick mode: clicking a second building completes the pair
           if (compareBuilding && !comparePair) {
             if (b.login.toLowerCase() === compareBuilding.login.toLowerCase()) {
@@ -1521,7 +1573,7 @@ function HomeContent() {
       {/* Shop & Auth moved to center buttons area */}
 
       {/* ─── GitHub Badge (mobile: top-center, desktop: top-right) ─── */}
-      {!flyMode && !introMode && (
+      {!flyMode && !introMode && !rabbitCinematic && (
         <div className="pointer-events-auto fixed top-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 sm:left-auto sm:right-4 sm:top-4 sm:translate-x-0">
           <a
             href="https://github.com/srizzon/git-city"
@@ -1545,7 +1597,7 @@ function HomeContent() {
       )}
 
       {/* ─── Main UI Overlay ─── */}
-      {!flyMode && !exploreMode && !introMode && (
+      {!flyMode && !exploreMode && !introMode && !rabbitCinematic && (
         <div
           className="pointer-events-none fixed inset-0 z-20 flex flex-col items-center justify-between pt-12 pb-4 px-3 sm:py-8 sm:px-4"
           style={{
@@ -1809,6 +1861,52 @@ function HomeContent() {
         </div>
       )}
 
+      {/* ─── A1: Sign-in prompt after building exploration ─── */}
+      {signInPromptVisible && !session && (
+        <div className="fixed top-20 left-1/2 z-50 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-xs animate-[slide-up_0.2s_ease-out]">
+          <div className="border-[3px] border-border bg-bg-raised/95 px-4 py-3 backdrop-blur-sm">
+            <p className="text-[10px] text-cream normal-case mb-2.5 leading-relaxed">
+              Sign in to give Kudos, raid buildings, and claim yours
+            </p>
+            <button
+              onClick={() => {
+                trackSignInPromptClicked();
+                setSignInPromptVisible(false);
+                handleSignIn();
+              }}
+              className="btn-press w-full py-2 text-[10px] text-bg"
+              style={{
+                backgroundColor: theme.accent,
+                boxShadow: `2px 2px 0 0 ${theme.shadow}`,
+              }}
+            >
+              Sign in with GitHub
+            </button>
+            <button
+              onClick={() => setSignInPromptVisible(false)}
+              className="mt-1.5 w-full py-1 text-[8px] text-dim transition-colors hover:text-muted"
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── A5: Ad redirect toast ─── */}
+      {adToast && (
+        <div className="fixed top-16 left-1/2 z-50 -translate-x-1/2 animate-[fade-in_0.15s_ease-out]">
+          <div
+            className="border-[3px] px-5 py-2.5 text-[10px] text-bg"
+            style={{
+              backgroundColor: theme.accent,
+              borderColor: theme.shadow,
+            }}
+          >
+            Opening {adToast} &rarr;
+          </div>
+        </div>
+      )}
+
       {/* ─── Building Profile Card ─── */}
       {/* Desktop: right edge, vertically centered. Mobile: bottom sheet, centered. */}
       {selectedBuilding && (!flyMode || flyPaused) && !comparePair && raidState.phase === "idle" && (
@@ -1904,7 +2002,7 @@ function HomeContent() {
                       const tb = tierOrder.indexOf(ACHIEVEMENT_TIERS_MAP[b] ?? "bronze");
                       return ta - tb;
                     })
-                    .slice(0, 6)
+                    .slice(0, 3)
                     .map((ach) => {
                       const tier = ACHIEVEMENT_TIERS_MAP[ach];
                       const color = tier ? TIER_COLORS_MAP[tier] : undefined;
@@ -1922,10 +2020,14 @@ function HomeContent() {
                         </span>
                       );
                     })}
-                  {selectedBuilding.achievements.length > 6 && (
-                    <span className="px-1.5 py-0.5 text-[8px] text-dim">
-                      +{selectedBuilding.achievements.length - 6}
-                    </span>
+                  {selectedBuilding.achievements.length > 3 && (
+                    <Link
+                      href={`/dev/${selectedBuilding.login}`}
+                      className="px-1.5 py-0.5 text-[8px] transition-colors hover:text-cream"
+                      style={{ color: theme.accent }}
+                    >
+                      +{selectedBuilding.achievements.length - 3} more &rarr;
+                    </Link>
                   )}
                 </div>
               )}
@@ -1996,6 +2098,30 @@ function HomeContent() {
                     className="btn-press mt-1.5 w-full border-[3px] border-red-500/60 px-4 py-2 text-xs text-red-400 transition-colors hover:bg-red-500/10"
                   >
                     {raidState.loading ? "Loading..." : "RAID"}
+                  </button>
+                </div>
+              )}
+
+              {/* A3: Disabled action buttons for non-logged users */}
+              {!session && (
+                <div className="mx-4 mb-3 space-y-1.5">
+                  <button
+                    onClick={() => { trackDisabledButtonClicked("kudos"); handleSignIn(); }}
+                    className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
+                  >
+                    &#x1F512; Give Kudos
+                  </button>
+                  <button
+                    onClick={() => { trackDisabledButtonClicked("gift"); handleSignIn(); }}
+                    className="btn-press w-full py-1.5 text-[9px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
+                  >
+                    &#x1F512; Send Gift
+                  </button>
+                  <button
+                    onClick={() => { trackDisabledButtonClicked("raid"); handleSignIn(); }}
+                    className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-red-500/30 text-red-400/40 transition-colors hover:border-red-500/60 hover:text-red-400/70"
+                  >
+                    &#x1F512; RAID
                   </button>
                 </div>
               )}
@@ -2583,7 +2709,7 @@ function HomeContent() {
       )}
 
       {/* ─── Bottom-left controls: Theme + Radio ─── */}
-      {!flyMode && !introMode && !exploreMode && (
+      {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (
         <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex items-center gap-2 sm:left-4">
           <button
             onClick={() => setThemeIndex((i) => (i + 1) % THEMES.length)}
@@ -2612,7 +2738,7 @@ function HomeContent() {
 
 
       {/* ─── Activity Ticker ─── */}
-      {!flyMode && !introMode && feedEvents.length >= 1 && (
+      {!flyMode && !introMode && !rabbitCinematic && feedEvents.length >= 1 && (
         <ActivityTicker
           events={feedEvents}
           onEventClick={(evt) => {
@@ -2844,7 +2970,9 @@ function HomeContent() {
             setPillModalOpen(false);
             if (rabbitProgress >= 5) return;
             if (!myBuilding?.claimed) return;
-            setRabbitFlash(true);
+            // Spawn rabbit BEFORE cinematic so camera flies past it
+            setRabbitSighting(rabbitProgress + 1);
+            setRabbitCinematic(true);
           }}
           onClose={() => setPillModalOpen(false)}
         />
@@ -2853,39 +2981,59 @@ function HomeContent() {
         <FounderMessage onClose={() => setFounderMessageOpen(false)} />
       )}
 
-      {/* "Follow the White Rabbit" flash */}
-      {rabbitFlash && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
-          style={{
-            animation: "rabbitFlash 4s ease-in-out forwards",
-          }}
-        >
-          <div className="absolute inset-0 bg-black/80" />
-          <p
-            className="relative font-pixel text-[14px] sm:text-[18px] tracking-widest text-center px-4"
+      {/* Rabbit Quest Cinematic Overlay */}
+      {rabbitCinematic && (
+        <div className="fixed inset-0 z-50 pointer-events-none">
+          {/* Letterbox bars */}
+          <div
+            className="absolute inset-x-0 top-0 origin-top bg-black/80 transition-transform duration-700"
+            style={{ height: "12%", transform: rabbitCinematicPhase >= 0 ? "scaleY(1)" : "scaleY(0)" }}
+          />
+          <div
+            className="absolute inset-x-0 bottom-0 origin-bottom bg-black/80 transition-transform duration-700"
+            style={{ height: "18%", transform: rabbitCinematicPhase >= 0 ? "scaleY(1)" : "scaleY(0)" }}
+          />
+
+          {/* CRT scanlines */}
+          <div
+            className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,255,65,0.08) 1px, rgba(0,255,65,0.08) 2px)",
+              backgroundSize: "100% 2px",
+            }}
+          />
+
+          {/* Text in lower bar */}
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center" style={{ height: "18%" }}>
+            {["Follow the white rabbit...", "It hides among the plazas..."].map((text, i) => (
+              <p
+                key={i}
+                className="absolute text-center font-pixel normal-case px-4"
+                style={{
+                  fontSize: "clamp(0.85rem, 3vw, 1.5rem)",
+                  letterSpacing: "0.08em",
+                  color: "#00ff41",
+                  textShadow: "0 0 20px rgba(0,255,65,0.5), 0 0 40px rgba(0,255,65,0.2)",
+                  opacity: rabbitCinematicPhase === i ? 1 : 0,
+                  transition: "opacity 0.7s ease-in-out",
+                }}
+              >
+                {text}
+              </p>
+            ))}
+          </div>
+
+          {/* Skip button */}
+          <button
+            className="pointer-events-auto absolute top-4 right-4 z-[60] font-pixel text-[10px] sm:text-[12px] tracking-wider border border-[#00ff41]/40 px-3 py-1.5 transition-colors hover:bg-[#00ff41]/10"
             style={{
               color: "#00ff41",
-              textShadow: "0 0 20px rgba(0,255,65,0.5), 0 0 40px rgba(0,255,65,0.2)",
-              animation: "rabbitText 4s ease-in-out forwards",
+              textShadow: "0 0 8px rgba(0,255,65,0.3)",
             }}
+            onClick={endRabbitCinematic}
           >
-            Follow the white rabbit...
-          </p>
-          <style jsx>{`
-            @keyframes rabbitFlash {
-              0% { opacity: 0; }
-              15% { opacity: 1; }
-              75% { opacity: 1; }
-              100% { opacity: 0; }
-            }
-            @keyframes rabbitText {
-              0% { opacity: 0; transform: scale(0.95); }
-              15% { opacity: 1; transform: scale(1); }
-              75% { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(1.02); }
-            }
-          `}</style>
+            SKIP
+          </button>
         </div>
       )}
 

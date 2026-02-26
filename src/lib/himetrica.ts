@@ -133,3 +133,17 @@ export function trackReferralLinkLanded(referrer: string) {
 export function trackShareClicked(method: string) {
   hm()?.track("share_clicked", { method });
 }
+
+// ─── Growth Optimization ────────────────────────────────────
+
+export function trackSignInPromptShown() {
+  hm()?.track("sign_in_prompt_shown");
+}
+
+export function trackSignInPromptClicked() {
+  hm()?.track("sign_in_prompt_clicked");
+}
+
+export function trackDisabledButtonClicked(button_name: string) {
+  hm()?.track("disabled_button_clicked", { button_name });
+}

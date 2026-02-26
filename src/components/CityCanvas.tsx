@@ -296,6 +296,95 @@ function IntroFlyover({ onEnd }: { onEnd: () => void }) {
   return null;
 }
 
+// ─── Rabbit Quest Flyover ────────────────────────────────────
+
+const RABBIT_FLYOVER_DURATION = 8; // seconds
+
+// Pre-allocated temp vectors for RabbitFlyover (avoid GC in useFrame)
+const _rabbitPos = new THREE.Vector3();
+const _rabbitLook = new THREE.Vector3();
+
+function buildRabbitCurves(plazaX: number, plazaZ: number) {
+  // Camera path: orbital start -> descend through city -> pass near rabbit -> climb back to orbital
+  const posPoints = [
+    new THREE.Vector3(800, 700, 1000),               // WP0: Orbital start (seamless)
+    new THREE.Vector3(500, 500, 700),                 // WP1: Descending
+    new THREE.Vector3(plazaX + 300, 300, plazaZ + 300), // WP2: Approaching
+    new THREE.Vector3(plazaX + 100, 80, plazaZ + 100),  // WP3: Close pass (high side)
+    new THREE.Vector3(plazaX - 80, 60, plazaZ - 60),    // WP4: Closest point (low swoop)
+    new THREE.Vector3(plazaX - 200, 150, plazaZ - 250),  // WP5: Pulling away
+    new THREE.Vector3(200, 450, 400),                 // WP6: Climbing back
+    new THREE.Vector3(800, 700, 1000),                // WP7: Orbital end (seamless)
+  ];
+
+  // Look targets converge on the plaza during the close pass, then drift to city center
+  const lookPoints = [
+    new THREE.Vector3(0, 200, 0),                       // WP0: City center
+    new THREE.Vector3(plazaX, 50, plazaZ),              // WP1: Starting to aim at plaza
+    new THREE.Vector3(plazaX, 10, plazaZ),              // WP2: Locked on plaza
+    new THREE.Vector3(plazaX, 5, plazaZ),               // WP3: Locked on plaza (ground level)
+    new THREE.Vector3(plazaX, 5, plazaZ),               // WP4: Holding on plaza
+    new THREE.Vector3(plazaX, 30, plazaZ),              // WP5: Lifting gaze
+    new THREE.Vector3(0, 150, 0),                       // WP6: Drifting to city center
+    new THREE.Vector3(0, 200, 0),                       // WP7: City center (match orbital)
+  ];
+
+  const posCurve = new THREE.CatmullRomCurve3(posPoints, false, "centripetal");
+  const lookCurve = new THREE.CatmullRomCurve3(lookPoints, false, "centripetal");
+  posCurve.getLength();
+  lookCurve.getLength();
+  return { posCurve, lookCurve };
+}
+
+function RabbitFlyover({
+  targetPlazaIndex,
+  plazas,
+  onEnd,
+}: {
+  targetPlazaIndex: number;
+  plazas: CityPlaza[];
+  onEnd: () => void;
+}) {
+  const { camera } = useThree();
+  const elapsed = useRef(0);
+  const ended = useRef(false);
+
+  const plaza = plazas[targetPlazaIndex];
+  const plazaX = plaza?.position[0] ?? 0;
+  const plazaZ = plaza?.position[2] ?? 0;
+
+  const { posCurve, lookCurve } = useMemo(
+    () => buildRabbitCurves(plazaX, plazaZ),
+    [plazaX, plazaZ]
+  );
+
+  useEffect(() => {
+    camera.position.set(800, 700, 1000);
+    camera.lookAt(0, 200, 0);
+  }, [camera]);
+
+  useFrame((_, delta) => {
+    if (ended.current) return;
+    elapsed.current += delta;
+
+    const rawT = Math.min(elapsed.current / RABBIT_FLYOVER_DURATION, 1);
+    const t = introEase(rawT);
+
+    posCurve.getPointAt(t, _rabbitPos);
+    lookCurve.getPointAt(t, _rabbitLook);
+
+    camera.position.copy(_rabbitPos);
+    camera.lookAt(_rabbitLook);
+
+    if (elapsed.current >= RABBIT_FLYOVER_DURATION && !ended.current) {
+      ended.current = true;
+      onEnd();
+    }
+  });
+
+  return null;
+}
+
 // ─── Camera Focus (controls OrbitControls target) ───────────
 
 function CameraFocus({
@@ -1401,12 +1490,15 @@ interface Props {
   onLandmarkClick?: () => void;
   rabbitSighting?: number | null;
   onRabbitCaught?: () => void;
+  rabbitCinematic?: boolean;
+  onRabbitCinematicEnd?: () => void;
+  rabbitCinematicTarget?: number;
 }
 
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
 
@@ -1438,7 +1530,15 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => {})} />}
 
-      {!introMode && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
+      {rabbitCinematic && rabbitCinematicTarget != null && (
+        <RabbitFlyover
+          targetPlazaIndex={RABBIT_PLAZA_INDICES[(rabbitCinematicTarget - 1)] ?? 1}
+          plazas={plazas}
+          onEnd={onRabbitCinematicEnd ?? (() => {})}
+        />
+      )}
+
+      {!introMode && !rabbitCinematic && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
         <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} />
       )}
 
