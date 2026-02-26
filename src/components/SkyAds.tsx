@@ -225,17 +225,21 @@ function BannerPlane({
     }
   });
 
-  // Register both banner sides for the capture-phase pointer guard
+  // Register banner sides + hitbox for the capture-phase pointer guard
   const side1Ref = useRef<THREE.Mesh>(null);
   const side2Ref = useRef<THREE.Mesh>(null);
+  const hitboxRef = useRef<THREE.Mesh>(null);
   useEffect(() => {
     const s1 = side1Ref.current;
     const s2 = side2Ref.current;
+    const hb = hitboxRef.current;
     if (s1) registerAdMesh(s1);
     if (s2) registerAdMesh(s2);
+    if (hb) registerAdMesh(hb);
     return () => {
       if (s1) unregisterAdMesh(s1);
       if (s2) unregisterAdMesh(s2);
+      if (hb) unregisterAdMesh(hb);
     };
   }, []);
 
@@ -256,6 +260,18 @@ function BannerPlane({
 
   return (
     <group ref={groupRef}>
+      {/* Invisible hitbox covering entire vehicle (plane + rope + banner) */}
+      <mesh
+        ref={hitboxRef}
+        position={[0, bannerY / 2, (ROPE_GAP + BANNER_LENGTH) / 2]}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
+        <boxGeometry args={[12, Math.abs(bannerY) + BANNER_HEIGHT + 12, ROPE_GAP + BANNER_LENGTH + 12]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
       {/* Paper plane — scale 3.5x (bigger than player's 3x, proportional to banner) */}
       <group scale={[3.5, 3.5, 3.5]} rotation={[0, Math.PI / 2, 0]}>
         <primitive object={clonedScene} />
@@ -374,17 +390,21 @@ function Blimp({
     }
   });
 
-  // Register both screen sides for the capture-phase pointer guard
+  // Register screen sides + hitbox for the capture-phase pointer guard
   const screen1Ref = useRef<THREE.Mesh>(null);
   const screen2Ref = useRef<THREE.Mesh>(null);
+  const blimpHitboxRef = useRef<THREE.Mesh>(null);
   useEffect(() => {
     const s1 = screen1Ref.current;
     const s2 = screen2Ref.current;
+    const hb = blimpHitboxRef.current;
     if (s1) registerAdMesh(s1);
     if (s2) registerAdMesh(s2);
+    if (hb) registerAdMesh(hb);
     return () => {
       if (s1) unregisterAdMesh(s1);
       if (s2) unregisterAdMesh(s2);
+      if (hb) unregisterAdMesh(hb);
     };
   }, []);
 
@@ -402,6 +422,18 @@ function Blimp({
 
   return (
     <group ref={groupRef}>
+      {/* Invisible hitbox covering entire blimp */}
+      <mesh
+        ref={blimpHitboxRef}
+        position={[0, -2, 0]}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
+        <boxGeometry args={[24, 24, 54]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
       {/* Body — elongated along local Z (forward), light hull */}
       <mesh scale={[0.7, 0.5, 1.6]}>
         <sphereGeometry args={[15, 16, 12]} />

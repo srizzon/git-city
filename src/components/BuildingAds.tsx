@@ -96,7 +96,12 @@ function AdBillboard({
   return (
     <group position={[building.position[0], 0, building.position[2]]}>
       {/* Dark frame behind the screen */}
-      <mesh position={[0, y, zOff - 0.3]}>
+      <mesh
+        position={[0, y, zOff - 0.3]}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
         <boxGeometry args={[panelW + frameT * 2, panelH + frameT * 2, 0.3]} />
         <meshStandardMaterial color="#222" metalness={0.6} roughness={0.4} />
       </mesh>
@@ -112,11 +117,23 @@ function AdBillboard({
         <planeGeometry args={[panelW, panelH]} />
       </mesh>
       {/* Support struts from below */}
-      <mesh position={[-panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]} rotation={[0.3, 0, 0]}>
+      <mesh
+        position={[-panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]}
+        rotation={[0.3, 0, 0]}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
         <boxGeometry args={[0.3, 3, 0.3]} />
         <meshStandardMaterial color="#333" metalness={0.5} roughness={0.4} />
       </mesh>
-      <mesh position={[panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]} rotation={[0.3, 0, 0]}>
+      <mesh
+        position={[panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]}
+        rotation={[0.3, 0, 0]}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
         <boxGeometry args={[0.3, 3, 0.3]} />
         <meshStandardMaterial color="#333" metalness={0.5} roughness={0.4} />
       </mesh>
@@ -188,19 +205,34 @@ function AdRooftopSign({
   return (
     <group position={[building.position[0], 0, building.position[2]]}>
       {/* Main pole */}
-      <mesh position={[0, poleY, 0]}>
+      <mesh
+        position={[0, poleY, 0]}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
         <cylinderGeometry args={[0.3, 0.4, poleH, 6]} />
         <meshStandardMaterial color="#666" metalness={0.7} roughness={0.3} />
       </mesh>
       {/* Spinning sign group */}
       <group ref={groupRef} position={[0, signY, 0]}>
         {/* Top crossbar */}
-        <mesh position={[0, signH / 2 + 0.2, 0]}>
+        <mesh
+          position={[0, signH / 2 + 0.2, 0]}
+          onClick={handleClick}
+          onPointerOver={handlePointerOver}
+          onPointerOut={handlePointerOut}
+        >
           <boxGeometry args={[signW + 1, 0.4, 0.6]} />
           <meshStandardMaterial color="#555" metalness={0.6} roughness={0.3} />
         </mesh>
         {/* Bottom crossbar */}
-        <mesh position={[0, -signH / 2 - 0.2, 0]}>
+        <mesh
+          position={[0, -signH / 2 - 0.2, 0]}
+          onClick={handleClick}
+          onPointerOver={handlePointerOver}
+          onPointerOut={handlePointerOut}
+        >
           <boxGeometry args={[signW + 1, 0.4, 0.6]} />
           <meshStandardMaterial color="#555" metalness={0.6} roughness={0.3} />
         </mesh>
@@ -336,6 +368,9 @@ function AdLedWrap({
             material={accentMat}
             position={[f.pos[0], f.pos[1] + wrapH / 2 + accentH / 2, f.pos[2]]}
             rotation={[f.rot[0], f.rot[1], f.rot[2]]}
+            onClick={handleClick}
+            onPointerOver={handlePointerOver}
+            onPointerOut={handlePointerOut}
           >
             <planeGeometry args={[f.w, accentH]} />
           </mesh>
@@ -344,6 +379,9 @@ function AdLedWrap({
             material={accentMat}
             position={[f.pos[0], f.pos[1] - wrapH / 2 - accentH / 2, f.pos[2]]}
             rotation={[f.rot[0], f.rot[1], f.rot[2]]}
+            onClick={handleClick}
+            onPointerOver={handlePointerOver}
+            onPointerOut={handlePointerOut}
           >
             <planeGeometry args={[f.w, accentH]} />
           </mesh>

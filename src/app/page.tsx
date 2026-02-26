@@ -466,9 +466,9 @@ function HomeContent() {
         if (login) identifyUser({ github_login: login, email: s.user?.email ?? undefined });
       }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, s: Session | null) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, s: Session | null) => {
       setSession(s);
-      if (s) {
+      if (s && event !== "TOKEN_REFRESHED") {
         const login = (s.user?.user_metadata?.user_name ?? s.user?.user_metadata?.preferred_username ?? "").toLowerCase();
         if (login) identifyUser({ github_login: login, email: s.user?.email ?? undefined });
       }
@@ -482,20 +482,15 @@ function HomeContent() {
     ""
   ).toLowerCase();
 
-  // Fetch fly vehicle from raid loadout (on login + when returning from shop tab)
+  // Fetch fly vehicle from raid loadout (on login)
+  const sessionUserId = session?.user?.id;
   useEffect(() => {
-    if (!session) return;
-    const fetchVehicle = () => {
-      fetch("/api/raid/loadout")
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => { if (data?.vehicle) setFlyVehicle(data.vehicle); })
-        .catch(() => {});
-    };
-    fetchVehicle();
-    const onVisible = () => { if (!document.hidden) fetchVehicle(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [session]);
+    if (!sessionUserId) return;
+    fetch("/api/raid/loadout")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.vehicle) setFlyVehicle(data.vehicle); })
+      .catch(() => {});
+  }, [sessionUserId]);
 
   // Save ?ref= to localStorage (7-day expiry)
   useEffect(() => {
@@ -759,16 +754,8 @@ function HomeContent() {
     loadCity();
   }, [reloadCity]);
 
-  // Reload city with cache bust when returning from another page (e.g. shop)
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible" && didInit.current) {
-        reloadCity(true);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [reloadCity]);
+  // City reload on tab return removed — navigating back from shop already
+  // re-mounts the component and loads fresh data via the mount effect above.
 
   // ─── Intro text phase timing (14s total) ─────────────────────
   // Phase 0: "Somewhere in the internet..."   0.8s → fade out ~3.8s
