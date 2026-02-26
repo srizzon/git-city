@@ -116,8 +116,6 @@ export default function RaidTag3D({ width, height, depth, attackerLogin, tagStyl
         <mesh position={[0, 0, 0.02]} material={ledMat}>
           <planeGeometry args={[panelW, panelH]} />
         </mesh>
-        {/* Glow */}
-        <pointLight color={theme.color} intensity={3} distance={panelW} decay={2} position={[0, 0, 2]} />
       </group>
 
       {/* ── Back face ── */}
@@ -135,7 +133,6 @@ export default function RaidTag3D({ width, height, depth, attackerLogin, tagStyl
         <mesh position={[0, 0, -0.02]} material={ledMat} rotation={[0, Math.PI, 0]}>
           <planeGeometry args={[panelW, panelH]} />
         </mesh>
-        <pointLight color={theme.color} intensity={3} distance={panelW} decay={2} position={[0, 0, -2]} />
       </group>
     </group>
   );

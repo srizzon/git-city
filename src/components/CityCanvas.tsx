@@ -1406,7 +1406,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
   return (
     <Canvas
       camera={{ position: [400, 450, 600], fov: 55, near: 0.5, far: 4000 }}
-      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
+      dpr={[1, 1.5]}
+      gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}

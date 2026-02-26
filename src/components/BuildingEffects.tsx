@@ -1676,9 +1676,6 @@ export function StreakFlame({
   streakDays: number;
   color?: string;
 }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const frameCount = useRef(0);
-
   // Streak determines how far up the strips go (10% to 100%)
   const fillPct = Math.min(1, streakDays <= 1 ? 0.1 : streakDays < 7 ? streakDays / 30 : streakDays < 14 ? 0.5 : streakDays < 30 ? 0.75 : 1);
   const stripH = height * fillPct;
@@ -1697,21 +1694,8 @@ export function StreakFlame({
     ];
   }, [width, depth]);
 
-  useFrame((state) => {
-    if (!groupRef.current) return;
-    frameCount.current++;
-    if (frameCount.current % 3 !== 0) return;
-    const t = state.clock.elapsedTime;
-    groupRef.current.children.forEach((child) => {
-      const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-      if (mat?.emissiveIntensity !== undefined) {
-        mat.emissiveIntensity = intensity + Math.sin(t * 2) * 0.8;
-      }
-    });
-  });
-
   return (
-    <group ref={groupRef}>
+    <group>
       {corners.map((c, i) => (
         <mesh key={i} position={[c.x, stripH / 2, c.z]}>
           <boxGeometry args={[stripW, stripH, stripW]} />
@@ -1726,12 +1710,6 @@ export function StreakFlame({
           />
         </mesh>
       ))}
-      <pointLight
-        position={[0, stripH, 0]}
-        color={color}
-        intensity={intensity * 8}
-        distance={60}
-      />
     </group>
   );
 }
