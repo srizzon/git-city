@@ -44,9 +44,10 @@ export async function createCryptoInvoice(
   }
 
   const priceUsd = item.price_usd_cents / 100;
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.thegitcity.com").replace(/\/+$/, "");
 
-  const successUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://thegitcity.com"}/shop/${githubLogin}?purchased=${itemId}`;
-  const cancelUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://thegitcity.com"}/shop/${githubLogin}`;
+  const successUrl = `${siteUrl}/shop/${githubLogin}?purchased=${itemId}`;
+  const cancelUrl = `${siteUrl}/shop/${githubLogin}`;
 
   const res = await fetch(`${NOWPAYMENTS_API}/invoice`, {
     method: "POST",
@@ -59,7 +60,7 @@ export async function createCryptoInvoice(
       price_currency: "usd",
       order_id: `${developerId}:${itemId}`,
       order_description: `${item.name} - ${githubLogin}`,
-      ipn_callback_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://thegitcity.com"}/api/webhooks/nowpayments`,
+      ipn_callback_url: `${siteUrl}/api/webhooks/nowpayments`,
       success_url: successUrl,
       cancel_url: cancelUrl,
     }),
