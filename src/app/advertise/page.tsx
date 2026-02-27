@@ -5,16 +5,15 @@ import { AdvertisePageTracker } from "./tracking";
 import { AdPurchaseForm } from "./AdPurchaseForm";
 
 const ACCENT = "#c8e64a";
-const SHADOW = "#5a7a00";
 
 export const metadata: Metadata = {
   title: "Advertise on Git City",
   description:
-    "Advertise on the tallest buildings and across the sky of a 3D city with 1,000+ GitHub developers. Billboards, LED wraps, planes, blimps. Full analytics.",
+    "Reach 8,500+ verified GitHub developers. Planes, blimps, billboards in a 3D city. 1%+ avg click rate. Real-time analytics. From $19/week.",
   openGraph: {
     title: "Advertise on Git City",
     description:
-      "Advertise on the tallest buildings and across the sky of a 3D city with 1,000+ GitHub developers. Billboards, LED wraps, planes, blimps. Full analytics.",
+      "Reach 8,500+ verified GitHub developers. Planes, blimps, billboards in a 3D city. 1%+ avg click rate. Real-time analytics. From $19/week.",
     siteName: "Git City",
     type: "website",
     locale: "en_US",
@@ -26,125 +25,259 @@ export const metadata: Metadata = {
   },
 };
 
+function formatK(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.floor(n / 1_000)}K`;
+  return n.toLocaleString();
+}
+
 async function getStats() {
   const supabase = getSupabaseAdmin();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
 
-  const [devResult, impressionResult] = await Promise.all([
+  const [devResult, impressionResult, clickResult] = await Promise.all([
     supabase
       .from("developers")
       .select("id", { count: "exact", head: true }),
     supabase
       .from("sky_ad_events")
       .select("id", { count: "exact", head: true })
-      .eq("event_type", "impression"),
+      .eq("event_type", "impression")
+      .gte("created_at", thirtyDaysAgo),
+    supabase
+      .from("sky_ad_events")
+      .select("id", { count: "exact", head: true })
+      .in("event_type", ["click", "cta_click"])
+      .gte("created_at", thirtyDaysAgo),
   ]);
 
-  return {
-    devCount: devResult.count ?? 0,
-    totalImpressions: impressionResult.count ?? 0,
-  };
+  const impressions = impressionResult.count ?? 0;
+  const clicks = clickResult.count ?? 0;
+  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+
+  return { devCount: devResult.count ?? 0, monthlyImpressions: impressions, monthlyClicks: clicks, ctr };
 }
 
+const COMPETITORS = [
+  { name: "X (Twitter)", ctr: 0.8 },
+  { name: "Google Display", ctr: 0.5 },
+  { name: "LinkedIn", ctr: 0.4 },
+  { name: "Avg banner ad", ctr: 0.46 },
+];
+
 export default async function AdvertisePage() {
-  const { devCount, totalImpressions } = await getStats();
+  const { devCount, monthlyImpressions, monthlyClicks, ctr } = await getStats();
+
+  const statCards = [
+    { value: `${formatK(monthlyImpressions)}+`, label: "monthly impressions" },
+    { value: `${formatK(monthlyClicks)}+`, label: "monthly ad clicks" },
+    {
+      value: `${ctr.toFixed(1)}%`,
+      label: "avg click rate",
+      sub: ctr > 0.9 ? "2x+ industry avg" : undefined,
+    },
+    { value: `${formatK(devCount)}+`, label: "developer buildings" },
+  ];
+
+  const barMax = Math.max(ctr, 1.2);
 
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
       <AdvertisePageTracker />
 
-      {/* ═══════════════════════════════════════════
-          ZONE 1: THE BUILDER
-          Purchase flow. Focused. No distractions.
-          ═══════════════════════════════════════════ */}
-      <div className="mx-auto max-w-3xl px-4 pt-6 pb-10">
+      <div className="mx-auto max-w-3xl px-4 pt-6 pb-12">
         {/* Nav */}
-        <div className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-xs text-muted transition-colors hover:text-cream"
-          >
-            &larr; Back to City
-          </Link>
-          <div className="flex items-center gap-4 text-[11px] text-muted normal-case">
-            <span>
-              <span style={{ color: ACCENT }}>
-                {devCount.toLocaleString()}+
-              </span>{" "}
-              buildings
-            </span>
-            <span>
-              <span style={{ color: ACCENT }}>
-                {totalImpressions.toLocaleString()}+
-              </span>{" "}
-              impressions
-            </span>
-          </div>
-        </div>
+        <Link
+          href="/"
+          className="text-sm text-muted transition-colors hover:text-cream"
+        >
+          &larr; Back to City
+        </Link>
 
-        {/* Hero text */}
-        <div className="mt-8 text-center">
-          <h1 className="text-2xl text-cream sm:text-3xl">
+        {/* ── Hero ── */}
+        <div className="mt-10 text-center">
+          <h1 className="text-3xl text-cream sm:text-4xl">
             Your brand in the{" "}
             <span style={{ color: ACCENT }}>skyline</span>
           </h1>
-          <p className="mt-2 text-xs text-muted normal-case">
-            Planes and blimps in the sky, billboards and LEDs on the tallest
-            buildings. <br />
-            Pick a format, preview in 3D, go live in minutes.
+          <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-muted normal-case">
+            Planes, blimps, and billboards inside a 3D city
+            with {devCount.toLocaleString()}+ developer buildings.
+            Not a banner ad. Not a sidebar. Something people actually look at.
           </p>
         </div>
 
-        {/* Purchase form: preview + control panel */}
-        <div className="mt-6">
+        {/* ── Stats ── */}
+        <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {statCards.map((s) => (
+            <div
+              key={s.label}
+              className="border-[3px] border-border p-4 text-center"
+            >
+              <p className="text-2xl" style={{ color: ACCENT }}>
+                {s.value}
+              </p>
+              <p className="mt-1 text-xs leading-tight text-muted normal-case">
+                {s.label}
+              </p>
+              {s.sub && (
+                <p
+                  className="mt-1 text-[10px] normal-case"
+                  style={{ color: ACCENT }}
+                >
+                  {s.sub}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* ── Your audience ── */}
+        <div className="mt-8 border-[3px] border-border p-5 sm:p-6">
+          <p className="text-base text-cream">Your audience</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {[
+              "Verified GitHub developers, not bots",
+              "Software engineers, CTOs, indie hackers",
+              "The people who build the tools your customers use",
+              "Minutes of engagement per session, not seconds",
+              "Global reach: US, EU, Brazil, India",
+              "100% viewability. No ad blockers. No scroll-past",
+            ].map((f) => (
+              <p
+                key={f}
+                className="flex items-start gap-2 text-sm text-muted normal-case"
+              >
+                <span className="mt-px" style={{ color: ACCENT }}>
+                  +
+                </span>
+                {f}
+              </p>
+            ))}
+          </div>
+        </div>
+
+        {/* ── CTR comparison ── */}
+        {ctr > 0.5 && (
+          <div className="mt-8 border-[3px] border-border p-5 sm:p-6">
+            <p className="text-base text-cream">
+              Git City vs traditional ads
+            </p>
+            <p className="mt-1 text-xs text-muted normal-case">
+              Average click-through rate by platform
+            </p>
+
+            <div className="mt-5 space-y-3">
+              {/* Git City bar */}
+              <div className="flex items-center gap-3">
+                <span className="w-28 shrink-0 text-xs text-cream normal-case sm:w-32">
+                  Git City
+                </span>
+                <div className="relative h-6 flex-1 overflow-hidden rounded-sm">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-sm"
+                    style={{
+                      width: `${(ctr / barMax) * 100}%`,
+                      backgroundColor: ACCENT,
+                    }}
+                  />
+                </div>
+                <span
+                  className="w-14 text-right text-sm font-bold"
+                  style={{ color: ACCENT }}
+                >
+                  {ctr.toFixed(1)}%
+                </span>
+              </div>
+
+              {/* Competitor bars */}
+              {COMPETITORS.map((p) => (
+                <div key={p.name} className="flex items-center gap-3">
+                  <span className="w-28 shrink-0 text-xs text-muted normal-case sm:w-32">
+                    {p.name}
+                  </span>
+                  <div className="relative h-6 flex-1 overflow-hidden rounded-sm">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-sm bg-border"
+                      style={{ width: `${(p.ctr / barMax) * 100}%` }}
+                    />
+                  </div>
+                  <span className="w-14 text-right text-sm text-muted">
+                    {p.ctr}%
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-4 text-xs text-dim normal-case">
+              Your ad is part of the world, not a banner people train
+              themselves to ignore.
+            </p>
+          </div>
+        )}
+
+        {/* ── Purchase form ── */}
+        <div className="mt-10">
           <AdPurchaseForm />
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════
-          ZONE 2: THE PROOF
-          For people who scroll down to learn more.
+          ZONE 2: HOW IT WORKS + FAQ
           ═══════════════════════════════════════════ */}
       <div
         className="border-t-[3px] border-border"
         style={{ backgroundColor: "#080e1c" }}
       >
-        <div className="mx-auto max-w-3xl px-4 py-14">
+        <div className="mx-auto max-w-3xl px-4 py-16">
           {/* How it works */}
-          <div className="grid gap-6 sm:grid-cols-4">
+          <div className="grid gap-8 sm:grid-cols-4">
             {[
-              { n: "01", t: "Pick", d: "Sky ads or building ads, 5 formats" },
-              { n: "02", t: "Design", d: "Write your message, pick your colors, preview in 3D" },
-              { n: "03", t: "Pay", d: "Secure checkout, no account needed" },
-              { n: "04", t: "Live", d: "Your ad goes live instantly across the city" },
+              { n: "01", t: "Pick", d: "5 formats from $19/week" },
+              {
+                n: "02",
+                t: "Design",
+                d: "Write your text, pick colors, preview in 3D",
+              },
+              {
+                n: "03",
+                t: "Pay",
+                d: "Secure Stripe checkout. No account needed",
+              },
+              {
+                n: "04",
+                t: "Track",
+                d: "Private dashboard with real-time impressions and clicks",
+              },
             ].map((s) => (
               <div key={s.n}>
-                <span className="text-xl" style={{ color: ACCENT }}>
+                <span className="text-2xl" style={{ color: ACCENT }}>
                   {s.n}
                 </span>
-                <h3 className="mt-1 text-sm text-cream">{s.t}</h3>
-                <p className="mt-1 text-[11px] leading-relaxed text-muted normal-case">
+                <h3 className="mt-1 text-base text-cream">{s.t}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted normal-case">
                   {s.d}
                 </p>
               </div>
             ))}
           </div>
 
-          {/* Included features */}
-          <div className="mt-12 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-            <p className="mb-2 text-sm text-cream sm:col-span-2">
+          {/* Every ad includes */}
+          <div className="mt-14 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+            <p className="mb-2 text-base text-cream sm:col-span-2">
               Every ad includes
             </p>
             {[
-              "Displayed on the tallest buildings or flying across the skyline",
-              "Custom text up to 80 characters with your brand colors",
+              "Your text, your colors, your brand",
               "Live 3D preview before you buy",
               "Clickable link with UTM tracking",
-              "Real-time impression and click analytics",
-              "Goes live instantly after payment",
+              "Private dashboard with real-time impressions and clicks",
+              "Live within minutes of payment",
+              "Free unlimited text and detail changes",
             ].map((f) => (
               <p
                 key={f}
-                className="flex items-center gap-2 text-xs text-muted normal-case"
+                className="flex items-center gap-2 text-sm text-muted normal-case"
               >
                 <span style={{ color: ACCENT }}>+</span>
                 {f}
@@ -153,38 +286,50 @@ export default async function AdvertisePage() {
           </div>
 
           {/* FAQ */}
-          <div className="mt-12">
-            <p className="mb-4 text-sm text-cream">FAQ</p>
+          <div className="mt-14">
+            <p className="mb-5 text-base text-cream">FAQ</p>
             <div className="space-y-3">
               {[
                 {
                   q: "How many people will see my ad?",
-                  a: `The city has ${devCount.toLocaleString()}+ developer buildings and growing. Building ads are placed on the tallest towers, which are the first thing visitors see. Sky ads fly across the entire skyline. Every visitor who explores the city sees your ad.`,
+                  a: `${formatK(monthlyImpressions)}+ monthly impressions across ${devCount.toLocaleString()}+ developer buildings. Sky ads fly across the entire skyline. Building ads sit on the tallest towers. There is no way to visit the city without seeing your ad.`,
+                },
+                {
+                  q: "What's the click-through rate?",
+                  a: `${ctr.toFixed(1)}% average CTR. That's 2x+ the industry average for display ads (0.46%). People click because the ads are part of the world, not something to scroll past.`,
+                },
+                {
+                  q: "Who is the audience?",
+                  a: "100% GitHub developers. Software engineers, CTOs, indie hackers, open source maintainers. Every building is a real GitHub profile with real contribution data. No bots, no fake traffic.",
                 },
                 {
                   q: "What formats are available?",
-                  a: "Sky: planes trailing LED banners, blimps with scrolling LED screens. Building: billboards mounted on tower faces, rotating rooftop signs, full LED wraps. All rendered in dot-matrix LED style.",
+                  a: "Sky: planes trailing LED banners, blimps with scrolling LED screens. Building: billboards mounted on tower faces, rotating rooftop signs, full LED wraps. All rendered in dot-matrix pixel style.",
                 },
                 {
-                  q: "Can I change my ad text?",
-                  a: "Yes. One free text change per week. Email samuelrizzondev@gmail.com.",
+                  q: "Do I get analytics?",
+                  a: "Yes. After purchase you get a private tracking dashboard with real-time impressions, clicks, and CTA clicks. Bookmark it and check anytime.",
                 },
                 {
-                  q: "What if I want a refund?",
-                  a: "Available within the first 3 days. After that it runs until the end of the paid period.",
+                  q: "How many ad slots are available?",
+                  a: "8 plane slots, 4 blimp slots, 10 each for billboard, rooftop, and LED wrap. Limited inventory keeps your ad visible.",
                 },
                 {
                   q: "How do I pay?",
-                  a: "Credit card, Apple Pay, or Google Pay via Stripe. No account needed.",
+                  a: "Credit card, Apple Pay, or Google Pay via Stripe. No account needed. Takes about 30 seconds.",
                 },
                 {
-                  q: "How many slots per format?",
-                  a: "4 plane, 2 blimp, 10 each for billboard, rooftop, and LED wrap. Limited inventory keeps your ad visible.",
+                  q: "Can I change my ad after buying?",
+                  a: "Yes. You get a setup page where you can update your text, brand name, description, and link anytime. Unlimited changes, no extra cost.",
+                },
+                {
+                  q: "What if I want a refund?",
+                  a: "Full refund within the first 3 days. After that it runs until the end of the paid period.",
                 },
               ].map((item) => (
-                <div key={item.q} className="border-[2px] border-border p-4">
-                  <h3 className="text-xs text-cream">{item.q}</h3>
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-muted normal-case">
+                <div key={item.q} className="border-[2px] border-border p-5">
+                  <h3 className="text-sm text-cream">{item.q}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted normal-case">
                     {item.a}
                   </p>
                 </div>
@@ -193,18 +338,8 @@ export default async function AdvertisePage() {
           </div>
 
           {/* Footer */}
-          <div className="mt-12 text-center">
-            <a
-              href="#"
-              className="btn-press inline-block px-7 py-3.5 text-sm text-bg"
-              style={{
-                backgroundColor: ACCENT,
-                boxShadow: `4px 4px 0 0 ${SHADOW}`,
-              }}
-            >
-              Browse Ad Formats
-            </a>
-            <p className="mt-4 text-[11px] text-muted normal-case">
+          <div className="mt-14 text-center">
+            <p className="text-xs text-muted normal-case">
               Questions?{" "}
               <a
                 href="mailto:samuelrizzondev@gmail.com"
@@ -214,7 +349,7 @@ export default async function AdvertisePage() {
                 samuelrizzondev@gmail.com
               </a>
             </p>
-            <p className="mt-4 text-[11px] text-muted normal-case">
+            <p className="mt-4 text-xs text-muted normal-case">
               built by{" "}
               <a
                 href="https://x.com/samuelrizzondev"

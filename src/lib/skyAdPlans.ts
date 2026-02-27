@@ -3,38 +3,38 @@ import type { AdVehicle } from "./skyAds";
 export type AdCurrency = "usd" | "brl";
 
 // Promo discount multiplier. Set to 1 to disable.
-export const PROMO_DISCOUNT = 0.5;
-export const PROMO_LABEL = "50% off - Git City Launch Week";
+export const PROMO_DISCOUNT = 1;
+export const PROMO_LABEL = "";
 
 export const SKY_AD_PLANS = {
   // Sky Ads
   plane_weekly: {
-    usd_cents: 700,
-    brl_cents: 3500,
+    usd_cents: 1900,
+    brl_cents: 9900,
     label: "Plane - Weekly",
     duration_days: 7,
     vehicle: "plane" as AdVehicle,
     category: "sky" as const,
   },
   plane_monthly: {
-    usd_cents: 1900,
-    brl_cents: 9500,
+    usd_cents: 5900,
+    brl_cents: 29900,
     label: "Plane - Monthly",
     duration_days: 30,
     vehicle: "plane" as AdVehicle,
     category: "sky" as const,
   },
   blimp_weekly: {
-    usd_cents: 1500,
-    brl_cents: 7500,
+    usd_cents: 7900,
+    brl_cents: 39900,
     label: "Blimp - Weekly",
     duration_days: 7,
     vehicle: "blimp" as AdVehicle,
     category: "sky" as const,
   },
   blimp_monthly: {
-    usd_cents: 3900,
-    brl_cents: 19500,
+    usd_cents: 27900,
+    brl_cents: 139900,
     label: "Blimp - Monthly",
     duration_days: 30,
     vehicle: "blimp" as AdVehicle,
@@ -42,48 +42,48 @@ export const SKY_AD_PLANS = {
   },
   // Building Ads
   billboard_weekly: {
-    usd_cents: 1200,
-    brl_cents: 5900,
+    usd_cents: 3900,
+    brl_cents: 19900,
     label: "Billboard - Weekly",
     duration_days: 7,
     vehicle: "billboard" as AdVehicle,
     category: "building" as const,
   },
   billboard_monthly: {
-    usd_cents: 2900,
-    brl_cents: 14500,
+    usd_cents: 13900,
+    brl_cents: 69900,
     label: "Billboard - Monthly",
     duration_days: 30,
     vehicle: "billboard" as AdVehicle,
     category: "building" as const,
   },
   rooftop_sign_weekly: {
-    usd_cents: 500,
-    brl_cents: 2500,
+    usd_cents: 5900,
+    brl_cents: 29900,
     label: "Rooftop Sign - Weekly",
     duration_days: 7,
     vehicle: "rooftop_sign" as AdVehicle,
     category: "building" as const,
   },
   rooftop_sign_monthly: {
-    usd_cents: 1500,
-    brl_cents: 7500,
+    usd_cents: 19900,
+    brl_cents: 99900,
     label: "Rooftop Sign - Monthly",
     duration_days: 30,
     vehicle: "rooftop_sign" as AdVehicle,
     category: "building" as const,
   },
   led_wrap_weekly: {
-    usd_cents: 1500,
-    brl_cents: 7500,
+    usd_cents: 2900,
+    brl_cents: 14900,
     label: "LED Wrap - Weekly",
     duration_days: 7,
     vehicle: "led_wrap" as AdVehicle,
     category: "building" as const,
   },
   led_wrap_monthly: {
-    usd_cents: 3900,
-    brl_cents: 19500,
+    usd_cents: 9900,
+    brl_cents: 49900,
     label: "LED Wrap - Monthly",
     duration_days: 30,
     vehicle: "led_wrap" as AdVehicle,

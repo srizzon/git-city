@@ -14,10 +14,10 @@ type Duration = "weekly" | "monthly";
 
 const VEHICLES: { id: Vehicle; icon: string; name: string }[] = [
   { id: "plane", icon: "\u2708", name: "Plane" },
-  { id: "blimp", icon: "\u25C6", name: "Blimp" },
+  { id: "led_wrap", icon: "\uD83D\uDCA1", name: "LED Wrap" },
   { id: "billboard", icon: "\uD83D\uDCCB", name: "Billboard" },
   { id: "rooftop_sign", icon: "\uD83D\uDD04", name: "Rooftop" },
-  { id: "led_wrap", icon: "\uD83D\uDCA1", name: "LED Wrap" },
+  { id: "blimp", icon: "\u25C6", name: "Blimp" },
 ];
 
 function getPlanId(vehicle: Vehicle, duration: Duration): SkyAdPlanId {
