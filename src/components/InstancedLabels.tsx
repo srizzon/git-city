@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useEffect } from "react";
+import { useRef, useMemo, useEffect, memo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
@@ -144,6 +144,43 @@ const _labelQuat = new THREE.Quaternion();
 const _labelScale = new THREE.Vector3(1, 1, 1);
 const _labelPos = new THREE.Vector3();
 
+// ─── Spatial Grid (O(nearby) lookups instead of O(n)) ─────────
+
+const GRID_CELL_SIZE = 100;
+
+class SpatialGrid2D {
+  private cells: Map<string, number[]> = new Map();
+
+  constructor(buildings: CityBuilding[], count: number) {
+    for (let i = 0; i < count; i++) {
+      const b = buildings[i];
+      const key = `${Math.floor(b.position[0] / GRID_CELL_SIZE)},${Math.floor(b.position[2] / GRID_CELL_SIZE)}`;
+      let cell = this.cells.get(key);
+      if (!cell) {
+        cell = [];
+        this.cells.set(key, cell);
+      }
+      cell.push(i);
+    }
+  }
+
+  queryRadius(x: number, z: number, radius: number): number[] {
+    const cr = Math.ceil(radius / GRID_CELL_SIZE);
+    const cx = Math.floor(x / GRID_CELL_SIZE);
+    const cz = Math.floor(z / GRID_CELL_SIZE);
+    const result: number[] = [];
+    for (let dx = -cr; dx <= cr; dx++) {
+      for (let dz = -cr; dz <= cr; dz++) {
+        const cell = this.cells.get(`${cx + dx},${cz + dz}`);
+        if (cell) {
+          for (let i = 0; i < cell.length; i++) result.push(cell[i]);
+        }
+      }
+    }
+    return result;
+  }
+}
+
 // ─── Component ─────────────────────────────────────────────────
 
 interface InstancedLabelsProps {
@@ -154,7 +191,7 @@ interface InstancedLabelsProps {
   focusedBuildingB?: string | null;
 }
 
-export default function InstancedLabels({
+export default memo(function InstancedLabels({
   buildings,
   introMode,
   flyMode,
@@ -253,6 +290,9 @@ export default function InstancedLabels({
     [buildings, count]
   );
 
+  // Spatial grid for fast nearby-building queries
+  const grid = useMemo(() => new SpatialGrid2D(buildings, count), [buildings, count]);
+
   // Throttled target alphas + per-frame lerp
   const targetAlphas = useRef<Float32Array | null>(null);
   const lastLabelTick = useRef(-1);
@@ -288,12 +328,19 @@ export default function InstancedLabels({
         const camX = camera.position.x;
         const camZ = camera.position.z;
 
-        for (let i = 0; i < count; i++) {
-          if (hasFocus) {
+        if (hasFocus) {
+          // Focus mode: dim all, highlight focused (must check all labels)
+          for (let i = 0; i < count; i++) {
             const loginLow = loginsLower[i];
             const isFocused = loginLow === focusedLower || loginLow === focusedBLower;
             targets[i] = isFocused ? 0 : 0.15;
-          } else {
+          }
+        } else {
+          // Normal mode: use spatial grid to only check nearby buildings
+          targets.fill(0);
+          const nearby = grid.queryRadius(camX, camZ, LABEL_VISIBLE_RADIUS);
+          for (let j = 0; j < nearby.length; j++) {
+            const i = nearby[j];
             const b = buildings[i];
             const dx = camX - b.position[0];
             const dz = camZ - b.position[2];
@@ -347,4 +394,4 @@ export default function InstancedLabels({
       renderOrder={10}
     />
   );
-}
+});

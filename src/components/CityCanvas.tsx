@@ -1503,6 +1503,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
 
+
   const cityRadius = useMemo(() => {
     let max = 200;
     for (const b of buildings) {

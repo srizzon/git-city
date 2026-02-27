@@ -26,7 +26,7 @@ import RaidOverlay from "@/components/RaidOverlay";
 import PillModal from "@/components/PillModal";
 import FounderMessage from "@/components/FounderMessage";
 import RabbitCompletion from "@/components/RabbitCompletion";
-import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent } from "@/lib/skyAds";
+import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
 import {
   identifyUser,
@@ -1237,8 +1237,9 @@ function HomeContent() {
         onAdClick={(ad) => {
           trackAdEvent(ad.id, "click", authLogin || undefined);
           trackSkyAdClick(ad.id, ad.vehicle, ad.link);
-          // A5: Direct open for ads with links (skip modal)
-          if (ad.link) {
+          // Building ads (billboard, rooftop, led_wrap): direct open
+          // Sky ads (plane, blimp): show modal first so user sees what it is
+          if (ad.link && isBuildingAd(ad.vehicle)) {
             const ctaHref = buildAdLink(ad) ?? ad.link;
             const isMailto = ad.link.startsWith("mailto:");
             trackAdEvent(ad.id, "cta_click", authLogin || undefined);

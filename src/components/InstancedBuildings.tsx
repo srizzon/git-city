@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useEffect } from "react";
+import { useRef, useMemo, useEffect, memo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
@@ -43,6 +43,7 @@ const vertexShader = /* glsl */ `
     vec4 mvPos = modelViewMatrix * instanceMatrix * vec4(localPos, 1.0);
     vViewPos = mvPos.xyz;
     vInstanceId = float(gl_InstanceID);
+
     gl_Position = projectionMatrix * mvPos;
   }
 `;
@@ -68,6 +69,10 @@ const fragmentShader = /* glsl */ `
   varying vec4 vTint;
 
   void main() {
+    // Early discard: skip fragments fully inside fog (invisible anyway)
+    float fogDepth = length(vViewPos);
+    if (fogDepth > uFogFar) discard;
+
     vec3 absN = abs(vNormal);
     float isRoof = step(0.5, absN.y);
 
@@ -136,9 +141,8 @@ const fragmentShader = /* glsl */ `
       if (bayer > uDimOpacity) discard;
     }
 
-    // Linear fog
-    float depth = length(vViewPos);
-    float fogFactor = smoothstep(uFogNear, uFogFar, depth);
+    // Linear fog (reuse fogDepth from early discard)
+    float fogFactor = smoothstep(uFogNear, uFogFar, fogDepth);
     color = mix(color, uFogColor, fogFactor);
 
     gl_FragColor = vec4(color, 1.0);
@@ -174,7 +178,7 @@ interface RiseState {
 const RISE_DURATION = 0.85; // seconds
 const RISE_STAGGER_DELAY = 0.003; // stagger between buildings (~2.4s for 800 buildings)
 
-export default function InstancedBuildings({
+export default memo(function InstancedBuildings({
   buildings,
   colors,
   atlasTexture,
@@ -539,4 +543,4 @@ export default function InstancedBuildings({
       frustumCulled={false}
     />
   );
-}
+});
