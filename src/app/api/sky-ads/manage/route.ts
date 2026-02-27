@@ -122,3 +122,44 @@ export async function DELETE(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+// Batch operations: pause, resume, or delete multiple ads
+export async function PATCH(request: Request) {
+  if (!(await checkAdmin())) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const { ids, action } = body;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return NextResponse.json({ error: "Missing ids array" }, { status: 400 });
+  }
+
+  const validActions = ["pause", "resume", "delete"];
+  if (!validActions.includes(action)) {
+    return NextResponse.json({ error: "Invalid action. Use: pause, resume, delete" }, { status: 400 });
+  }
+
+  const admin = getSupabaseAdmin();
+
+  if (action === "delete") {
+    // Delete related events first, then the ads
+    await admin.from("sky_ad_events").delete().in("ad_id", ids);
+    const { error } = await admin.from("sky_ads").delete().in("id", ids);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+  } else {
+    const active = action === "resume";
+    const { error } = await admin
+      .from("sky_ads")
+      .update({ active })
+      .in("id", ids);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+  }
+
+  return NextResponse.json({ ok: true, affected: ids.length });
+}
