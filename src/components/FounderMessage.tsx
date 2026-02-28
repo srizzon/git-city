@@ -6,7 +6,7 @@ interface FounderMessageProps {
   onClose: () => void;
 }
 
-type Lang = "en" | "pt";
+type Lang = "en" | "pt" | "zh";
 
 const MESSAGES: Record<Lang, string[]> = {
   en: [
@@ -31,16 +31,36 @@ const MESSAGES: Record<Lang, string[]> = {
     "Obrigado por estar aqui. Obrigado por construir. A cidade e de voces.",
     "Nos vemos nas ruas.",
   ],
+  zh: [
+    "你选择了真相。选得好。",
+    "你在这里看到的一切……建筑、灯光、街道……都是代码。每一个像素、每一扇亮灯的窗户、每一道阴影。这一切都是一场模拟。而你其实早就知道了。",
+    "你可能不知道的是，在整座城市背后，只有一名开发者。一个人决定独自搭建这一切，只因为他有这个能力。",
+    "Git 之城诞生于一个周末。想法很简单：如果我们不再只看图表上的绿色方块，而是看清它们真正的意义——人。日复一日，在创造。",
+    "一周之内，超过 6000 名开发者来到这里。6000 座建筑，出现在一座七天前还不存在的城市里。是你们建造了这座城。我只是开启了信号。",
+    "你点击的这根天线？它是真实的。它在传输 Git 之城。而让这个信号持续运转需要成本。服务器、数据库、API 调用……每新增一座建筑，成本就随之上涨。",
+    "如果 Git 之城对你有意义，请帮我维持这个信号。任何支持，都能让这座城市继续存在。",
+    "感谢你的到来。感谢你的创造。这座城市，属于你。",
+    "街头再见。"
+  ]
 };
 
 const SIGNATURE: Record<Lang, string> = {
   en: "// samuel, founder, solo dev, citizen #1",
   pt: "// samuel, fundador, dev solo, cidadao #1",
+  zh: "// samuel, 创始人,  solo 开发者, 公民 #1",
 };
 
 const PS_TEXT: Record<Lang, string> = {
   en: "P.S. Would the white rabbit have found you if you had chosen the other one?",
   pt: "P.S. Sera que o coelho branco te encontraria se voce tivesse escolhido a outra?",
+  zh: "P.S. 如果白兔子选择了另一个，你会找到它吗？",
+};
+
+// 新增支持按钮多语言文案
+const SUPPORT_TEXT: Record<Lang, string> = {
+  en: "Keep the signal alive",
+  pt: "Mantenha o sinal vivo",
+  zh: "维持信号运转",
 };
 
 const CHAR_DELAY = 25;
@@ -87,15 +107,18 @@ export default function FounderMessage({ onClose }: FounderMessageProps) {
     }
   }, []);
 
-  // Typing effect
+  // Typing effect - 修复同步setState警告
   useEffect(() => {
     if (allParagraphsDone) return;
 
     const text = paragraphs[currentParagraph];
     if (!text) return;
 
-    charIndexRef.current = 0;
-    setTypedText("");
+    // 关键修复：用setTimeout异步重置，避免同步setState
+    const resetTimer = setTimeout(() => {
+      charIndexRef.current = 0;
+      setTypedText("");
+    }, 0);
 
     const type = () => {
       if (charIndexRef.current < text.length) {
@@ -118,6 +141,7 @@ export default function FounderMessage({ onClose }: FounderMessageProps) {
 
     return () => {
       if (typingRef.current) clearTimeout(typingRef.current);
+      clearTimeout(resetTimer); // 清理重置定时器
     };
   }, [currentParagraph, paragraphs, allParagraphsDone, scrollToBottom]);
 
@@ -229,6 +253,17 @@ export default function FounderMessage({ onClose }: FounderMessageProps) {
             >
               PT
             </button>
+            <button
+              onClick={() => switchLang("zh")}
+              className="font-pixel text-[9px] px-2 py-0.5 cursor-pointer transition-colors"
+              style={{
+                color: lang === "zh" ? "#00ff41" : "rgba(0, 255, 65, 0.25)",
+                background: lang === "zh" ? "rgba(0, 255, 65, 0.1)" : "transparent",
+                border: `1px solid ${lang === "zh" ? "rgba(0, 255, 65, 0.3)" : "transparent"}`,
+              }}
+            >
+              ZH
+            </button>
 
             {/* Close */}
             <button
@@ -264,8 +299,9 @@ export default function FounderMessage({ onClose }: FounderMessageProps) {
                 style={{ color: "#e0e0e0" }}
               >
                 {typedText}
+                {/* 优化Tailwind类名：w-[7px]→w-1.75, h-[11px]→h-2.75, ml-[1px]→ml-px */}
                 <span
-                  className="inline-block w-[7px] h-[11px] ml-[1px] align-middle"
+                  className="inline-block w-1.75 h-2.75 ml-px align-middle"
                   style={{
                     background: cursorVisible ? "#00ff41" : "transparent",
                     transition: "background 0.1s",
@@ -278,7 +314,7 @@ export default function FounderMessage({ onClose }: FounderMessageProps) {
             {!allParagraphsDone && typedText.length === 0 && paragraphsDone.length > 0 && (
               <p className="font-pixel text-[10px] sm:text-[11px]">
                 <span
-                  className="inline-block w-[7px] h-[11px] align-middle"
+                  className="inline-block w-1.75 h-2.75 align-middle"
                   style={{
                     background: cursorVisible ? "#00ff41" : "transparent",
                     transition: "background 0.1s",
@@ -326,7 +362,8 @@ export default function FounderMessage({ onClose }: FounderMessageProps) {
                 e.currentTarget.style.borderColor = "rgba(0, 255, 65, 0.4)";
               }}
             >
-              {lang === "en" ? "Keep the signal alive" : "Mantenha o sinal vivo"}
+              {/* 替换为多语言文案 */}
+              {SUPPORT_TEXT[lang]}
             </a>
           </div>
 

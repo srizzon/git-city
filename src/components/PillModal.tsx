@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 
 interface PillModalProps {
   isLoggedIn: boolean;
@@ -11,8 +11,53 @@ interface PillModalProps {
   onClose: () => void;
 }
 
+// 多语言文案配置
+type Lang = "en" | "pt" | "zh";
+const TRANSLATIONS: Record<Lang, Record<string, string>> = {
+  en: {
+    title: "MAKE YOUR CHOICE",
+    redPillLabel: "The truth",
+    divider: "OR",
+    bluePillLabelReady: "The rabbit hole",
+    bluePillLabelCompleted: "Already found",
+    bluePillLabelNotLoggedIn: "You're not ready yet",
+    bluePillLabelNotClaimed: "Claim your building first",
+    lockedText: "LOCKED",
+    foundText: "FOUND",
+    closeHint: "ESC TO CLOSE",
+  },
+  pt: {
+    title: "FAÇA SUA ESCOLHA",
+    redPillLabel: "A verdade",
+    divider: "OU",
+    bluePillLabelReady: "O buraco do coelho",
+    bluePillLabelCompleted: "Já encontrado",
+    bluePillLabelNotLoggedIn: "Você ainda não está pronto",
+    bluePillLabelNotClaimed: "Reivindique seu prédio primeiro",
+    lockedText: "TRANCADO",
+    foundText: "ENCONTRADO",
+    closeHint: "ESC PARA FECHAR",
+  },
+  zh: {
+    title: "做出你的选择",
+    redPillLabel: "真相",
+    divider: "或者",
+    bluePillLabelReady: "兔子洞",
+    bluePillLabelCompleted: "已找到",
+    bluePillLabelNotLoggedIn: "你还没有准备好",
+    bluePillLabelNotClaimed: "先认领你的建筑",
+    lockedText: "已锁定",
+    foundText: "已找到",
+    closeHint: "按 ESC 关闭",
+  },
+};
+
 export default function PillModal({ isLoggedIn, hasClaimed, rabbitCompleted, onRedPill, onBluePill, onClose }: PillModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  // 新增语言状态（默认英文，和其他组件保持一致）
+  const [lang, setLang] = useState<Lang>("en");
+  // 获取当前语言文案
+  const t = TRANSLATIONS[lang];
 
   // Pre-compute matrix rain characters to avoid hydration mismatch
   const rainColumns = useMemo(() =>
@@ -26,7 +71,29 @@ export default function PillModal({ isLoggedIn, hasClaimed, rabbitCompleted, onR
     requestAnimationFrame(() => {
       if (overlayRef.current) overlayRef.current.style.opacity = "1";
     });
-  }, []);
+
+    // 监听ESC键关闭弹窗
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [onClose]);
+
+  // 切换语言方法
+  const switchLang = (newLang: Lang) => {
+    setLang(newLang);
+  };
+
+  // 计算蓝药丸状态相关
+  const canClickBluePill = isLoggedIn && hasClaimed && !rabbitCompleted;
+  const isLocked = !isLoggedIn || !hasClaimed;
+  const getBluePillLabel = () => {
+    if (rabbitCompleted) return t.bluePillLabelCompleted;
+    if (!isLoggedIn) return t.bluePillLabelNotLoggedIn;
+    if (!hasClaimed) return t.bluePillLabelNotClaimed;
+    return t.bluePillLabelReady;
+  };
 
   return (
     <div
@@ -39,6 +106,24 @@ export default function PillModal({ isLoggedIn, hasClaimed, rabbitCompleted, onR
     >
       {/* Dark overlay */}
       <div className="absolute inset-0 bg-black/85" />
+
+      {/* 新增语言切换按钮 - 固定右上角 */}
+      <div className="fixed top-4 right-4 z-30 flex items-center gap-1">
+        {(["en", "pt", "zh"] as Lang[]).map((language) => (
+          <button
+            key={language}
+            onClick={() => switchLang(language)}
+            className="font-pixel text-[9px] px-2 py-0.5 cursor-pointer transition-colors"
+            style={{
+              color: lang === language ? "#00ff41" : "rgba(0, 255, 65, 0.25)",
+              background: lang === language ? "rgba(0, 255, 65, 0.1)" : "transparent",
+              border: `1px solid ${lang === language ? "rgba(0, 255, 65, 0.3)" : "transparent"}`,
+            }}
+          >
+            {language.toUpperCase()}
+          </button>
+        ))}
+      </div>
 
       {/* Matrix rain effect */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-10">
@@ -65,12 +150,12 @@ export default function PillModal({ isLoggedIn, hasClaimed, rabbitCompleted, onR
         className="relative flex flex-col items-center gap-8 px-4"
         style={{ animation: "pillFadeIn 0.5s ease-out both" }}
       >
-        {/* Title */}
+        {/* Title - 纯当前语言文案 */}
         <h2
           className="font-pixel text-[14px] sm:text-[18px] tracking-wider text-center"
           style={{ color: "#00ff41" }}
         >
-          MAKE YOUR CHOICE
+          {t.title}
         </h2>
 
         {/* Pills container */}
@@ -94,94 +179,79 @@ export default function PillModal({ isLoggedIn, hasClaimed, rabbitCompleted, onR
               <div className="absolute top-[4px] left-[22px] w-[6px] h-[3px]" style={{ background: "#ff4444" }} />
             </div>
             <span className="font-pixel text-[10px] sm:text-[12px] uppercase tracking-wider text-red-400 group-hover:text-red-300 transition-colors">
-              The truth
+              {t.redPillLabel}
             </span>
           </button>
 
-          {/* Divider */}
+          {/* Divider - 纯当前语言文案 */}
           <span
             className="font-pixel text-[12px] sm:text-[14px]"
             style={{ color: "#00ff41", opacity: 0.4 }}
           >
-            OR
+            {t.divider}
           </span>
 
           {/* Blue Pill */}
-          {(() => {
-            const canClick = isLoggedIn && hasClaimed && !rabbitCompleted;
-            const isLocked = !isLoggedIn || !hasClaimed;
-            const label = rabbitCompleted
-              ? "Already found"
-              : !isLoggedIn
-                ? "You're not ready yet"
-                : !hasClaimed
-                  ? "Claim your building first"
-                  : "The rabbit hole";
-            return (
-              <button
-                onClick={() => {
-                  if (canClick) onBluePill();
-                }}
-                className={`group flex flex-col items-center gap-3 transition-transform duration-200 ${
-                  canClick ? "cursor-pointer hover:scale-110" : "cursor-not-allowed"
-                }`}
-              >
+          <button
+            onClick={() => {
+              if (canClickBluePill) onBluePill();
+            }}
+            className={`group flex flex-col items-center gap-3 transition-transform duration-200 ${canClickBluePill ? "cursor-pointer hover:scale-110" : "cursor-not-allowed"
+              }`}
+          >
+            <div
+              className="relative w-20 h-12 sm:w-24 sm:h-14 rounded-full"
+              style={{
+                background: canClickBluePill ? "#2266cc" : rabbitCompleted ? "#1a3322" : "#223344",
+                border: `3px solid ${canClickBluePill ? "#4499ff" : rabbitCompleted ? "#2a5533" : "#334455"}`,
+                boxShadow: canClickBluePill
+                  ? "4px 4px 0px #0a2244, 0 0 24px rgba(68, 136, 255, 0.25), inset -3px -3px 0px #114488, inset 3px 3px 0px #3377dd"
+                  : "4px 4px 0px #0a1520, inset -3px -3px 0px #1a2a3a, inset 3px 3px 0px #2a3a4a",
+                opacity: canClickBluePill ? 1 : 0.5,
+              }}
+            >
+              {/* Pixel highlight blocks */}
+              <div
+                className="absolute top-[4px] left-[10px] w-[10px] h-[4px]"
+                style={{ background: canClickBluePill ? "#6699ff" : "#3a4a5a" }}
+              />
+              <div
+                className="absolute top-[4px] left-[22px] w-[6px] h-[3px]"
+                style={{ background: canClickBluePill ? "#4488ee" : "#2a3a4a" }}
+              />
+              {isLocked && (
                 <div
-                  className="relative w-20 h-12 sm:w-24 sm:h-14 rounded-full"
-                  style={{
-                    background: canClick ? "#2266cc" : rabbitCompleted ? "#1a3322" : "#223344",
-                    border: `3px solid ${canClick ? "#4499ff" : rabbitCompleted ? "#2a5533" : "#334455"}`,
-                    boxShadow: canClick
-                      ? "4px 4px 0px #0a2244, 0 0 24px rgba(68, 136, 255, 0.25), inset -3px -3px 0px #114488, inset 3px 3px 0px #3377dd"
-                      : "4px 4px 0px #0a1520, inset -3px -3px 0px #1a2a3a, inset 3px 3px 0px #2a3a4a",
-                    opacity: canClick ? 1 : 0.5,
-                  }}
+                  className="absolute inset-0 flex items-center justify-center font-pixel text-[10px]"
+                  style={{ color: "#556677" }}
                 >
-                  {/* Pixel highlight blocks */}
-                  <div
-                    className="absolute top-[4px] left-[10px] w-[10px] h-[4px]"
-                    style={{ background: canClick ? "#6699ff" : "#3a4a5a" }}
-                  />
-                  <div
-                    className="absolute top-[4px] left-[22px] w-[6px] h-[3px]"
-                    style={{ background: canClick ? "#4488ee" : "#2a3a4a" }}
-                  />
-                  {isLocked && (
-                    <div
-                      className="absolute inset-0 flex items-center justify-center font-pixel text-[10px]"
-                      style={{ color: "#556677" }}
-                    >
-                      LOCKED
-                    </div>
-                  )}
-                  {rabbitCompleted && (
-                    <div
-                      className="absolute inset-0 flex items-center justify-center font-pixel text-[10px]"
-                      style={{ color: "#00ff41" }}
-                    >
-                      FOUND
-                    </div>
-                  )}
+                  {t.lockedText}
                 </div>
-                <span
-                  className={`font-pixel text-[10px] sm:text-[12px] uppercase tracking-wider transition-colors ${
-                    canClick
-                      ? "text-blue-400 group-hover:text-blue-300"
-                      : rabbitCompleted
-                        ? "text-green-600"
-                        : "text-gray-600"
-                  }`}
+              )}
+              {rabbitCompleted && (
+                <div
+                  className="absolute inset-0 flex items-center justify-center font-pixel text-[10px]"
+                  style={{ color: "#00ff41" }}
                 >
-                  {label}
-                </span>
-              </button>
-            );
-          })()}
+                  {t.foundText}
+                </div>
+              )}
+            </div>
+            <span
+              className={`font-pixel text-[10px] sm:text-[12px] uppercase tracking-wider transition-colors ${canClickBluePill
+                  ? "text-blue-400 group-hover:text-blue-300"
+                  : rabbitCompleted
+                    ? "text-green-600"
+                    : "text-gray-600"
+                }`}
+            >
+              {getBluePillLabel()}
+            </span>
+          </button>
         </div>
 
-        {/* Close hint */}
-        <p className="font-pixel text-[8px] text-gray-600 tracking-wider mt-4">
-          ESC TO CLOSE
+        {/* Close hint - 纯当前语言文案 */}
+        <p className="font-pixel text-[10px] text-gray-600 tracking-wider mt-4">
+          {t.closeHint}
         </p>
       </div>
 
