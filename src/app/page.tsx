@@ -1800,7 +1800,7 @@ function HomeContent() {
 
             {initialLoading && (
               <p className="text-[10px] text-muted normal-case whitespace-pre-line">
-                Loading city... \n 正在加载城市...
+                Loading city... | 正在加载城市...
               </p>
             )}
           </div>

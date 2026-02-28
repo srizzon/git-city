@@ -169,7 +169,7 @@ export default async function LeaderboardPage({
             href="/"
             className="text-xs text-muted transition-colors hover:text-cream"
           >
-            &larr; Back to City
+            &larr; Back to City | 返回城市
           </Link>
         </div>
 
@@ -177,8 +177,8 @@ export default async function LeaderboardPage({
           <h1 className="text-3xl text-cream md:text-4xl">
             Leader<span style={{ color: ACCENT }}>board</span>
           </h1>
-          <p className="mt-3 text-xs text-muted normal-case">
-            Top developers ranked in Git City
+          <p className="mt-3 text-xs text-muted normal-case whitespace-pre-line">
+            Top developers ranked in Git City \n  Git City 开发者排行榜
           </p>
         </div>
 
@@ -208,8 +208,8 @@ export default async function LeaderboardPage({
           {/* Header row */}
           <div className="flex items-center gap-4 border-b-[3px] border-border bg-bg-card px-5 py-3 text-xs text-muted">
             <span className="w-10 text-center">#</span>
-            <span className="flex-1">Developer</span>
-            <span className="hidden w-24 text-right sm:block">Language</span>
+            <span className="flex-1">Developer | 开发者</span>
+            <span className="hidden w-24 text-right sm:block">Language | 语言</span>
             <span className="w-28 text-right">{metricLabel}</span>
           </div>
 
@@ -231,7 +231,7 @@ export default async function LeaderboardPage({
                   </span>
                   {newLogins.has(dev.github_login.toLowerCase()) && (
                     <span className="block text-[7px] font-bold" style={{ color: "#ffd700" }}>
-                      NEW
+                      NEW | 新加入
                     </span>
                   )}
                 </span>
@@ -275,8 +275,8 @@ export default async function LeaderboardPage({
           <LeaderboardUserPosition tab={activeTab} topLogins={topLogins} />
 
           {devs.length === 0 && (
-            <div className="px-5 py-8 text-center text-xs text-muted normal-case">
-              No data for this category yet.
+            <div className="px-5 py-8 text-center text-xs text-muted normal-case whitespace-pre-line">
+              No data for this category yet. \n 暂无此分类数据。
             </div>
           )}
         </div>
@@ -291,7 +291,7 @@ export default async function LeaderboardPage({
               boxShadow: "4px 4px 0 0 #5a7a00",
             }}
           >
-            Enter the City
+            Enter the City | 进入城市
           </Link>
 
           <p className="mt-6 text-[9px] text-muted normal-case">
@@ -305,6 +305,13 @@ export default async function LeaderboardPage({
             >
               @samuelrizzondev
             </a>
+              Sinicization Contribution by{" "}
+              <a href="https://github.com/EndlessPixel"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-cream"
+                style={{ color: ACCENT }}>@EndlessPixel
+              </a>
           </p>
         </div>
       </div>
