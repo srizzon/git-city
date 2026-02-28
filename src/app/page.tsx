@@ -1682,6 +1682,51 @@ function HomeContent() {
               )}
             </div>
 
+            {/* Milestone progress banner */}
+            {(() => {
+              const MILESTONES = [10000, 15000, 25000, 50000, 100000];
+              const count = stats.total_developers;
+              if (count <= 0) return null;
+              const target = MILESTONES.find((m) => count < m);
+              if (!target) return null;
+              const prev = MILESTONES[MILESTONES.indexOf(target) - 1] ?? 0;
+              const progress = ((count - prev) / (target - prev)) * 100;
+              const remaining = target - count;
+              const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
+              return (
+                <div className="w-full max-w-sm">
+                  <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm">
+                    <div className="mb-2 flex items-baseline justify-between">
+                      <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
+                        ROAD TO {label}
+                      </span>
+                      <span className="text-[9px] text-cream/60">
+                        {remaining.toLocaleString()} to go
+                      </span>
+                    </div>
+                    <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
+                      <div
+                        className="absolute inset-y-0 left-0 transition-all duration-1000"
+                        style={{
+                          width: `${progress}%`,
+                          backgroundColor: theme.accent,
+                          boxShadow: `0 0 8px ${theme.accent}60`,
+                        }}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-baseline justify-between">
+                      <span className="text-[10px] text-cream">
+                        {count.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
+                      </span>
+                      <span className="text-[8px] text-cream/40 normal-case">
+                        Something unlocks at {label}...
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Search */}
             <form
               onSubmit={handleSubmit}
@@ -1694,7 +1739,7 @@ function HomeContent() {
                   setUsername(e.target.value);
                   if (feedback?.type === "error") setFeedback(null);
                 }}
-                placeholder="find yourself in the city"
+                placeholder="add a dev to the city"
                 className="min-w-0 flex-1 border-[3px] border-border bg-bg-raised px-3 py-2 text-base sm:text-xs text-cream outline-none transition-colors placeholder:text-dim sm:px-4 sm:py-2.5"
                 style={{ borderColor: undefined }}
                 onFocus={(e) => (e.currentTarget.style.borderColor = theme.accent)}
