@@ -1491,6 +1491,17 @@ function HomeContent() {
           }
         }}
         onAdViewed={(adId) => {
+          // sessionStorage dedup: prevent inflated impressions across remounts
+          try {
+            const key = "gc_ad_viewed";
+            const raw = sessionStorage.getItem(key);
+            const viewed: string[] = raw ? JSON.parse(raw) : [];
+            if (viewed.includes(adId)) return;
+            viewed.push(adId);
+            sessionStorage.setItem(key, JSON.stringify(viewed));
+          } catch {
+            // sessionStorage unavailable — allow tracking
+          }
           trackAdEvent(adId, "impression", authLogin || undefined);
           const ad = skyAds.find(a => a.id === adId);
           if (ad) trackSkyAdImpression(ad.id, ad.vehicle, ad.brand);

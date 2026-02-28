@@ -39,6 +39,7 @@
     "postprocessing": "^6.38.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "resend": "^6.9.3",
     "server-only": "^0.0.1",
     "stripe": "^20.3.1",
     "three": "^0.183.0"

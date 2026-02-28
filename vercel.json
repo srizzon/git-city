@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/ad-expiry",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
