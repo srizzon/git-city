@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
@@ -148,6 +148,9 @@ interface CityStats {
   total_developers: number;
   total_contributions: number;
 }
+
+// Milestones that trigger 24h celebration effects
+const CELEBRATION_MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000, 100000];
 
 // ─── Loading phases for search feedback ─────────────────────
 const LOADING_PHASES = [
@@ -397,6 +400,7 @@ function HomeContent() {
   const [flyPaused, setFlyPaused] = useState(false);
   const [flyPauseSignal, setFlyPauseSignal] = useState(0);
   const [stats, setStats] = useState<CityStats>({ total_developers: 0, total_contributions: 0 });
+  const [milestoneCelebrations, setMilestoneCelebrations] = useState<{ milestone: number; reached_at: string }[]>([]);
   const [focusedBuilding, setFocusedBuilding] = useState<string | null>(null);
   const [shareData, setShareData] = useState<{
     login: string;
@@ -1430,6 +1434,52 @@ function HomeContent() {
   // Live users presence
   const { count: liveUsers, status: liveStatus } = useLiveUsers();
 
+  // ─── Milestone celebration system ──────────────────────────
+  const forceCelebrate = searchParams.has("celebrate");
+
+  const celebrationActive = useMemo(() => {
+    if (forceCelebrate) return true;
+    if (stats.total_developers < CELEBRATION_MILESTONES[0]) return false;
+    const current = [...CELEBRATION_MILESTONES].reverse().find((m) => stats.total_developers >= m);
+    if (!current) return false;
+    const record = milestoneCelebrations.find((c) => c.milestone === current);
+    if (!record) return true;
+    const elapsed = Date.now() - new Date(record.reached_at).getTime();
+    return elapsed < 24 * 60 * 60 * 1000;
+  }, [stats.total_developers, milestoneCelebrations, forceCelebrate]);
+
+  // Fetch milestone celebrations on mount
+  useEffect(() => {
+    fetch("/api/milestone-celebration")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => { if (Array.isArray(data)) setMilestoneCelebrations(data); })
+      .catch(() => {});
+  }, []);
+
+  // Record milestone when crossed
+  useEffect(() => {
+    if (stats.total_developers < CELEBRATION_MILESTONES[0]) return;
+    const current = [...CELEBRATION_MILESTONES].reverse().find((m) => stats.total_developers >= m);
+    if (!current) return;
+    const alreadyRecorded = milestoneCelebrations.some((c) => c.milestone === current);
+    if (alreadyRecorded) return;
+    fetch("/api/milestone-celebration", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ total_developers: stats.total_developers }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.celebrated) {
+          setMilestoneCelebrations((prev) => [
+            { milestone: data.milestone, reached_at: data.reached_at ?? new Date().toISOString() },
+            ...prev,
+          ]);
+        }
+      })
+      .catch(() => {});
+  }, [stats.total_developers, milestoneCelebrations]);
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-bg font-pixel uppercase text-warm">
       {/* 3D Canvas */}
@@ -1480,6 +1530,7 @@ function HomeContent() {
         flyPauseSignal={flyPauseSignal}
         flyHasOverlay={!!selectedBuilding}
         holdRise={loadStage !== "done"}
+        celebrationActive={celebrationActive}
         skyAds={skyAds}
         onAdClick={(ad) => {
           trackSkyAdClick(ad.id, ad.vehicle, ad.link);
@@ -1973,6 +2024,47 @@ function HomeContent() {
               const MILESTONES = [10000, 15000, 25000, 50000, 100000];
               const count = stats.total_developers;
               if (count <= 0) return null;
+
+              if (celebrationActive) {
+                return (
+                  <div className="w-full max-w-sm">
+                    <style>{`@keyframes celebration-glow {
+  0%, 100% { box-shadow: 0 0 8px ${theme.accent}60; }
+  50% { box-shadow: 0 0 20px ${theme.accent}, 0 0 40px ${theme.accent}40; }
+}`}</style>
+                    <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm">
+                      <div className="mb-2 flex items-center justify-center gap-2">
+                        <span className="animate-pulse text-[10px]" style={{ color: theme.accent }}>★</span>
+                        <span className="text-[10px] tracking-widest text-cream">10,000 DEVELOPERS</span>
+                        <span className="animate-pulse text-[10px]" style={{ color: theme.accent }}>★</span>
+                      </div>
+                      <div className="mb-2 text-center text-[9px] tracking-wider text-cream/50">
+                        The city that code built.
+                      </div>
+                      <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
+                        <div
+                          className="absolute inset-y-0 left-0"
+                          style={{
+                            width: "100%",
+                            backgroundColor: theme.accent,
+                            boxShadow: `0 0 8px ${theme.accent}60`,
+                            animation: "celebration-glow 2s ease-in-out infinite",
+                          }}
+                        />
+                      </div>
+                      <div className="mt-2 flex items-baseline justify-between">
+                        <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
+                          10K unlocked
+                        </span>
+                        <span className="text-[9px] text-cream/40">
+                          Next: 15K
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               const target = MILESTONES.find((m) => count < m);
               if (!target) return null;
               const prev = MILESTONES[MILESTONES.indexOf(target) - 1] ?? 0;
