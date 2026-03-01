@@ -112,8 +112,6 @@ function AdBillboard({
         <boxGeometry args={[0.3, 3, 0.3]} />
         <meshStandardMaterial color="#333" metalness={0.5} roughness={0.4} />
       </mesh>
-      {/* Spot glow */}
-      <pointLight position={[0, y, zOff + 2]} color={ad.color} intensity={4} distance={20} />
     </group>
   );
 }
@@ -214,8 +212,6 @@ function AdRooftopSign({
         >
           <planeGeometry args={[signW, signH]} />
         </mesh>
-        {/* Glow */}
-        <pointLight position={[0, 0, 0]} color={ad.color} intensity={4} distance={15} />
       </group>
     </group>
   );
@@ -293,8 +289,27 @@ function AdLedWrap({
     [width, depth, y, gap]
   );
 
+  // Invisible viewability proxy at building center — covers all 4 directions
+  const proxyRef = useRef<THREE.Mesh | null>(null);
+  useEffect(() => { return () => { if (proxyRef.current) unregisterAdMesh(proxyRef.current); }; }, []);
+
   return (
     <group position={[building.position[0], 0, building.position[2]]}>
+      {/* Invisible proxy mesh for viewability tracking (covers all faces) */}
+      <mesh
+        ref={(el) => {
+          const prev = proxyRef.current;
+          if (prev && prev !== el) unregisterAdMesh(prev);
+          proxyRef.current = el;
+          if (el) registerAdMesh(el);
+          meshRef?.(el);
+        }}
+        position={[0, y, 0]}
+        visible={false}
+      >
+        <boxGeometry args={[width, wrapH, depth]} />
+        <meshBasicMaterial />
+      </mesh>
       {faces.map((f, i) => (
         <group key={i}>
           {/* LED text band */}
@@ -304,7 +319,6 @@ function AdLedWrap({
               if (prev && prev !== el) unregisterAdMesh(prev);
               faceMeshes.current[i] = el;
               if (el) registerAdMesh(el);
-              if (i === 0) meshRef?.(el);
             }}
             material={ledMat}
             position={[f.pos[0], f.pos[1], f.pos[2]]}
@@ -331,8 +345,6 @@ function AdLedWrap({
           </mesh>
         </group>
       ))}
-      {/* Single glow light (emissive materials handle most of the glow) */}
-      <pointLight position={[0, y, 0]} color={ad.color} intensity={4} distance={20} />
     </group>
   );
 }

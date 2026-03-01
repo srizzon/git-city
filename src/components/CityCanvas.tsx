@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, useGLTF, Stats } from "@react-three/drei";
+import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/drei";
+import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
@@ -16,6 +17,7 @@ import type { RaidPhase } from "@/lib/useRaidSequence";
 import type { RaidExecuteResponse } from "@/lib/raid";
 import FounderSpire from "./FounderSpire";
 import WhiteRabbit from "./WhiteRabbit";
+import CelebrationEffect from "./CelebrationEffect";
 
 // ─── Theme Definitions ───────────────────────────────────────
 
@@ -549,7 +551,7 @@ const _idealLook = new THREE.Vector3();
 const _blendedPos = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 
-function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, vehicleType = "airplane" }: { onExit: () => void; onHud: (s: number, a: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; vehicleType?: string }) {
+function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, vehicleType = "airplane" }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; vehicleType?: string }) {
   const { camera } = useThree();
   const ref = useRef<THREE.Group>(null);
   const orbitRef = useRef<any>(null);
@@ -717,13 +719,9 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
       hudTimer.current += dt;
       if (hudTimer.current > 0.25) {
         hudTimer.current = 0;
-        const s = 0;
-        const a = Math.round(pos.current.y);
-        if (s !== lastHudSpeed.current || a !== lastHudAlt.current) {
-          lastHudSpeed.current = s;
-          lastHudAlt.current = a;
-          onHud(s, pos.current.y);
-        }
+        lastHudSpeed.current = 0;
+        lastHudAlt.current = Math.round(pos.current.y);
+        onHud(0, pos.current.y, pos.current.x, pos.current.z, yaw.current);
       }
       return;
     }
@@ -807,13 +805,9 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     hudTimer.current += dt;
     if (hudTimer.current > 0.25) {
       hudTimer.current = 0;
-      const s = Math.round(flySpeed.current);
-      const a = Math.round(pos.current.y);
-      if (s !== lastHudSpeed.current || a !== lastHudAlt.current) {
-        lastHudSpeed.current = s;
-        lastHudAlt.current = a;
-        onHud(flySpeed.current, pos.current.y);
-      }
+      lastHudSpeed.current = Math.round(flySpeed.current);
+      lastHudAlt.current = Math.round(pos.current.y);
+      onHud(flySpeed.current, pos.current.y, pos.current.x, pos.current.z, yaw.current);
     }
   });
 
@@ -1309,7 +1303,7 @@ function Bridge({ bridge }: { bridge: CityBridge }) {
   const pillarSpacing = deckLength / (pillarCount + 1);
 
   return (
-    <group position={[bx, 0, bz]}>
+    <group position={[bx, 0, bz]} rotation={[0, bridge.rotation ?? 0, 0]}>
       {/* Deck */}
       <mesh position={[0, deckY, 0]}>
         <boxGeometry args={[deckLength, deckHeight, deckWidth]} />
@@ -1467,7 +1461,7 @@ interface Props {
   flyVehicle?: string;
   onExitFly: () => void;
   themeIndex: number;
-  onHud?: (speed: number, altitude: number) => void;
+  onHud?: (speed: number, altitude: number, x: number, z: number, yaw: number) => void;
   onPause?: (paused: boolean) => void;
   focusedBuilding?: string | null;
   focusedBuildingB?: string | null;
@@ -1494,15 +1488,17 @@ interface Props {
   onRabbitCinematicEnd?: () => void;
   rabbitCinematicTarget?: number;
   ghostPreviewLogin?: string | null;
+  holdRise?: boolean;
+  celebrationActive?: boolean;
 }
 
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
-
+  const [dpr, setDpr] = useState(1.5);
 
   const cityRadius = useMemo(() => {
     let max = 200;
@@ -1516,11 +1512,12 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
   return (
     <Canvas
       camera={{ position: [400, 450, 600], fov: 55, near: 0.5, far: 4000 }}
-      dpr={[1, 1.5]}
+      dpr={dpr}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
+      <PerformanceMonitor onIncline={() => setDpr(1.5)} onDecline={() => setDpr(1)} />
       <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
 
       <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
@@ -1560,6 +1557,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       <FounderSpire onClick={onLandmarkClick ?? (() => {})} />
 
+      {celebrationActive && <CelebrationEffect cityRadius={cityRadius} />}
+
       {rabbitSighting && rabbitSighting >= 1 && rabbitSighting <= 5 && (() => {
         const plazaIdx = RABBIT_PLAZA_INDICES[rabbitSighting - 1];
         const plaza = plazas[plazaIdx];
@@ -1598,6 +1597,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         introMode={introMode}
         flyMode={flyMode}
         ghostPreviewLogin={ghostPreviewLogin}
+        holdRise={holdRise}
       />
 
       <InstancedDecorations items={decorations} roadMarkingColor={t.roadMarkingColor} sidewalkColor={t.sidewalkColor} />
@@ -1615,6 +1615,15 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           />
         </>
       )}
+
+      <EffectComposer multisampling={0}>
+        <Bloom
+          mipmapBlur
+          luminanceThreshold={1}
+          luminanceSmoothing={0.3}
+          intensity={1.2}
+        />
+      </EffectComposer>
     </Canvas>
   );
 }

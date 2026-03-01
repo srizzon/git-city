@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
+import { containsBlockedContent, isSuspiciousLink } from "@/lib/ad-moderation";
 
 const ALLOWED_LINK = /^(https:\/\/|mailto:)/;
 
@@ -62,16 +63,32 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    const modText = containsBlockedContent(safeText);
+    if (modText.blocked) {
+      return NextResponse.json({ error: modText.reason ?? "Text not allowed" }, { status: 400 });
+    }
     update.text = safeText;
   }
 
   if (body.brand !== undefined) {
     const safeBrand = String(body.brand).slice(0, 60).trim();
+    if (safeBrand) {
+      const modBrand = containsBlockedContent(safeBrand);
+      if (modBrand.blocked) {
+        return NextResponse.json({ error: modBrand.reason ?? "Brand not allowed" }, { status: 400 });
+      }
+    }
     update.brand = safeBrand || null;
   }
 
   if (body.description !== undefined) {
     const safeDesc = String(body.description).slice(0, 200).trim();
+    if (safeDesc) {
+      const modDesc = containsBlockedContent(safeDesc);
+      if (modDesc.blocked) {
+        return NextResponse.json({ error: modDesc.reason ?? "Description not allowed" }, { status: 400 });
+      }
+    }
     update.description = safeDesc || null;
   }
 
@@ -82,6 +99,9 @@ export async function POST(request: NextRequest) {
         { error: "Link must start with https:// or mailto:" },
         { status: 400 },
       );
+    }
+    if (safeLink && isSuspiciousLink(safeLink)) {
+      return NextResponse.json({ error: "This link is not allowed" }, { status: 400 });
     }
     update.link = safeLink || null;
   }

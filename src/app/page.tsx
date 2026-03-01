@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
 import {
   generateCityLayout,
+  DISTRICT_NAMES,
+  DISTRICT_COLORS,
   type CityBuilding,
   type CityPlaza,
   type CityDecoration,
   type CityRiver,
   type CityBridge,
+  type DistrictZone,
 } from "@/lib/github";
 import Image from "next/image";
 import Link from "next/link";
@@ -27,6 +30,10 @@ import RaidOverlay from "@/components/RaidOverlay";
 import PillModal from "@/components/PillModal";
 import FounderMessage from "@/components/FounderMessage";
 import RabbitCompletion from "@/components/RabbitCompletion";
+import DistrictChooser from "@/components/DistrictChooser";
+import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
+import MiniMap from "@/components/MiniMap";
+import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
 import {
@@ -143,6 +150,9 @@ interface CityStats {
   total_developers: number;
   total_contributions: number;
 }
+
+// Milestones that trigger 24h celebration effects
+const CELEBRATION_MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000, 100000];
 
 // ─── Loading phases for search feedback ─────────────────────
 const LOADING_PHASES = [
@@ -365,8 +375,13 @@ function HomeContent() {
   const [decorations, setDecorations] = useState<CityDecoration[]>([]);
   const [river, setRiver] = useState<CityRiver | null>(null);
   const [bridges, setBridges] = useState<CityBridge[]>([]);
+  const [districtZones, setDistrictZones] = useState<DistrictZone[]>([]);
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  // Loading state machine — skip on return visits that still have cached data
+  const [loadStage, setLoadStage] = useState<LoadingStage>(() => getCityCache() ? "done" : "init");
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const initialLoading = loadStage !== "done";
   const [feedback, setFeedback] = useState<{
     type: "loading" | "error";
     code?: "not-found" | "org" | "no-activity" | "rate-limit" | "github-rate-limit" | "network" | "generic";
@@ -380,9 +395,15 @@ function HomeContent() {
   const [exploreMode, setExploreMode] = useState(false);
   const [themeIndex, setThemeIndex] = useState(0);
   const [hud, setHud] = useState({ speed: 0, altitude: 0 });
+  const [playerPos, setPlayerPos] = useState<{ x: number; z: number }>({ x: 0, z: 0 });
+  const [districtAnnouncement, setDistrictAnnouncement] = useState<{ name: string; color: string; population: number } | null>(null);
+  const lastDistrictRef = useRef<string | null>(null);
+  const announceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const announceCooldownRef = useRef(0);
   const [flyPaused, setFlyPaused] = useState(false);
   const [flyPauseSignal, setFlyPauseSignal] = useState(0);
   const [stats, setStats] = useState<CityStats>({ total_developers: 0, total_contributions: 0 });
+  const [milestoneCelebrations, setMilestoneCelebrations] = useState<{ milestone: number; reached_at: string }[]>([]);
   const [focusedBuilding, setFocusedBuilding] = useState<string | null>(null);
   const [shareData, setShareData] = useState<{
     login: string;
@@ -418,9 +439,13 @@ function HomeContent() {
   const [caCopied, setCaCopied] = useState(false);
   const [pillModalOpen, setPillModalOpen] = useState(false);
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
+  const [districtChooserOpen, setDistrictChooserOpen] = useState(false);
   const [rabbitCinematic, setRabbitCinematic] = useState(false);
   const [rabbitCinematicPhase, setRabbitCinematicPhase] = useState(-1);
-  const [rabbitProgress, setRabbitProgress] = useState(0);
+  const [rabbitProgress, setRabbitProgress] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    return parseInt(localStorage.getItem("gitcity_rabbit_progress") ?? "0", 10) || 0;
+  });
   const [rabbitSighting, setRabbitSighting] = useState<number | null>(null);
   const [rabbitCompletion, setRabbitCompletion] = useState(false);
   const [rabbitHintFlash, setRabbitHintFlash] = useState<string | null>(null);
@@ -800,20 +825,40 @@ function HomeContent() {
     return () => timers.forEach(clearTimeout);
   }, [rabbitCinematic]);
 
-  // Fetch rabbit progress on login
+  // Fetch rabbit progress on login — sync local progress to server
   useEffect(() => {
     if (!session) return;
-    fetch("/api/rabbit?check=true")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (!data) return;
-        setRabbitProgress(data.progress ?? 0);
-        // If mid-quest, show rabbit automatically
-        if (data.progress > 0 && data.progress < 5) {
-          setRabbitSighting(data.progress + 1);
+    (async () => {
+      try {
+        const res = await fetch("/api/rabbit?check=true");
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverProgress = data?.progress ?? 0;
+        const localProgress = parseInt(localStorage.getItem("gitcity_rabbit_progress") ?? "0", 10) || 0;
+
+        // Sync local progress to server if ahead (silently fails if no claimed building)
+        if (localProgress > serverProgress) {
+          for (let s = serverProgress + 1; s <= localProgress; s++) {
+            const sr = await fetch("/api/rabbit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sighting: s }),
+            });
+            if (!sr.ok) break; // stop sync if server rejects (e.g. no claimed building)
+          }
         }
-      })
-      .catch(() => {});
+
+        const best = Math.max(serverProgress, localProgress);
+        setRabbitProgress(best);
+        localStorage.setItem("gitcity_rabbit_progress", String(best));
+        if (best > 0 && best < 5) {
+          setRabbitSighting(best + 1);
+        }
+        if (best >= 5 && serverProgress < 5 && localProgress >= 5) {
+          setRabbitCompletion(true);
+        }
+      } catch {}
+    })();
   }, [session]);
 
   // Auto-dismiss rabbit hint flash
@@ -829,33 +874,52 @@ function HomeContent() {
     const sighting = rabbitSighting;
     setRabbitSighting(null);
 
-    try {
-      const res = await fetch("/api/rabbit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sighting }),
-      });
-      const data = await res.json();
-      if (!res.ok) return;
+    // Try to save to API (works when logged in + has claimed building)
+    const login = (session?.user?.user_metadata?.user_name ?? "").toLowerCase();
+    const claimed = login && buildings.some((b) => b.login.toLowerCase() === login && b.claimed);
+    if (session && claimed) {
+      try {
+        const res = await fetch("/api/rabbit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sighting }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setRabbitProgress(data.progress);
+          localStorage.setItem("gitcity_rabbit_progress", String(data.progress));
 
-      setRabbitProgress(data.progress);
-
-      if (data.completed) {
-        // Sighting 5: trigger cinematic
-        setRabbitCompletion(true);
-      } else {
-        // Sightings 1-4: show hint + spawn next
-        setRabbitHintFlash("The rabbit moves deeper...");
-        setTimeout(() => {
-          setRabbitSighting(data.progress + 1);
-        }, 2000);
+          if (data.completed) {
+            setRabbitCompletion(true);
+            return;
+          }
+          setRabbitHintFlash("The rabbit moves deeper...");
+          setTimeout(() => setRabbitSighting(data.progress + 1), 2000);
+          return;
+        }
+      } catch {
+        // Fall through to local tracking
       }
-    } catch {
-      // Silently fail, rabbit will reappear on reload
     }
-  }, [rabbitSighting]);
+
+    // Local tracking (not logged in or API failed)
+    const newProgress = sighting;
+    setRabbitProgress(newProgress);
+    localStorage.setItem("gitcity_rabbit_progress", String(newProgress));
+
+    if (sighting >= 5) {
+      // Final sighting: need login to save achievement
+      handleSignInWithRef();
+      return;
+    }
+
+    // Sightings 1-4: advance locally
+    setRabbitHintFlash("The rabbit moves deeper...");
+    setTimeout(() => setRabbitSighting(newProgress + 1), 2000);
+  }, [rabbitSighting, session, buildings, handleSignInWithRef]);
 
   const reloadCity = useCallback(async (bustCache = false) => {
+    if (bustCache) clearCityCache();
     const cacheBust = bustCache ? `&_t=${Date.now()}` : "";
     const CHUNK = 1000;
     const res = await fetch(`/api/city?from=0&to=${CHUNK}${cacheBust}`);
@@ -871,9 +935,13 @@ function HomeContent() {
     setDecorations(layout.decorations);
     setRiver(layout.river);
     setBridges(layout.bridges);
+    setDistrictZones(layout.districtZones);
 
     const total = data.stats?.total_developers ?? 0;
-    if (total <= CHUNK) return layout.buildings;
+    if (total <= CHUNK) {
+      setCityCache({ ...layout, stats: data.stats });
+      return layout.buildings;
+    }
 
     // Fetch remaining chunks in parallel
     const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
@@ -898,7 +966,26 @@ function HomeContent() {
     setDecorations(fullLayout.decorations);
     setRiver(fullLayout.river);
     setBridges(fullLayout.bridges);
+    setDistrictZones(fullLayout.districtZones);
+    setCityCache({ ...fullLayout, stats: data.stats });
     return fullLayout.buildings;
+  }, []);
+
+  // Handle loading fade complete: transition to "done" and trigger intro
+  const handleLoadFadeComplete = useCallback(() => {
+    setLoadStage("done");
+    const hasDeepLink = searchParams.get("user") || searchParams.get("compare");
+    if (!localStorage.getItem("gitcity_intro_seen") && !hasDeepLink) {
+      setIntroMode(true);
+    }
+  }, [searchParams]);
+
+  // Retry handler for loading errors
+  const handleLoadRetry = useCallback(() => {
+    setLoadStage("init");
+    setLoadProgress(0);
+    setLoadError(null);
+    didInit.current = false;
   }, []);
 
   // Load city from Supabase on mount
@@ -906,23 +993,140 @@ function HomeContent() {
     if (didInit.current) return;
     didInit.current = true;
 
+    // Return visit: restore from cache or fetch silently
+    if (loadStage === "done") {
+      const cached = getCityCache();
+      if (cached) {
+        setBuildings(cached.buildings);
+        setPlazas(cached.plazas);
+        setDecorations(cached.decorations);
+        setRiver(cached.river);
+        setBridges(cached.bridges);
+        setDistrictZones(cached.districtZones);
+        setStats(cached.stats);
+      } else {
+        reloadCity().catch(() => {});
+      }
+      return;
+    }
+
+    const loadStartTime = performance.now();
+
     async function loadCity() {
       try {
-        await reloadCity();
-      } catch {
-        // City might be empty, that's ok
-      } finally {
-        setInitialLoading(false);
-        // Start intro if first visit (no deep-link params)
-        const hasDeepLink = searchParams.get("user") || searchParams.get("compare");
-        if (!localStorage.getItem("gitcity_intro_seen") && !hasDeepLink) {
-          setIntroMode(true);
+        // WebGL check
+        setLoadStage("init");
+        setLoadProgress(3);
+        const canvas = document.createElement("canvas");
+        const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+        if (!gl) {
+          setLoadError("Your browser does not support WebGL. Try Chrome, Firefox, or Edge.");
+          setLoadStage("error");
+          return;
         }
+
+        // Fetch first chunk
+        setLoadStage("fetching");
+        setLoadProgress(10);
+
+        const CHUNK = 1000;
+        const res = await fetch(`/api/city?from=0&to=${CHUNK}`);
+        if (!res.ok) throw new Error("Failed to fetch city data");
+        const data = await res.json();
+
+        setLoadProgress(30);
+
+        if (data.developers.length === 0) {
+          // Empty city, skip to ready
+          setLoadProgress(100);
+          setLoadStage("ready");
+          return;
+        }
+
+        // Generate layout
+        setLoadStage("generating");
+        setLoadProgress(45);
+        await new Promise((r) => setTimeout(r, 0)); // yield to browser
+
+        setStats(data.stats);
+        let finalLayout = generateCityLayout(data.developers);
+        setBuildings(finalLayout.buildings);
+        setPlazas(finalLayout.plazas);
+        setDecorations(finalLayout.decorations);
+        setRiver(finalLayout.river);
+        setBridges(finalLayout.bridges);
+        setDistrictZones(finalLayout.districtZones);
+
+        setLoadProgress(55);
+
+        // Rendering: wait for Canvas to process data (2 rAF + fallback)
+        setLoadStage("rendering");
+        setLoadProgress(65);
+
+        await new Promise<void>((resolve) => {
+          let resolved = false;
+          const done = () => {
+            if (resolved) return;
+            resolved = true;
+            resolve();
+          };
+          // 2 chained rAFs
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => done());
+          });
+          // Fallback for hidden tabs where rAF doesn't fire
+          setTimeout(done, 500);
+        });
+
+        setLoadProgress(80);
+
+        // Fetch remaining chunks if needed
+        const total = data.stats?.total_developers ?? 0;
+        if (total > CHUNK) {
+          const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
+          for (let from = CHUNK; from < total; from += CHUNK) {
+            promises.push(
+              fetch(`/api/city?from=${from}&to=${from + CHUNK}`)
+                .then((r) => (r.ok ? r.json() : null))
+            );
+          }
+          const results = await Promise.all(promises);
+          let allDevs = [...data.developers];
+          for (const chunk of results) {
+            if (chunk?.developers?.length) {
+              allDevs = [...allDevs, ...chunk.developers];
+            }
+          }
+          finalLayout = generateCityLayout(allDevs);
+          setBuildings(finalLayout.buildings);
+          setPlazas(finalLayout.plazas);
+          setDecorations(finalLayout.decorations);
+          setRiver(finalLayout.river);
+          setBridges(finalLayout.bridges);
+          setDistrictZones(finalLayout.districtZones);
+        }
+
+        // Save to cache for return visits
+        setCityCache({ ...finalLayout, stats: data.stats });
+        setLoadProgress(95);
+
+        // Enforce minimum 800ms display time to avoid flash
+        const elapsed = performance.now() - loadStartTime;
+        if (elapsed < 800) {
+          await new Promise((r) => setTimeout(r, 800 - elapsed));
+        }
+
+        setLoadProgress(100);
+        setLoadStage("ready");
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : "Something went wrong");
+        setLoadStage("error");
       }
     }
 
     loadCity();
-  }, [reloadCity]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadStage]);
 
   // City reload on tab return removed — navigating back from shop already
   // re-mounts the component and loads fresh data via the mount effect above.
@@ -1121,8 +1325,11 @@ function HomeContent() {
 
       setFeedback(null);
 
-      // Reload city with cache-bust so the new dev is included
-      const updatedBuildings = await reloadCity(true);
+      // Only reload city if the dev is new — skip the full reload when they already exist
+      let updatedBuildings: CityBuilding[] | null = null;
+      if (!existedBefore) {
+        updatedBuildings = await reloadCity(true);
+      }
 
       // Focus camera on the searched building
       setFocusedBuilding(devData.github_login);
@@ -1138,8 +1345,9 @@ function HomeContent() {
         setTimeout(() => setGhostPreviewLogin(null), 4000);
       }
 
-      // Find the building in the updated city
-      const foundBuilding = updatedBuildings?.find(
+      // Find the building in the current or updated city
+      const searchPool = updatedBuildings ?? buildings;
+      const foundBuilding = searchPool.find(
         (b: CityBuilding) => b.login.toLowerCase() === trimmed
       );
 
@@ -1236,11 +1444,67 @@ function HomeContent() {
     !!myBuilding?.claimed &&
     !myBuilding.owned_items.includes("flag");
 
+  // Show district chooser once per session when user hasn't chosen yet
+  const shouldShowDistrictChooser =
+    !!session && !!myBuilding?.claimed && !myBuilding.district_chosen;
+
+  useEffect(() => {
+    if (shouldShowDistrictChooser && !sessionStorage.getItem("district_dismissed")) {
+      setDistrictChooserOpen(true);
+    }
+  }, [shouldShowDistrictChooser]);
+
   // Streak auto check-in (1x per browser session)
   const { streakData } = useStreakCheckin(session, !!myBuilding?.claimed);
 
   // Live users presence
   const { count: liveUsers, status: liveStatus } = useLiveUsers();
+
+  // ─── Milestone celebration system ──────────────────────────
+  const forceCelebrate = searchParams.has("celebrate");
+
+  const celebrationActive = useMemo(() => {
+    if (forceCelebrate) return true;
+    if (stats.total_developers < CELEBRATION_MILESTONES[0]) return false;
+    const current = [...CELEBRATION_MILESTONES].reverse().find((m) => stats.total_developers >= m);
+    if (!current) return false;
+    const record = milestoneCelebrations.find((c) => c.milestone === current);
+    if (!record) return true;
+    const elapsed = Date.now() - new Date(record.reached_at).getTime();
+    return elapsed < 24 * 60 * 60 * 1000;
+  }, [stats.total_developers, milestoneCelebrations, forceCelebrate]);
+
+  // Fetch milestone celebrations on mount
+  useEffect(() => {
+    fetch("/api/milestone-celebration")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => { if (Array.isArray(data)) setMilestoneCelebrations(data); })
+      .catch(() => {});
+  }, []);
+
+  // Record milestone when crossed
+  useEffect(() => {
+    if (stats.total_developers < CELEBRATION_MILESTONES[0]) return;
+    const current = [...CELEBRATION_MILESTONES].reverse().find((m) => stats.total_developers >= m);
+    if (!current) return;
+    const alreadyRecorded = milestoneCelebrations.some((c) => c.milestone === current);
+    if (alreadyRecorded) return;
+    fetch("/api/milestone-celebration", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ total_developers: stats.total_developers }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.celebrated) {
+          setMilestoneCelebrations((prev) => [
+            { milestone: data.milestone, reached_at: data.reached_at ?? new Date().toISOString() },
+            ...prev,
+          ]);
+        }
+      })
+      .catch(() => {});
+  }, [stats.total_developers, milestoneCelebrations]);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-bg font-pixel uppercase text-warm">
@@ -1253,9 +1517,37 @@ function HomeContent() {
         bridges={bridges}
         flyMode={flyMode}
         flyVehicle={flyVehicle}
-        onExitFly={() => { setFlyMode(false); setFlyPaused(false); }}
+        onExitFly={() => { setFlyMode(false); setFlyPaused(false); lastDistrictRef.current = null; setDistrictAnnouncement(null); clearTimeout(announceTimerRef.current); }}
         themeIndex={themeIndex}
-        onHud={(s, a) => setHud({ speed: s, altitude: a })}
+        onHud={(s, a, x, z, yaw) => {
+          setHud({ speed: s, altitude: a });
+          // Look-ahead: ~40u ahead of airplane = center of screen
+          const mapX = x - Math.sin(yaw) * 40;
+          const mapZ = z - Math.cos(yaw) * 40;
+          setPlayerPos({ x: mapX, z: mapZ });
+          // Find nearest building to determine district
+          let nearestDistrict: string | null = null;
+          let bestDist = Infinity;
+          for (const b of buildings) {
+            const dx = mapX - b.position[0], dz = mapZ - b.position[2];
+            const dist = dx * dx + dz * dz;
+            if (dist < bestDist) { bestDist = dist; nearestDistrict = b.district ?? "fullstack"; }
+          }
+          const district = nearestDistrict
+            ? districtZones.find(d => d.id === nearestDistrict) ?? null
+            : null;
+          const now = Date.now();
+          if (district && district.id !== lastDistrictRef.current) {
+            lastDistrictRef.current = district.id;
+            // Only show announcement if cooldown elapsed (5s)
+            if (now - announceCooldownRef.current > 5000) {
+              announceCooldownRef.current = now;
+              clearTimeout(announceTimerRef.current);
+              setDistrictAnnouncement({ name: district.name, color: district.color, population: district.population });
+              announceTimerRef.current = setTimeout(() => setDistrictAnnouncement(null), 3000);
+            }
+          }
+        }}
         onPause={(p) => setFlyPaused(p)}
         focusedBuilding={focusedBuilding}
         focusedBuildingB={focusedBuildingB}
@@ -1263,6 +1555,8 @@ function HomeContent() {
         onClearFocus={() => setFocusedBuilding(null)}
         flyPauseSignal={flyPauseSignal}
         flyHasOverlay={!!selectedBuilding}
+        holdRise={loadStage !== "done"}
+        celebrationActive={celebrationActive}
         skyAds={skyAds}
         onAdClick={(ad) => {
           trackSkyAdClick(ad.id, ad.vehicle, ad.link);
@@ -1292,6 +1586,17 @@ function HomeContent() {
           }
         }}
         onAdViewed={(adId) => {
+          // sessionStorage dedup: prevent inflated impressions across remounts
+          try {
+            const key = "gc_ad_viewed";
+            const raw = sessionStorage.getItem(key);
+            const viewed: string[] = raw ? JSON.parse(raw) : [];
+            if (viewed.includes(adId)) return;
+            viewed.push(adId);
+            sessionStorage.setItem(key, JSON.stringify(viewed));
+          } catch {
+            // sessionStorage unavailable — allow tracking
+          }
           trackAdEvent(adId, "impression", authLogin || undefined);
           const ad = skyAds.find(a => a.id === adId);
           if (ad) trackSkyAdImpression(ad.id, ad.vehicle, ad.brand);
@@ -1351,6 +1656,18 @@ function HomeContent() {
           }
         }}
       />
+
+      {/* Loading screen overlay */}
+      {loadStage !== "done" && (
+        <LoadingScreen
+          stage={loadStage}
+          progress={loadProgress}
+          error={loadError}
+          accentColor={theme.accent}
+          onRetry={handleLoadRetry}
+          onFadeComplete={handleLoadFadeComplete}
+        />
+      )}
 
       {/* ─── Intro Flyover Overlay ─── */}
       {introMode && (
@@ -1465,8 +1782,8 @@ function HomeContent() {
             </div>
           </div>
 
-          {/* Flight data */}
-          <div className="absolute bottom-4 left-3 text-[9px] leading-loose text-muted sm:bottom-6 sm:left-6 sm:text-[10px]">
+          {/* Flight data (above lo-fi radio) */}
+          <div className="absolute bottom-14 left-3 text-[9px] leading-loose text-muted sm:left-4 sm:text-[10px]">
             <div className="flex items-center gap-2">
               <span>SPD 速度</span>
               <span style={{ color: theme.accent }} className="w-6 text-right">
@@ -1490,8 +1807,19 @@ function HomeContent() {
             </div>
           </div>
 
+          {/* District announcement */}
+          {districtAnnouncement && (
+            <div key={districtAnnouncement.name} className="absolute bottom-32 left-3 animate-district-in sm:left-4">
+              <div className="border-l-4 bg-bg/80 px-4 py-2 backdrop-blur-sm" style={{ borderColor: districtAnnouncement.color }}>
+                <div className="text-[8px] uppercase tracking-widest text-muted">District</div>
+                <div className="font-pixel text-sm text-cream">{districtAnnouncement.name}</div>
+                <div className="text-[8px] text-muted">{districtAnnouncement.population.toLocaleString()} devs</div>
+              </div>
+            </div>
+          )}
+
           {/* Controls hint */}
-          <div className="absolute bottom-4 right-3 text-right text-[8px] leading-loose text-muted sm:bottom-6 sm:right-6 sm:text-[9px]">
+          <div className="absolute bottom-[140px] right-3 text-right text-[8px] leading-loose text-muted sm:right-4 sm:text-[9px]">
             {flyPaused ? (
               <>
                 <div>
@@ -1532,6 +1860,15 @@ function HomeContent() {
           </div>
         </div>
       )}
+
+      {/* ─── Mini-map ─── */}
+      <MiniMap
+        buildings={buildings}
+        playerX={playerPos.x}
+        playerZ={playerPos.z}
+        visible={flyMode}
+        currentDistrict={lastDistrictRef.current}
+      />
 
       {/* ─── Explore Mode: minimal UI ─── */}
       {exploreMode && !flyMode && (
@@ -1622,7 +1959,7 @@ function HomeContent() {
 
       {/* ─── GitHub Badge (mobile: top-center, desktop: top-right) ─── */}
       {!flyMode && !introMode && !rabbitCinematic && (
-        <div className="pointer-events-auto fixed top-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 sm:left-auto sm:right-4 sm:top-4 sm:translate-x-0">
+        <div className={`pointer-events-auto fixed top-3 left-1/2 z-30 -translate-x-1/2 items-center gap-2 sm:left-auto sm:right-4 sm:top-4 sm:translate-x-0 ${exploreMode ? "hidden lg:flex" : "flex"}`}>
           <a
             href="https://github.com/srizzon/git-city"
             target="_blank"
@@ -1724,6 +2061,47 @@ function HomeContent() {
               const MILESTONES = [10000, 15000, 25000, 50000, 100000];
               const count = stats.total_developers;
               if (count <= 0) return null;
+
+              if (celebrationActive) {
+                return (
+                  <div className="w-full max-w-sm">
+                    <style>{`@keyframes celebration-glow {
+  0%, 100% { box-shadow: 0 0 8px ${theme.accent}60; }
+  50% { box-shadow: 0 0 20px ${theme.accent}, 0 0 40px ${theme.accent}40; }
+}`}</style>
+                    <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm">
+                      <div className="mb-2 flex items-center justify-center gap-2">
+                        <span className="animate-pulse text-[10px]" style={{ color: theme.accent }}>★</span>
+                        <span className="text-[10px] tracking-widest text-cream">10,000 DEVELOPERS</span>
+                        <span className="animate-pulse text-[10px]" style={{ color: theme.accent }}>★</span>
+                      </div>
+                      <div className="mb-2 text-center text-[9px] tracking-wider text-cream/50">
+                        The city that code built.
+                      </div>
+                      <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
+                        <div
+                          className="absolute inset-y-0 left-0"
+                          style={{
+                            width: "100%",
+                            backgroundColor: theme.accent,
+                            boxShadow: `0 0 8px ${theme.accent}60`,
+                            animation: "celebration-glow 2s ease-in-out infinite",
+                          }}
+                        />
+                      </div>
+                      <div className="mt-2 flex items-baseline justify-between">
+                        <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
+                          10K unlocked
+                        </span>
+                        <span className="text-[9px] text-cream/40">
+                          Next: 15K
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               const target = MILESTONES.find((m) => count < m);
               if (!target) return null;
               const prev = MILESTONES[MILESTONES.indexOf(target) - 1] ?? 0;
@@ -2148,6 +2526,18 @@ function HomeContent() {
                   )}
                 </div>
               </div>
+
+              {/* District badge */}
+              {selectedBuilding.district && (
+                <div className="px-4 pb-2">
+                  <span
+                    className="inline-block px-2 py-0.5 text-[8px] text-bg"
+                    style={{ backgroundColor: DISTRICT_COLORS[selectedBuilding.district] ?? '#888' }}
+                  >
+                    {DISTRICT_NAMES[selectedBuilding.district] ?? selectedBuilding.district}
+                  </span>
+                </div>
+              )}
 
               {/* Stats */}
               <div className="grid grid-cols-3 gap-px bg-border/30 mx-4 mb-3 border border-border/50">
@@ -3179,11 +3569,30 @@ function HomeContent() {
         />
       )}
 
+      {/* District chooser modal */}
+      {districtChooserOpen && myBuilding && (
+        <DistrictChooser
+          currentDistrict={myBuilding.district ?? null}
+          inferredDistrict={myBuilding.district ?? null}
+          onClose={() => { sessionStorage.setItem("district_dismissed", "1"); setDistrictChooserOpen(false); }}
+          onChosen={(districtId) => {
+            sessionStorage.setItem("district_dismissed", "1");
+            setDistrictChooserOpen(false);
+            // Update the building in local state
+            setBuildings((prev) =>
+              prev.map((b) =>
+                b.login === myBuilding.login
+                  ? { ...b, district: districtId, district_chosen: true }
+                  : b
+              )
+            );
+          }}
+        />
+      )}
+
       {/* Founder's Landmark modals */}
       {pillModalOpen && (
         <PillModal
-          isLoggedIn={!!session}
-          hasClaimed={!!myBuilding?.claimed}
           rabbitCompleted={rabbitProgress >= 5}
           onRedPill={() => {
             setPillModalOpen(false);
@@ -3192,8 +3601,6 @@ function HomeContent() {
           onBluePill={() => {
             setPillModalOpen(false);
             if (rabbitProgress >= 5) return;
-            if (!myBuilding?.claimed) return;
-            // Spawn rabbit BEFORE cinematic so camera flies past it
             setRabbitSighting(rabbitProgress + 1);
             setRabbitCinematic(true);
           }}

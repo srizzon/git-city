@@ -3,8 +3,6 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 
 interface PillModalProps {
-  isLoggedIn: boolean;
-  hasClaimed: boolean;
   rabbitCompleted: boolean;
   onRedPill: () => void;
   onBluePill: () => void;

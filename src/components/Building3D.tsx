@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect, memo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
@@ -164,7 +164,7 @@ function createWindowTexture(
 
 // ─── Claimed Glow (neon trim + roof light) ────────────────────
 
-export function ClaimedGlow({ height, width, depth }: { height: number; width: number; depth: number }) {
+export const ClaimedGlow = memo(function ClaimedGlow({ height, width, depth }: { height: number; width: number; depth: number }) {
   const trimThickness = 1.2;
   const trimHeight = 2;
   const accent = "#c8e64a";
@@ -199,7 +199,7 @@ export function ClaimedGlow({ height, width, depth }: { height: number; width: n
 
     </group>
   );
-}
+});
 
 // ─── Multi-Level Labels ──────────────────────────────────────
 
@@ -343,7 +343,6 @@ export function FocusBeacon({ height, width, depth, accentColor }: { height: num
           <octahedronGeometry args={[6, 0]} />
           <meshBasicMaterial color={accentColor} transparent opacity={0.15} />
         </mesh>
-        <pointLight color={accentColor} intensity={80} distance={150} />
       </group>
     </group>
   );
@@ -353,7 +352,7 @@ export function FocusBeacon({ height, width, depth, accentColor }: { height: num
 
 // ─── Loadout-Aware Effect Rendering ──────────────────────────
 
-export function BuildingItemEffects({ building, accentColor, focused }: { building: CityBuilding; accentColor: string; focused?: boolean }) {
+export const BuildingItemEffects = memo(function BuildingItemEffects({ building, accentColor, focused }: { building: CityBuilding; accentColor: string; focused?: boolean }) {
   const { height, width, depth, owned_items, loadout, billboard_images } = building;
   const items = owned_items ?? [];
 
@@ -453,7 +452,7 @@ export function BuildingItemEffects({ building, accentColor, focused }: { buildi
       )}
     </>
   );
-}
+});
 
 // ─── Main Building Component ─────────────────────────────────
 

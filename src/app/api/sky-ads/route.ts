@@ -21,26 +21,29 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
 }
 
 /**
- * Pick which paid ads to show this rotation window.
- * Permanent ads (no plan_id / priority >= 100) always show.
- * Paid ads rotate every ROTATION_INTERVAL seconds so all get equal airtime.
+ * Pick which ads to show this rotation window.
+ * Paid ads get priority. House ads (priority >= 100) fill remaining slots.
  */
 function rotateAds(ads: SkyAd[], maxSlots: number): SkyAd[] {
-  const permanent = ads.filter((a) => a.priority >= 100);
+  const house = ads.filter((a) => a.priority >= 100);
   const paid = ads.filter((a) => a.priority < 100);
 
-  const availableSlots = Math.max(0, maxSlots - permanent.length);
-
-  if (paid.length <= availableSlots) {
-    // All fit, no rotation needed
-    return [...permanent, ...paid];
+  if (paid.length >= maxSlots) {
+    // Paid ads fill all slots, no house ads
+    const seed = Math.floor(Date.now() / 1000 / ROTATION_INTERVAL);
+    return seededShuffle(paid, seed).slice(0, maxSlots);
   }
 
-  // Time-based seed: changes every ROTATION_INTERVAL seconds
+  // Paid ads first, then rotate paid if needed
   const seed = Math.floor(Date.now() / 1000 / ROTATION_INTERVAL);
-  const shuffled = seededShuffle(paid, seed);
+  const selectedPaid =
+    paid.length > maxSlots
+      ? seededShuffle(paid, seed).slice(0, maxSlots)
+      : paid;
 
-  return [...permanent, ...shuffled.slice(0, availableSlots)];
+  // House ads fill remaining slots
+  const remaining = maxSlots - selectedPaid.length;
+  return [...selectedPaid, ...house.slice(0, remaining)];
 }
 
 export async function GET() {

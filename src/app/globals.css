@@ -178,6 +178,17 @@ body {
 }
 .live-dot { animation: live-pulse 2s ease-in-out infinite; }
 
+/* ─── District fly-by announcement ─── */
+@keyframes district-in {
+  0%   { opacity: 0; transform: translateX(-20px); }
+  10%  { opacity: 1; transform: translateX(0); }
+  80%  { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(0); }
+}
+.animate-district-in {
+  animation: district-in 3s ease-out forwards;
+}
+
 .gift-cta {
   animation:
     gift-glow 2s ease-in-out infinite,

@@ -7,6 +7,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getOwnedItems } from "@/lib/items";
 import { TIER_COLORS } from "@/lib/achievements";
+import { DISTRICT_NAMES, DISTRICT_COLORS } from "@/lib/github";
 import { ITEM_NAMES } from "@/lib/zones";
 import ClaimButton from "@/components/ClaimButton";
 import ShareButtons from "@/components/ShareButtons";
@@ -181,6 +182,23 @@ export default async function DevPage({ params }: Props) {
               {dev.rank && (
                 <div className="mt-3 inline-block border-[2px] px-3 py-1 text-sm" style={{ borderColor: accent, color: accent }}>
                   #{dev.rank} in the city | 城市排名 #{dev.rank}
+                </div>
+              )}
+
+              {/* District badge */}
+              {dev.district && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span
+                    className="px-2 py-0.5 text-[10px] text-bg"
+                    style={{ backgroundColor: DISTRICT_COLORS[dev.district] ?? '#888' }}
+                  >
+                    {DISTRICT_NAMES[dev.district] ?? dev.district}
+                  </span>
+                  {dev.district_rank && (
+                    <span className="text-[10px] text-muted">
+                      {dev.district_rank === 1 ? 'Mayor' : `#${dev.district_rank}`} in {DISTRICT_NAMES[dev.district]}
+                    </span>
+                  )}
                 </div>
               )}
 

@@ -1,12 +1,62 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, memo } from "react";
 import { useFrame } from "@react-three/fiber";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
 import { ClaimedGlow, BuildingItemEffects } from "./Building3D";
 import { StreakFlame, NeonOutline, ParticleAura, SpotlightEffect } from "./BuildingEffects";
 import RaidTag3D from "./RaidTag3D";
+
+// ─── Memoized per-building effects ────────────────────────────
+
+const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
+  building,
+  accentColor,
+  isFocused,
+  isDimmed,
+  isGhostTarget,
+  ghostEffectId,
+}: {
+  building: CityBuilding;
+  accentColor: string;
+  isFocused: boolean;
+  isDimmed: boolean;
+  isGhostTarget: boolean;
+  ghostEffectId: number;
+}) {
+  return (
+    <group position={[building.position[0], 0, building.position[2]]} visible={!isDimmed}>
+      {building.claimed && (
+        <ClaimedGlow height={building.height} width={building.width} depth={building.depth} />
+      )}
+      <BuildingItemEffects
+        building={building}
+        accentColor={accentColor}
+        focused={isFocused}
+      />
+      {isGhostTarget && (
+        ghostEffectId === 0
+          ? <NeonOutline width={building.width} height={building.height} depth={building.depth} color={accentColor} />
+          : ghostEffectId === 1
+          ? <ParticleAura width={building.width} height={building.height} depth={building.depth} color={accentColor} />
+          : <SpotlightEffect height={building.height} width={building.width} depth={building.depth} color={accentColor} />
+      )}
+      {building.app_streak > 0 && (
+        <StreakFlame height={building.height} width={building.width} depth={building.depth} streakDays={building.app_streak} color={accentColor} />
+      )}
+      {building.active_raid_tag && (
+        <RaidTag3D
+          width={building.width}
+          height={building.height}
+          depth={building.depth}
+          attackerLogin={building.active_raid_tag.attacker_login}
+          tagStyle={building.active_raid_tag.tag_style}
+        />
+      )}
+    </group>
+  );
+});
 
 // ─── Spatial Grid (same structure as CityScene) ────────────────
 
@@ -37,8 +87,9 @@ function querySpatialGrid(grid: GridIndex, x: number, z: number, radius: number)
 // ─── Constants ─────────────────────────────────────────────────
 
 const EFFECTS_RADIUS = 400;
-const EFFECTS_RADIUS_HYSTERESIS = 500;
+const EFFECTS_RADIUS_HYSTERESIS = 480;
 const EFFECTS_UPDATE_INTERVAL = 0.3; // seconds
+const MAX_ACTIVE_EFFECTS = 40;
 
 // ─── Component ─────────────────────────────────────────────────
 
@@ -70,6 +121,9 @@ export default function EffectsLayer({
   const lastUpdate = useRef(-1);
   const activeSetRef = useRef(new Set<number>());
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
+  const prevCamPos = useRef<[number, number]>([0, 0]);
+  const prevCamTime = useRef(0);
+  const smoothVel = useRef<[number, number]>([0, 0]);
 
   const focusedLower = focusedBuilding?.toLowerCase() ?? null;
   const focusedBLower = focusedBuildingB?.toLowerCase() ?? null;
@@ -86,15 +140,38 @@ export default function EffectsLayer({
     if (introMode) return; // Skip effects during intro
 
     const elapsed = clock.elapsedTime;
-    if (elapsed - lastUpdate.current < EFFECTS_UPDATE_INTERVAL) return;
+    const interval = flyMode ? 0.15 : EFFECTS_UPDATE_INTERVAL;
+    if (elapsed - lastUpdate.current < interval) return;
     lastUpdate.current = elapsed;
 
-    const cx = camera.position.x;
-    const cz = camera.position.z;
-    const candidates = querySpatialGrid(grid, cx, cz, EFFECTS_RADIUS_HYSTERESIS);
+    const rawCx = camera.position.x;
+    const rawCz = camera.position.z;
+    let cx = rawCx;
+    let cz = rawCz;
+
+    // In fly mode, predict ahead using smoothed velocity so effects pre-load without flickering
+    const dt = elapsed - prevCamTime.current;
+    if (flyMode && dt > 0.01) {
+      const vxRaw = (rawCx - prevCamPos.current[0]) / dt;
+      const vzRaw = (rawCz - prevCamPos.current[1]) / dt;
+      // Exponential moving average to avoid jitter on turns
+      const SMOOTH = 0.3;
+      smoothVel.current[0] += (vxRaw - smoothVel.current[0]) * SMOOTH;
+      smoothVel.current[1] += (vzRaw - smoothVel.current[1]) * SMOOTH;
+      const LOOK_AHEAD_SECS = 2.0;
+      cx += smoothVel.current[0] * LOOK_AHEAD_SECS;
+      cz += smoothVel.current[1] * LOOK_AHEAD_SECS;
+    }
+    prevCamPos.current[0] = rawCx;
+    prevCamPos.current[1] = rawCz;
+    prevCamTime.current = elapsed;
+
+    // Wider hysteresis in fly mode so buildings stay active longer once loaded
+    const flyHyst = flyMode ? 450 : EFFECTS_RADIUS_HYSTERESIS;
+    const candidates = querySpatialGrid(grid, cx, cz, flyHyst);
 
     const nearSq = EFFECTS_RADIUS * EFFECTS_RADIUS;
-    const farSq = EFFECTS_RADIUS_HYSTERESIS * EFFECTS_RADIUS_HYSTERESIS;
+    const farSq = flyHyst * flyHyst;
     const newSet = new Set<number>();
 
     for (let c = 0; c < candidates.length; c++) {
@@ -123,6 +200,30 @@ export default function EffectsLayer({
     if (focusedBLower) {
       const fi = loginToIdx.get(focusedBLower);
       if (fi !== undefined) newSet.add(fi);
+    }
+
+    // Cap at MAX_ACTIVE_EFFECTS — keep closest buildings
+    if (newSet.size > MAX_ACTIVE_EFFECTS) {
+      const withDist = Array.from(newSet).map((idx) => {
+        const b = buildings[idx];
+        const dx = cx - b.position[0];
+        const dz = cz - b.position[2];
+        return { idx, distSq: dx * dx + dz * dz };
+      });
+      withDist.sort((a, b) => a.distSq - b.distSq);
+      newSet.clear();
+      for (let i = 0; i < MAX_ACTIVE_EFFECTS && i < withDist.length; i++) {
+        newSet.add(withDist[i].idx);
+      }
+      // Re-add focused buildings (always visible)
+      if (focusedLower) {
+        const fi = loginToIdx.get(focusedLower);
+        if (fi !== undefined) newSet.add(fi);
+      }
+      if (focusedBLower) {
+        const fi = loginToIdx.get(focusedBLower);
+        if (fi !== undefined) newSet.add(fi);
+      }
     }
 
     // Check if changed
@@ -166,36 +267,15 @@ export default function EffectsLayer({
         const isDimmed = !!focusedLower && !isFocused;
         const isGhostTarget = ghostLower === loginLower;
         return (
-          <group key={b.login} position={[b.position[0], 0, b.position[2]]} visible={!isDimmed}>
-            {b.claimed && (
-              <ClaimedGlow height={b.height} width={b.width} depth={b.depth} />
-            )}
-            <BuildingItemEffects
-              building={b}
-              accentColor={accentColor}
-              focused={isFocused}
-            />
-            {/* A8: Ghost preview effect (temporary aura) */}
-            {isGhostTarget && (
-              ghostEffectId === 0
-                ? <NeonOutline width={b.width} height={b.height} depth={b.depth} color={accentColor} />
-                : ghostEffectId === 1
-                ? <ParticleAura width={b.width} height={b.height} depth={b.depth} color={accentColor} />
-                : <SpotlightEffect height={b.height} width={b.width} depth={b.depth} color={accentColor} />
-            )}
-            {b.app_streak > 0 && (
-              <StreakFlame height={b.height} width={b.width} depth={b.depth} streakDays={b.app_streak} color={accentColor} />
-            )}
-            {b.active_raid_tag && (
-              <RaidTag3D
-                width={b.width}
-                height={b.height}
-                depth={b.depth}
-                attackerLogin={b.active_raid_tag.attacker_login}
-                tagStyle={b.active_raid_tag.tag_style}
-              />
-            )}
-          </group>
+          <ActiveBuildingEffects
+            key={b.login}
+            building={b}
+            accentColor={accentColor}
+            isFocused={isFocused}
+            isDimmed={isDimmed}
+            isGhostTarget={isGhostTarget}
+            ghostEffectId={ghostEffectId}
+          />
         );
       })}
       {/* A8: Ghost preview for building not in active set (force render) */}

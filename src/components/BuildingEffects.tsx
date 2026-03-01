@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useMemo, useState, useEffect } from "react";
+import { useRef, useMemo, useState, useEffect, memo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 // ─── Neon Outline ────────────────────────────────────────────
 // Wireframe edges with strong emission around the building
 
-export function NeonOutline({
+export const NeonOutline = memo(function NeonOutline({
   width,
   height,
   depth,
@@ -45,14 +45,14 @@ export function NeonOutline({
       <lineBasicMaterial color={color} transparent opacity={0.8} linewidth={2} />
     </lineSegments>
   );
-}
+});
 
 // ─── Particle Aura ───────────────────────────────────────────
 // Floating particles around the building
 
 const AURA_COUNT = 60;
 
-export function ParticleAura({
+export const ParticleAura = memo(function ParticleAura({
   width,
   height,
   depth,
@@ -119,12 +119,12 @@ export function ParticleAura({
       />
     </points>
   );
-}
+});
 
 // ─── Searchlights (was Spotlight) ────────────────────────────
 // 2 circus-style beams shooting straight up from rooftop
 
-export function SpotlightEffect({
+export const SpotlightEffect = memo(function SpotlightEffect({
   height,
   width,
   depth,
@@ -186,7 +186,7 @@ export function SpotlightEffect({
         {/* Projector box base */}
         <mesh position={[0, 0.6, 0]}>
           <boxGeometry args={[2, 1.2, 2]} />
-          <meshStandardMaterial color="#333340" metalness={0.7} roughness={0.3} />
+          <meshStandardMaterial color="#333340" emissive="#666666" emissiveIntensity={2} toneMapped={false} metalness={0.7} roughness={0.3} />
         </mesh>
         {/* Inner beam */}
         <mesh position={[0, beamH / 2 + 1, 0]}>
@@ -198,14 +198,13 @@ export function SpotlightEffect({
           <coneGeometry args={[topR * 1.6, beamH * 0.95, 8, 1, true]} />
           {glowMat}
         </mesh>
-        <pointLight position={[0, 1.5, 0]} color={color} intensity={20} distance={40} />
       </group>
 
       {/* Beam 2 */}
       <group ref={beam2} position={[spread, 0, spread * 0.5]}>
         <mesh position={[0, 0.6, 0]}>
           <boxGeometry args={[2, 1.2, 2]} />
-          <meshStandardMaterial color="#333340" metalness={0.7} roughness={0.3} />
+          <meshStandardMaterial color="#333340" emissive="#666666" emissiveIntensity={2} toneMapped={false} metalness={0.7} roughness={0.3} />
         </mesh>
         <mesh position={[0, beamH / 2 + 1, 0]}>
           <coneGeometry args={[topR, beamH, 8, 1, true]} />
@@ -215,16 +214,15 @@ export function SpotlightEffect({
           <coneGeometry args={[topR * 1.6, beamH * 0.95, 8, 1, true]} />
           {glowMat}
         </mesh>
-        <pointLight position={[0, 1.5, 0]} color={color} intensity={20} distance={40} />
       </group>
     </group>
   );
-}
+});
 
 // ─── Rooftop Fire ────────────────────────────────────────────
 // Blocky contained campfire with strong orange glow
 
-export function RooftopFire({
+export const RooftopFire = memo(function RooftopFire({
   height,
   width,
   depth,
@@ -287,16 +285,14 @@ export function RooftopFire({
           </mesh>
         ))}
       </group>
-      {/* Glow light */}
-      <pointLight position={[0, 6, 0]} color="#ff6622" intensity={40} distance={60} />
     </group>
   );
-}
+});
 
 // ─── Helipad ─────────────────────────────────────────────────
 // Flat cylinder on rooftop with "H" marking + glowing border
 
-export function Helipad({
+export const Helipad = memo(function Helipad({
   height,
   width,
   depth,
@@ -360,28 +356,14 @@ export function Helipad({
           emissiveIntensity={1}
         />
       </mesh>
-      {/* Corner lights */}
-      {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle, i) => (
-        <pointLight
-          key={i}
-          position={[
-            Math.cos(angle) * (padSize / 2 + 0.3),
-            0.8,
-            Math.sin(angle) * (padSize / 2 + 0.3),
-          ]}
-          color="#ff4444"
-          intensity={5}
-          distance={15}
-        />
-      ))}
     </group>
   );
-}
+});
 
 // ─── Solar Panels (was Antenna Array) ────────────────────────
 // 2×3 grid of tilted solar panels on rooftop center
 
-export function AntennaArray({
+export const AntennaArray = memo(function AntennaArray({
   height,
   width,
   depth,
@@ -462,12 +444,12 @@ export function AntennaArray({
       })}
     </group>
   );
-}
+});
 
 // ─── Rooftop Garden ──────────────────────────────────────────
 // Green base with cubic Minecraft-style trees (box geometry)
 
-export function RooftopGarden({
+export const RooftopGarden = memo(function RooftopGarden({
   height,
   width,
   depth,
@@ -569,12 +551,12 @@ export function RooftopGarden({
       ))}
     </group>
   );
-}
+});
 
 // ─── Water Tower (was Spire) ─────────────────────────────────
 // Pixel water tower on corner of rooftop
 
-export function Spire({
+export const Spire = memo(function Spire({
   height,
   width,
   depth,
@@ -644,7 +626,7 @@ export function Spire({
       ))}
     </group>
   );
-}
+});
 
 // ─── Billboard (Multi / Times Square) ────────────────────────
 // Each purchase = one billboard slot distributed across building faces
@@ -755,7 +737,7 @@ function billboardSeeded(seed: number): number {
   return (s - 1) / 2147483646;
 }
 
-export function Billboards({
+export const Billboards = memo(function Billboards({
   height,
   width,
   depth,
@@ -863,12 +845,12 @@ export function Billboards({
       ))}
     </group>
   );
-}
+});
 
 // ─── Flag ────────────────────────────────────────────────────
 // Animated flag on corner of building (front-right)
 
-export function Flag({
+export const Flag = memo(function Flag({
   height,
   width,
   depth,
@@ -917,12 +899,12 @@ export function Flag({
       </mesh>
     </group>
   );
-}
+});
 
 // ─── Neon Trim (aura zone) ───────────────────────────────────
 // Glowing neon outlines on all 12 building edges + scanning band
 
-export function NeonTrim({
+export const NeonTrim = memo(function NeonTrim({
   width,
   height,
   depth,
@@ -1045,14 +1027,13 @@ export function NeonTrim({
         </mesh>
       </group>
 
-      <pointLight position={[0, height * 0.5, 0]} color={color} intensity={12} distance={45} />
     </group>
   );
-}
+});
 
 // ─── Satellite Dish (crown zone) ─────────────────────────────
 
-export function SatelliteDish({
+export const SatelliteDish = memo(function SatelliteDish({
   height,
   width,
   depth,
@@ -1101,11 +1082,11 @@ export function SatelliteDish({
       </group>
     </group>
   );
-}
+});
 
 // ─── Crown Item (crown zone — premium) ──────────────────────
 
-export function CrownItem({
+export const CrownItem = memo(function CrownItem({
   height,
   color = "#ffd700",
   focused,
@@ -1177,14 +1158,13 @@ export function CrownItem({
         </mesh>
       ))}
 
-      <pointLight color={color} intensity={50} distance={70} />
     </group>
   );
-}
+});
 
 // ─── Pool Party (roof zone — premium) ───────────────────────
 
-export function PoolParty({
+export const PoolParty = memo(function PoolParty({
   height,
   width,
   depth,
@@ -1241,12 +1221,12 @@ export function PoolParty({
       ))}
     </group>
   );
-}
+});
 
 // ─── Holo Shield (was Hologram Ring) ─────────────────────────
 // Wireframe force field wrapping building + 2 orbiting data rings
 
-export function HologramRing({
+export const HologramRing = memo(function HologramRing({
   width,
   height,
   depth,
@@ -1341,19 +1321,18 @@ export function HologramRing({
         </mesh>
       </group>
 
-      <pointLight color={color} intensity={15} distance={60} />
     </group>
   );
-}
+});
 
 // ─── Electric Storm (was Lightning Aura) ─────────────────────
 // Storm clouds + zig-zag lightning bolts + rain + flash
 
-const RAIN_COUNT = 50;
-const BOLT_SEGS = 6;
+const RAIN_COUNT = 20;
+const BOLT_SEGS = 4;
 const BOLT_SLOTS = 3;
 
-export function LightningAura({
+export const LightningAura = memo(function LightningAura({
   width,
   height,
   depth,
@@ -1367,8 +1346,6 @@ export function LightningAura({
   const rainRef = useRef<THREE.Group>(null);
   const boltsRef = useRef<THREE.Group>(null);
   const cloudsRef = useRef<THREE.Group>(null);
-  const flash1 = useRef<THREE.PointLight>(null);
-  const flash2 = useRef<THREE.PointLight>(null);
   const nextStrike = useRef(0);
   const strikeEnd = useRef(0);
 
@@ -1380,7 +1357,7 @@ export function LightningAura({
   // Cloud blocks
   const clouds = useMemo(() => {
     const arr: { x: number; z: number; y: number; w: number; h: number; d: number }[] = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 4; i++) {
       arr.push({
         x: (Math.random() - 0.5) * spread * 1.6,
         z: (Math.random() - 0.5) * spread * 1.6,
@@ -1388,7 +1365,7 @@ export function LightningAura({
         w: 4 + Math.random() * 8, h: 2 + Math.random() * 2, d: 4 + Math.random() * 8,
       });
     }
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 2; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = spread * (0.6 + Math.random() * 0.5);
       arr.push({
@@ -1505,15 +1482,12 @@ export function LightningAura({
       }
     }
 
-    // Flash
-    if (flash1.current) flash1.current.intensity = striking ? 120 + Math.random() * 80 : 0;
-    if (flash2.current) flash2.current.intensity = striking ? 80 + Math.random() * 60 : 0;
-
-    // Cloud flash glow
+    // Cloud flash glow (emissive replaces pointLights)
     if (cloudsRef.current) {
       cloudsRef.current.children.forEach((c) => {
         const mat = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
-        mat.emissiveIntensity = striking ? 1.5 : 0;
+        mat.emissiveIntensity = striking ? 4.0 : 0;
+        mat.toneMapped = !striking;
       });
     }
   });
@@ -1568,19 +1542,16 @@ export function LightningAura({
         ))}
       </group>
 
-      {/* Flash lights */}
-      <pointLight ref={flash1} color="#ffffff" intensity={0} distance={120} position={[0, cloudY, 0]} />
-      <pointLight ref={flash2} color={color} intensity={0} distance={80} />
     </group>
   );
-}
+});
 
 // ─── LED Banner (faces zone) ─────────────────────────────────
 // Scrolling marquee segments around building — Times Square style
 
 const LED_SEGS = 8; // segments per face
 
-export function LEDBanner({
+export const LEDBanner = memo(function LEDBanner({
   height,
   width,
   depth,
@@ -1657,13 +1628,13 @@ export function LEDBanner({
       })}
     </group>
   );
-}
+});
 
 // ─── Streak Glow ──────────────────────────────────────────
 // Vertical neon strips on building edges. Height scales with streak.
 // Uses theme accent color. No conflict with roof/crown items.
 
-export function StreakFlame({
+export const StreakFlame = memo(function StreakFlame({
   height,
   width,
   depth,
@@ -1712,4 +1683,4 @@ export function StreakFlame({
       ))}
     </group>
   );
-}
+});

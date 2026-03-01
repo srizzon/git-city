@@ -73,6 +73,7 @@ interface CitySceneProps {
   introMode?: boolean;
   flyMode?: boolean;
   ghostPreviewLogin?: string | null;
+  holdRise?: boolean;
 }
 
 export default function CityScene({
@@ -87,6 +88,7 @@ export default function CityScene({
   introMode,
   flyMode,
   ghostPreviewLogin,
+  holdRise,
 }: CitySceneProps) {
   // Single atlas texture for all building windows (created once per theme)
   const atlasTexture = useMemo(() => createWindowAtlas(colors), [colors]);
@@ -158,6 +160,7 @@ export default function CityScene({
         focusedBuildingB={focusedBuildingB}
         introMode={introMode}
         onBuildingClick={onBuildingClick}
+        holdRise={holdRise}
       />
 
       {/* All labels: single instanced draw call with billboard shader */}

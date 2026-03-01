@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { SKY_AD_PLANS, isValidPlanId, getPriceCents, type AdCurrency } from "@/lib/skyAdPlans";
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
 import { rateLimit } from "@/lib/rate-limit";
+import { containsBlockedContent } from "@/lib/ad-moderation";
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -71,6 +72,15 @@ export async function POST(request: NextRequest) {
   if (text.length > MAX_TEXT_LENGTH) {
     return NextResponse.json(
       { error: `Text must be ${MAX_TEXT_LENGTH} characters or less` },
+      { status: 400 }
+    );
+  }
+
+  // Moderate text content
+  const modResult = containsBlockedContent(text);
+  if (modResult.blocked) {
+    return NextResponse.json(
+      { error: modResult.reason ?? "Ad text not allowed" },
       { status: 400 }
     );
   }

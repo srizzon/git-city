@@ -167,6 +167,7 @@ interface InstancedBuildingsProps {
   onBuildingClick?: (building: CityBuilding) => void;
   dimOpacity?: number;
   dimEmissive?: number;
+  holdRise?: boolean;
 }
 
 // Rise animation tracking
@@ -188,6 +189,7 @@ export default memo(function InstancedBuildings({
   onBuildingClick,
   dimOpacity,
   dimEmissive,
+  holdRise,
 }: InstancedBuildingsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = buildings.length;
@@ -287,6 +289,8 @@ export default memo(function InstancedBuildings({
   const risingRef = useRef<RiseState[]>([]);
   const riseInitialized = useRef(false);
   const hasPlayedRise = useRef(false);
+  const holdRiseRef = useRef(holdRise);
+  holdRiseRef.current = holdRise;
 
   // Initialize instances
   useEffect(() => {
@@ -375,6 +379,9 @@ export default memo(function InstancedBuildings({
   useFrame(({ clock }) => {
     const mesh = meshRef.current;
     if (!mesh) return;
+
+    // Hold rise animation until loading screen is done
+    if (holdRiseRef.current) return;
 
     // Initialize rise animation queue (staggered)
     const now = clock.elapsedTime;
@@ -506,9 +513,9 @@ export default memo(function InstancedBuildings({
         return;
       }
       if ((window as any).__spireCursor) return;
-      // Throttle hover raycast to ~15Hz
+      // Throttle hover raycast to ~8Hz
       const now = performance.now();
-      if (now - lastMoveTime < 66) return;
+      if (now - lastMoveTime < 125) return;
       lastMoveTime = now;
       const id = raycastInstance(e.clientX, e.clientY);
       document.body.style.cursor = id !== null ? "pointer" : "auto";

@@ -1,11 +1,9 @@
 /**
  * In-memory sliding window rate limiter.
  *
- * Limitations (acceptable for most Next.js deployments):
- * - State is per-process: each serverless cold-start or Edge isolate
- *   gets its own Map.  For true distributed rate limiting, swap this
- *   for Upstash Redis (@upstash/ratelimit).
- * - Cleaned up lazily every 60 s to prevent unbounded memory growth.
+ * State is per-process: each serverless cold-start gets its own Map.
+ * Good enough for most abuse prevention. For true distributed rate
+ * limiting, swap for Upstash Redis (@upstash/ratelimit).
  */
 
 interface Entry {

@@ -298,8 +298,6 @@ function BannerPlane({
         <planeGeometry args={[BANNER_LENGTH, BANNER_HEIGHT]} />
       </mesh>
 
-      {/* LED glow — tinted to ad color */}
-      <pointLight position={[0, bannerY, bannerZ]} color={ad.color} intensity={5} distance={30} />
     </group>
   );
 }
@@ -539,8 +537,6 @@ function Blimp({
         <planeGeometry args={[26, 9]} />
       </mesh>
 
-      {/* LED screen glow */}
-      <pointLight position={[0, -2, 0]} color={ad.color} intensity={5} distance={30} />
     </group>
   );
 }

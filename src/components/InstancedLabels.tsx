@@ -349,7 +349,17 @@ export default memo(function InstancedLabels({
           }
         }
       }
-      allConverged.current = false;
+
+      // Only un-converge if targets actually differ from current alphas
+      if (allConverged.current) {
+        for (let i = 0; i < count; i++) {
+          const diff = targets[i] - arr[i];
+          if (diff > 0.01 || diff < -0.01) {
+            allConverged.current = false;
+            break;
+          }
+        }
+      }
     }
 
     // Skip lerp if already converged

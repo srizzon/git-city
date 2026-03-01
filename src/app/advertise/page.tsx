@@ -324,7 +324,7 @@ export default async function AdvertisePage() {
                 },
                 {
                   q: "What if I want a refund?",
-                  a: "Full refund within the first 3 days. After that it runs until the end of the paid period.",
+                  a: "Refunds are evaluated on a case-by-case basis. Contact samuelrizzondev@gmail.com within the first 24 hours if there's an issue with your ad.",
                 },
               ].map((item) => (
                 <div key={item.q} className="border-[2px] border-border p-5">

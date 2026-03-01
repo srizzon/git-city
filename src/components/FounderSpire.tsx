@@ -251,14 +251,6 @@ export default function FounderSpire({ onClick }: FounderSpireProps) {
         decay={2}
       />
 
-      {/* Subtle base glow */}
-      <pointLight
-        position={[0, 10, 0]}
-        color={MATRIX_GREEN}
-        intensity={20}
-        distance={80}
-        decay={2}
-      />
     </group>
   );
 }
