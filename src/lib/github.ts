@@ -522,6 +522,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
         active_raid_tag: (dev as unknown as Record<string, unknown>).active_raid_tag as CityBuilding["active_raid_tag"] ?? null,
         rabbit_completed: (dev as unknown as Record<string, unknown>).rabbit_completed as boolean ?? false,
         district: did,
+        district_chosen: (dev as unknown as Record<string, unknown>).district_chosen as boolean ?? false,
         position: [posX, 0, posZ],
         width: w,
         depth: d,
