@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges" width="512" height="512">
+  <!-- CONCEPT 6: Genesis Commit - Terminal pixel art -->
+  <!-- "git init... git commit -m 'first city'" -->
+
+  <!-- Background -->
+  <rect width="64" height="64" fill="#0d1117"/>
+
+  <!-- Terminal border -->
+  <rect x="0" y="0" width="64" height="1" fill="#00ff41" opacity="0.3"/>
+  <rect x="0" y="63" width="64" height="1" fill="#00ff41" opacity="0.3"/>
+  <rect x="0" y="0" width="1" height="64" fill="#00ff41" opacity="0.3"/>
+  <rect x="63" y="0" width="1" height="64" fill="#00ff41" opacity="0.3"/>
+
+  <!-- Title bar -->
+  <rect x="1" y="1" width="62" height="8" fill="#111820"/>
+  <!-- macOS dots -->
+  <rect x="4" y="4" width="2" height="2" fill="#ff5f56"/>
+  <rect x="8" y="4" width="2" height="2" fill="#ffbd2e"/>
+  <rect x="12" y="4" width="2" height="2" fill="#27c93f"/>
+  <!-- Title hint "git-city" -->
+  <rect x="36" y="4" width="7" height="2" fill="#00ff41" opacity="0.15"/>
+  <rect x="44" y="5" width="1" height="1" fill="#00ff41" opacity="0.1"/>
+  <rect x="46" y="4" width="9" height="2" fill="#00ff41" opacity="0.15"/>
+
+  <!-- Separator -->
+  <rect x="1" y="9" width="62" height="1" fill="#00ff41" opacity="0.15"/>
+
+  <!-- Content area -->
+  <rect x="1" y="10" width="62" height="43" fill="#080d08"/>
+
+  <!-- Subtle CRT scanlines -->
+  <rect x="1" y="14" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+  <rect x="1" y="18" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+  <rect x="1" y="22" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+  <rect x="1" y="26" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+  <rect x="1" y="30" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+  <rect x="1" y="34" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+  <rect x="1" y="38" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+  <rect x="1" y="42" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+  <rect x="1" y="46" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+  <rect x="1" y="50" width="62" height="1" fill="#00ff41" opacity="0.015"/>
+
+  <!-- LINE 1: > git init -->
+  <!-- ">" prompt -->
+  <rect x="4" y="15" width="1" height="1" fill="#00ff41" opacity="0.5"/>
+  <rect x="5" y="16" width="1" height="1" fill="#00ff41" opacity="0.5"/>
+  <rect x="4" y="17" width="1" height="1" fill="#00ff41" opacity="0.5"/>
+  <!-- "git" word bar -->
+  <rect x="8" y="15" width="7" height="3" fill="#00ff41" opacity="0.75"/>
+  <!-- "init" word bar -->
+  <rect x="17" y="15" width="9" height="3" fill="#00ff41" opacity="0.75"/>
+
+  <!-- LINE 2: > git commit -m -->
+  <!-- ">" prompt -->
+  <rect x="4" y="25" width="1" height="1" fill="#00ff41" opacity="0.5"/>
+  <rect x="5" y="26" width="1" height="1" fill="#00ff41" opacity="0.5"/>
+  <rect x="4" y="27" width="1" height="1" fill="#00ff41" opacity="0.5"/>
+  <!-- "git" -->
+  <rect x="8" y="25" width="7" height="3" fill="#00ff41" opacity="0.75"/>
+  <!-- "commit" -->
+  <rect x="17" y="25" width="14" height="3" fill="#00ff41" opacity="0.75"/>
+  <!-- "-m" -->
+  <rect x="33" y="25" width="5" height="3" fill="#00ff41" opacity="0.75"/>
+
+  <!-- LINE 3: "first city" (commit message, dimmer like a string) -->
+  <rect x="8" y="33" width="2" height="3" fill="#c8e64a" opacity="0.4"/><!-- opening quote -->
+  <rect x="11" y="33" width="11" height="3" fill="#c8e64a" opacity="0.55"/><!-- "first" -->
+  <rect x="24" y="33" width="9" height="3" fill="#c8e64a" opacity="0.55"/><!-- "city" -->
+  <rect x="34" y="33" width="2" height="3" fill="#c8e64a" opacity="0.4"/><!-- closing quote -->
+
+  <!-- CURSOR (blinking block) -->
+  <rect x="4" y="43" width="4" height="5" fill="#00ff41"/>
+  <!-- Cursor glow -->
+  <rect x="3" y="42" width="6" height="7" fill="#00ff41" opacity="0.08"/>
+
+  <!-- Bottom separator -->
+  <rect x="1" y="53" width="62" height="1" fill="#00ff41" opacity="0.15"/>
+
+  <!-- Bottom bar -->
+  <rect x="1" y="54" width="62" height="9" fill="#111820"/>
+
+  <!-- "#" character (3x5 pixels, centered) -->
+  <!-- # left vertical -->
+  <rect x="27" y="56" width="1" height="5" fill="#00ff41" opacity="0.45"/>
+  <!-- # right vertical -->
+  <rect x="29" y="56" width="1" height="5" fill="#00ff41" opacity="0.45"/>
+  <!-- # top horizontal -->
+  <rect x="28" y="57" width="1" height="1" fill="#00ff41" opacity="0.45"/>
+  <!-- # bottom horizontal -->
+  <rect x="28" y="59" width="1" height="1" fill="#00ff41" opacity="0.45"/>
+
+  <!-- "1" character (3x5 pixels) -->
+  <!-- 1 stem -->
+  <rect x="33" y="56" width="1" height="5" fill="#00ff41" opacity="0.45"/>
+  <!-- 1 flag -->
+  <rect x="32" y="57" width="1" height="1" fill="#00ff41" opacity="0.45"/>
+  <!-- 1 base -->
+  <rect x="32" y="60" width="3" height="1" fill="#00ff41" opacity="0.45"/>
+</svg>

@@ -3,6 +3,8 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { checkAchievements } from "@/lib/achievements";
+import { touchLastActive } from "@/lib/notification-helpers";
+import { sendRaidAlertNotification } from "@/lib/notification-senders/raid";
 import {
   calculateAttackScore,
   calculateDefenseScore,
@@ -291,6 +293,18 @@ export async function POST(request: Request) {
         defense_score: defense.total,
       },
     });
+
+    // Track activity + notify defender
+    touchLastActive(attacker.id);
+    sendRaidAlertNotification(
+      defender.id,
+      defender.github_login,
+      attacker.github_login,
+      raidId,
+      success,
+      attack.total,
+      defense.total,
+    );
 
     // Check achievements for both
     const newAttackerXp = (attacker.raid_xp ?? 0) + (success ? XP_WIN_ATTACKER : 0);

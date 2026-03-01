@@ -3,6 +3,8 @@ import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { autoEquipIfSolo } from "@/lib/items";
 import { SKY_AD_PLANS, isValidPlanId } from "@/lib/skyAdPlans";
+import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
+import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import type Stripe from "stripe";
 
 // Disable body parsing — Stripe needs raw body for signature verification
@@ -153,10 +155,9 @@ export async function POST(request: Request) {
           const ownerId = giftedTo ? Number(giftedTo) : Number(developerId);
           await autoEquipIfSolo(ownerId, itemId);
 
-          // Insert feed event
+          // Insert feed event + send notifications
           const githubLogin = session.metadata?.github_login;
           if (giftedTo) {
-            // Fetch receiver login for feed event
             const { data: receiver } = await sb
               .from("developers")
               .select("github_login")
@@ -172,12 +173,19 @@ export async function POST(request: Request) {
                 item_id: itemId,
               },
             });
+
+            // Gift notifications: receipt to buyer, alert to receiver
+            sendGiftSentNotification(Number(developerId), githubLogin ?? "", receiver?.github_login ?? "unknown", pending.id, itemId);
+            sendGiftReceivedNotification(Number(giftedTo), githubLogin ?? "someone", receiver?.github_login ?? "unknown", pending.id, itemId);
           } else {
             await sb.from("activity_feed").insert({
               event_type: "item_purchased",
               actor_id: Number(developerId),
               metadata: { login: githubLogin, item_id: itemId },
             });
+
+            // Purchase receipt notification
+            sendPurchaseNotification(Number(developerId), githubLogin ?? "", pending.id, itemId);
           }
         } else {
           // Check if already completed (webhook duplicate)

@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { checkAchievements } from "@/lib/achievements";
+import { touchLastActive } from "@/lib/notification-helpers";
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabase();
@@ -85,6 +86,9 @@ export async function POST(request: Request) {
   if (insertError && !insertError.code?.includes("23505")) {
     return NextResponse.json({ error: "Failed to give kudos" }, { status: 500 });
   }
+
+  // Track activity
+  touchLastActive(giver.id);
 
   // Only increment + feed if the insert actually happened (no conflict)
   if (!insertError) {

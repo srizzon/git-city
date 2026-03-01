@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { autoEquipIfSolo } from "@/lib/items";
+import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
+import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 
 export const dynamic = "force-dynamic";
 
@@ -97,18 +99,26 @@ export async function POST(request: Request) {
               .single();
 
             if (fullPurchase.gifted_to) {
+              const { data: receiver } = await sb
+                .from("developers")
+                .select("github_login")
+                .eq("id", fullPurchase.gifted_to)
+                .single();
               await sb.from("activity_feed").insert({
                 event_type: "gift_sent",
                 actor_id: fullPurchase.developer_id,
                 target_id: fullPurchase.gifted_to,
-                metadata: { giver_login: dev?.github_login, item_id: fullPurchase.item_id },
+                metadata: { giver_login: dev?.github_login, receiver_login: receiver?.github_login, item_id: fullPurchase.item_id },
               });
+              sendGiftSentNotification(fullPurchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", purchase.id, fullPurchase.item_id);
+              sendGiftReceivedNotification(fullPurchase.gifted_to, dev?.github_login ?? "someone", receiver?.github_login ?? "unknown", purchase.id, fullPurchase.item_id);
             } else {
               await sb.from("activity_feed").insert({
                 event_type: "item_purchased",
                 actor_id: fullPurchase.developer_id,
                 metadata: { login: dev?.github_login, item_id: fullPurchase.item_id },
               });
+              sendPurchaseNotification(fullPurchase.developer_id, dev?.github_login ?? "", purchase.id, fullPurchase.item_id);
             }
           }
         }

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { checkAchievements } from "@/lib/achievements";
+import { cacheEmailFromAuth, touchLastActive, ensurePreferences } from "@/lib/notification-helpers";
+import { sendWelcomeNotification } from "@/lib/notification-senders/welcome";
+import { sendReferralJoinedNotification } from "@/lib/notification-senders/referral";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -40,13 +43,18 @@ export async function GET(request: Request) {
       .eq("claimed", false)
       .select("id");
 
-    // First-time claim → dev_joined feed event
+    // First-time claim → dev_joined feed event + welcome email
     if (claimResult && claimResult.length > 0) {
       await admin.from("activity_feed").insert({
         event_type: "dev_joined",
         actor_id: claimResult[0].id,
         metadata: { login: githubLogin },
       });
+
+      // Cache email, create preferences, send welcome notification
+      cacheEmailFromAuth(claimResult[0].id, data.user.id).catch(() => {});
+      ensurePreferences(claimResult[0].id).catch(() => {});
+      sendWelcomeNotification(claimResult[0].id, githubLogin);
     }
 
     // Fetch dev record for achievement check + referral processing
@@ -59,6 +67,10 @@ export async function GET(request: Request) {
         .single();
 
       if (dev) {
+        // Cache email + update last_active_at on every login
+        cacheEmailFromAuth(dev.id, data.user.id).catch(() => {});
+        touchLastActive(dev.id);
+
         // Process referral (from ?ref= param forwarded by client)
         const ref = searchParams.get("ref");
         if (ref && ref !== githubLogin && !dev.referred_by) {
@@ -82,6 +94,9 @@ export async function GET(request: Request) {
               target_id: dev.id,
               metadata: { referrer_login: referrer.github_login, referred_login: githubLogin },
             });
+
+            // Notify referrer that their referral joined
+            sendReferralJoinedNotification(referrer.id, referrer.github_login, githubLogin, dev.id);
 
             // Check referral achievements for the referrer
             const { data: referrerFull } = await admin

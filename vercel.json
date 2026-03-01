@@ -1,8 +1,10 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/ad-expiry",
-      "schedule": "0 */6 * * *"
-    }
+    { "path": "/api/cron/ad-expiry",      "schedule": "0 */6 * * *" },
+    { "path": "/api/cron/flush-batches",   "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/streak-reminder", "schedule": "0 20 * * *" },
+    { "path": "/api/cron/weekly-digest",   "schedule": "0 10 * * 1" },
+    { "path": "/api/cron/monthly-digest",  "schedule": "0 10 1 * *" },
+    { "path": "/api/cron/re-engagement",   "schedule": "0 14 * * *" }
   ]
 }

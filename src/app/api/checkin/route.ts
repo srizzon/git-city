@@ -4,6 +4,9 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { checkAchievements } from "@/lib/achievements";
 import { ITEM_NAMES } from "@/lib/zones";
+import { touchLastActive } from "@/lib/notification-helpers";
+import { sendStreakMilestoneNotification } from "@/lib/notification-senders/streak";
+import { sendStreakBrokenNotification } from "@/lib/notification-senders/streak-broken";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // A12: Streak reward milestones — {milestone: days, pool: item_ids to pick from}
@@ -186,6 +189,21 @@ export async function POST() {
     return NextResponse.json({ error: checkinResult.error }, { status: 400 });
   }
 
+  // Track activity
+  touchLastActive(dev.id);
+
+  // Detect streak broken: previous streak was >= 7, now reset to 1, and freeze didn't save them
+  const previousStreak = dev.app_streak ?? 0;
+  if (
+    checkinResult.checked_in &&
+    checkinResult.streak === 1 &&
+    previousStreak >= 7 &&
+    !checkinResult.was_frozen
+  ) {
+    const today = new Date().toISOString().split("T")[0];
+    sendStreakBrokenNotification(dev.id, githubLogin, previousStreak, today);
+  }
+
   let newAchievements: string[] = [];
   let streakReward: { milestone: number; item_id: string; item_name: string } | null = null;
 
@@ -221,6 +239,17 @@ export async function POST() {
 
     // A12: Streak rewards - grant free items at milestones
     streakReward = await grantStreakReward(sb, dev.id, checkinResult.streak);
+
+    // Streak milestone notifications (7, 30, 100, 365)
+    if ([7, 30, 100, 365].includes(checkinResult.streak)) {
+      sendStreakMilestoneNotification(
+        dev.id,
+        githubLogin,
+        checkinResult.streak,
+        checkinResult.longest,
+        streakReward?.item_name,
+      );
+    }
 
     // Insert feed event
     await sb.from("activity_feed").insert({

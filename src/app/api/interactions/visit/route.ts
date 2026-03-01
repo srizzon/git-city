@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
+import { touchLastActive } from "@/lib/notification-helpers";
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabase();
@@ -53,6 +54,9 @@ export async function POST(request: Request) {
   if (!building) {
     return NextResponse.json({ error: "Building not found" }, { status: 404 });
   }
+
+  // Track activity
+  touchLastActive(visitor.id);
 
   // No self-visits
   if (visitor.id === building.id) {

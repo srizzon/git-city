@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabase";
+import { sendAchievementNotification } from "./notification-senders/achievement";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -171,6 +172,15 @@ export async function checkAchievements(
         })),
       },
     });
+  }
+
+  // Notify developer of gold/diamond achievements
+  if (actorLogin) {
+    sendAchievementNotification(
+      developerId,
+      actorLogin,
+      newUnlocks.map((a) => ({ id: a.id, name: a.name, tier: a.tier })),
+    );
   }
 
   return newUnlocks.map((a) => a.id);
