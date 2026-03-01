@@ -59,13 +59,14 @@ const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
 });
 
 const THEMES = [
-  { name: "Midnight", accent: "#6090e0", shadow: "#203870" },
-  { name: "Sunset",   accent: "#c8e64a", shadow: "#5a7a00" },
-  { name: "Neon",     accent: "#e040c0", shadow: "#600860" },
-  { name: "Emerald",  accent: "#f0c060", shadow: "#806020" },
+  { name: "Midnight 午夜", accent: "#6090e0", shadow: "#203870" },
+  { name: "Sunset 日落",   accent: "#c8e64a", shadow: "#5a7a00" },
+  { name: "Neon 霓虹",     accent: "#e040c0", shadow: "#600860" },
+  { name: "Emerald 翡翠",  accent: "#f0c060", shadow: "#806020" },
 ];
 
 // Achievement display data for profile card (client-side, mirrors DB)
+// 成就显示数据（客户端，与数据库同步）
 const TIER_COLORS_MAP: Record<string, string> = {
   bronze: "#cd7f32", silver: "#c0c0c0", gold: "#ffd700", diamond: "#b9f2ff",
 };
@@ -98,6 +99,7 @@ const ACHIEVEMENT_NAMES_MAP: Record<string, string> = {
 };
 
 // Dev "class" — funny RPG-style title, deterministic per username
+// Dev "class" — 有趣的 RPG 风格标题，根据用户名确定
 const DEV_CLASSES = [
   "Vibe Coder",
   "Stack Overflow Tourist",
@@ -154,11 +156,11 @@ const CELEBRATION_MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000,
 
 // ─── Loading phases for search feedback ─────────────────────
 const LOADING_PHASES = [
-  { delay: 0,     text: "Fetching GitHub profile..." },
-  { delay: 2000,  text: "Analyzing contributions..." },
-  { delay: 5000,  text: "Building the city block..." },
-  { delay: 9000,  text: "Almost there..." },
-  { delay: 13000, text: "This one's a big profile. Hang tight..." },
+  { delay: 0,     text: "Fetching GitHub profile... \n 正在获取 GitHub 个人资料..." },
+  { delay: 2000,  text: "Analyzing contributions... \n 正在分析贡献..." },
+  { delay: 5000,  text: "Building the city block... \n 正在构建城市街区..." },
+  { delay: 9000,  text: "Almost there... \n 差不多了..." },
+  { delay: 13000, text: "This one's a big profile. Hang tight... \n 这个用户的个人资料比较大，耐心等待..." },
 ];
 
 // Errors that won't change if you retry the same username
@@ -166,34 +168,34 @@ const PERMANENT_ERROR_CODES = new Set(["not-found", "org", "no-activity"]);
 
 const ERROR_MESSAGES: Record<string, { primary: (u: string) => string; secondary: string; hasRetry?: boolean; hasLink?: boolean }> = {
   "not-found": {
-    primary: (u) => `"@${u}" doesn't exist on GitHub`,
-    secondary: "Check the spelling — could be a typo. GitHub usernames are case-insensitive.",
+    primary: (u) => `"@${u}" doesn't exist on GitHub | 该用户不存在于 GitHub 上`,
+    secondary: "Check the spelling — could be a typo. GitHub usernames are case-insensitive. \n 请检查用户名拼写是否正确，GitHub 用户名不区分大小写。",
   },
   "org": {
-    primary: (u) => `"@${u}" is an organization, not a person`,
-    secondary: "Git City is for individual profiles. Try searching for one of its contributors by their personal username.",
+    primary: (u) => `"@${u}" is an organization, not a person | 该用户是组织，不是个人`,
+    secondary: "Git City is for individual profiles. Try searching for one of its contributors by their personal username. \n Git City 是针对个人用户的，不支持组织搜索。请尝试搜索其贡献者的个人用户名。",
   },
   "no-activity": {
-    primary: (u) => `"@${u}" has no public activity yet`,
-    secondary: "Is this you? Open your profile settings, scroll to 'Contributions & activity', and enable 'Include private contributions'. Then search again.",
+    primary: (u) => `"@${u}" has no public activity yet | 该用户暂无公开活动`,
+    secondary: "Is this you? Open your profile settings, scroll to 'Contributions & activity', and enable 'Include private contributions'. Then search again. \n 是否是您？请打开您的个人资料设置，滚动到 '贡献与活动'，并启用 '包含私有贡献'。然后再次搜索。",
     hasLink: true,
   },
   "rate-limit": {
-    primary: () => "Search limit reached",
-    secondary: "You can look up 10 new profiles per hour. Developers already in the city are unlimited.",
+    primary: () => "Search limit reached | 搜索次数已达上限",
+    secondary: "You can look up 10 new profiles per hour. Developers already in the city are unlimited. \n 每个小时最多只能搜索 10 个新用户。已加入城市的开发者没有搜索次数限制。",
   },
   "github-rate-limit": {
-    primary: () => "GitHub's API is temporarily unavailable",
-    secondary: "Too many requests to GitHub. Try again in a few minutes.",
+    primary: () => "GitHub's API is temporarily unavailable | GitHub API 暂时不可用",
+    secondary: "Too many requests to GitHub. Try again in a few minutes. \n 由于 GitHub API 调用次数过多，暂时无法响应。请稍后重试。",
   },
   "network": {
-    primary: () => "Couldn't reach the server",
-    secondary: "Check your internet connection and try again.",
+    primary: () => "Couldn't reach the server | 无法连接到服务器",
+    secondary: "Check your internet connection and try again. \n 请检查您的互联网连接并稍后重试。",
     hasRetry: true,
   },
   "generic": {
-    primary: () => "Something went wrong",
-    secondary: "An unexpected error occurred. Try again.",
+    primary: () => "Something went wrong | 发生了一些错误",
+    secondary: "An unexpected error occurred. Try again. \n 发生了一些未知错误，请稍后重试。",
     hasRetry: true,
   },
 };
@@ -236,7 +238,7 @@ function SearchFeedback({
     return (
       <div className="flex items-center gap-2 py-1 animate-[fade-in_0.15s_ease-out]">
         <span className="blink-dot h-2 w-2 flex-shrink-0" style={{ backgroundColor: accentColor }} />
-        <span className="text-[11px] text-muted normal-case">{LOADING_PHASES[phaseIndex].text}</span>
+        <span className="text-[11px] text-muted normal-case whitespace-pre-line">{LOADING_PHASES[phaseIndex].text}</span>
       </div>
     );
   }
@@ -253,7 +255,7 @@ function SearchFeedback({
     >
       <button onClick={onDismiss} className="absolute top-2 right-2 text-[10px] text-muted transition-colors hover:text-cream">&#10005;</button>
       <p className="text-[11px] text-cream normal-case pr-4">{msg.primary(u)}</p>
-      <p className="mt-1 text-[10px] text-muted normal-case">{msg.secondary}</p>
+      <p className="mt-1 text-[10px] text-muted normal-case whitespace-pre-line">{msg.secondary}</p>
       {msg.hasLink && (
         <a
           href="https://github.com/settings/profile"
@@ -262,7 +264,7 @@ function SearchFeedback({
           className="mt-2 inline-block text-[10px] normal-case transition-colors hover:text-cream"
           style={{ color: accentColor }}
         >
-          Open Profile Settings &rarr;
+          Open Profile Settings &rarr; | 打开个人资料设置 &rarr;
         </a>
       )}
       {msg.hasRetry && (
@@ -270,7 +272,7 @@ function SearchFeedback({
           onClick={onRetry}
           className="btn-press mt-2 border-[2px] border-border px-3 py-1 text-[10px] text-cream transition-colors hover:border-border-light"
         >
-          Retry
+          Retry | 重试
         </button>
       )}
     </div>
@@ -314,7 +316,7 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
           href={`/leaderboard?tab=${cat.tab}`}
           className="text-[9px] text-muted transition-colors hover:text-cream normal-case"
         >
-          View all &rarr;
+          View all &rarr; | 查看所有 &rarr;
         </a>
       </div>
       <div className="border-[2px] border-border bg-bg-raised/80 backdrop-blur-sm">
@@ -352,6 +354,7 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
 }
 
 // ─── Streak Pill (HUD element, inline next to @username) ────
+//  streak 条纹（HUD 元素，内联在 @username 旁边）
 function getStreakTierColor(streak: number) {
   if (streak >= 30) return "#aa44ff";
   if (streak >= 14) return "#ff2222";
@@ -448,12 +451,14 @@ function HomeContent() {
   const [rabbitHintFlash, setRabbitHintFlash] = useState<string | null>(null);
 
   // Growth optimization (A1: sign-in prompt, A5: ad direct open)
+  // 增长优化（A1：登录提示，A5：广告直接打开）
   const buildingClickCountRef = useRef(0);
   const signInPromptShownRef = useRef(false);
   const [signInPromptVisible, setSignInPromptVisible] = useState(false);
   const [adToast, setAdToast] = useState<string | null>(null);
 
   // A8: Ghost preview for own building
+  // A8：自有建筑的幽灵预览
   const ghostPreviewShownRef = useRef(false);
   const [ghostPreviewLogin, setGhostPreviewLogin] = useState<string | null>(null);
 
@@ -463,6 +468,7 @@ function HomeContent() {
   const lastSuccessfulRaidRef = useRef<{ defenderLogin: string; attackerLogin: string; tagStyle: string } | null>(null);
 
   // Track successful raid data before state resets
+  // 在状态重置之前跟踪成功的raid数据
   useEffect(() => {
     if (raidState.raidData?.success && raidState.defenderBuilding) {
       lastSuccessfulRaidRef.current = {
@@ -474,6 +480,7 @@ function HomeContent() {
   }, [raidState.raidData, raidState.defenderBuilding]);
 
   // Update building with raid tag when raid exits
+  // 当raid退出时，更新建筑上的raid标签
   useEffect(() => {
     const prev = prevRaidPhaseRef.current;
     prevRaidPhaseRef.current = raidState.phase;
@@ -499,6 +506,7 @@ function HomeContent() {
   }, [raidState.phase]);
 
   // Fetch ads from DB (fallback to DEFAULT_SKY_ADS on error)
+  // 从DB获取广告（出错时回退到DEFAULT_SKY_ADS）
   useEffect(() => {
     fetch("/api/sky-ads")
       .then((r) => r.ok ? r.json() : null)
@@ -507,6 +515,7 @@ function HomeContent() {
   }, []);
 
   // Fetch $GITC price from DexScreener + poll every 30s
+  // 从DexScreener获取$GITC价格 + 每30秒轮询一次
   useEffect(() => {
     let cancelled = false;
     const fetchPrice = () =>
@@ -524,6 +533,7 @@ function HomeContent() {
   }, []);
 
   // Derived — second focused building for dual-focus camera
+  // 派生 — 双焦点相机的第二个聚焦建筑
   const focusedBuildingB = comparePair ? comparePair[1].login : null;
 
   const [isMobile, setIsMobile] = useState(false);
@@ -533,6 +543,7 @@ function HomeContent() {
   const savedFocusRef = useRef<string | null>(null);
 
   // Detect mobile/touch device
+  // 检测移动/触摸设备
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640 || "ontouchstart" in window);
     check();
@@ -547,6 +558,7 @@ function HomeContent() {
   }, []);
 
   // Auth state listener
+  // 认证状态监听器
   useEffect(() => {
     const supabase = createBrowserSupabase();
     supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
@@ -573,6 +585,7 @@ function HomeContent() {
   ).toLowerCase();
 
   // Fetch fly vehicle from raid loadout (on login)
+  // 从raid负载中获取飞车（登录时）
   const sessionUserId = session?.user?.id;
   useEffect(() => {
     if (!sessionUserId) return;
@@ -583,6 +596,7 @@ function HomeContent() {
   }, [sessionUserId]);
 
   // Save ?ref= to localStorage (7-day expiry)
+  // 保存 ?ref= 到 localStorage（7天过期）
   useEffect(() => {
     const ref = searchParams.get("ref");
     if (ref) {
@@ -594,6 +608,7 @@ function HomeContent() {
   }, [searchParams]);
 
   // Forward ref from localStorage to auth callback URL
+  // 从 localStorage 转发 ref 到认证回调 URL
   const handleSignInWithRef = useCallback(async () => {
     trackSignInClicked("city");
     const supabase = createBrowserSupabase();
@@ -614,6 +629,7 @@ function HomeContent() {
   }, []);
 
   // Fetch activity feed on mount + poll every 60s
+  // 挂载时获取活动流 + 每60秒轮询一次
   useEffect(() => {
     let cancelled = false;
     const fetchFeed = async () => {
@@ -630,6 +646,7 @@ function HomeContent() {
   }, []);
 
   // Visit tracking: fire visit POST after 3s of profile card open
+  // 访问跟踪：在打开个人资料卡片3秒后触发访问 POST
   useEffect(() => {
     if (selectedBuilding && session && selectedBuilding.login.toLowerCase() !== authLogin) {
       visitTimerRef.current = setTimeout(async () => {
@@ -665,6 +682,7 @@ function HomeContent() {
         trackKudosSent(selectedBuilding.login);
         setKudosSent(true);
         // Increment kudos_count locally
+        // 本地增加 kudos_count
         const newCount = (selectedBuilding.kudos_count ?? 0) + 1;
         setSelectedBuilding({ ...selectedBuilding, kudos_count: newCount });
         setBuildings((prev) =>
@@ -684,6 +702,7 @@ function HomeContent() {
   }, [selectedBuilding, kudosSending, kudosSent, session, authLogin]);
 
   // Gift: open modal with available items
+  // 礼物：打开包含可用物品的弹窗
   const handleOpenGift = useCallback(async () => {
     if (!selectedBuilding || !session) return;
     setGiftModalOpen(true);
@@ -702,6 +721,7 @@ function HomeContent() {
   }, [selectedBuilding, session]);
 
   // Gift: checkout for receiver
+  // 礼物：为接收者结账
   const handleGiftCheckout = useCallback(async (itemId: string) => {
     if (!selectedBuilding || giftBuying) return;
     setGiftBuying(itemId);
@@ -733,6 +753,12 @@ function HomeContent() {
   // ESC: layered dismissal
   // During fly mode: only close overlays (profile card) — AirplaneFlight handles pause/exit
   // Outside fly mode: compare → share modal → profile card → focus → explore mode
+
+  // EndlessPixel的吐槽： 我也不知道翻译的什么鬼，机翻的结果
+
+  // ESC: 分阶段裁员
+  // 在飞行模式下：仅关闭覆盖层（个人资料卡）——AirplaneFlight 负责暂停/退出
+  // 外部模式下：比较 → 分享弹窗 → 个人资料卡 → 关注 → 探索模式
   useEffect(() => {
     if (flyMode && !selectedBuilding) return;
     if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !rabbitCinematic && raidState.phase === "idle") return;
@@ -1660,13 +1686,13 @@ function HomeContent() {
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-center" style={{ height: "18%" }}>
             {/* Narrative texts (phases 0-2) */}
             {[
-              "Somewhere in the internet...",
-              "Developers became buildings",
-              "And commits became floors",
+              "Somewhere in the internet... \n 发现了 GitHub 开发者......",
+              "Developers became buildings \n 开发者成为了建筑",
+              "And commits became floors \n 提交成为了楼层",
             ].map((text, i) => (
               <p
                 key={i}
-                className="absolute text-center font-pixel normal-case text-cream"
+                className="absolute text-center font-pixel normal-case text-cream whitespace-pre-line"
                 style={{
                   fontSize: "clamp(0.85rem, 3vw, 1.5rem)",
                   letterSpacing: "0.05em",
@@ -1692,7 +1718,7 @@ function HomeContent() {
                 style={{ fontSize: "clamp(1.2rem, 5vw, 2.8rem)" }}
               >
                 Welcome to{" "}
-                <span style={{ color: theme.accent }}>Git City</span>
+                <span style={{ color: theme.accent }}>Git City</span><br />欢迎来到{" "} <span style={{ color: theme.accent }}>Git City</span>
               </p>
             </div>
           </div>
@@ -1735,7 +1761,7 @@ function HomeContent() {
             className="pointer-events-auto absolute top-4 right-4 font-pixel text-[10px] uppercase text-cream/40 transition-colors hover:text-cream sm:text-xs"
             onClick={endIntro}
           >
-            Skip &gt;
+            Skip 跳过 &gt;
           </button>
         </div>
       )}
@@ -1759,7 +1785,7 @@ function HomeContent() {
           {/* Flight data (above lo-fi radio) */}
           <div className="absolute bottom-14 left-3 text-[9px] leading-loose text-muted sm:left-4 sm:text-[10px]">
             <div className="flex items-center gap-2">
-              <span>SPD</span>
+              <span>SPD 速度</span>
               <span style={{ color: theme.accent }} className="w-6 text-right">
                 {Math.round(hud.speed)}
               </span>
@@ -1774,7 +1800,7 @@ function HomeContent() {
               </div>
             </div>
             <div>
-              ALT{" "}
+              ALT 高度{" "}
               <span style={{ color: theme.accent }}>
                 {Math.round(hud.altitude)}
               </span>
@@ -1797,37 +1823,37 @@ function HomeContent() {
             {flyPaused ? (
               <>
                 <div>
-                  <span className="text-cream">Drag</span> orbit
+                  <span className="text-cream">Drag</span> orbit 拖拽轨道
                 </div>
                 <div>
-                  <span className="text-cream">Scroll</span> zoom
+                  <span className="text-cream">Scroll</span> zoom 缩放
                 </div>
                 <div>
-                  <span className="text-cream">WASD</span> resume
+                  <span className="text-cream">WASD</span> resume 恢复
                 </div>
                 <div>
-                  <span style={{ color: theme.accent }}>ESC</span> exit
+                  <span style={{ color: theme.accent }}>ESC</span> exit 退出
                 </div>
               </>
             ) : (
               <>
                 <div>
-                  <span className="text-cream">Mouse</span> steer
+                  <span className="text-cream">Mouse</span> steer 鼠标控制
                 </div>
                 <div>
-                  <span className="text-cream">Shift</span> boost
+                  <span className="text-cream">Shift</span> boost 加速
                 </div>
                 <div>
-                  <span className="text-cream">Alt</span> slow
+                  <span className="text-cream">Alt</span> slow 减速
                 </div>
                 <div>
-                  <span className="text-cream">Scroll</span> base speed
+                  <span className="text-cream">Scroll</span> base speed 基础速度
                 </div>
                 <div>
-                  <span style={{ color: theme.accent }}>P</span> pause
+                  <span style={{ color: theme.accent }}>P</span> pause 暂停
                 </div>
                 <div>
-                  <span style={{ color: theme.accent }}>ESC</span> pause
+                  <span style={{ color: theme.accent }}>ESC</span> pause 暂停
                 </div>
               </>
             )}
@@ -1978,12 +2004,12 @@ function HomeContent() {
                 Git{" "}
                 <span style={{ color: theme.accent }}>City</span>
               </h1>
-              <p className="mt-2 text-[10px] leading-relaxed text-cream/80 normal-case">
+              <p className="mt-2 text-[11.5px] leading-relaxed text-cream/80 normal-case whitespace-pre-line">
                 {stats.total_developers > 0
                   ? `A city of ${stats.total_developers.toLocaleString()} GitHub developers. Find yourself.`
-                  : "A global city of GitHub developers. Find yourself."}
+                  : "A global city of GitHub developers. Find yourself. \n 加入我们，发现更多的 GitHub 开发者。"}
               </p>
-              <p className="pointer-events-auto mt-1 text-[9px] text-cream/50 normal-case">
+              <p className="pointer-events-auto mt-1 text-[10px] text-cream/50 normal-case">
                 built by{" "}
                 <a
                   href="https://x.com/samuelrizzondev"
@@ -1993,6 +2019,17 @@ function HomeContent() {
                   style={{ color: theme.accent }}
                 >
                   @samuelrizzondev
+                </a>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                Sinicization by{" "}
+                <a
+                  href="https://github.com/EndlessPixel"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors hover:text-cream"
+                  style={{ color: theme.accent }}
+                >
+                  @EndlessPixel
                 </a>
               </p>
               {gitcPrice && (
@@ -2096,8 +2133,8 @@ function HomeContent() {
                       <span className="text-[10px] text-cream">
                         {count.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
                       </span>
-                      <span className="text-[8px] text-cream/40 normal-case">
-                        Something unlocks at {label}...
+                      <span className="text-[8px] text-cream/40 normal-case whitespace-pre-line">
+                        Something unlocks at {label}... \n 某物在 {label} 解锁
                       </span>
                     </div>
                   </div>
@@ -2139,7 +2176,11 @@ function HomeContent() {
             {/* Search Feedback: loading phases + errors */}
             <SearchFeedback feedback={feedback} accentColor={theme.accent} onDismiss={() => setFeedback(null)} onRetry={searchUser} />
 
-            {/* Loading indicator removed — LoadingScreen overlay handles this */}
+            {initialLoading && (
+              <p className="text-[10px] text-muted normal-case whitespace-pre-line">
+                Loading city... | 正在加载城市...
+              </p>
+            )}
           </div>
 
           {/* Center - Explore buttons + Shop + Auth */}
@@ -2171,7 +2212,7 @@ function HomeContent() {
                     boxShadow: `4px 4px 0 0 ${theme.shadow}`,
                   }}
                 >
-                  Explore City
+                  Explore City | 探索城市
                 </button>
                 {!isMobile && (
                   <button
@@ -2182,7 +2223,7 @@ function HomeContent() {
                       boxShadow: `4px 4px 0 0 ${theme.shadow}`,
                     }}
                   >
-                    &#9992; Fly
+                    &#9992; Fly | 飞行
                   </button>
                 )}
               </div>
@@ -2194,19 +2235,19 @@ function HomeContent() {
                   className="btn-press border-[3px] border-border bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
                   style={{ color: theme.accent }}
                 >
-                  Shop
+                  Shop | 商店
                 </Link>
                 <Link
                   href="/advertise"
                   className="btn-press relative border-[3px] px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors"
                   style={{ color: theme.accent, borderColor: theme.accent + "60", backgroundColor: theme.accent + "12" }}
                 >
-                  Place your Ad
+                  Place your Ad | 发布广告
                   <span
                     className="absolute -top-1.5 -right-2 rounded-sm px-1 py-px text-[7px] font-bold leading-none text-bg"
                     style={{ backgroundColor: theme.accent }}
                   >
-                    NEW
+                    NEW | 新的
                   </span>
                 </Link>
                 <Link
@@ -2214,7 +2255,7 @@ function HomeContent() {
                   className="btn-press border-[3px] border-border bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
                   style={{ color: theme.accent }}
                 >
-                  &#9819; Leaderboard
+                  &#9819; Leaderboard | 排行榜
                 </Link>
               </div>
 
@@ -2226,7 +2267,7 @@ function HomeContent() {
                     className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/80 px-3 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
                   >
                     <span style={{ color: theme.accent }}>G</span>
-                    <span className="text-cream">Sign in</span>
+                    <span className="text-cream">Sign in | 登录</span>
                   </button>
                 ) : (
                   <>
@@ -2282,13 +2323,13 @@ function HomeContent() {
       {purchasedItem && (
         <div className="fixed top-16 left-1/2 z-50 -translate-x-1/2">
           <div
-            className="border-[3px] px-5 py-2.5 text-[10px] text-bg"
+            className="border-[3px] px-5 py-2.5 text-[10px] text-bg whitespace-pre-line"
             style={{
               backgroundColor: theme.accent,
               borderColor: theme.shadow,
             }}
           >
-            Item purchased! Effect applied to your building.
+            Item purchased! Effect applied to your building. \n 项目购买成功！效果已应用于您的建筑。
           </div>
         </div>
       )}
@@ -2315,6 +2356,7 @@ function HomeContent() {
           <div className="border-[3px] border-border bg-bg-raised/95 px-4 py-3 backdrop-blur-sm">
             <p className="text-[10px] text-cream normal-case mb-2.5 leading-relaxed">
               Sign in to give Kudos, raid buildings, and claim yours
+              登录以点赞、突袭建筑和认领您的建筑
             </p>
             <button
               onClick={() => {
@@ -2328,13 +2370,13 @@ function HomeContent() {
                 boxShadow: `2px 2px 0 0 ${theme.shadow}`,
               }}
             >
-              Sign in with GitHub
+              Sign in with GitHub | 使用 GitHub 登录
             </button>
             <button
               onClick={() => setSignInPromptVisible(false)}
               className="mt-1.5 w-full py-1 text-[8px] text-dim transition-colors hover:text-muted"
             >
-              Maybe later
+              Maybe later | 稍后再说
             </button>
           </div>
         </div>
@@ -2350,7 +2392,7 @@ function HomeContent() {
               borderColor: theme.shadow,
             }}
           >
-            Opening {adToast} &rarr;
+            Opening 打开 {adToast} &rarr;
           </div>
         </div>
       )}
@@ -2362,11 +2404,11 @@ function HomeContent() {
             className="border-[3px] bg-bg-raised/95 px-4 py-3 backdrop-blur-sm"
             style={{ borderColor: theme.accent }}
           >
-            <p className="text-[10px] text-cream normal-case mb-2 leading-relaxed">
-              Unlock effects for your building
+            <p className="text-[10px] text-cream normal-case mb-2 leading-relaxed whitespace-pre-line">
+              Unlock effects for your building \n 解锁您建筑的效果
             </p>
-            <p className="text-[8px] text-muted normal-case mb-2.5">
-              Neon Outline, Particle Aura, Spotlight, and more
+            <p className="text-[8px] text-muted normal-case mb-2.5 whitespace-pre-line">
+              Neon Outline, Particle Aura, Spotlight, and more \n 霓虹轮廓、粒子光环、聚光灯等
             </p>
             <Link
               href={myBuilding?.claimed ? `/shop/${ghostPreviewLogin}` : `/dev/${ghostPreviewLogin}`}
@@ -2472,14 +2514,14 @@ function HomeContent() {
                         className="flex-shrink-0 px-1.5 py-0.5 text-[7px] text-bg"
                         style={{ backgroundColor: theme.accent }}
                       >
-                        Claimed
+                        Claimed | 已认领
                       </span>
                     )}
                   </div>
                   <p className="truncate text-[10px] text-muted">@{selectedBuilding.login}</p>
                   {selectedBuilding.active_raid_tag && (
                     <p className="text-[8px] text-red-400">
-                      Raided by @{selectedBuilding.active_raid_tag.attacker_login}
+                      Raided by @{selectedBuilding.active_raid_tag.attacker_login} | 被 @{selectedBuilding.active_raid_tag.attacker_login} 攻击
                     </p>
                   )}
                 </div>
@@ -2500,12 +2542,12 @@ function HomeContent() {
               {/* Stats */}
               <div className="grid grid-cols-3 gap-px bg-border/30 mx-4 mb-3 border border-border/50">
                 {[
-                  { label: "Rank", value: `#${selectedBuilding.rank}` },
-                  { label: "Contribs", value: selectedBuilding.contributions.toLocaleString() },
-                  { label: "Repos", value: selectedBuilding.public_repos.toLocaleString() },
-                  { label: "Stars", value: selectedBuilding.total_stars.toLocaleString() },
-                  { label: "Kudos", value: (selectedBuilding.kudos_count ?? 0).toLocaleString() },
-                  { label: "Visits", value: (selectedBuilding.visit_count ?? 0).toLocaleString() },
+                  { label: "Rank | 排名", value: `#${selectedBuilding.rank}` },
+                  { label: "Contribs | 贡献", value: selectedBuilding.contributions.toLocaleString() },
+                  { label: "Repos | 仓库", value: selectedBuilding.public_repos.toLocaleString() },
+                  { label: "Stars | 星标", value: selectedBuilding.total_stars.toLocaleString() },
+                  { label: "Kudos | 奖励", value: (selectedBuilding.kudos_count ?? 0).toLocaleString() },
+                  { label: "Visits | 访问", value: (selectedBuilding.visit_count ?? 0).toLocaleString() },
                 ].map((s) => (
                   <div key={s.label} className="bg-bg-card p-2 text-center">
                     <div className="text-xs" style={{ color: theme.accent }}>{s.value}</div>
@@ -2640,20 +2682,20 @@ function HomeContent() {
                     }}
                   >
                     {kudosSending ? (
-                      <span className="animate-pulse">Sending...</span>
+                      <span className="animate-pulse">Sending 发送中...</span>
                     ) : kudosError ? (
                       <span>{kudosError}</span>
                     ) : kudosSent ? (
                       <span>+1 Kudos!</span>
                     ) : (
-                      "Give Kudos"
+                      "Give Kudos | 给建设者点赞"
                     )}
                   </button>
                   <button
                     onClick={handleOpenGift}
                     className="btn-press mt-1.5 w-full border-[2px] border-border py-1.5 text-[9px] text-cream transition-colors hover:border-border-light"
                   >
-                    Send Gift
+                    Send Gift | 发送礼物
                   </button>
                   {/* Raid button */}
                   {raidState.phase === "idle" && raidState.error && (
@@ -2680,19 +2722,19 @@ function HomeContent() {
                     onClick={() => { trackDisabledButtonClicked("kudos"); handleSignIn(); }}
                     className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
                   >
-                    &#x1F512; Give Kudos
+                    &#x1F512; Give Kudos | 给建设者点赞
                   </button>
                   <button
                     onClick={() => { trackDisabledButtonClicked("gift"); handleSignIn(); }}
                     className="btn-press w-full py-1.5 text-[9px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
                   >
-                    &#x1F512; Send Gift
+                    &#x1F512; Send Gift | 发送礼物
                   </button>
                   <button
                     onClick={() => { trackDisabledButtonClicked("raid"); handleSignIn(); }}
                     className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-red-500/30 text-red-400/40 transition-colors hover:border-red-500/60 hover:text-red-400/70"
                   >
-                    &#x1F512; RAID
+                    &#x1F512; RAID | 发起突袭
                   </button>
                 </div>
               )}
@@ -2726,7 +2768,7 @@ function HomeContent() {
                     }}
                     className="btn-press w-full border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
                   >
-                    Compare
+                    Compare | 对比
                   </button>
                 </div>
               )}
@@ -2743,13 +2785,13 @@ function HomeContent() {
                         boxShadow: `2px 2px 0 0 ${theme.shadow}`,
                       }}
                     >
-                      Loadout
+                      Loadout | 装备
                     </Link>
                     <Link
                       href={`/dev/${selectedBuilding.login}`}
                       className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
                     >
-                      Profile
+                      Profile | 个人资料
                     </Link>
                   </>
                 ) : (
@@ -2762,7 +2804,7 @@ function HomeContent() {
                         boxShadow: `2px 2px 0 0 ${theme.shadow}`,
                       }}
                     >
-                      View Profile
+                      View Profile | 查看个人资料
                     </Link>
                     <a
                       href={`https://github.com/${selectedBuilding.login}`}
@@ -2805,8 +2847,8 @@ function HomeContent() {
             </div>
             {/* Self-compare hint */}
             {compareSelfHint && (
-              <p className="mt-1 text-[9px] normal-case" style={{ color: "#f85149" }}>
-                Pick a different building to compare
+              <p className="mt-1 text-[9px] normal-case whitespace-pre-line" style={{ color: "#f85149" }}>
+                Pick a different building to compare \n 选择不同的建筑进行对比
               </p>
             )}
             {/* Search field for compare pick */}
@@ -3039,7 +3081,7 @@ function HomeContent() {
                   }}
                   className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
                 >
-                  Card
+                  Card | 卡片
                 </button>
                 <button
                   onClick={async () => {
@@ -3057,7 +3099,7 @@ function HomeContent() {
                   }}
                   className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
                 >
-                  Stories
+                  Stories | 故事
                 </button>
               </div>
 
@@ -3072,13 +3114,13 @@ function HomeContent() {
                   }}
                   className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
                 >
-                  Compare Again
+                  Compare Again | 再次对比
                 </button>
                 <button
                   onClick={closeCompare}
                   className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
                 >
-                  Close
+                  Close | 关闭
                 </button>
               </div>
             </div>
@@ -3119,13 +3161,13 @@ function HomeContent() {
             )}
 
             <p className="text-xs text-cream normal-case">
-              <span style={{ color: theme.accent }}>@{shareData.login}</span> joined the city!
+              <span style={{ color: theme.accent }}>@{shareData.login}</span> joined the city! | 该用户加入了城市！
             </p>
 
             <p className="mt-2 text-[10px] text-muted normal-case">
               Rank <span style={{ color: theme.accent }}>#{shareData.rank ?? "?"}</span>
               {" · "}
-              <span style={{ color: theme.accent }}>{shareData.contributions.toLocaleString()}</span> contributions
+              <span style={{ color: theme.accent }}>{shareData.contributions.toLocaleString()}</span> contributions | 该用户做出了 <span style={{ color: theme.accent }}>{shareData.contributions.toLocaleString()}</span> 次贡献
             </p>
 
             {/* Buttons */}
@@ -3147,7 +3189,7 @@ function HomeContent() {
                   boxShadow: `3px 3px 0 0 ${theme.shadow}`,
                 }}
               >
-                Explore Building
+                Explore Building | 探索建筑
               </button>
 
               <a
@@ -3161,7 +3203,7 @@ function HomeContent() {
                 onClick={() => trackShareClicked("x")}
                 className="btn-press border-[3px] border-border px-4 py-2 text-[10px] text-cream transition-colors hover:border-border-light"
               >
-                Share on X
+                Share on X | 在 X 上分享
               </a>
 
               <button
@@ -3184,7 +3226,7 @@ function HomeContent() {
               href={`/dev/${shareData.login}`}
               className="mt-4 inline-block text-[9px] text-muted transition-colors hover:text-cream normal-case"
             >
-              View full profile &rarr;
+              View full profile &rarr; | 查看完整配置文件 &rarr;
             </a>
           </div>
         </div>
@@ -3435,8 +3477,8 @@ function HomeContent() {
               <span className="text-2xl">{"\uD83C\uDFC1"}</span>
               <div className="text-left">
                 <p className="text-xs text-cream">Flag</p>
-                <p className="text-[9px] text-muted normal-case">
-                  A flag on top of your building
+                <p className="text-[9px] text-muted normal-case whitespace-pre-line">
+                  A flag on top of your building \n 你的建筑上有一个标志
                 </p>
               </div>
             </div>

@@ -281,9 +281,9 @@ function PixModal({
           </div>
         ) : status === "expired" ? (
           <div className="py-6 text-center">
-            <p className="mb-2 text-xs text-red-400">QR code expired</p>
+            <p className="mb-2 text-xs text-red-400">QR code expired | 二维码已过期</p>
             <p className="text-[9px] text-muted normal-case">
-              Close and try again to generate a new code.
+              Close and try again to generate a new code. | 关闭并再次尝试生成新代码
             </p>
             <button
               onClick={onClose}
@@ -312,7 +312,7 @@ function PixModal({
 
             {/* PIX code + copy */}
             <div className="mb-4">
-              <p className="mb-1 text-[8px] text-muted">PIX code (copy &amp; paste):</p>
+              <p className="mb-1 text-[8px] text-muted normal-case">PIX code (copy &amp; paste):</p>
               <div className="flex items-stretch gap-1">
                 <div className="flex-1 overflow-hidden border-[2px] border-border bg-bg-card px-2 py-1.5">
                   <p className="truncate text-[8px] text-cream normal-case">
@@ -337,11 +337,11 @@ function PixModal({
               <p className="text-[9px] text-muted normal-case">
                 Expires in{" "}
                 <span style={{ color: countdown < 60 ? "#ef4444" : ACCENT }}>
-                  {formatCountdown(countdown)}
+                  {formatCountdown(countdown)} | 过期时间 {formatCountdown(countdown)}
                 </span>
               </p>
               <p className="text-[9px] text-muted normal-case animate-pulse">
-                Checking payment...
+                Checking payment... | 正在检查支付状态
               </p>
             </div>
           </>
@@ -517,16 +517,16 @@ function BillboardUploadPanel({
         <>
           {autoUploading && (
             <div className="mb-2 border-[2px] border-dashed px-3 py-2 text-[10px] normal-case animate-pulse" style={{ borderColor: ACCENT, color: ACCENT }}>
-              Uploading your billboard image...
+              Uploading your billboard image... | 正在上传您的广告牌图片
             </div>
           )}
           {!autoUploading && images.filter(Boolean).length === 0 && (
             <div className="mb-2 border-[2px] border-dashed px-3 py-2 text-[10px] normal-case" style={{ borderColor: ACCENT, color: ACCENT }}>
-              Upload an image to each slot below to display on your building!
+              Upload an image to each slot below to display on your building! | 每个插槽上传1张图片以显示在您的建筑中
             </div>
           )}
           <p className="mb-2 text-[9px] text-muted normal-case">
-            {slotCount} billboard slot{slotCount !== 1 ? "s" : ""} — upload an image for each. Buy more to unlock more slots.
+            {slotCount} billboard slot{slotCount !== 1 ? "s" : ""} — upload an image for each. Buy more to unlock more slots. | 每个插槽可上传1张图片。购买更多以解锁更多插槽
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {Array.from({ length: displaySlots }).map((_, i) => {
@@ -576,13 +576,13 @@ function BillboardUploadPanel({
             })}
           </div>
           <p className="mt-1 text-[8px] text-dim normal-case">
-            PNG, JPEG, WebP or GIF. Max 2 MB.
+            PNG, JPEG, WebP or GIF. Max 2 MB. Each purchase = 1 billboard slot. | PNG, JPEG, WebP或GIF。最大2MB。每个购买 = 1个广告牌插槽
           </p>
         </>
       ) : (
         <>
           <p className="mb-2 text-[9px] text-muted normal-case">
-            Try it — pick an image to preview on the 3D building. Purchase to save.
+            Try it — pick an image to preview on the 3D building. Purchase to save. | 尝试它 — 选择一个图片预览在3D建筑中。购买以保存
           </p>
           <div className="flex items-center gap-3">
             {images[0] && (
@@ -973,7 +973,7 @@ export default function ShopClient({
   if (items.length === 0) {
     return (
       <p className="py-8 text-center text-[10px] text-muted normal-case">
-        No items available yet. Check back soon!
+        No items available yet. Check back soon! | 暂无物品可用，稍后再试
       </p>
     );
   }
@@ -1040,8 +1040,8 @@ export default function ShopClient({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="border-[3px] border-border bg-bg p-6 text-center">
             <div className="mb-3 text-2xl animate-pulse">{ITEM_EMOJIS[buyingItem] ?? "🛒"}</div>
-            <p className="text-xs text-cream">Redirecting to checkout...</p>
-            <p className="mt-1 text-[9px] text-muted normal-case">Please wait</p>
+            <p className="text-xs text-cream">Redirecting to checkout... | 正在跳转至结账页面</p>
+            <p className="mt-1 text-[9px] text-muted normal-case">Please wait | 请稍等</p>
           </div>
         </div>
       )}
@@ -1125,7 +1125,7 @@ export default function ShopClient({
                     {ZONE_LABELS[zone] ?? zone}
                   </h3>
                   <span className="text-[9px] text-muted normal-case">
-                    {ownedCount}/{zoneItemIds.length} owned · equipped: {equippedName}
+                    {ownedCount}/{zoneItemIds.length} owned · equipped: {equippedName} | 已拥有{ownedCount}/{zoneItemIds.length}项 · 已装备：{equippedName}
                   </span>
                 </div>
 
@@ -1239,7 +1239,7 @@ export default function ShopClient({
                           {/* A13: Social proof - weekly purchase count */}
                           {(purchaseCounts[itemId] ?? 0) >= 3 && !isOwned && (
                             <span className="mt-0.5 text-[8px] text-dim">
-                              {purchaseCounts[itemId]} purchased this week
+                              {purchaseCounts[itemId]} purchased this week | 本周已购买{purchaseCounts[itemId]}次
                             </span>
                           )}
                         </button>
@@ -1293,10 +1293,10 @@ export default function ShopClient({
           <div className="border-[3px] border-border bg-bg-raised p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm" style={{ color: ACCENT }}>
-                Faces
+                Faces | 面部
               </h3>
               <span className="text-[9px] text-muted normal-case">
-                {owned.filter((id) => FACES_ITEMS.includes(id)).length}/{FACES_ITEMS.length} owned · always active if owned
+                {owned.filter((id) => FACES_ITEMS.includes(id)).length}/{FACES_ITEMS.length} owned · always active if owned | 已拥有{owned.filter((id) => FACES_ITEMS.includes(id)).length}/{FACES_ITEMS.length}项 · 已购买则始终激活
               </span>
             </div>
 
@@ -1387,7 +1387,7 @@ export default function ShopClient({
                       {/* A13: Social proof */}
                       {(purchaseCounts[itemId] ?? 0) >= 3 && !isFacesOwned && (
                         <span className="mt-0.5 text-[8px] text-dim">
-                          {purchaseCounts[itemId]} purchased this week
+                          {purchaseCounts[itemId]} purchased this week | 本周已购买{purchaseCounts[itemId]}次
                         </span>
                       )}
                     </button>
@@ -1497,10 +1497,10 @@ export default function ShopClient({
               <div className="border-[3px] border-border bg-bg-raised p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm" style={{ color: ACCENT }}>
-                    Consumables
+                    Consumables | 可消耗项
                   </h3>
                   <span className="text-[9px] text-muted normal-case">
-                    one-time use items
+                    one-time use items | 一次性使用项
                   </span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1577,7 +1577,7 @@ export default function ShopClient({
 
           {/* Payment note */}
           <p className="text-center text-[10px] text-dim normal-case">
-            Payment via Stripe
+            Payment via Stripe | 通过Stripe支付
           </p>
             </div>
           </div>
@@ -1595,15 +1595,15 @@ export default function ShopClient({
           <div className="border-[3px] border-border bg-bg-raised p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm" style={{ color: "#ff5555" }}>
-                Raid
+                Raid | 突袭
               </h3>
               <span className="text-[9px] text-muted normal-case">
-                vehicles, tags & boosts
+                vehicles, tags & boosts | 车辆、标签 & 强化项
               </span>
             </div>
 
             {/* --- Vehicles Sub-Section --- */}
-            <p className="mb-1.5 text-[9px] uppercase tracking-wider text-muted">Vehicles</p>
+            <p className="mb-1.5 text-[9px] uppercase tracking-wider text-muted">Vehicles | 车辆</p>
             <div className="grid grid-cols-2 gap-3 mb-0">
               {/* Airplane - free default */}
               <button
@@ -1701,7 +1701,7 @@ export default function ShopClient({
             <hr className="my-4 border-red-500/20" />
 
             {/* --- Graffiti Tags Sub-Section --- */}
-            <p className="mb-1.5 text-[9px] uppercase tracking-wider text-muted">Graffiti Tags</p>
+            <p className="mb-1.5 text-[9px] uppercase tracking-wider text-muted">Graffiti Tags | 涂鸦标签</p>
             {(() => {
               const TAG_COLORS: Record<string, string> = {
                 tag_neon: "#00ffff",
@@ -1770,7 +1770,7 @@ export default function ShopClient({
             <hr className="my-4 border-red-500/20" />
 
             {/* --- Boosts Sub-Section --- */}
-            <p className="mb-1.5 text-[9px] uppercase tracking-wider text-muted">Boosts (consumable)</p>
+            <p className="mb-1.5 text-[9px] uppercase tracking-wider text-muted">Boosts (consumable) | 强化项 (可消耗)</p>
             {(() => {
               const BOOST_BONUSES: Record<string, number> = {
                 raid_boost_small: 5,
@@ -1831,7 +1831,7 @@ export default function ShopClient({
 
           {/* Payment note */}
           <p className="text-center text-[10px] text-dim normal-case">
-            Payment via Stripe
+            Payment via Stripe | 通过Stripe支付
           </p>
         </div>
       )}

@@ -7,8 +7,8 @@ export default function DevNotFound() {
     <main className="flex min-h-screen flex-col items-center justify-center bg-bg font-pixel uppercase text-warm">
       <div className="text-center">
         <h1 className="text-5xl text-cream">404</h1>
-        <p className="mt-4 text-xs text-muted normal-case">
-          This dev hasn&apos;t been added to Git City yet
+        <p className="mt-4 text-xs text-muted normal-case whitespace-pre-line">
+          This dev hasn&apos;t been added to Git City yet \n 此开发者尚未添加到 Git City
         </p>
         <Link
           href="/"
@@ -18,7 +18,7 @@ export default function DevNotFound() {
             boxShadow: "4px 4px 0 0 #5a7a00",
           }}
         >
-          Search in City
+          Search in City | 在城市搜索
         </Link>
       </div>
     </main>

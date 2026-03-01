@@ -78,7 +78,7 @@ export default function ReturnModal({ streakData, onClose }: Props) {
 
         <div className="flex flex-col">
           <span className="text-[10px] text-cream">
-            day streak{was_frozen ? " (saved)" : ""}
+            day streak | 连续天数 {was_frozen ? " (saved)" : ""}
           </span>
           {subtitle && (
             <span className="text-[9px] text-muted">{subtitle}</span>

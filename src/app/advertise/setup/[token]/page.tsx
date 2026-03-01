@@ -48,10 +48,10 @@ export default async function SetupPage({ params }: Props) {
             +
           </p>
           <h1 className="mt-2 text-2xl text-cream">
-            Your ad is <span style={{ color: ACCENT }}>live!</span>
+            Your ad is <span style={{ color: ACCENT }}>live | 广告已上线</span>
           </h1>
-          <p className="mt-3 text-xs text-muted normal-case">
-            Payment confirmed. Your ad is now running in the city.
+          <p className="mt-3 text-xs text-muted normal-case whitespace-pre-line">
+            Payment confirmed. Your ad is now running in the city. \n 支付已确认，广告已在城市运行。
           </p>
         </div>
 

@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const dev = await getDeveloper(username);
 
   if (!dev) {
-    return { title: "Developer Not Found - Git City" };
+    return { title: "Developer Not Found | 开发者未找到 - Git City" };
   }
 
   const contribs = (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions;
@@ -154,7 +154,7 @@ export default async function DevPage({ params }: Props) {
           href="/"
           className="mb-6 inline-block text-sm text-muted transition-colors hover:text-cream sm:mb-8"
         >
-          &larr; Back to City
+          &larr; Back to City | 返回城市
         </Link>
 
         {/* Profile Card */}
@@ -181,7 +181,7 @@ export default async function DevPage({ params }: Props) {
               {/* Rank Badge */}
               {dev.rank && (
                 <div className="mt-3 inline-block border-[2px] px-3 py-1 text-sm" style={{ borderColor: accent, color: accent }}>
-                  #{dev.rank} in the city
+                  #{dev.rank} in the city | 城市排名 #{dev.rank}
                 </div>
               )}
 
@@ -227,7 +227,7 @@ export default async function DevPage({ params }: Props) {
               boxShadow: `4px 4px 0 0 ${shadow}`,
             }}
           >
-            View in City
+            View in City | 在城市查看
           </Link>
         </div>
 
@@ -238,7 +238,7 @@ export default async function DevPage({ params }: Props) {
               href={`/shop/${dev.github_login}`}
               className="btn-press flex w-full items-center justify-center gap-2 border-[3px] border-border px-6 py-3 text-sm text-cream transition-colors hover:border-border-light"
             >
-              Customize Building
+              Customize Building | 自定义建筑
             </Link>
           </div>
         )}
@@ -283,7 +283,7 @@ export default async function DevPage({ params }: Props) {
         {achievements.length > 0 && (
           <div className="mt-5">
             <h2 className="mb-3 text-sm text-cream">
-              Achievements
+              Achievements | 成就
               <span className="ml-2 text-[10px] text-muted">{achievements.length}</span>
             </h2>
             <div className="flex flex-wrap gap-2">
@@ -311,7 +311,7 @@ export default async function DevPage({ params }: Props) {
         {/* Owned Items */}
         {ownedItems.length > 0 && (
           <div className="mt-5">
-            <h2 className="mb-3 text-sm text-cream">Building Items</h2>
+            <h2 className="mb-3 text-sm text-cream">Building Items | 建筑项目</h2>
             <div className="flex flex-wrap gap-2">
               {ownedItems.map((itemId) => (
                 <span
@@ -337,7 +337,7 @@ export default async function DevPage({ params }: Props) {
         {referredDevs && referredDevs.length > 0 && (
           <div className="mt-5">
             <h2 className="mb-3 text-sm text-cream">
-              Invited Devs
+              Invited Devs | 邀请的开发者
               <span className="ml-2 text-[10px] text-muted">{dev.referral_count ?? referredDevs.length}</span>
             </h2>
             <div className="flex flex-wrap gap-2">
@@ -388,6 +388,13 @@ export default async function DevPage({ params }: Props) {
               style={{ color: accent }}
             >
               @samuelrizzondev
+            </a>
+            Sinicization Contribution by{" "}
+            <a href="https://github.com/EndlessPixel"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-cream"
+              style={{ color: ACCENT }}>@EndlessPixel
             </a>
           </p>
         </div>

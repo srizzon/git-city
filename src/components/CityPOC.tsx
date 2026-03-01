@@ -521,7 +521,7 @@ export default function CityPOC() {
 
         {mode === "individual" && count > 2000 && (
           <div style={{ color: "#e64a4a", fontSize: 10 }}>
-            Capped at 2k to prevent crash
+            Capped at 2k to prevent crash | 最大显示2000个建筑物，防止崩溃
           </div>
         )}
       </div>

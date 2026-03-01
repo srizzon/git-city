@@ -40,12 +40,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const dev = await getDeveloper(username);
 
   if (!dev) {
-    return { title: "Developer Not Found - Git City" };
+    return { title: "Developer Not Found | 开发者不存在 - Git City" };
   }
 
   return {
-    title: `Shop - @${dev.github_login} - Git City`,
-    description: `Customize @${dev.github_login}'s building in Git City`,
+    title: `Shop - @${dev.github_login} | 商店 - @${dev.github_login} - Git City`,
+    description: `Customize @${dev.github_login}'s building in Git City | 自定义 @${dev.github_login} 的建筑 - Git City`,
   };
 }
 
@@ -95,7 +95,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
                 boxShadow: "3px 3px 0 0 #5a7a00",
               }}
             >
-              View Profile
+              View Profile | 查看个人资料
             </Link>
           </div>
         </div>
@@ -148,6 +148,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
       .eq("item_id", "raid_loadout")
       .maybeSingle(),
     // A10+A13: Count purchases per item for popularity badges + social proof
+    // 购买记录：获取所有已完成购买的物品ID和购买时间
     sb
       .from("purchases")
       .select("item_id, created_at")
@@ -157,6 +158,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
   const achievements = (achievementsResult.data ?? []).map((a: { achievement_id: string }) => a.achievement_id);
 
   // A10: Compute top 3 most purchased items (min 5 purchases)
+  // 购买记录：统计每个物品的购买次数
   const purchaseCounts: Record<string, number> = {};
   const weeklyPurchaseCounts: Record<string, number> = {};
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -186,6 +188,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
   );
 
   // Extract customization values
+  // 自定义颜色：提取初始自定义颜色
   let initialCustomColor: string | null = null;
   let initialBillboardImages: string[] = [];
   for (const row of customizationsResult.data ?? []) {
@@ -195,6 +198,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
     }
     if (row.item_id === "billboard") {
       // Support both new array format and legacy single image
+      // 看板娘：提取初始看板娘图片URL
       if (Array.isArray(config?.images)) {
         initialBillboardImages = config.images as string[];
       } else if (typeof config?.image_url === "string") {
@@ -230,7 +234,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
             <div>
               <h1 className="text-lg text-cream">Shop</h1>
               <p className="mt-0.5 text-[10px] text-muted normal-case">
-                Customize @{dev.github_login}&apos;s building
+                Customize @{dev.github_login}&apos;s building in Git City
               </p>
             </div>
           </div>
@@ -264,13 +268,13 @@ export default async function ShopPage({ params, searchParams }: Props) {
             href={`/dev/${dev.github_login}`}
             className="text-xs text-muted transition-colors hover:text-cream normal-case"
           >
-            View profile &rarr;
+            View profile | 查看个人资料 &rarr;
           </Link>
           <Link
             href={`/?user=${dev.github_login}`}
             className="text-xs text-muted transition-colors hover:text-cream normal-case"
           >
-            View in city &rarr;
+            View in city | 在Git City中查看 &rarr;
           </Link>
         </div>
 
@@ -286,6 +290,13 @@ export default async function ShopPage({ params, searchParams }: Props) {
               style={{ color: ACCENT }}
             >
               @samuelrizzondev
+            </a>
+            Sinicization Contribution by{" "}
+            <a href="https://github.com/EndlessPixel"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-cream"
+              style={{ color: ACCENT }}>@EndlessPixel
             </a>
           </p>
         </div>

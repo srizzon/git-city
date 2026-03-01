@@ -14,6 +14,8 @@
 
 ---
 
+Lang: English | [中文](README-zh.md)
+
 ## What is Git City?
 
 Git City transforms every GitHub profile into a unique pixel art building. The more you contribute, the taller your building grows. Explore an interactive 3D city, fly between buildings, and discover developers from around the world.
@@ -82,4 +84,5 @@ Open [http://localhost:3001](http://localhost:3001) to see the city.
 
 <p align="center">
   Built by <a href="https://x.com/samuelrizzondev">@samuelrizzondev</a>
+  Sinicization Contribution：<a href="https://github.com/EndlessPixel">@EndlessPixel</a>
 </p>

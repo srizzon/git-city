@@ -346,7 +346,7 @@ export default function ShopPreview({
           {highlightItemId ? "PREVIEW" : "HOVER AN ITEM TO PREVIEW"}
         </span>
         <span className="bg-bg/80 px-2 py-0.5 text-[9px] text-muted normal-case">
-          Scroll: zoom · Drag: rotate · Right-drag: move
+          Scroll: zoom · Drag: rotate · Right-drag: move | 滚动：缩放 · 拖动：旋转 · 右键拖动：移动
         </span>
       </div>
     </div>

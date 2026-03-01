@@ -393,10 +393,10 @@ function RabbitContent() {
           {completed && myPosition > 0 && (
             <>
               <p
-                className="font-pixel text-[11px] sm:text-[14px] tracking-widest"
+                className="font-pixel text-[11px] sm:text-[14px] tracking-widest whitespace-pre-line"
                 style={{ color: "#00ff41", textShadow: "0 0 10px rgba(0,255,65,0.4)" }}
               >
-                You were #{myPosition} to arrive
+                You were #{myPosition} to arrive \n 您是第 #{myPosition} 个到达的
               </p>
               {completedDate && (
                 <p
@@ -411,16 +411,16 @@ function RabbitContent() {
           {!completed && (
             <>
               <p
-                className="font-pixel text-[11px] sm:text-[13px] tracking-widest text-center"
+                className="font-pixel text-[11px] sm:text-[13px] tracking-widest text-center whitespace-pre-line"
                 style={{ color: "#555" }}
               >
-                You haven&apos;t found the white rabbit yet.
+                You haven&apos;t found the white rabbit yet. \n 您还没有找到白色的兔子。
               </p>
               <p
-                className="font-pixel text-[9px] sm:text-[11px] tracking-widest text-center"
+                className="font-pixel text-[9px] sm:text-[11px] tracking-widest text-center whitespace-pre-line"
                 style={{ color: "#00ff41", opacity: 0.4 }}
               >
-                Return to the spire. Make your choice.
+                Return to the spire. Make your choice. \n 返回尖峰，做出你的选择。
               </p>
             </>
           )}
@@ -444,7 +444,7 @@ function RabbitContent() {
                 background: "rgba(0,0,0,0.7)",
               }}
             >
-              SHARE ON X
+              SHARE ON X | 分享到X
             </a>
           )}
           <Link
@@ -452,7 +452,7 @@ function RabbitContent() {
             className="font-pixel text-[10px] sm:text-[11px] tracking-widest px-4 py-2 hover:opacity-80 transition-opacity"
             style={{ color: "#00ff41", textShadow: "0 0 8px rgba(0,255,65,0.3)" }}
           >
-            {"<"} BACK TO CITY
+            {"<"} BACK TO CITY | 返回城市
           </Link>
         </div>
       </div>

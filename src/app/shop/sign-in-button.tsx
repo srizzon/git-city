@@ -22,7 +22,7 @@ export default function SignInButton({ accent }: { accent: string }) {
         boxShadow: "4px 4px 0 0 #5a7a00",
       }}
     >
-      Sign in with GitHub
+      Sign in with GitHub | 用GitHub登录
     </button>
   );
 }

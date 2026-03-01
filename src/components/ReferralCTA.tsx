@@ -22,10 +22,10 @@ export default function ReferralCTA({ login, accent }: Props) {
   };
 
   return (
-    <div className="border-[3px] border-border bg-bg-card p-4 sm:p-5">
-      <p className="text-sm text-cream">Invite a dev to the city</p>
-      <p className="mt-1 text-[10px] text-muted normal-case">
-        Share your link — when they join, you get credit
+    <div className="border-[3px] border-border bg-bg-card p-4 sm:p-5 whitespace-pre-line">
+      <p className="text-sm text-cream">Invite a dev to the city \n 邀请一个开发者加入城市</p>
+      <p className="mt-1 text-[10px] text-muted normal-case whitespace-pre-line">
+        Share your link — when they join, you get credit \n 分享您的链接 — 当他们加入时，您将获得积分
       </p>
       <div className="mt-3 flex gap-2">
         <input

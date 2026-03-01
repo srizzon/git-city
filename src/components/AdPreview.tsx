@@ -583,10 +583,10 @@ export default function AdPreview({
       </div>
       <div className="absolute bottom-2 left-2 right-2 flex flex-col items-center gap-1 pointer-events-none">
         <span className="bg-bg/80 px-2 py-0.5 text-[9px] font-pixel uppercase text-muted">
-          Live preview
+          Live preview | 实时预览
         </span>
         <span className="bg-bg/80 px-2 py-0.5 text-[9px] font-pixel text-muted normal-case">
-          Scroll: zoom · Drag: rotate · Right-drag: move
+          Scroll: zoom · Drag: rotate · Right-drag: move | 滚动：缩放 · 拖动：旋转 · 右键拖动：移动
         </span>
       </div>
     </div>

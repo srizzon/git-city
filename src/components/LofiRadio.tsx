@@ -253,7 +253,7 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
         onContextMenu={(e) => { e.preventDefault(); setExpanded(true); }}
         className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-all hover:border-border-light"
         style={{ borderColor: playing ? accent + "60" : undefined } as React.CSSProperties}
-        title={playing ? "Pause music" : "Play music"}
+        title={playing ? "Pause music 暂停音乐" : "Play music 播放音乐"}
       >
         <span style={{ color: playing ? accent : "var(--color-muted)" }}>
           {playing ? "\u23F8" : "\u25B6"}
@@ -264,7 +264,7 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
         <span
           onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
           className="text-muted hover:text-cream ml-0.5"
-          title="More controls"
+          title="More controls 更多控制"
         >
           {"\u2026"}
         </span>

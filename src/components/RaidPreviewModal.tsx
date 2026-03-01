@@ -55,7 +55,7 @@ function StrengthBar({
         {breakdown.streak > 0 && <span>streak {breakdown.streak}</span>}
         {breakdown.kudos > 0 && <span>kudos {breakdown.kudos}</span>}
         {breakdown.commits === 0 && breakdown.streak === 0 && breakdown.kudos === 0 && (
-          <span>no stats</span>
+          <span>no stats | 无统计数据</span>
         )}
       </div>
     </div>
@@ -87,10 +87,10 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
         {/* Header */}
         <div className="mb-3 text-center">
           <h2 className="font-silkscreen text-sm uppercase tracking-wider text-red-400">
-            Raid Preview
+            Raid Preview |  raid预览
           </h2>
-          <p className="mt-1 text-[10px] text-muted">
-            {preview.raids_today}/{preview.raids_max} raids used today
+          <p className="mt-1 text-[10px] text-muted whitespace-pre-line">
+            {preview.raids_today}/{preview.raids_max} raids used today \n 已使用{preview.raids_today}/{preview.raids_max} 次
           </p>
         </div>
 
@@ -109,7 +109,7 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
         {/* Vehicle Selector */}
         {preview.available_vehicles.length > 1 && (
           <div className="mb-4">
-            <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted">Vehicle</p>
+            <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted">Vehicle | 车辆</p>
             <div className="flex gap-2">
               {preview.available_vehicles.map((v) => (
                 <button
@@ -190,7 +190,7 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
                     : "border-cream/10 text-muted hover:border-cream/20"
                 }`}
               >
-                None
+                None | 无
               </button>
               {preview.available_boosts.map((boost) => (
                 <button
@@ -222,7 +222,7 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
             onClick={onCancel}
             className="btn-press flex-1 border-[2px] border-cream/20 px-3 py-2 text-xs text-muted transition-colors hover:border-cream/40 hover:text-cream"
           >
-            Cancel
+            Cancel | 取消
           </button>
           <button
             onClick={() => onRaid(selectedBoost?.purchase_id, selectedVehicle)}

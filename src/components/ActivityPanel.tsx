@@ -87,7 +87,7 @@ export default function ActivityPanel({ initialEvents, open, onClose, onNavigate
       <div ref={panelRef} className="flex-1 overflow-y-auto">
         {events.length === 0 ? (
           <div className="px-4 py-8 text-center text-[10px] text-dim normal-case">
-            The city is quiet... be the first to make noise
+            The city is quiet... be the first to make noise | 城市安静... 成为第一个噪音的人
           </div>
         ) : (
           events.map((e) => {
@@ -120,7 +120,7 @@ export default function ActivityPanel({ initialEvents, open, onClose, onNavigate
                     className="mt-1 ml-7 text-[9px] hover:underline"
                     style={{ color: ACCENT }}
                   >
-                    View building →
+                    View building | 查看建筑物 →
                   </button>
                 )}
               </div>
@@ -130,13 +130,13 @@ export default function ActivityPanel({ initialEvents, open, onClose, onNavigate
 
         {loading && (
           <div className="px-4 py-3 text-center text-[9px] text-dim animate-pulse">
-            Loading...
+            Loading... | 正在加载...
           </div>
         )}
 
         {!hasMore && events.length > 0 && (
           <div className="px-4 py-3 text-center text-[9px] text-dim">
-            End of activity
+            End of activity | 活动结束
           </div>
         )}
       </div>

@@ -7,8 +7,8 @@ interface RabbitCompletionProps {
   onComplete: () => void;
 }
 
-const LINE_1 = "You found the white rabbit.";
-const LINE_2 = "Welcome to the other side.";
+const LINE_1 = "You found the white rabbit. | 你发现了白色的兔子。";
+const LINE_2 = "Welcome to the other side. | 欢迎来到另一边。";
 const CHAR_DELAY = 50;
 
 export default function RabbitCompletion({ onComplete }: RabbitCompletionProps) {

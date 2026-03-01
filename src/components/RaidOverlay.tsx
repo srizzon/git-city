@@ -228,9 +228,9 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
                   <AnimatedScore target={raidData.defense_score} />
                 </p>
                 <div className="mt-1 space-y-0.5 text-[9px] text-muted/60">
-                  <p>{raidData.defense_breakdown.commits} commits</p>
-                  <p>{raidData.defense_breakdown.streak} streak</p>
-                  <p>{raidData.defense_breakdown.kudos} kudos</p>
+                  <p className="whitespace-pre-line">{raidData.defense_breakdown.commits} commits \n 获得{raidData.defense_breakdown.commits} 提交</p>
+                  <p className="whitespace-pre-line">{raidData.defense_breakdown.streak} streak \n 获得{raidData.defense_breakdown.streak} 连胜</p>
+                  <p className="whitespace-pre-line">{raidData.defense_breakdown.kudos} kudos \n 获得{raidData.defense_breakdown.kudos} kudos</p>
                 </div>
               </div>
             </div>
@@ -247,7 +247,7 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
               {/* XP earned */}
               {raidData.xp_earned > 0 && (
                 <p className="text-center text-sm text-orange-300">
-                  +{raidData.xp_earned} Raid XP
+                  +{raidData.xp_earned} Raid XP | 获得{raidData.xp_earned} XP
                   {raidData.new_title && ` · Title: ${raidData.new_title}`}
                 </p>
               )}
@@ -257,7 +257,7 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
                 onClick={onExit}
                 className="btn-press w-full border-[2px] border-cream/20 px-4 py-3 text-sm text-cream transition-colors hover:border-cream/40"
               >
-                Back to City
+                Back to City | 返回城市
               </button>
               <button
                 onClick={() => {
@@ -269,7 +269,7 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
                 }}
                 className="btn-press w-full border-[2px] border-blue-400/40 px-4 py-3 text-sm text-blue-400 transition-colors hover:bg-blue-400/10"
               >
-                Share on X
+                Share on X | 分享到X
               </button>
             </div>
           </div>
@@ -283,7 +283,7 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
             onClick={onSkip}
             className="text-[9px] text-muted/50 transition-colors hover:text-muted"
           >
-            Press ESC to skip
+            Press ESC to skip | 按ESC跳过
           </button>
         </div>
       )}

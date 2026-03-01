@@ -179,8 +179,8 @@ export function SetupContent({
 
         {/* Live click modal preview */}
         <div>
-          <p className="mb-2 text-xs text-muted normal-case">
-            What visitors see when they click your ad
+          <p className="mb-2 text-xs text-muted normal-case whitespace-pre-line">
+            What visitors see when they click your ad \n 点击广告后，访客会看到的内容
           </p>
           <ClickPreview
             vehicle={ad.vehicle}
@@ -195,12 +195,12 @@ export function SetupContent({
       {/* Right: Setup form */}
       <div>
         <h2 className="text-base text-cream">
-          Add <span style={{ color: ACCENT }}>details</span>{" "}
+          Add <span style={{ color: ACCENT }}>details | 补充广告详情</span>{" "}
           <span className="text-xs text-muted normal-case">(optional)</span>
         </h2>
-        <p className="mt-2 text-xs text-muted normal-case">
+        <p className="mt-2 text-xs text-muted normal-case whitespace-pre-line">
           These show when someone clicks your ad. You can always update them
-          later.
+          later. \n 这些内容会在访客点击广告后显示，您可以随时更新。
         </p>
 
         <div className="mt-5 space-y-5">
@@ -225,15 +225,15 @@ export function SetupContent({
                 {text.length}/{MAX_TEXT_LENGTH}
               </span>
             </p>
-            <p className="text-[11px] text-muted normal-case">
-              This is what appears on the building in the city
+            <p className="text-[11px] text-muted normal-case whitespace-pre-line">
+              This is what appears on the building in the city \n 这就是城市里建筑物上显示的内容
             </p>
           </div>
 
           {/* Brand name */}
           <div>
             <label className="block text-xs text-muted normal-case">
-              Brand name
+              Brand name | 品牌名称
             </label>
             <input
               type="text"
@@ -251,7 +251,7 @@ export function SetupContent({
           {/* Description */}
           <div>
             <label className="block text-xs text-muted normal-case">
-              Description
+              Description | 广告描述
             </label>
             <textarea
               value={description}
@@ -288,7 +288,7 @@ export function SetupContent({
               </p>
             )}
             <p className="mt-1 text-[11px] text-muted normal-case">
-              Where should clicks go?
+              Where should clicks go? | 点击广告后，访客会被重定向到的链接
             </p>
           </div>
 
@@ -324,7 +324,7 @@ export function SetupContent({
               href={`/advertise/track/${token}`}
               className="text-xs text-muted normal-case transition-colors hover:text-cream"
             >
-              Skip to dashboard &rarr;
+              Skip to dashboard | 跳过到仪表板 &rarr;
             </Link>
           </div>
         </div>

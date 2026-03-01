@@ -84,7 +84,7 @@ export default function ShareButtons({
           boxShadow: `3px 3px 0 0 ${shadow}`,
         }}
       >
-        Share on X
+        Share on X | 分享到X
       </a>
 
       {/* Download Card */}
@@ -128,13 +128,13 @@ export default function ShareButtons({
               onClick={() => handleDownload("landscape")}
               className="block w-full whitespace-nowrap px-4 py-2 text-left text-[10px] text-cream transition-colors hover:bg-bg-card"
             >
-              Landscape (1200x675)
+              Landscape (1200x675) | 风景图 (1200x675)
             </button>
             <button
               onClick={() => handleDownload("stories")}
               className="block w-full whitespace-nowrap px-4 py-2 text-left text-[10px] text-cream transition-colors hover:bg-bg-card"
             >
-              Stories (1080x1920)
+              Stories (1080x1920) | 故事图 (1080x1920)
             </button>
           </div>
         )}
