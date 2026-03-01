@@ -1421,15 +1421,24 @@ function Waterfront({ river, dockColor }: { river: CityRiver; dockColor: string 
 
 // ─── Orbit Scene (controls + focus) ──────────────────────────
 
-function OrbitScene({ buildings, focusedBuilding, focusedBuildingB }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null }) {
+function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, onCameraMove }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; onCameraMove?: (x: number, z: number, tx: number, tz: number) => void }) {
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
+  const frameCount = useRef(0);
 
   // Reset camera on mount — wide panorama centered on founder area
   useEffect(() => {
     camera.position.set(800, 700, 1000);
     camera.lookAt(TARGET_X, TARGET_Y, TARGET_Z);
   }, [camera]);
+
+  // Report camera position ~10fps (every 6 frames) to avoid flooding React state
+  useFrame(() => {
+    frameCount.current++;
+    if (frameCount.current % 6 !== 0 || !onCameraMove) return;
+    const t = controlsRef.current?.target;
+    onCameraMove(camera.position.x, camera.position.z, t?.x ?? 0, t?.z ?? 0);
+  });
 
   return (
     <>
@@ -1490,12 +1499,13 @@ interface Props {
   ghostPreviewLogin?: string | null;
   holdRise?: boolean;
   celebrationActive?: boolean;
+  onCameraMove?: (x: number, z: number, tx: number, tz: number) => void;
 }
 
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, onCameraMove }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
   const [dpr, setDpr] = useState(1.5);
@@ -1538,7 +1548,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       )}
 
       {!introMode && !rabbitCinematic && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
-        <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} />
+        <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} onCameraMove={onCameraMove} />
       )}
 
       {raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && (
