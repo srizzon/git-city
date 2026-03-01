@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 const ETH_ADDRESS = "0x8C24A2b54128bC0717F533E6DA7338be30b9f732";
+const ACCENT = "#c8e64a";
 
 function SupportContent() {
   const searchParams = useSearchParams();
@@ -51,269 +52,142 @@ function SupportContent() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
-      style={{
-        background: "#0a0a0a",
-        fontFamily: "'Silkscreen', monospace",
-      }}
-    >
-      {/* Scanline overlay */}
-      <div
-        className="pointer-events-none fixed inset-0 z-10"
-        style={{
-          background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,65,0.015) 2px, rgba(0,255,65,0.015) 4px)",
-        }}
-      />
+    <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <Link
+          href="/"
+          className="mb-6 inline-block text-sm text-muted transition-colors hover:text-cream sm:mb-8"
+        >
+          &larr; Back to City
+        </Link>
 
-      <div className="relative z-20 w-full max-w-lg flex flex-col gap-10">
+        <h1 className="text-2xl text-cream sm:text-3xl">
+          Keep the <span style={{ color: ACCENT }}>Signal</span> Alive
+        </h1>
+        <p className="mt-2 text-xs text-muted normal-case sm:text-sm">
+          Git City runs on servers, databases, and API calls. Every new building
+          that goes up, the cost goes up with it. Your support keeps this city
+          running.
+        </p>
+
         {/* Thank you banner */}
         {thanks && (
           <div
-            className="flex flex-col gap-2 p-5"
-            style={{
-              border: "2px solid #00ff41",
-              background: "rgba(0, 255, 65, 0.08)",
-              boxShadow: "0 0 20px rgba(0, 255, 65, 0.15)",
-            }}
+            className="mt-6 border-[3px] p-5 sm:p-6"
+            style={{ borderColor: ACCENT, backgroundColor: "rgba(200, 230, 74, 0.06)" }}
           >
-            <span
-              className="font-pixel text-[12px] sm:text-[14px] tracking-wider"
-              style={{ color: "#00ff41" }}
-            >
-              THANK YOU FOR YOUR SUPPORT
-            </span>
-            <span
-              className="font-pixel text-[9px] sm:text-[10px]"
-              style={{ color: "rgba(0, 255, 65, 0.6)" }}
-            >
+            <p className="text-sm" style={{ color: ACCENT }}>
+              Thank you for your support
+            </p>
+            <p className="mt-2 text-xs text-muted normal-case">
               Your contribution keeps the city running. You are a real one.
-            </span>
+            </p>
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex flex-col gap-3">
-          <h1
-            className="font-pixel text-[16px] sm:text-[20px] tracking-wider"
-            style={{ color: "#00ff41" }}
-          >
-            &gt; KEEP THE SIGNAL ALIVE
-          </h1>
-          <p
-            className="font-pixel text-[9px] sm:text-[10px] leading-relaxed"
-            style={{ color: "rgba(0, 255, 65, 0.5)" }}
-          >
-            Git City runs on servers, databases, and API calls. Every new building
-            that goes up, the cost goes up with it. Your support keeps this city
-            running.
-          </p>
-        </div>
-
-        {/* Stripe */}
-        <div
-          className="flex flex-col gap-3 p-5"
-          style={{
-            border: "2px solid rgba(0, 255, 65, 0.2)",
-            background: "rgba(0, 255, 65, 0.02)",
-            boxShadow: "4px 4px 0px rgba(0, 255, 65, 0.08)",
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className="font-pixel text-[11px] sm:text-[12px] tracking-wider"
-              style={{ color: "#00ff41" }}
-            >
-              01 // ONE-TIME SUPPORT
-            </span>
+        <div className="mt-8 flex flex-col gap-5">
+          {/* Stripe */}
+          <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
+            <p className="text-sm text-cream">
+              <span style={{ color: ACCENT }}>01.</span> One-time Support
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {[5, 10, 25].map((amount) => (
+                <button
+                  key={amount}
+                  disabled={loadingAmount !== null}
+                  onClick={() => handleStripeCheckout(amount)}
+                  className="btn-press border-[2px] border-border px-5 py-2 text-xs text-cream transition-colors hover:border-border-light disabled:cursor-wait disabled:opacity-50"
+                >
+                  {loadingAmount === amount ? "..." : `$${amount}`}
+                </button>
+              ))}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-dim">$</span>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="__"
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && customAmount) {
+                      handleStripeCheckout(parseInt(customAmount, 10));
+                    }
+                  }}
+                  className="w-14 border-[2px] border-border bg-transparent px-2 py-2 text-xs text-cream outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <button
+                  disabled={loadingAmount !== null || !customAmount || parseInt(customAmount, 10) < 1}
+                  onClick={() => handleStripeCheckout(parseInt(customAmount, 10))}
+                  className="btn-press border-[2px] border-border px-3 py-2 text-[10px] text-cream transition-colors hover:border-border-light disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  {loadingAmount && loadingAmount !== 5 && loadingAmount !== 10 && loadingAmount !== 25 ? "..." : "GO"}
+                </button>
+              </div>
+            </div>
+            {error && (
+              <p className="mt-3 text-xs normal-case" style={{ color: "#f87171" }}>
+                {error}
+              </p>
+            )}
           </div>
-          <div className="flex flex-wrap items-center gap-3 mt-1">
-            {[5, 10, 25].map((amount) => (
+
+          {/* GitHub Sponsors */}
+          <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
+            <p className="text-sm text-cream">
+              <span style={{ color: ACCENT }}>02.</span> GitHub Sponsors
+            </p>
+            <a
+              href="https://github.com/sponsors/srizzon"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-press mt-4 inline-block border-[2px] border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
+            >
+              github.com/sponsors/srizzon
+            </a>
+          </div>
+
+          {/* Crypto (ETH) */}
+          <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
+            <p className="text-sm text-cream">
+              <span style={{ color: ACCENT }}>03.</span> Crypto (ETH)
+            </p>
+            <div className="mt-4 flex items-center gap-3">
+              <code className="break-all text-[9px] text-muted normal-case sm:text-xs">
+                {ETH_ADDRESS}
+              </code>
               <button
-                key={amount}
-                disabled={loadingAmount !== null}
-                onClick={() => handleStripeCheckout(amount)}
-                className="font-pixel text-[11px] sm:text-[12px] px-5 py-2.5 tracking-wider transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                onClick={copyEth}
+                className="btn-press shrink-0 border-[2px] border-border px-3 py-1.5 text-[10px] transition-colors hover:border-border-light"
                 style={{
-                  color: "#00ff41",
-                  border: "2px solid rgba(0, 255, 65, 0.35)",
-                  background: "rgba(0, 255, 65, 0.05)",
-                  boxShadow: "3px 3px 0px rgba(0, 255, 65, 0.12)",
-                }}
-                onMouseEnter={(e) => {
-                  if (!loadingAmount) {
-                    e.currentTarget.style.background = "rgba(0, 255, 65, 0.15)";
-                    e.currentTarget.style.borderColor = "#00ff41";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(0, 255, 65, 0.05)";
-                  e.currentTarget.style.borderColor = "rgba(0, 255, 65, 0.35)";
+                  color: copied ? "#0d0d0f" : ACCENT,
+                  backgroundColor: copied ? ACCENT : "transparent",
                 }}
               >
-                {loadingAmount === amount ? "..." : `$${amount}`}
-              </button>
-            ))}
-            <div className="flex items-center gap-2">
-              <span
-                className="font-pixel text-[11px] sm:text-[12px]"
-                style={{ color: "rgba(0, 255, 65, 0.5)" }}
-              >
-                $
-              </span>
-              <input
-                type="number"
-                min={1}
-                placeholder="__"
-                value={customAmount}
-                onChange={(e) => setCustomAmount(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && customAmount) {
-                    handleStripeCheckout(parseInt(customAmount, 10));
-                  }
-                }}
-                className="font-pixel text-[11px] sm:text-[12px] w-16 px-2 py-2 tracking-wider outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                style={{
-                  color: "#00ff41",
-                  border: "2px solid rgba(0, 255, 65, 0.35)",
-                  background: "rgba(0, 255, 65, 0.02)",
-                }}
-              />
-              <button
-                disabled={loadingAmount !== null || !customAmount || parseInt(customAmount, 10) < 1}
-                onClick={() => handleStripeCheckout(parseInt(customAmount, 10))}
-                className="font-pixel text-[9px] sm:text-[10px] px-3 py-2.5 tracking-wider transition-all duration-200 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                style={{
-                  color: "#00ff41",
-                  border: "2px solid rgba(0, 255, 65, 0.35)",
-                  background: "rgba(0, 255, 65, 0.05)",
-                  boxShadow: "3px 3px 0px rgba(0, 255, 65, 0.12)",
-                }}
-                onMouseEnter={(e) => {
-                  if (!loadingAmount && customAmount) {
-                    e.currentTarget.style.background = "rgba(0, 255, 65, 0.15)";
-                    e.currentTarget.style.borderColor = "#00ff41";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(0, 255, 65, 0.05)";
-                  e.currentTarget.style.borderColor = "rgba(0, 255, 65, 0.35)";
-                }}
-              >
-                {loadingAmount && loadingAmount !== 5 && loadingAmount !== 10 && loadingAmount !== 25 ? "..." : "GO"}
+                {copied ? "Copied!" : "Copy"}
               </button>
             </div>
           </div>
-          {error && (
-            <span
-              className="font-pixel text-[9px] sm:text-[10px]"
-              style={{ color: "#ff4141" }}
-            >
-              {error}
-            </span>
-          )}
-        </div>
 
-        {/* GitHub Sponsors */}
-        <div
-          className="flex flex-col gap-3 p-5"
-          style={{
-            border: "2px solid rgba(0, 255, 65, 0.2)",
-            background: "rgba(0, 255, 65, 0.02)",
-            boxShadow: "4px 4px 0px rgba(0, 255, 65, 0.08)",
-          }}
-        >
-          <span
-            className="font-pixel text-[11px] sm:text-[12px] tracking-wider"
-            style={{ color: "#00ff41" }}
-          >
-            02 // GITHUB SPONSORS
-          </span>
-          <a
-            href="https://github.com/sponsors/srizzon"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-pixel text-[10px] sm:text-[11px] px-5 py-2.5 tracking-wider transition-all duration-200 cursor-pointer inline-block w-fit"
-            style={{
-              color: "#00ff41",
-              border: "2px solid rgba(0, 255, 65, 0.35)",
-              background: "rgba(0, 255, 65, 0.05)",
-              boxShadow: "3px 3px 0px rgba(0, 255, 65, 0.12)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(0, 255, 65, 0.15)";
-              e.currentTarget.style.borderColor = "#00ff41";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(0, 255, 65, 0.05)";
-              e.currentTarget.style.borderColor = "rgba(0, 255, 65, 0.35)";
-            }}
-          >
-            github.com/sponsors/srizzon
-          </a>
-        </div>
-
-        {/* Crypto */}
-        <div
-          className="flex flex-col gap-3 p-5"
-          style={{
-            border: "2px solid rgba(0, 255, 65, 0.2)",
-            background: "rgba(0, 255, 65, 0.02)",
-            boxShadow: "4px 4px 0px rgba(0, 255, 65, 0.08)",
-          }}
-        >
-          <span
-            className="font-pixel text-[11px] sm:text-[12px] tracking-wider"
-            style={{ color: "#00ff41" }}
-          >
-            03 // CRYPTO (ETH)
-          </span>
-          <div className="flex items-center gap-2 mt-1">
-            <code
-              className="font-pixel text-[7px] sm:text-[8px] break-all"
-              style={{ color: "rgba(0, 255, 65, 0.6)" }}
+          {/* $GITC Community Token */}
+          <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
+            <p className="text-sm text-cream">
+              <span style={{ color: ACCENT }}>04.</span> $GITC Community Token
+            </p>
+            <p className="mt-2 text-xs text-muted normal-case">
+              The community created a token to support the project.
+            </p>
+            <Link
+              href="/token"
+              className="btn-press mt-4 inline-block border-[2px] border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
             >
-              {ETH_ADDRESS}
-            </code>
-            <button
-              onClick={copyEth}
-              className="font-pixel text-[9px] px-3 py-1.5 shrink-0 cursor-pointer transition-all duration-200"
-              style={{
-                color: copied ? "#0a0a0a" : "#00ff41",
-                border: "2px solid rgba(0, 255, 65, 0.35)",
-                background: copied ? "#00ff41" : "rgba(0, 255, 65, 0.05)",
-                boxShadow: "2px 2px 0px rgba(0, 255, 65, 0.12)",
-              }}
-              onMouseEnter={(e) => {
-                if (!copied) {
-                  e.currentTarget.style.background = "rgba(0, 255, 65, 0.15)";
-                  e.currentTarget.style.borderColor = "#00ff41";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!copied) {
-                  e.currentTarget.style.background = "rgba(0, 255, 65, 0.05)";
-                  e.currentTarget.style.borderColor = "rgba(0, 255, 65, 0.35)";
-                }
-              }}
-            >
-              {copied ? "COPIED" : "COPY"}
-            </button>
+              Learn more & disclaimer
+            </Link>
           </div>
         </div>
-
-        {/* Back link */}
-        <Link
-          href="/"
-          className="font-pixel text-[9px] sm:text-[10px] tracking-wider transition-colors duration-200"
-          style={{ color: "rgba(0, 255, 65, 0.35)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "#00ff41")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(0, 255, 65, 0.35)")}
-        >
-          &lt; BACK TO CITY
-        </Link>
       </div>
-    </div>
+    </main>
   );
 }
 

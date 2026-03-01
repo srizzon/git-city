@@ -88,26 +88,38 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Pr
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-30 flex h-7 items-center overflow-hidden border-t border-border/30 bg-bg/90 backdrop-blur-sm cursor-pointer"
-      onClick={onOpenPanel}
+      className="fixed bottom-0 left-0 right-0 z-30 flex h-7 items-center border-t border-border/30 bg-bg/90 backdrop-blur-sm"
     >
       <div
-        className="ticker-scroll flex whitespace-nowrap"
-        style={{ "--ticker-duration": `${Math.max(30, tickerText.length * 2)}s` } as React.CSSProperties}
+        className="min-w-0 flex-1 overflow-hidden cursor-pointer"
+        onClick={onOpenPanel}
       >
-        {/* Duplicate for seamless loop */}
-        {[...tickerText, ...tickerText].map((item, i) => (
-          <span
-            key={`${item.id}-${i}`}
-            className="mx-6 text-[10px] text-muted hover:text-cream transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEventClick?.(item.event);
-            }}
-          >
-            {item.text}
-          </span>
-        ))}
+        <div
+          className="ticker-scroll flex whitespace-nowrap"
+          style={{ "--ticker-duration": `${Math.max(20, tickerText.length)}s` } as React.CSSProperties}
+        >
+          {[...tickerText, ...tickerText].map((item, i) => (
+            <span
+              key={`${item.id}-${i}`}
+              className="mx-6 text-[10px] text-muted hover:text-cream transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEventClick?.(item.event);
+              }}
+            >
+              {item.text}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer links */}
+      <div className="hidden sm:flex items-center gap-2 shrink-0 pr-3 pl-2 border-l border-border/30">
+        <a href="/terms" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">Terms</a>
+        <span className="text-[8px] text-cream/10">·</span>
+        <a href="/privacy" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">Privacy</a>
+        <span className="text-[8px] text-cream/10">·</span>
+        <a href="/support" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">Support</a>
       </div>
 
       <style jsx>{`

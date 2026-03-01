@@ -136,14 +136,6 @@ function getDevClass(login: string) {
   return DEV_CLASSES[((h % DEV_CLASSES.length) + DEV_CLASSES.length) % DEV_CLASSES.length];
 }
 
-const GITC_CA = "0xd523f92f5f313288cf69ac9ca456b8a7d7a6dba3";
-function formatTokenPrice(n: number) {
-  if (n < 0.00001) return `$${n.toExponential(2)}`;
-  if (n < 0.01) return `$${n.toFixed(6)}`;
-  if (n < 1) return `$${n.toFixed(4)}`;
-  return `$${n.toFixed(2)}`;
-}
-
 interface CityStats {
   total_developers: number;
   total_contributions: number;
@@ -432,8 +424,6 @@ function HomeContent() {
   const [compareLang, setCompareLang] = useState<"en" | "pt">("en");
   const [clickedAd, setClickedAd] = useState<import("@/lib/skyAds").SkyAd | null>(null);
   const [skyAds, setSkyAds] = useState<import("@/lib/skyAds").SkyAd[]>(DEFAULT_SKY_ADS);
-  const [gitcPrice, setGitcPrice] = useState<{ priceUsd: string; change24h: number } | null>(null);
-  const [caCopied, setCaCopied] = useState(false);
   const [pillModalOpen, setPillModalOpen] = useState(false);
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
   const [districtChooserOpen, setDistrictChooserOpen] = useState(false);
@@ -506,23 +496,6 @@ function HomeContent() {
       .catch(() => {});
   }, []);
 
-  // Fetch $GITC price from DexScreener + poll every 30s
-  useEffect(() => {
-    let cancelled = false;
-    const fetchPrice = () =>
-      fetch(`https://api.dexscreener.com/latest/dex/tokens/${GITC_CA}`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (cancelled || !d.pairs?.[0]) return;
-          const p = d.pairs[0];
-          setGitcPrice({ priceUsd: p.priceUsd, change24h: p.priceChange?.h24 ?? 0 });
-        })
-        .catch(() => {});
-    fetchPrice();
-    const id = setInterval(fetchPrice, 30_000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, []);
-
   // Derived — second focused building for dual-focus camera
   const focusedBuildingB = comparePair ? comparePair[1].login : null;
 
@@ -538,12 +511,6 @@ function HomeContent() {
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
-  }, []);
-
-  const copyCA = useCallback(() => {
-    navigator.clipboard.writeText(GITC_CA);
-    setCaCopied(true);
-    setTimeout(() => setCaCopied(false), 2000);
   }, []);
 
   // Auth state listener
@@ -1870,25 +1837,6 @@ function HomeContent() {
             </button>
           </div>
 
-          {/* $GITC price widget (top-center, desktop only) */}
-          {gitcPrice && (
-            <div className="pointer-events-auto absolute top-3 left-1/2 -translate-x-1/2 hidden sm:block sm:top-4">
-              <button
-                onClick={copyCA}
-                className="flex items-center gap-2 border-[3px] border-border bg-bg/70 px-3 py-1.5 text-[10px] backdrop-blur-sm transition-colors"
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = theme.accent + "80")}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "")}
-              >
-                <span style={{ color: theme.accent }}>$GITC</span>
-                <span className="text-cream">{formatTokenPrice(parseFloat(gitcPrice.priceUsd))}</span>
-                <span style={{ color: gitcPrice.change24h >= 0 ? "#4ade80" : "#f87171" }}>
-                  {gitcPrice.change24h >= 0 ? "+" : ""}{gitcPrice.change24h.toFixed(1)}%
-                </span>
-                <span className="text-dim">{caCopied ? "Copied!" : "Copy CA"}</span>
-              </button>
-            </div>
-          )}
-
           {/* Theme switcher (bottom-left) — same position as main controls */}
           <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex items-center gap-2 sm:left-4">
             <button
@@ -1995,28 +1943,6 @@ function HomeContent() {
                   @samuelrizzondev
                 </a>
               </p>
-              {gitcPrice && (
-                <button
-                  onClick={copyCA}
-                  className="mt-1.5 inline-flex items-center gap-1.5 border-[2px] border-border bg-bg/70 px-2.5 py-1 text-[9px] backdrop-blur-sm transition-colors"
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = theme.accent + "80")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "")}
-                >
-                  <span style={{ color: theme.accent }}>$GITC</span>
-                  <span className="text-cream">{formatTokenPrice(parseFloat(gitcPrice.priceUsd))}</span>
-                  <span style={{ color: gitcPrice.change24h >= 0 ? "#4ade80" : "#f87171" }}>
-                    {gitcPrice.change24h >= 0 ? "+" : ""}{gitcPrice.change24h.toFixed(1)}%
-                  </span>
-                  <span className="text-dim">
-                    {caCopied ? "Copied!" : `${GITC_CA.slice(0, 6)}...${GITC_CA.slice(-4)}`}
-                  </span>
-                  {!caCopied && (
-                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-dim">
-                      <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                    </svg>
-                  )}
-                </button>
-              )}
             </div>
 
             {/* Milestone progress banner */}
@@ -3656,6 +3582,7 @@ function HomeContent() {
       {rabbitCompletion && (
         <RabbitCompletion onComplete={() => setRabbitCompletion(false)} />
       )}
+
     </main>
   );
 }
