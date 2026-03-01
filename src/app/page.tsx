@@ -382,7 +382,15 @@ function HomeContent() {
   const [introMode, setIntroMode] = useState(false);
   const [introPhase, setIntroPhase] = useState(-1); // -1 = not started, 0-3 = text phases, 4 = done
   const [exploreMode, setExploreMode] = useState(false);
-  const [themeIndex, setThemeIndex] = useState(0);
+  const [themeIndex, setThemeIndex] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const saved = localStorage.getItem("gitcity_theme");
+    if (saved !== null) {
+      const n = parseInt(saved, 10);
+      if (n >= 0 && n <= 3) return n;
+    }
+    return 0;
+  });
   const [hud, setHud] = useState({ speed: 0, altitude: 0 });
   const [playerPos, setPlayerPos] = useState<{ x: number; z: number }>({ x: 0, z: 0 });
   const [districtAnnouncement, setDistrictAnnouncement] = useState<{ name: string; color: string; population: number } | null>(null);
@@ -547,6 +555,38 @@ function HomeContent() {
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data?.vehicle) setFlyVehicle(data.vehicle); })
       .catch(() => {});
+  }, [sessionUserId]);
+
+  // Load theme from DB when logged in (overrides localStorage)
+  const themeLoadedFromDb = useRef(false);
+  useEffect(() => {
+    if (!sessionUserId || themeLoadedFromDb.current) return;
+    themeLoadedFromDb.current = true;
+    fetch("/api/preferences/theme")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data && typeof data.city_theme === "number" && data.city_theme >= 0 && data.city_theme <= 3) {
+          setThemeIndex(data.city_theme);
+          localStorage.setItem("gitcity_theme", String(data.city_theme));
+        }
+      })
+      .catch(() => {});
+  }, [sessionUserId]);
+
+  // Cycle theme: save to localStorage + sync to DB if logged in
+  const cycleTheme = useCallback(() => {
+    setThemeIndex((i) => {
+      const next = (i + 1) % THEMES.length;
+      localStorage.setItem("gitcity_theme", String(next));
+      if (sessionUserId) {
+        fetch("/api/preferences/theme", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ city_theme: next }),
+        }).catch(() => {});
+      }
+      return next;
+    });
   }, [sessionUserId]);
 
   // Save ?ref= to localStorage (7-day expiry)
@@ -1840,7 +1880,7 @@ function HomeContent() {
           {/* Theme switcher (bottom-left) — same position as main controls */}
           <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex items-center gap-2 sm:left-4">
             <button
-              onClick={() => setThemeIndex((i) => (i + 1) % THEMES.length)}
+              onClick={cycleTheme}
               className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
             >
               <span style={{ color: theme.accent }}>&#9654;</span>
@@ -3209,7 +3249,7 @@ function HomeContent() {
       {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (
         <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex items-center gap-2 sm:left-4">
           <button
-            onClick={() => setThemeIndex((i) => (i + 1) % THEMES.length)}
+            onClick={cycleTheme}
             className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
           >
             <span style={{ color: theme.accent }}>&#9654;</span>
