@@ -1419,7 +1419,8 @@ function HomeContent() {
     }
   };
 
-  const handleClaimFreeGift = async () => {
+const handleClaimFreeGift = async () => {
+    if (claimingGift) return;
     setClaimingGift(true);
     try {
       const res = await fetch("/api/claim-free-item", { method: "POST" });
@@ -1428,7 +1429,8 @@ function HomeContent() {
         await reloadCity();
         setGiftClaimed(true);
       }
-    } finally {
+    } catch { /* ignore */ }
+    finally {
       setClaimingGift(false);
     }
   };
