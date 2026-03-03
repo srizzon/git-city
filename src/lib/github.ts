@@ -363,6 +363,7 @@ function localBlockAxisPos(idx: number, footprint: number): number {
 
 export function generateCityLayout(
   devs: DeveloperRecord[],
+
   districtOffsets?: Record<string, number>
 ): {
   buildings: CityBuilding[];

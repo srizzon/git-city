@@ -165,8 +165,6 @@ export async function GET(request: Request) {
         total_developers: 0,
         total_contributions: 0,
       },
-    },
-    {
       headers: {
         "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
       },
