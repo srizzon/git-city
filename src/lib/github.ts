@@ -206,12 +206,12 @@ function calcHeightV2(
   const cnsScore = Math.pow(consistencyNorm, 0.6);
 
   const composite =
-    cScore  * 0.35 +
-    sScore  * 0.20 +
+    cScore * 0.35 +
+    sScore * 0.20 +
     prScore * 0.15 +
     extScore * 0.10 +
     cnsScore * 0.10 +
-    fScore  * 0.10;
+    fScore * 0.10;
 
   const height = Math.min(MAX_BUILDING_HEIGHT, MIN_BUILDING_HEIGHT + composite * HEIGHT_RANGE);
   return { height, composite };
@@ -361,7 +361,11 @@ function localBlockAxisPos(idx: number, footprint: number): number {
   return sign * (abs * footprint + abs * STREET_W);
 }
 
-export function generateCityLayout(devs: DeveloperRecord[]): {
+export function generateCityLayout(
+  devs: DeveloperRecord[],
+  globalMax?: { contributions: number; total_stars: number; contributions_total: number },
+  districtOffsets?: Record<string, number>
+): {
   buildings: CityBuilding[];
   plazas: CityPlaza[];
   decorations: CityDecoration[];
@@ -373,9 +377,10 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   const plazas: CityPlaza[] = [];
   const decorations: CityDecoration[] = [];
   const districtZones: DistrictZone[] = [];
-  const maxContrib = devs.reduce((max, d) => Math.max(max, d.contributions), 1);
-  const maxStars = devs.reduce((max, d) => Math.max(max, d.total_stars), 1);
-  const maxContribV2 = devs.reduce((max, d) => Math.max(max, d.contributions_total ?? 0), 1);
+
+  const maxContrib = globalMax?.contributions ?? devs.reduce((max, d) => Math.max(max, d.contributions), 1);
+  const maxStars = globalMax?.total_stars ?? devs.reduce((max, d) => Math.max(max, d.total_stars), 1);
+  const maxContribV2 = globalMax?.contributions_total ?? devs.reduce((max, d) => Math.max(max, d.contributions_total ?? 0), 1);
 
   // ── 1. Group by district, sort within each, concat in priority order ──
   const composites = precomputeComposites(devs, maxContrib, maxStars, maxContribV2);
@@ -405,36 +410,32 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   // ── Extract top 50 global devs as "downtown" (center, around the spire) ──
   const DOWNTOWN_COUNT = 50;
   const LOTS_PER_BLOCK = BLOCK_SIZE * BLOCK_SIZE; // 16
-  const allDevsSorted = [...devs].sort((a, b) =>
-    (composites.get(b.github_login) ?? 0) - (composites.get(a.github_login) ?? 0)
-  );
-  const downtownDevs = allDevsSorted.slice(0, DOWNTOWN_COUNT);
+
+  // Note: We use rank-based logic for stability.
+  const downtownDevs = devs
+    .filter(d => (d.rank ?? 999999) <= DOWNTOWN_COUNT)
+    .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+
   const downtownSet = new Set(downtownDevs.map(d => d.github_login));
 
-  for (let i = 0; i < downtownDevs.length; i += LOTS_PER_BLOCK) {
-    const end = Math.min(i + LOTS_PER_BLOCK, downtownDevs.length);
-    const slice = downtownDevs.slice(i, end);
-    const shuffled = seededShuffle(slice, hashStr('downtown') + i);
-    for (let j = 0; j < shuffled.length; j++) downtownDevs[i + j] = shuffled[j];
-  }
-
-  const downtownOverride = new Set(downtownDevs.map(d => d.github_login));
-
-  // ── Per-district dev arrays (sorted by composite, block-shuffled, minus downtown) ──
+  // ── Per-district dev arrays (sorted by rank for stability, minus downtown) ──
   const districtDevArrays: { did: string; devs: DeveloperRecord[] }[] = [];
   for (const did of DISTRICT_ORDER) {
     const group = districtGroups[did];
     if (!group || group.length === 0) continue;
-    const filtered = group.filter(d => !downtownSet.has(d.github_login));
+    const filtered = group
+      .filter(d => !downtownSet.has(d.github_login))
+      .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
     if (filtered.length === 0) continue;
-    // Full shuffle: organic mix of tall and short buildings
-    districtDevArrays.push({ did, devs: seededShuffle(filtered, hashStr(did)) });
+    districtDevArrays.push({ did, devs: filtered });
   }
   for (const [did, group] of Object.entries(districtGroups)) {
     if (!DISTRICT_ORDER.includes(did)) {
-      const filtered = group.filter(d => !downtownSet.has(d.github_login));
+      const filtered = group
+        .filter(d => !downtownSet.has(d.github_login))
+        .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
       if (filtered.length === 0) continue;
-      districtDevArrays.push({ did, devs: seededShuffle(filtered, hashStr(did)) });
+      districtDevArrays.push({ did, devs: filtered });
     }
   }
 
@@ -493,7 +494,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       const floors = Math.max(3, Math.floor(height / floorH));
       const windowsPerFloor = Math.max(3, Math.floor(w / 5));
       const sideWindowsPerFloor = Math.max(3, Math.floor(d / 5));
-      const did = downtownOverride.has(dev.github_login)
+      const did = downtownSet.has(dev.github_login)
         ? 'downtown'
         : (dev.district ?? inferDistrict(dev.primary_language));
 
@@ -600,24 +601,27 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
     clusterDevs: DeveloperRecord[],
     ogx: number, ogz: number,
     addPlaza: boolean,
+    startSpiralIdx: number = 0,
   ) {
     // Plaza at origin cell
     if (addPlaza) {
       const key = `${ogx},${ogz}`;
-      occupiedCells.add(key);
-      let [pcx, pcz] = gridToWorld(ogx, ogz);
-      if (pcz > RIVER_Z_THRESHOLD) pcz += RIVER_PUSH;
-      plazas.push({
-        position: [pcx, 0, pcz],
-        size: Math.min(BLOCK_FOOTPRINT_X, BLOCK_FOOTPRINT_Z) * 0.8,
-        variant: seededRandom(globalBlockSeed * 997 + 42),
-      });
-      allBlocks.push({ cx: pcx, cz: pcz, gx: ogx, gz: ogz });
-      globalBlockSeed++;
+      if (!occupiedCells.has(key)) {
+        occupiedCells.add(key);
+        let [pcx, pcz] = gridToWorld(ogx, ogz);
+        if (pcz > RIVER_Z_THRESHOLD) pcz += RIVER_PUSH;
+        plazas.push({
+          position: [pcx, 0, pcz],
+          size: Math.min(BLOCK_FOOTPRINT_X, BLOCK_FOOTPRINT_Z) * 0.8,
+          variant: seededRandom(globalBlockSeed * 997 + 42),
+        });
+        allBlocks.push({ cx: pcx, cz: pcz, gx: ogx, gz: ogz });
+        globalBlockSeed++;
+      }
     }
 
     let devIdx = 0;
-    let spiralIdx = 0;
+    let spiralIdx = startSpiralIdx;
 
     while (devIdx < clusterDevs.length) {
       const [bx, by] = spiralCoord(spiralIdx);
@@ -646,15 +650,20 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   }
 
   // ── A) Downtown: spiral at grid (0, 0) ──
+  // Downtown usually doesn't need offsets as it's small and always at center
   placeSpiralCluster(downtownDevs, 0, 0, true);
 
   // ── B) Districts: spiral at offset grid positions ──
   for (let di = 0; di < districtDevArrays.length; di++) {
+    const arrayInfo = districtDevArrays[di];
     const angle = (di / districtDevArrays.length) * Math.PI * 2 - Math.PI / 2;
     // Snap district origin to global grid
     const ogx = Math.round(Math.cos(angle) * DISTRICT_GRID_RADIUS);
     const ogz = Math.round(Math.sin(angle) * DISTRICT_GRID_RADIUS);
-    placeSpiralCluster(districtDevArrays[di].devs, ogx, ogz, true);
+
+    // Use the count of developers in this district that come BEFORE our chunk
+    const offset = districtOffsets?.[arrayInfo.did] ?? 0;
+    placeSpiralCluster(arrayInfo.devs, ogx, ogz, true, offset);
   }
 
   // ── Road markings between adjacent blocks (global grid) ──

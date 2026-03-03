@@ -3,16 +3,33 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const from = Math.max(0, parseInt(searchParams.get("from") ?? "0", 10));
-  const to = Math.min(
-    from + 1000,
-    parseInt(searchParams.get("to") ?? "500", 10)
-  );
+  let from = Math.max(0, parseInt(searchParams.get("from") ?? "0", 10));
+  let to = parseInt(searchParams.get("to") ?? "1000", 10);
+  const targetUser = searchParams.get("user");
 
   const sb = getSupabaseAdmin();
 
-  // Round 1: devs + stats in parallel
-  const [devsResult, statsResult] = await Promise.all([
+  // If targetUser is provided, find their rank and adjust the range
+  if (targetUser) {
+    const { data: userDev } = await sb
+      .from("developers")
+      .select("rank")
+      .eq("github_login", targetUser)
+      .maybeSingle();
+
+    if (userDev && userDev.rank !== null) {
+      const rank = userDev.rank;
+      const chunkSize = 1000;
+      from = Math.floor((rank - 1) / chunkSize) * chunkSize;
+      to = from + chunkSize;
+    }
+  }
+
+  // Bound 'to' to a max of 1000 from 'from'
+  to = Math.min(to, from + 1000);
+
+  // Round 1: devs + stats + top dev (for max stats) in parallel
+  const [devsResult, statsResult, topDevResult] = await Promise.all([
     sb
       .from("developers")
       .select(
@@ -21,17 +38,25 @@ export async function GET(request: Request) {
       .order("rank", { ascending: true })
       .range(from, to - 1),
     sb.from("city_stats").select("*").eq("id", 1).single(),
+    sb.from("developers").select("contributions, total_stars, contributions_total").order("rank", { ascending: true }).limit(1).single(),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const devs = (devsResult.data ?? []) as Record<string, any>[];
   const devIds = devs.map((d: Record<string, any>) => d.id);
 
+  const globalMax = {
+    contributions: topDevResult.data?.contributions ?? 1,
+    total_stars: topDevResult.data?.total_stars ?? 1,
+    contributions_total: topDevResult.data?.contributions_total ?? 1,
+  };
+
   if (devIds.length === 0) {
     return NextResponse.json(
       {
         developers: [],
         stats: statsResult.data ?? { total_developers: 0, total_contributions: 0 },
+        globalMax,
       },
       { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } }
     );
@@ -146,6 +171,7 @@ export async function GET(request: Request) {
         total_developers: 0,
         total_contributions: 0,
       },
+      globalMax,
     },
     {
       headers: {

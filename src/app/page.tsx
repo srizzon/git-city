@@ -63,9 +63,9 @@ const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road 
 
 const THEMES = [
   { name: "Midnight", accent: "#6090e0", shadow: "#203870" },
-  { name: "Sunset",   accent: "#c8e64a", shadow: "#5a7a00" },
-  { name: "Neon",     accent: "#e040c0", shadow: "#600860" },
-  { name: "Emerald",  accent: "#f0c060", shadow: "#806020" },
+  { name: "Sunset", accent: "#c8e64a", shadow: "#5a7a00" },
+  { name: "Neon", accent: "#e040c0", shadow: "#600860" },
+  { name: "Emerald", accent: "#f0c060", shadow: "#806020" },
 ];
 
 // Achievement display data for profile card (client-side, mirrors DB)
@@ -149,10 +149,10 @@ const CELEBRATION_MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000,
 
 // ─── Loading phases for search feedback ─────────────────────
 const LOADING_PHASES = [
-  { delay: 0,     text: "Fetching GitHub profile..." },
-  { delay: 2000,  text: "Analyzing contributions..." },
-  { delay: 5000,  text: "Building the city block..." },
-  { delay: 9000,  text: "Almost there..." },
+  { delay: 0, text: "Fetching GitHub profile..." },
+  { delay: 2000, text: "Analyzing contributions..." },
+  { delay: 5000, text: "Building the city block..." },
+  { delay: 9000, text: "Almost there..." },
   { delay: 13000, text: "This one's a big profile. Hang tight..." },
 ];
 
@@ -325,9 +325,9 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
                 style={{
                   color:
                     i === 0 ? "#ffd700"
-                    : i === 1 ? "#c0c0c0"
-                    : i === 2 ? "#cd7f32"
-                    : accent,
+                      : i === 1 ? "#c0c0c0"
+                        : i === 2 ? "#cd7f32"
+                          : accent,
                 }}
               >
                 #{i + 1}
@@ -474,11 +474,11 @@ function HomeContent() {
     fetch("https://api.github.com/repos/srizzon/git-city")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.stargazers_count != null) setStarCount(d.stargazers_count); })
-      .catch(() => {});
+      .catch(() => { });
     fetch("https://discord.com/api/v9/invites/2bTjFAkny7?with_counts=true")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.approximate_member_count != null) setDiscordMembers(d.approximate_member_count); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Track successful raid data before state resets
@@ -504,13 +504,13 @@ function HomeContent() {
         prev.map((b) =>
           b.login === defenderLogin
             ? {
-                ...b,
-                active_raid_tag: {
-                  attacker_login: attackerLogin,
-                  tag_style: tagStyle,
-                  expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
-                },
-              }
+              ...b,
+              active_raid_tag: {
+                attacker_login: attackerLogin,
+                tag_style: tagStyle,
+                expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+              },
+            }
             : b
         )
       );
@@ -522,7 +522,7 @@ function HomeContent() {
     fetch("/api/sky-ads")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (Array.isArray(data) && data.length > 0) setSkyAds(data); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Derived — second focused building for dual-focus camera
@@ -575,7 +575,7 @@ function HomeContent() {
     fetch("/api/raid/loadout")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data?.vehicle) setFlyVehicle(data.vehicle); })
-      .catch(() => {});
+      .catch(() => { });
   }, [sessionUserId]);
 
   // Load theme from DB when logged in (overrides localStorage)
@@ -591,7 +591,7 @@ function HomeContent() {
           localStorage.setItem("gitcity_theme", String(data.city_theme));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [sessionUserId]);
 
   // Cycle theme: save to localStorage + sync to DB if logged in
@@ -604,7 +604,7 @@ function HomeContent() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ city_theme: next }),
-        }).catch(() => {});
+        }).catch(() => { });
       }
       return next;
     });
@@ -801,7 +801,7 @@ function HomeContent() {
             setFocusedBuilding(compareBuilding.login);
             setCompareBuilding(null);
           } else if (giftModalOpen) { setGiftModalOpen(false); setGiftItems(null); }
-            else if (giftClaimed) setGiftClaimed(false);
+          else if (giftClaimed) setGiftClaimed(false);
           else if (shareData) { setShareData(null); setSelectedBuilding(null); setFocusedBuilding(null); }
           else if (selectedBuilding) { setSelectedBuilding(null); setFocusedBuilding(null); }
           else if (focusedBuilding) setFocusedBuilding(null);
@@ -859,7 +859,7 @@ function HomeContent() {
         if (best >= 5 && serverProgress < 5 && localProgress >= 5) {
           setRabbitCompletion(true);
         }
-      } catch {}
+      } catch { }
     })();
   }, [session]);
 
@@ -1007,7 +1007,7 @@ function HomeContent() {
         setDistrictZones(cached.districtZones);
         setStats(cached.stats);
       } else {
-        reloadCity().catch(() => {});
+        reloadCity().catch(() => { });
       }
       return;
     }
@@ -1027,12 +1027,16 @@ function HomeContent() {
           return;
         }
 
-        // Fetch first chunk
+        // Fetch prioritized chunk (either user-specific or downtown)
         setLoadStage("fetching");
         setLoadProgress(10);
 
-        const CHUNK = 1000;
-        const res = await fetch(`/api/city?from=0&to=${CHUNK}`);
+        const targetUser = searchParams.get("user");
+        const fetchUrl = targetUser
+          ? `/api/city?user=${encodeURIComponent(targetUser)}`
+          : "/api/city?from=0&to=1000";
+
+        const res = await fetch(fetchUrl);
         if (!res.ok) throw new Error("Failed to fetch city data");
         const data = await res.json();
 
@@ -1051,7 +1055,9 @@ function HomeContent() {
         await new Promise((r) => setTimeout(r, 0)); // yield to browser
 
         setStats(data.stats);
-        let finalLayout = generateCityLayout(data.developers);
+
+        // Use globalMax from server for stability
+        let finalLayout = generateCityLayout(data.developers, data.globalMax);
         setBuildings(finalLayout.buildings);
         setPlazas(finalLayout.plazas);
         setDecorations(finalLayout.decorations);
@@ -1061,37 +1067,37 @@ function HomeContent() {
 
         setLoadProgress(55);
 
-        // Rendering: wait for Canvas to process data (2 rAF + fallback)
+        // Rendering: wait for Canvas to process data
         setLoadStage("rendering");
         setLoadProgress(65);
 
         await new Promise<void>((resolve) => {
           let resolved = false;
-          const done = () => {
-            if (resolved) return;
-            resolved = true;
-            resolve();
-          };
-          // 2 chained rAFs
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => done());
-          });
-          // Fallback for hidden tabs where rAF doesn't fire
+          const done = () => { if (resolved) return; resolved = true; resolve(); };
+          requestAnimationFrame(() => requestAnimationFrame(() => done()));
           setTimeout(done, 500);
         });
 
         setLoadProgress(80);
 
         // Fetch remaining chunks if needed
+        const CHUNK = 1000;
         const total = data.stats?.total_developers ?? 0;
-        if (total > CHUNK) {
+        if (total > data.developers.length) {
           const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
-          for (let from = CHUNK; from < total; from += CHUNK) {
-            promises.push(
-              fetch(`/api/city?from=${from}&to=${from + CHUNK}`)
-                .then((r) => (r.ok ? r.json() : null))
-            );
+
+          // Determine which chunks are missing
+          const loadedRanks = new Set(data.developers.map((d: any) => d.rank));
+          for (let from = 0; from < total; from += CHUNK) {
+            // If the start of this chunk isn't loaded, fetch it
+            if (!loadedRanks.has(from + 1)) {
+              promises.push(
+                fetch(`/api/city?from=${from}&to=${from + CHUNK}`)
+                  .then((r) => (r.ok ? r.json() : null))
+              );
+            }
           }
+
           const results = await Promise.all(promises);
           let allDevs = [...data.developers];
           for (const chunk of results) {
@@ -1099,7 +1105,12 @@ function HomeContent() {
               allDevs = [...allDevs, ...chunk.developers];
             }
           }
-          finalLayout = generateCityLayout(allDevs);
+
+          // Sort by rank for layout stability (though generateCityLayout 
+          // should now handle this internally if we refactored it correctly)
+          allDevs.sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+
+          finalLayout = generateCityLayout(allDevs, data.globalMax);
           setBuildings(finalLayout.buildings);
           setPlazas(finalLayout.plazas);
           setDecorations(finalLayout.decorations);
@@ -1112,7 +1123,7 @@ function HomeContent() {
         setCityCache({ ...finalLayout, stats: data.stats });
         setLoadProgress(95);
 
-        // Enforce minimum 800ms display time to avoid flash
+        // Enforce minimum 800ms display time
         const elapsed = performance.now() - loadStartTime;
         if (elapsed < 800) {
           await new Promise((r) => setTimeout(r, 800 - elapsed));
@@ -1127,7 +1138,7 @@ function HomeContent() {
     }
 
     loadCity();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadStage]);
 
   // City reload on tab return removed — navigating back from shop already
@@ -1486,7 +1497,7 @@ function HomeContent() {
     fetch("/api/milestone-celebration")
       .then((r) => r.ok ? r.json() : [])
       .then((data) => { if (Array.isArray(data)) setMilestoneCelebrations(data); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Record milestone when crossed
@@ -1510,7 +1521,7 @@ function HomeContent() {
           ]);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [stats.total_developers, milestoneCelebrations]);
 
   return (
@@ -1610,7 +1621,7 @@ function HomeContent() {
         }}
         introMode={introMode}
         onIntroEnd={endIntro}
-        onFocusInfo={() => {}}
+        onFocusInfo={() => { }}
         ghostPreviewLogin={ghostPreviewLogin}
         raidPhase={raidState.phase}
         raidData={raidState.raidData}
@@ -1954,7 +1965,7 @@ function HomeContent() {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
             <span style={{ color: theme.accent }}>&#9733;</span>
             {starCount != null && <span className="text-cream">{starCount.toLocaleString()}</span>}
           </a>
@@ -1964,7 +1975,7 @@ function HomeContent() {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2]"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2]"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z" /></svg>
             <span className="text-cream">Discord</span>
             {discordMembers != null && <span className="text-cream">{discordMembers.toLocaleString()}</span>}
           </a>
@@ -2678,8 +2689,8 @@ function HomeContent() {
                       boxShadow: kudosError
                         ? "0 0 12px rgba(255,68,68,0.4)"
                         : kudosSent
-                        ? "0 0 12px rgba(57,211,83,0.4)"
-                        : `2px 2px 0 0 ${theme.shadow}`,
+                          ? "0 0 12px rgba(57,211,83,0.4)"
+                          : `2px 2px 0 0 ${theme.shadow}`,
                     }}
                   >
                     {kudosSending ? (
@@ -2918,215 +2929,215 @@ function HomeContent() {
         const closeCompare = () => { setSelectedBuilding(comparePair[0]); setFocusedBuilding(comparePair[0].login); setComparePair(null); setCompareBuilding(null); };
 
         return (
-        <>
-          {/* No fullscreen backdrop — let the user orbit the camera freely */}
-          <div className="pointer-events-auto fixed z-40
+          <>
+            {/* No fullscreen backdrop — let the user orbit the camera freely */}
+            <div className="pointer-events-auto fixed z-40
             bottom-0 left-0 right-0
             sm:bottom-auto sm:left-auto sm:right-5 sm:top-1/2 sm:-translate-y-1/2"
-          >
-            <div className="relative border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
+            >
+              <div className="relative border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
               w-full sm:w-[380px] sm:border-[3px] sm:max-h-[85vh] sm:overflow-y-auto
               max-h-[45vh] overflow-y-auto
               animate-[slide-up_0.2s_ease-out] sm:animate-none"
-            >
-              {/* Drag handle on mobile - swipe down to close */}
-              <div
-                className="flex justify-center py-2 sm:hidden"
-                onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
-                onTouchEnd={(e) => { const start = (e.currentTarget as any)._touchY; if (start != null && e.changedTouches[0].clientY - start > 50) closeCompare(); }}
               >
-                <div className="h-1 w-10 rounded-full bg-border" />
-              </div>
-
-              {/* ── Header: Avatars + VS ── */}
-              <div className="flex items-start justify-center gap-5 px-5 pt-1 pb-4 sm:pt-4">
-                <Link href={`/dev/${comparePair[0].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
-                  {comparePair[0].avatar_url && (
-                    <Image
-                      src={comparePair[0].avatar_url}
-                      alt={comparePair[0].login}
-                      width={56}
-                      height={56}
-                      className="border-[3px] transition-colors group-hover:brightness-110"
-                      style={{
-                        imageRendering: "pixelated",
-                        borderColor: totalAWins >= totalBWins ? theme.accent : "#3a3a40",
-                      }}
-                    />
-                  )}
-                  <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[0].login}</p>
-                  <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[0].login)}</p>
-                </Link>
-
-                <span className="text-base shrink-0 pt-4" style={{ color: theme.accent }}>VS</span>
-
-                <Link href={`/dev/${comparePair[1].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
-                  {comparePair[1].avatar_url && (
-                    <Image
-                      src={comparePair[1].avatar_url}
-                      alt={comparePair[1].login}
-                      width={56}
-                      height={56}
-                      className="border-[3px] transition-colors group-hover:brightness-110"
-                      style={{
-                        imageRendering: "pixelated",
-                        borderColor: totalBWins >= totalAWins ? theme.accent : "#3a3a40",
-                      }}
-                    />
-                  )}
-                  <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[1].login}</p>
-                  <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[1].login)}</p>
-                </Link>
-              </div>
-
-              {/* ── Scoreboard ── */}
-              <div className="mx-4 border-[2px] border-border bg-bg-card">
-                {cmpRows.map((s, i) => (
-                  <div
-                    key={s.key}
-                    className={`flex items-center py-2 px-3 ${i < cmpRows.length - 1 ? "border-b border-border/40" : ""}`}
-                  >
-                    <span
-                      className="w-[72px] text-right text-[11px] tabular-nums"
-                      style={{ color: s.aW ? theme.accent : s.bW ? "#555" : "#888" }}
-                    >
-                      {s.key === "rank" ? (s.a > 0 ? `#${s.a}` : "-") : s.a.toLocaleString()}
-                    </span>
-                    <span className="flex-1 text-center text-[8px] text-muted uppercase tracking-wider">
-                      {s.label}
-                    </span>
-                    <span
-                      className="w-[72px] text-left text-[11px] tabular-nums"
-                      style={{ color: s.bW ? theme.accent : s.aW ? "#555" : "#888" }}
-                    >
-                      {s.key === "rank" ? (s.b > 0 ? `#${s.b}` : "-") : s.b.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* ── Winner banner ── */}
-              <div
-                className="mx-4 mt-3 py-2.5 text-center text-[11px] uppercase tracking-wide"
-                style={{
-                  backgroundColor: `${theme.accent}15`,
-                  border: `2px solid ${theme.accent}40`,
-                  color: theme.accent,
-                }}
-              >
-                {cmpSummary}
-              </div>
-
-              {/* ── Actions ── */}
-              <div className="px-4 pt-3 pb-1 flex gap-2">
-                <a
-                  href={`https://x.com/intent/tweet?text=${encodeURIComponent(
-                    `I just compared my building with ${comparePair[1].login}'s in Git City. It wasn't even close. What's yours?`
-                  )}&url=${encodeURIComponent(
-                    `${typeof window !== "undefined" ? window.location.origin : ""}/compare/${comparePair[0].login}/${comparePair[1].login}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
-                  style={{
-                    backgroundColor: theme.accent,
-                    boxShadow: `2px 2px 0 0 ${theme.shadow}`,
-                  }}
+                {/* Drag handle on mobile - swipe down to close */}
+                <div
+                  className="flex justify-center py-2 sm:hidden"
+                  onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
+                  onTouchEnd={(e) => { const start = (e.currentTarget as any)._touchY; if (start != null && e.changedTouches[0].clientY - start > 50) closeCompare(); }}
                 >
-                  Share on X
-                </a>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      `${window.location.origin}/compare/${comparePair[0].login}/${comparePair[1].login}`
-                    );
-                    setCompareCopied(true);
-                    setTimeout(() => setCompareCopied(false), 2000);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
-                >
-                  {compareCopied ? "Copied!" : "Copy Link"}
-                </button>
-              </div>
+                  <div className="h-1 w-10 rounded-full bg-border" />
+                </div>
 
-              {/* Download with lang toggle */}
-              <div className="px-4 flex items-center gap-2 pb-1">
-                <div className="flex gap-0.5 shrink-0">
-                  {(["en", "pt"] as const).map((l) => (
-                    <button
-                      key={l}
-                      onClick={() => setCompareLang(l)}
-                      className="px-2 py-0.5 text-[9px] uppercase transition-colors"
-                      style={{
-                        color: compareLang === l ? theme.accent : "#666",
-                        borderBottom: compareLang === l ? `2px solid ${theme.accent}` : "2px solid transparent",
-                      }}
+                {/* ── Header: Avatars + VS ── */}
+                <div className="flex items-start justify-center gap-5 px-5 pt-1 pb-4 sm:pt-4">
+                  <Link href={`/dev/${comparePair[0].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
+                    {comparePair[0].avatar_url && (
+                      <Image
+                        src={comparePair[0].avatar_url}
+                        alt={comparePair[0].login}
+                        width={56}
+                        height={56}
+                        className="border-[3px] transition-colors group-hover:brightness-110"
+                        style={{
+                          imageRendering: "pixelated",
+                          borderColor: totalAWins >= totalBWins ? theme.accent : "#3a3a40",
+                        }}
+                      />
+                    )}
+                    <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[0].login}</p>
+                    <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[0].login)}</p>
+                  </Link>
+
+                  <span className="text-base shrink-0 pt-4" style={{ color: theme.accent }}>VS</span>
+
+                  <Link href={`/dev/${comparePair[1].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
+                    {comparePair[1].avatar_url && (
+                      <Image
+                        src={comparePair[1].avatar_url}
+                        alt={comparePair[1].login}
+                        width={56}
+                        height={56}
+                        className="border-[3px] transition-colors group-hover:brightness-110"
+                        style={{
+                          imageRendering: "pixelated",
+                          borderColor: totalBWins >= totalAWins ? theme.accent : "#3a3a40",
+                        }}
+                      />
+                    )}
+                    <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[1].login}</p>
+                    <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[1].login)}</p>
+                  </Link>
+                </div>
+
+                {/* ── Scoreboard ── */}
+                <div className="mx-4 border-[2px] border-border bg-bg-card">
+                  {cmpRows.map((s, i) => (
+                    <div
+                      key={s.key}
+                      className={`flex items-center py-2 px-3 ${i < cmpRows.length - 1 ? "border-b border-border/40" : ""}`}
                     >
-                      {l}
-                    </button>
+                      <span
+                        className="w-[72px] text-right text-[11px] tabular-nums"
+                        style={{ color: s.aW ? theme.accent : s.bW ? "#555" : "#888" }}
+                      >
+                        {s.key === "rank" ? (s.a > 0 ? `#${s.a}` : "-") : s.a.toLocaleString()}
+                      </span>
+                      <span className="flex-1 text-center text-[8px] text-muted uppercase tracking-wider">
+                        {s.label}
+                      </span>
+                      <span
+                        className="w-[72px] text-left text-[11px] tabular-nums"
+                        style={{ color: s.bW ? theme.accent : s.aW ? "#555" : "#888" }}
+                      >
+                        {s.key === "rank" ? (s.b > 0 ? `#${s.b}` : "-") : s.b.toLocaleString()}
+                      </span>
+                    </div>
                   ))}
                 </div>
-                <button
-                  onClick={async () => {
-                    const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=landscape&lang=${compareLang}`);
-                    if (!res.ok) return;
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
-                >
-                  Card
-                </button>
-                <button
-                  onClick={async () => {
-                    const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=stories&lang=${compareLang}`);
-                    if (!res.ok) return;
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}-stories.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
-                >
-                  Stories
-                </button>
-              </div>
 
-              {/* Compare Again + Close */}
-              <div className="flex gap-2 px-4 pt-1 pb-5 sm:pb-4">
-                <button
-                  onClick={() => {
-                    const first = comparePair[0];
-                    setComparePair(null);
-                    setCompareBuilding(first);
-                    setFocusedBuilding(first.login);
+                {/* ── Winner banner ── */}
+                <div
+                  className="mx-4 mt-3 py-2.5 text-center text-[11px] uppercase tracking-wide"
+                  style={{
+                    backgroundColor: `${theme.accent}15`,
+                    border: `2px solid ${theme.accent}40`,
+                    color: theme.accent,
                   }}
-                  className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
                 >
-                  Compare Again
-                </button>
-                <button
-                  onClick={closeCompare}
-                  className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
-                >
-                  Close
-                </button>
+                  {cmpSummary}
+                </div>
+
+                {/* ── Actions ── */}
+                <div className="px-4 pt-3 pb-1 flex gap-2">
+                  <a
+                    href={`https://x.com/intent/tweet?text=${encodeURIComponent(
+                      `I just compared my building with ${comparePair[1].login}'s in Git City. It wasn't even close. What's yours?`
+                    )}&url=${encodeURIComponent(
+                      `${typeof window !== "undefined" ? window.location.origin : ""}/compare/${comparePair[0].login}/${comparePair[1].login}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
+                    style={{
+                      backgroundColor: theme.accent,
+                      boxShadow: `2px 2px 0 0 ${theme.shadow}`,
+                    }}
+                  >
+                    Share on X
+                  </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}/compare/${comparePair[0].login}/${comparePair[1].login}`
+                      );
+                      setCompareCopied(true);
+                      setTimeout(() => setCompareCopied(false), 2000);
+                    }}
+                    className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                  >
+                    {compareCopied ? "Copied!" : "Copy Link"}
+                  </button>
+                </div>
+
+                {/* Download with lang toggle */}
+                <div className="px-4 flex items-center gap-2 pb-1">
+                  <div className="flex gap-0.5 shrink-0">
+                    {(["en", "pt"] as const).map((l) => (
+                      <button
+                        key={l}
+                        onClick={() => setCompareLang(l)}
+                        className="px-2 py-0.5 text-[9px] uppercase transition-colors"
+                        style={{
+                          color: compareLang === l ? theme.accent : "#666",
+                          borderBottom: compareLang === l ? `2px solid ${theme.accent}` : "2px solid transparent",
+                        }}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=landscape&lang=${compareLang}`);
+                      if (!res.ok) return;
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                  >
+                    Card
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=stories&lang=${compareLang}`);
+                      if (!res.ok) return;
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}-stories.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                  >
+                    Stories
+                  </button>
+                </div>
+
+                {/* Compare Again + Close */}
+                <div className="flex gap-2 px-4 pt-1 pb-5 sm:pb-4">
+                  <button
+                    onClick={() => {
+                      const first = comparePair[0];
+                      setComparePair(null);
+                      setCompareBuilding(first);
+                      setFocusedBuilding(first.login);
+                    }}
+                    className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                  >
+                    Compare Again
+                  </button>
+                  <button
+                    onClick={closeCompare}
+                    className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </>
+          </>
         );
       })()}
 
