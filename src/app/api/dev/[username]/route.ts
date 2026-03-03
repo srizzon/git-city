@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/supabase-server";
 import type { TopRepo } from "@/lib/github";
 
-// ─── Rate Limiting ───────────────────────────────────────────
-
-async function hashIP(ip: string): Promise<string> {
-  const data = new TextEncoder().encode(ip + (process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""));
+async function hashKey(key: string): Promise<string> {
+  const data = new TextEncoder().encode(key + (process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""));
   const buf = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
-async function checkRateLimit(ip: string): Promise<boolean> {
+async function isRateLimited(key: string): Promise<boolean> {
   const sb = getSupabaseAdmin();
-  const ipHash = await hashIP(ip);
+  const ipHash = await hashKey(key);
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
   const { count } = await sb
@@ -23,13 +22,14 @@ async function checkRateLimit(ip: string): Promise<boolean> {
     .eq("ip_hash", ipHash)
     .gte("created_at", oneHourAgo);
 
-  if ((count ?? 0) >= 10) return false;
-
-  await sb.from("add_requests").insert({ ip_hash: ipHash });
-  return true;
+  return (count ?? 0) >= 10;
 }
 
-// ─── GitHub Fetching ─────────────────────────────────────────
+async function recordRateLimitRequest(key: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const ipHash = await hashKey(key);
+  await sb.from("add_requests").insert({ ip_hash: ipHash });
+}
 
 function ghHeaders(): HeadersInit {
   const h: HeadersInit = {
@@ -230,7 +230,6 @@ export async function GET(
   const { username } = await params;
   const sb = getSupabaseAdmin();
 
-  // Check cache first (no rate limit cost)
   const { data: cached } = await sb
     .from("developers")
     .select("*")
@@ -248,15 +247,31 @@ export async function GET(
     }
   }
 
-  // Only rate limit when we need to fetch from GitHub
-  if (process.env.NODE_ENV !== "development") {
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      request.headers.get("x-real-ip") ??
-      "unknown";
+  // Rate limit only applies to brand-new developers (not in DB at all).
+  // Stale refreshes for existing devs are unlimited ("already in the city").
+  let rateLimitKey: string | null = null;
+  if (process.env.NODE_ENV !== "development" && !cached) {
+    // Auth user ID is preferred over IP to avoid shared-IP false positives
+    // (e.g. users behind the same corporate/university NAT sharing a quota).
+    let key: string;
+    try {
+      const authClient = await createServerSupabase();
+      const { data: { user } } = await authClient.auth.getUser();
+      key = user ? `user:${user.id}` : (
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+        request.headers.get("x-real-ip") ??
+        "unknown"
+      );
+    } catch {
+      key =
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+        request.headers.get("x-real-ip") ??
+        "unknown";
+    }
 
-    const allowed = await checkRateLimit(ip);
-    if (!allowed) {
+    rateLimitKey = key;
+    const limited = await isRateLimited(key);
+    if (limited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Max 10 lookups per hour." },
         { status: 429 }
@@ -264,7 +279,6 @@ export async function GET(
     }
   }
 
-  // Fetch from GitHub
   try {
     const headers = ghHeaders();
 
@@ -379,6 +393,11 @@ export async function GET(
         language: r.language,
         url: r.html_url,
       }));
+
+    // Record after validation so failed lookups (typos, orgs) don't burn slots.
+    if (rateLimitKey) {
+      await recordRateLimitRequest(rateLimitKey);
+    }
 
     // Upsert into Supabase
     const record = {
