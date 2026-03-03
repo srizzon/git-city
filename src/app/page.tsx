@@ -1420,7 +1420,8 @@ function HomeContent() {
   };
 
   const handleClaimFreeGift = async () => {
-    setClaimingGift(true);
+if (claimingGift) return;
+        setClaimingGift(true);
     try {
       const res = await fetch("/api/claim-free-item", { method: "POST" });
       if (res.ok) {
