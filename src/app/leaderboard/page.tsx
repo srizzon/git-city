@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import LeaderboardTracker from "@/components/LeaderboardTracker";
 import LeaderboardYouBadge, { LeaderboardAuthProvider } from "@/components/LeaderboardYouBadge";
 import LeaderboardUserPosition from "@/components/LeaderboardUserPosition";
 import LeaderboardYouVsNext from "@/components/LeaderboardYouVsNext";
+import FlyLeaderboard from "@/components/FlyLeaderboard";
 
 export const revalidate = 300; // ISR: regenerate every 5 min
 
@@ -52,9 +54,10 @@ function rankColor(rank: number): string {
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; mode?: string }>;
 }) {
   const params = await searchParams;
+  const mode = params.mode ?? "developers";
   const activeTab = (params.tab ?? "contributors") as TabId;
 
   const supabase = getSupabaseAdmin();
@@ -182,104 +185,144 @@ export default async function LeaderboardPage({
           </p>
         </div>
 
-        {/* Tabs */}
-        <div className="mt-6 flex flex-wrap justify-center gap-1">
-          {TABS.filter((t) => t.id !== "recruiters" || hasRecruiters).map((tab) => (
+        {/* Mode toggle: Developers | Game */}
+        <div className="mt-6 flex justify-center">
+          <div className="flex border-[2px] border-border">
             <Link
-              key={tab.id}
-              href={`/leaderboard?tab=${tab.id}`}
-              className="px-3 py-1.5 text-[10px] transition-colors border-[2px]"
+              href="/leaderboard?mode=developers"
+              className="px-5 py-2 text-[11px] transition-colors"
               style={{
-                borderColor: activeTab === tab.id ? ACCENT : "var(--color-border)",
-                color: activeTab === tab.id ? ACCENT : "var(--color-muted)",
-                backgroundColor: activeTab === tab.id ? "rgba(200, 230, 74, 0.1)" : "transparent",
+                color: mode === "developers" ? ACCENT : "var(--color-muted)",
+                backgroundColor: mode === "developers" ? "rgba(200, 230, 74, 0.1)" : "transparent",
               }}
             >
-              {tab.label}
+              Developers
             </Link>
-          ))}
-        </div>
-
-        {/* A4: "You vs. Next" banner */}
-        <LeaderboardYouVsNext metrics={devMetrics} metricLabel={metricLabel} />
-
-        {/* Table */}
-        <div className="mt-6 border-[3px] border-border">
-          {/* Header row */}
-          <div className="flex items-center gap-4 border-b-[3px] border-border bg-bg-card px-5 py-3 text-xs text-muted">
-            <span className="w-10 text-center">#</span>
-            <span className="flex-1">Developer</span>
-            <span className="hidden w-24 text-right sm:block">Language</span>
-            <span className="w-28 text-right">{metricLabel}</span>
+            <Link
+              href="/leaderboard?mode=game"
+              className="relative border-l-[2px] border-border px-5 py-2 text-[11px] transition-colors"
+              style={{
+                color: mode === "game" ? ACCENT : "var(--color-muted)",
+                backgroundColor: mode === "game" ? "rgba(200, 230, 74, 0.1)" : "transparent",
+              }}
+            >
+              Game
+            </Link>
           </div>
-
-          {/* Rows */}
-          {devs.map((dev, i) => {
-            const pos = i + 1;
-            return (
-              <Link
-                key={dev.github_login}
-                href={`/dev/${dev.github_login}`}
-                className="flex items-center gap-4 border-b border-border/50 px-5 py-3.5 transition-colors hover:bg-bg-card"
-              >
-                <span className="w-10 text-center">
-                  <span
-                    className="text-sm font-bold"
-                    style={{ color: rankColor(pos) }}
-                  >
-                    {pos}
-                  </span>
-                  {newLogins.has(dev.github_login.toLowerCase()) && (
-                    <span className="block text-[7px] font-bold" style={{ color: "#ffd700" }}>
-                      NEW
-                    </span>
-                  )}
-                </span>
-
-                <div className="flex flex-1 items-center gap-3 overflow-hidden">
-                  {dev.avatar_url && (
-                    <Image
-                      src={dev.avatar_url}
-                      alt={dev.github_login}
-                      width={36}
-                      height={36}
-                      className="border-[2px] border-border"
-                      style={{ imageRendering: "pixelated" }}
-                    />
-                  )}
-                  <div className="overflow-hidden">
-                    <p className="truncate text-sm text-cream">
-                      {dev.name ?? dev.github_login}
-                      <LeaderboardYouBadge login={dev.github_login} />
-                    </p>
-                    {dev.name && (
-                      <p className="truncate text-[10px] text-muted">
-                        @{dev.github_login}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <span className="hidden w-24 text-right text-xs text-muted sm:block">
-                  {dev.primary_language ?? "\u2014"}
-                </span>
-
-                <span className="w-28 text-right text-sm" style={{ color: ACCENT }}>
-                  {getMetricValue(dev)}
-                </span>
-              </Link>
-            );
-          })}
-
-          {/* "YOU" row if not in top 50 — handled client-side */}
-          <LeaderboardUserPosition tab={activeTab} topLogins={topLogins} />
-
-          {devs.length === 0 && (
-            <div className="px-5 py-8 text-center text-xs text-muted normal-case">
-              No data for this category yet.
-            </div>
-          )}
         </div>
+
+        {mode === "developers" ? (
+          <>
+            {/* Tabs */}
+            <div className="mt-6 flex flex-wrap justify-center gap-1">
+              {TABS.filter((t) => t.id !== "recruiters" || hasRecruiters).map((tab) => (
+                <Link
+                  key={tab.id}
+                  href={`/leaderboard?tab=${tab.id}`}
+                  className="px-3 py-1.5 text-[10px] transition-colors border-[2px]"
+                  style={{
+                    borderColor: activeTab === tab.id ? ACCENT : "var(--color-border)",
+                    color: activeTab === tab.id ? ACCENT : "var(--color-muted)",
+                    backgroundColor: activeTab === tab.id ? "rgba(200, 230, 74, 0.1)" : "transparent",
+                  }}
+                >
+                  {tab.label}
+                </Link>
+              ))}
+            </div>
+
+            {/* A4: "You vs. Next" banner */}
+            <LeaderboardYouVsNext metrics={devMetrics} metricLabel={metricLabel} />
+
+            {/* Table */}
+            <div className="mt-6 border-[3px] border-border">
+              {/* Header row */}
+              <div className="flex items-center gap-4 border-b-[3px] border-border bg-bg-card px-5 py-3 text-xs text-muted">
+                <span className="w-10 text-center">#</span>
+                <span className="flex-1">Developer</span>
+                <span className="hidden w-24 text-right sm:block">Language</span>
+                <span className="w-28 text-right">{metricLabel}</span>
+              </div>
+
+              {/* Rows */}
+              {devs.map((dev, i) => {
+                const pos = i + 1;
+                return (
+                  <Link
+                    key={dev.github_login}
+                    href={`/dev/${dev.github_login}`}
+                    className="flex items-center gap-4 border-b border-border/50 px-5 py-3.5 transition-colors hover:bg-bg-card"
+                  >
+                    <span className="w-10 text-center">
+                      <span
+                        className="text-sm font-bold"
+                        style={{ color: rankColor(pos) }}
+                      >
+                        {pos}
+                      </span>
+                      {newLogins.has(dev.github_login.toLowerCase()) && (
+                        <span className="block text-[7px] font-bold" style={{ color: "#ffd700" }}>
+                          NEW
+                        </span>
+                      )}
+                    </span>
+
+                    <div className="flex flex-1 items-center gap-3 overflow-hidden">
+                      {dev.avatar_url && (
+                        <Image
+                          src={dev.avatar_url}
+                          alt={dev.github_login}
+                          width={36}
+                          height={36}
+                          className="border-[2px] border-border"
+                          style={{ imageRendering: "pixelated" }}
+                        />
+                      )}
+                      <div className="overflow-hidden">
+                        <p className="truncate text-sm text-cream">
+                          {dev.name ?? dev.github_login}
+                          <LeaderboardYouBadge login={dev.github_login} />
+                        </p>
+                        {dev.name && (
+                          <p className="truncate text-[10px] text-muted">
+                            @{dev.github_login}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <span className="hidden w-24 text-right text-xs text-muted sm:block">
+                      {dev.primary_language ?? "\u2014"}
+                    </span>
+
+                    <span className="w-28 text-right text-sm" style={{ color: ACCENT }}>
+                      {getMetricValue(dev)}
+                    </span>
+                  </Link>
+                );
+              })}
+
+              {/* "YOU" row if not in top 50 — handled client-side */}
+              <LeaderboardUserPosition tab={activeTab} topLogins={topLogins} />
+
+              {devs.length === 0 && (
+                <div className="px-5 py-8 text-center text-xs text-muted normal-case">
+                  No data for this category yet.
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <Suspense
+            fallback={
+              <div className="mt-10 text-center text-xs text-muted normal-case">
+                Loading daily scores...
+              </div>
+            }
+          >
+            <FlyLeaderboard />
+          </Suspense>
+        )}
 
         {/* Footer */}
         <div className="mt-8 text-center">

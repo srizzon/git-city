@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
+import { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
@@ -58,7 +58,7 @@ const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
 });
 
 // Feature flags — flip to switch milestone banner
-const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road to 1K, "devs" = total developers
+const MILESTONE_MODE: "stars" | "devs" = "stars"; // "stars" = GitHub stars road to 1K, "devs" = total developers
 
 const THEMES = [
   { name: "Midnight", accent: "#6090e0", shadow: "#203870" },
@@ -369,7 +369,7 @@ function HomeContent() {
   const [districtZones, setDistrictZones] = useState<DistrictZone[]>([]);
   const [loading, setLoading] = useState(false);
   // Loading state machine — skip on return visits that still have cached data
-  const [loadStage, setLoadStage] = useState<LoadingStage>(() => getCityCache() ? "done" : "init");
+  const [loadStage, setLoadStage] = useState<LoadingStage>("init");
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const initialLoading = loadStage !== "done";
@@ -404,6 +404,12 @@ function HomeContent() {
   const announceCooldownRef = useRef(0);
   const [flyPaused, setFlyPaused] = useState(false);
   const [flyPauseSignal, setFlyPauseSignal] = useState(0);
+  const [flyScore, setFlyScore] = useState({ score: 0, earned: 0, combo: 0, collected: 0, maxCombo: 1 });
+  const [flyPersonalBest, setFlyPersonalBest] = useState(0);
+  const flyStartTime = useRef(0);
+  const flyPausedAt = useRef(0);
+  const flyTotalPauseMs = useRef(0);
+  const [flyElapsedSec, setFlyElapsedSec] = useState(0);
   const [stats, setStats] = useState<CityStats>({ total_developers: 0, total_contributions: 0 });
   const [milestoneCelebrations, setMilestoneCelebrations] = useState<{ milestone: number; reached_at: string }[]>([]);
   const [focusedBuilding, setFocusedBuilding] = useState<string | null>(null);
@@ -444,10 +450,11 @@ function HomeContent() {
   const [districtChooserOpen, setDistrictChooserOpen] = useState(false);
   const [rabbitCinematic, setRabbitCinematic] = useState(false);
   const [rabbitCinematicPhase, setRabbitCinematicPhase] = useState(-1);
-  const [rabbitProgress, setRabbitProgress] = useState(() => {
-    if (typeof window === "undefined") return 0;
-    return parseInt(localStorage.getItem("gitcity_rabbit_progress") ?? "0", 10) || 0;
-  });
+  const [rabbitProgress, setRabbitProgress] = useState(0);
+  useEffect(() => {
+    const saved = parseInt(localStorage.getItem("gitcity_rabbit_progress") ?? "0", 10) || 0;
+    if (saved > 0) setRabbitProgress(saved);
+  }, []);
   const [rabbitSighting, setRabbitSighting] = useState<number | null>(null);
   const [rabbitCompletion, setRabbitCompletion] = useState(false);
   const [rabbitHintFlash, setRabbitHintFlash] = useState<string | null>(null);
@@ -582,6 +589,17 @@ function HomeContent() {
     session?.user?.user_metadata?.preferred_username ??
     ""
   ).toLowerCase();
+
+  // Fly timer — ticks every second while flying and not paused
+  useEffect(() => {
+    if (!flyMode || flyPaused) return;
+    const id = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - flyStartTime.current - flyTotalPauseMs.current;
+      setFlyElapsedSec(Math.floor(elapsed / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [flyMode, flyPaused]);
 
   // Fetch fly vehicle from raid loadout (on login)
   const sessionUserId = session?.user?.id;
@@ -1551,7 +1569,63 @@ function HomeContent() {
         bridges={bridges}
         flyMode={flyMode}
         flyVehicle={flyVehicle}
-        onExitFly={() => { setFlyMode(false); setFlyPaused(false); lastDistrictRef.current = null; setDistrictAnnouncement(null); clearTimeout(announceTimerRef.current); }}
+        onExitFly={() => {
+          const wallMs = Date.now() - flyStartTime.current;
+          // Exclude pause time from flight duration
+          const currentPauseMs = flyPausedAt.current > 0 ? Date.now() - flyPausedAt.current : 0;
+          const flightMs = Math.max(0, wallMs - flyTotalPauseMs.current - currentPauseMs);
+          // Time bonus: each 3s under 90s = +1 point (max ~30 pts, rewards efficiency)
+          const FLY_TIME_LIMIT = 90;
+          const timeBonus = flyScore.collected > 0 ? Math.max(0, Math.floor((FLY_TIME_LIMIT - flightMs / 1000) / 3)) : 0;
+          const finalScore = flyScore.score + timeBonus;
+          // Submit score if logged in and scored
+          if (session && finalScore > 0) {
+            const maxComboVal = Math.min(Math.max(flyScore.maxCombo, 1), 3);
+            fetch("/api/fly-scores", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ score: finalScore, collected: flyScore.collected, max_combo: maxComboVal, flight_ms: flightMs }),
+            }).catch(() => {});
+          }
+          // Update personal best
+          if (finalScore > flyPersonalBest) {
+            setFlyPersonalBest(finalScore);
+            try { localStorage.setItem("gitcity_fly_pb", String(finalScore)); } catch {}
+          }
+          // Update fly history (streak, days played, per-seed scores)
+          if (finalScore > 0) {
+            try {
+              const now = new Date();
+              const start = new Date(now.getFullYear(), 0, 0);
+              const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
+              const currentSeed = `${now.getFullYear()}-${dayOfYear}`;
+              const raw = localStorage.getItem("gitcity_fly_history");
+              const hist = raw ? JSON.parse(raw) : { seeds: {}, currentStreak: 0, longestStreak: 0, lastPlayedSeed: "" };
+              const prev = hist.seeds[currentSeed];
+              hist.seeds[currentSeed] = {
+                bestScore: Math.max(prev?.bestScore ?? 0, finalScore),
+                playCount: (prev?.playCount ?? 0) + 1,
+              };
+              // Recalculate streak
+              if (hist.lastPlayedSeed !== currentSeed) {
+                // Check if lastPlayedSeed was yesterday
+                const yesterdayDay = dayOfYear - 1;
+                const yesterdaySeed = yesterdayDay >= 1 ? `${now.getFullYear()}-${yesterdayDay}` : `${now.getFullYear() - 1}-365`;
+                if (hist.lastPlayedSeed === yesterdaySeed) {
+                  hist.currentStreak = (hist.currentStreak || 0) + 1;
+                } else if (!hist.lastPlayedSeed) {
+                  hist.currentStreak = 1;
+                } else {
+                  hist.currentStreak = 1;
+                }
+                hist.lastPlayedSeed = currentSeed;
+              }
+              hist.longestStreak = Math.max(hist.longestStreak || 0, hist.currentStreak);
+              localStorage.setItem("gitcity_fly_history", JSON.stringify(hist));
+            } catch {}
+          }
+          setFlyMode(false); setFlyPaused(false); lastDistrictRef.current = null; setDistrictAnnouncement(null); clearTimeout(announceTimerRef.current);
+        }}
         themeIndex={themeIndex}
         onHud={(s, a, x, z, yaw) => {
           setHud({ speed: s, altitude: a });
@@ -1582,7 +1656,16 @@ function HomeContent() {
             }
           }
         }}
-        onPause={(p) => setFlyPaused(p)}
+        onPause={(p) => {
+          if (p) {
+            flyPausedAt.current = Date.now();
+          } else if (flyPausedAt.current > 0) {
+            flyTotalPauseMs.current += Date.now() - flyPausedAt.current;
+            flyPausedAt.current = 0;
+          }
+          setFlyPaused(p);
+        }}
+        onCollect={(score, earned, combo, collected, maxCombo) => setFlyScore({ score, earned, combo, collected, maxCombo })}
         focusedBuilding={focusedBuilding}
         focusedBuildingB={focusedBuildingB}
         accentColor={theme.accent}
@@ -1813,7 +1896,32 @@ function HomeContent() {
               <span className="text-[10px] text-cream">
                 {flyPaused ? "Paused" : "Fly"}
               </span>
+              <span className="mx-1 text-border">|</span>
+              <span className="text-[10px]" style={{ color: theme.accent }}>{flyScore.score}</span>
+              <span className="text-[10px] text-muted">PX</span>
+              {flyScore.combo >= 2 && (
+                <span className="animate-pulse text-[10px] font-bold" style={{ color: "#ffd700" }}>
+                  &times;{flyScore.combo >= 4 ? 3 : flyScore.combo >= 3 ? 2 : 1.5}
+                </span>
+              )}
             </div>
+          </div>
+
+          {/* Score HUD (top right) */}
+          <div className="absolute top-4 right-3 text-right text-[9px] text-muted sm:right-4 sm:text-[10px]">
+            <div>{flyScore.collected}/40 collected</div>
+            <div className="mt-1 flex h-[4px] w-24 items-center border border-border/40 bg-bg/50 ml-auto">
+              <div className="h-full transition-all duration-150" style={{ width: `${(flyScore.collected / 40) * 100}%`, backgroundColor: theme.accent }} />
+            </div>
+            <div className="mt-1.5 text-[8px]">
+              <span className="text-muted">TIME </span>
+              <span style={{ color: flyElapsedSec < 90 ? theme.accent : "#f85149" }}>
+                {Math.floor(flyElapsedSec / 60)}:{String(flyElapsedSec % 60).padStart(2, "0")}
+              </span>
+            </div>
+            {flyPersonalBest > 0 && (
+              <div className="mt-0.5 text-[8px] text-muted">BEST: <span style={{ color: theme.accent }}>{flyPersonalBest}</span></div>
+            )}
           </div>
 
           {/* Flight data (above lo-fi radio) */}
@@ -2245,14 +2353,32 @@ function HomeContent() {
                 </button>
                 {!isMobile && (
                   <button
-                    onClick={() => { setFocusedBuilding(null); setFlyMode(true); }}
+                    onClick={() => {
+                      setFocusedBuilding(null);
+                      setFlyMode(true);
+                      setFlyScore({ score: 0, earned: 0, combo: 0, collected: 0, maxCombo: 1 });
+                      flyStartTime.current = Date.now();
+                      flyPausedAt.current = 0;
+                      flyTotalPauseMs.current = 0;
+                      setFlyElapsedSec(0);
+                      try { setFlyPersonalBest(parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0); } catch { setFlyPersonalBest(0); }
+                    }}
                     className="btn-press px-7 py-3 text-xs sm:py-3.5 sm:text-sm text-bg"
                     style={{
                       backgroundColor: theme.accent,
                       boxShadow: `4px 4px 0 0 ${theme.shadow}`,
                     }}
                   >
-                    &#9992; Fly
+                    <span className="relative">
+                      &#9992; Fly
+                      <span
+                        className="absolute -top-3 -right-8 animate-pulse rounded-sm px-1 py-px text-[7px] font-bold leading-none text-bg"
+                        style={{ backgroundColor: theme.accent }}
+                      >
+                        NEW
+                      </span>
+                    </span>
+                    <span className="block text-[8px] opacity-60 normal-case">Collect PX</span>
                   </button>
                 )}
               </div>

@@ -13,6 +13,9 @@ interface WhiteRabbitProps {
 const WHITE = "#f0f0f0";
 const RED_EYE = "#ff0000";
 
+// Shared geometry — prevents GPU leaks on mount/unmount
+const _box = /* @__PURE__ */ new THREE.BoxGeometry(1, 1, 1);
+
 export default function WhiteRabbit({ position, visible, onCaught }: WhiteRabbitProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { gl, camera } = useThree();
@@ -139,74 +142,62 @@ export default function WhiteRabbit({ position, visible, onCaught }: WhiteRabbit
   return (
     <group ref={groupRef} position={position}>
       {/* Invisible hitbox for easier clicking */}
-      <mesh visible={false}>
-        <boxGeometry args={[12, 18, 10]} />
+      <mesh visible={false} geometry={_box} scale={[12, 18, 10]}>
         <meshBasicMaterial />
       </mesh>
 
       {/* Body (torso) */}
-      <mesh position={[0, 4, 0]}>
-        <boxGeometry args={[6, 7, 5]} />
+      <mesh position={[0, 4, 0]} geometry={_box} scale={[6, 7, 5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.15} />
       </mesh>
 
       {/* Head */}
-      <mesh position={[0, 10, 0]}>
-        <boxGeometry args={[5, 4, 4]} />
+      <mesh position={[0, 10, 0]} geometry={_box} scale={[5, 4, 4]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.15} />
       </mesh>
 
       {/* Left ear */}
-      <mesh position={[-1.2, 14.5, 0]}>
-        <boxGeometry args={[1.2, 4, 1]} />
+      <mesh position={[-1.2, 14.5, 0]} geometry={_box} scale={[1.2, 4, 1]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.15} />
       </mesh>
 
       {/* Right ear */}
-      <mesh position={[1.2, 14.5, 0]}>
-        <boxGeometry args={[1.2, 4, 1]} />
+      <mesh position={[1.2, 14.5, 0]} geometry={_box} scale={[1.2, 4, 1]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.15} />
       </mesh>
 
       {/* Left eye (red - Matrix reference) */}
-      <mesh position={[-1.2, 10.5, 2.1]}>
-        <boxGeometry args={[0.8, 0.8, 0.3]} />
+      <mesh position={[-1.2, 10.5, 2.1]} geometry={_box} scale={[0.8, 0.8, 0.3]}>
         <meshStandardMaterial color={RED_EYE} emissive={RED_EYE} emissiveIntensity={3} />
       </mesh>
 
       {/* Right eye (red) */}
-      <mesh position={[1.2, 10.5, 2.1]}>
-        <boxGeometry args={[0.8, 0.8, 0.3]} />
+      <mesh position={[1.2, 10.5, 2.1]} geometry={_box} scale={[0.8, 0.8, 0.3]}>
         <meshStandardMaterial color={RED_EYE} emissive={RED_EYE} emissiveIntensity={3} />
       </mesh>
 
       {/* Front left leg */}
-      <mesh position={[-1.8, 0.5, 1]}>
-        <boxGeometry args={[1.5, 2, 1.5]} />
+      <mesh position={[-1.8, 0.5, 1]} geometry={_box} scale={[1.5, 2, 1.5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.1} />
       </mesh>
 
       {/* Front right leg */}
-      <mesh position={[1.8, 0.5, 1]}>
-        <boxGeometry args={[1.5, 2, 1.5]} />
+      <mesh position={[1.8, 0.5, 1]} geometry={_box} scale={[1.5, 2, 1.5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.1} />
       </mesh>
 
       {/* Back left leg */}
-      <mesh position={[-1.8, 0.5, -1]}>
-        <boxGeometry args={[1.5, 2, 1.5]} />
+      <mesh position={[-1.8, 0.5, -1]} geometry={_box} scale={[1.5, 2, 1.5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.1} />
       </mesh>
 
       {/* Back right leg */}
-      <mesh position={[1.8, 0.5, -1]}>
-        <boxGeometry args={[1.5, 2, 1.5]} />
+      <mesh position={[1.8, 0.5, -1]} geometry={_box} scale={[1.5, 2, 1.5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.1} />
       </mesh>
 
       {/* Tail (round puff) */}
-      <mesh position={[0, 4, -3.2]}>
-        <boxGeometry args={[2, 2, 2]} />
+      <mesh position={[0, 4, -3.2]} geometry={_box} scale={[2, 2, 2]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.2} />
       </mesh>
 
@@ -245,60 +236,49 @@ export function MiniWhiteRabbit({ height, width, depth }: { height: number; widt
   return (
     <group ref={groupRef} position={[width * 0.3, height, depth * 0.3]} scale={[s, s, s]}>
       {/* Body */}
-      <mesh position={[0, 4, 0]}>
-        <boxGeometry args={[6, 7, 5]} />
+      <mesh position={[0, 4, 0]} geometry={_box} scale={[6, 7, 5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.3} />
       </mesh>
 
       {/* Head */}
-      <mesh position={[0, 10, 0]}>
-        <boxGeometry args={[5, 4, 4]} />
+      <mesh position={[0, 10, 0]} geometry={_box} scale={[5, 4, 4]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.3} />
       </mesh>
 
       {/* Left ear */}
-      <mesh position={[-1.2, 14.5, 0]}>
-        <boxGeometry args={[1.2, 4, 1]} />
+      <mesh position={[-1.2, 14.5, 0]} geometry={_box} scale={[1.2, 4, 1]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.3} />
       </mesh>
 
       {/* Right ear */}
-      <mesh position={[1.2, 14.5, 0]}>
-        <boxGeometry args={[1.2, 4, 1]} />
+      <mesh position={[1.2, 14.5, 0]} geometry={_box} scale={[1.2, 4, 1]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.3} />
       </mesh>
 
       {/* Eyes (red) */}
-      <mesh position={[-1.2, 10.5, 2.1]}>
-        <boxGeometry args={[0.8, 0.8, 0.3]} />
+      <mesh position={[-1.2, 10.5, 2.1]} geometry={_box} scale={[0.8, 0.8, 0.3]}>
         <meshStandardMaterial color={RED_EYE} emissive={RED_EYE} emissiveIntensity={2} />
       </mesh>
-      <mesh position={[1.2, 10.5, 2.1]}>
-        <boxGeometry args={[0.8, 0.8, 0.3]} />
+      <mesh position={[1.2, 10.5, 2.1]} geometry={_box} scale={[0.8, 0.8, 0.3]}>
         <meshStandardMaterial color={RED_EYE} emissive={RED_EYE} emissiveIntensity={2} />
       </mesh>
 
       {/* Legs */}
-      <mesh position={[-1.8, 0.5, 1]}>
-        <boxGeometry args={[1.5, 2, 1.5]} />
+      <mesh position={[-1.8, 0.5, 1]} geometry={_box} scale={[1.5, 2, 1.5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.2} />
       </mesh>
-      <mesh position={[1.8, 0.5, 1]}>
-        <boxGeometry args={[1.5, 2, 1.5]} />
+      <mesh position={[1.8, 0.5, 1]} geometry={_box} scale={[1.5, 2, 1.5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.2} />
       </mesh>
-      <mesh position={[-1.8, 0.5, -1]}>
-        <boxGeometry args={[1.5, 2, 1.5]} />
+      <mesh position={[-1.8, 0.5, -1]} geometry={_box} scale={[1.5, 2, 1.5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.2} />
       </mesh>
-      <mesh position={[1.8, 0.5, -1]}>
-        <boxGeometry args={[1.5, 2, 1.5]} />
+      <mesh position={[1.8, 0.5, -1]} geometry={_box} scale={[1.5, 2, 1.5]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.2} />
       </mesh>
 
       {/* Tail */}
-      <mesh position={[0, 4, -3.2]}>
-        <boxGeometry args={[2, 2, 2]} />
+      <mesh position={[0, 4, -3.2]} geometry={_box} scale={[2, 2, 2]}>
         <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={0.3} />
       </mesh>
 

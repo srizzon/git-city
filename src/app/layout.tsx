@@ -94,7 +94,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-bg font-pixel text-warm">
+      <body className="bg-bg font-pixel text-warm" suppressHydrationWarning>
         {children}
         <GlobalRadio />
         <Analytics />

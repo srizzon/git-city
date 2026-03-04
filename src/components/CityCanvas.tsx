@@ -70,7 +70,7 @@ const THEMES: CityTheme[] = [
       [0, "#000206"], [0.15, "#020814"], [0.30, "#061428"], [0.45, "#0c2040"],
       [0.55, "#102850"], [0.65, "#0c2040"], [0.80, "#061020"], [1, "#020608"],
     ],
-    fogColor: "#0a1428", fogNear: 500, fogFar: 3500,
+    fogColor: "#0a1428", fogNear: 400, fogFar: 2500,
     ambientColor: "#4060b0", ambientIntensity: 0.55,
     sunColor: "#7090d0", sunIntensity: 0.75, sunPos: [300, 120, -200],
     fillColor: "#304080", fillIntensity: 0.3, fillPos: [-200, 60, 200],
@@ -92,7 +92,7 @@ const THEMES: CityTheme[] = [
       [0.46, "#a05068"], [0.52, "#d07060"], [0.57, "#e89060"], [0.62, "#f0b070"],
       [0.68, "#f0c888"], [0.75, "#c08060"], [0.85, "#603030"], [1, "#180c10"],
     ],
-    fogColor: "#80405a", fogNear: 500, fogFar: 3500,
+    fogColor: "#80405a", fogNear: 400, fogFar: 2500,
     ambientColor: "#e0a080", ambientIntensity: 0.7,
     sunColor: "#f0b070", sunIntensity: 1.0, sunPos: [400, 120, -300],
     fillColor: "#6050a0", fillIntensity: 0.35, fillPos: [-200, 80, 200],
@@ -114,7 +114,7 @@ const THEMES: CityTheme[] = [
       [0.52, "#500860"], [0.60, "#380648"], [0.75, "#180230"], [0.90, "#0c0118"],
       [1, "#06000c"],
     ],
-    fogColor: "#1a0830", fogNear: 500, fogFar: 3500,
+    fogColor: "#1a0830", fogNear: 400, fogFar: 2500,
     ambientColor: "#8040c0", ambientIntensity: 0.6,
     sunColor: "#c050e0", sunIntensity: 0.85, sunPos: [300, 100, -200],
     fillColor: "#00c0d0", fillIntensity: 0.4, fillPos: [-250, 60, 200],
@@ -136,7 +136,7 @@ const THEMES: CityTheme[] = [
       [0.52, "#004828"], [0.60, "#003820"], [0.75, "#002014"], [0.90, "#001008"],
       [1, "#000604"],
     ],
-    fogColor: "#0a2014", fogNear: 500, fogFar: 3500,
+    fogColor: "#0a2014", fogNear: 400, fogFar: 2500,
     ambientColor: "#40a060", ambientIntensity: 0.55,
     sunColor: "#70d090", sunIntensity: 0.75, sunPos: [300, 100, -250],
     fillColor: "#20a080", fillIntensity: 0.35, fillPos: [-200, 60, 200],
@@ -551,7 +551,7 @@ const _idealLook = new THREE.Vector3();
 const _blendedPos = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 
-function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, vehicleType = "airplane" }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; vehicleType?: string }) {
+function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, vehicleType = "airplane", posRef }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; vehicleType?: string; posRef?: React.MutableRefObject<THREE.Vector3> }) {
   const { camera } = useThree();
   const ref = useRef<THREE.Group>(null);
   const orbitRef = useRef<any>(null);
@@ -767,6 +767,8 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     _fwd.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     pos.current.addScaledVector(_fwd, actualSpeed * dt);
 
+    if (posRef) posRef.current.copy(pos.current);
+
     const targetBank = -turnInput * MAX_BANK;
     bank.current += (targetBank - bank.current) * 5 * dt;
 
@@ -831,6 +833,233 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
           target={pos.current.toArray() as [number, number, number]}
         />
       )}
+    </>
+  );
+}
+
+// ─── Sky Collectibles ────────────────────────────────────────
+
+const COLLECTIBLE_COUNT = 40;
+const COMBO_WINDOW = 3; // seconds
+// Hitbox radius per type — generous for good UX at flight speed
+const COLLECT_RADIUS: Record<string, number> = { common: 20, rare: 28, epic: 35 };
+
+interface CollectibleDef {
+  x: number; y: number; z: number;
+  type: "common" | "rare" | "epic";
+  points: number;
+  size: number;
+}
+
+const _cMatrix = new THREE.Matrix4();
+const _cScale = new THREE.Vector3();
+const _cPos = new THREE.Vector3();
+const _cQuat = new THREE.Quaternion();
+const _cEuler = new THREE.Euler();
+
+function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius }: {
+  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  accentColor: string;
+  onCollect: (score: number, earned: number, combo: number, collected: number, maxCombo: number) => void;
+  cityRadius: number;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const flashRef = useRef<THREE.PointLight>(null);
+
+  // Generate collectible positions using radial zone distribution across the city
+  const items = useMemo<CollectibleDef[]>(() => {
+    const spread = cityRadius * 0.6;
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 0);
+    const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
+    let seed = dayOfYear * 7919 + now.getFullYear();
+
+    const rng = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+    const MIN_SPACING = 80;
+    const result: CollectibleDef[] = [];
+
+    // Check minimum distance against all placed items
+    const tooClose = (x: number, y: number, z: number) =>
+      result.some(p => (p.x - x) ** 2 + (p.y - y) ** 2 + (p.z - z) ** 2 < MIN_SPACING ** 2);
+
+    // Place items in angular sectors within a radial zone
+    const placeInZone = (
+      count: number,
+      minR: number, maxR: number,
+      minAlt: number, maxAlt: number,
+      type: "common" | "rare" | "epic",
+      points: number, size: number,
+    ) => {
+      const angularOffset = rng() * Math.PI * 2; // random rotation per zone
+      for (let i = 0; i < count; i++) {
+        const baseAngle = angularOffset + (i / count) * Math.PI * 2;
+        let placed = false;
+        for (let attempt = 0; attempt < 10 && !placed; attempt++) {
+          const angle = baseAngle + (rng() - 0.5) * (Math.PI * 2 / count) * 0.7;
+          const dist = minR + rng() * (maxR - minR);
+          const x = Math.cos(angle) * dist;
+          const z = Math.sin(angle) * dist;
+          const y = minAlt + rng() * (maxAlt - minAlt);
+          if (!tooClose(x, y, z)) {
+            result.push({ x, y, z, type, points, size });
+            placed = true;
+          }
+        }
+        // Fallback: place anyway if all attempts collided
+        if (!placed) {
+          const angle = baseAngle + (rng() - 0.5) * 0.3;
+          const dist = minR + rng() * (maxR - minR);
+          result.push({
+            x: Math.cos(angle) * dist,
+            y: minAlt + rng() * (maxAlt - minAlt),
+            z: Math.sin(angle) * dist,
+            type, points, size,
+          });
+        }
+      }
+    };
+
+    // Altitudes are absolute — player flies between MIN_ALT(25) and MAX_ALT(900)
+    // Inner ring: 10 commons between buildings, low altitude
+    placeInZone(10, spread * 0.2, spread * 0.4, 80, 250, "common", 1, 6);
+    // Mid ring: 12 commons + 4 rares, medium altitude
+    placeInZone(12, spread * 0.4, spread * 0.7, 200, 500, "common", 1, 6);
+    placeInZone(4, spread * 0.4, spread * 0.7, 300, 600, "rare", 5, 9);
+    // Outer ring: 8 commons + 4 rares + 2 epics, high altitude
+    placeInZone(8, spread * 0.7, spread, 250, 550, "common", 1, 6);
+    placeInZone(4, spread * 0.7, spread, 400, 700, "rare", 5, 9);
+    placeInZone(2, spread * 0.7, spread, 650, 850, "epic", 25, 14);
+
+    return result;
+  }, [cityRadius]);
+
+  // Track collected state
+  const collected = useRef(new Uint8Array(COLLECTIBLE_COUNT));
+  const collectedCount = useRef(0);
+  const totalScore = useRef(0);
+  const lastCollectTime = useRef(0);
+  const comboCount = useRef(0);
+  const maxCombo = useRef(1);
+  const flashTimer = useRef(0);
+
+  // HDR colors — values > 1 glow naturally with toneMapped={false}
+  const colors = useMemo(() => ({
+    common: new THREE.Color(0, 2.5, 2.5),   // bright cyan
+    rare: new THREE.Color(2.5, 0.5, 3),     // vivid purple
+    epic: new THREE.Color(3, 2.2, 0),        // bright gold
+  }), []);
+
+  // Set instance colors
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    for (let i = 0; i < items.length; i++) {
+      mesh.setColorAt(i, colors[items[i].type]);
+    }
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [items, colors]);
+
+  const prevTime = useRef(0);
+
+  useFrame((state) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    const t = state.clock.elapsedTime;
+    const dt = prevTime.current > 0 ? Math.min(t - prevTime.current, 0.05) : 0.016;
+    prevTime.current = t;
+    const playerPos = playerPosRef.current;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      if (collected.current[i]) {
+        // Hide collected items
+        _cScale.set(0, 0, 0);
+        _cPos.set(item.x, item.y, item.z);
+        _cMatrix.compose(_cPos, _cQuat.identity(), _cScale);
+        mesh.setMatrixAt(i, _cMatrix);
+        continue;
+      }
+
+      // Check collection — hitbox scales with item type
+      const dx = playerPos.x - item.x;
+      const dy = playerPos.y - item.y;
+      const dz = playerPos.z - item.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      const radius = COLLECT_RADIUS[item.type];
+
+      if (distSq < radius * radius) {
+        collected.current[i] = 1;
+        collectedCount.current++;
+
+        // Combo logic
+        const now = t;
+        if (now - lastCollectTime.current < COMBO_WINDOW) {
+          comboCount.current++;
+        } else {
+          comboCount.current = 1;
+        }
+        lastCollectTime.current = now;
+
+        const multiplier = comboCount.current >= 4 ? 3 : comboCount.current >= 3 ? 2 : comboCount.current >= 2 ? 1.5 : 1;
+        const multiplierInt = multiplier >= 3 ? 3 : multiplier >= 2 ? 2 : 1;
+        if (multiplierInt > maxCombo.current) maxCombo.current = multiplierInt;
+
+        const earned = Math.round(item.points * multiplier);
+        totalScore.current += earned;
+
+        // Flash effect
+        if (flashRef.current) {
+          flashRef.current.position.set(item.x, item.y, item.z);
+          flashRef.current.intensity = 20;
+          flashTimer.current = 0.3;
+        }
+
+        onCollect(totalScore.current, earned, comboCount.current, collectedCount.current, maxCombo.current);
+
+        // Hide immediately
+        _cScale.set(0, 0, 0);
+        _cPos.set(item.x, item.y, item.z);
+        _cMatrix.compose(_cPos, _cQuat.identity(), _cScale);
+        mesh.setMatrixAt(i, _cMatrix);
+        continue;
+      }
+
+      // Animate: spin around Y + gentle pulse
+      const pulse = 1 + Math.sin(t * 2.5 + i) * 0.2;
+      const s = item.size * pulse;
+      _cEuler.set(0, t * 2.0 + i * 0.7, 0);
+      _cQuat.setFromEuler(_cEuler);
+      _cPos.set(item.x, item.y, item.z);
+      _cScale.set(s, s, s);
+      _cMatrix.compose(_cPos, _cQuat, _cScale);
+      mesh.setMatrixAt(i, _cMatrix);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+
+    // Fade flash
+    if (flashRef.current && flashTimer.current > 0) {
+      flashTimer.current -= dt;
+      flashRef.current.intensity = Math.max(0, (flashTimer.current / 0.3) * 20);
+    }
+  });
+
+  // Coin geometry: thin disc standing upright (like a Mario coin)
+  const coinGeo = useMemo(() => {
+    const geo = new THREE.CylinderGeometry(1, 1, 0.15, 16);
+    geo.rotateZ(Math.PI / 2); // stand upright — flat faces now face left/right
+    return geo;
+  }, []);
+
+  return (
+    <>
+      <instancedMesh ref={meshRef} args={[coinGeo, undefined, COLLECTIBLE_COUNT]}>
+        <meshBasicMaterial color="#ffffff" toneMapped={false} />
+      </instancedMesh>
+      <pointLight ref={flashRef} intensity={0} distance={120} color="#ffffff" />
     </>
   );
 }
@@ -920,23 +1149,22 @@ function ParkedCar({ position, rotation, variant }: { position: [number, number,
 
 // ─── Park Bench ───────────────────────────────────────────────
 
+const _dBox = /* @__PURE__ */ new THREE.BoxGeometry(1, 1, 1);
+const _dPlane = /* @__PURE__ */ new THREE.PlaneGeometry(1, 1);
+
 function ParkBench({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      <mesh position={[0, 0.9, 0]}>
-        <boxGeometry args={[5, 0.3, 1.5]} />
+      <mesh position={[0, 0.9, 0]} geometry={_dBox} scale={[5, 0.3, 1.5]}>
         <meshStandardMaterial color="#6b4226" emissive="#6b4226" emissiveIntensity={0.3} />
       </mesh>
-      <mesh position={[0, 1.7, -0.65]} rotation={[0.15, 0, 0]}>
-        <boxGeometry args={[5, 1.3, 0.2]} />
+      <mesh position={[0, 1.7, -0.65]} rotation={[0.15, 0, 0]} geometry={_dBox} scale={[5, 1.3, 0.2]}>
         <meshStandardMaterial color="#6b4226" emissive="#6b4226" emissiveIntensity={0.3} />
       </mesh>
-      <mesh position={[-2, 0.45, 0]}>
-        <boxGeometry args={[0.3, 0.9, 1.2]} />
+      <mesh position={[-2, 0.45, 0]} geometry={_dBox} scale={[0.3, 0.9, 1.2]}>
         <meshStandardMaterial color="#3a3a3a" emissive="#3a3a3a" emissiveIntensity={0.3} />
       </mesh>
-      <mesh position={[2, 0.45, 0]}>
-        <boxGeometry args={[0.3, 0.9, 1.2]} />
+      <mesh position={[2, 0.45, 0]} geometry={_dBox} scale={[0.3, 0.9, 1.2]}>
         <meshStandardMaterial color="#3a3a3a" emissive="#3a3a3a" emissiveIntensity={0.3} />
       </mesh>
     </group>
@@ -973,8 +1201,7 @@ function Fountain({ position }: { position: [number, number, number] }) {
 function Sidewalk({ position, size, color }: { position: [number, number, number]; size: [number, number]; color?: string }) {
   const c = color ?? "#585860";
   return (
-    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={size} />
+    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]} geometry={_dPlane} scale={[size[0], size[1], 1]}>
       <meshStandardMaterial color={c} emissive={c} emissiveIntensity={0.2} roughness={0.85} />
     </mesh>
   );
@@ -1007,12 +1234,17 @@ const _dPos = new THREE.Vector3();
 const _dQuat = new THREE.Quaternion();
 const _dScale = new THREE.Vector3();
 const _dEuler = new THREE.Euler();
+const _dLocalPos = new THREE.Vector3();
+const _dPartQuat = new THREE.Quaternion();
 
 function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { items: CityDecoration[]; roadMarkingColor: string; sidewalkColor: string }) {
   const trees = useMemo(() => items.filter(d => d.type === 'tree'), [items]);
   const lamps = useMemo(() => items.filter(d => d.type === 'streetLamp'), [items]);
   const cars = useMemo(() => items.filter(d => d.type === 'car'), [items]);
   const roadMarkings = useMemo(() => items.filter(d => d.type === 'roadMarking'), [items]);
+  const benches = useMemo(() => items.filter(d => d.type === 'bench'), [items]);
+  const fountains = useMemo(() => items.filter(d => d.type === 'fountain'), [items]);
+  const sidewalks = useMemo(() => items.filter(d => d.type === 'sidewalk'), [items]);
 
   const treeTrunkRef = useRef<THREE.InstancedMesh>(null);
   const treeCanopyRef = useRef<THREE.InstancedMesh>(null);
@@ -1021,6 +1253,15 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
   const carBodyRef = useRef<THREE.InstancedMesh>(null);
   const carCabinRef = useRef<THREE.InstancedMesh>(null);
   const roadMarkingRef = useRef<THREE.InstancedMesh>(null);
+  const benchSeatRef = useRef<THREE.InstancedMesh>(null);
+  const benchBackRef = useRef<THREE.InstancedMesh>(null);
+  const benchLegLRef = useRef<THREE.InstancedMesh>(null);
+  const benchLegRRef = useRef<THREE.InstancedMesh>(null);
+  const fountainBasinRef = useRef<THREE.InstancedMesh>(null);
+  const fountainMidRef = useRef<THREE.InstancedMesh>(null);
+  const fountainUpperRef = useRef<THREE.InstancedMesh>(null);
+  const fountainWaterRef = useRef<THREE.InstancedMesh>(null);
+  const sidewalkRef = useRef<THREE.InstancedMesh>(null);
 
   // Shared geometries
   const geos = useMemo(() => ({
@@ -1031,6 +1272,10 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
     carBody: new THREE.BoxGeometry(8, 2.5, 3.5),
     carCabin: new THREE.BoxGeometry(5, 2, 3.2),
     roadMarking: new THREE.PlaneGeometry(1, 1),
+    fountainBasin: new THREE.CylinderGeometry(8, 8.5, 2.4, 16),
+    fountainMid: new THREE.CylinderGeometry(5, 5.5, 2, 12),
+    fountainUpper: new THREE.CylinderGeometry(2.5, 3.2, 2, 10),
+    fountainWater: new THREE.CylinderGeometry(1.8, 2, 1.2, 10),
   }), []);
 
   // Shared materials
@@ -1046,7 +1291,14 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
     roadMarking: new THREE.MeshStandardMaterial({
       color: roadMarkingColor, emissive: roadMarkingColor, emissiveIntensity: 0.8,
     }),
-  }), [roadMarkingColor]);
+    benchWood: new THREE.MeshStandardMaterial({ color: "#6b4226", emissive: "#6b4226", emissiveIntensity: 0.3 }),
+    benchMetal: new THREE.MeshStandardMaterial({ color: "#3a3a3a", emissive: "#3a3a3a", emissiveIntensity: 0.3 }),
+    fountainStone1: new THREE.MeshStandardMaterial({ color: "#707070", emissive: "#707070", emissiveIntensity: 0.25 }),
+    fountainStone2: new THREE.MeshStandardMaterial({ color: "#808080", emissive: "#808080", emissiveIntensity: 0.25 }),
+    fountainStone3: new THREE.MeshStandardMaterial({ color: "#909090", emissive: "#909090", emissiveIntensity: 0.25 }),
+    fountainWater: new THREE.MeshStandardMaterial({ color: "#4090d0", emissive: "#2060a0", emissiveIntensity: 2.0, toneMapped: false, transparent: true, opacity: 0.7 }),
+    sidewalk: new THREE.MeshStandardMaterial({ color: sidewalkColor, emissive: sidewalkColor, emissiveIntensity: 0.2, roughness: 0.85 }),
+  }), [roadMarkingColor, sidewalkColor]);
 
   // Set up tree instances
   useEffect(() => {
@@ -1149,6 +1401,111 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
     roadMarkingRef.current.instanceMatrix.needsUpdate = true;
   }, [roadMarkings]);
 
+  // Set up bench instances
+  useEffect(() => {
+    if (!benchSeatRef.current || !benchBackRef.current || !benchLegLRef.current || !benchLegRRef.current || benches.length === 0) return;
+
+    for (let i = 0; i < benches.length; i++) {
+      const d = benches[i];
+      _dEuler.set(0, d.rotation, 0);
+      _dQuat.setFromEuler(_dEuler);
+
+      // Seat: local [0, 0.9, 0], scale [5, 0.3, 1.5]
+      _dLocalPos.set(0, 0.9, 0).applyQuaternion(_dQuat);
+      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
+      _dScale.set(5, 0.3, 1.5);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      benchSeatRef.current.setMatrixAt(i, _dMatrix);
+
+      // Backrest: local [0, 1.7, -0.65], rot [0.15, 0, 0], scale [5, 1.3, 0.2]
+      _dLocalPos.set(0, 1.7, -0.65).applyQuaternion(_dQuat);
+      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
+      _dEuler.set(0.15, 0, 0);
+      _dPartQuat.setFromEuler(_dEuler);
+      _dPartQuat.premultiply(_dQuat);
+      _dScale.set(5, 1.3, 0.2);
+      _dMatrix.compose(_dPos, _dPartQuat, _dScale);
+      benchBackRef.current.setMatrixAt(i, _dMatrix);
+
+      // Leg L: local [-2, 0.45, 0], scale [0.3, 0.9, 1.2]
+      _dEuler.set(0, d.rotation, 0);
+      _dQuat.setFromEuler(_dEuler);
+      _dLocalPos.set(-2, 0.45, 0).applyQuaternion(_dQuat);
+      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
+      _dScale.set(0.3, 0.9, 1.2);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      benchLegLRef.current.setMatrixAt(i, _dMatrix);
+
+      // Leg R: local [2, 0.45, 0], scale [0.3, 0.9, 1.2]
+      _dLocalPos.set(2, 0.45, 0).applyQuaternion(_dQuat);
+      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
+      _dScale.set(0.3, 0.9, 1.2);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      benchLegRRef.current.setMatrixAt(i, _dMatrix);
+    }
+
+    benchSeatRef.current.instanceMatrix.needsUpdate = true;
+    benchBackRef.current.instanceMatrix.needsUpdate = true;
+    benchLegLRef.current.instanceMatrix.needsUpdate = true;
+    benchLegRRef.current.instanceMatrix.needsUpdate = true;
+  }, [benches]);
+
+  // Set up fountain instances
+  useEffect(() => {
+    if (!fountainBasinRef.current || !fountainMidRef.current || !fountainUpperRef.current || !fountainWaterRef.current || fountains.length === 0) return;
+    _dQuat.identity();
+    _dScale.set(1, 1, 1);
+
+    for (let i = 0; i < fountains.length; i++) {
+      const d = fountains[i];
+
+      // Basin: y+1.2
+      _dPos.set(d.position[0], d.position[1] + 1.2, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      fountainBasinRef.current.setMatrixAt(i, _dMatrix);
+
+      // Mid: y+3.4
+      _dPos.set(d.position[0], d.position[1] + 3.4, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      fountainMidRef.current.setMatrixAt(i, _dMatrix);
+
+      // Upper: y+5.6
+      _dPos.set(d.position[0], d.position[1] + 5.6, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      fountainUpperRef.current.setMatrixAt(i, _dMatrix);
+
+      // Water: y+7.2
+      _dPos.set(d.position[0], d.position[1] + 7.2, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      fountainWaterRef.current.setMatrixAt(i, _dMatrix);
+    }
+
+    fountainBasinRef.current.instanceMatrix.needsUpdate = true;
+    fountainMidRef.current.instanceMatrix.needsUpdate = true;
+    fountainUpperRef.current.instanceMatrix.needsUpdate = true;
+    fountainWaterRef.current.instanceMatrix.needsUpdate = true;
+  }, [fountains]);
+
+  // Set up sidewalk instances
+  useEffect(() => {
+    if (!sidewalkRef.current || sidewalks.length === 0) return;
+
+    for (let i = 0; i < sidewalks.length; i++) {
+      const d = sidewalks[i];
+      const w = d.size?.[0] ?? 1;
+      const h = d.size?.[1] ?? 1;
+
+      _dEuler.set(-Math.PI / 2, 0, 0);
+      _dQuat.setFromEuler(_dEuler);
+      _dPos.set(d.position[0], d.position[1], d.position[2]);
+      _dScale.set(w, h, 1);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      sidewalkRef.current.setMatrixAt(i, _dMatrix);
+    }
+
+    sidewalkRef.current.instanceMatrix.needsUpdate = true;
+  }, [sidewalks]);
+
   // Dispose
   useEffect(() => {
     return () => {
@@ -1180,16 +1537,25 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
       {roadMarkings.length > 0 && (
         <instancedMesh ref={roadMarkingRef} args={[geos.roadMarking, mats.roadMarking, roadMarkings.length]} />
       )}
-      {/* Benches, fountains, sidewalks: keep as individual components (usually few) */}
-      {items.filter(d => d.type === 'bench').map((d, i) => (
-        <ParkBench key={`bench-${i}`} position={d.position} rotation={d.rotation} />
-      ))}
-      {items.filter(d => d.type === 'fountain').map((d, i) => (
-        <Fountain key={`fountain-${i}`} position={d.position} />
-      ))}
-      {items.filter(d => d.type === 'sidewalk').map((d, i) => (
-        <Sidewalk key={`walk-${i}`} position={d.position} size={d.size!} color={sidewalkColor} />
-      ))}
+      {benches.length > 0 && (
+        <>
+          <instancedMesh ref={benchSeatRef} args={[_dBox, mats.benchWood, benches.length]} />
+          <instancedMesh ref={benchBackRef} args={[_dBox, mats.benchWood, benches.length]} />
+          <instancedMesh ref={benchLegLRef} args={[_dBox, mats.benchMetal, benches.length]} />
+          <instancedMesh ref={benchLegRRef} args={[_dBox, mats.benchMetal, benches.length]} />
+        </>
+      )}
+      {fountains.length > 0 && (
+        <>
+          <instancedMesh ref={fountainBasinRef} args={[geos.fountainBasin, mats.fountainStone1, fountains.length]} />
+          <instancedMesh ref={fountainMidRef} args={[geos.fountainMid, mats.fountainStone2, fountains.length]} />
+          <instancedMesh ref={fountainUpperRef} args={[geos.fountainUpper, mats.fountainStone3, fountains.length]} />
+          <instancedMesh ref={fountainWaterRef} args={[geos.fountainWater, mats.fountainWater, fountains.length]} />
+        </>
+      )}
+      {sidewalks.length > 0 && (
+        <instancedMesh ref={sidewalkRef} args={[_dPlane, mats.sidewalk, sidewalks.length]} />
+      )}
     </>
   );
 }
@@ -1305,17 +1671,14 @@ function Bridge({ bridge }: { bridge: CityBridge }) {
   return (
     <group position={[bx, 0, bz]} rotation={[0, bridge.rotation ?? 0, 0]}>
       {/* Deck */}
-      <mesh position={[0, deckY, 0]}>
-        <boxGeometry args={[deckLength, deckHeight, deckWidth]} />
+      <mesh position={[0, deckY, 0]} geometry={_dBox} scale={[deckLength, deckHeight, deckWidth]}>
         <meshStandardMaterial color="#505860" emissive="#404850" emissiveIntensity={0.4} />
       </mesh>
       {/* Guardrails */}
-      <mesh position={[0, deckY + 1, deckWidth / 2 - 0.2]}>
-        <boxGeometry args={[deckLength, 1.5, 0.4]} />
+      <mesh position={[0, deckY + 1, deckWidth / 2 - 0.2]} geometry={_dBox} scale={[deckLength, 1.5, 0.4]}>
         <meshStandardMaterial color="#606870" emissive="#505860" emissiveIntensity={0.3} />
       </mesh>
-      <mesh position={[0, deckY + 1, -(deckWidth / 2 - 0.2)]}>
-        <boxGeometry args={[deckLength, 1.5, 0.4]} />
+      <mesh position={[0, deckY + 1, -(deckWidth / 2 - 0.2)]} geometry={_dBox} scale={[deckLength, 1.5, 0.4]}>
         <meshStandardMaterial color="#606870" emissive="#505860" emissiveIntensity={0.3} />
       </mesh>
       {/* Pillars */}
@@ -1323,23 +1686,19 @@ function Bridge({ bridge }: { bridge: CityBridge }) {
         const px = -deckLength / 2 + pillarSpacing * (i + 1);
         return (
           <group key={i}>
-            <mesh position={[px, deckY / 2, 0]}>
-              <boxGeometry args={[2.5, deckY, 2.5]} />
+            <mesh position={[px, deckY / 2, 0]} geometry={_dBox} scale={[2.5, deckY, 2.5]}>
               <meshStandardMaterial color="#404848" emissive="#303838" emissiveIntensity={0.3} />
             </mesh>
             {/* Suspension cables (simple lines from pillar tops to deck edges) */}
-            <mesh position={[px, deckY + 8, 0]}>
-              <boxGeometry args={[2, 16, 2]} />
+            <mesh position={[px, deckY + 8, 0]} geometry={_dBox} scale={[2, 16, 2]}>
               <meshStandardMaterial color="#404848" emissive="#303838" emissiveIntensity={0.3} />
             </mesh>
             {/* Cable left */}
-            <mesh position={[px - deckLength * 0.12, deckY + 6, 0]} rotation={[0, 0, 0.35]}>
-              <boxGeometry args={[deckLength * 0.25, 0.3, 0.3]} />
+            <mesh position={[px - deckLength * 0.12, deckY + 6, 0]} rotation={[0, 0, 0.35]} geometry={_dBox} scale={[deckLength * 0.25, 0.3, 0.3]}>
               <meshStandardMaterial color="#606060" emissive="#505050" emissiveIntensity={0.3} />
             </mesh>
             {/* Cable right */}
-            <mesh position={[px + deckLength * 0.12, deckY + 6, 0]} rotation={[0, 0, -0.35]}>
-              <boxGeometry args={[deckLength * 0.25, 0.3, 0.3]} />
+            <mesh position={[px + deckLength * 0.12, deckY + 6, 0]} rotation={[0, 0, -0.35]} geometry={_dBox} scale={[deckLength * 0.25, 0.3, 0.3]}>
               <meshStandardMaterial color="#606060" emissive="#505050" emissiveIntensity={0.3} />
             </mesh>
           </group>
@@ -1460,6 +1819,7 @@ interface Props {
   flyMode: boolean;
   flyVehicle?: string;
   onExitFly: () => void;
+  onCollect?: (score: number, earned: number, combo: number, collected: number, maxCombo: number) => void;
   themeIndex: number;
   onHud?: (speed: number, altitude: number, x: number, z: number, yaw: number) => void;
   onPause?: (paused: boolean) => void;
@@ -1495,10 +1855,12 @@ interface Props {
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
-  const [dpr, setDpr] = useState(1.5);
+  const [dpr, setDpr] = useState(1);
+  const [bloomEnabled, setBloomEnabled] = useState(false);
+  const flyPosRef = useRef(new THREE.Vector3());
 
   const cityRadius = useMemo(() => {
     let max = 200;
@@ -1517,7 +1879,10 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
-      <PerformanceMonitor onIncline={() => setDpr(1.5)} onDecline={() => setDpr(1)} />
+      <PerformanceMonitor
+        onIncline={() => { setDpr(1.25); setBloomEnabled(true); }}
+        onDecline={() => { setDpr(0.75); setBloomEnabled(false); }}
+      />
       <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
 
       <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
@@ -1551,7 +1916,12 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         />
       )}
 
-      {!introMode && flyMode && <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => {})} onPause={onPause ?? (() => {})} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} vehicleType={flyVehicle} />}
+      {!introMode && flyMode && (
+        <>
+          <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => {})} onPause={onPause ?? (() => {})} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} vehicleType={flyVehicle} posRef={flyPosRef} />
+          <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => {})} cityRadius={cityRadius} />
+        </>
+      )}
 
       <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />
 
@@ -1616,14 +1986,16 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         </>
       )}
 
-      <EffectComposer multisampling={0}>
-        <Bloom
-          mipmapBlur
-          luminanceThreshold={1}
-          luminanceSmoothing={0.3}
-          intensity={1.2}
-        />
-      </EffectComposer>
+      {bloomEnabled && (
+        <EffectComposer multisampling={0}>
+          <Bloom
+            mipmapBlur
+            luminanceThreshold={1}
+            luminanceSmoothing={0.3}
+            intensity={1.2}
+          />
+        </EffectComposer>
+      )}
     </Canvas>
   );
 }

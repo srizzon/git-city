@@ -177,7 +177,7 @@ interface RiseState {
 }
 
 const RISE_DURATION = 0.85; // seconds
-const RISE_STAGGER_DELAY = 0.003; // stagger between buildings (~2.4s for 800 buildings)
+const MAX_RISE_TOTAL = 4; // cap total stagger to 4s regardless of building count
 
 // Module-level flag so the rise animation only plays once per session,
 // surviving component remounts caused by Next.js navigation.
@@ -392,10 +392,11 @@ export default memo(function InstancedBuildings({
     const now = clock.elapsedTime;
     if (!riseInitialized.current) {
       riseInitialized.current = true;
+      const staggerDelay = Math.min(0.003, MAX_RISE_TOTAL / Math.max(1, count));
       const queue: RiseState[] = [];
       for (let i = 0; i < count; i++) {
         queue.push({
-          startTime: now + i * RISE_STAGGER_DELAY,
+          startTime: now + i * staggerDelay,
           idx: i,
         });
       }

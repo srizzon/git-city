@@ -1,11 +1,16 @@
 "use client";
 
 import { useRef, useMemo, useEffect } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { isBuildingAd, type SkyAd } from "@/lib/skyAds";
 import type { CityBuilding } from "@/lib/github";
 import { createLedTexture, ViewabilityTracker, SCROLL_SPEED, markAdPointerConsumed, registerAdMesh, unregisterAdMesh } from "./SkyAds";
+
+// Shared geometries — prevents GPU leaks on mount/unmount
+const _box = /* @__PURE__ */ new THREE.BoxGeometry(1, 1, 1);
+const _plane = /* @__PURE__ */ new THREE.PlaneGeometry(1, 1);
+const _cylinder = /* @__PURE__ */ new THREE.CylinderGeometry(0.3, 0.4, 1, 6);
 
 // ─── Ref helper — registers mesh for capture-phase pointer guard ─
 
@@ -90,8 +95,7 @@ function AdBillboard({
   return (
     <group position={[building.position[0], 0, building.position[2]]}>
       {/* Dark frame behind the screen */}
-      <mesh position={[0, y, zOff - 0.3]} onClick={handleClick}>
-        <boxGeometry args={[panelW + frameT * 2, panelH + frameT * 2, 0.3]} />
+      <mesh position={[0, y, zOff - 0.3]} onClick={handleClick} geometry={_box} scale={[panelW + frameT * 2, panelH + frameT * 2, 0.3]}>
         <meshStandardMaterial color="#222" metalness={0.6} roughness={0.4} />
       </mesh>
       {/* LED screen */}
@@ -100,16 +104,14 @@ function AdBillboard({
         material={ledMat}
         position={[0, y, zOff + 0.1]}
         onClick={handleClick}
-      >
-        <planeGeometry args={[panelW, panelH]} />
-      </mesh>
+        geometry={_plane}
+        scale={[panelW, panelH, 1]}
+      />
       {/* Support struts from below */}
-      <mesh position={[-panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]} rotation={[0.3, 0, 0]}>
-        <boxGeometry args={[0.3, 3, 0.3]} />
+      <mesh position={[-panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]} rotation={[0.3, 0, 0]} geometry={_box} scale={[0.3, 3, 0.3]}>
         <meshStandardMaterial color="#333" metalness={0.5} roughness={0.4} />
       </mesh>
-      <mesh position={[panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]} rotation={[0.3, 0, 0]}>
-        <boxGeometry args={[0.3, 3, 0.3]} />
+      <mesh position={[panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]} rotation={[0.3, 0, 0]} geometry={_box} scale={[0.3, 3, 0.3]}>
         <meshStandardMaterial color="#333" metalness={0.5} roughness={0.4} />
       </mesh>
     </group>
@@ -178,20 +180,17 @@ function AdRooftopSign({
   return (
     <group position={[building.position[0], 0, building.position[2]]}>
       {/* Main pole */}
-      <mesh position={[0, poleY, 0]}>
-        <cylinderGeometry args={[0.3, 0.4, poleH, 6]} />
+      <mesh position={[0, poleY, 0]} geometry={_cylinder} scale={[1, poleH, 1]}>
         <meshStandardMaterial color="#666" metalness={0.7} roughness={0.3} />
       </mesh>
       {/* Spinning sign group */}
       <group ref={groupRef} position={[0, signY, 0]}>
         {/* Top crossbar */}
-        <mesh position={[0, signH / 2 + 0.2, 0]}>
-          <boxGeometry args={[signW + 1, 0.4, 0.6]} />
+        <mesh position={[0, signH / 2 + 0.2, 0]} geometry={_box} scale={[signW + 1, 0.4, 0.6]}>
           <meshStandardMaterial color="#555" metalness={0.6} roughness={0.3} />
         </mesh>
         {/* Bottom crossbar */}
-        <mesh position={[0, -signH / 2 - 0.2, 0]}>
-          <boxGeometry args={[signW + 1, 0.4, 0.6]} />
+        <mesh position={[0, -signH / 2 - 0.2, 0]} geometry={_box} scale={[signW + 1, 0.4, 0.6]}>
           <meshStandardMaterial color="#555" metalness={0.6} roughness={0.3} />
         </mesh>
         {/* Front face */}
@@ -200,18 +199,18 @@ function AdRooftopSign({
           material={ledMat}
           position={[0, 0, 0.15]}
           onClick={handleClick}
-        >
-          <planeGeometry args={[signW, signH]} />
-        </mesh>
+          geometry={_plane}
+          scale={[signW, signH, 1]}
+        />
         {/* Back face */}
         <mesh
           material={ledMat}
           position={[0, 0, -0.15]}
           rotation={[0, Math.PI, 0]}
           onClick={handleClick}
-        >
-          <planeGeometry args={[signW, signH]} />
-        </mesh>
+          geometry={_plane}
+          scale={[signW, signH, 1]}
+        />
       </group>
     </group>
   );
@@ -306,8 +305,9 @@ function AdLedWrap({
         }}
         position={[0, y, 0]}
         visible={false}
+        geometry={_box}
+        scale={[width, wrapH, depth]}
       >
-        <boxGeometry args={[width, wrapH, depth]} />
         <meshBasicMaterial />
       </mesh>
       {faces.map((f, i) => (
@@ -324,25 +324,25 @@ function AdLedWrap({
             position={[f.pos[0], f.pos[1], f.pos[2]]}
             rotation={[f.rot[0], f.rot[1], f.rot[2]]}
             onClick={handleClick}
-          >
-            <planeGeometry args={[f.w, wrapH]} />
-          </mesh>
+            geometry={_plane}
+            scale={[f.w, wrapH, 1]}
+          />
           {/* Accent line above */}
           <mesh
             material={accentMat}
             position={[f.pos[0], f.pos[1] + wrapH / 2 + accentH / 2, f.pos[2]]}
             rotation={[f.rot[0], f.rot[1], f.rot[2]]}
-          >
-            <planeGeometry args={[f.w, accentH]} />
-          </mesh>
+            geometry={_plane}
+            scale={[f.w, accentH, 1]}
+          />
           {/* Accent line below */}
           <mesh
             material={accentMat}
             position={[f.pos[0], f.pos[1] - wrapH / 2 - accentH / 2, f.pos[2]]}
             rotation={[f.rot[0], f.rot[1], f.rot[2]]}
-          >
-            <planeGeometry args={[f.w, accentH]} />
-          </mesh>
+            geometry={_plane}
+            scale={[f.w, accentH, 1]}
+          />
         </group>
       ))}
     </group>
@@ -360,8 +360,20 @@ interface BuildingAdsProps {
   focusedBuildingB?: string | null;
 }
 
+// Pre-allocated vector for distance culling
+const _adCamPos = new THREE.Vector3();
+
 export default function BuildingAds({ ads, buildings, onAdClick, onAdViewed, focusedBuilding, focusedBuildingB }: BuildingAdsProps) {
   const meshRefs = useRef<Map<string, THREE.Mesh>>(new Map());
+  const groupRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
+
+  // Distance culling: hide all building ads when camera is far away
+  useFrame(() => {
+    if (!groupRef.current) return;
+    _adCamPos.set(camera.position.x, 0, camera.position.z);
+    groupRef.current.visible = _adCamPos.length() < 1500;
+  });
 
   const top10 = useMemo(
     () =>
@@ -388,7 +400,7 @@ export default function BuildingAds({ ads, buildings, onAdClick, onAdViewed, foc
   const focusedBLower = focusedBuildingB?.toLowerCase() ?? null;
 
   return (
-    <group>
+    <group ref={groupRef}>
       {billboardAds.map((ad, i) => {
         const building = top10[i];
         if (!building) return null;
