@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useMemo, useCallback } from "react";
+import { useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import type { CityBuilding } from "@/lib/github";
 
 interface MiniMapProps {
@@ -33,6 +33,20 @@ const DISTRICT_RGB: Record<string, [number, number, number]> = {
 export default function MiniMap({ buildings, playerX, playerZ, visible, currentDistrict }: MiniMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Refs for high-frequency values so draw() doesn't re-create every frame.
+  // Updated via useLayoutEffect (not during render) to satisfy react-hooks/refs.
+  const playerXRef = useRef(playerX);
+  const playerZRef = useRef(playerZ);
+  const currentDistrictRef = useRef(currentDistrict);
+  useLayoutEffect(() => {
+    playerXRef.current = playerX;
+    playerZRef.current = playerZ;
+    currentDistrictRef.current = currentDistrict;
+  }, [playerX, playerZ, currentDistrict]);
+
+  // Stable pixel buffer — allocated once, reused on every draw to avoid GC churn
+  const bufRef = useRef<Uint8ClampedArray | null>(null);
+
   // World bounds (stable)
   const wb = useMemo(() => {
     if (buildings.length === 0) return null;
@@ -47,6 +61,10 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
     const m = 60;
     return { x0: x0 - m, x1: x1 + m, z0: z0 - m, z1: z1 + m };
   }, [buildings]);
+
+  // Ref so w2p can read the latest wb without being a dep of draw
+  const wbRef = useRef(wb);
+  useLayoutEffect(() => { wbRef.current = wb; }, [wb]);
 
   // Pre-compute building pixel data
   const bPixels = useMemo(() => {
@@ -63,8 +81,9 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
     }));
   }, [buildings, wb]);
 
-  // World → pixel
+  // Stable world-to-pixel transform — reads wb from ref, never re-creates
   const w2p = useCallback((wx: number, wz: number): [number, number] => {
+    const wb = wbRef.current;
     if (!wb) return [RES / 2, RES / 2];
     const ww = wb.x1 - wb.x0, wh = wb.z1 - wb.z0;
     const ds = RES - PAD * 2;
@@ -72,22 +91,30 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
     const ox = PAD + (ds - ww * s) / 2;
     const oy = PAD + (ds - wh * s) / 2;
     return [Math.round(ox + (wx - wb.x0) * s), Math.round(oy + (wz - wb.z0) * s)];
-  }, [wb]);
+  }, []); // stable: reads from wbRef, no deps needed
 
-  // Draw frame
+  // Draw frame — playerX/playerZ/currentDistrict read from refs so this
+  // callback only re-creates when bPixels changes (i.e. when buildings change),
+  // not on every animation frame as the player moves.
   const draw = useCallback((blink: boolean) => {
     const canvas = canvasRef.current;
     if (!canvas || bPixels.length === 0) return;
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
 
+    // Reuse the stable backing buffer — avoids allocating 16 KB on every draw
+    if (!bufRef.current) {
+      bufRef.current = new Uint8ClampedArray(RES * RES * 4);
+    }
+    const buf = bufRef.current;
+
     // Background: very dark
-    const buf = new Uint8ClampedArray(RES * RES * 4);
     for (let i = 0; i < buf.length; i += 4) {
       buf[i] = 5; buf[i + 1] = 5; buf[i + 2] = 7; buf[i + 3] = 220;
     }
 
     // Buildings
+    const currentDistrict = currentDistrictRef.current;
     for (const { px, py, d } of bPixels) {
       if (px < 0 || px >= RES || py < 0 || py >= RES) continue;
       const idx = (py * RES + px) * 4;
@@ -105,7 +132,7 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
     }
 
     // Player cross (white, 5px)
-    const [ppx, ppy] = w2p(playerX, playerZ);
+    const [ppx, ppy] = w2p(playerXRef.current, playerZRef.current);
     const set = (x: number, y: number) => {
       if (x >= 0 && x < RES && y >= 0 && y < RES) {
         const i = (y * RES + x) * 4;
@@ -121,12 +148,15 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
     }
 
     ctx.putImageData(new ImageData(buf, RES, RES), 0, 0);
-  }, [bPixels, currentDistrict, playerX, playerZ, w2p]);
+  }, [bPixels, w2p]); // no longer deps on playerX, playerZ, currentDistrict
 
-  // Redraw on changes
+  // Redraw when visibility or buildings change
   useEffect(() => { if (visible) draw(true); }, [visible, draw]);
 
-  // Blink
+  // Blink — this is now the sole driver of the player dot animation.
+  // Previously the useEffect above would fire on every frame (because
+  // playerX/playerZ caused draw to re-create each frame), which
+  // overrode draw(false) calls here and broke the blink effect.
   useEffect(() => {
     if (!visible) return;
     let on = true;
