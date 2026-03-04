@@ -1854,6 +1854,7 @@ function WallpaperOrbitScene({ speed }: { speed: number }) {
 
 interface Props {
   buildings: CityBuilding[];
+  editorPayload?: EditorPreviewPayload | null;
   plazas: CityPlaza[];
   decorations: CityDecoration[];
   river?: CityRiver | null;
@@ -1897,10 +1898,185 @@ interface Props {
   wallpaperSpeed?: number;
 }
 
+function EditorVoxelPreview({ payload }: { payload?: EditorPreviewPayload | null }) {
+  const cells = useMemo(() => {
+    if (!payload?.voxels?.length && !payload?.blocks?.length) {
+      return [] as Array<{ x: number; y: number; z: number; color: string }>;
+    }
+
+    const cols = Math.max(1, payload.grid?.cols ?? 38);
+    const depth = Math.max(1, payload.grid?.depth ?? 32);
+    let rows = payload.grid?.rows ?? 0;
+    if (rows <= 0) {
+      const floors = payload.grid?.floors ?? 0;
+      rows = floors > 0 ? floors * 10 : 0;
+    }
+
+    const map = new Map<string, { x: number; y: number; z: number; color: string }>();
+    let maxY = 0;
+    if (payload.voxels?.length) {
+      for (const v of payload.voxels) {
+        const x = Number(v.x);
+        const y = Number(v.y);
+        const z = Number(v.z);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+        const color = typeof v.color === "string" ? v.color : "#7c8aa0";
+        map.set(`${x}:${y}:${z}`, { x, y, z, color });
+        if (y > maxY) maxY = y;
+      }
+    } else {
+      for (const b of payload.blocks ?? []) {
+        const x = Number(b.x);
+        const y = Number(b.top);
+        const w = Math.max(1, Number(b.widthUnits ?? 1));
+        const h = Math.max(1, Number(b.heightUnits ?? 1));
+        const color = typeof b.color === "string" ? b.color : "#7c8aa0";
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+        for (let yy = y; yy < y + h; yy++) {
+          for (let xx = x; xx < x + w; xx++) {
+            map.set(`${xx}:${yy}:0`, { x: xx, y: yy, z: 0, color });
+            if (yy > maxY) maxY = yy;
+          }
+        }
+      }
+    }
+
+    const finalRows = Math.max(1, rows || maxY + 1);
+    const out = Array.from(map.values()).sort((a, b) => a.y - b.y || a.x - b.x || a.z - b.z);
+
+    // Store rows/cols in closure object for transform below
+    (out as unknown as { __rows?: number; __cols?: number; __depth?: number }).__rows = finalRows;
+    (out as unknown as { __rows?: number; __cols?: number; __depth?: number }).__cols = cols;
+    (out as unknown as { __rows?: number; __cols?: number; __depth?: number }).__depth = depth;
+    return out;
+  }, [payload]);
+
+  const groupedByColor = useMemo(() => {
+    const map = new Map<string, Array<{ x: number; y: number; z: number; color: string }>>();
+    for (const cell of cells) {
+      const group = map.get(cell.color);
+      if (group) group.push(cell);
+      else map.set(cell.color, [cell]);
+    }
+    return Array.from(map.entries());
+  }, [cells]);
+
+  useEffect(() => {
+    const meta = cells as unknown as { __rows?: number; __cols?: number; __depth?: number };
+    const rows = Math.max(1, meta.__rows ?? 120);
+    const cols = Math.max(1, meta.__cols ?? 38);
+    const depth = Math.max(1, meta.__depth ?? 32);
+    try {
+      const topColors = groupedByColor
+        .map(([color, group]) => [color, group.length] as const)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+      const debug = {
+        cells: cells.length,
+        rows,
+        cols,
+        depth,
+        topColors,
+        sample: cells.slice(0, 10),
+      };
+      console.log("[City Preview Debug]", debug);
+      (window as unknown as Record<string, unknown>).__gcCityPreviewDebug = debug;
+    } catch {}
+  }, [cells, groupedByColor]);
+
+  if (cells.length === 0) return null;
+
+  return (
+    <group position={[120, 0, -40]}>
+      {groupedByColor.map(([color, group]) => (
+        <EditorVoxelPreviewColorGroup
+          key={`${color}-${group.length}`}
+          color={color}
+          cells={group}
+          rows={(cells as unknown as { __rows?: number }).__rows ?? 120}
+          cols={(cells as unknown as { __cols?: number }).__cols ?? 38}
+          depth={(cells as unknown as { __depth?: number }).__depth ?? 32}
+        />
+      ))}
+    </group>
+  );
+}
+
+function EditorVoxelPreviewColorGroup({
+  color,
+  cells,
+  rows,
+  cols,
+  depth,
+}: {
+  color: string;
+  cells: Array<{ x: number; y: number; z: number; color: string }>;
+  rows: number;
+  cols: number;
+  depth: number;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    const m = new THREE.Matrix4();
+    const p = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3(0.92, 0.92, 0.92);
+
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      p.set(
+        cell.x - cols / 2 + 0.5,
+        (rows - cell.y - 0.5) * 1.2,
+        cell.z - depth / 2 + 0.5,
+      );
+      m.compose(p, q, s);
+      mesh.setMatrixAt(i, m);
+    }
+
+    mesh.count = cells.length;
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [cells, rows, cols, depth]);
+
+  if (cells.length === 0) return null;
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, cells.length]} frustumCulled={false}>
+      <boxGeometry args={[1, 1.2, 1]} />
+      <meshBasicMaterial color={color} toneMapped={false} />
+    </instancedMesh>
+  );
+}
+
+interface EditorPreviewBlock {
+  x?: number;
+  top?: number;
+  widthUnits?: number;
+  heightUnits?: number;
+  color?: string;
+}
+
+interface EditorPreviewVoxel {
+  x?: number;
+  y?: number;
+  z?: number;
+  color?: string;
+}
+
+interface EditorPreviewPayload {
+  grid?: { cols?: number; rows?: number; floors?: number; depth?: number };
+  blocks?: EditorPreviewBlock[];
+  voxels?: EditorPreviewVoxel[];
+}
+
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed }: Props) {
+export default function CityCanvas({ buildings, editorPayload, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
   const [dpr, setDpr] = useState(1);
@@ -1977,6 +2153,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />
 
       <FounderSpire onClick={onLandmarkClick ?? (() => {})} />
+
+      <EditorVoxelPreview payload={editorPayload} />
 
       {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={cityRadius} />}
 
