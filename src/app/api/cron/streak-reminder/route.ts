@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendStreakReminderNotification } from "@/lib/notification-senders/streak-reminder";
+import { sendDailiesReminderNotification } from "@/lib/notification-senders/dailies-reminder";
 
 /**
  * Cron: Daily 20:00 UTC - Remind developers who haven't checked in today
@@ -71,5 +72,57 @@ export async function GET(request: NextRequest) {
     offset += batchSize;
   }
 
-  return NextResponse.json({ ok: true, ...results });
+  // ─── Dailies reminders: users with 1-2 missions done but not 3 ────
+  const dailiesResults = { reminded: 0, skipped: 0 };
+  let dailiesOffset = 0;
+
+  while (true) {
+    // Find devs who have some (but not all) missions done today
+    const { data: partial } = await sb
+      .from("daily_mission_progress")
+      .select("developer_id")
+      .eq("mission_date", today)
+      .eq("completed", true);
+
+    if (!partial || partial.length === 0) break;
+
+    // Count completions per developer
+    const countMap = new Map<number, number>();
+    for (const row of partial) {
+      countMap.set(row.developer_id, (countMap.get(row.developer_id) ?? 0) + 1);
+    }
+
+    // Filter to devs with 1 or 2 completions (not 3, not 0)
+    const partialDevIds = [...countMap.entries()]
+      .filter(([, count]) => count >= 1 && count < 3)
+      .map(([id]) => id);
+
+    if (partialDevIds.length === 0) break;
+
+    // Batch fetch developer info
+    const batch = partialDevIds.slice(dailiesOffset, dailiesOffset + batchSize);
+    if (batch.length === 0) break;
+
+    const { data: devs } = await sb
+      .from("developers")
+      .select("id, github_login")
+      .in("id", batch)
+      .eq("claimed", true)
+      .not("email", "is", null);
+
+    for (const dev of devs ?? []) {
+      try {
+        const completedCount = countMap.get(dev.id) ?? 0;
+        sendDailiesReminderNotification(dev.id, dev.github_login, completedCount, today);
+        dailiesResults.reminded++;
+      } catch {
+        dailiesResults.skipped++;
+      }
+    }
+
+    // Only one pass needed since we fetched all progress rows at once
+    break;
+  }
+
+  return NextResponse.json({ ok: true, ...results, dailies: dailiesResults });
 }

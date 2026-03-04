@@ -8,6 +8,7 @@ import LeaderboardYouBadge, { LeaderboardAuthProvider } from "@/components/Leade
 import LeaderboardUserPosition from "@/components/LeaderboardUserPosition";
 import LeaderboardYouVsNext from "@/components/LeaderboardYouVsNext";
 import FlyLeaderboard from "@/components/FlyLeaderboard";
+import DailiesLeaderboard from "@/components/DailiesLeaderboard";
 
 export const revalidate = 300; // ISR: regenerate every 5 min
 
@@ -208,10 +209,30 @@ export default async function LeaderboardPage({
             >
               Game
             </Link>
+            <Link
+              href="/leaderboard?mode=dailies"
+              className="relative border-l-[2px] border-border px-5 py-2 text-[11px] transition-colors"
+              style={{
+                color: mode === "dailies" ? ACCENT : "var(--color-muted)",
+                backgroundColor: mode === "dailies" ? "rgba(200, 230, 74, 0.1)" : "transparent",
+              }}
+            >
+              Dailies
+            </Link>
           </div>
         </div>
 
-        {mode === "developers" ? (
+        {mode === "dailies" ? (
+          <Suspense
+            fallback={
+              <div className="mt-10 text-center text-xs text-muted normal-case">
+                Loading dailies leaderboard...
+              </div>
+            }
+          >
+            <DailiesLeaderboard />
+          </Suspense>
+        ) : mode === "developers" ? (
           <>
             {/* Tabs */}
             <div className="mt-6 flex flex-wrap justify-center gap-1">

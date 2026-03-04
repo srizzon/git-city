@@ -449,6 +449,11 @@ export async function GET(
       });
     }
 
+    // Assign last-place rank to new dev (lightweight, no full recalc)
+    if (isNewDev && devId) {
+      await sb.rpc("assign_new_dev_rank", { dev_id: devId });
+    }
+
     // Fire-and-forget: recalculate ranks in background (don't block the response)
     if (isNewDev) {
       sb.rpc("recalculate_ranks").then(

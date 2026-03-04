@@ -22,6 +22,7 @@ import {
   HologramRing,
   LightningAura,
   LEDBanner,
+  GitHubStar,
 } from "./BuildingEffects";
 import { ClaimedGlow } from "./Building3D";
 import type { BuildingDims } from "./ShopClient";
@@ -143,6 +144,8 @@ function EffectForItem({
       return <LightningAura {...dims} color={ACCENT} />;
     case "led_banner":
       return <LEDBanner {...dims} color={ACCENT} />;
+    case "github_star":
+      return <GitHubStar {...dims} />;
     default:
       return null;
   }

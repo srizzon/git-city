@@ -89,7 +89,7 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
         id: "dailies",
         name: "Standup / Dailies",
         description: "Quick daily activities: Push, Code Review, Bug Hunt, Deploy",
-        status: "planned",
+        status: "done",
       },
       {
         id: "xp-leveling",
@@ -112,8 +112,8 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       {
         id: "onboarding",
         name: "Onboarding Tutorial",
-        description: "Guided first 90 seconds: walk, push, visit, learn the loop",
-        status: "planned",
+        description: "Guided first 90 seconds: fly, explore, visit, learn the loop",
+        status: "building",
       },
     ],
   },

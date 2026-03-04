@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { touchLastActive } from "@/lib/notification-helpers";
+import { trackDailyMission } from "@/lib/dailies";
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabase();
@@ -57,6 +58,8 @@ export async function POST(request: Request) {
 
   // Track activity
   touchLastActive(visitor.id);
+  trackDailyMission(visitor.id, "visit_building");
+  trackDailyMission(visitor.id, "visit_3_buildings");
 
   // No self-visits
   if (visitor.id === building.id) {

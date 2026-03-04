@@ -654,6 +654,8 @@ export default function ShopClient({
   const [hasChanges, setHasChanges] = useState(false);
   const [highlightItem, setHighlightItem] = useState<string | null>(null);
   const [confirmBuyItem, setConfirmBuyItem] = useState<string | null>(null);
+  const [verifyingStar, setVerifyingStar] = useState(false);
+  const [starVerifyStep, setStarVerifyStep] = useState<"idle" | "opened" | "verifying">("idle");
   const [activeTab, setActiveTab] = useState<"building" | "raid">(() => {
     if (purchasedItem && [...RAID_VEHICLE_ITEMS, ...RAID_TAG_ITEMS, ...RAID_BOOST_ITEMS].includes(purchasedItem)) return "raid";
     return "building";
@@ -674,6 +676,12 @@ export default function ShopClient({
   // Track shop page view on mount
   useEffect(() => {
     trackShopPageView();
+    // Fire-and-forget daily mission tracking
+    fetch("/api/dailies/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mission_id: "visit_shop" }),
+    }).catch(() => {});
   }, []);
 
   // Post-purchase: show toast + auto-equip if zone is empty + switch tab
@@ -852,6 +860,57 @@ export default function ShopClient({
       setBuyingItem(null);
     }
   }, [buyingItem]);
+
+  const verifyGitHubStar = useCallback(async () => {
+    if (verifyingStar) return;
+    setVerifyingStar(true);
+    setStarVerifyStep("verifying");
+    setError(null);
+
+    try {
+      const res = await fetch("/api/verify-github-star", { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Verification failed");
+        setStarVerifyStep("opened");
+        return;
+      }
+
+      if (data.verified) {
+        setOwned((prev) => prev.includes("github_star") ? prev : [...prev, "github_star"]);
+        // Auto-equip in crown if nothing equipped
+        if (!loadout.crown) {
+          setLoadout((prev) => ({ ...prev, crown: "github_star" }));
+          setHasChanges(true);
+        }
+        setStarVerifyStep("idle");
+      } else {
+        setError("Star not found — make sure you starred the repo first!");
+        setStarVerifyStep("opened");
+      }
+    } catch {
+      setError("Network error. Try again.");
+      setStarVerifyStep("opened");
+    } finally {
+      setVerifyingStar(false);
+    }
+  }, [loadout.crown, verifyingStar]);
+
+  // Auto-verify when user returns from GitHub tab
+  useEffect(() => {
+    if (starVerifyStep !== "opened") return;
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") verifyGitHubStar();
+    };
+    const onFocus = () => verifyGitHubStar();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [starVerifyStep, verifyGitHubStar]);
 
   const handleSetRaidVehicle = useCallback(async (vehicleId: string) => {
     const res = await fetch("/api/raid/loadout", {
@@ -1140,6 +1199,8 @@ export default function ShopClient({
                     const hasAchievement = achUnlock && achievements.includes(achUnlock.achievement);
                     const isBuying = buyingItem === itemId;
 
+                    const isGitHubStar = itemId === "github_star";
+
                     // Badge text
                     let badge: string;
                     let badgeColor: string;
@@ -1149,6 +1210,9 @@ export default function ShopClient({
                     } else if (isOwned) {
                       badge = "\u2713";
                       badgeColor = ACCENT;
+                    } else if (isGitHubStar) {
+                      badge = "\u2B50 STAR TO UNLOCK";
+                      badgeColor = "#FFD700";
                     } else if (isFreeItem) {
                       badge = "FREE";
                       badgeColor = ACCENT;
@@ -1172,6 +1236,14 @@ export default function ShopClient({
                         handleUnequip(zoneKey);
                       } else if (isOwned) {
                         handleEquip(zoneKey, itemId);
+                      } else if (isGitHubStar && !isOwned) {
+                        // Step 1: open repo, Step 2: verify
+                        if (starVerifyStep === "idle") {
+                          window.open("https://github.com/srizzon/git-city", "_blank");
+                          setStarVerifyStep("opened");
+                        } else if (starVerifyStep === "opened") {
+                          verifyGitHubStar();
+                        }
                       } else if (isFreeItem) {
                         claimFreeItem();
                       } else if (shopItem && shopItem.price_usd_cents > 0) {
@@ -1234,7 +1306,9 @@ export default function ShopClient({
                             className={`mt-0.5 ${badge.startsWith("$") ? "text-[10px] font-bold" : "text-[9px]"}`}
                             style={{ color: badgeColor }}
                           >
-                            {isBuying ? "..." : badge}
+                            {isBuying ? "..." : isGitHubStar && !isOwned && !isEquipped ? (
+                              verifyingStar ? "Verifying..." : starVerifyStep === "opened" ? "Verify \u2B50" : badge
+                            ) : badge}
                           </span>
                           {/* A13: Social proof - weekly purchase count */}
                           {(purchaseCounts[itemId] ?? 0) >= 3 && !isOwned && (

@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { checkAchievements } from "@/lib/achievements";
 import { touchLastActive } from "@/lib/notification-helpers";
+import { trackDailyMission } from "@/lib/dailies";
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabase();
@@ -89,6 +90,8 @@ export async function POST(request: Request) {
 
   // Track activity
   touchLastActive(giver.id);
+  trackDailyMission(giver.id, "give_kudos");
+  trackDailyMission(giver.id, "give_kudos_3");
 
   // Only increment + feed if the insert actually happened (no conflict)
   if (!insertError) {

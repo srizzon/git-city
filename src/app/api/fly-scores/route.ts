@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
+import { trackDailyMission } from "@/lib/dailies";
 
 function getTodaySeed() {
   const now = new Date();
@@ -9,6 +10,19 @@ function getTodaySeed() {
   const diff = now.getTime() - start.getTime();
   const dayOfYear = Math.floor(diff / 86400000);
   return `${now.getFullYear()}-${dayOfYear}`;
+}
+
+// Max possible score for a given number of collected items, based on game mechanics:
+// - 2 epics (25pts), 8 rares (5pts), 30 commons (1pt) — all at max combo (3x)
+// - Time bonus: up to 50% of collection score
+function maxScoreForCollected(collected: number): number {
+  if (collected <= 0) return 0;
+  const epics = Math.min(collected, 2);
+  const rares = Math.min(Math.max(collected - 2, 0), 8);
+  const commons = Math.max(collected - 10, 0);
+  const bestComboScore = epics * 75 + rares * 15 + commons * 3;
+  // +50% time bonus, +10% buffer for floating-point edge cases
+  return Math.ceil(bestComboScore * 1.5 * 1.1);
 }
 
 export async function POST(request: Request) {
@@ -41,6 +55,22 @@ export async function POST(request: Request) {
   }
   if (typeof flight_ms !== "number" || flight_ms < 10_000) {
     return NextResponse.json({ error: "Invalid flight time" }, { status: 400 });
+  }
+
+  // Cross-validation: score must be achievable with the claimed collected count
+  const ceiling = maxScoreForCollected(collected);
+  if (score > ceiling) {
+    return NextResponse.json({ error: "Invalid score" }, { status: 400 });
+  }
+
+  // Cross-validation: collecting items takes time — at least 500ms per item
+  if (collected > 0 && flight_ms < collected * 500) {
+    return NextResponse.json({ error: "Invalid flight time" }, { status: 400 });
+  }
+
+  // No score without collecting anything
+  if (collected === 0 && score > 0) {
+    return NextResponse.json({ error: "Invalid score" }, { status: 400 });
   }
 
   const githubLogin = (
@@ -79,6 +109,10 @@ export async function POST(request: Request) {
   if (insertError) {
     return NextResponse.json({ error: "Failed to save" }, { status: 500 });
   }
+
+  // Track daily missions for fly scores
+  trackDailyMission(dev.id, "fly_score_50", { score });
+  trackDailyMission(dev.id, "fly_score_150", { score });
 
   // Compute rank: count distinct developers who beat this score
   // "Beat" = higher score, OR same score with faster time

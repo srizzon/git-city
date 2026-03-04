@@ -24,6 +24,8 @@ import { ITEM_NAMES, ITEM_EMOJIS } from "@/lib/zones";
 import { useStreakCheckin } from "@/lib/useStreakCheckin";
 import { useLiveUsers } from "@/lib/useLiveUsers";
 import { useRaidSequence } from "@/lib/useRaidSequence";
+import { useDailies } from "@/lib/useDailies";
+import DailiesWidget from "@/components/DailiesWidget";
 import RaidPreviewModal from "@/components/RaidPreviewModal";
 import RaidOverlay from "@/components/RaidOverlay";
 import PillModal from "@/components/PillModal";
@@ -85,6 +87,7 @@ const ACHIEVEMENT_TIERS_MAP: Record<string, string> = {
   obsessed: "gold",
   no_life: "diamond",
   white_rabbit: "diamond",
+  daily_rookie: "bronze", daily_regular: "silver", daily_master: "gold", daily_legend: "diamond",
 };
 const ACHIEVEMENT_NAMES_MAP: Record<string, string> = {
   god_mode: "God Mode", legend: "Legend", famous: "Famous", mayor: "Mayor",
@@ -97,6 +100,7 @@ const ACHIEVEMENT_NAMES_MAP: Record<string, string> = {
   on_fire: "On Fire", dedicated: "Dedicated", obsessed: "Obsessed",
   no_life: "No Life", generous_streak: "Generous Streak",
   white_rabbit: "White Rabbit",
+  daily_rookie: "Daily Rookie", daily_regular: "Daily Regular", daily_master: "Daily Master", daily_legend: "Daily Legend",
 };
 
 // Dev "class" — funny RPG-style title, deterministic per username
@@ -728,6 +732,8 @@ function HomeContent() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ building_login: selectedBuilding.login }),
           });
+          trackMissionRef.current("visit_building");
+          trackMissionRef.current("visit_3_buildings");
         } catch { /* ignore */ }
       }, 3000);
     }
@@ -750,6 +756,8 @@ function HomeContent() {
       });
       if (res.ok) {
         trackKudosSent(selectedBuilding.login);
+        trackMissionRef.current("give_kudos");
+        trackMissionRef.current("give_kudos_3");
         setKudosSent(true);
         // Increment kudos_count locally
         const newCount = (selectedBuilding.kudos_count ?? 0) + 1;
@@ -981,15 +989,13 @@ function HomeContent() {
 
   const reloadCity = useCallback(async (bustCache = false) => {
     if (bustCache) clearCityCache();
-    const cacheBust = bustCache ? `&_t=${Date.now()}` : "";
-    const CHUNK = 1000;
-    const res = await fetch(`/api/city?from=0&to=${CHUNK}${cacheBust}`);
+    const cacheBust = bustCache ? `?_t=${Date.now()}` : "";
+    const res = await fetch(`/api/city${cacheBust}`);
     if (!res.ok) return null;
     const data = await res.json();
     setStats(data.stats);
     if (data.developers.length === 0) return null;
 
-    // Render downtown immediately
     const layout = generateCityLayout(data.developers);
     setBuildings(layout.buildings);
     setPlazas(layout.plazas);
@@ -997,39 +1003,8 @@ function HomeContent() {
     setRiver(layout.river);
     setBridges(layout.bridges);
     setDistrictZones(layout.districtZones);
-
-    const total = data.stats?.total_developers ?? 0;
-    if (total <= CHUNK) {
-      setCityCache({ ...layout, stats: data.stats });
-      return layout.buildings;
-    }
-
-    // Fetch remaining chunks in parallel
-    const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
-    for (let from = CHUNK; from < total; from += CHUNK) {
-      promises.push(
-        fetch(`/api/city?from=${from}&to=${from + CHUNK}${cacheBust}`)
-          .then(r => r.ok ? r.json() : null)
-      );
-    }
-    const results = await Promise.all(promises);
-    let allDevs = [...data.developers];
-    for (const chunk of results) {
-      if (chunk?.developers?.length) {
-        allDevs = [...allDevs, ...chunk.developers];
-      }
-    }
-
-    // Regenerate full layout with all developers
-    const fullLayout = generateCityLayout(allDevs);
-    setBuildings(fullLayout.buildings);
-    setPlazas(fullLayout.plazas);
-    setDecorations(fullLayout.decorations);
-    setRiver(fullLayout.river);
-    setBridges(fullLayout.bridges);
-    setDistrictZones(fullLayout.districtZones);
-    setCityCache({ ...fullLayout, stats: data.stats });
-    return fullLayout.buildings;
+    setCityCache({ ...layout, stats: data.stats });
+    return layout.buildings;
   }, []);
 
   // Handle loading fade complete: transition to "done" and trigger intro
@@ -1083,19 +1058,17 @@ function HomeContent() {
           return;
         }
 
-        // Fetch first chunk
+        // Fetch all city data in a single request
         setLoadStage("fetching");
         setLoadProgress(10);
 
-        const CHUNK = 1000;
-        const res = await fetch(`/api/city?from=0&to=${CHUNK}`);
+        const res = await fetch("/api/city");
         if (!res.ok) throw new Error("Failed to fetch city data");
         const data = await res.json();
 
-        setLoadProgress(30);
+        setLoadProgress(40);
 
         if (data.developers.length === 0) {
-          // Empty city, skip to ready
           setLoadProgress(100);
           setLoadStage("ready");
           return;
@@ -1103,11 +1076,11 @@ function HomeContent() {
 
         // Generate layout
         setLoadStage("generating");
-        setLoadProgress(45);
+        setLoadProgress(50);
         await new Promise((r) => setTimeout(r, 0)); // yield to browser
 
         setStats(data.stats);
-        let finalLayout = generateCityLayout(data.developers);
+        const finalLayout = generateCityLayout(data.developers);
         setBuildings(finalLayout.buildings);
         setPlazas(finalLayout.plazas);
         setDecorations(finalLayout.decorations);
@@ -1115,11 +1088,11 @@ function HomeContent() {
         setBridges(finalLayout.bridges);
         setDistrictZones(finalLayout.districtZones);
 
-        setLoadProgress(55);
+        setLoadProgress(70);
 
         // Rendering: wait for Canvas to process data (2 rAF + fallback)
         setLoadStage("rendering");
-        setLoadProgress(65);
+        setLoadProgress(80);
 
         await new Promise<void>((resolve) => {
           let resolved = false;
@@ -1128,41 +1101,11 @@ function HomeContent() {
             resolved = true;
             resolve();
           };
-          // 2 chained rAFs
           requestAnimationFrame(() => {
             requestAnimationFrame(() => done());
           });
-          // Fallback for hidden tabs where rAF doesn't fire
           setTimeout(done, 500);
         });
-
-        setLoadProgress(80);
-
-        // Fetch remaining chunks if needed
-        const total = data.stats?.total_developers ?? 0;
-        if (total > CHUNK) {
-          const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
-          for (let from = CHUNK; from < total; from += CHUNK) {
-            promises.push(
-              fetch(`/api/city?from=${from}&to=${from + CHUNK}`)
-                .then((r) => (r.ok ? r.json() : null))
-            );
-          }
-          const results = await Promise.all(promises);
-          let allDevs = [...data.developers];
-          for (const chunk of results) {
-            if (chunk?.developers?.length) {
-              allDevs = [...allDevs, ...chunk.developers];
-            }
-          }
-          finalLayout = generateCityLayout(allDevs);
-          setBuildings(finalLayout.buildings);
-          setPlazas(finalLayout.plazas);
-          setDecorations(finalLayout.decorations);
-          setRiver(finalLayout.river);
-          setBridges(finalLayout.bridges);
-          setDistrictZones(finalLayout.districtZones);
-        }
 
         // Save to cache for return visits
         setCityCache({ ...finalLayout, stats: data.stats });
@@ -1522,6 +1465,12 @@ if (claimingGift) return;
   // Streak auto check-in (1x per browser session)
   const { streakData } = useStreakCheckin(session, !!myBuilding?.claimed);
 
+  // Daily missions
+  const { data: dailiesData, trackClientMission, claim: claimDailies, refresh: refreshDailies, toasts: dailyToasts } = useDailies(session, !!myBuilding?.claimed);
+  // Stable ref so closures (visit useEffect, kudos callback) always use latest
+  const trackMissionRef = useRef(trackClientMission);
+  trackMissionRef.current = trackClientMission;
+
   // Live users presence
   const { count: liveUsers, status: liveStatus } = useLiveUsers();
 
@@ -1843,6 +1792,10 @@ if (claimingGift) return;
           setKudosError(null);
           lastDistRef.current = 999;
           setFocusDist(999);
+          // Track explore_district daily if clicking a building in a different district
+          if (myBuilding?.district && b.district && b.district !== myBuilding.district) {
+            trackMissionRef.current("explore_district");
+          }
           if (flyMode) {
             // Auto-pause flight to show profile card
             setFlyPauseSignal(s => s + 1);
@@ -3687,6 +3640,44 @@ if (claimingGift) return;
         </div>
       )}
 
+
+      {/* ─── Daily Missions (quest tracker, right side) ─── */}
+      {session && myBuilding?.claimed && !flyMode && !introMode && !rabbitCinematic && (
+        <DailiesWidget
+          data={dailiesData}
+          accent={theme.accent}
+          shadow={theme.shadow}
+          isMobile={isMobile}
+          onClaim={claimDailies}
+          onRefresh={refreshDailies}
+        />
+      )}
+
+      {/* ─── Daily mission progress toasts (top-center, always visible) ─── */}
+      {dailyToasts.length > 0 && (
+        <div className="pointer-events-none fixed left-1/2 top-4 z-[60] flex -translate-x-1/2 flex-col items-center gap-1.5">
+          {dailyToasts.map((t) => (
+            <div
+              key={t.id}
+              className="pointer-events-none border-[2px] border-border bg-bg-raised/95 px-4 py-2 text-[11px] backdrop-blur-sm"
+              style={{ animation: "toastDrop 0.3s ease-out, toastOut 0.4s ease-in 2s forwards", borderColor: t.done ? theme.accent : undefined }}
+            >
+              <span style={{ color: theme.accent }}>{t.done ? "\u2713" : "\u2606"}</span>
+              {" "}{t.title}{t.done ? " \u2014 Complete!" : ""}
+            </div>
+          ))}
+          <style jsx>{`
+            @keyframes toastDrop {
+              from { opacity: 0; transform: translateY(-16px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes toastOut {
+              from { opacity: 1; }
+              to { opacity: 0; transform: translateY(-8px); }
+            }
+          `}</style>
+        </div>
+      )}
 
       {/* ─── Activity Ticker ─── */}
       {!flyMode && !introMode && !rabbitCinematic && feedEvents.length >= 1 && (

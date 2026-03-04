@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { checkAchievements } from "@/lib/achievements";
 import { touchLastActive } from "@/lib/notification-helpers";
 import { sendRaidAlertNotification } from "@/lib/notification-senders/raid";
+import { trackDailyMission } from "@/lib/dailies";
 import {
   calculateAttackScore,
   calculateDefenseScore,
@@ -296,6 +297,8 @@ export async function POST(request: Request) {
 
     // Track activity + notify defender
     touchLastActive(attacker.id);
+    trackDailyMission(attacker.id, "attempt_battle");
+    if (success) trackDailyMission(attacker.id, "win_battle");
     sendRaidAlertNotification(
       defender.id,
       defender.github_login,

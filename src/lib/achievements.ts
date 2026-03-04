@@ -59,6 +59,7 @@ interface DevStats {
   raid_xp?: number;
   /** Number of shop items purchased (paid or free). */
   purchases?: number;
+  dailies_completed?: number;
 }
 
 /**
@@ -117,6 +118,8 @@ export async function checkAchievements(
         return (stats.raid_xp ?? 0) >= a.threshold;
       case "purchases":
         return (stats.purchases ?? 0) >= a.threshold;
+      case "dailies":
+        return (stats.dailies_completed ?? 0) >= a.threshold;
       default:
         return false;
     }

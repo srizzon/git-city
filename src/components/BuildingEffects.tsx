@@ -1566,3 +1566,142 @@ export const StreakFlame = memo(function StreakFlame({
     </group>
   );
 });
+
+// ─── GitHub Star (crown zone) ────────────────────────────────
+// Giant golden 5-pointed star floating above the building
+
+function createStarShape(outerR: number, innerR: number, points = 5): THREE.Shape {
+  const shape = new THREE.Shape();
+  for (let i = 0; i < points * 2; i++) {
+    const angle = (i * Math.PI) / points - Math.PI / 2;
+    const r = i % 2 === 0 ? outerR : innerR;
+    const x = Math.cos(angle) * r;
+    const y = Math.sin(angle) * r;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return shape;
+}
+
+const _starShape = /* @__PURE__ */ createStarShape(1, 0.4);
+const _starGeo = /* @__PURE__ */ new THREE.ExtrudeGeometry(_starShape, {
+  depth: 0.4,
+  bevelEnabled: false,
+});
+
+const STAR_GOLD = "#FFD700";
+
+export const GitHubStar = memo(function GitHubStar({
+  width,
+  height,
+  depth,
+  color = STAR_GOLD,
+}: {
+  width: number;
+  height: number;
+  depth: number;
+  color?: string;
+}) {
+  const starRef = useRef<THREE.Group>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
+  const raysRef = useRef<THREE.Group>(null);
+  const frameCount = useRef(0);
+
+  const starScale = Math.min(width, depth) * 0.2;
+  const floatY = height + 12;
+
+  useFrame((state) => {
+    frameCount.current++;
+    if (frameCount.current % 2 !== 0) return;
+    const t = state.clock.elapsedTime;
+
+    if (starRef.current) {
+      starRef.current.position.y = floatY + Math.sin(t * 0.8) * 2;
+      starRef.current.rotation.y = t * 0.4;
+      starRef.current.rotation.x = Math.sin(t * 0.3) * 0.15;
+    }
+
+    if (glowRef.current) {
+      glowRef.current.position.y = floatY + Math.sin(t * 0.8) * 2;
+      const mat = glowRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.12 + Math.sin(t * 2) * 0.05;
+      const pulse = 1 + Math.sin(t * 2) * 0.1;
+      glowRef.current.scale.setScalar(pulse);
+    }
+
+    if (raysRef.current) {
+      raysRef.current.position.y = floatY + Math.sin(t * 0.8) * 2;
+      raysRef.current.rotation.z = t * 0.15;
+      raysRef.current.children.forEach((ray, i) => {
+        const mat = (ray as THREE.Mesh).material as THREE.MeshBasicMaterial;
+        mat.opacity = 0.06 + Math.sin(t * 3 + i * 1.2) * 0.04;
+      });
+    }
+  });
+
+  return (
+    <group>
+      {/* Star body */}
+      <group ref={starRef} position={[0, floatY, 0]} scale={[starScale, starScale, starScale]}>
+        <mesh geometry={_starGeo}>
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={3}
+            toneMapped={false}
+            metalness={0.3}
+            roughness={0.4}
+          />
+        </mesh>
+        <mesh geometry={_starGeo} rotation={[0, Math.PI, 0]} position={[0, 0, 0.4]}>
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={3}
+            toneMapped={false}
+            metalness={0.3}
+            roughness={0.4}
+          />
+        </mesh>
+      </group>
+
+      {/* Glow sphere */}
+      <mesh ref={glowRef} position={[0, floatY, 0]}>
+        <sphereGeometry args={[starScale * 2, 12, 12]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.12}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Light rays */}
+      <group ref={raysRef} position={[0, floatY, 0]}>
+        {Array.from({ length: 8 }).map((_, i) => {
+          const angle = (i / 8) * Math.PI * 2;
+          const rayLen = starScale * 3.5;
+          return (
+            <mesh
+              key={i}
+              position={[Math.cos(angle) * rayLen * 0.5, Math.sin(angle) * rayLen * 0.5, 0]}
+              rotation={[0, 0, angle - Math.PI / 2]}
+              scale={[0.3, rayLen, 0.1]}
+              geometry={_box}
+            >
+              <meshBasicMaterial
+                color={color}
+                transparent
+                opacity={0.08}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+              />
+            </mesh>
+          );
+        })}
+      </group>
+    </group>
+  );
+});

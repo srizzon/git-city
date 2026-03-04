@@ -8,6 +8,7 @@ const BOT_UA_PATTERNS = /bot|crawler|spider|headless|phantomjs|selenium|puppetee
 
 const ALLOWED_ORIGINS = new Set([
   "https://thegitcity.com",
+  "https://www.thegitcity.com",
   "http://localhost:3001",
   "http://localhost:3000",
 ]);

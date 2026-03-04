@@ -7,6 +7,7 @@ import { ITEM_NAMES } from "@/lib/zones";
 import { touchLastActive } from "@/lib/notification-helpers";
 import { sendStreakMilestoneNotification } from "@/lib/notification-senders/streak";
 import { sendStreakBrokenNotification } from "@/lib/notification-senders/streak-broken";
+import { trackDailyMission } from "@/lib/dailies";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // A12: Streak reward milestones — {milestone: days, pool: item_ids to pick from}
@@ -191,6 +192,7 @@ export async function POST() {
 
   // Track activity
   touchLastActive(dev.id);
+  trackDailyMission(dev.id, "checkin");
 
   // Detect streak broken: previous streak was >= 7, now reset to 1, and freeze didn't save them
   const previousStreak = dev.app_streak ?? 0;

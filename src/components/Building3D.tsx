@@ -25,6 +25,7 @@ import {
   LightningAura,
   LEDBanner,
   StreakFlame,
+  GitHubStar,
 } from "./BuildingEffects";
 import { MiniWhiteRabbit } from "./WhiteRabbit";
 
@@ -432,6 +433,9 @@ export const BuildingItemEffects = memo(function BuildingItemEffects({ building,
       )}
       {shouldRenderZone("crown_item") && (
         <CrownItem height={height} color={accentColor} focused={focused} />
+      )}
+      {shouldRenderZone("github_star") && (
+        <GitHubStar height={height} width={width} depth={depth} color={accentColor} />
       )}
       {/* White rabbit: always renders for completers, not tied to loadout */}
       {building.rabbit_completed && (

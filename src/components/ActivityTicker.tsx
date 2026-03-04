@@ -49,6 +49,8 @@ function formatEvent(e: FeedEvent): string {
       return `\u{1F6E1} ${meta.defender_login ? `@${meta.defender_login}` : target} defended against ${meta.attacker_login ? `@${meta.attacker_login}` : actor}`;
     case "streak_checkin":
       return `\u{1F525} ${meta.login ? `@${meta.login}` : actor} checked in (${meta.streak}-day streak)`;
+    case "github_star_verified":
+      return `\u2B50 ${meta.login ? `@${meta.login}` : actor} unlocked the GitHub Star`;
     case "dev_highlight": {
       const login = meta.login ? `@${meta.login}` : actor;
       switch (meta.highlight) {
