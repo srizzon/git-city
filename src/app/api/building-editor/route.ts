@@ -3,6 +3,8 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const ITEM_ID = "building_editor_v1";
+const TEXT_TOOL_ITEM_ID = "editor_text_tool";
+const IMAGE_TOOL_ITEM_ID = "editor_image_tool";
 
 type EditorPayload = Record<string, unknown>;
 
@@ -25,7 +27,7 @@ async function getAuthedDeveloper() {
   const sb = getSupabaseAdmin();
   const { data: dev } = await sb
     .from("developers")
-    .select("id, claimed, claimed_by")
+    .select("id, github_login, claimed, claimed_by")
     .eq("github_login", githubLogin)
     .single();
 
@@ -50,12 +52,34 @@ export async function GET() {
     .eq("item_id", ITEM_ID)
     .maybeSingle();
 
+  const [ownRes, giftRes] = await Promise.all([
+    sb
+      .from("purchases")
+      .select("item_id")
+      .eq("developer_id", dev.id)
+      .is("gifted_to", null)
+      .eq("status", "completed")
+      .in("item_id", [TEXT_TOOL_ITEM_ID, IMAGE_TOOL_ITEM_ID]),
+    sb
+      .from("purchases")
+      .select("item_id")
+      .eq("gifted_to", dev.id)
+      .eq("status", "completed")
+      .in("item_id", [TEXT_TOOL_ITEM_ID, IMAGE_TOOL_ITEM_ID]),
+  ]);
+  const owned = new Set([...(ownRes.data ?? []), ...(giftRes.data ?? [])].map((p) => p.item_id));
+
   const config = (data?.config ?? {}) as Record<string, unknown>;
   return NextResponse.json({
     draft: (config.draft ?? null) as EditorPayload | null,
     published: (config.published ?? null) as EditorPayload | null,
     updated_at: config.updated_at ?? null,
     published_at: config.published_at ?? null,
+    github_login: dev.github_login,
+    features: {
+      text_unlocked: owned.has(TEXT_TOOL_ITEM_ID),
+      image_unlocked: owned.has(IMAGE_TOOL_ITEM_ID),
+    },
   });
 }
 

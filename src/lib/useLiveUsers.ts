@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { createBrowserSupabase } from "@/lib/supabase";
+import { createBrowserSupabase, hasBrowserSupabaseEnv } from "@/lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-type Status = "connecting" | "connected" | "error";
+type Status = "connecting" | "connected" | "error" | "disabled";
 
 export function useLiveUsers() {
   const [count, setCount] = useState(1);
@@ -12,6 +12,11 @@ export function useLiveUsers() {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
+    if (!hasBrowserSupabaseEnv()) {
+      setStatus("disabled");
+      return;
+    }
+
     const supabase = createBrowserSupabase();
     const presenceKey = crypto.randomUUID();
 

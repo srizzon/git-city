@@ -234,6 +234,17 @@ export default async function ShopPage({ params, searchParams }: Props) {
               </p>
             </div>
           </div>
+          <div className="mt-4 border-[2px] border-border/60 bg-bg-card p-3">
+            <p className="text-[10px] text-muted normal-case">
+              Want custom structure? Build your base in the voxel editor, then use shop/loadout items on top.
+            </p>
+            <Link
+              href={`/editor?max_floors=${Math.max(1, Math.min(50, dev.floors ?? 50))}`}
+              className="btn-press mt-3 inline-block border-[2px] border-border px-4 py-2 text-[10px] text-cream transition-colors hover:border-border-light"
+            >
+              Open Building Editor
+            </Link>
+          </div>
         </div>
 
         {/* Shop items (client component) */}

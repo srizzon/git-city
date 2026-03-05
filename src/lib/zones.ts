@@ -30,6 +30,8 @@ export const ITEM_NAMES: Record<string, string> = {
   custom_color: "Custom Color",
   billboard: "Billboard",
   led_banner: "LED Banner",
+  editor_text_tool: "Editor Text Tool",
+  editor_image_tool: "Editor Image Tool",
   neon_outline: "Neon Outline",
   particle_aura: "Particle Aura",
   streak_freeze: "Streak Freeze",
@@ -82,7 +84,7 @@ export const ITEM_EMOJIS: Record<string, string> = {
   github_star: "⭐",
 };
 
-export const FACES_ITEMS = ["custom_color", "billboard", "led_banner"];
+export const FACES_ITEMS = ["custom_color", "billboard", "led_banner", "editor_text_tool", "editor_image_tool"];
 
 export const RAID_VEHICLE_ITEMS = ["raid_helicopter", "raid_drone", "raid_rocket"];
 export const RAID_TAG_ITEMS = ["tag_neon", "tag_fire", "tag_gold"];

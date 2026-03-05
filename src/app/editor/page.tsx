@@ -2,12 +2,16 @@
 
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, type ThreeEvent } from "@react-three/fiber";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 type Tool = "draw" | "erase";
-type ModelType = "door" | "window";
+type ModelType = "door" | "window" | "text";
+type PaintSurface = "front" | "back" | "left" | "right";
+type HoverPaintTarget = { x: number; y: number; z: number; surface: PaintSurface };
 
 type Block = {
   id: string;
@@ -30,8 +34,20 @@ type SavedPayload = {
   grid?: { cols?: number; rows?: number; floors?: number; cellHeightFloor?: number };
   footprint?: { lotWidth?: number; lotDepth?: number };
   blocks?: Array<{ x?: number; top?: number; widthUnits?: number; heightUnits?: number; color?: string }>;
-  copy_all_sides?: boolean;
+  roof_color?: string;
   voxels?: Array<{ x?: number; y?: number; z?: number; color?: string }>;
+  image_decals?: Array<{
+    id?: string;
+    src?: string;
+    surface?: PaintSurface;
+    cx?: number;
+    cy?: number;
+    cz?: number;
+    w?: number;
+    h?: number;
+    rotation_quarter?: number;
+    mirror?: boolean;
+  }>;
 };
 
 // Match city lot footprint (src/lib/github.ts): LOT_W=38, LOT_D=32.
@@ -43,14 +59,8 @@ const FLOOR_UNITS = 10;
 const MAX_FLOORS = 50;
 const MAJOR_GRID_COLUMNS = 4;
 const EDITOR_BUILDING_STORAGE_KEY = "gitcity_editor_building_v1";
-const AUTO_ROOF_COLORS = [
-  "#111111", // black
-  "#6b4423", // brown
-  "#2f6b3c", // green
-  "#b78a1d", // yellow
-  "#6b3f9e", // purple
-  "#2a4f9e", // azul
-];
+const DEFAULT_ROOF_COLOR = "#6b4423";
+const DEFAULT_COLOR = "#9ca3af";
 
 const COLORS = [
   // Gray
@@ -94,6 +104,45 @@ type PaintModel = {
   h: number;
   pixels: ModelPixel[];
 };
+
+type FacadeImageDecal = {
+  id: string;
+  src: string;
+  surface: PaintSurface;
+  cx: number;
+  cy: number;
+  cz: number;
+  w: number;
+  h: number;
+  rotationQuarter: number;
+  mirror: boolean;
+};
+
+type EditorSnapshot = {
+  blocks: Block[];
+  extraVoxels: Voxel[];
+  imageDecals: FacadeImageDecal[];
+  floors: number;
+  roofColor: string;
+};
+
+function rotateModel90(source: PaintModel): PaintModel {
+  const nextPixels = source.pixels.map((p) => ({
+    x: source.h - 1 - p.y,
+    y: p.x,
+    color: p.color,
+  }));
+  return {
+    ...source,
+    w: source.h,
+    h: source.w,
+    pixels: nextPixels,
+  };
+}
+
+function shouldMirrorTextOnSurface(surface: PaintSurface) {
+  return surface === "back" || surface === "right";
+}
 
 function rectPixels(w: number, h: number, color: string): ModelPixel[] {
   const out: ModelPixel[] = [];
@@ -142,30 +191,130 @@ const WINDOW_MODELS: PaintModel[] = [
 
 const ALL_MODELS = [...DOOR_MODELS, ...WINDOW_MODELS];
 
+type BuildingPreset = {
+  id: string;
+  label: string;
+  roofColor: string;
+  wallMain: string;
+  wallAccent: string;
+  doorModelId: string;
+  windowModelId: string;
+  stripeEvery: number;
+};
+
+const BUILDING_PRESETS: BuildingPreset[] = [
+  {
+    id: "glass-tower",
+    label: "Glass Tower",
+    roofColor: "#0f172a",
+    wallMain: "#94a3b8",
+    wallAccent: "#1f2937",
+    doorModelId: "door_05",
+    windowModelId: "win_02",
+    stripeEvery: 3,
+  },
+  {
+    id: "neo-brick",
+    label: "Neo Brick",
+    roofColor: "#5b3a29",
+    wallMain: "#d97706",
+    wallAccent: "#7c2d12",
+    doorModelId: "door_01",
+    windowModelId: "win_10",
+    stripeEvery: 2,
+  },
+  {
+    id: "minimal-white",
+    label: "Minimal White",
+    roofColor: "#334155",
+    wallMain: "#f1f5f9",
+    wallAccent: "#94a3b8",
+    doorModelId: "door_04",
+    windowModelId: "win_03",
+    stripeEvery: 4,
+  },
+  {
+    id: "cyber-grid",
+    label: "Cyber Grid",
+    roofColor: "#111827",
+    wallMain: "#1f2937",
+    wallAccent: "#22d3ee",
+    doorModelId: "door_09",
+    windowModelId: "win_07",
+    stripeEvery: 2,
+  },
+  {
+    id: "corporate-blue",
+    label: "Corporate Blue",
+    roofColor: "#1e3a8a",
+    wallMain: "#cbd5e1",
+    wallAccent: "#1d4ed8",
+    doorModelId: "door_10",
+    windowModelId: "win_04",
+    stripeEvery: 3,
+  },
+  {
+    id: "carbon-luxe",
+    label: "Carbon Luxe",
+    roofColor: "#0b0f16",
+    wallMain: "#111827",
+    wallAccent: "#9ca3af",
+    doorModelId: "door_02",
+    windowModelId: "win_09",
+    stripeEvery: 4,
+  },
+  {
+    id: "neon-slate",
+    label: "Neon Slate",
+    roofColor: "#0f172a",
+    wallMain: "#1e293b",
+    wallAccent: "#22d3ee",
+    doorModelId: "door_08",
+    windowModelId: "win_08",
+    stripeEvery: 2,
+  },
+  {
+    id: "metro-graphite",
+    label: "Metro Graphite",
+    roofColor: "#1f2937",
+    wallMain: "#334155",
+    wallAccent: "#e2e8f0",
+    doorModelId: "door_09",
+    windowModelId: "win_01",
+    stripeEvery: 3,
+  },
+  {
+    id: "tech-ivory",
+    label: "Tech Ivory",
+    roofColor: "#475569",
+    wallMain: "#f8fafc",
+    wallAccent: "#38bdf8",
+    doorModelId: "door_04",
+    windowModelId: "win_06",
+    stripeEvery: 5,
+  },
+  {
+    id: "midnight-grid-x",
+    label: "Midnight Grid X",
+    roofColor: "#020617",
+    wallMain: "#0f172a",
+    wallAccent: "#a3e635",
+    doorModelId: "door_05",
+    windowModelId: "win_07",
+    stripeEvery: 2,
+  },
+];
+
 function voxelKey(x: number, y: number, z: number) {
   return `${x}:${y}:${z}`;
 }
 
-function mapFacadeXToDepthZ(x: number, cols: number, depth: number) {
-  if (cols <= 1 || depth <= 1) return 0;
-  const t = x / (cols - 1);
-  return Math.max(0, Math.min(depth - 1, Math.round(t * (depth - 1))));
-}
-
-function blocksToVoxels(source: Block[], depth: number, cols: number, copyAllSides: boolean): Voxel[] {
+function blocksToVoxels(source: Block[]): Voxel[] {
   const out = new Map<string, Voxel>();
   for (const b of source) {
     for (let y = b.top; y < b.top + b.h; y++) {
       for (let x = b.x; x < b.x + b.w; x++) {
-        if (copyAllSides) {
-          const sideZ = mapFacadeXToDepthZ(x, cols, depth);
-          out.set(voxelKey(x, y, 0), { x, y, z: 0, color: b.color }); // front
-          out.set(voxelKey(x, y, depth - 1), { x, y, z: depth - 1, color: b.color }); // back
-          out.set(voxelKey(0, y, sideZ), { x: 0, y, z: sideZ, color: b.color }); // left
-          out.set(voxelKey(cols - 1, y, sideZ), { x: cols - 1, y, z: sideZ, color: b.color }); // right
-        } else {
-          out.set(voxelKey(x, y, 0), { x, y, z: 0, color: b.color });
-        }
+        out.set(voxelKey(x, y, 0), { x, y, z: 0, color: b.color });
       }
     }
   }
@@ -213,11 +362,19 @@ function isConnectedToBase3D(source: Voxel[], rows: number) {
   return visited.size === occupied.size;
 }
 
-function addAutomaticRoof(source: Voxel[], roofColor: string): Voxel[] {
-  if (source.length === 0) return source;
-
+function addAutomaticRoof(source: Voxel[], roofColor: string, rows: number, cols: number, depth: number): Voxel[] {
   const out = new Map<string, Voxel>();
   for (const v of source) out.set(voxelKey(v.x, v.y, v.z), v);
+  const roofY = 0; // Always keep roof at the top floor limit in editor.
+
+  if (source.length === 0) {
+    for (let x = 0; x < cols; x++) {
+      for (let z = 0; z < depth; z++) {
+        out.set(voxelKey(x, roofY, z), { x, y: roofY, z, color: roofColor });
+      }
+    }
+    return Array.from(out.values());
+  }
 
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
@@ -237,7 +394,7 @@ function addAutomaticRoof(source: Voxel[], roofColor: string): Voxel[] {
     return Array.from(out.values());
   }
 
-  const roofY = topY > 0 ? topY - 1 : topY;
+  if (roofY >= rows) return Array.from(out.values());
   for (let x = minX; x <= maxX; x++) {
     for (let z = minZ; z <= maxZ; z++) {
       out.set(voxelKey(x, roofY, z), { x, y: roofY, z, color: roofColor });
@@ -294,22 +451,146 @@ function ColorVoxelInstanced({
   );
 }
 
-function VoxelEditor3D({
+function GhostVoxels({
   voxels,
   rows,
   cols,
   depth,
-  onPaintCell,
-  setHoverCell,
 }: {
   voxels: Voxel[];
   rows: number;
   cols: number;
   depth: number;
-  onPaintCell: (x: number, y: number) => void;
-  setHoverCell: (cell: { x: number; y: number } | null) => void;
+}) {
+  if (voxels.length === 0) return null;
+  const xOffset = cols / 2;
+  const zOffset = depth / 2;
+
+  return (
+    <group>
+      {voxels.map((v) => (
+        <mesh key={`ghost-${v.x}-${v.y}-${v.z}-${v.color}`} position={[v.x - xOffset + 0.5, rows - v.y - 0.5, v.z - zOffset + 0.5]}>
+          <boxGeometry args={[0.98, 0.98, 0.98]} />
+          <meshBasicMaterial color={v.color} transparent opacity={0.48} depthWrite={false} depthTest={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function FacadeImageDecals({
+  decals,
+  rows,
+  cols,
+  depth,
+  opacity = 1,
+}: {
+  decals: FacadeImageDecal[];
+  rows: number;
+  cols: number;
+  depth: number;
+  opacity?: number;
+}) {
+  const xOffset = cols / 2;
+  const zOffset = depth / 2;
+  const decalOutset = 0.01;
+  const uniqueSources = useMemo(() => Array.from(new Set(decals.map((d) => d.src).filter(Boolean))), [decals]);
+  const texturesBySrc = useMemo(() => {
+    const loader = new THREE.TextureLoader();
+    const map = new Map<string, THREE.Texture>();
+    for (const src of uniqueSources) {
+      const texture = loader.load(src);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = 4;
+      map.set(src, texture);
+    }
+    return map;
+  }, [uniqueSources]);
+
+  useEffect(() => {
+    return () => {
+      for (const texture of texturesBySrc.values()) texture.dispose();
+    };
+  }, [texturesBySrc]);
+
+  return (
+    <group>
+      {decals.map((d, idx) => {
+        const worldY = rows - d.cy - 0.5;
+        const isFrontBack = d.surface === "front" || d.surface === "back";
+        const worldX = isFrontBack
+          ? d.cx - xOffset + 0.5
+          : d.surface === "left"
+            ? -cols / 2 + decalOutset
+            : cols / 2 - decalOutset;
+        const worldZ = isFrontBack
+          ? d.surface === "front"
+            ? -depth / 2 + decalOutset
+            : depth / 2 - decalOutset
+          : d.cz - zOffset + 0.5;
+        const yaw =
+          d.surface === "front"
+            ? 0
+            : d.surface === "back"
+              ? Math.PI
+              : d.surface === "left"
+                ? Math.PI / 2
+                : -Math.PI / 2;
+        return (
+          <mesh
+            key={`${d.id}-${idx}`}
+            position={[worldX, worldY, worldZ]}
+            rotation={[0, yaw, d.rotationQuarter * (Math.PI / 2)]}
+            scale={[d.mirror ? -1 : 1, 1, 1]}
+          >
+            <planeGeometry args={[d.w, d.h]} />
+            <meshBasicMaterial
+              map={texturesBySrc.get(d.src) ?? null}
+              transparent
+              opacity={opacity}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+              polygonOffset
+              polygonOffsetFactor={-2}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function VoxelEditor3D({
+  voxels,
+  ghostVoxels,
+  imageDecals,
+  ghostImageDecal,
+  rows,
+  cols,
+  depth,
+  cameraLocked,
+  layFlat,
+  onPaintCell,
+  onPaintStrokeStart,
+  setHoverTarget,
+}: {
+  voxels: Voxel[];
+  ghostVoxels: Voxel[];
+  imageDecals: FacadeImageDecal[];
+  ghostImageDecal: FacadeImageDecal | null;
+  rows: number;
+  cols: number;
+  depth: number;
+  cameraLocked: boolean;
+  layFlat: boolean;
+  onPaintCell: (x: number, y: number, z: number, surface: PaintSurface) => void;
+  onPaintStrokeStart: () => void;
+  setHoverTarget: (cell: HoverPaintTarget | null) => void;
 }) {
   const voxelList = useMemo(() => voxels, [voxels]);
+  const [isPaintingStroke, setIsPaintingStroke] = useState(false);
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const sceneGroupRef = useRef<THREE.Group>(null);
   const groupedByColor = useMemo(() => {
     const map = new Map<string, Voxel[]>();
     for (const v of voxelList) {
@@ -320,53 +601,175 @@ function VoxelEditor3D({
     return Array.from(map.entries());
   }, [voxelList]);
 
-  function frontPointToCell(point: THREE.Vector3) {
-    const x = Math.floor(point.x + cols / 2);
+  function pointToVoxel(point: THREE.Vector3, surface: PaintSurface) {
     const y = Math.floor(rows - point.y);
-    if (x < 0 || x >= cols || y < 0 || y >= rows) return null;
-    return { x, y };
+    if (y < 0 || y >= rows) return null;
+
+    if (surface === "front" || surface === "back") {
+      const x = Math.floor(point.x + cols / 2);
+      if (x < 0 || x >= cols) return null;
+      return { x, y, z: surface === "front" ? 0 : depth - 1, surface };
+    }
+
+    const z = Math.floor(point.z + depth / 2);
+    if (z < 0 || z >= depth) return null;
+    return { x: surface === "left" ? 0 : cols - 1, y, z, surface };
   }
 
-  function handleFrontPaint(event: ThreeEvent<PointerEvent>) {
+  function handlePaint(event: ThreeEvent<PointerEvent>, surface: PaintSurface) {
     event.stopPropagation();
-    const localPoint = event.point.clone();
-    const cell = frontPointToCell(localPoint);
-    if (!cell) return;
-    setHoverCell(cell);
-    onPaintCell(cell.x, cell.y);
+    const localPoint = sceneGroupRef.current
+      ? sceneGroupRef.current.worldToLocal(event.point.clone())
+      : event.point.clone();
+    const target = pointToVoxel(localPoint, surface);
+    if (!target) return;
+    setHoverTarget(target);
+    onPaintCell(target.x, target.y, target.z, target.surface);
   }
+
+  const paintPlanes = useMemo(
+    () => [
+      {
+        surface: "front" as PaintSurface,
+        position: [0, rows / 2, -depth / 2 + 1.05] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+        size: [cols, rows] as [number, number],
+      },
+      {
+        surface: "back" as PaintSurface,
+        position: [0, rows / 2, depth / 2 - 1.05] as [number, number, number],
+        rotation: [0, Math.PI, 0] as [number, number, number],
+        size: [cols, rows] as [number, number],
+      },
+      {
+        surface: "left" as PaintSurface,
+        position: [-cols / 2 + 1.05, rows / 2, 0] as [number, number, number],
+        rotation: [0, Math.PI / 2, 0] as [number, number, number],
+        size: [depth, rows] as [number, number],
+      },
+      {
+        surface: "right" as PaintSurface,
+        position: [cols / 2 - 1.05, rows / 2, 0] as [number, number, number],
+        rotation: [0, -Math.PI / 2, 0] as [number, number, number],
+        size: [depth, rows] as [number, number],
+      },
+    ],
+    [rows, cols, depth],
+  );
+
+  useEffect(() => {
+    const step = 0.12;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (cameraLocked) return;
+      const controls = controlsRef.current as (OrbitControlsImpl & {
+        getAzimuthalAngle?: () => number;
+        setAzimuthalAngle?: (angle: number) => void;
+        getPolarAngle?: () => number;
+        setPolarAngle?: (angle: number) => void;
+        rotateLeft?: (angle: number) => void;
+        rotateUp?: (angle: number) => void;
+      }) | null;
+      if (!controls) return;
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        if (controls.getAzimuthalAngle && controls.setAzimuthalAngle) {
+          controls.setAzimuthalAngle(controls.getAzimuthalAngle() + step);
+        } else {
+          controls.rotateLeft?.(step);
+        }
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        if (controls.getAzimuthalAngle && controls.setAzimuthalAngle) {
+          controls.setAzimuthalAngle(controls.getAzimuthalAngle() - step);
+        } else {
+          controls.rotateLeft?.(-step);
+        }
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (controls.getPolarAngle && controls.setPolarAngle) {
+          const next = Math.min(Math.PI - 0.2, controls.getPolarAngle() - step);
+          controls.setPolarAngle(next);
+        } else {
+          controls.rotateUp?.(step);
+        }
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (controls.getPolarAngle && controls.setPolarAngle) {
+          const next = Math.max(0.2, controls.getPolarAngle() + step);
+          controls.setPolarAngle(next);
+        } else {
+          controls.rotateUp?.(-step);
+        }
+      } else {
+        return;
+      }
+      controls.update();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [cameraLocked]);
 
   return (
     <Canvas camera={{ position: [28, 26, 28], fov: 48 }}>
       <color attach="background" args={["#101015"]} />
       <ambientLight intensity={0.7} />
       <directionalLight intensity={1.1} position={[20, 24, 14]} />
-      <gridHelper args={[90, 90, "#2b2b33", "#1b1b22"]} position={[0, 0, 0]} />
-      {groupedByColor.map(([groupColor, groupVoxels]) => (
-        <ColorVoxelInstanced
-          key={`${groupColor}-${groupVoxels.length}`}
-          voxels={groupVoxels}
-          rows={rows}
-          cols={cols}
-          depth={depth}
-          color={groupColor}
-        />
-      ))}
-      <mesh
-        position={[0, rows / 2, -depth / 2 + 1.05]}
-        onPointerDown={handleFrontPaint}
-        onPointerMove={(event) => {
-          const localPoint = event.point.clone();
-          const cell = frontPointToCell(localPoint);
-          setHoverCell(cell);
-          if ((event.buttons & 1) === 1) handleFrontPaint(event);
-        }}
-        onPointerLeave={() => setHoverCell(null)}
-      >
-        <planeGeometry args={[cols, rows]} />
-        <meshBasicMaterial transparent opacity={0.06} color="#c8e64a" side={THREE.DoubleSide} />
-      </mesh>
-      <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+      <group ref={sceneGroupRef} rotation={layFlat ? [0, 0, Math.PI / 2] : [0, 0, 0]}>
+        <gridHelper args={[90, 90, "#2b2b33", "#1b1b22"]} position={[0, 0, 0]} />
+        {groupedByColor.map(([groupColor, groupVoxels]) => (
+          <ColorVoxelInstanced
+            key={`${groupColor}-${groupVoxels.length}`}
+            voxels={groupVoxels}
+            rows={rows}
+            cols={cols}
+            depth={depth}
+            color={groupColor}
+          />
+        ))}
+        <GhostVoxels voxels={ghostVoxels} rows={rows} cols={cols} depth={depth} />
+        <FacadeImageDecals decals={imageDecals} rows={rows} cols={cols} depth={depth} />
+        {ghostImageDecal && (
+          <FacadeImageDecals decals={[ghostImageDecal]} rows={rows} cols={cols} depth={depth} opacity={0.45} />
+        )}
+        {paintPlanes.map((plane) => (
+          <mesh
+            key={`paint-plane-${plane.surface}`}
+            position={plane.position}
+            rotation={plane.rotation}
+            onPointerDown={(event) => {
+              setIsPaintingStroke(true);
+              onPaintStrokeStart();
+              handlePaint(event, plane.surface);
+            }}
+            onPointerMove={(event) => {
+              event.stopPropagation();
+              const localPoint = sceneGroupRef.current
+                ? sceneGroupRef.current.worldToLocal(event.point.clone())
+                : event.point.clone();
+              const target = pointToVoxel(localPoint, plane.surface);
+              setHoverTarget(target);
+              if ((event.buttons & 1) === 1) handlePaint(event, plane.surface);
+            }}
+            onPointerUp={() => setIsPaintingStroke(false)}
+            onPointerLeave={() => {
+              setIsPaintingStroke(false);
+              setHoverTarget(null);
+            }}
+          >
+            <planeGeometry args={plane.size} />
+            <meshBasicMaterial transparent opacity={0.08} color="#c8e64a" side={THREE.DoubleSide} />
+          </mesh>
+        ))}
+      </group>
+      <OrbitControls
+        ref={controlsRef}
+        makeDefault
+        enableDamping
+        dampingFactor={0.08}
+        enabled={!cameraLocked && !isPaintingStroke}
+      />
     </Canvas>
   );
 }
@@ -379,36 +782,121 @@ export default function BuildingEditorPage() {
     ? Math.max(1, Math.min(MAX_FLOORS, Math.floor(maxFloorsQuery)))
     : MAX_FLOORS;
   const [tool, setTool] = useState<Tool>("draw");
-  const [color, setColor] = useState(COLORS[0]);
+  const [cameraLocked, setCameraLocked] = useState(false);
+  const [color, setColor] = useState(DEFAULT_COLOR);
+  const [roofColor, setRoofColor] = useState(DEFAULT_ROOF_COLOR);
+  const [showRoofPalette, setShowRoofPalette] = useState(false);
+  const [showTextTool, setShowTextTool] = useState(false);
+  const [showImageTool, setShowImageTool] = useState(false);
+  const [showPresetTool, setShowPresetTool] = useState(false);
+  const [textToolUnlocked, setTextToolUnlocked] = useState(false);
+  const [imageToolUnlocked, setImageToolUnlocked] = useState(false);
+  const [ownerLogin, setOwnerLogin] = useState("");
+  const [textInput, setTextInput] = useState("");
+  const [textSizePx, setTextSizePx] = useState(16);
+  const [textLetterSpacing, setTextLetterSpacing] = useState(0);
+  const [textRotationQuarter, setTextRotationQuarter] = useState(0);
+  const [textMirrorEnabled, setTextMirrorEnabled] = useState(false);
+  const [generatedTextModel, setGeneratedTextModel] = useState<PaintModel | null>(null);
+  const [textPlacementReady, setTextPlacementReady] = useState(false);
+  const [textError, setTextError] = useState("");
+  const [imageSrc, setImageSrc] = useState("");
+  const [imageWidthUnits, setImageWidthUnits] = useState(12);
+  const [imageHeightUnits, setImageHeightUnits] = useState(12);
+  const [imageRotationQuarter, setImageRotationQuarter] = useState(0);
+  const [imageMirrorEnabled, setImageMirrorEnabled] = useState(false);
+  const [imagePlacementReady, setImagePlacementReady] = useState(false);
+  const [imageError, setImageError] = useState("");
+  const [imageDecals, setImageDecals] = useState<FacadeImageDecal[]>([]);
+  const [undoStack, setUndoStack] = useState<EditorSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<EditorSnapshot[]>([]);
+  const [layFlat, setLayFlat] = useState(false);
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [copyAllSides, setCopyAllSides] = useState(false);
-  const [floors, setFloors] = useState(Math.min(12, maxFloors));
+  const [floors, setFloors] = useState(maxFloors);
   const [isPointerDown, setIsPointerDown] = useState(false);
   const [paintWholeBlock, setPaintWholeBlock] = useState(false);
   const [copyFromFloor, setCopyFromFloor] = useState(1);
   const [copyToFloors, setCopyToFloors] = useState("");
-  const [editDepth, setEditDepth] = useState(0);
   const [extraVoxels, setExtraVoxels] = useState<Voxel[]>([]);
   const [expandedPanel, setExpandedPanel] = useState<ModelType | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null);
+  const [hoverTarget, setHoverTarget] = useState<HoverPaintTarget | null>(null);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveOk, setSaveOk] = useState(false);
   const [busyAction, setBusyAction] = useState<"draft" | "publish" | null>(null);
   const [loadedFromCloud, setLoadedFromCloud] = useState(false);
+  const [joystickDragging, setJoystickDragging] = useState(false);
+  const [joystickKnob, setJoystickKnob] = useState({ x: 0, y: 0 });
+  const joystickBaseRef = useRef<HTMLDivElement | null>(null);
+  const joystickPointerIdRef = useRef<number | null>(null);
+  const joystickVectorRef = useRef({ x: 0, y: 0 });
+  const rotateIntervalRef = useRef<number | null>(null);
+  const previousRowsRef = useRef(floors * FLOOR_UNITS);
+  const skipRowsReanchorRef = useRef(false);
+  const blocksRef = useRef(blocks);
+  const extraVoxelsRef = useRef(extraVoxels);
+  const imageDecalsRef = useRef(imageDecals);
+  const floorsRef = useRef(floors);
+  const roofColorRef = useRef(roofColor);
 
   const rows = floors * FLOOR_UNITS;
+  const shopHref = ownerLogin ? `/shop/${ownerLogin}` : "/shop";
   const floorOptions = useMemo(
     () => Array.from({ length: maxFloors }, (_, i) => i + 1),
     [maxFloors],
   );
 
   useEffect(() => {
-    setFloors((prev) => Math.min(prev, maxFloors));
+    blocksRef.current = blocks;
+  }, [blocks]);
+
+  useEffect(() => {
+    extraVoxelsRef.current = extraVoxels;
+  }, [extraVoxels]);
+
+  useEffect(() => {
+    imageDecalsRef.current = imageDecals;
+  }, [imageDecals]);
+
+  useEffect(() => {
+    floorsRef.current = floors;
+  }, [floors]);
+
+  useEffect(() => {
+    roofColorRef.current = roofColor;
+  }, [roofColor]);
+
+  useEffect(() => {
+    setFloors(maxFloors);
   }, [maxFloors]);
 
   useEffect(() => {
-    setBlocks((prev) => prev.filter((b) => b.top + b.h <= rows));
+    const previousRows = previousRowsRef.current;
+    if (previousRows === rows) return;
+
+    if (skipRowsReanchorRef.current) {
+      previousRowsRef.current = rows;
+      skipRowsReanchorRef.current = false;
+      return;
+    }
+
+    const delta = rows - previousRows;
+    setBlocks((prev) =>
+      prev
+        .map((b) => ({ ...b, top: b.top + delta }))
+        .filter((b) => b.top >= 0 && b.top + b.h <= rows),
+    );
+    setExtraVoxels((prev) =>
+      prev
+        .map((v) => ({ ...v, y: v.y + delta }))
+        .filter((v) => v.y >= 0 && v.y < rows),
+    );
+    setImageDecals((prev) =>
+      prev
+        .map((d) => ({ ...d, cy: d.cy + delta }))
+        .filter((d) => d.cy >= 0 && d.cy < rows),
+    );
+    previousRowsRef.current = rows;
   }, [rows]);
 
   useEffect(() => {
@@ -421,11 +909,132 @@ export default function BuildingEditorPage() {
     return () => window.removeEventListener("mouseup", stopPaint);
   }, []);
 
+  function dispatchRotateKey(key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown") {
+    if (cameraLocked) return;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  }
+
+  function updateJoystickFromClient(clientX: number, clientY: number) {
+    const base = joystickBaseRef.current;
+    if (!base) return;
+    const rect = base.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const maxRadius = 20;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > maxRadius && dist > 0) {
+      const s = maxRadius / dist;
+      dx *= s;
+      dy *= s;
+    }
+    setJoystickKnob({ x: dx, y: dy });
+    joystickVectorRef.current = { x: dx / maxRadius, y: dy / maxRadius };
+  }
+
+  function startJoystick(clientX: number, clientY: number) {
+    if (cameraLocked) return;
+    setJoystickDragging(true);
+    updateJoystickFromClient(clientX, clientY);
+  }
+
+  function stopJoystick() {
+    setJoystickDragging(false);
+    setJoystickKnob({ x: 0, y: 0 });
+    joystickVectorRef.current = { x: 0, y: 0 };
+    joystickPointerIdRef.current = null;
+  }
+
+  useEffect(() => {
+    if (rotateIntervalRef.current !== null) {
+      window.clearInterval(rotateIntervalRef.current);
+      rotateIntervalRef.current = null;
+    }
+    if (!joystickDragging || cameraLocked) return;
+
+    const tick = () => {
+      const v = joystickVectorRef.current;
+      const dead = 0.25;
+      if (v.x <= -dead) dispatchRotateKey("ArrowLeft");
+      if (v.x >= dead) dispatchRotateKey("ArrowRight");
+      if (v.y <= -dead) dispatchRotateKey("ArrowUp");
+      if (v.y >= dead) dispatchRotateKey("ArrowDown");
+    };
+
+    tick();
+    rotateIntervalRef.current = window.setInterval(tick, 65);
+    return () => {
+      if (rotateIntervalRef.current !== null) {
+        window.clearInterval(rotateIntervalRef.current);
+        rotateIntervalRef.current = null;
+      }
+    };
+  }, [joystickDragging, cameraLocked]);
+
+  function captureSnapshot(): EditorSnapshot {
+    return {
+      blocks: blocksRef.current.map((b) => ({ ...b })),
+      extraVoxels: extraVoxelsRef.current.map((v) => ({ ...v })),
+      imageDecals: imageDecalsRef.current.map((d) => ({ ...d })),
+      floors: floorsRef.current,
+      roofColor: roofColorRef.current,
+    };
+  }
+
+  function restoreSnapshot(snapshot: EditorSnapshot) {
+    skipRowsReanchorRef.current = true;
+    setFloors(snapshot.floors);
+    setRoofColor(snapshot.roofColor);
+    setBlocks(snapshot.blocks.map((b) => ({ ...b })));
+    setExtraVoxels(snapshot.extraVoxels.map((v) => ({ ...v })));
+    setImageDecals(snapshot.imageDecals.map((d) => ({ ...d })));
+  }
+
+  function pushUndoSnapshot() {
+    const snapshot = captureSnapshot();
+    setUndoStack((prev) => {
+      const next = [...prev, snapshot];
+      return next.length > 80 ? next.slice(next.length - 80) : next;
+    });
+    setRedoStack([]);
+  }
+
+  function undoAction() {
+    setUndoStack((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      const current = captureSnapshot();
+      setRedoStack((redoPrev) => {
+        const next = [...redoPrev, current];
+        return next.length > 80 ? next.slice(next.length - 80) : next;
+      });
+      restoreSnapshot(last);
+      return prev.slice(0, -1);
+    });
+  }
+
+  function redoAction() {
+    setRedoStack((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      const current = captureSnapshot();
+      setUndoStack((undoPrev) => {
+        const next = [...undoPrev, current];
+        return next.length > 80 ? next.slice(next.length - 80) : next;
+      });
+      restoreSnapshot(last);
+      return prev.slice(0, -1);
+    });
+  }
+
   function applyPayload(source: SavedPayload | null) {
     if (!source || typeof source !== "object") return false;
     const payloadBlocks = Array.isArray(source.blocks) ? source.blocks : [];
     const payloadVoxels = Array.isArray(source.voxels) ? source.voxels : [];
-    if (payloadBlocks.length === 0 && payloadVoxels.length === 0) return false;
+    const payloadImageDecals = Array.isArray(source.image_decals) ? source.image_decals : [];
+    if (payloadBlocks.length === 0 && payloadVoxels.length === 0 && payloadImageDecals.length === 0) return false;
+    if (typeof source.roof_color === "string") setRoofColor(source.roof_color);
 
     const nextFloorsRaw = Number(
       source.grid?.floors ?? Math.ceil((Number(source.grid?.rows ?? 120) || 120) / FLOOR_UNITS),
@@ -440,7 +1049,7 @@ export default function BuildingEditorPage() {
         const top = Number(b.top ?? 0);
         const w = Number(b.widthUnits ?? 1);
         const h = Number(b.heightUnits ?? 1);
-        const c = typeof b.color === "string" ? b.color : COLORS[0];
+        const c = typeof b.color === "string" ? b.color : DEFAULT_COLOR;
         if (!Number.isFinite(x) || !Number.isFinite(top) || !Number.isFinite(w) || !Number.isFinite(h)) return null;
         return {
           id: `load-${idx}-${x}-${top}`,
@@ -453,29 +1062,94 @@ export default function BuildingEditorPage() {
       })
       .filter((b): b is Block => !!b);
 
-    const nextCopyAllSides = Boolean(source.copy_all_sides);
-    const baseVoxels = new Set(
-      blocksToVoxels(nextBlocks, depth3d, COLS, nextCopyAllSides).map((v) => voxelKey(v.x, v.y, v.z)),
-    );
+    const baseVoxels = new Set(blocksToVoxels(nextBlocks).map((v) => voxelKey(v.x, v.y, v.z)));
     const nextExtraVoxels: Voxel[] = payloadVoxels
       .map((v) => {
         const x = Number(v.x ?? 0);
         const y = Number(v.y ?? 0);
         const z = Number(v.z ?? 0);
-        const c = typeof v.color === "string" ? v.color : COLORS[0];
+        const c = typeof v.color === "string" ? v.color : DEFAULT_COLOR;
         if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
         return { x: Math.floor(x), y: Math.floor(y), z: Math.floor(z), color: c } as Voxel;
       })
       .filter((v): v is Voxel => !!v && !baseVoxels.has(voxelKey(v.x, v.y, v.z)));
+    const nextImageDecals: FacadeImageDecal[] = payloadImageDecals
+      .map((d, idx) => {
+        if (typeof d?.src !== "string") return null;
+        const surface = d.surface;
+        if (surface !== "front" && surface !== "back" && surface !== "left" && surface !== "right") return null;
+        const cx = Number(d.cx ?? 0);
+        const cy = Number(d.cy ?? 0);
+        const cz = Number(d.cz ?? 0);
+        const w = Number(d.w ?? 1);
+        const h = Number(d.h ?? 1);
+        const rotationQuarter = Number(d.rotation_quarter ?? 0);
+        const mirror = Boolean(d.mirror ?? false);
+        if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(cz) || !Number.isFinite(w) || !Number.isFinite(h)) {
+          return null;
+        }
+        return {
+          id: typeof d.id === "string" && d.id.length > 0 ? d.id : `img-${idx}-${Date.now()}`,
+          src: d.src,
+          surface,
+          cx: Math.floor(cx),
+          cy: Math.floor(cy),
+          cz: Math.floor(cz),
+          w: Math.max(1, Math.floor(w)),
+          h: Math.max(1, Math.floor(h)),
+          rotationQuarter: ((Math.floor(rotationQuarter) % 4) + 4) % 4,
+          mirror,
+        } as FacadeImageDecal;
+      })
+      .filter((d): d is FacadeImageDecal => !!d);
 
-    setFloors(nextFloors);
-    setBlocks(nextBlocks.filter((b) => b.top + b.h <= nextFloors * FLOOR_UNITS));
-    setCopyAllSides(nextCopyAllSides);
-    setExtraVoxels(
-      nextExtraVoxels.filter(
-        (v) => v.y >= 0 && v.y < nextFloors * FLOOR_UNITS && v.x >= 0 && v.x < COLS && v.z >= 0 && v.z < depth3d,
-      ),
-    );
+    const sourceRows = nextFloors * FLOOR_UNITS;
+    const targetFloors = maxFloors;
+    const targetRows = targetFloors * FLOOR_UNITS;
+    const deltaRows = targetRows - sourceRows;
+    const addedFloors = deltaRows > 0 ? Math.floor(deltaRows / FLOOR_UNITS) : 0;
+
+    const shiftedBlocks = nextBlocks
+      .map((b) => ({ ...b, top: b.top + deltaRows }))
+      .filter((b) => b.top >= 0 && b.top + b.h <= targetRows);
+    const shiftedExtraVoxels = nextExtraVoxels
+      .map((v) => ({ ...v, y: v.y + deltaRows }))
+      .filter((v) => v.y >= 0 && v.y < targetRows && v.x >= 0 && v.x < COLS && v.z >= 0 && v.z < depth3d);
+    const shiftedImageDecals = nextImageDecals
+      .map((d) => ({ ...d, cy: d.cy + deltaRows }))
+      .filter((d) => d.cy >= 0 && d.cy < targetRows);
+
+    // If account floor limit increased, clone the previous top floor into each new floor.
+    const topFrontBlocks = nextBlocks.filter((b) => b.top >= 0 && b.top < FLOOR_UNITS);
+    const topExtraVoxels = nextExtraVoxels.filter((v) => v.y >= 0 && v.y < FLOOR_UNITS);
+    const grownBlocks: Block[] = [];
+    const grownExtraVoxels: Voxel[] = [];
+    if (addedFloors > 0) {
+      for (let f = 0; f < addedFloors; f++) {
+        const floorOffset = f * FLOOR_UNITS;
+        for (const b of topFrontBlocks) {
+          grownBlocks.push({
+            ...b,
+            id: `grow-${f}-${b.id}`,
+            top: b.top + floorOffset,
+          });
+        }
+        for (const v of topExtraVoxels) {
+          grownExtraVoxels.push({
+            ...v,
+            y: v.y + floorOffset,
+          });
+        }
+      }
+    }
+
+    skipRowsReanchorRef.current = true;
+    setFloors(targetFloors);
+    setBlocks([...grownBlocks, ...shiftedBlocks]);
+    setExtraVoxels([...grownExtraVoxels, ...shiftedExtraVoxels]);
+    setImageDecals(shiftedImageDecals);
+    setUndoStack([]);
+    setRedoStack([]);
     return true;
   }
 
@@ -495,6 +1169,9 @@ export default function BuildingEditorPage() {
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
+        if (typeof data?.github_login === "string") setOwnerLogin(data.github_login);
+        setTextToolUnlocked(Boolean(data?.features?.text_unlocked));
+        setImageToolUnlocked(Boolean(data?.features?.image_unlocked));
         const preferred = (data?.draft ?? data?.published) as SavedPayload | undefined;
         if (preferred && applyPayload(preferred)) {
           setLoadedFromCloud(true);
@@ -515,6 +1192,233 @@ export default function BuildingEditorPage() {
     () => ALL_MODELS.find((m) => m.id === selectedModelId) ?? null,
     [selectedModelId],
   );
+  const activeModel = useMemo(() => {
+    const base = generatedTextModel ?? selectedModel;
+    if (!base) return null;
+    if (base.type !== "text") return base;
+    let rotated = base;
+    for (let i = 0; i < textRotationQuarter; i++) rotated = rotateModel90(rotated);
+    return rotated;
+  }, [generatedTextModel, selectedModel, textRotationQuarter]);
+
+  function buildTextModel(text: string, sizePx: number, letterSpacingPx: number, fillColor: string): PaintModel | null {
+    const value = text.trim();
+    if (!value) return null;
+
+    const safeSize = Math.max(1, Math.min(100, Math.floor(sizePx)));
+    const safeLetterSpacing = Math.max(-2, Math.min(30, Math.floor(letterSpacingPx)));
+    const supersample = 8;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.font = `500 ${safeSize}px Tahoma, Verdana, Arial, sans-serif`;
+    const chars = Array.from(value);
+    const charsWidth = chars.reduce((sum, ch) => sum + ctx.measureText(ch).width, 0);
+    const spacingTotal = Math.max(0, chars.length - 1) * safeLetterSpacing;
+    const textWidth = charsWidth + spacingTotal;
+    const pad = Math.max(2, Math.ceil(safeSize * 0.25));
+    const width = Math.max(1, Math.ceil(textWidth) + pad * 2); // model width in voxel units
+    const height = Math.max(1, Math.ceil(safeSize * 1.15) + pad * 2); // model height in voxel units
+    canvas.width = width * supersample;
+    canvas.height = height * supersample;
+
+    ctx.setTransform(supersample, 0, 0, supersample, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `500 ${safeSize}px Tahoma, Verdana, Arial, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    let cursorX = pad;
+    for (const ch of chars) {
+      ctx.fillText(ch, cursorX, height / 2);
+      cursorX += ctx.measureText(ch).width + safeLetterSpacing;
+    }
+
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const pixels: ModelPixel[] = [];
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let alphaSum = 0;
+        for (let sy = 0; sy < supersample; sy++) {
+          for (let sx = 0; sx < supersample; sx++) {
+            const px = x * supersample + sx;
+            const py = y * supersample + sy;
+            alphaSum += data[(py * canvas.width + px) * 4 + 3];
+          }
+        }
+        const alphaAvg = alphaSum / (supersample * supersample * 255);
+        if (alphaAvg < 0.2) continue;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+        pixels.push({ x, y, color: fillColor });
+      }
+    }
+
+    if (pixels.length === 0) return null;
+
+    return {
+      id: `text-${value}-${safeSize}-${safeLetterSpacing}-${fillColor.replace("#", "")}`,
+      label: `Text ${value}`,
+      type: "text",
+      w: maxX - minX + 1,
+      h: maxY - minY + 1,
+      pixels: pixels.map((p) => ({ x: p.x - minX, y: p.y - minY, color: p.color })),
+    };
+  }
+
+  function generateTextPlacement() {
+    setTextError("");
+    setImagePlacementReady(false);
+    if (!textToolUnlocked) {
+      setGeneratedTextModel(null);
+      setTextPlacementReady(false);
+      setTextError("Text tool is locked. Buy once ($2) to use forever.");
+      return;
+    }
+    const model = buildTextModel(textInput, textSizePx, textLetterSpacing, color);
+    if (!model) {
+      setGeneratedTextModel(null);
+      setTextPlacementReady(false);
+      setTextError("Type a text before pressing OK.");
+      return;
+    }
+    setExpandedPanel(null);
+    setSelectedModelId(null);
+    setGeneratedTextModel(model);
+    setTextPlacementReady(true);
+  }
+
+  useEffect(() => {
+    if (!textPlacementReady) return;
+    const model = buildTextModel(textInput, textSizePx, textLetterSpacing, color);
+    if (!model) {
+      setGeneratedTextModel(null);
+      return;
+    }
+    setGeneratedTextModel(model);
+  }, [textInput, textSizePx, textLetterSpacing, color, textPlacementReady]);
+
+  function clampDecalCenter(index: number, size: number, max: number) {
+    const left = Math.floor((size - 1) / 2);
+    const right = Math.floor(size / 2);
+    const min = left;
+    const maxCenter = max - 1 - right;
+    return Math.max(min, Math.min(maxCenter, index));
+  }
+
+  function buildImageDecalForTarget(
+    target: HoverPaintTarget,
+    src: string,
+    wUnits: number,
+    hUnits: number,
+    id: string,
+    rotationQuarter: number,
+    mirror: boolean,
+  ): FacadeImageDecal {
+    const quarter = ((Math.floor(rotationQuarter) % 4) + 4) % 4;
+    const baseW = Math.max(1, Math.floor(wUnits));
+    const baseH = Math.max(1, Math.floor(hUnits));
+    const rotatedW = quarter % 2 === 1 ? baseH : baseW;
+    const rotatedH = quarter % 2 === 1 ? baseW : baseH;
+    const w = Math.max(
+      1,
+      Math.min(target.surface === "left" || target.surface === "right" ? depth3d : COLS, rotatedW),
+    );
+    const h = Math.max(1, Math.min(rows, rotatedH));
+    const cy = clampDecalCenter(target.y, h, rows);
+    if (target.surface === "left" || target.surface === "right") {
+      const cz = clampDecalCenter(target.z, w, depth3d);
+      return {
+        id,
+        src,
+        surface: target.surface,
+        cx: target.x,
+        cy,
+        cz,
+        w,
+        h,
+        rotationQuarter: quarter,
+        mirror,
+      };
+    }
+    const cx = clampDecalCenter(target.x, w, COLS);
+    return {
+      id,
+      src,
+      surface: target.surface,
+      cx,
+      cy,
+      cz: target.z,
+      w,
+      h,
+      rotationQuarter: quarter,
+      mirror,
+    };
+  }
+
+  const ghostImageDecal = useMemo(() => {
+    if (!imagePlacementReady || !hoverTarget || !imageSrc || tool !== "draw") return null;
+    return buildImageDecalForTarget(
+      hoverTarget,
+      imageSrc,
+      imageWidthUnits,
+      imageHeightUnits,
+      "ghost-image",
+      imageRotationQuarter,
+      imageMirrorEnabled,
+    );
+  }, [
+    imagePlacementReady,
+    hoverTarget,
+    imageSrc,
+    imageWidthUnits,
+    imageHeightUnits,
+    imageRotationQuarter,
+    imageMirrorEnabled,
+    tool,
+  ]);
+  const ghostVoxels = useMemo(() => {
+    if (!activeModel || !hoverTarget || tool !== "draw") return [];
+    const top = Math.max(0, hoverTarget.y - activeModel.h + 1);
+    const mirror =
+      activeModel.type === "text" &&
+      (shouldMirrorTextOnSurface(hoverTarget.surface) !== textMirrorEnabled);
+    if (hoverTarget.surface === "left" || hoverTarget.surface === "right") {
+      const zStart = Math.max(
+        0,
+        Math.min(depth3d - activeModel.w, hoverTarget.z - Math.floor(activeModel.w / 2)),
+      );
+      const xFixed = hoverTarget.surface === "left" ? 0 : COLS - 1;
+      return activeModel.pixels
+        .map((p) => ({
+          x: xFixed,
+          y: top + p.y,
+          z: zStart + (mirror ? activeModel.w - 1 - p.x : p.x),
+          color: p.color,
+        }))
+        .filter((v) => v.y >= 0 && v.y < rows && v.z >= 0 && v.z < depth3d);
+    }
+    const xStart = Math.max(0, Math.min(COLS - activeModel.w, hoverTarget.x - Math.floor(activeModel.w / 2)));
+    const zFixed = hoverTarget.surface === "front" ? 0 : depth3d - 1;
+    return activeModel.pixels
+      .map((p) => ({
+        x: xStart + (mirror ? activeModel.w - 1 - p.x : p.x),
+        y: top + p.y,
+        z: zFixed,
+        color: p.color,
+      }))
+      .filter((v) => v.x >= 0 && v.x < COLS && v.y >= 0 && v.y < rows);
+  }, [activeModel, hoverTarget, tool, depth3d, rows, textMirrorEnabled]);
 
   function modelPlacement(model: PaintModel, x: number, y: number) {
     const px = Math.max(0, Math.min(COLS - model.w, x - Math.floor(model.w / 2)));
@@ -523,12 +1427,16 @@ export default function BuildingEditorPage() {
   }
 
   const voxels = useMemo(() => {
-    const base = blocksToVoxels(blocks, depth3d, COLS, copyAllSides);
+    const base = blocksToVoxels(blocks);
     const merged = new Map<string, Voxel>();
     for (const v of base) merged.set(voxelKey(v.x, v.y, v.z), v);
     for (const v of extraVoxels) merged.set(voxelKey(v.x, v.y, v.z), v);
     return Array.from(merged.values());
-  }, [blocks, depth3d, copyAllSides, extraVoxels]);
+  }, [blocks, extraVoxels]);
+  const previewVoxels = useMemo(
+    () => addAutomaticRoof(voxels, roofColor, rows, COLS, depth3d),
+    [voxels, roofColor, rows, depth3d],
+  );
 
   function floorToRowStart(floorFromBottom: number) {
     return rows - floorFromBottom * FLOOR_UNITS;
@@ -632,15 +1540,47 @@ export default function BuildingEditorPage() {
     });
   }
 
+  function applyWholeSideBlockAtDepth(y: number, z: number, surface: "left" | "right") {
+    const depthBand = Math.floor((z * MAJOR_GRID_COLUMNS) / depth3d);
+    const zStart = Math.floor((depthBand * depth3d) / MAJOR_GRID_COLUMNS);
+    const zEnd = Math.floor(((depthBand + 1) * depth3d) / MAJOR_GRID_COLUMNS) - 1;
+    const floorBand = Math.floor(y / FLOOR_UNITS);
+    const yStart = floorBand * FLOOR_UNITS;
+    const yEnd = Math.min(rows - 1, yStart + FLOOR_UNITS - 1);
+    const xFixed = surface === "left" ? 0 : COLS - 1;
+
+    setExtraVoxels((prev) => {
+      const within = (v: Voxel) => v.x === xFixed && v.z >= zStart && v.z <= zEnd && v.y >= yStart && v.y <= yEnd;
+      if (tool === "erase") return prev.filter((v) => !within(v));
+
+      const next = [...prev];
+      const indexByKey = new Map<string, number>();
+      for (let i = 0; i < next.length; i++) indexByKey.set(voxelKey(next[i].x, next[i].y, next[i].z), i);
+
+      for (let yy = yStart; yy <= yEnd; yy++) {
+        for (let zz = zStart; zz <= zEnd; zz++) {
+          const key = voxelKey(xFixed, yy, zz);
+          const idx = indexByKey.get(key);
+          if (idx !== undefined) next[idx] = { ...next[idx], color };
+          else next.push({ x: xFixed, y: yy, z: zz, color });
+        }
+      }
+      return next;
+    });
+  }
+
   function paintModelAt(model: PaintModel, x: number, y: number, targetDepth = 0) {
     const place = modelPlacement(model, x, y);
     const cells = model.pixels.map((p) => ({
       x: place.x + p.x,
       y: place.top + p.y,
       color: p.color,
-    }));
+    }))
+      .filter((c) => c.x >= 0 && c.x < COLS && c.y >= 0 && c.y < rows);
 
-    if (targetDepth === 0 && !copyAllSides) {
+    if (cells.length === 0) return;
+
+    if (targetDepth === 0) {
       setBlocks((prev) => {
         const target = new Set(cells.map((c) => cellKey(c.x, c.y)));
         const kept = prev.filter((b) => !target.has(cellKey(b.x, b.top)));
@@ -713,16 +1653,98 @@ export default function BuildingEditorPage() {
     });
   }
 
-  function paintCell3D(x: number, y: number) {
+  function paintVoxel3D(x: number, y: number, z: number, surface: PaintSurface) {
     setSaveMessage("");
-    const targetDepth = Math.max(0, Math.min(depth3d - 1, editDepth));
+    const targetDepth = Math.max(0, Math.min(depth3d - 1, z));
 
-    if (selectedModel && tool === "draw") {
-      paintModelAt(selectedModel, x, y, targetDepth);
+    if (imagePlacementReady && tool === "draw" && imageSrc && imageToolUnlocked) {
+      const decal = buildImageDecalForTarget(
+        { x, y, z: targetDepth, surface },
+        imageSrc,
+        imageWidthUnits,
+        imageHeightUnits,
+        `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        imageRotationQuarter,
+        imageMirrorEnabled,
+      );
+      setImageDecals((prev) => [...prev, decal]);
       return;
     }
 
-    if (targetDepth === 0 && !copyAllSides) {
+    if (activeModel && tool === "draw") {
+      if (activeModel.type === "text") {
+        const top = Math.max(0, y - activeModel.h + 1);
+        const mirror = shouldMirrorTextOnSurface(surface) !== textMirrorEnabled;
+
+        if (surface === "left" || surface === "right") {
+          const zStart = Math.max(0, Math.min(depth3d - activeModel.w, targetDepth - Math.floor(activeModel.w / 2)));
+          const xFixed = surface === "left" ? 0 : COLS - 1;
+          setExtraVoxels((prev) => {
+            const next = [...prev];
+            const indexByKey = new Map<string, number>();
+            for (let i = 0; i < next.length; i++) indexByKey.set(voxelKey(next[i].x, next[i].y, next[i].z), i);
+            for (const p of activeModel.pixels) {
+              const vx = xFixed;
+              const vy = top + p.y;
+              const vz = zStart + (mirror ? activeModel.w - 1 - p.x : p.x);
+              if (vy < 0 || vy >= rows || vz < 0 || vz >= depth3d) continue;
+              const key = voxelKey(vx, vy, vz);
+              const idx = indexByKey.get(key);
+              if (idx !== undefined) next[idx] = { ...next[idx], color: p.color };
+              else next.push({ x: vx, y: vy, z: vz, color: p.color });
+            }
+            return next;
+          });
+          return;
+        }
+
+        const xStart = Math.max(0, Math.min(COLS - activeModel.w, x - Math.floor(activeModel.w / 2)));
+        const zFixed = surface === "front" ? 0 : depth3d - 1;
+        setExtraVoxels((prev) => {
+          const next = [...prev];
+          const indexByKey = new Map<string, number>();
+          for (let i = 0; i < next.length; i++) indexByKey.set(voxelKey(next[i].x, next[i].y, next[i].z), i);
+          for (const p of activeModel.pixels) {
+            const vx = xStart + (mirror ? activeModel.w - 1 - p.x : p.x);
+            const vy = top + p.y;
+            if (vx < 0 || vx >= COLS || vy < 0 || vy >= rows) continue;
+            const key = voxelKey(vx, vy, zFixed);
+            const idx = indexByKey.get(key);
+            if (idx !== undefined) next[idx] = { ...next[idx], color: p.color };
+            else next.push({ x: vx, y: vy, z: zFixed, color: p.color });
+          }
+          return next;
+        });
+        return;
+      }
+
+      if (surface === "left" || surface === "right") {
+        const top = Math.max(0, y - activeModel.h + 1);
+        const zStart = Math.max(0, Math.min(depth3d - activeModel.w, targetDepth - Math.floor(activeModel.w / 2)));
+        const xFixed = surface === "left" ? 0 : COLS - 1;
+        setExtraVoxels((prev) => {
+          const next = [...prev];
+          const indexByKey = new Map<string, number>();
+          for (let i = 0; i < next.length; i++) indexByKey.set(voxelKey(next[i].x, next[i].y, next[i].z), i);
+          for (const p of activeModel.pixels) {
+            const vx = xFixed;
+            const vy = top + p.y;
+            const vz = zStart + p.x;
+            if (vy < 0 || vy >= rows || vz < 0 || vz >= depth3d) continue;
+            const key = voxelKey(vx, vy, vz);
+            const idx = indexByKey.get(key);
+            if (idx !== undefined) next[idx] = { ...next[idx], color: p.color };
+            else next.push({ x: vx, y: vy, z: vz, color: p.color });
+          }
+          return next;
+        });
+        return;
+      }
+      paintModelAt(activeModel, x, y, targetDepth);
+      return;
+    }
+
+    if (surface === "front" && targetDepth === 0) {
       if (paintWholeBlock) {
         applyWholeBlockAt(x, y);
         return;
@@ -732,6 +1754,10 @@ export default function BuildingEditorPage() {
     }
 
     if (paintWholeBlock) {
+      if (surface === "left" || surface === "right") {
+        applyWholeSideBlockAtDepth(y, targetDepth, surface);
+        return;
+      }
       applyWholeBlockAtDepth(x, y, targetDepth);
       return;
     }
@@ -762,9 +1788,10 @@ export default function BuildingEditorPage() {
   }
 
   function clearAll() {
+    pushUndoSnapshot();
     setBlocks([]);
     setExtraVoxels([]);
-    setCopyAllSides(false);
+    setImageDecals([]);
   }
 
   function isConnectedToBase(source: Block[]) {
@@ -816,8 +1843,7 @@ export default function BuildingEditorPage() {
     }
 
     setBusyAction(mode);
-    const roofColor = AUTO_ROOF_COLORS[Math.floor(Math.random() * AUTO_ROOF_COLORS.length)];
-    const voxelsWithRoof = addAutomaticRoof(voxels, roofColor);
+    const voxelsWithRoof = addAutomaticRoof(voxels, roofColor, rows, COLS, depth3d);
 
     const payload = {
       version: 1,
@@ -831,12 +1857,24 @@ export default function BuildingEditorPage() {
         heightFloor: Number((b.h * 0.1).toFixed(1)),
         color: b.color,
       })),
-      copy_all_sides: copyAllSides,
+      roof_color: roofColor,
       voxels: voxelsWithRoof.map((v) => ({
         x: v.x,
         y: v.y,
         z: v.z,
         color: v.color,
+      })),
+      image_decals: imageDecals.map((d) => ({
+        id: d.id,
+        src: d.src,
+        surface: d.surface,
+        cx: d.cx,
+        cy: d.cy,
+        cz: d.cz,
+        w: d.w,
+        h: d.h,
+        rotation_quarter: d.rotationQuarter,
+        mirror: d.mirror,
       })),
     };
     try {
@@ -849,7 +1887,6 @@ export default function BuildingEditorPage() {
         .slice(0, 8);
       console.log("[Editor Save Debug]", {
         selectedColor: color,
-        copyAllSides,
         blocks: payload.blocks.length,
         voxels: payload.voxels.length,
         roofColor,
@@ -857,7 +1894,6 @@ export default function BuildingEditorPage() {
       });
       (window as unknown as Record<string, unknown>).__gcEditorSaveDebug = {
         selectedColor: color,
-        copyAllSides,
         blocks: payload.blocks.length,
         voxels: payload.voxels.length,
         roofColor,
@@ -905,6 +1941,7 @@ export default function BuildingEditorPage() {
   function copyFloorPattern() {
     const targets = parseTargetFloors(copyToFloors).filter((f) => f !== copyFromFloor);
     if (targets.length === 0) return;
+    pushUndoSnapshot();
 
     const fromStart = floorToRowStart(copyFromFloor);
     const fromEnd = fromStart + FLOOR_UNITS - 1;
@@ -918,7 +1955,16 @@ export default function BuildingEditorPage() {
       }
     }
 
-    if (sourceCells.size === 0) return;
+    const sourceExtraCells = extraVoxels
+      .filter((v) => v.y >= fromStart && v.y <= fromEnd)
+      .map((v) => ({
+        x: v.x,
+        z: v.z,
+        localY: v.y - fromStart,
+        color: v.color,
+      }));
+
+    if (sourceCells.size === 0 && sourceExtraCells.length === 0) return;
 
     setBlocks((prev) => {
       let next = [...prev];
@@ -955,6 +2001,157 @@ export default function BuildingEditorPage() {
       }
       return next;
     });
+
+    if (sourceExtraCells.length > 0) {
+      setExtraVoxels((prev) => {
+        let next = [...prev];
+        for (const floor of targets) {
+          const targetStart = floorToRowStart(floor);
+          const targetEnd = targetStart + FLOOR_UNITS - 1;
+
+          next = next.filter((v) => !(v.y >= targetStart && v.y <= targetEnd));
+
+          const indexByKey = new Map<string, number>();
+          for (let i = 0; i < next.length; i++) indexByKey.set(voxelKey(next[i].x, next[i].y, next[i].z), i);
+
+          for (const c of sourceExtraCells) {
+            const y = targetStart + c.localY;
+            if (y < targetStart || y > targetEnd) continue;
+            const key = voxelKey(c.x, y, c.z);
+            const idx = indexByKey.get(key);
+            if (idx !== undefined) next[idx] = { ...next[idx], color: c.color };
+            else next.push({ x: c.x, y, z: c.z, color: c.color });
+          }
+        }
+        return next;
+      });
+    }
+  }
+
+  function applyBuildingPreset(preset: BuildingPreset) {
+    pushUndoSnapshot();
+    setSaveMessage("");
+    setGeneratedTextModel(null);
+    setTextPlacementReady(false);
+    setImagePlacementReady(false);
+    setSelectedModelId(null);
+    setExpandedPanel(null);
+    setRoofColor(preset.roofColor);
+
+    const doorModel = DOOR_MODELS.find((m) => m.id === preset.doorModelId) ?? DOOR_MODELS[0];
+    const windowModel = WINDOW_MODELS.find((m) => m.id === preset.windowModelId) ?? WINDOW_MODELS[0];
+
+    const frontBlocks = new Map<string, Block>();
+    const extraMap = new Map<string, Voxel>();
+
+    const addFront = (x: number, y: number, colorValue: string) => {
+      if (x < 0 || x >= COLS || y < 0 || y >= rows) return;
+      const key = `${x}:${y}`;
+      frontBlocks.set(key, {
+        id: `preset-${key}-${Math.random().toString(36).slice(2, 6)}`,
+        x,
+        top: y,
+        w: 1,
+        h: 1,
+        color: colorValue,
+      });
+    };
+
+    const addExtra = (x: number, y: number, z: number, colorValue: string) => {
+      if (x < 0 || x >= COLS || y < 0 || y >= rows || z < 0 || z >= depth3d) return;
+      const key = voxelKey(x, y, z);
+      extraMap.set(key, { x, y, z, color: colorValue });
+    };
+
+    const stampModel = (
+      model: PaintModel,
+      surface: PaintSurface,
+      center: number,
+      top: number,
+      useModelColors = true,
+      fallbackColor = preset.wallAccent,
+    ) => {
+      if (surface === "front" || surface === "back") {
+        const xStart = Math.max(0, Math.min(COLS - model.w, center - Math.floor(model.w / 2)));
+        const zFixed = surface === "front" ? 0 : depth3d - 1;
+        for (const p of model.pixels) {
+          const x = xStart + p.x;
+          const y = top + p.y;
+          const c = useModelColors ? p.color : fallbackColor;
+          if (surface === "front") addFront(x, y, c);
+          else addExtra(x, y, zFixed, c);
+        }
+        return;
+      }
+      const zStart = Math.max(0, Math.min(depth3d - model.w, center - Math.floor(model.w / 2)));
+      const xFixed = surface === "left" ? 0 : COLS - 1;
+      for (const p of model.pixels) {
+        const z = zStart + p.x;
+        const y = top + p.y;
+        const c = useModelColors ? p.color : fallbackColor;
+        addExtra(xFixed, y, z, c);
+      }
+    };
+
+    // Base shell on all four sides.
+    for (let y = 0; y < rows; y++) {
+      const floorBandFromTop = Math.floor(y / FLOOR_UNITS);
+      const stripe = floorBandFromTop % preset.stripeEvery === 0;
+      const wallColor = stripe ? preset.wallAccent : preset.wallMain;
+
+      for (let x = 0; x < COLS; x++) {
+        addFront(x, y, wallColor);
+        addExtra(x, y, depth3d - 1, wallColor);
+      }
+      for (let z = 0; z < depth3d; z++) {
+        addExtra(0, y, z, wallColor);
+        addExtra(COLS - 1, y, z, wallColor);
+      }
+    }
+
+    // Ground floor double door centered on front.
+    const groundTop = floorToRowStart(1);
+    const doorGap = 1;
+    const doorHalfSpan = Math.floor(doorModel.w / 2);
+    const center = Math.floor(COLS / 2);
+    const leftCenter = center - doorHalfSpan - Math.floor(doorGap / 2);
+    const rightCenter = center + doorHalfSpan + Math.ceil(doorGap / 2);
+    stampModel(doorModel, "front", leftCenter, groundTop, true);
+    stampModel(doorModel, "front", rightCenter, groundTop, true);
+
+    // Replicate windows on floors 2..N.
+    for (let floor = 2; floor <= floors; floor++) {
+      const floorTop = floorToRowStart(floor);
+      const windowTop = floorTop + 2;
+
+      const frontStep = Math.max(windowModel.w + 3, 7);
+      for (let cx = 4; cx < COLS - 2; cx += frontStep) {
+        stampModel(windowModel, "front", cx, windowTop, true);
+        stampModel(windowModel, "back", cx, windowTop, true);
+      }
+
+      const sideStep = Math.max(windowModel.w + 3, 7);
+      for (let cz = 4; cz < depth3d - 2; cz += sideStep) {
+        stampModel(windowModel, "left", cz, windowTop, true);
+        stampModel(windowModel, "right", cz, windowTop, true);
+      }
+    }
+
+    // Lobby accent strip on floor 1.
+    const lobbyTop = floorToRowStart(1) + 1;
+    for (let x = 0; x < COLS; x++) {
+      addFront(x, lobbyTop, preset.wallAccent);
+      addExtra(x, lobbyTop, depth3d - 1, preset.wallAccent);
+    }
+    for (let z = 0; z < depth3d; z++) {
+      addExtra(0, lobbyTop, z, preset.wallAccent);
+      addExtra(COLS - 1, lobbyTop, z, preset.wallAccent);
+    }
+
+    setBlocks(Array.from(frontBlocks.values()));
+    setExtraVoxels(Array.from(extraMap.values()));
+    setImageDecals([]);
+    setShowPresetTool(false);
   }
 
   return (
@@ -963,8 +2160,16 @@ export default function BuildingEditorPage() {
         <header className="border border-border bg-bg-card p-4">
           <h1 className="text-lg text-cream">Building Block Editor 3D</h1>
           <p className="mt-1 text-xs text-muted">
-            Edit the front facade in 3D blocks, rotate the building, and copy it to all sides.
+            Drag to orbit the camera. Use Travar to freeze the view while painting. Publishing turns this into your live city building skin.
           </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
+            <Link href="/" className="border border-border px-2 py-1 text-muted hover:text-cream">
+              Back to city
+            </Link>
+            <Link href={shopHref} className="border border-border px-2 py-1 text-muted hover:text-cream">
+              Open shop/loadout
+            </Link>
+          </div>
         </header>
 
         <section className="grid gap-4 lg:grid-cols-[340px_1fr]">
@@ -1024,6 +2229,7 @@ export default function BuildingEditorPage() {
                   onClick={() => {
                     setExpandedPanel(null);
                     setSelectedModelId(null);
+                    setGeneratedTextModel(null);
                   }}
                   className={`border px-2 py-1 ${selectedModelId === null ? "border-lime bg-lime text-black" : "border-border"}`}
                 >
@@ -1035,7 +2241,10 @@ export default function BuildingEditorPage() {
                   {DOOR_MODELS.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => setSelectedModelId(m.id)}
+                      onClick={() => {
+                        setSelectedModelId(m.id);
+                        setGeneratedTextModel(null);
+                      }}
                       className={`border px-2 py-1 text-left ${selectedModelId === m.id ? "border-lime bg-lime text-black" : "border-border"}`}
                     >
                       {m.label}
@@ -1048,7 +2257,10 @@ export default function BuildingEditorPage() {
                   {WINDOW_MODELS.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => setSelectedModelId(m.id)}
+                      onClick={() => {
+                        setSelectedModelId(m.id);
+                        setGeneratedTextModel(null);
+                      }}
                       className={`border px-2 py-1 text-left ${selectedModelId === m.id ? "border-lime bg-lime text-black" : "border-border"}`}
                     >
                       {m.label}
@@ -1068,33 +2280,12 @@ export default function BuildingEditorPage() {
                 />
                 Paint full major block
               </label>
-              <button
-                onClick={() => setCopyAllSides(true)}
-                className={`border px-2 py-1 ${copyAllSides ? "border-lime bg-lime text-black" : "border-border"}`}
-              >
-                Copy to all sides
-              </button>
-              <button
-                onClick={() => setCopyAllSides(false)}
-                className={`border px-2 py-1 ${!copyAllSides ? "border-lime bg-lime text-black" : "border-border"}`}
-              >
-                Edit front facade only
-              </button>
               <p className="text-[10px] text-muted">
-                You can keep editing after copying to all sides.
+                Front, back, and side guides are all paintable at all times.
               </p>
-              <label className="mt-2 block text-[10px] text-muted">
-                Z layer (3D depth editing)
-                <input
-                  type="range"
-                  min={0}
-                  max={Math.max(0, depth3d - 1)}
-                  value={editDepth}
-                  onChange={(e) => setEditDepth(Number(e.target.value))}
-                  className="mt-1 w-full"
-                />
-                <span className="text-cream">z = {editDepth}</span>
-              </label>
+              <p className="text-[10px] text-muted">
+                All 4 transparent side guides are active. Click any side directly to paint it.
+              </p>
             </div>
 
             <div className="space-y-2 border border-border p-3 text-xs">
@@ -1104,10 +2295,17 @@ export default function BuildingEditorPage() {
                 <select
                   value={copyFromFloor}
                   onChange={(e) => setCopyFromFloor(Number(e.target.value))}
-                  className="border border-border bg-[#111117] px-2 py-1"
+                  className="border border-lime bg-[#111117] px-2 py-1 text-lime focus:outline-none"
+                  style={{
+                    color: "#c8e64a",
+                    borderColor: "#c8e64a",
+                    backgroundColor: "#0f1116",
+                    colorScheme: "dark",
+                    boxShadow: "inset 0 0 0 9999px #0f1116",
+                  }}
                 >
                   {floorOptions.map((f) => (
-                    <option key={f} value={f}>
+                    <option key={f} value={f} style={{ color: "#c8e64a", backgroundColor: "#0f1116" }}>
                       {f}
                     </option>
                   ))}
@@ -1131,13 +2329,6 @@ export default function BuildingEditorPage() {
 
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => void saveBuilding("draft")}
-                disabled={busyAction !== null}
-                className="border border-border px-3 py-2 text-xs disabled:opacity-60"
-              >
-                {busyAction === "draft" ? "Saving..." : "Save draft"}
-              </button>
-              <button
                 onClick={() => void saveBuilding("publish")}
                 disabled={busyAction !== null}
                 className="border border-lime bg-lime px-3 py-2 text-xs text-black disabled:opacity-60"
@@ -1151,6 +2342,9 @@ export default function BuildingEditorPage() {
             <p className="text-[10px] text-muted">
               Max floors for this account: {maxFloors}. {loadedFromCloud ? "Cloud project loaded." : "Using local project data."}
             </p>
+            <p className="text-[10px] text-muted">
+              Publish updates your building in the city. Loadout/shop items still apply on top of this base model.
+            </p>
             {saveMessage && (
               <div
                 className={`border px-2 py-2 text-xs ${saveOk ? "border-green-500 text-green-300" : "border-red-500 text-red-300"}`}
@@ -1162,35 +2356,420 @@ export default function BuildingEditorPage() {
 
           <section className="border border-border bg-bg-card p-4">
             <div className="grid gap-3 lg:grid-cols-[1fr_190px]">
-              <div
-                className="overflow-auto border border-border bg-[#121216]"
-                style={{ maxHeight: "76vh" }}
-              >
-                <div className="h-[76vh] min-w-full p-2">
-                  <VoxelEditor3D
-                    voxels={voxels}
-                    rows={rows}
-                    cols={COLS}
-                    depth={depth3d}
-                    onPaintCell={paintCell3D}
-                    setHoverCell={setHoverCell}
-                  />
+              <div className="flex flex-col gap-3">
+                <div
+                  className="relative overflow-hidden border border-border bg-[#121216]"
+                >
+                  <div className="pointer-events-none absolute right-3 top-3 z-10 border border-border bg-[#121216]/90 px-2 py-1 text-[10px] text-cream">
+                    Rotate building with arrow keys
+                  </div>
+                  <button
+                    onClick={() => setCameraLocked((prev) => !prev)}
+                    className={`absolute left-3 top-3 z-10 border px-3 py-2 text-[10px] ${cameraLocked ? "border-lime bg-lime text-black" : "border-border bg-[#121216]/90 text-cream"}`}
+                  >
+                    {cameraLocked ? "UNLOCK IMAGE" : "LOCK IMAGE"}
+                  </button>
+                  <button
+                    onClick={() => setLayFlat((prev) => !prev)}
+                    className="absolute left-36 top-3 z-10 border border-border bg-[#121216]/90 px-3 py-2 text-[10px] text-cream hover:border-border-light"
+                    title="Lay building flat"
+                  >
+                    ↻ {layFlat ? "UPRIGHT" : "LAY FLAT"}
+                  </button>
+                  <button
+                    onClick={undoAction}
+                    disabled={undoStack.length === 0}
+                    className="absolute left-[290px] top-3 z-10 border border-border bg-[#121216]/90 px-3 py-2 text-[10px] text-cream hover:border-border-light disabled:opacity-45"
+                    title="Undo last action"
+                  >
+                    UNDO
+                  </button>
+                  <button
+                    onClick={redoAction}
+                    disabled={redoStack.length === 0}
+                    className="absolute left-[360px] top-3 z-10 border border-border bg-[#121216]/90 px-3 py-2 text-[10px] text-cream hover:border-border-light disabled:opacity-45"
+                    title="Redo action"
+                  >
+                    REDO
+                  </button>
+                  <div
+                    ref={joystickBaseRef}
+                    className="absolute bottom-3 right-3 z-10 h-24 w-24 rounded-full border border-lime/70 bg-[#121216]/90 shadow-[inset_0_0_14px_rgba(200,230,74,0.25)]"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      joystickPointerIdRef.current = e.pointerId;
+                      startJoystick(e.clientX, e.clientY);
+                    }}
+                    onPointerMove={(e) => {
+                      if (!joystickDragging) return;
+                      if (joystickPointerIdRef.current !== e.pointerId) return;
+                      updateJoystickFromClient(e.clientX, e.clientY);
+                    }}
+                    onPointerUp={(e) => {
+                      if (joystickPointerIdRef.current !== e.pointerId) return;
+                      stopJoystick();
+                    }}
+                    onPointerCancel={(e) => {
+                      if (joystickPointerIdRef.current !== e.pointerId) return;
+                      stopJoystick();
+                    }}
+                  >
+                    <div className="absolute inset-2 rounded-full border border-lime/35" />
+                    <div
+                      className="absolute h-9 w-9 rounded-full border border-lime bg-lime/35 shadow-[0_0_12px_rgba(200,230,74,0.45)]"
+                      style={{
+                        left: `calc(50% + ${joystickKnob.x}px)`,
+                        top: `calc(50% + ${joystickKnob.y}px)`,
+                        transform: "translate(-50%, -50%)",
+                      }}
+                    />
+                  </div>
+                  <div className="h-[76vh] min-w-full p-2">
+                    <VoxelEditor3D
+                      voxels={previewVoxels}
+                      ghostVoxels={ghostVoxels}
+                      imageDecals={imageDecals}
+                      ghostImageDecal={ghostImageDecal}
+                      rows={rows}
+                      cols={COLS}
+                      depth={depth3d}
+                      cameraLocked={cameraLocked}
+                      layFlat={layFlat}
+                      onPaintCell={paintVoxel3D}
+                      onPaintStrokeStart={pushUndoSnapshot}
+                      setHoverTarget={setHoverTarget}
+                    />
+                  </div>
+                </div>
+                <div className="border border-border bg-bg-raised p-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setShowRoofPalette((prev) => !prev)}
+                      className="border border-border px-3 py-2 text-xs hover:border-border-light"
+                    >
+                      Change roof color
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowPresetTool((prev) => !prev);
+                        setShowTextTool(false);
+                        setShowImageTool(false);
+                      }}
+                      className="border border-border px-3 py-2 text-xs hover:border-border-light"
+                    >
+                      Building presets
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowTextTool((prev) => !prev);
+                        setShowImageTool(false);
+                        setShowPresetTool(false);
+                      }}
+                      className="border border-border px-3 py-2 text-xs hover:border-border-light"
+                    >
+                      {textToolUnlocked ? "Add text" : "Add text ($2)"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowImageTool((prev) => !prev);
+                        setShowTextTool(false);
+                        setShowPresetTool(false);
+                      }}
+                      className="border border-border px-3 py-2 text-xs hover:border-border-light"
+                    >
+                      {imageToolUnlocked ? "Add image" : "Add image ($5)"}
+                    </button>
+                  </div>
+                  {showRoofPalette && (
+                    <div className="mt-2 grid grid-cols-10 gap-1">
+                      {COLORS.map((c) => (
+                        <button
+                          key={`roof-${c}`}
+                          onClick={() => {
+                            pushUndoSnapshot();
+                            setRoofColor(c);
+                          }}
+                          className={`h-5 w-5 border ${roofColor === c ? "border-cream" : "border-border"}`}
+                          style={{ background: c }}
+                          aria-label={`Roof color ${c}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {showPresetTool && (
+                    <div className="mt-3 space-y-2 border border-border p-2 text-[10px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted">Choose a modern preset</span>
+                        <button
+                          onClick={() => setShowPresetTool(false)}
+                          className="border border-border px-2 py-1 text-[9px] hover:border-border-light"
+                        >
+                          CLOSE
+                        </button>
+                      </div>
+                      <div className="grid gap-1">
+                        {BUILDING_PRESETS.map((preset) => (
+                          <button
+                            key={preset.id}
+                            onClick={() => applyBuildingPreset(preset)}
+                            className="border border-border px-3 py-2 text-left text-[10px] hover:border-lime"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-muted">
+                        Applies full facade style with door on floor 1 and repeated windows from floor 2+.
+                      </p>
+                    </div>
+                  )}
+                  {showTextTool && (
+                    <div className="mt-3 space-y-2 border border-border p-2 text-[10px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted">Text writer</span>
+                        <button
+                          onClick={() => {
+                            setShowTextTool(false);
+                            setGeneratedTextModel(null);
+                            setTextPlacementReady(false);
+                            setTextRotationQuarter(0);
+                            setTextMirrorEnabled(false);
+                            setTool("draw");
+                          }}
+                          className="border border-border px-2 py-1 text-[9px] hover:border-border-light"
+                        >
+                          CLOSE
+                        </button>
+                      </div>
+                      {!textToolUnlocked && (
+                        <div className="space-y-2 border border-border bg-[#111117] p-2">
+                          <p className="text-muted">Text tool is premium: $2 one-time. After payment, it is unlocked forever.</p>
+                          <Link
+                            href={shopHref}
+                            className="inline-block border border-lime bg-lime px-3 py-1 text-[10px] text-black"
+                          >
+                            Unlock in shop
+                          </Link>
+                        </div>
+                      )}
+                      {textToolUnlocked && (
+                        <>
+                      <label className="block">
+                        <span className="text-muted">Text</span>
+                        <input
+                          value={textInput}
+                          onChange={(e) => setTextInput(e.target.value)}
+                          className="mt-1 w-full border border-border bg-[#111117] px-2 py-1 text-cream"
+                          placeholder="Type your text"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-muted">Size ({textSizePx}px)</span>
+                        <input
+                          type="range"
+                          min={1}
+                          max={100}
+                          value={textSizePx}
+                          onChange={(e) => setTextSizePx(Number(e.target.value))}
+                          className="mt-1 w-full"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-muted">Letter spacing ({textLetterSpacing}px)</span>
+                        <input
+                          type="range"
+                          min={-2}
+                          max={30}
+                          value={textLetterSpacing}
+                          onChange={(e) => setTextLetterSpacing(Number(e.target.value))}
+                          className="mt-1 w-full"
+                        />
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={generateTextPlacement}
+                          className="border border-lime bg-lime px-3 py-1 text-[10px] text-black"
+                        >
+                          OK
+                        </button>
+                        <button
+                          onClick={() => setTextRotationQuarter((r) => (r + 1) % 4)}
+                          className="border border-border px-3 py-1 text-[10px]"
+                        >
+                          Rotate 90°
+                        </button>
+                        <button
+                          onClick={() => setTextMirrorEnabled((prev) => !prev)}
+                          className={`border px-3 py-1 text-[10px] ${
+                            textMirrorEnabled ? "border-lime bg-lime text-black" : "border-border"
+                          }`}
+                        >
+                          Mirror text
+                        </button>
+                        <button
+                          onClick={() => {
+                            setGeneratedTextModel(null);
+                            setTextPlacementReady(false);
+                            setTextRotationQuarter(0);
+                            setTextMirrorEnabled(false);
+                          }}
+                          className="border border-border px-3 py-1 text-[10px]"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      {generatedTextModel && (
+                        <p className="text-muted">
+                          Text is ready ({textRotationQuarter * 90}deg, mirror {textMirrorEnabled ? "on" : "off"}). Move over the building to preview, then click to place.
+                        </p>
+                      )}
+                      {textError && <p className="text-red-300">{textError}</p>}
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {showImageTool && (
+                    <div className="mt-3 space-y-2 border border-border p-2 text-[10px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted">Image facade</span>
+                        <button
+                          onClick={() => {
+                            setShowImageTool(false);
+                            setImagePlacementReady(false);
+                            setImageError("");
+                            setImageRotationQuarter(0);
+                            setImageMirrorEnabled(false);
+                            setTool("draw");
+                          }}
+                          className="border border-border px-2 py-1 text-[9px] hover:border-border-light"
+                        >
+                          CLOSE
+                        </button>
+                      </div>
+                      {!imageToolUnlocked && (
+                        <div className="space-y-2 border border-border bg-[#111117] p-2">
+                          <p className="text-muted">Image tool is premium: $5 one-time. After payment, it is unlocked forever.</p>
+                          <Link
+                            href={shopHref}
+                            className="inline-block border border-lime bg-lime px-3 py-1 text-[10px] text-black"
+                          >
+                            Unlock in shop
+                          </Link>
+                        </div>
+                      )}
+                      {imageToolUnlocked && (
+                        <>
+                      <label className="block">
+                        <span className="text-muted">Image file</span>
+                        <input
+                          type="file"
+                          accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              const result = typeof reader.result === "string" ? reader.result : "";
+                              setImageSrc(result);
+                              setImageError("");
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                          className="mt-1 w-full border border-border bg-[#111117] px-2 py-1 text-cream file:border-0 file:bg-lime file:px-2 file:py-1 file:text-black"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-muted">Width ({imageWidthUnits})</span>
+                        <input
+                          type="range"
+                          min={1}
+                          max={COLS}
+                          value={imageWidthUnits}
+                          onChange={(e) => setImageWidthUnits(Number(e.target.value))}
+                          className="mt-1 w-full"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-muted">Height ({imageHeightUnits})</span>
+                        <input
+                          type="range"
+                          min={1}
+                          max={rows}
+                          value={imageHeightUnits}
+                          onChange={(e) => setImageHeightUnits(Number(e.target.value))}
+                          className="mt-1 w-full"
+                        />
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setImageRotationQuarter((r) => (r + 1) % 4)}
+                          className="border border-border px-3 py-1 text-[10px]"
+                        >
+                          Rotate 90°
+                        </button>
+                        <button
+                          onClick={() => setImageMirrorEnabled((v) => !v)}
+                          className={`border px-3 py-1 text-[10px] ${
+                            imageMirrorEnabled ? "border-lime bg-lime text-black" : "border-border"
+                          }`}
+                        >
+                          Mirror image
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            if (!imageToolUnlocked) {
+                              setImagePlacementReady(false);
+                              setImageError("Image tool is locked. Buy once ($5) to use forever.");
+                              return;
+                            }
+                            if (!imageSrc) {
+                              setImagePlacementReady(false);
+                              setImageError("Select an image before pressing OK.");
+                              return;
+                            }
+                            setTool("draw");
+                            setGeneratedTextModel(null);
+                            setTextPlacementReady(false);
+                            setImagePlacementReady(true);
+                            setImageError("");
+                          }}
+                          className="border border-lime bg-lime px-3 py-1 text-[10px] text-black"
+                        >
+                          OK
+                        </button>
+                        <button
+                          onClick={() => {
+                            setImagePlacementReady(false);
+                            setImageError("");
+                            setImageRotationQuarter(0);
+                            setImageMirrorEnabled(false);
+                          }}
+                          className="border border-border px-3 py-1 text-[10px]"
+                        >
+                          Stop placing
+                        </button>
+                      </div>
+                      {imagePlacementReady && (
+                        <p className="text-muted">
+                          Image is ready ({imageRotationQuarter * 90}deg, mirror {imageMirrorEnabled ? "on" : "off"}). Move over facade to preview, then click to place.
+                        </p>
+                      )}
+                      {imageError && <p className="text-red-300">{imageError}</p>}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-
+              
               <aside className="border border-border bg-bg-raised p-3">
-                <p className="mb-2 text-xs text-muted">Height (floors)</p>
-                <div className="max-h-[76vh] space-y-1 overflow-auto pr-1">
-                  {floorOptions.map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFloors(f)}
-                      className={`w-full border px-2 py-1 text-left text-xs ${floors === f ? "border-lime bg-lime text-black" : "border-border"}`}
-                    >
-                      {f} floor{f > 1 ? "s" : ""}
-                    </button>
-                  ))}
-                </div>
+                <p className="mb-2 text-xs text-muted">Building height</p>
+                <p className="border border-border bg-[#111117] px-3 py-2 text-xs text-cream">
+                  Your building has {floors} floor{floors > 1 ? "s" : ""}.
+                </p>
               </aside>
             </div>
           </section>
