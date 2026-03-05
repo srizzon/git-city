@@ -23,9 +23,8 @@ export async function GET(request: Request) {
     sb.from("city_stats").select("*").eq("id", 1).single(),
   ]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const devs = (devsResult.data ?? []) as Record<string, any>[];
-  const devIds = devs.map((d: Record<string, any>) => d.id);
+  const devs = (devsResult.data ?? []) as Record<string, unknown>[];
+  const devIds = devs.map((d: Record<string, unknown>) => d.id as number);
 
   if (devIds.length === 0) {
     return NextResponse.json(
@@ -125,17 +124,17 @@ export async function GET(request: Request) {
     ...dev,
     kudos_count: dev.kudos_count ?? 0,
     visit_count: dev.visit_count ?? 0,
-    owned_items: ownedItemsMap[dev.id] ?? [],
-    custom_color: customColorMap[dev.id] ?? null,
-    billboard_images: billboardImagesMap[dev.id] ?? [],
-    achievements: achievementsMap[dev.id] ?? [],
-    loadout: loadoutMap[dev.id] ?? null,
+    owned_items: ownedItemsMap[dev.id as number] ?? [],
+    custom_color: customColorMap[dev.id as number] ?? null,
+    billboard_images: billboardImagesMap[dev.id as number] ?? [],
+    achievements: achievementsMap[dev.id as number] ?? [],
+    loadout: loadoutMap[dev.id as number] ?? null,
     app_streak: dev.app_streak ?? 0,
     raid_xp: dev.raid_xp ?? 0,
     current_week_contributions: dev.current_week_contributions ?? 0,
     current_week_kudos_given: dev.current_week_kudos_given ?? 0,
     current_week_kudos_received: dev.current_week_kudos_received ?? 0,
-    active_raid_tag: raidTagMap[dev.id] ?? null,
+    active_raid_tag: raidTagMap[dev.id as number] ?? null,
     rabbit_completed: dev.rabbit_completed ?? false,
     xp_total: dev.xp_total ?? 0,
     xp_level: dev.xp_level ?? 1,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { getTasklets } from "@/lib/tasklets";
 
 const STORAGE_BUCKET = "city-data";
 const STORAGE_PATH = "snapshot.json";
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
   const sb = getSupabaseAdmin();
 
   // Ensure public bucket exists (idempotent)
-  await sb.storage.createBucket(STORAGE_BUCKET, { public: true }).catch(() => {});
+  await sb.storage.createBucket(STORAGE_BUCKET, { public: true }).catch(() => { });
 
   // Fetch everything in parallel
   const [devs, purchases, giftPurchases, customizations, achievements, raidTags, statsResult] =
@@ -136,26 +137,69 @@ export async function GET(request: NextRequest) {
     };
   }
 
-  // Merge
-  const developers = devs.map((dev) => ({
-    ...dev,
-    kudos_count: dev.kudos_count ?? 0,
-    visit_count: dev.visit_count ?? 0,
-    owned_items: ownedItemsMap[dev.id] ?? [],
-    custom_color: customColorMap[dev.id] ?? null,
-    billboard_images: billboardImagesMap[dev.id] ?? [],
-    achievements: achievementsMap[dev.id] ?? [],
-    loadout: loadoutMap[dev.id] ?? null,
-    app_streak: dev.app_streak ?? 0,
-    raid_xp: dev.raid_xp ?? 0,
-    current_week_contributions: dev.current_week_contributions ?? 0,
-    current_week_kudos_given: dev.current_week_kudos_given ?? 0,
-    current_week_kudos_received: dev.current_week_kudos_received ?? 0,
-    active_raid_tag: raidTagMap[dev.id] ?? null,
-    rabbit_completed: dev.rabbit_completed ?? false,
-    xp_total: dev.xp_total ?? 0,
-    xp_level: dev.xp_level ?? 1,
-  }));
+  // Merge all developer data using Tasklets (offload to worker thread)
+  // This is the right place: merging 5000+ records is genuinely O(n) with large n,
+  // and the result feeds directly into generateCityLayout (CPU-intensive).
+  const tasklets = await getTasklets();
+
+  const developers = tasklets
+    ? await tasklets.run(
+      (
+        devs: Record<string, unknown>[],
+        owned: Record<number, string[]>,
+        colors: Record<number, string>,
+        billboards: Record<number, string[]>,
+        achievements: Record<number, string[]>,
+        loadouts: Record<number, { crown: string | null; roof: string | null; aura: string | null }>,
+        raidTags: Record<number, { attacker_login: string; tag_style: string; expires_at: string }>,
+      ) =>
+        devs.map((dev) => ({
+          ...dev,
+          kudos_count: (dev.kudos_count as number) ?? 0,
+          visit_count: (dev.visit_count as number) ?? 0,
+          owned_items: owned[dev.id as number] ?? [],
+          custom_color: colors[dev.id as number] ?? null,
+          billboard_images: billboards[dev.id as number] ?? [],
+          achievements: achievements[dev.id as number] ?? [],
+          loadout: loadouts[dev.id as number] ?? null,
+          app_streak: (dev.app_streak as number) ?? 0,
+          raid_xp: (dev.raid_xp as number) ?? 0,
+          current_week_contributions: (dev.current_week_contributions as number) ?? 0,
+          current_week_kudos_given: (dev.current_week_kudos_given as number) ?? 0,
+          current_week_kudos_received: (dev.current_week_kudos_received as number) ?? 0,
+          active_raid_tag: raidTags[dev.id as number] ?? null,
+          rabbit_completed: (dev.rabbit_completed as boolean) ?? false,
+          xp_total: (dev.xp_total as number) ?? 0,
+          xp_level: (dev.xp_level as number) ?? 1,
+        })),
+      devs as Record<string, unknown>[],
+      ownedItemsMap,
+      customColorMap,
+      billboardImagesMap,
+      achievementsMap,
+      loadoutMap,
+      raidTagMap,
+    )
+    : devs.map((dev) => ({
+      ...dev,
+      kudos_count: dev.kudos_count ?? 0,
+      visit_count: dev.visit_count ?? 0,
+      owned_items: ownedItemsMap[dev.id] ?? [],
+      custom_color: customColorMap[dev.id] ?? null,
+      billboard_images: billboardImagesMap[dev.id] ?? [],
+      achievements: achievementsMap[dev.id] ?? [],
+      loadout: loadoutMap[dev.id] ?? null,
+      app_streak: dev.app_streak ?? 0,
+      raid_xp: dev.raid_xp ?? 0,
+      current_week_contributions: dev.current_week_contributions ?? 0,
+      current_week_kudos_given: dev.current_week_kudos_given ?? 0,
+      current_week_kudos_received: dev.current_week_kudos_received ?? 0,
+      active_raid_tag: raidTagMap[dev.id] ?? null,
+      rabbit_completed: dev.rabbit_completed ?? false,
+      xp_total: dev.xp_total ?? 0,
+      xp_level: dev.xp_level ?? 1,
+    }));
+
 
   const snapshot = JSON.stringify({
     developers,

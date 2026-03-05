@@ -34,6 +34,7 @@
     "@types/three": "^0.183.0",
     "@vercel/analytics": "^1.6.1",
     "@vercel/speed-insights": "^1.3.1",
+    "@wendelmax/tasklets": "^2.2.0",
     "howler": "^2.2.4",
     "next": "16.1.6",
     "postprocessing": "^6.38.3",
