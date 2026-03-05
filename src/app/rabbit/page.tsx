@@ -23,7 +23,8 @@ interface UserRabbitData {
 // ─── Canvas Matrix Rain ─────────────────────────────────────
 // Uses a single <canvas> for performance - no DOM thrashing
 
-const KATAKANA = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン";
+const KATAKANA =
+  "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン";
 
 function MatrixRainCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -199,26 +200,23 @@ function PixelRabbitStatue({ completed }: { completed: boolean }) {
   }, [completed]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={200}
-      height={260}
-      style={{ imageRendering: "pixelated" }}
-    />
+    <canvas ref={canvasRef} width={200} height={260} style={{ imageRendering: "pixelated" }} />
   );
 }
 
 // ─── Floating Particles ─────────────────────────────────────
 
 function FloatingParticlesCSS() {
-  const particles = useMemo(() =>
-    Array.from({ length: 15 }, () => ({
-      left: `${15 + Math.random() * 70}%`,
-      duration: 6 + Math.random() * 8,
-      delay: Math.random() * 6,
-      size: 2 + Math.random() * 2,
-    })),
-  []);
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 15 }, () => ({
+        left: `${15 + Math.random() * 70}%`,
+        duration: 6 + Math.random() * 8,
+        delay: Math.random() * 6,
+        size: 2 + Math.random() * 2,
+      })),
+    [],
+  );
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 1 }}>
@@ -240,10 +238,20 @@ function FloatingParticlesCSS() {
       ))}
       <style jsx>{`
         @keyframes particleUp {
-          0% { transform: translateY(0); opacity: 0; }
-          10% { opacity: 0.5; }
-          80% { opacity: 0.2; }
-          100% { transform: translateY(-100vh); opacity: 0; }
+          0% {
+            transform: translateY(0);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.5;
+          }
+          80% {
+            opacity: 0.2;
+          }
+          100% {
+            transform: translateY(-100vh);
+            opacity: 0;
+          }
         }
       `}</style>
     </div>
@@ -252,7 +260,15 @@ function FloatingParticlesCSS() {
 
 // ─── Orbiting Names Ring ────────────────────────────────────
 
-function CompleterRing({ completers, currentLogin, completed }: { completers: Completer[]; currentLogin: string; completed: boolean }) {
+function CompleterRing({
+  completers,
+  currentLogin,
+  completed,
+}: {
+  completers: Completer[];
+  currentLogin: string;
+  completed: boolean;
+}) {
   if (completers.length === 0) return null;
 
   const visible = completers.slice(0, 20);
@@ -272,7 +288,7 @@ function CompleterRing({ completers, currentLogin, completed }: { completers: Co
         {visible.map((c, i) => {
           const angle = (i / visible.length) * 360;
           const isMe = c.login.toLowerCase() === currentLogin.toLowerCase();
-          const displayName = completed ? (c.name || c.login) : "???";
+          const displayName = completed ? c.name || c.login : "???";
           // Responsive radius
           const radius = typeof window !== "undefined" && window.innerWidth < 640 ? 120 : 180;
 
@@ -295,8 +311,12 @@ function CompleterRing({ completers, currentLogin, completed }: { completers: Co
       </div>
       <style jsx>{`
         @keyframes ringOrbit {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
         }
       `}</style>
     </div>
@@ -324,8 +344,10 @@ function RabbitContent() {
 
       if (session) {
         fetch("/api/rabbit?check=true")
-          .then((r) => r.ok ? r.json() : null)
-          .then((data) => { if (data) setUserData(data); })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data) setUserData(data);
+          })
           .catch(() => {});
       } else {
         setUserData({ progress: 0, completed: false, completed_at: null });
@@ -333,22 +355,31 @@ function RabbitContent() {
     });
 
     fetch("/api/rabbit")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data?.completers) setCompleters(data.completers); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.completers) setCompleters(data.completers);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   const completed = userData?.completed ?? false;
-  const myPosition = completers.findIndex((c) => c.login.toLowerCase() === currentLogin.toLowerCase()) + 1;
+  const myPosition =
+    completers.findIndex((c) => c.login.toLowerCase() === currentLogin.toLowerCase()) + 1;
   const completedDate = userData?.completed_at
-    ? new Date(userData.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    ? new Date(userData.completed_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
     : null;
 
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center">
-        <p className="font-pixel text-[14px] tracking-widest" style={{ color: "#00ff41" }}>...</p>
+        <p className="font-pixel text-[14px] tracking-widest" style={{ color: "#00ff41" }}>
+          ...
+        </p>
       </div>
     );
   }
@@ -365,8 +396,10 @@ function RabbitContent() {
       <CompleterRing completers={completers} currentLogin={currentLogin} completed={completed} />
 
       {/* Layer 3: Content - flexbox column layout */}
-      <div className="fixed inset-0 z-10 flex flex-col items-center" style={{ pointerEvents: "none" }}>
-
+      <div
+        className="fixed inset-0 z-10 flex flex-col items-center"
+        style={{ pointerEvents: "none" }}
+      >
         {/* Top section */}
         <div className="flex flex-col items-center gap-2 pt-8 sm:pt-12">
           <p
@@ -379,7 +412,8 @@ function RabbitContent() {
             className="font-pixel text-[9px] sm:text-[11px] tracking-widest"
             style={{ color: "#00ff41", opacity: 0.5 }}
           >
-            {completers.length} citizen{completers.length !== 1 ? "s" : ""} {completers.length === 1 ? "has" : "have"} found the white rabbit
+            {completers.length} citizen{completers.length !== 1 ? "s" : ""}{" "}
+            {completers.length === 1 ? "has" : "have"} found the white rabbit
           </p>
         </div>
 
@@ -427,13 +461,16 @@ function RabbitContent() {
         </div>
 
         {/* Bottom buttons */}
-        <div className="flex flex-col items-center gap-3 pb-8 sm:pb-10" style={{ pointerEvents: "auto" }}>
+        <div
+          className="flex flex-col items-center gap-3 pb-8 sm:pb-10"
+          style={{ pointerEvents: "auto" }}
+        >
           {completed && (
             <a
               href={`https://x.com/intent/tweet?text=${encodeURIComponent(
                 myPosition
                   ? `I followed the white rabbit in Git City.\nCitizen #${myPosition} to find the other side.`
-                  : `I followed the white rabbit in Git City.`
+                  : `I followed the white rabbit in Git City.`,
               )}&url=${encodeURIComponent("https://thegitcity.com/rabbit")}`}
               target="_blank"
               rel="noopener noreferrer"

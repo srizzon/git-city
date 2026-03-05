@@ -35,13 +35,22 @@ function generateBuildings(count: number): BuildingData[] {
 
   function spiralCoord(index: number): [number, number] {
     if (index === 0) return [0, 0];
-    let x = 0, y = 0, dx = 1, dy = 0;
-    let segLen = 1, segPassed = 0, turns = 0;
+    let x = 0,
+      y = 0,
+      dx = 1,
+      dy = 0;
+    let segLen = 1,
+      segPassed = 0,
+      turns = 0;
     for (let i = 0; i < index; i++) {
-      x += dx; y += dy; segPassed++;
+      x += dx;
+      y += dy;
+      segPassed++;
       if (segPassed === segLen) {
         segPassed = 0;
-        const tmp = dx; dx = -dy; dy = tmp;
+        const tmp = dx;
+        dx = -dy;
+        dy = tmp;
         turns++;
         if (turns % 2 === 0) segLen++;
       }
@@ -64,7 +73,7 @@ function generateBuildings(count: number): BuildingData[] {
         const offsetX = (c - (BLOCK_SIZE - 1) / 2) * CELL_SPACING;
         const offsetZ = (r - (BLOCK_SIZE - 1) / 2) * CELL_SPACING;
 
-        const seed = (idx + 1) * 16807 % 2147483647;
+        const seed = ((idx + 1) * 16807) % 2147483647;
         const r1 = seededRand(seed);
         const r2 = seededRand(seed + 1);
         const r3 = seededRand(seed + 2);
@@ -80,7 +89,13 @@ function generateBuildings(count: number): BuildingData[] {
         buildings.push({
           x: blockCenterX + offsetX,
           z: blockCenterZ + offsetZ,
-          height, width, depth, litPct, windowsPerFloor, floors, seed,
+          height,
+          width,
+          depth,
+          litPct,
+          windowsPerFloor,
+          floors,
+          seed,
           customColor: null,
         });
         idx++;
@@ -116,7 +131,10 @@ function createAtlas(): THREE.CanvasTexture {
   buf32.fill(faceABGR);
 
   let s = 42;
-  const rand = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+  const rand = () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
 
   for (let band = 0; band < ATLAS_LIT_PCTS.length; band++) {
     const litPct = ATLAS_LIT_PCTS[band];
@@ -125,9 +143,7 @@ function createAtlas(): THREE.CanvasTexture {
       const rowY = (bandStart + r) * ATLAS_CELL;
       for (let c = 0; c < ATLAS_COLS; c++) {
         const px = c * ATLAS_CELL;
-        const abgr = rand() < litPct
-          ? litABGRs[Math.floor(rand() * litABGRs.length)]
-          : offABGR;
+        const abgr = rand() < litPct ? litABGRs[Math.floor(rand() * litABGRs.length)] : offABGR;
         for (let dy = 0; dy < WS; dy++) {
           const rowOffset = (rowY + dy) * ATLAS_SIZE + px;
           for (let dx = 0; dx < WS; dx++) {
@@ -278,9 +294,7 @@ function InstancedCity({ buildings }: { buildings: BuildingData[] }) {
     };
   }, [geo, material, atlas]);
 
-  return (
-    <instancedMesh ref={meshRef} args={[geo, material, count]} frustumCulled={false} />
-  );
+  return <instancedMesh ref={meshRef} args={[geo, material, count]} frustumCulled={false} />;
 }
 
 // ─── Individual Mode (CURRENT APPROACH simulation) ───────────
@@ -343,7 +357,13 @@ const IndividualBuilding = memo(function IndividualBuilding({
   );
 });
 
-function IndividualCity({ buildings, atlas }: { buildings: BuildingData[]; atlas: THREE.CanvasTexture }) {
+function IndividualCity({
+  buildings,
+  atlas,
+}: {
+  buildings: BuildingData[];
+  atlas: THREE.CanvasTexture;
+}) {
   return (
     <>
       {buildings.map((b, i) => (
@@ -398,11 +418,7 @@ function Ground() {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1, 0]}>
       <planeGeometry args={[20000, 20000]} />
-      <meshStandardMaterial
-        color="#0a0a14"
-        emissive="#0a0a14"
-        emissiveIntensity={0.3}
-      />
+      <meshStandardMaterial color="#0a0a14" emissive="#0a0a14" emissiveIntensity={0.3} />
     </mesh>
   );
 }
@@ -425,9 +441,7 @@ export default function CityPOC() {
     return buildings.slice(0, Math.min(count, 2000));
   }, [buildings, count, mode]);
 
-  const effectiveCount = mode === "individual"
-    ? Math.min(count, 2000)
-    : count;
+  const effectiveCount = mode === "individual" ? Math.min(count, 2000) : count;
 
   const handleCountChange = useCallback((newCount: number) => {
     setCount(newCount);
@@ -455,9 +469,7 @@ export default function CityPOC() {
           minWidth: 220,
         }}
       >
-        <div style={{ fontSize: 14, color: "#c8e64a", fontWeight: "bold" }}>
-          PERFORMANCE POC
-        </div>
+        <div style={{ fontSize: 14, color: "#c8e64a", fontWeight: "bold" }}>PERFORMANCE POC</div>
 
         {/* Mode Toggle */}
         <div style={{ display: "flex", gap: 6 }}>
@@ -520,9 +532,7 @@ export default function CityPOC() {
         </div>
 
         {mode === "individual" && count > 2000 && (
-          <div style={{ color: "#e64a4a", fontSize: 10 }}>
-            Capped at 2k to prevent crash
-          </div>
+          <div style={{ color: "#e64a4a", fontSize: 10 }}>Capped at 2k to prevent crash</div>
         )}
       </div>
 

@@ -220,22 +220,31 @@ function DroneMesh() {
       {/* Camera eye */}
       <mesh position={[0, -0.25, -0.5]}>
         <boxGeometry args={[0.4, 0.2, 0.4]} />
-        <meshStandardMaterial color="#00ccff" emissive="#00aaff" emissiveIntensity={2} toneMapped={false} />
+        <meshStandardMaterial
+          color="#00ccff"
+          emissive="#00aaff"
+          emissiveIntensity={2}
+          toneMapped={false}
+        />
       </mesh>
       {/* Arms + motors + rotors */}
-      {([
-        [-1.8, 0, -1.8],
-        [1.8, 0, -1.8],
-        [-1.8, 0, 1.8],
-        [1.8, 0, 1.8],
-      ] as [number, number, number][]).map((pos, i) => (
+      {(
+        [
+          [-1.8, 0, -1.8],
+          [1.8, 0, -1.8],
+          [-1.8, 0, 1.8],
+          [1.8, 0, 1.8],
+        ] as [number, number, number][]
+      ).map((pos, i) => (
         <group key={i}>
           <mesh position={[pos[0] * 0.5, 0, pos[2] * 0.5]}>
-            <boxGeometry args={[
-              Math.abs(pos[0]) > 0 ? Math.abs(pos[0]) : 0.15,
-              0.15,
-              Math.abs(pos[2]) > 0 ? 0.15 : Math.abs(pos[2]),
-            ]} />
+            <boxGeometry
+              args={[
+                Math.abs(pos[0]) > 0 ? Math.abs(pos[0]) : 0.15,
+                0.15,
+                Math.abs(pos[2]) > 0 ? 0.15 : Math.abs(pos[2]),
+              ]}
+            />
             <meshStandardMaterial color="#333" emissive="#222" emissiveIntensity={0.4} />
           </mesh>
           <mesh position={pos}>
@@ -244,15 +253,27 @@ function DroneMesh() {
           </mesh>
           <group
             position={[pos[0], 0.2, pos[2]]}
-            ref={(el) => { if (el) rotorsRef.current[i] = el; }}
+            ref={(el) => {
+              if (el) rotorsRef.current[i] = el;
+            }}
           >
             <mesh>
               <boxGeometry args={[2, 0.05, 0.2]} />
-              <meshStandardMaterial color="#00ccff" emissive="#00aadd" emissiveIntensity={1.5} toneMapped={false} />
+              <meshStandardMaterial
+                color="#00ccff"
+                emissive="#00aadd"
+                emissiveIntensity={1.5}
+                toneMapped={false}
+              />
             </mesh>
             <mesh rotation={[0, Math.PI / 2, 0]}>
               <boxGeometry args={[2, 0.05, 0.2]} />
-              <meshStandardMaterial color="#00ccff" emissive="#00aadd" emissiveIntensity={1.5} toneMapped={false} />
+              <meshStandardMaterial
+                color="#00ccff"
+                emissive="#00aadd"
+                emissiveIntensity={1.5}
+                toneMapped={false}
+              />
             </mesh>
           </group>
           <pointLight position={[pos[0], 0.3, pos[2]]} color="#00ccff" intensity={1} distance={5} />
@@ -267,7 +288,8 @@ function RocketMesh() {
 
   useFrame(({ clock }) => {
     if (flameRef.current) {
-      const flicker = 0.8 + Math.sin(clock.elapsedTime * 20) * 0.2 + Math.sin(clock.elapsedTime * 33) * 0.15;
+      const flicker =
+        0.8 + Math.sin(clock.elapsedTime * 20) * 0.2 + Math.sin(clock.elapsedTime * 33) * 0.15;
       flameRef.current.scale.set(flicker, flicker, 1 + Math.sin(clock.elapsedTime * 15) * 0.3);
     }
   });
@@ -296,12 +318,14 @@ function RocketMesh() {
         <meshStandardMaterial color="#888" emissive="#555" emissiveIntensity={0.4} />
       </mesh>
       {/* Fins */}
-      {([
-        [0, -0.8, 2, 0],
-        [0, 0.8, 2, 0],
-        [-0.8, 0, 2, Math.PI / 2],
-        [0.8, 0, 2, Math.PI / 2],
-      ] as [number, number, number, number][]).map(([x, y, z, rot], i) => (
+      {(
+        [
+          [0, -0.8, 2, 0],
+          [0, 0.8, 2, 0],
+          [-0.8, 0, 2, Math.PI / 2],
+          [0.8, 0, 2, Math.PI / 2],
+        ] as [number, number, number, number][]
+      ).map(([x, y, z, rot], i) => (
         <mesh key={i} position={[x, y, z]} rotation={[0, 0, rot]}>
           <boxGeometry args={[0.1, 1.5, 1.2]} />
           <meshStandardMaterial color="#cc3333" emissive="#992222" emissiveIntensity={0.6} />
@@ -310,7 +334,12 @@ function RocketMesh() {
       {/* Engine flame */}
       <mesh ref={flameRef} position={[0, 0, 2.5]}>
         <boxGeometry args={[0.6, 0.6, 1.2]} />
-        <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={3} toneMapped={false} />
+        <meshStandardMaterial
+          color="#ff6600"
+          emissive="#ff4400"
+          emissiveIntensity={3}
+          toneMapped={false}
+        />
       </mesh>
       <pointLight position={[0, 0, 3]} color="#ff6600" intensity={8} distance={15} />
     </group>
@@ -319,26 +348,35 @@ function RocketMesh() {
 
 export function VehicleMesh({ type }: { type: string }) {
   switch (type) {
-    case "raid_helicopter": return <HelicopterMesh />;
-    case "raid_drone": return <DroneMesh />;
-    case "raid_rocket": return <RocketMesh />;
-    default: return <AirplaneMesh />;
+    case "raid_helicopter":
+      return <HelicopterMesh />;
+    case "raid_drone":
+      return <DroneMesh />;
+    case "raid_rocket":
+      return <RocketMesh />;
+    default:
+      return <AirplaneMesh />;
   }
 }
 
 // ─── Smoke Trail ──────────────────────────────────────────────
 
-function SmokeTrail({ vehicleRef, active }: {
+function SmokeTrail({
+  vehicleRef,
+  active,
+}: {
   vehicleRef: React.RefObject<THREE.Group | null>;
   active: boolean;
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const particles = useRef<{
-    pos: THREE.Vector3;
-    vel: THREE.Vector3;
-    age: number;
-    maxAge: number;
-  }[]>([]);
+  const particles = useRef<
+    {
+      pos: THREE.Vector3;
+      vel: THREE.Vector3;
+      age: number;
+      maxAge: number;
+    }[]
+  >([]);
   const _matrix = useMemo(() => new THREE.Matrix4(), []);
   const _scale = useMemo(() => new THREE.Vector3(), []);
   const _worldPos = useMemo(() => new THREE.Vector3(), []);
@@ -379,11 +417,7 @@ function SmokeTrail({ vehicleRef, active }: {
           }
           const p = particles.current[oldest];
           p.pos.copy(spawnPos);
-          p.vel.set(
-            (Math.random() - 0.5) * 2,
-            Math.random() * 3 + 1,
-            (Math.random() - 0.5) * 2,
-          );
+          p.vel.set((Math.random() - 0.5) * 2, Math.random() * 3 + 1, (Math.random() - 0.5) * 2);
           p.age = 0;
           p.maxAge = 0.8 + Math.random() * 0.6;
         }
@@ -426,10 +460,7 @@ function SmokeTrail({ vehicleRef, active }: {
 
 // ─── Shockwave Ring ──────────────────────────────────────────
 
-function Shockwave({ active, position }: {
-  active: boolean;
-  position: THREE.Vector3;
-}) {
+function Shockwave({ active, position }: { active: boolean; position: THREE.Vector3 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const timeRef = useRef(0);
 
@@ -467,7 +498,12 @@ function Shockwave({ active, position }: {
 
 // ─── Projectile Pool (fires FROM vehicle) ────────────────────
 
-function ProjectilePool({ active, vehicleRef, targetPos, onImpact }: {
+function ProjectilePool({
+  active,
+  vehicleRef,
+  targetPos,
+  onImpact,
+}: {
   active: boolean;
   vehicleRef: React.RefObject<THREE.Group | null>;
   targetPos: THREE.Vector3;
@@ -475,12 +511,14 @@ function ProjectilePool({ active, vehicleRef, targetPos, onImpact }: {
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const glowRef = useRef<THREE.InstancedMesh>(null);
-  const projectiles = useRef<{
-    pos: THREE.Vector3;
-    vel: THREE.Vector3;
-    alive: boolean;
-    spawned: boolean;
-  }[]>([]);
+  const projectiles = useRef<
+    {
+      pos: THREE.Vector3;
+      vel: THREE.Vector3;
+      alive: boolean;
+      spawned: boolean;
+    }[]
+  >([]);
   const nextSpawnIdx = useRef(0);
   const spawnTimer = useRef(0);
   const impactCount = useRef(0);
@@ -517,11 +555,13 @@ function ProjectilePool({ active, vehicleRef, targetPos, onImpact }: {
           .sub(p.pos)
           .normalize()
           .multiplyScalar(120)
-          .add(new THREE.Vector3(
-            (Math.random() - 0.5) * 15,
-            (Math.random() - 0.5) * 8,
-            (Math.random() - 0.5) * 15,
-          ));
+          .add(
+            new THREE.Vector3(
+              (Math.random() - 0.5) * 15,
+              (Math.random() - 0.5) * 8,
+              (Math.random() - 0.5) * 15,
+            ),
+          );
       }
       nextSpawnIdx.current++;
     }
@@ -559,7 +599,11 @@ function ProjectilePool({ active, vehicleRef, targetPos, onImpact }: {
   return (
     <group>
       {/* Core — small bright bullet */}
-      <instancedMesh ref={meshRef} args={[undefined, undefined, PROJECTILE_COUNT]} frustumCulled={false}>
+      <instancedMesh
+        ref={meshRef}
+        args={[undefined, undefined, PROJECTILE_COUNT]}
+        frustumCulled={false}
+      >
         <sphereGeometry args={[0.6, 6, 6]} />
         <meshStandardMaterial
           color="#ffaa00"
@@ -569,14 +613,13 @@ function ProjectilePool({ active, vehicleRef, targetPos, onImpact }: {
         />
       </instancedMesh>
       {/* Glow halo — larger, transparent, trails behind */}
-      <instancedMesh ref={glowRef} args={[undefined, undefined, PROJECTILE_COUNT]} frustumCulled={false}>
+      <instancedMesh
+        ref={glowRef}
+        args={[undefined, undefined, PROJECTILE_COUNT]}
+        frustumCulled={false}
+      >
         <sphereGeometry args={[2, 8, 8]} />
-        <meshBasicMaterial
-          color="#ff4400"
-          transparent
-          opacity={0.25}
-          depthWrite={false}
-        />
+        <meshBasicMaterial color="#ff4400" transparent opacity={0.25} depthWrite={false} />
       </instancedMesh>
     </group>
   );
@@ -587,7 +630,9 @@ function ProjectilePool({ active, vehicleRef, targetPos, onImpact }: {
 function DebrisParticles({ active, origin }: { active: boolean; origin: THREE.Vector3 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const glowRef = useRef<THREE.InstancedMesh>(null);
-  const particles = useRef<{ pos: THREE.Vector3; vel: THREE.Vector3; alive: boolean; size: number }[]>([]);
+  const particles = useRef<
+    { pos: THREE.Vector3; vel: THREE.Vector3; alive: boolean; size: number }[]
+  >([]);
   const _matrix = useMemo(() => new THREE.Matrix4(), []);
   const _scale = useMemo(() => new THREE.Vector3(), []);
 
@@ -597,11 +642,15 @@ function DebrisParticles({ active, origin }: { active: boolean; origin: THREE.Ve
       const angle = Math.random() * Math.PI * 2;
       const speed = 15 + Math.random() * 30;
       return {
-        pos: origin.clone().add(new THREE.Vector3(
-          (Math.random() - 0.5) * 6,
-          Math.random() * 5,
-          (Math.random() - 0.5) * 6,
-        )),
+        pos: origin
+          .clone()
+          .add(
+            new THREE.Vector3(
+              (Math.random() - 0.5) * 6,
+              Math.random() * 5,
+              (Math.random() - 0.5) * 6,
+            ),
+          ),
         vel: new THREE.Vector3(
           Math.cos(angle) * speed,
           Math.random() * 25 + 15,
@@ -646,11 +695,19 @@ function DebrisParticles({ active, origin }: { active: boolean; origin: THREE.Ve
 
   return (
     <group>
-      <instancedMesh ref={meshRef} args={[undefined, undefined, DEBRIS_COUNT]} frustumCulled={false}>
+      <instancedMesh
+        ref={meshRef}
+        args={[undefined, undefined, DEBRIS_COUNT]}
+        frustumCulled={false}
+      >
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial color="#555" />
       </instancedMesh>
-      <instancedMesh ref={glowRef} args={[undefined, undefined, DEBRIS_COUNT]} frustumCulled={false}>
+      <instancedMesh
+        ref={glowRef}
+        args={[undefined, undefined, DEBRIS_COUNT]}
+        frustumCulled={false}
+      >
         <sphereGeometry args={[0.8, 4, 4]} />
         <meshBasicMaterial color="#ff4400" transparent opacity={0.5} depthWrite={false} />
       </instancedMesh>
@@ -665,10 +722,11 @@ function FireGlow({ active, position }: { active: boolean; position: THREE.Vecto
 
   useFrame(({ clock }) => {
     if (!active || !lightRef.current) return;
-    const flicker = 0.7
-      + Math.sin(clock.elapsedTime * 15) * 0.15
-      + Math.sin(clock.elapsedTime * 23) * 0.1
-      + Math.sin(clock.elapsedTime * 37) * 0.05;
+    const flicker =
+      0.7 +
+      Math.sin(clock.elapsedTime * 15) * 0.15 +
+      Math.sin(clock.elapsedTime * 23) * 0.1 +
+      Math.sin(clock.elapsedTime * 37) * 0.05;
     lightRef.current.intensity = 30 * flicker;
   });
 
@@ -688,7 +746,13 @@ function FireGlow({ active, position }: { active: boolean; position: THREE.Vecto
 
 // ─── Shield Dome ──────────────────────────────────────────────
 
-function ShieldDome({ active, position, size, strength, hitIntensity }: {
+function ShieldDome({
+  active,
+  position,
+  size,
+  strength,
+  hitIntensity,
+}: {
   active: boolean;
   position: THREE.Vector3;
   size: number;
@@ -708,7 +772,8 @@ function ShieldDome({ active, position, size, strength, hitIntensity }: {
 
     if (wireRef.current) {
       const wireMat = wireRef.current.material as THREE.MeshBasicMaterial;
-      wireMat.opacity = (strength === "strong" ? 0.35 : strength === "medium" ? 0.2 : 0.1) + hitPulse * 0.5;
+      wireMat.opacity =
+        (strength === "strong" ? 0.35 : strength === "medium" ? 0.2 : 0.1) + hitPulse * 0.5;
     }
   });
 
@@ -733,7 +798,13 @@ function ShieldDome({ active, position, size, strength, hitIntensity }: {
 
 // ─── Main Component ───────────────────────────────────────────
 
-export default function RaidSequence3D({ phase, attacker, defender, raidData, onPhaseComplete }: Props) {
+export default function RaidSequence3D({
+  phase,
+  attacker,
+  defender,
+  raidData,
+  onPhaseComplete,
+}: Props) {
   const { camera } = useThree();
   const vehicleRef = useRef<THREE.Group>(null);
   const phaseTimeRef = useRef(0);
@@ -768,10 +839,7 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
 
   // Orbit entry: arrive from the attacker's direction
   const orbitStartAngle = useMemo(() => {
-    return Math.atan2(
-      attackerPos.z - defenderTopPos.z,
-      attackerPos.x - defenderTopPos.x,
-    );
+    return Math.atan2(attackerPos.z - defenderTopPos.z, attackerPos.x - defenderTopPos.x);
   }, [attackerPos, defenderTopPos]);
 
   const orbitEntryPos = useMemo(() => {
@@ -808,12 +876,14 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
     mid.y = cruiseHeight;
 
     // Depart forward + up (not straight up)
-    const depart = liftEndPos.clone()
+    const depart = liftEndPos
+      .clone()
       .add(flightDir.clone().multiplyScalar(35))
       .setY(liftEndPos.y + 25);
 
     // Approach from behind orbit entry, slightly above
-    const approach = orbitEntryPos.clone()
+    const approach = orbitEntryPos
+      .clone()
       .add(flightDir.clone().multiplyScalar(-25))
       .setY(orbitEntryPos.y + 15);
 
@@ -931,11 +1001,7 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
           );
 
           // Face toward defender
-          _vehicleTarget.set(
-            defenderTopPos.x,
-            rooftopY + liftEase * 10,
-            defenderTopPos.z,
-          );
+          _vehicleTarget.set(defenderTopPos.x, rooftopY + liftEase * 10, defenderTopPos.z);
           vehicleRef.current.lookAt(_vehicleTarget);
           vehicleRef.current.rotateY(Math.PI); // nose is -Z
           vehicleRef.current.rotateX(liftProgress * 0.08); // slight nose-up tilt
@@ -1015,11 +1081,7 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
           vehicleRef.current.scale.setScalar(2);
 
           // Look along orbit tangent (direction of travel)
-          _vehicleTarget.set(
-            vehicleX + tangentX * 30,
-            vehicleY - 2,
-            vehicleZ + tangentZ * 30,
-          );
+          _vehicleTarget.set(vehicleX + tangentX * 30, vehicleY - 2, vehicleZ + tangentZ * 30);
           vehicleRef.current.lookAt(_vehicleTarget);
           vehicleRef.current.rotateY(Math.PI); // flip: nose faces travel direction
 
@@ -1083,7 +1145,7 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
             playRaidSound("shield_hit");
             hitIntensityRef.current = 1;
           }
-          forceRender(n => n + 1);
+          forceRender((n) => n + 1);
         }
 
         // Vehicle rises after climax
@@ -1118,7 +1180,8 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
 
         // Vehicle circles in victory
         if (vehicleRef.current) {
-          const victoryAngle = orbitStartAngle - (phaseTimeRef.current + ATTACK_DURATION) * ORBIT_SPEED * 0.3;
+          const victoryAngle =
+            orbitStartAngle - (phaseTimeRef.current + ATTACK_DURATION) * ORBIT_SPEED * 0.3;
           const victoryDist = ORBIT_RADIUS * 1.5;
           vehicleRef.current.position.set(
             defenderTopPos.x + Math.cos(victoryAngle) * victoryDist,
@@ -1146,11 +1209,9 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
 
         if (vehicleRef.current) {
           // Fly away back towards attacker direction
-          _tempVec.set(
-            attackerPos.x - defenderTopPos.x,
-            0,
-            attackerPos.z - defenderTopPos.z,
-          ).normalize();
+          _tempVec
+            .set(attackerPos.x - defenderTopPos.x, 0, attackerPos.z - defenderTopPos.z)
+            .normalize();
 
           vehicleRef.current.position.addScaledVector(_tempVec, delta * 40);
           vehicleRef.current.position.y += delta * 8;
@@ -1204,7 +1265,11 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
   return (
     <group>
       {/* Vehicle */}
-      <group ref={vehicleRef} position={[attackerPos.x, attackerPos.y - 4, attackerPos.z]} scale={2}>
+      <group
+        ref={vehicleRef}
+        position={[attackerPos.x, attackerPos.y - 4, attackerPos.z]}
+        scale={2}
+      >
         <VehicleMesh type={vehicleType} />
       </group>
 
@@ -1239,13 +1304,22 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
       />
 
       {/* Shockwave ring */}
-      <Shockwave active={(isAttack || isOutro) && !!raidData?.success && climaxTriggered.current} position={defenderTopPos} />
+      <Shockwave
+        active={(isAttack || isOutro) && !!raidData?.success && climaxTriggered.current}
+        position={defenderTopPos}
+      />
 
       {/* Debris */}
-      <DebrisParticles active={(isAttack || isOutro) && !!raidData?.success && climaxTriggered.current} origin={defenderTopPos} />
+      <DebrisParticles
+        active={(isAttack || isOutro) && !!raidData?.success && climaxTriggered.current}
+        origin={defenderTopPos}
+      />
 
       {/* Fire glow */}
-      <FireGlow active={(isAttack || isOutro) && !!raidData?.success && climaxTriggered.current} position={defenderTopPos} />
+      <FireGlow
+        active={(isAttack || isOutro) && !!raidData?.success && climaxTriggered.current}
+        position={defenderTopPos}
+      />
     </group>
   );
 }

@@ -21,7 +21,9 @@ const UPDATABLE_FIELDS = [
  */
 export async function GET() {
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -77,7 +79,9 @@ export async function GET() {
  */
 export async function PATCH(request: Request) {
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -115,7 +119,10 @@ export async function PATCH(request: Request) {
   }
 
   // Validate digest_frequency
-  if (update.digest_frequency && !["realtime", "hourly", "daily", "weekly"].includes(update.digest_frequency as string)) {
+  if (
+    update.digest_frequency &&
+    !["realtime", "hourly", "daily", "weekly"].includes(update.digest_frequency as string)
+  ) {
     return NextResponse.json({ error: "Invalid digest_frequency" }, { status: 400 });
   }
 
@@ -141,10 +148,7 @@ export async function PATCH(request: Request) {
 
   const { data: updated, error } = await sb
     .from("notification_preferences")
-    .upsert(
-      { developer_id: dev.id, ...update },
-      { onConflict: "developer_id" },
-    )
+    .upsert({ developer_id: dev.id, ...update }, { onConflict: "developer_id" })
     .select()
     .single();
 

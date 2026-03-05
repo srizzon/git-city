@@ -14,7 +14,9 @@ export async function GET(request: Request) {
 
   const { data: dev } = await sb
     .from("developers")
-    .select("id, github_login, name, avatar_url, contributions, contributions_total, total_stars, public_repos, rank, referral_count, kudos_count")
+    .select(
+      "id, github_login, name, avatar_url, contributions, contributions_total, total_stars, public_repos, rank, referral_count, kudos_count",
+    )
     .eq("github_login", login)
     .single();
 
@@ -27,7 +29,10 @@ export async function GET(request: Request) {
 
   if (tab === "contributors") {
     position = dev.rank;
-    const contribs = (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions;
+    const contribs =
+      dev.contributions_total && dev.contributions_total > 0
+        ? dev.contributions_total
+        : dev.contributions;
     metricValue = contribs.toLocaleString();
   } else if (tab === "stars") {
     const { count } = await sb
@@ -76,6 +81,6 @@ export async function GET(request: Request) {
       headers: {
         "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
       },
-    }
+    },
   );
 }

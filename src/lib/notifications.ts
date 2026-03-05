@@ -18,28 +18,28 @@ export type NotificationCategory =
 export type Priority = "high" | "normal" | "low";
 
 export interface NotificationPayload {
-  type: string;                          // 'welcome', 'raid_alert', etc.
+  type: string; // 'welcome', 'raid_alert', etc.
   category: NotificationCategory;
   developerId: number;
   dedupKey: string;
 
   // Content (adapts per channel)
-  title: string;                         // email subject, push title
-  body: string;                          // push body, email preview text
-  html?: string;                         // rich email body (wrapped in base template)
-  actionUrl?: string;                    // CTA link / deep link
-  iconUrl?: string;                      // push notification icon
-  data?: Record<string, unknown>;        // structured data for push/in_app deep links
+  title: string; // email subject, push title
+  body: string; // push body, email preview text
+  html?: string; // rich email body (wrapped in base template)
+  actionUrl?: string; // CTA link / deep link
+  iconUrl?: string; // push notification icon
+  data?: Record<string, unknown>; // structured data for push/in_app deep links
 
   // Behavior
-  forceSend?: boolean;                   // bypass preferences (purchase receipts)
-  channels?: Channel[];                  // restrict to these channels (default: ["email"])
-  skipIfActive?: boolean;                // skip if user was active < 5 min ago
-  priority?: Priority;                   // high = never batch, low = batch eligible
+  forceSend?: boolean; // bypass preferences (purchase receipts)
+  channels?: Channel[]; // restrict to these channels (default: ["email"])
+  skipIfActive?: boolean; // skip if user was active < 5 min ago
+  priority?: Priority; // high = never batch, low = batch eligible
 
   // Batching (for low/normal priority)
-  batchKey?: string;                     // group key: "raids:42", "social:42"
-  batchWindowMinutes?: number;           // how long to accumulate (default: 60)
+  batchKey?: string; // group key: "raids:42", "social:42"
+  batchWindowMinutes?: number; // how long to accumulate (default: 60)
   batchEventData?: Record<string, unknown>; // data for this individual event within a batch
 }
 
@@ -48,13 +48,14 @@ export interface SendResult {
   success: boolean;
   providerId?: string;
   skipped?: string;
-  batched?: boolean;                     // true if added to batch instead of sent
+  batched?: boolean; // true if added to batch instead of sent
 }
 
 // ── Config ──
 
 const FROM = "Git City <noreply@thegitcity.com>";
-const HMAC_SECRET = process.env.UNSUBSCRIBE_HMAC_SECRET || process.env.CRON_SECRET || "fallback-secret";
+const HMAC_SECRET =
+  process.env.UNSUBSCRIBE_HMAC_SECRET || process.env.CRON_SECRET || "fallback-secret";
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
 const RATE_LIMITS: Record<Channel, { perHour: number; perDay: number }> = {
@@ -72,7 +73,7 @@ const RATE_LIMITS: Record<Channel, { perHour: number; perDay: number }> = {
 export async function sendNotification(payload: NotificationPayload): Promise<SendResult[]> {
   const results: SendResult[] = [];
   const sb = getSupabaseAdmin();
-  const targetChannels = payload.channels ?? ["email"] as Channel[];
+  const targetChannels = payload.channels ?? (["email"] as Channel[]);
 
   // Skip all channels if user is recently active
   if (payload.skipIfActive) {
@@ -351,7 +352,8 @@ function buildDigestFromBatch(
     })
     .join("");
 
-  const remainingText = count > 10 ? `<p style="color: #666; font-size: 13px;">...and ${count - 10} more</p>` : "";
+  const remainingText =
+    count > 10 ? `<p style="color: #666; font-size: 13px;">...and ${count - 10} more</p>` : "";
 
   return {
     type: `${batch.notification_type}_digest`,
@@ -632,16 +634,16 @@ async function isInQuietHours(
 
   if (data?.quiet_hours_start == null || data?.quiet_hours_end == null) return false;
 
-  const { data: dev } = await sb
-    .from("developers")
-    .select("timezone")
-    .eq("id", devId)
-    .single();
+  const { data: dev } = await sb.from("developers").select("timezone").eq("id", devId).single();
 
   const tz = dev?.timezone || "UTC";
   let currentHour: number;
   try {
-    const formatter = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false });
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour: "numeric",
+      hour12: false,
+    });
     currentHour = parseInt(formatter.format(new Date()), 10);
   } catch {
     currentHour = new Date().getUTCHours();
@@ -681,8 +683,5 @@ export function verifyHmacToken(devId: number, category: string, token: string):
 // ── Helpers ──
 
 function escapeBasicHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

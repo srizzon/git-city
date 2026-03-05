@@ -5,7 +5,9 @@ const OWNER_LOGIN = "srizzon";
 
 export default async function AdminAdsLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) redirect("/");
 

@@ -41,7 +41,9 @@ export async function POST(request: Request) {
   // Fetch attacker
   const attackerRes = await admin
     .from("developers")
-    .select("id, claimed, app_streak, github_login, avatar_url, current_week_contributions, current_week_kudos_given")
+    .select(
+      "id, claimed, app_streak, github_login, avatar_url, current_week_contributions, current_week_kudos_given",
+    )
     .eq("github_login", githubLogin)
     .single();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -54,7 +56,9 @@ export async function POST(request: Request) {
   // Fetch defender
   const defenderRes = await admin
     .from("developers")
-    .select("id, claimed, app_streak, avatar_url, github_login, contributions, current_week_contributions, current_week_kudos_received")
+    .select(
+      "id, claimed, app_streak, avatar_url, github_login, contributions, current_week_contributions, current_week_kudos_received",
+    )
     .eq("github_login", target_login.toLowerCase())
     .single();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,26 +127,27 @@ export async function POST(request: Request) {
   });
 
   // Fetch available boosts, owned vehicles, and saved raid loadout
-  const [{ data: boostPurchases }, { data: vehiclePurchases }, { data: raidLoadoutRow }] = await Promise.all([
-    admin
-      .from("purchases")
-      .select("id, item_id, items!inner(name, metadata)")
-      .eq("developer_id", attacker.id)
-      .eq("status", "completed")
-      .eq("items.metadata->>type", "raid_boost"),
-    admin
-      .from("purchases")
-      .select("item_id, items!inner(metadata)")
-      .eq("developer_id", attacker.id)
-      .eq("status", "completed")
-      .eq("items.metadata->>type", "raid_vehicle"),
-    admin
-      .from("developer_customizations")
-      .select("config")
-      .eq("developer_id", attacker.id)
-      .eq("item_id", "raid_loadout")
-      .maybeSingle(),
-  ]);
+  const [{ data: boostPurchases }, { data: vehiclePurchases }, { data: raidLoadoutRow }] =
+    await Promise.all([
+      admin
+        .from("purchases")
+        .select("id, item_id, items!inner(name, metadata)")
+        .eq("developer_id", attacker.id)
+        .eq("status", "completed")
+        .eq("items.metadata->>type", "raid_boost"),
+      admin
+        .from("purchases")
+        .select("item_id, items!inner(metadata)")
+        .eq("developer_id", attacker.id)
+        .eq("status", "completed")
+        .eq("items.metadata->>type", "raid_vehicle"),
+      admin
+        .from("developer_customizations")
+        .select("config")
+        .eq("developer_id", attacker.id)
+        .eq("item_id", "raid_loadout")
+        .maybeSingle(),
+    ]);
 
   const availableBoosts: RaidBoostItem[] = (boostPurchases ?? []).map((p) => {
     const item = p.items as unknown as { name: string; metadata: { bonus: number } };

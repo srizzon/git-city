@@ -17,7 +17,9 @@ export async function GET(request: Request) {
   } else {
     // Auth-based: resolve developer_id from session
     const supabase = await createServerSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -136,7 +138,7 @@ export async function POST(request: Request) {
       config,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "developer_id,item_id" }
+    { onConflict: "developer_id,item_id" },
   );
 
   return NextResponse.json({ ok: true, vehicle: config.vehicle, tag: config.tag });

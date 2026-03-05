@@ -41,7 +41,12 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
 
   // Cinema bars shown during cinematic phases, retract on share
   const showBars = phase !== "idle" && phase !== "preview" && phase !== "done" && phase !== "share";
-  const showText = phase === "intro" || phase === "flight" || phase === "attack" || phase === "outro_win" || phase === "outro_lose";
+  const showText =
+    phase === "intro" ||
+    phase === "flight" ||
+    phase === "attack" ||
+    phase === "outro_win" ||
+    phase === "outro_lose";
   const showScore = phase === "share";
 
   useEffect(() => {
@@ -216,7 +221,9 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
                   <p>{raidData.attack_breakdown.commits} commits</p>
                   <p>{raidData.attack_breakdown.streak} streak</p>
                   <p>{raidData.attack_breakdown.kudos} kudos</p>
-                  {raidData.attack_breakdown.boost ? <p>{raidData.attack_breakdown.boost} boost</p> : null}
+                  {raidData.attack_breakdown.boost ? (
+                    <p>{raidData.attack_breakdown.boost} boost</p>
+                  ) : null}
                 </div>
               </div>
 

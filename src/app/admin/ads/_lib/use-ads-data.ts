@@ -68,9 +68,7 @@ export function useAdsData({ filters, onToast }: UseAdsDataOptions) {
 
     // Source filter
     if (filters.source !== "all") {
-      result = result.filter((ad) =>
-        filters.source === "paid" ? !!ad.plan_id : !ad.plan_id,
-      );
+      result = result.filter((ad) => (filters.source === "paid" ? !!ad.plan_id : !ad.plan_id));
     }
 
     // Sort - user's choice is the ONLY sort (no forced "active first")
@@ -90,7 +88,7 @@ export function useAdsData({ filters, onToast }: UseAdsDataOptions) {
         case "priority":
           return dir * (a.priority - b.priority);
         case "created_at":
-          return dir * ((a.created_at ?? "").localeCompare(b.created_at ?? ""));
+          return dir * (a.created_at ?? "").localeCompare(b.created_at ?? "");
         case "status":
           return dir * (getStatusOrder(getAdStatus(a)) - getStatusOrder(getAdStatus(b)));
         default:
@@ -118,10 +116,7 @@ export function useAdsData({ filters, onToast }: UseAdsDataOptions) {
     return { ...t, ctr: totalCtr };
   }, [ads]);
 
-  const activeCount = useMemo(
-    () => ads.filter((a) => getAdStatus(a) === "active").length,
-    [ads],
-  );
+  const activeCount = useMemo(() => ads.filter((a) => getAdStatus(a) === "active").length, [ads]);
   const paidCount = useMemo(() => ads.filter((a) => !!a.plan_id).length, [ads]);
 
   // Toggle active/paused (optimistic)
@@ -129,9 +124,7 @@ export function useAdsData({ filters, onToast }: UseAdsDataOptions) {
     async (id: string, currentActive: boolean) => {
       const newActive = !currentActive;
       // Optimistic update
-      setAds((prev) =>
-        prev.map((ad) => (ad.id === id ? { ...ad, active: newActive } : ad)),
-      );
+      setAds((prev) => prev.map((ad) => (ad.id === id ? { ...ad, active: newActive } : ad)));
       try {
         const res = await fetch("/api/sky-ads/manage", {
           method: "PUT",
@@ -142,11 +135,7 @@ export function useAdsData({ filters, onToast }: UseAdsDataOptions) {
         onToast(newActive ? "Ad resumed" : "Ad paused", "success");
       } catch {
         // Revert
-        setAds((prev) =>
-          prev.map((ad) =>
-            ad.id === id ? { ...ad, active: currentActive } : ad,
-          ),
-        );
+        setAds((prev) => prev.map((ad) => (ad.id === id ? { ...ad, active: currentActive } : ad)));
         onToast("Failed to toggle ad", "error");
       }
     },
@@ -263,7 +252,10 @@ export function useAdsData({ filters, onToast }: UseAdsDataOptions) {
           onToast(data.error ?? "Batch operation failed", "error");
           return false;
         }
-        onToast(`${ids.length} ads ${action === "delete" ? "deleted" : action === "pause" ? "paused" : "resumed"}`, "success");
+        onToast(
+          `${ids.length} ads ${action === "delete" ? "deleted" : action === "pause" ? "paused" : "resumed"}`,
+          "success",
+        );
         fetchStats();
         return true;
       } catch {

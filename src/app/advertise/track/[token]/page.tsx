@@ -7,11 +7,14 @@ const ACCENT = "#c8e64a";
 
 // Historical baselines from Himetrica (tracking was lost in Supabase due to www origin bug).
 // Same map as in /api/sky-ads/analytics — keep in sync.
-const HISTORICAL_BASELINES: Record<string, { impressions: number; clicks: number; cta_clicks: number }> = {
-  "gitcity":   { impressions: 311161, clicks: 2527, cta_clicks: 1110 },
-  "samuel":    { impressions: 280045, clicks: 2274, cta_clicks: 999 },
-  "build":     { impressions: 248929, clicks: 2022, cta_clicks: 888 },
-  "advertise": { impressions: 31116,  clicks: 253,  cta_clicks: 110 },
+const HISTORICAL_BASELINES: Record<
+  string,
+  { impressions: number; clicks: number; cta_clicks: number }
+> = {
+  gitcity: { impressions: 311161, clicks: 2527, cta_clicks: 1110 },
+  samuel: { impressions: 280045, clicks: 2274, cta_clicks: 999 },
+  build: { impressions: 248929, clicks: 2022, cta_clicks: 888 },
+  advertise: { impressions: 31116, clicks: 253, cta_clicks: 110 },
 };
 
 export const metadata: Metadata = {
@@ -32,7 +35,9 @@ export default async function TrackingPage({ params }: Props) {
 
   const { data: ad } = await sb
     .from("sky_ads")
-    .select("id, text, brand, color, bg_color, vehicle, active, starts_at, ends_at, plan_id, created_at")
+    .select(
+      "id, text, brand, color, bg_color, vehicle, active, starts_at, ends_at, plan_id, created_at",
+    )
     .eq("tracking_token", token)
     .maybeSingle();
 
@@ -66,11 +71,8 @@ export default async function TrackingPage({ params }: Props) {
   const now = new Date();
   const endsAt = ad.ends_at ? new Date(ad.ends_at) : null;
   const isExpired = endsAt ? now > endsAt : false;
-  const status = !ad.active && !ad.starts_at
-    ? "pending"
-    : ad.active && !isExpired
-      ? "active"
-      : "expired";
+  const status =
+    !ad.active && !ad.starts_at ? "pending" : ad.active && !isExpired ? "active" : "expired";
 
   const statusColors = {
     pending: "#f8d880",
@@ -90,10 +92,7 @@ export default async function TrackingPage({ params }: Props) {
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
       <div className="mx-auto max-w-2xl px-4 py-10">
-        <Link
-          href="/advertise"
-          className="text-xs text-muted transition-colors hover:text-cream"
-        >
+        <Link href="/advertise" className="text-xs text-muted transition-colors hover:text-cream">
           &larr; Back to Advertise
         </Link>
 
@@ -106,16 +105,21 @@ export default async function TrackingPage({ params }: Props) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-lg">
-                {ad.vehicle === "plane" ? "\u2708" : ad.vehicle === "blimp" ? "\u25C6" : ad.vehicle === "billboard" ? "\uD83D\uDCCB" : ad.vehicle === "rooftop_sign" ? "\uD83D\uDD04" : ad.vehicle === "led_wrap" ? "\uD83D\uDCA1" : "\u2708"}
+                {ad.vehicle === "plane"
+                  ? "\u2708"
+                  : ad.vehicle === "blimp"
+                    ? "\u25C6"
+                    : ad.vehicle === "billboard"
+                      ? "\uD83D\uDCCB"
+                      : ad.vehicle === "rooftop_sign"
+                        ? "\uD83D\uDD04"
+                        : ad.vehicle === "led_wrap"
+                          ? "\uD83D\uDCA1"
+                          : "\u2708"}
               </span>
-              <span className="text-xs text-cream">
-                {ad.brand || ad.id}
-              </span>
+              <span className="text-xs text-cream">{ad.brand || ad.id}</span>
             </div>
-            <span
-              className="text-[10px] uppercase"
-              style={{ color: statusColors[status] }}
-            >
+            <span className="text-[10px] uppercase" style={{ color: statusColors[status] }}>
               {status}
             </span>
           </div>
@@ -141,16 +145,11 @@ export default async function TrackingPage({ params }: Props) {
             { label: "Clicks", value: totalClicks },
             { label: "CTA Clicks", value: totalCtaClicks },
           ].map((stat) => (
-            <div
-              key={stat.label}
-              className="border-[3px] border-border p-4 text-center"
-            >
+            <div key={stat.label} className="border-[3px] border-border p-4 text-center">
               <p className="text-xl text-cream" style={{ color: ACCENT }}>
                 {stat.value.toLocaleString()}
               </p>
-              <p className="mt-1 text-[9px] text-muted normal-case">
-                {stat.label}
-              </p>
+              <p className="mt-1 text-[9px] text-muted normal-case">{stat.label}</p>
             </div>
           ))}
         </div>
@@ -160,16 +159,21 @@ export default async function TrackingPage({ params }: Props) {
           <h2 className="text-sm text-cream">Details</h2>
           <div className="mt-4 space-y-3">
             {[
-              { label: "Vehicle", value: ad.vehicle === "rooftop_sign" ? "Rooftop Sign" : ad.vehicle === "led_wrap" ? "LED Wrap" : ad.vehicle.charAt(0).toUpperCase() + ad.vehicle.slice(1) },
+              {
+                label: "Vehicle",
+                value:
+                  ad.vehicle === "rooftop_sign"
+                    ? "Rooftop Sign"
+                    : ad.vehicle === "led_wrap"
+                      ? "LED Wrap"
+                      : ad.vehicle.charAt(0).toUpperCase() + ad.vehicle.slice(1),
+              },
               { label: "Plan", value: ad.plan_id?.replace("_", " ") ?? "-" },
               { label: "Created", value: formatDate(ad.created_at) },
               { label: "Started", value: formatDate(ad.starts_at) },
               { label: "Ends", value: formatDate(ad.ends_at) },
             ].map((row) => (
-              <div
-                key={row.label}
-                className="flex items-baseline justify-between text-[10px]"
-              >
+              <div key={row.label} className="flex items-baseline justify-between text-[10px]">
                 <span className="text-muted normal-case">{row.label}</span>
                 <span className="text-cream">{row.value}</span>
               </div>

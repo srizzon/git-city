@@ -36,7 +36,7 @@ export default function PitchDeck({ stats }: { stats: PitchStats }) {
       setDir(idx > active ? "next" : "prev");
       setActive(idx);
     },
-    [active]
+    [active],
   );
 
   const next = useCallback(() => go(active + 1), [go, active]);
@@ -116,25 +116,18 @@ export default function PitchDeck({ stats }: { stats: PitchStats }) {
           animation: `${dir === "next" ? "slideInRight" : "slideInLeft"} 0.3s ease-out`,
         }}
       >
-        <div className="flex min-h-full items-center justify-center">
-          {slides[active]}
-        </div>
+        <div className="flex min-h-full items-center justify-center">{slides[active]}</div>
       </div>
 
       {/* ── bottom bar ── */}
       <div className="absolute bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm sm:px-8">
         {/* left: back + counter */}
         <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="text-xs text-dim transition-colors hover:text-cream sm:text-sm"
-          >
+          <Link href="/" className="text-xs text-dim transition-colors hover:text-cream sm:text-sm">
             &larr; City
           </Link>
           <span className="text-sm text-muted sm:text-base">
-            <span style={{ color: CREAM }}>
-              {String(active + 1).padStart(2, "0")}
-            </span>
+            <span style={{ color: CREAM }}>{String(active + 1).padStart(2, "0")}</span>
             <span className="text-dim"> / {TOTAL_SLIDES}</span>
           </span>
         </div>
@@ -142,12 +135,7 @@ export default function PitchDeck({ stats }: { stats: PitchStats }) {
         {/* center: progress bar */}
         <div className="hidden flex-1 items-center justify-center gap-1.5 px-8 md:flex">
           {SLIDE_LABELS.map((label, i) => (
-            <button
-              key={label}
-              onClick={() => go(i)}
-              className="group relative"
-              aria-label={label}
-            >
+            <button key={label} onClick={() => go(i)} className="group relative" aria-label={label}>
               <div
                 className="h-1.5 w-6 transition-all lg:w-8"
                 style={{
@@ -218,8 +206,7 @@ function SlideCover({ stats }: { stats: PitchStats }) {
   return (
     <div className="flex flex-col items-center gap-8 text-center">
       <div className="text-6xl sm:text-8xl lg:text-9xl">
-        <span style={{ color: CREAM }}>GIT</span>{" "}
-        <span style={{ color: ACCENT }}>CITY</span>
+        <span style={{ color: CREAM }}>GIT</span> <span style={{ color: ACCENT }}>CITY</span>
       </div>
       <p className="max-w-lg text-base leading-relaxed text-muted normal-case sm:text-xl lg:text-2xl">
         Your GitHub profile as a 3D pixel art building in an interactive city
@@ -275,19 +262,16 @@ function SlideSolution() {
     <div className="flex w-full max-w-4xl flex-col gap-8">
       <SlideHeader n="03" title="The Solution" />
       <p className="max-w-2xl text-base leading-relaxed text-muted normal-case sm:text-lg">
-        Git City transforms every GitHub developer into a unique 3D pixel art
-        building. Contributions become height. Repos become width. Activity
-        lights up windows. Together, they form a living city.
+        Git City transforms every GitHub developer into a unique 3D pixel art building.
+        Contributions become height. Repos become width. Activity lights up windows. Together, they
+        form a living city.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <SolutionPoint
           title="Contributions = Height"
           desc="More commits, taller building. The skyline tells the story."
         />
-        <SolutionPoint
-          title="Repos = Width"
-          desc="More public repos, wider foundation."
-        />
+        <SolutionPoint title="Repos = Width" desc="More public repos, wider foundation." />
         <SolutionPoint
           title="Stars = Lit Windows"
           desc="Activity and stars light up your building at night."
@@ -367,9 +351,7 @@ function SlideTraction({ stats }: { stats: PitchStats }) {
         <MetricCard value={stats.conversionRate} label="Conversion rate" />
       </div>
       <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
-        <p className="mb-4 text-sm text-cream sm:text-base">
-          Revenue (first {stats.daysOld} days)
-        </p>
+        <p className="mb-4 text-sm text-cream sm:text-base">Revenue (first {stats.daysOld} days)</p>
         <div className="grid gap-5 sm:grid-cols-3">
           <MetricCard value={stats.formattedRevenue} label="Total revenue" accent />
           <MetricCard value={stats.formattedAdCampaigns} label="Paid ad campaigns" />
@@ -429,9 +411,8 @@ function SlideMarket() {
         />
       </div>
       <p className="text-sm leading-relaxed text-muted normal-case sm:text-base">
-        Developer tools market projected at $45B+ by 2028. Developer identity
-        and community platforms are underserved. GitHub has no social layer
-        beyond follow/star.
+        Developer tools market projected at $45B+ by 2028. Developer identity and community
+        platforms are underserved. GitHub has no social layer beyond follow/star.
       </p>
     </div>
   );
@@ -456,15 +437,19 @@ function SlideCompetition() {
           <tbody className="text-muted">
             <CompRow feature="3D visualization" gc="Full city" sky="Bar chart" cr="None" />
             <CompRow feature="Community" gc="Kudos, battles, gifts" sky="None" cr="Basic" />
-            <CompRow feature="Gamification" gc="Achievements, streaks, boards" sky="None" cr="Score" />
+            <CompRow
+              feature="Gamification"
+              gc="Achievements, streaks, boards"
+              sky="None"
+              cr="Score"
+            />
             <CompRow feature="Monetization" gc="Ads + Shop" sky="None (dead)" cr="Premium" />
             <CompRow feature="Status" gc="Active, growing" sky="Discontinued" cr="Low traction" />
           </tbody>
         </table>
       </div>
       <p className="text-sm text-dim normal-case sm:text-base">
-        GitHub Skyline was discontinued. No active product does what Git City
-        does.
+        GitHub Skyline was discontinued. No active product does what Git City does.
       </p>
     </div>
   );
@@ -544,9 +529,8 @@ function SlideFounder() {
             </div>
           </div>
           <p className="text-sm leading-relaxed text-muted normal-case sm:text-base">
-            Built Git City in a single day and has been iterating daily since.
-            Handles everything: 3D engine, backend, payments, marketing,
-            community. Building in public on X/Twitter.
+            Built Git City in a single day and has been iterating daily since. Handles everything:
+            3D engine, backend, payments, marketing, community. Building in public on X/Twitter.
           </p>
           <div className="flex flex-wrap gap-3">
             <Pill>Next.js</Pill>
@@ -567,18 +551,14 @@ function SlideVision() {
     <div className="flex w-full max-w-4xl flex-col items-center justify-center gap-10 text-center">
       <SlideHeader n="11" title="Vision" />
       <p className="max-w-2xl text-lg leading-relaxed text-muted normal-case sm:text-2xl">
-        Building the social layer GitHub never made. A living city where
-        developers have an identity, a community, and a reason to come back
-        every day.
+        Building the social layer GitHub never made. A living city where developers have an
+        identity, a community, and a reason to come back every day.
       </p>
       <div className="border-[3px] border-border bg-bg-raised p-8 sm:p-10">
         <p className="text-3xl text-cream sm:text-5xl">
-          The future of developer identity is a{" "}
-          <span style={{ color: ACCENT }}>city</span>.
+          The future of developer identity is a <span style={{ color: ACCENT }}>city</span>.
         </p>
-        <p className="mt-4 text-sm text-muted normal-case sm:text-base">
-          thegitcity.com
-        </p>
+        <p className="mt-4 text-sm text-muted normal-case sm:text-base">thegitcity.com</p>
       </div>
     </div>
   );
@@ -589,11 +569,36 @@ function SlideRoadmap() {
     <div className="flex w-full max-w-4xl flex-col gap-6">
       <SlideHeader n="12" title="Roadmap" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <RoadmapItem quarter="Q1 2026" status="done" title="Core City" desc="3D city, leaderboards, achievements, streaks, shop, ads, districts, battles" />
-        <RoadmapItem quarter="Q2 2026" status="next" title="Street Mode" desc="Third-person walking. Visit buildings, discover secrets, vehicles." />
-        <RoadmapItem quarter="Q3 2026" status="planned" title="Pixels Economy" desc="Virtual currency, premium marketplace, season passes." />
-        <RoadmapItem quarter="Q4 2026" status="planned" title="Git City Wrapped" desc="Year-in-review animations. Viral shareable cards." />
-        <RoadmapItem quarter="2027" status="planned" title="100K+ Devs" desc="Enterprise, API, analytics dashboard, global events." />
+        <RoadmapItem
+          quarter="Q1 2026"
+          status="done"
+          title="Core City"
+          desc="3D city, leaderboards, achievements, streaks, shop, ads, districts, battles"
+        />
+        <RoadmapItem
+          quarter="Q2 2026"
+          status="next"
+          title="Street Mode"
+          desc="Third-person walking. Visit buildings, discover secrets, vehicles."
+        />
+        <RoadmapItem
+          quarter="Q3 2026"
+          status="planned"
+          title="Pixels Economy"
+          desc="Virtual currency, premium marketplace, season passes."
+        />
+        <RoadmapItem
+          quarter="Q4 2026"
+          status="planned"
+          title="Git City Wrapped"
+          desc="Year-in-review animations. Viral shareable cards."
+        />
+        <RoadmapItem
+          quarter="2027"
+          status="planned"
+          title="100K+ Devs"
+          desc="Enterprise, API, analytics dashboard, global events."
+        />
       </div>
     </div>
   );
@@ -622,9 +627,7 @@ function SlideContact() {
           samuelrizzondev@gmail.com
         </a>
       </div>
-      <p className="mt-4 text-sm text-muted normal-case sm:text-base">
-        thegitcity.com
-      </p>
+      <p className="mt-4 text-sm text-muted normal-case sm:text-base">thegitcity.com</p>
     </div>
   );
 }
@@ -650,15 +653,7 @@ function Pill({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ProblemCard({
-  icon,
-  title,
-  body,
-}: {
-  icon: string;
-  title: string;
-  body: string;
-}) {
+function ProblemCard({ icon, title, body }: { icon: string; title: string; body: string }) {
   return (
     <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
       <p className="mb-3 text-2xl sm:text-3xl" style={{ color: ACCENT }}>
@@ -684,15 +679,7 @@ function SolutionPoint({ title, desc }: { title: string; desc: string }) {
   );
 }
 
-function FeatureCard({
-  icon,
-  title,
-  items,
-}: {
-  icon: string;
-  title: string;
-  items: string[];
-}) {
+function FeatureCard({ icon, title, items }: { icon: string; title: string; items: string[] }) {
   return (
     <div className="border-[3px] border-border bg-bg-raised p-5">
       <p className="mb-2 text-base sm:text-lg" style={{ color: ACCENT }}>
@@ -711,26 +698,13 @@ function FeatureCard({
   );
 }
 
-function MetricCard({
-  value,
-  label,
-  accent,
-}: {
-  value: string;
-  label: string;
-  accent?: boolean;
-}) {
+function MetricCard({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
   return (
     <div className="flex flex-col gap-1">
-      <p
-        className="text-3xl sm:text-4xl"
-        style={{ color: accent ? ACCENT : CREAM }}
-      >
+      <p className="text-3xl sm:text-4xl" style={{ color: accent ? ACCENT : CREAM }}>
         {value}
       </p>
-      <p className="text-xs leading-tight text-muted normal-case sm:text-sm">
-        {label}
-      </p>
+      <p className="text-xs leading-tight text-muted normal-case sm:text-sm">{label}</p>
     </div>
   );
 }
@@ -751,21 +725,13 @@ function ModelCard({
   return (
     <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
       <div className="mb-3 flex items-center gap-2">
-        <span
-          className="h-2.5 w-2.5"
-          style={{ background: status === "live" ? ACCENT : MUTED }}
-        />
-        <span
-          className="text-xs sm:text-sm"
-          style={{ color: status === "live" ? ACCENT : MUTED }}
-        >
+        <span className="h-2.5 w-2.5" style={{ background: status === "live" ? ACCENT : MUTED }} />
+        <span className="text-xs sm:text-sm" style={{ color: status === "live" ? ACCENT : MUTED }}>
           {status === "live" ? "LIVE" : "PLANNED"}
         </span>
       </div>
       <p className="mb-2 text-base text-cream sm:text-lg">{title}</p>
-      <p className="mb-4 text-sm leading-relaxed text-muted normal-case">
-        {desc}
-      </p>
+      <p className="mb-4 text-sm leading-relaxed text-muted normal-case">{desc}</p>
       <div className="h-[2px] bg-border" />
       <div className="mt-3 flex justify-between text-sm">
         <span className="text-dim">Price</span>
@@ -773,23 +739,13 @@ function ModelCard({
       </div>
       <div className="mt-1 flex justify-between text-sm">
         <span className="text-dim">Revenue</span>
-        <span style={{ color: status === "live" ? ACCENT : MUTED }}>
-          {revenue}
-        </span>
+        <span style={{ color: status === "live" ? ACCENT : MUTED }}>{revenue}</span>
       </div>
     </div>
   );
 }
 
-function MarketRow({
-  label,
-  value,
-  desc,
-}: {
-  label: string;
-  value: string;
-  desc: string;
-}) {
+function MarketRow({ label, value, desc }: { label: string; value: string; desc: string }) {
   return (
     <div className="flex items-center gap-6 border-[3px] border-border bg-bg-raised p-5 sm:p-6">
       <div
@@ -800,9 +756,7 @@ function MarketRow({
       </div>
       <div>
         <p className="text-2xl text-cream sm:text-4xl">{value}</p>
-        <p className="mt-1 text-sm text-muted normal-case sm:text-base">
-          {desc}
-        </p>
+        <p className="mt-1 text-sm text-muted normal-case sm:text-base">{desc}</p>
       </div>
     </div>
   );
@@ -831,15 +785,7 @@ function CompRow({
   );
 }
 
-function GTMCard({
-  n,
-  title,
-  desc,
-}: {
-  n: string;
-  title: string;
-  desc: string;
-}) {
+function GTMCard({ n, title, desc }: { n: string; title: string; desc: string }) {
   return (
     <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
       <p className="mb-2 text-base sm:text-lg" style={{ color: ACCENT }}>

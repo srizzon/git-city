@@ -26,20 +26,14 @@ export default memo(function XpBar({ xpTotal, xpLevel }: XpBarProps) {
   return (
     <div className="flex items-center gap-1.5 border-[2px] border-border bg-bg/80 px-2 py-1 backdrop-blur-sm">
       {/* Level number */}
-      <span
-        className="text-sm font-bold leading-none"
-        style={{ color: tier.color }}
-      >
+      <span className="text-sm font-bold leading-none" style={{ color: tier.color }}>
         {xpLevel}
       </span>
 
       {/* Progress bar */}
       <div className="flex flex-col gap-0.5">
         {badge && (
-          <span
-            className="text-[7px] font-bold leading-none"
-            style={{ color: tier.color }}
-          >
+          <span className="text-[7px] font-bold leading-none" style={{ color: tier.color }}>
             {badge}
           </span>
         )}

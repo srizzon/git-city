@@ -52,7 +52,7 @@ const ATLAS_LIT_PCTS = [0.2, 0.35, 0.5, 0.65, 0.8, 0.95];
 function colorToABGR(hex: string): number {
   const c = new THREE.Color(hex);
   return (
-    255 << 24 |
+    (255 << 24) |
     (Math.round(c.b * 255) << 16) |
     (Math.round(c.g * 255) << 8) |
     Math.round(c.r * 255)
@@ -90,9 +90,7 @@ export function createWindowAtlas(colors: BuildingColors): THREE.CanvasTexture {
       const rowY = (bandStart + r) * ATLAS_CELL;
       for (let c = 0; c < ATLAS_COLS; c++) {
         const px = c * ATLAS_CELL;
-        const abgr = rand() < litPct
-          ? litABGRs[Math.floor(rand() * litABGRs.length)]
-          : offABGR;
+        const abgr = rand() < litPct ? litABGRs[Math.floor(rand() * litABGRs.length)] : offABGR;
         // Write WS×WS pixel block directly
         for (let dy = 0; dy < WS; dy++) {
           const rowOffset = (rowY + dy) * ATLAS_SIZE + px;
@@ -123,7 +121,7 @@ function createWindowTexture(
   seed: number,
   litColors: string[],
   offColor: string,
-  faceColor: string
+  faceColor: string,
 ): THREE.CanvasTexture {
   const WS = 6;
   const GAP = 2;
@@ -169,7 +167,15 @@ function createWindowTexture(
 
 // ─── Claimed Glow (neon trim + roof light) ────────────────────
 
-export const ClaimedGlow = memo(function ClaimedGlow({ height, width, depth }: { height: number; width: number; depth: number }) {
+export const ClaimedGlow = memo(function ClaimedGlow({
+  height,
+  width,
+  depth,
+}: {
+  height: number;
+  width: number;
+  depth: number;
+}) {
   const trimThickness = 1.2;
   const trimHeight = 2;
   const accent = "#c8e64a";
@@ -183,25 +189,44 @@ export const ClaimedGlow = memo(function ClaimedGlow({ height, width, depth }: {
         {/* Front */}
         <mesh position={[0, 0, hd]}>
           <boxGeometry args={[width + trimThickness * 2, trimHeight, trimThickness]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={3} toneMapped={false} />
+          <meshStandardMaterial
+            color={accent}
+            emissive={accent}
+            emissiveIntensity={3}
+            toneMapped={false}
+          />
         </mesh>
         {/* Back */}
         <mesh position={[0, 0, -hd]}>
           <boxGeometry args={[width + trimThickness * 2, trimHeight, trimThickness]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={3} toneMapped={false} />
+          <meshStandardMaterial
+            color={accent}
+            emissive={accent}
+            emissiveIntensity={3}
+            toneMapped={false}
+          />
         </mesh>
         {/* Left */}
         <mesh position={[-hw, 0, 0]}>
           <boxGeometry args={[trimThickness, trimHeight, depth]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={3} toneMapped={false} />
+          <meshStandardMaterial
+            color={accent}
+            emissive={accent}
+            emissiveIntensity={3}
+            toneMapped={false}
+          />
         </mesh>
         {/* Right */}
         <mesh position={[hw, 0, 0]}>
           <boxGeometry args={[trimThickness, trimHeight, depth]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={3} toneMapped={false} />
+          <meshStandardMaterial
+            color={accent}
+            emissive={accent}
+            emissiveIntensity={3}
+            toneMapped={false}
+          />
         </mesh>
       </group>
-
     </group>
   );
 });
@@ -217,9 +242,10 @@ function createFarLabel(building: CityBuilding): THREE.CanvasTexture {
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  const login = building.login.length > 16
-    ? building.login.slice(0, 16).toUpperCase() + "..."
-    : building.login.toUpperCase();
+  const login =
+    building.login.length > 16
+      ? building.login.slice(0, 16).toUpperCase() + "..."
+      : building.login.toUpperCase();
   const text = `@${login}`;
 
   ctx.font = 'bold 40px "Silkscreen", monospace';
@@ -263,7 +289,6 @@ function createFarLabel(building: CityBuilding): THREE.CanvasTexture {
   return tex;
 }
 
-
 // ─── Building Animation (separate component, unmounts when done) ─
 
 function BuildingRiseAnimation({
@@ -305,7 +330,17 @@ function BuildingRiseAnimation({
 const BEACON_HEIGHT = 500;
 const SPOTLIGHT_Y = 400; // cone origin high above
 
-export function FocusBeacon({ height, width, depth, accentColor }: { height: number; width: number; depth: number; accentColor: string }) {
+export function FocusBeacon({
+  height,
+  width,
+  depth,
+  accentColor,
+}: {
+  height: number;
+  width: number;
+  depth: number;
+  accentColor: string;
+}) {
   const coneRef = useRef<THREE.Mesh>(null);
   const markerRef = useRef<THREE.Group>(null);
 
@@ -314,7 +349,7 @@ export function FocusBeacon({ height, width, depth, accentColor }: { height: num
     // Cone pulse
     if (coneRef.current) {
       (coneRef.current.material as THREE.MeshBasicMaterial).opacity =
-        0.10 + Math.sin(t * 1.5) * 0.03;
+        0.1 + Math.sin(t * 1.5) * 0.03;
     }
     // Marker bob + spin
     if (markerRef.current) {
@@ -333,7 +368,7 @@ export function FocusBeacon({ height, width, depth, accentColor }: { height: num
         <meshBasicMaterial
           color={accentColor}
           transparent
-          opacity={0.10}
+          opacity={0.1}
           side={THREE.DoubleSide}
           depthWrite={false}
         />
@@ -364,7 +399,15 @@ export function FocusBeacon({ height, width, depth, accentColor }: { height: num
 
 // ─── Loadout-Aware Effect Rendering ──────────────────────────
 
-export const BuildingItemEffects = memo(function BuildingItemEffects({ building, accentColor, focused }: { building: CityBuilding; accentColor: string; focused?: boolean }) {
+export const BuildingItemEffects = memo(function BuildingItemEffects({
+  building,
+  accentColor,
+  focused,
+}: {
+  building: CityBuilding;
+  accentColor: string;
+  focused?: boolean;
+}) {
   const { height, width, depth, owned_items, loadout, billboard_images } = building;
   const items = owned_items ?? [];
 
@@ -375,7 +418,7 @@ export const BuildingItemEffects = memo(function BuildingItemEffects({ building,
 
   // Without a loadout, only render flag (free claim item). All other items require explicit equip.
   const hasLoadout = loadout && (loadout.crown || loadout.roof || loadout.aura);
-  const crownItem = hasLoadout ? loadout.crown : (items.includes("flag") ? "flag" : null);
+  const crownItem = hasLoadout ? loadout.crown : items.includes("flag") ? "flag" : null;
   const roofItem = hasLoadout ? loadout.roof : null;
   const auraItem = hasLoadout ? loadout.aura : null;
 
@@ -417,12 +460,8 @@ export const BuildingItemEffects = memo(function BuildingItemEffects({ building,
       )}
 
       {/* Crown zone */}
-      {shouldRenderZone("helipad") && (
-        <Helipad height={height} width={width} depth={depth} />
-      )}
-      {shouldRenderZone("spire") && (
-        <Spire height={height} width={width} depth={depth} />
-      )}
+      {shouldRenderZone("helipad") && <Helipad height={height} width={width} depth={depth} />}
+      {shouldRenderZone("spire") && <Spire height={height} width={width} depth={depth} />}
       {shouldRenderZone("flag") && (
         <Flag height={height} width={width} depth={depth} color={accentColor} />
       )}
@@ -449,18 +488,20 @@ export const BuildingItemEffects = memo(function BuildingItemEffects({ building,
         <GitHubStar height={height} width={width} depth={depth} color={accentColor} />
       )}
       {/* White rabbit: always renders for completers, not tied to loadout */}
-      {building.rabbit_completed && (
-        <MiniWhiteRabbit height={height} width={width} depth={depth} />
-      )}
+      {building.rabbit_completed && <MiniWhiteRabbit height={height} width={width} depth={depth} />}
 
       {/* New roof zone items */}
-      {shouldRenderZone("pool_party") && (
-        <PoolParty height={height} width={width} depth={depth} />
-      )}
+      {shouldRenderZone("pool_party") && <PoolParty height={height} width={width} depth={depth} />}
 
       {/* Faces zone (always render if owned) */}
       {shouldRender("billboard") && (
-        <Billboards height={height} width={width} depth={depth} images={billboard_images ?? []} color={accentColor} />
+        <Billboards
+          height={height}
+          width={width}
+          depth={depth}
+          images={billboard_images ?? []}
+          color={accentColor}
+        />
       )}
       {shouldRender("led_banner") && (
         <LEDBanner height={height} width={width} depth={depth} color={accentColor} />
@@ -482,22 +523,32 @@ interface Props {
   onClick?: (building: CityBuilding) => void;
 }
 
-export default function Building3D({ building, colors, atlasTexture, introMode, focused, dimmed, accentColor, onClick }: Props) {
+export default function Building3D({
+  building,
+  colors,
+  atlasTexture,
+  introMode,
+  focused,
+  dimmed,
+  accentColor,
+  onClick,
+}: Props) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const spriteRef = useRef<THREE.Sprite>(null);
   const pointerDown = useRef<{ x: number; y: number } | null>(null);
 
   const textures = useMemo(() => {
-    const seed =
-      building.login.split("").reduce((a, c) => a + c.charCodeAt(0), 0) * 137;
+    const seed = building.login.split("").reduce((a, c) => a + c.charCodeAt(0), 0) * 137;
 
     // Custom color buildings: per-building canvas textures (rare, <5%)
     // Blend custom color 50% with theme face color to prevent glaring brightness
     if (building.custom_color) {
-      const blended = new THREE.Color(colors.face)
-        .lerp(new THREE.Color(building.custom_color), 0.5);
-      const blendedHex = '#' + blended.getHexString();
+      const blended = new THREE.Color(colors.face).lerp(
+        new THREE.Color(building.custom_color),
+        0.5,
+      );
+      const blendedHex = "#" + blended.getHexString();
       const front = createWindowTexture(
         building.floors,
         building.windowsPerFloor,
@@ -505,7 +556,7 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
         seed,
         colors.windowLit,
         colors.windowOff,
-        blendedHex
+        blendedHex,
       );
       const side = createWindowTexture(
         building.floors,
@@ -514,7 +565,7 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
         seed + 7919,
         colors.windowLit,
         colors.windowOff,
-        blendedHex
+        blendedHex,
       );
       return { front, side };
     }
@@ -528,7 +579,9 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
     front.offset.set(frontColStart / ATLAS_COLS, bandRowOffset / ATLAS_COLS);
     front.repeat.set(building.windowsPerFloor / ATLAS_COLS, building.floors / ATLAS_COLS);
 
-    const sideColStart = Math.abs((seed + 7919) % Math.max(1, ATLAS_COLS - building.sideWindowsPerFloor));
+    const sideColStart = Math.abs(
+      (seed + 7919) % Math.max(1, ATLAS_COLS - building.sideWindowsPerFloor),
+    );
     const side = atlasTexture.clone();
     side.offset.set(sideColStart / ATLAS_COLS, bandRowOffset / ATLAS_COLS);
     side.repeat.set(building.sideWindowsPerFloor / ATLAS_COLS, building.floors / ATLAS_COLS);
@@ -568,12 +621,14 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
 
   // Defer label creation until intro is done (saves 160KB+ canvas work per building)
   const labelTexture = useMemo(
-    () => introMode ? null : createFarLabel(building),
-    [building, introMode]
+    () => (introMode ? null : createFarLabel(building)),
+    [building, introMode],
   );
 
   useEffect(() => {
-    return () => { labelTexture?.dispose(); };
+    return () => {
+      labelTexture?.dispose();
+    };
   }, [labelTexture]);
 
   const labelMaterial = useMemo(
@@ -587,7 +642,7 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
             fog: true,
           })
         : null,
-    [labelTexture]
+    [labelTexture],
   );
 
   // Dispose materials + label material on unmount/change
@@ -603,7 +658,7 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
     for (const mat of materials) {
       mat.transparent = dimmed || false;
       mat.opacity = dimmed ? 0.55 : 1;
-      mat.emissiveIntensity = dimmed ? 0.3 : (mat.map ? 2.0 : 1.5);
+      mat.emissiveIntensity = dimmed ? 0.3 : mat.map ? 2.0 : 1.5;
     }
     if (labelMaterial) {
       labelMaterial.opacity = focused ? 0 : dimmed ? 0.15 : 1;
@@ -623,19 +678,39 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
         geometry={SHARED_BOX_GEO}
         scale={[building.width, 0.001, building.depth]}
         dispose={null}
-        onPointerDown={introMode ? undefined : (e) => {
-          pointerDown.current = { x: e.clientX, y: e.clientY };
-        }}
-        onClick={introMode ? undefined : (e) => {
-          e.stopPropagation();
-          if (!pointerDown.current) return;
-          const dx = e.clientX - pointerDown.current.x;
-          const dy = e.clientY - pointerDown.current.y;
-          if (dx * dx + dy * dy > 25) return; // >5px = drag, not click
-          onClick?.(building);
-        }}
-        onPointerOver={introMode ? undefined : () => { document.body.style.cursor = "pointer"; }}
-        onPointerOut={introMode ? undefined : () => { document.body.style.cursor = "auto"; }}
+        onPointerDown={
+          introMode
+            ? undefined
+            : (e) => {
+                pointerDown.current = { x: e.clientX, y: e.clientY };
+              }
+        }
+        onClick={
+          introMode
+            ? undefined
+            : (e) => {
+                e.stopPropagation();
+                if (!pointerDown.current) return;
+                const dx = e.clientX - pointerDown.current.x;
+                const dy = e.clientY - pointerDown.current.y;
+                if (dx * dx + dy * dy > 25) return; // >5px = drag, not click
+                onClick?.(building);
+              }
+        }
+        onPointerOver={
+          introMode
+            ? undefined
+            : () => {
+                document.body.style.cursor = "pointer";
+              }
+        }
+        onPointerOut={
+          introMode
+            ? undefined
+            : () => {
+                document.body.style.cursor = "auto";
+              }
+        }
       />
 
       {labelMaterial && (
@@ -647,67 +722,109 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
         />
       )}
 
-      <BuildingRiseAnimation
-        height={building.height}
-        meshRef={meshRef}
-        spriteRef={spriteRef}
-      />
+      <BuildingRiseAnimation height={building.height} meshRef={meshRef} spriteRef={spriteRef} />
 
       {/* Skip heavy effects during intro - camera moves too fast to see them */}
-      {!introMode && building.claimed && <ClaimedGlow height={building.height} width={building.width} depth={building.depth} />}
+      {!introMode && building.claimed && (
+        <ClaimedGlow height={building.height} width={building.width} depth={building.depth} />
+      )}
 
-      {!introMode && focused && <FocusBeacon height={building.height} width={building.width} depth={building.depth} accentColor={accentColor ?? "#c8e64a"} />}
+      {!introMode && focused && (
+        <FocusBeacon
+          height={building.height}
+          width={building.width}
+          depth={building.depth}
+          accentColor={accentColor ?? "#c8e64a"}
+        />
+      )}
 
       {!introMode && (
-        <BuildingItemEffects building={building} accentColor={accentColor ?? colors.accent ?? "#c8e64a"} focused={focused} />
+        <BuildingItemEffects
+          building={building}
+          accentColor={accentColor ?? colors.accent ?? "#c8e64a"}
+          focused={focused}
+        />
       )}
 
       {!introMode && building.app_streak > 0 && (
-        <StreakFlame height={building.height} width={building.width} depth={building.depth} streakDays={building.app_streak} color={accentColor ?? colors.accent ?? "#c8e64a"} />
+        <StreakFlame
+          height={building.height}
+          width={building.width}
+          depth={building.depth}
+          streakDays={building.app_streak}
+          color={accentColor ?? colors.accent ?? "#c8e64a"}
+        />
       )}
 
       {/* XP Tier visual effects */}
-      {!introMode && building.xp_level >= 5 && (() => {
-        const tier = tierFromLevel(building.xp_level);
-        return (
-          <>
-            {/* Staging (Lv 5-8): Blue neon trim */}
-            {tier.id === "staging" && (
-              <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
-            )}
-            {/* Production (Lv 9-13): Purple base glow + neon trim */}
-            {tier.id === "production" && (
-              <>
-                <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
-                <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
-              </>
-            )}
-            {/* Open Source (Lv 14-18): Golden base + golden neon trim */}
-            {tier.id === "open_source" && (
-              <>
-                <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
-                <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
-              </>
-            )}
-            {/* Unicorn (Lv 19-23): Cyan sky beam + base glow + neon trim */}
-            {tier.id === "unicorn" && (
-              <>
-                <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
-                <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
-                <TierSkyBeam height={building.height} color={tier.color} />
-              </>
-            )}
-            {/* Founder (Lv 24+): Prismatic sky beam + base glow + white neon trim */}
-            {tier.id === "founder" && (
-              <>
-                <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
-                <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
-                <TierSkyBeam height={building.height} color={tier.color} prismatic />
-              </>
-            )}
-          </>
-        );
-      })()}
+      {!introMode &&
+        building.xp_level >= 5 &&
+        (() => {
+          const tier = tierFromLevel(building.xp_level);
+          return (
+            <>
+              {/* Staging (Lv 5-8): Blue neon trim */}
+              {tier.id === "staging" && (
+                <TierNeonTrim
+                  width={building.width}
+                  height={building.height}
+                  depth={building.depth}
+                  color={tier.color}
+                />
+              )}
+              {/* Production (Lv 9-13): Purple base glow + neon trim */}
+              {tier.id === "production" && (
+                <>
+                  <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
+                  <TierNeonTrim
+                    width={building.width}
+                    height={building.height}
+                    depth={building.depth}
+                    color={tier.color}
+                  />
+                </>
+              )}
+              {/* Open Source (Lv 14-18): Golden base + golden neon trim */}
+              {tier.id === "open_source" && (
+                <>
+                  <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
+                  <TierNeonTrim
+                    width={building.width}
+                    height={building.height}
+                    depth={building.depth}
+                    color={tier.color}
+                  />
+                </>
+              )}
+              {/* Unicorn (Lv 19-23): Cyan sky beam + base glow + neon trim */}
+              {tier.id === "unicorn" && (
+                <>
+                  <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
+                  <TierNeonTrim
+                    width={building.width}
+                    height={building.height}
+                    depth={building.depth}
+                    color={tier.color}
+                  />
+                  <TierSkyBeam height={building.height} color={tier.color} />
+                </>
+              )}
+              {/* Founder (Lv 24+): Prismatic sky beam + base glow + white neon trim */}
+              {tier.id === "founder" && (
+                <>
+                  <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
+                  <TierNeonTrim
+                    width={building.width}
+                    height={building.height}
+                    depth={building.depth}
+                    color={tier.color}
+                  />
+                  <TierSkyBeam height={building.height} color={tier.color} prismatic />
+                </>
+              )}
+            </>
+          );
+        })()}
     </group>
   );
 }

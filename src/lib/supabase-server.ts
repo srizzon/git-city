@@ -16,7 +16,7 @@ export async function createServerSupabase() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, options),
             );
           } catch {
             // setAll can throw in Server Components (read-only).
@@ -24,6 +24,6 @@ export async function createServerSupabase() {
           }
         },
       },
-    }
+    },
   );
 }

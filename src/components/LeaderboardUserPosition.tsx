@@ -43,9 +43,7 @@ export default function LeaderboardUserPosition({
 
   return (
     <>
-      <div className="px-5 py-1 text-center text-[9px] text-dim">
-        {"\u22EE"}
-      </div>
+      <div className="px-5 py-1 text-center text-[9px] text-dim">{"\u22EE"}</div>
       <Link
         href={`/dev/${data.github_login}`}
         className="flex items-center gap-4 border-t border-border/50 px-5 py-3.5 hover:bg-bg-card"
@@ -68,7 +66,9 @@ export default function LeaderboardUserPosition({
           <div className="overflow-hidden">
             <p className="truncate text-sm text-cream">
               {data.name ?? data.github_login}
-              <span className="ml-2 text-[10px]" style={{ color: ACCENT }}>YOU</span>
+              <span className="ml-2 text-[10px]" style={{ color: ACCENT }}>
+                YOU
+              </span>
             </p>
           </div>
         </div>

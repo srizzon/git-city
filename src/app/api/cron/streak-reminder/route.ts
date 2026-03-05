@@ -40,9 +40,7 @@ export async function GET(request: NextRequest) {
       .select("developer_id, streak_reminders")
       .in("developer_id", devIds);
 
-    const prefsMap = new Map(
-      (prefs ?? []).map((p) => [p.developer_id, p]),
-    );
+    const prefsMap = new Map((prefs ?? []).map((p) => [p.developer_id, p]));
 
     for (const dev of devs) {
       try {

@@ -53,11 +53,7 @@ export async function isRecentlyActive(devId: number, minutesAgo = 5): Promise<b
   const sb = getSupabaseAdmin();
   const cutoff = new Date(Date.now() - minutesAgo * 60_000).toISOString();
 
-  const { data } = await sb
-    .from("developers")
-    .select("last_active_at")
-    .eq("id", devId)
-    .single();
+  const { data } = await sb.from("developers").select("last_active_at").eq("id", devId).single();
 
   if (!data?.last_active_at) return false;
   return data.last_active_at > cutoff;
@@ -82,10 +78,7 @@ export async function getPushTokens(devId: number): Promise<{ token: string; pla
  */
 export function touchLastActive(devId: number): void {
   const sb = getSupabaseAdmin();
-  sb.from("developers")
-    .update({ last_active_at: new Date().toISOString() })
-    .eq("id", devId)
-    .then();
+  sb.from("developers").update({ last_active_at: new Date().toISOString() }).eq("id", devId).then();
 }
 
 /**

@@ -38,7 +38,9 @@ export async function POST(request: Request) {
   // Fetch giver (must have claimed building)
   const { data: giver } = await admin
     .from("developers")
-    .select("id, claimed, contributions, public_repos, total_stars, kudos_count, kudos_streak, last_kudos_given_date")
+    .select(
+      "id, claimed, contributions, public_repos, total_stars, kudos_count, kudos_streak, last_kudos_given_date",
+    )
     .eq("github_login", githubLogin)
     .single();
 
@@ -75,13 +77,11 @@ export async function POST(request: Request) {
   }
 
   // Insert (ON CONFLICT DO NOTHING via PK constraint)
-  const { error: insertError } = await admin
-    .from("developer_kudos")
-    .insert({
-      giver_id: giver.id,
-      receiver_id: receiver.id,
-      given_date: today,
-    });
+  const { error: insertError } = await admin.from("developer_kudos").insert({
+    giver_id: giver.id,
+    receiver_id: receiver.id,
+    given_date: today,
+  });
 
   // Duplicate key = already given today, treat as success
   if (insertError && !insertError.code?.includes("23505")) {
@@ -98,8 +98,12 @@ export async function POST(request: Request) {
     await admin.rpc("increment_kudos_count", { target_dev_id: receiver.id });
 
     // Grant XP: giver gets 3, receiver gets 1
-    admin.rpc("grant_xp", { p_developer_id: giver.id, p_source: "kudos_given", p_amount: 3 }).then();
-    admin.rpc("grant_xp", { p_developer_id: receiver.id, p_source: "kudos_received", p_amount: 1 }).then();
+    admin
+      .rpc("grant_xp", { p_developer_id: giver.id, p_source: "kudos_given", p_amount: 3 })
+      .then();
+    admin
+      .rpc("grant_xp", { p_developer_id: receiver.id, p_source: "kudos_received", p_amount: 1 })
+      .then();
 
     await admin.from("activity_feed").insert({
       event_type: "kudos_given",
@@ -141,16 +145,20 @@ export async function POST(request: Request) {
     }
 
     // Check kudos streak achievements
-    await checkAchievements(giver.id, {
-      contributions: giver.contributions ?? 0,
-      public_repos: giver.public_repos ?? 0,
-      total_stars: giver.total_stars ?? 0,
-      referral_count: 0,
-      kudos_count: giver.kudos_count ?? 0,
-      gifts_sent: 0,
-      gifts_received: 0,
-      kudos_streak: newKudosStreak,
-    }, githubLogin);
+    await checkAchievements(
+      giver.id,
+      {
+        contributions: giver.contributions ?? 0,
+        public_repos: giver.public_repos ?? 0,
+        total_stars: giver.total_stars ?? 0,
+        referral_count: 0,
+        kudos_count: giver.kudos_count ?? 0,
+        gifts_sent: 0,
+        gifts_received: 0,
+        kudos_streak: newKudosStreak,
+      },
+      githubLogin,
+    );
   }
 
   return NextResponse.json({ ok: true });

@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import type { AdsFilters, Period, StatusFilter, VehicleFilter, SourceFilter, SortKey, SortDir } from "./types";
+import type {
+  AdsFilters,
+  Period,
+  StatusFilter,
+  VehicleFilter,
+  SourceFilter,
+  SortKey,
+  SortDir,
+} from "./types";
 import { STORAGE_KEY } from "./constants";
 
 const DEFAULTS: AdsFilters = {
@@ -32,7 +40,15 @@ function parseParams(params: URLSearchParams): Partial<AdsFilters> {
   const s = params.get("status");
   if (s === "all" || s === "active" || s === "paused" || s === "expired") result.status = s;
   const v = params.get("vehicle");
-  if (v === "all" || v === "plane" || v === "blimp" || v === "billboard" || v === "rooftop_sign" || v === "led_wrap") result.vehicle = v;
+  if (
+    v === "all" ||
+    v === "plane" ||
+    v === "blimp" ||
+    v === "billboard" ||
+    v === "rooftop_sign" ||
+    v === "led_wrap"
+  )
+    result.vehicle = v;
   const src = params.get("source");
   if (src === "all" || src === "paid" || src === "manual") result.source = src;
   const q = params.get("q");

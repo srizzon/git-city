@@ -5,7 +5,14 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { isBuildingAd, type SkyAd } from "@/lib/skyAds";
 import type { CityBuilding } from "@/lib/github";
-import { createLedTexture, ViewabilityTracker, SCROLL_SPEED, markAdPointerConsumed, registerAdMesh, unregisterAdMesh } from "./SkyAds";
+import {
+  createLedTexture,
+  ViewabilityTracker,
+  SCROLL_SPEED,
+  markAdPointerConsumed,
+  registerAdMesh,
+  unregisterAdMesh,
+} from "./SkyAds";
 
 // Shared geometries — prevents GPU leaks on mount/unmount
 const _box = /* @__PURE__ */ new THREE.BoxGeometry(1, 1, 1);
@@ -56,7 +63,7 @@ function AdBillboard({
 }) {
   const { tex, needsScroll } = useMemo(
     () => createLedTexture(ad.text, ad.color, ad.bgColor),
-    [ad.text, ad.color, ad.bgColor]
+    [ad.text, ad.color, ad.bgColor],
   );
 
   const ledMat = useMemo(
@@ -70,11 +77,14 @@ function AdBillboard({
         polygonOffset: true,
         polygonOffsetFactor: -1,
       }),
-    [tex]
+    [tex],
   );
 
   useEffect(() => {
-    return () => { tex.dispose(); ledMat.dispose(); };
+    return () => {
+      tex.dispose();
+      ledMat.dispose();
+    };
   }, [tex, ledMat]);
 
   useFrame(({ clock }) => {
@@ -83,7 +93,11 @@ function AdBillboard({
 
   const { handleClick } = useAdInteraction(ad, onAdClick);
   const prevMesh = useRef<THREE.Mesh | null>(null);
-  useEffect(() => { return () => { if (prevMesh.current) unregisterAdMesh(prevMesh.current); }; }, []);
+  useEffect(() => {
+    return () => {
+      if (prevMesh.current) unregisterAdMesh(prevMesh.current);
+    };
+  }, []);
 
   const { width, depth, height } = building;
   const panelW = Math.max(width * 0.9, 12);
@@ -95,7 +109,12 @@ function AdBillboard({
   return (
     <group position={[building.position[0], 0, building.position[2]]}>
       {/* Dark frame behind the screen */}
-      <mesh position={[0, y, zOff - 0.3]} onClick={handleClick} geometry={_box} scale={[panelW + frameT * 2, panelH + frameT * 2, 0.3]}>
+      <mesh
+        position={[0, y, zOff - 0.3]}
+        onClick={handleClick}
+        geometry={_box}
+        scale={[panelW + frameT * 2, panelH + frameT * 2, 0.3]}
+      >
         <meshStandardMaterial color="#222" metalness={0.6} roughness={0.4} />
       </mesh>
       {/* LED screen */}
@@ -108,10 +127,20 @@ function AdBillboard({
         scale={[panelW, panelH, 1]}
       />
       {/* Support struts from below */}
-      <mesh position={[-panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]} rotation={[0.3, 0, 0]} geometry={_box} scale={[0.3, 3, 0.3]}>
+      <mesh
+        position={[-panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]}
+        rotation={[0.3, 0, 0]}
+        geometry={_box}
+        scale={[0.3, 3, 0.3]}
+      >
         <meshStandardMaterial color="#333" metalness={0.5} roughness={0.4} />
       </mesh>
-      <mesh position={[panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]} rotation={[0.3, 0, 0]} geometry={_box} scale={[0.3, 3, 0.3]}>
+      <mesh
+        position={[panelW * 0.3, y - panelH / 2 - 1.5, zOff - 0.3]}
+        rotation={[0.3, 0, 0]}
+        geometry={_box}
+        scale={[0.3, 3, 0.3]}
+      >
         <meshStandardMaterial color="#333" metalness={0.5} roughness={0.4} />
       </mesh>
     </group>
@@ -138,7 +167,7 @@ function AdRooftopSign({
 
   const { tex, needsScroll } = useMemo(
     () => createLedTexture(ad.text, ad.color, ad.bgColor),
-    [ad.text, ad.color, ad.bgColor]
+    [ad.text, ad.color, ad.bgColor],
   );
 
   const ledMat = useMemo(
@@ -150,11 +179,14 @@ function AdRooftopSign({
         emissiveIntensity: 1.2,
         toneMapped: false,
       }),
-    [tex]
+    [tex],
   );
 
   useEffect(() => {
-    return () => { tex.dispose(); ledMat.dispose(); };
+    return () => {
+      tex.dispose();
+      ledMat.dispose();
+    };
   }, [tex, ledMat]);
 
   useFrame(({ clock }, delta) => {
@@ -166,7 +198,11 @@ function AdRooftopSign({
 
   const { handleClick } = useAdInteraction(ad, onAdClick);
   const prevMesh = useRef<THREE.Mesh | null>(null);
-  useEffect(() => { return () => { if (prevMesh.current) unregisterAdMesh(prevMesh.current); }; }, []);
+  useEffect(() => {
+    return () => {
+      if (prevMesh.current) unregisterAdMesh(prevMesh.current);
+    };
+  }, []);
 
   const { width, height } = building;
   const signW = Math.max(width * 1.2, 14);
@@ -234,7 +270,7 @@ function AdLedWrap({
 }) {
   const { tex, needsScroll } = useMemo(
     () => createLedTexture(ad.text, ad.color, ad.bgColor),
-    [ad.text, ad.color, ad.bgColor]
+    [ad.text, ad.color, ad.bgColor],
   );
 
   const ledMat = useMemo(
@@ -246,7 +282,7 @@ function AdLedWrap({
         emissiveIntensity: 1.2,
         toneMapped: false,
       }),
-    [tex]
+    [tex],
   );
 
   const accentMat = useMemo(
@@ -257,11 +293,15 @@ function AdLedWrap({
         emissiveIntensity: 2,
         toneMapped: false,
       }),
-    [ad.color]
+    [ad.color],
   );
 
   useEffect(() => {
-    return () => { tex.dispose(); ledMat.dispose(); accentMat.dispose(); };
+    return () => {
+      tex.dispose();
+      ledMat.dispose();
+      accentMat.dispose();
+    };
   }, [tex, ledMat, accentMat]);
 
   useFrame(({ clock }) => {
@@ -270,7 +310,13 @@ function AdLedWrap({
 
   const { handleClick } = useAdInteraction(ad, onAdClick);
   const faceMeshes = useRef<(THREE.Mesh | null)[]>([null, null, null, null]);
-  useEffect(() => { return () => { for (const m of faceMeshes.current) { if (m) unregisterAdMesh(m); } }; }, []);
+  useEffect(() => {
+    return () => {
+      for (const m of faceMeshes.current) {
+        if (m) unregisterAdMesh(m);
+      }
+    };
+  }, []);
 
   const { width, depth, height } = building;
   const wrapH = 3; // thin band
@@ -282,15 +328,27 @@ function AdLedWrap({
     () => [
       { pos: [0, y, depth / 2 + gap] as const, rot: [0, 0, 0] as const, w: width + gap * 2 },
       { pos: [0, y, -depth / 2 - gap] as const, rot: [0, Math.PI, 0] as const, w: width + gap * 2 },
-      { pos: [width / 2 + gap, y, 0] as const, rot: [0, Math.PI / 2, 0] as const, w: depth + gap * 2 },
-      { pos: [-width / 2 - gap, y, 0] as const, rot: [0, -Math.PI / 2, 0] as const, w: depth + gap * 2 },
+      {
+        pos: [width / 2 + gap, y, 0] as const,
+        rot: [0, Math.PI / 2, 0] as const,
+        w: depth + gap * 2,
+      },
+      {
+        pos: [-width / 2 - gap, y, 0] as const,
+        rot: [0, -Math.PI / 2, 0] as const,
+        w: depth + gap * 2,
+      },
     ],
-    [width, depth, y, gap]
+    [width, depth, y, gap],
   );
 
   // Invisible viewability proxy at building center — covers all 4 directions
   const proxyRef = useRef<THREE.Mesh | null>(null);
-  useEffect(() => { return () => { if (proxyRef.current) unregisterAdMesh(proxyRef.current); }; }, []);
+  useEffect(() => {
+    return () => {
+      if (proxyRef.current) unregisterAdMesh(proxyRef.current);
+    };
+  }, []);
 
   return (
     <group position={[building.position[0], 0, building.position[2]]}>
@@ -363,7 +421,14 @@ interface BuildingAdsProps {
 // Pre-allocated vector for distance culling
 const _adCamPos = new THREE.Vector3();
 
-export default function BuildingAds({ ads, buildings, onAdClick, onAdViewed, focusedBuilding, focusedBuildingB }: BuildingAdsProps) {
+export default function BuildingAds({
+  ads,
+  buildings,
+  onAdClick,
+  onAdViewed,
+  focusedBuilding,
+  focusedBuildingB,
+}: BuildingAdsProps) {
   const meshRefs = useRef<Map<string, THREE.Mesh>>(new Map());
   const groupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
@@ -376,11 +441,8 @@ export default function BuildingAds({ ads, buildings, onAdClick, onAdViewed, foc
   });
 
   const top10 = useMemo(
-    () =>
-      [...buildings]
-        .sort((a, b) => b.height - a.height)
-        .slice(0, 10),
-    [buildings]
+    () => [...buildings].sort((a, b) => b.height - a.height).slice(0, 10),
+    [buildings],
   );
 
   const { billboardAds, rooftopSignAds, ledWrapAds } = useMemo(() => {
@@ -405,7 +467,8 @@ export default function BuildingAds({ ads, buildings, onAdClick, onAdViewed, foc
         const building = top10[i];
         if (!building) return null;
         const loginLower = building.login.toLowerCase();
-        const isDimmed = !!focusedLower && loginLower !== focusedLower && loginLower !== focusedBLower;
+        const isDimmed =
+          !!focusedLower && loginLower !== focusedLower && loginLower !== focusedBLower;
         return (
           <group key={ad.id} visible={!isDimmed}>
             <AdBillboard
@@ -424,7 +487,8 @@ export default function BuildingAds({ ads, buildings, onAdClick, onAdViewed, foc
         const building = top10[i];
         if (!building) return null;
         const loginLower = building.login.toLowerCase();
-        const isDimmed = !!focusedLower && loginLower !== focusedLower && loginLower !== focusedBLower;
+        const isDimmed =
+          !!focusedLower && loginLower !== focusedLower && loginLower !== focusedBLower;
         return (
           <group key={ad.id} visible={!isDimmed}>
             <AdRooftopSign
@@ -443,7 +507,8 @@ export default function BuildingAds({ ads, buildings, onAdClick, onAdViewed, foc
         const building = top10[i];
         if (!building) return null;
         const loginLower = building.login.toLowerCase();
-        const isDimmed = !!focusedLower && loginLower !== focusedLower && loginLower !== focusedBLower;
+        const isDimmed =
+          !!focusedLower && loginLower !== focusedLower && loginLower !== focusedBLower;
         return (
           <group key={ad.id} visible={!isDimmed}>
             <AdLedWrap

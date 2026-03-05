@@ -7,10 +7,7 @@ export async function GET(request: Request) {
   const developerId = parseInt(searchParams.get("developer_id") ?? "", 10);
 
   if (!developerId || isNaN(developerId)) {
-    return NextResponse.json(
-      { error: "developer_id is required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "developer_id is required" }, { status: 400 });
   }
 
   const sb = getSupabaseAdmin();
@@ -63,10 +60,7 @@ export async function POST(request: Request) {
   ).toLowerCase();
 
   if (!githubLogin) {
-    return NextResponse.json(
-      { error: "No GitHub login found" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });
   }
 
   const sb = getSupabaseAdmin();
@@ -79,10 +73,7 @@ export async function POST(request: Request) {
     .single();
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
-    return NextResponse.json(
-      { error: "Building not found or not yours" },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "Building not found or not yours" }, { status: 403 });
   }
 
   // Parse body
@@ -98,7 +89,7 @@ export async function POST(request: Request) {
   if (item_id !== "custom_color") {
     return NextResponse.json(
       { error: "Use /api/customizations/upload for billboard" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -112,19 +103,13 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!purchase) {
-    return NextResponse.json(
-      { error: "You don't own this item" },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "You don't own this item" }, { status: 403 });
   }
 
   // null = remove color, otherwise validate hex
   if (color !== null && color !== undefined) {
     if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
-      return NextResponse.json(
-        { error: "Invalid hex color (use #RRGGBB)" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid hex color (use #RRGGBB)" }, { status: 400 });
     }
   }
 
@@ -138,33 +123,25 @@ export async function POST(request: Request) {
 
     if (deleteError) {
       console.error("Delete error:", deleteError);
-      return NextResponse.json(
-        { error: "Failed to remove customization" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to remove customization" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, color: null });
   }
 
   // Upsert customization
-  const { error: upsertError } = await sb
-    .from("developer_customizations")
-    .upsert(
-      {
-        developer_id: dev.id,
-        item_id: "custom_color",
-        config: { color },
-      },
-      { onConflict: "developer_id,item_id" }
-    );
+  const { error: upsertError } = await sb.from("developer_customizations").upsert(
+    {
+      developer_id: dev.id,
+      item_id: "custom_color",
+      config: { color },
+    },
+    { onConflict: "developer_id,item_id" },
+  );
 
   if (upsertError) {
     console.error("Upsert error:", upsertError);
-    return NextResponse.json(
-      { error: "Failed to save customization" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to save customization" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, color });

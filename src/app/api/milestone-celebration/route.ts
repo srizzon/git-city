@@ -22,7 +22,10 @@ export async function POST(req: Request) {
   // Idempotent: only insert if this milestone hasn't been recorded yet
   const { data, error } = await sb
     .from("milestone_celebrations")
-    .upsert({ milestone, reached_at: new Date().toISOString() }, { onConflict: "milestone", ignoreDuplicates: true })
+    .upsert(
+      { milestone, reached_at: new Date().toISOString() },
+      { onConflict: "milestone", ignoreDuplicates: true },
+    )
     .select()
     .single();
 

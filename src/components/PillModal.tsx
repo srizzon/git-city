@@ -9,16 +9,24 @@ interface PillModalProps {
   onClose: () => void;
 }
 
-export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onClose }: PillModalProps) {
+export default function PillModal({
+  rabbitCompleted,
+  onRedPill,
+  onBluePill,
+  onClose,
+}: PillModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Pre-compute matrix rain characters to avoid hydration mismatch
-  const rainColumns = useMemo(() =>
-    Array.from({ length: 20 }, (_, i) =>
-      Array.from({ length: 30 }, (_, j) =>
-        String.fromCharCode(0x30a0 + ((i * 31 + j * 17 + 7) % 96))
-      )
-    ), []);
+  const rainColumns = useMemo(
+    () =>
+      Array.from({ length: 20 }, (_, i) =>
+        Array.from({ length: 30 }, (_, j) =>
+          String.fromCharCode(0x30a0 + ((i * 31 + j * 17 + 7) % 96)),
+        ),
+      ),
+    [],
+  );
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -88,8 +96,14 @@ export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onCl
               }}
             >
               {/* Pixel highlight blocks */}
-              <div className="absolute top-[4px] left-[10px] w-[10px] h-[4px]" style={{ background: "#ff6666" }} />
-              <div className="absolute top-[4px] left-[22px] w-[6px] h-[3px]" style={{ background: "#ff4444" }} />
+              <div
+                className="absolute top-[4px] left-[10px] w-[10px] h-[4px]"
+                style={{ background: "#ff6666" }}
+              />
+              <div
+                className="absolute top-[4px] left-[22px] w-[6px] h-[3px]"
+                style={{ background: "#ff4444" }}
+              />
             </div>
             <span className="font-pixel text-[10px] sm:text-[12px] uppercase tracking-wider text-red-400 group-hover:text-red-300 transition-colors">
               The truth
@@ -106,7 +120,9 @@ export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onCl
 
           {/* Blue Pill */}
           <button
-            onClick={() => { if (!rabbitCompleted) onBluePill(); }}
+            onClick={() => {
+              if (!rabbitCompleted) onBluePill();
+            }}
             className={`group flex flex-col items-center gap-3 transition-transform duration-200 ${
               !rabbitCompleted ? "cursor-pointer hover:scale-110" : "cursor-default"
             }`}
@@ -142,9 +158,7 @@ export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onCl
             </div>
             <span
               className={`font-pixel text-[10px] sm:text-[12px] uppercase tracking-wider transition-colors ${
-                rabbitCompleted
-                  ? "text-green-600"
-                  : "text-blue-400 group-hover:text-blue-300"
+                rabbitCompleted ? "text-green-600" : "text-blue-400 group-hover:text-blue-300"
               }`}
             >
               {rabbitCompleted ? "Already found" : "The rabbit hole"}
@@ -153,20 +167,28 @@ export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onCl
         </div>
 
         {/* Close hint */}
-        <p className="font-pixel text-[8px] text-gray-600 tracking-wider mt-4">
-          ESC TO CLOSE
-        </p>
+        <p className="font-pixel text-[8px] text-gray-600 tracking-wider mt-4">ESC TO CLOSE</p>
       </div>
 
       {/* Keyframes */}
       <style jsx>{`
         @keyframes matrixRain {
-          0% { transform: translateY(-100%); }
-          100% { transform: translateY(100vh); }
+          0% {
+            transform: translateY(-100%);
+          }
+          100% {
+            transform: translateY(100vh);
+          }
         }
         @keyframes pillFadeIn {
-          0% { opacity: 0; transform: scale(0.95); }
-          100% { opacity: 1; transform: scale(1); }
+          0% {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
         }
       `}</style>
     </div>

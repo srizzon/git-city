@@ -11,9 +11,7 @@ export default function ReferralCTA({ login, accent }: Props) {
   const [copied, setCopied] = useState(false);
 
   const referralUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/?ref=${login}`
-      : `/?ref=${login}`;
+    typeof window !== "undefined" ? `${window.location.origin}/?ref=${login}` : `/?ref=${login}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralUrl);

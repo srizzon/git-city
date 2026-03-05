@@ -52,7 +52,7 @@ function createPreviewWindowTexture(
   rows: number,
   cols: number,
   seed: number,
-  faceColor?: string | null
+  faceColor?: string | null,
 ): THREE.CanvasTexture {
   const WS = 6;
   const GAP = 2;
@@ -327,7 +327,10 @@ export default function ShopPreview({
   const camDist = Math.max(80, dims.height * 2.5);
 
   return (
-    <div className="relative border-[3px] border-border" style={{ backgroundColor: THEME.fogColor }}>
+    <div
+      className="relative border-[3px] border-border"
+      style={{ backgroundColor: THEME.fogColor }}
+    >
       <div className="h-[280px] sm:h-[360px] lg:h-[520px]">
         <Canvas
           camera={{ position: [camDist * 0.5, camDist * 0.3, camDist * 0.7], fov: 45 }}

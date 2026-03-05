@@ -14,9 +14,7 @@ const labels: Record<AdStatus, string> = {
 
 export function StatusBadge({ status }: { status: AdStatus }) {
   return (
-    <span
-      className={`inline-block border px-2 py-0.5 text-[10px] ${styles[status]}`}
-    >
+    <span className={`inline-block border px-2 py-0.5 text-[10px] ${styles[status]}`}>
       {labels[status]}
     </span>
   );

@@ -12,13 +12,7 @@ interface Props {
 
 type CardLang = "en" | "pt";
 
-export default function ShareButtons({
-  login,
-  contributions,
-  rank,
-  accent,
-  shadow,
-}: Props) {
+export default function ShareButtons({ login, contributions, rank, accent, shadow }: Props) {
   const [copied, setCopied] = useState(false);
   const [showFormatMenu, setShowFormatMenu] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -26,9 +20,7 @@ export default function ShareButtons({
   const menuRef = useRef<HTMLDivElement>(null);
 
   const profileUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/dev/${login}`
-      : `/dev/${login}`;
+    typeof window !== "undefined" ? `${window.location.origin}/dev/${login}` : `/dev/${login}`;
 
   const tweetText = `My GitHub just turned into a building. ${contributions.toLocaleString()} contributions, Rank #${rank ?? "?"}. What does yours look like?`;
 
@@ -42,9 +34,7 @@ export default function ShareButtons({
     setShowFormatMenu(false);
     setDownloading(true);
     try {
-      const res = await fetch(
-        `/api/share-card/${login}?format=${format}&lang=${cardLang}`
-      );
+      const res = await fetch(`/api/share-card/${login}?format=${format}&lang=${cardLang}`);
       if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -106,8 +96,7 @@ export default function ShareButtons({
                 className="px-3 py-1 text-[10px] transition-colors"
                 style={{
                   color: cardLang === "en" ? accent : muted,
-                  borderBottom:
-                    cardLang === "en" ? `2px solid ${accent}` : "2px solid transparent",
+                  borderBottom: cardLang === "en" ? `2px solid ${accent}` : "2px solid transparent",
                 }}
               >
                 EN
@@ -117,8 +106,7 @@ export default function ShareButtons({
                 className="px-3 py-1 text-[10px] transition-colors"
                 style={{
                   color: cardLang === "pt" ? accent : muted,
-                  borderBottom:
-                    cardLang === "pt" ? `2px solid ${accent}` : "2px solid transparent",
+                  borderBottom: cardLang === "pt" ? `2px solid ${accent}` : "2px solid transparent",
                 }}
               >
                 PT

@@ -37,10 +37,7 @@ export interface StreakData {
 
 const CACHE_KEY = "gc_checkin";
 
-export function useStreakCheckin(
-  session: Session | null,
-  hasClaimed: boolean,
-) {
+export function useStreakCheckin(session: Session | null, hasClaimed: boolean) {
   const [streakData, setStreakData] = useState<StreakData | null>(() => {
     if (typeof window === "undefined") return null;
     try {

@@ -30,20 +30,38 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
       {building.claimed && (
         <ClaimedGlow height={building.height} width={building.width} depth={building.depth} />
       )}
-      <BuildingItemEffects
-        building={building}
-        accentColor={accentColor}
-        focused={isFocused}
-      />
-      {isGhostTarget && (
-        ghostEffectId === 0
-          ? <NeonOutline width={building.width} height={building.height} depth={building.depth} color={accentColor} />
-          : ghostEffectId === 1
-          ? <ParticleAura width={building.width} height={building.height} depth={building.depth} color={accentColor} />
-          : <SpotlightEffect height={building.height} width={building.width} depth={building.depth} color={accentColor} />
-      )}
+      <BuildingItemEffects building={building} accentColor={accentColor} focused={isFocused} />
+      {isGhostTarget &&
+        (ghostEffectId === 0 ? (
+          <NeonOutline
+            width={building.width}
+            height={building.height}
+            depth={building.depth}
+            color={accentColor}
+          />
+        ) : ghostEffectId === 1 ? (
+          <ParticleAura
+            width={building.width}
+            height={building.height}
+            depth={building.depth}
+            color={accentColor}
+          />
+        ) : (
+          <SpotlightEffect
+            height={building.height}
+            width={building.width}
+            depth={building.depth}
+            color={accentColor}
+          />
+        ))}
       {building.app_streak > 0 && (
-        <StreakFlame height={building.height} width={building.width} depth={building.depth} streakDays={building.app_streak} color={accentColor} />
+        <StreakFlame
+          height={building.height}
+          width={building.width}
+          depth={building.depth}
+          streakDays={building.app_streak}
+          color={accentColor}
+        />
       )}
       {building.active_raid_tag && (
         <RaidTag3D
@@ -179,7 +197,12 @@ export default function EffectsLayer({
       const b = buildings[idx];
 
       // Only buildings that have something to render
-      const hasEffects = b.claimed || (b.owned_items && b.owned_items.length > 0) || (b.app_streak > 0) || !!b.active_raid_tag || b.rabbit_completed;
+      const hasEffects =
+        b.claimed ||
+        (b.owned_items && b.owned_items.length > 0) ||
+        b.app_streak > 0 ||
+        !!b.active_raid_tag ||
+        b.rabbit_completed;
       if (!hasEffects) continue;
 
       const dx = cx - b.position[0];
@@ -281,12 +304,28 @@ export default function EffectsLayer({
       {/* A8: Ghost preview for building not in active set (force render) */}
       {ghostBuilding && ghostIdx != null && !activeIndices.includes(ghostIdx) && (
         <group position={[ghostBuilding.position[0], 0, ghostBuilding.position[2]]}>
-          {ghostEffectId === 0
-            ? <NeonOutline width={ghostBuilding.width} height={ghostBuilding.height} depth={ghostBuilding.depth} color={accentColor} />
-            : ghostEffectId === 1
-            ? <ParticleAura width={ghostBuilding.width} height={ghostBuilding.height} depth={ghostBuilding.depth} color={accentColor} />
-            : <SpotlightEffect height={ghostBuilding.height} width={ghostBuilding.width} depth={ghostBuilding.depth} color={accentColor} />
-          }
+          {ghostEffectId === 0 ? (
+            <NeonOutline
+              width={ghostBuilding.width}
+              height={ghostBuilding.height}
+              depth={ghostBuilding.depth}
+              color={accentColor}
+            />
+          ) : ghostEffectId === 1 ? (
+            <ParticleAura
+              width={ghostBuilding.width}
+              height={ghostBuilding.height}
+              depth={ghostBuilding.depth}
+              color={accentColor}
+            />
+          ) : (
+            <SpotlightEffect
+              height={ghostBuilding.height}
+              width={ghostBuilding.width}
+              depth={ghostBuilding.depth}
+              color={accentColor}
+            />
+          )}
         </group>
       )}
     </>

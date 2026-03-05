@@ -4,7 +4,14 @@
 export const ZONE_ITEMS: Record<string, string[]> = {
   crown: ["flag", "helipad", "spire", "satellite_dish", "crown_item", "github_star"],
   roof: ["antenna_array", "rooftop_garden", "rooftop_fire", "pool_party"],
-  aura: ["neon_trim", "spotlight", "hologram_ring", "lightning_aura", "neon_outline", "particle_aura"],
+  aura: [
+    "neon_trim",
+    "spotlight",
+    "hologram_ring",
+    "lightning_aura",
+    "neon_outline",
+    "particle_aura",
+  ],
 };
 
 export const ZONE_LABELS: Record<string, string> = {
@@ -62,11 +69,24 @@ export const ACHIEVEMENT_ITEMS: Record<string, { achievement: string; label: str
 };
 
 export const ITEM_EMOJIS: Record<string, string> = {
-  flag: "🏁", helipad: "🚁", spire: "🪣", satellite_dish: "📡", crown_item: "👑",
-  antenna_array: "☀️", rooftop_garden: "🌿", rooftop_fire: "🔥", pool_party: "🏊",
-  neon_trim: "💡", spotlight: "🔦", hologram_ring: "💫", lightning_aura: "⚡",
-  custom_color: "🎨", billboard: "📺", led_banner: "🪧",
-  neon_outline: "🔮", particle_aura: "✨",
+  flag: "🏁",
+  helipad: "🚁",
+  spire: "🪣",
+  satellite_dish: "📡",
+  crown_item: "👑",
+  antenna_array: "☀️",
+  rooftop_garden: "🌿",
+  rooftop_fire: "🔥",
+  pool_party: "🏊",
+  neon_trim: "💡",
+  spotlight: "🔦",
+  hologram_ring: "💫",
+  lightning_aura: "⚡",
+  custom_color: "🎨",
+  billboard: "📺",
+  led_banner: "🪧",
+  neon_outline: "🔮",
+  particle_aura: "✨",
   streak_freeze: "🧊",
   // Raid
   raid_helicopter: "🚁",

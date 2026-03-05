@@ -29,9 +29,7 @@ export async function sendCommunityMilestoneNotifications(
     if (!devs || devs.length === 0) break;
 
     const results = await Promise.allSettled(
-      devs.map((dev) =>
-        sendNotificationForMilestone(dev.id, dev.github_login, milestone),
-      ),
+      devs.map((dev) => sendNotificationForMilestone(dev.id, dev.github_login, milestone)),
     );
 
     for (const result of results) {
@@ -49,11 +47,7 @@ export async function sendCommunityMilestoneNotifications(
   return stats;
 }
 
-function sendNotificationForMilestone(
-  devId: number,
-  login: string,
-  milestone: number,
-) {
+function sendNotificationForMilestone(devId: number, login: string, milestone: number) {
   const formatted = milestone.toLocaleString();
 
   return sendNotificationAsync({

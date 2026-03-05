@@ -32,8 +32,8 @@ export const TIER_COLORS: Record<string, string> = {
 
 export const TIER_EMOJI: Record<string, string> = {
   bronze: "\u{1F7E4}", // brown circle
-  silver: "\u{26AA}",  // white circle
-  gold: "\u{1F7E1}",   // yellow circle
+  silver: "\u{26AA}", // white circle
+  gold: "\u{1F7E1}", // yellow circle
   diamond: "\u{1F48E}", // gem
 };
 
@@ -74,25 +74,20 @@ interface DevStats {
 export async function checkAchievements(
   developerId: number,
   stats: DevStats,
-  actorLogin?: string
+  actorLogin?: string,
 ): Promise<string[]> {
   const sb = getSupabaseAdmin();
 
   // Fetch all achievements not yet unlocked by this dev
   const [allRes, unlockedRes] = await Promise.all([
-    sb.from("achievements").select("id, category, threshold, tier, name, reward_type, reward_item_id"),
     sb
-      .from("developer_achievements")
-      .select("achievement_id")
-      .eq("developer_id", developerId),
+      .from("achievements")
+      .select("id, category, threshold, tier, name, reward_type, reward_item_id"),
+    sb.from("developer_achievements").select("achievement_id").eq("developer_id", developerId),
   ]);
 
-  const unlocked = new Set(
-    (unlockedRes.data ?? []).map((r) => r.achievement_id)
-  );
-  const eligible = (allRes.data ?? []).filter(
-    (a) => !unlocked.has(a.id)
-  ) as Achievement[];
+  const unlocked = new Set((unlockedRes.data ?? []).map((r) => r.achievement_id));
+  const eligible = (allRes.data ?? []).filter((a) => !unlocked.has(a.id)) as Achievement[];
 
   // Filter by stats thresholds
   const newUnlocks = eligible.filter((a) => {
@@ -139,9 +134,7 @@ export async function checkAchievements(
     .upsert(unlockRows, { onConflict: "developer_id,achievement_id" });
 
   // Grant free items for unlock_item rewards
-  const itemRewards = newUnlocks.filter(
-    (a) => a.reward_type === "unlock_item" && a.reward_item_id
-  );
+  const itemRewards = newUnlocks.filter((a) => a.reward_type === "unlock_item" && a.reward_item_id);
 
   if (itemRewards.length > 0) {
     const purchaseRows = itemRewards.map((a) => ({
@@ -155,9 +148,7 @@ export async function checkAchievements(
     }));
 
     // Batch upsert — unique index on (developer_id, item_id) prevents duplicates
-    await sb
-      .from("purchases")
-      .upsert(purchaseRows, { onConflict: "developer_id,item_id" });
+    await sb.from("purchases").upsert(purchaseRows, { onConflict: "developer_id,item_id" });
   }
 
   // Grant XP for each achievement unlock
@@ -228,7 +219,7 @@ const CHUNK_SIZE = 500;
  * Automatically chunks large ID arrays to stay within Supabase query limits.
  */
 export async function getAchievementsForDevelopers(
-  developerIds: number[]
+  developerIds: number[],
 ): Promise<Record<number, string[]>> {
   if (developerIds.length === 0) return {};
 
@@ -247,8 +238,8 @@ export async function getAchievementsForDevelopers(
           .from("developer_achievements")
           .select("developer_id, achievement_id")
           .in("developer_id", chunk)
-          .then(({ data }) => data ?? [])
-      )
+          .then(({ data }) => data ?? []),
+      ),
     )
   ).flat();
 

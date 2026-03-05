@@ -1,9 +1,10 @@
 import crypto from "node:crypto";
 import { getSupabaseAdmin } from "./supabase";
 
-const NOWPAYMENTS_API = process.env.NOWPAYMENTS_SANDBOX === "true"
-  ? "https://api-sandbox.nowpayments.io/v1"
-  : "https://api.nowpayments.io/v1";
+const NOWPAYMENTS_API =
+  process.env.NOWPAYMENTS_SANDBOX === "true"
+    ? "https://api-sandbox.nowpayments.io/v1"
+    : "https://api.nowpayments.io/v1";
 
 interface InvoiceResponse {
   id: string;
@@ -44,7 +45,10 @@ export async function createCryptoInvoice(
   }
 
   const priceUsd = item.price_usd_cents / 100;
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.thegitcity.com").replace(/\/+$/, "");
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.thegitcity.com").replace(
+    /\/+$/,
+    "",
+  );
 
   const successUrl = `${siteUrl}/shop/${githubLogin}?purchased=${itemId}`;
   const cancelUrl = `${siteUrl}/shop/${githubLogin}`;
@@ -87,18 +91,12 @@ export async function createCryptoInvoice(
  * Verify NOWPayments IPN callback signature.
  * They use HMAC-SHA512 with sorted JSON body.
  */
-export function verifyIpnSignature(
-  rawBody: Record<string, unknown>,
-  signature: string,
-): boolean {
+export function verifyIpnSignature(rawBody: Record<string, unknown>, signature: string): boolean {
   const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
   if (!ipnSecret) return false;
 
   const sorted = sortObject(rawBody);
-  const hmac = crypto
-    .createHmac("sha512", ipnSecret)
-    .update(JSON.stringify(sorted))
-    .digest("hex");
+  const hmac = crypto.createHmac("sha512", ipnSecret).update(JSON.stringify(sorted)).digest("hex");
 
   return hmac === signature;
 }

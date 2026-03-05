@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   if (!ok) {
     return NextResponse.json(
       { error: "Too many requests. Try again in a few seconds." },
-      { status: 429 }
+      { status: 429 },
     );
   }
 
@@ -54,9 +54,7 @@ export async function POST(request: NextRequest) {
   // Brazilian Stripe CNPJ can't charge USD to Brazilian cards.
   // Detect country via Vercel/CF geolocation headers and force BRL for BR users.
   const country =
-    request.headers.get("x-vercel-ip-country") ??
-    request.headers.get("cf-ipcountry") ??
-    "";
+    request.headers.get("x-vercel-ip-country") ?? request.headers.get("cf-ipcountry") ?? "";
   const isBrazil = country.toUpperCase() === "BR";
   const currency: AdCurrency = isBrazil ? "brl" : body.currency === "brl" ? "brl" : "usd";
 
@@ -72,17 +70,14 @@ export async function POST(request: NextRequest) {
   if (text.length > MAX_TEXT_LENGTH) {
     return NextResponse.json(
       { error: `Text must be ${MAX_TEXT_LENGTH} characters or less` },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   // Moderate text content
   const modResult = containsBlockedContent(text);
   if (modResult.blocked) {
-    return NextResponse.json(
-      { error: modResult.reason ?? "Ad text not allowed" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: modResult.reason ?? "Ad text not allowed" }, { status: 400 });
   }
 
   // Validate colors
@@ -151,10 +146,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Store stripe session ID on the ad row
-    await sb
-      .from("sky_ads")
-      .update({ stripe_session_id: session.id })
-      .eq("id", adId);
+    await sb.from("sky_ads").update({ stripe_session_id: session.id }).eq("id", adId);
 
     return NextResponse.json({ url: session.url });
   } catch (err) {

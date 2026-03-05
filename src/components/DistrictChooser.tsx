@@ -1,11 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  DISTRICT_NAMES,
-  DISTRICT_COLORS,
-  DISTRICT_DESCRIPTIONS,
-} from "@/lib/github";
+import { DISTRICT_NAMES, DISTRICT_COLORS, DISTRICT_DESCRIPTIONS } from "@/lib/github";
 
 interface DistrictChooserProps {
   currentDistrict: string | null;
@@ -15,8 +11,16 @@ interface DistrictChooserProps {
 }
 
 const CHOOSABLE_DISTRICTS = [
-  "frontend", "backend", "fullstack", "mobile", "data_ai",
-  "devops", "security", "gamedev", "vibe_coder", "creator",
+  "frontend",
+  "backend",
+  "fullstack",
+  "mobile",
+  "data_ai",
+  "devops",
+  "security",
+  "gamedev",
+  "vibe_coder",
+  "creator",
 ];
 
 export default function DistrictChooser({
@@ -65,10 +69,7 @@ export default function DistrictChooser({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-bg/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-bg/70 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
       <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto border-[3px] border-border bg-bg-raised p-5 sm:p-6">
@@ -125,9 +126,7 @@ export default function DistrictChooser({
           })}
         </div>
 
-        {error && (
-          <p className="mt-3 text-[10px] text-red-400 normal-case">{error}</p>
-        )}
+        {error && <p className="mt-3 text-[10px] text-red-400 normal-case">{error}</p>}
 
         {/* Confirm */}
         <button
@@ -135,9 +134,7 @@ export default function DistrictChooser({
           disabled={!selected || submitting}
           className="btn-press mt-4 w-full border-[3px] border-border px-4 py-2.5 text-sm text-bg transition-colors disabled:opacity-40"
           style={{
-            backgroundColor: selected
-              ? DISTRICT_COLORS[selected]
-              : "var(--color-muted)",
+            backgroundColor: selected ? DISTRICT_COLORS[selected] : "var(--color-muted)",
           }}
         >
           {submitting ? "Confirming..." : "Confirm District"}

@@ -38,7 +38,9 @@ export default function ReturnModal({ streakData, onClose }: Props) {
   useEffect(() => {
     const delay = new_achievements.length > 0 ? 6000 : 4000;
     timerRef.current = setTimeout(handleClose, delay);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [handleClose, new_achievements.length]);
 
   const raids = streakData.raids_since_last ?? [];
@@ -77,18 +79,11 @@ export default function ReturnModal({ streakData, onClose }: Props) {
         </span>
 
         <div className="flex flex-col">
-          <span className="text-[10px] text-cream">
-            day streak{was_frozen ? " (saved)" : ""}
-          </span>
-          {subtitle && (
-            <span className="text-[9px] text-muted">{subtitle}</span>
-          )}
+          <span className="text-[10px] text-cream">day streak{was_frozen ? " (saved)" : ""}</span>
+          {subtitle && <span className="text-[9px] text-muted">{subtitle}</span>}
         </div>
 
-        <div
-          className="h-5 w-1 rounded-full"
-          style={{ backgroundColor: color }}
-        />
+        <div className="h-5 w-1 rounded-full" style={{ backgroundColor: color }} />
       </div>
     </div>
   );

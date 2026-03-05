@@ -22,7 +22,9 @@ export const MAX_TEXT_LENGTH = 80;
 const ALLOWED_LINK_PATTERN = /^(https:\/\/|mailto:)/;
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
-export function isBuildingAd(vehicle: string): vehicle is "billboard" | "rooftop_sign" | "led_wrap" {
+export function isBuildingAd(
+  vehicle: string,
+): vehicle is "billboard" | "rooftop_sign" | "led_wrap" {
   return vehicle === "billboard" || vehicle === "rooftop_sign" || vehicle === "led_wrap";
 }
 
@@ -66,8 +68,16 @@ export function buildAdLink(ad: SkyAd): string | undefined {
 }
 
 /** Fire a tracking beacon to the sky-ads track API (non-blocking). */
-export function trackAdEvent(adId: string, eventType: "impression" | "click" | "cta_click", githubLogin?: string) {
-  const body = JSON.stringify({ ad_id: adId, event_type: eventType, ...(githubLogin && { github_login: githubLogin }) });
+export function trackAdEvent(
+  adId: string,
+  eventType: "impression" | "click" | "cta_click",
+  githubLogin?: string,
+) {
+  const body = JSON.stringify({
+    ad_id: adId,
+    event_type: eventType,
+    ...(githubLogin && { github_login: githubLogin }),
+  });
   if (typeof navigator !== "undefined" && navigator.sendBeacon) {
     navigator.sendBeacon("/api/sky-ads/track", new Blob([body], { type: "application/json" }));
   } else {
@@ -76,8 +86,16 @@ export function trackAdEvent(adId: string, eventType: "impression" | "click" | "
 }
 
 /** Fire multiple event types in a single beacon (saves rate limit budget). */
-export function trackAdEvents(adId: string, eventTypes: ("impression" | "click" | "cta_click")[], githubLogin?: string) {
-  const body = JSON.stringify({ ad_id: adId, event_types: eventTypes, ...(githubLogin && { github_login: githubLogin }) });
+export function trackAdEvents(
+  adId: string,
+  eventTypes: ("impression" | "click" | "cta_click")[],
+  githubLogin?: string,
+) {
+  const body = JSON.stringify({
+    ad_id: adId,
+    event_types: eventTypes,
+    ...(githubLogin && { github_login: githubLogin }),
+  });
   if (typeof navigator !== "undefined" && navigator.sendBeacon) {
     navigator.sendBeacon("/api/sky-ads/track", new Blob([body], { type: "application/json" }));
   } else {
@@ -90,7 +108,8 @@ export const DEFAULT_SKY_ADS: SkyAd[] = [
     id: "gitcity",
     text: "THEGITCITY.COM ★ YOUR CODE, YOUR CITY ★ THEGITCITY.COM",
     brand: "Git City",
-    description: "A city built from GitHub contributions. Search your username and find your building among thousands of developers.",
+    description:
+      "A city built from GitHub contributions. Search your username and find your building among thousands of developers.",
     color: "#f8d880",
     bgColor: "#1a1018",
     link: "https://thegitcity.com",

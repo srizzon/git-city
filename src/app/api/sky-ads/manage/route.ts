@@ -14,7 +14,9 @@ function generateToken(): string {
 
 async function checkAdmin() {
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return null;
   const login = (
     user.user_metadata.user_name ??
@@ -31,10 +33,27 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { id, brand, text, description, color, bg_color, link, vehicle, priority, starts_at, ends_at, purchaser_email, plan_id } = body;
+  const {
+    id,
+    brand,
+    text,
+    description,
+    color,
+    bg_color,
+    link,
+    vehicle,
+    priority,
+    starts_at,
+    ends_at,
+    purchaser_email,
+    plan_id,
+  } = body;
 
   if (!id || !brand || !text) {
-    return NextResponse.json({ error: "Missing required fields: id, brand, text" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing required fields: id, brand, text" },
+      { status: 400 },
+    );
   }
 
   const validVehicles = ["plane", "blimp", "billboard", "rooftop_sign", "led_wrap"];
@@ -43,22 +62,26 @@ export async function POST(request: Request) {
   const trackingToken = generateToken();
 
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("sky_ads").insert({
-    id,
-    brand,
-    text,
-    description: description ?? null,
-    color: color ?? "#f8d880",
-    bg_color: bg_color ?? "#1a1018",
-    link: link ?? null,
-    vehicle: safeVehicle,
-    priority: priority ?? 50,
-    starts_at: starts_at ?? null,
-    ends_at: ends_at ?? null,
-    tracking_token: trackingToken,
-    purchaser_email: purchaser_email ?? null,
-    plan_id: plan_id ?? null,
-  }).select().single();
+  const { data, error } = await admin
+    .from("sky_ads")
+    .insert({
+      id,
+      brand,
+      text,
+      description: description ?? null,
+      color: color ?? "#f8d880",
+      bg_color: bg_color ?? "#1a1018",
+      link: link ?? null,
+      vehicle: safeVehicle,
+      priority: priority ?? 50,
+      starts_at: starts_at ?? null,
+      ends_at: ends_at ?? null,
+      tracking_token: trackingToken,
+      purchaser_email: purchaser_email ?? null,
+      plan_id: plan_id ?? null,
+    })
+    .select()
+    .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -69,9 +92,19 @@ export async function POST(request: Request) {
 
 // Update an existing ad
 const ALLOWED_UPDATE_FIELDS = new Set([
-  "active", "brand", "text", "description", "color", "bg_color",
-  "link", "vehicle", "priority", "starts_at", "ends_at",
-  "purchaser_email", "plan_id",
+  "active",
+  "brand",
+  "text",
+  "description",
+  "color",
+  "bg_color",
+  "link",
+  "vehicle",
+  "priority",
+  "starts_at",
+  "ends_at",
+  "purchaser_email",
+  "plan_id",
 ]);
 
 export async function PUT(request: Request) {
@@ -152,7 +185,10 @@ export async function PATCH(request: Request) {
 
   const validActions = ["pause", "resume", "delete"];
   if (!validActions.includes(action)) {
-    return NextResponse.json({ error: "Invalid action. Use: pause, resume, delete" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid action. Use: pause, resume, delete" },
+      { status: 400 },
+    );
   }
 
   const admin = getSupabaseAdmin();
@@ -166,10 +202,7 @@ export async function PATCH(request: Request) {
     }
   } else {
     const active = action === "resume";
-    const { error } = await admin
-      .from("sky_ads")
-      .update({ active })
-      .in("id", ids);
+    const { error } = await admin.from("sky_ads").update({ active }).in("id", ids);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

@@ -82,14 +82,11 @@ export async function POST(request: Request) {
     if (!ZONE_ITEMS[zone]?.includes(itemId)) {
       return NextResponse.json(
         { error: `${itemId} is not valid for zone ${zone}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (!ownedSet.has(itemId)) {
-      return NextResponse.json(
-        { error: `You don't own ${itemId}` },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: `You don't own ${itemId}` }, { status: 403 });
     }
     config[zone] = itemId;
   }
@@ -101,7 +98,10 @@ export async function POST(request: Request) {
     .eq("developer_id", dev.id)
     .eq("item_id", "loadout")
     .maybeSingle();
-  const prev = (currentLoadout?.config ?? { crown: null, roof: null, aura: null }) as Record<string, string | null>;
+  const prev = (currentLoadout?.config ?? { crown: null, roof: null, aura: null }) as Record<
+    string,
+    string | null
+  >;
 
   // Upsert loadout
   await admin.from("developer_customizations").upsert(
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
       config,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "developer_id,item_id" }
+    { onConflict: "developer_id,item_id" },
   );
 
   // Feed event for newly equipped items

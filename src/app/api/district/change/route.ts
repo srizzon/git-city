@@ -4,8 +4,16 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 
 const VALID_DISTRICTS = [
-  "frontend", "backend", "fullstack", "mobile", "data_ai",
-  "devops", "security", "gamedev", "vibe_coder", "creator",
+  "frontend",
+  "backend",
+  "fullstack",
+  "mobile",
+  "data_ai",
+  "devops",
+  "security",
+  "gamedev",
+  "vibe_coder",
+  "creator",
 ];
 
 export async function POST(request: Request) {
@@ -62,20 +70,14 @@ export async function POST(request: Request) {
 
   // Same district = no-op, just confirm
   if (oldDistrict === district_id) {
-    await admin
-      .from("developers")
-      .update({ district_chosen: true })
-      .eq("id", dev.id);
+    await admin.from("developers").update({ district_chosen: true }).eq("id", dev.id);
     return NextResponse.json({ ok: true, district: district_id });
   }
 
   // Business rules only apply to real changes (not first choice)
   if (!isFirstChoice) {
     if ((dev.district_changes_count ?? 0) >= 2) {
-      return NextResponse.json(
-        { error: "Paid district changes coming soon" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Paid district changes coming soon" }, { status: 403 });
     }
 
     if (dev.district_changed_at) {
@@ -84,10 +86,7 @@ export async function POST(request: Request) {
       const remaining = lastChange + cooldownMs - Date.now();
       if (remaining > 0) {
         const days = Math.ceil(remaining / (24 * 60 * 60 * 1000));
-        return NextResponse.json(
-          { error: `Cooldown: wait ${days} days` },
-          { status: 429 },
-        );
+        return NextResponse.json({ error: `Cooldown: wait ${days} days` }, { status: 429 });
       }
     }
   }
@@ -102,9 +101,7 @@ export async function POST(request: Request) {
       district_changes_count: isActualChange
         ? (dev.district_changes_count ?? 0) + 1
         : (dev.district_changes_count ?? 0),
-      district_changed_at: isActualChange
-        ? new Date().toISOString()
-        : dev.district_changed_at,
+      district_changed_at: isActualChange ? new Date().toISOString() : dev.district_changed_at,
     })
     .eq("id", dev.id);
 

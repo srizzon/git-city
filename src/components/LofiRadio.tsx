@@ -20,7 +20,9 @@ const DEFAULT_SHADOW = "#203870";
 
 function destroyHowl(howl: Howl | null) {
   if (howl) {
-    try { howl.unload(); } catch {}
+    try {
+      howl.unload();
+    } catch {}
   }
 }
 
@@ -69,9 +71,15 @@ export default function LofiRadio() {
   }, [volume, trackIndex, shuffle]);
 
   // ── Keep module-level state in sync ──
-  useEffect(() => { _volume = volume; }, [volume]);
-  useEffect(() => { _muted = muted; }, [muted]);
-  useEffect(() => { _shuffle = shuffle; }, [shuffle]);
+  useEffect(() => {
+    _volume = volume;
+  }, [volume]);
+  useEffect(() => {
+    _muted = muted;
+  }, [muted]);
+  useEffect(() => {
+    _shuffle = shuffle;
+  }, [shuffle]);
 
   // ── Listen for mode events from main page ──
   useEffect(() => {
@@ -119,7 +127,10 @@ export default function LofiRadio() {
       volume: fadeIn ? 0 : vol,
       onend: () => _advanceFn?.(index),
       onloaderror: () => _advanceFn?.(index),
-      onplay: () => { setPlaying(true); _playing = true; },
+      onplay: () => {
+        setPlaying(true);
+        _playing = true;
+      },
     });
 
     howlRef.current = howl;
@@ -132,19 +143,25 @@ export default function LofiRadio() {
     _playing = true;
   }, []);
 
-  const advanceTrack = useCallback((currentIndex: number) => {
-    let next: number;
-    if (_shuffle) {
-      do { next = Math.floor(Math.random() * TRACKS.length); }
-      while (next === currentIndex && TRACKS.length > 1);
-    } else {
-      next = (currentIndex + 1) % TRACKS.length;
-    }
-    playTrack(next);
-  }, [playTrack]);
+  const advanceTrack = useCallback(
+    (currentIndex: number) => {
+      let next: number;
+      if (_shuffle) {
+        do {
+          next = Math.floor(Math.random() * TRACKS.length);
+        } while (next === currentIndex && TRACKS.length > 1);
+      } else {
+        next = (currentIndex + 1) % TRACKS.length;
+      }
+      playTrack(next);
+    },
+    [playTrack],
+  );
 
   // Keep module-level advance fn in sync
-  useEffect(() => { _advanceFn = advanceTrack; }, [advanceTrack]);
+  useEffect(() => {
+    _advanceFn = advanceTrack;
+  }, [advanceTrack]);
 
   const togglePlay = useCallback(() => {
     if (playing && howlRef.current) {
@@ -234,71 +251,97 @@ export default function LofiRadio() {
       {expanded && (
         <div
           className={`absolute z-[25] border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm ${
-            flyMode ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2'
+            flyMode ? "bottom-0 left-full ml-2" : "bottom-full left-0 mb-2"
           }`}
-          style={{ animation: "fade-in 0.15s ease-out", boxShadow: `3px 3px 0 0 ${shadow}`, width: 200 }}
+          style={{
+            animation: "fade-in 0.15s ease-out",
+            boxShadow: `3px 3px 0 0 ${shadow}`,
+            width: 200,
+          }}
         >
-      {/* Track name + close */}
-      <div className="flex items-center justify-between gap-2 px-2.5 pt-2 pb-1">
-        <span className="truncate text-[10px] text-cream">{currentTrack?.title ?? "No track"}</span>
-        <button
-          onClick={() => setExpanded(false)}
-          className="btn-press shrink-0 text-[10px] text-muted hover:text-cream"
-          title="Close"
-        >
-          &times;
-        </button>
-      </div>
+          {/* Track name + close */}
+          <div className="flex items-center justify-between gap-2 px-2.5 pt-2 pb-1">
+            <span className="truncate text-[10px] text-cream">
+              {currentTrack?.title ?? "No track"}
+            </span>
+            <button
+              onClick={() => setExpanded(false)}
+              className="btn-press shrink-0 text-[10px] text-muted hover:text-cream"
+              title="Close"
+            >
+              &times;
+            </button>
+          </div>
 
-      {/* Big controls row */}
-      <div className="flex items-center justify-center gap-4 px-2.5 py-2">
-        <button onClick={skipPrev} className="btn-press text-[12px] text-muted hover:text-cream" title="Previous track">
-          {"\u25C0"}
-        </button>
-        <button
-          onClick={togglePlay}
-          className="btn-press flex h-[32px] w-[32px] items-center justify-center border-[2px] border-border hover:border-cream/40"
-          style={{ color: playing ? accent : "var(--color-cream)" }}
-          title={playing ? "Pause" : "Play"}
-        >
-          <span className="text-[14px]">{playing ? "\u23F8" : "\u25B6"}</span>
-        </button>
-        <button onClick={skipNext} className="btn-press text-[12px] text-muted hover:text-cream" title="Next track">
-          {"\u25B6"}
-        </button>
-      </div>
+          {/* Big controls row */}
+          <div className="flex items-center justify-center gap-4 px-2.5 py-2">
+            <button
+              onClick={skipPrev}
+              className="btn-press text-[12px] text-muted hover:text-cream"
+              title="Previous track"
+            >
+              {"\u25C0"}
+            </button>
+            <button
+              onClick={togglePlay}
+              className="btn-press flex h-[32px] w-[32px] items-center justify-center border-[2px] border-border hover:border-cream/40"
+              style={{ color: playing ? accent : "var(--color-cream)" }}
+              title={playing ? "Pause" : "Play"}
+            >
+              <span className="text-[14px]">{playing ? "\u23F8" : "\u25B6"}</span>
+            </button>
+            <button
+              onClick={skipNext}
+              className="btn-press text-[12px] text-muted hover:text-cream"
+              title="Next track"
+            >
+              {"\u25B6"}
+            </button>
+          </div>
 
-      {/* Volume row */}
-      <div className="flex items-center gap-2 px-2.5 pb-2">
-        <button onClick={toggleMute} className="btn-press text-[9px] text-muted hover:text-cream shrink-0" title={muted ? "Unmute" : "Mute"}>
-          {muted || volume === 0 ? "\uD83D\uDD07" : "\uD83D\uDD0A"}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={muted ? 0 : volume}
-          onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-          className="radio-volume flex-1"
-          style={{ "--radio-accent": accent } as React.CSSProperties}
-        />
-        <button
-          onClick={() => { setShuffle((s) => { _shuffle = !s; return !s; }); }}
-          className="btn-press text-[9px] shrink-0"
-          style={{ color: shuffle ? accent : "var(--color-muted)" }}
-          title={shuffle ? "Shuffle: on" : "Shuffle: off"}
-        >
-          {"\uD83D\uDD00"}
-        </button>
-      </div>
+          {/* Volume row */}
+          <div className="flex items-center gap-2 px-2.5 pb-2">
+            <button
+              onClick={toggleMute}
+              className="btn-press text-[9px] text-muted hover:text-cream shrink-0"
+              title={muted ? "Unmute" : "Mute"}
+            >
+              {muted || volume === 0 ? "\uD83D\uDD07" : "\uD83D\uDD0A"}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={muted ? 0 : volume}
+              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+              className="radio-volume flex-1"
+              style={{ "--radio-accent": accent } as React.CSSProperties}
+            />
+            <button
+              onClick={() => {
+                setShuffle((s) => {
+                  _shuffle = !s;
+                  return !s;
+                });
+              }}
+              className="btn-press text-[9px] shrink-0"
+              style={{ color: shuffle ? accent : "var(--color-muted)" }}
+              title={shuffle ? "Shuffle: on" : "Shuffle: off"}
+            >
+              {"\uD83D\uDD00"}
+            </button>
+          </div>
         </div>
       )}
 
       {/* Collapsed button */}
       <button
         onClick={togglePlay}
-        onContextMenu={(e) => { e.preventDefault(); setExpanded(true); }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setExpanded(true);
+        }}
         className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-all hover:border-border-light"
         style={{ borderColor: playing ? accent + "60" : undefined } as React.CSSProperties}
         title={playing ? "Pause music" : "Play music"}
@@ -310,7 +353,10 @@ export default function LofiRadio() {
           {playing ? currentTrack?.title : "Lo-fi"}
         </span>
         <span
-          onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(true);
+          }}
           className="text-muted hover:text-cream ml-0.5"
           title="More controls"
         >

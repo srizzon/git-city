@@ -228,7 +228,7 @@ export default memo(function InstancedBuildings({
       vertexShader,
       fragmentShader,
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update theme-dependent uniforms without recreating the material
@@ -262,7 +262,9 @@ export default memo(function InstancedBuildings({
       uvF[i * 4 + 3] = b.floors / ATLAS_COLS;
 
       // Side face UV (different column start for variety)
-      const sideColStart = Math.abs((seed + 7919) % Math.max(1, ATLAS_COLS - b.sideWindowsPerFloor));
+      const sideColStart = Math.abs(
+        (seed + 7919) % Math.max(1, ATLAS_COLS - b.sideWindowsPerFloor),
+      );
       uvS[i * 4 + 0] = sideColStart / ATLAS_COLS;
       uvS[i * 4 + 1] = bandRowOffset / ATLAS_COLS;
       uvS[i * 4 + 2] = b.sideWindowsPerFloor / ATLAS_COLS;
@@ -513,19 +515,21 @@ export default memo(function InstancedBuildings({
     // Hover raycast for cursor:pointer — skip on touch devices (no cursor)
     const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     let lastMoveTime = 0;
-    const onPointerMove = isTouch ? null : (e: PointerEvent) => {
-      if (introRef.current) {
-        document.body.style.cursor = "auto";
-        return;
-      }
-      if ((window as any).__spireCursor) return;
-      // Throttle hover raycast to ~8Hz
-      const now = performance.now();
-      if (now - lastMoveTime < 125) return;
-      lastMoveTime = now;
-      const id = raycastInstance(e.clientX, e.clientY);
-      document.body.style.cursor = id !== null ? "pointer" : "auto";
-    };
+    const onPointerMove = isTouch
+      ? null
+      : (e: PointerEvent) => {
+          if (introRef.current) {
+            document.body.style.cursor = "auto";
+            return;
+          }
+          if ((window as any).__spireCursor) return;
+          // Throttle hover raycast to ~8Hz
+          const now = performance.now();
+          if (now - lastMoveTime < 125) return;
+          lastMoveTime = now;
+          const id = raycastInstance(e.clientX, e.clientY);
+          document.body.style.cursor = id !== null ? "pointer" : "auto";
+        };
 
     canvas.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("pointerup", onPointerUp);
@@ -549,11 +553,5 @@ export default memo(function InstancedBuildings({
 
   if (count === 0) return null;
 
-  return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geo, material, count]}
-      frustumCulled={false}
-    />
-  );
+  return <instancedMesh ref={meshRef} args={[geo, material, count]} frustumCulled={false} />;
 });

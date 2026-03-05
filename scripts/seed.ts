@@ -8,7 +8,7 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 
 if (!SUPABASE_URL || !SUPABASE_KEY || !GITHUB_TOKEN) {
   console.error(
-    "Missing env vars. Make sure NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and GITHUB_TOKEN are set."
+    "Missing env vars. Make sure NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and GITHUB_TOKEN are set.",
   );
   console.error("Run: source .env.local && npx tsx scripts/seed.ts");
   process.exit(1);
@@ -21,29 +21,111 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
 // ─── Top devs list ───────────────────────────────────────────
 
 const TOP_DEVS = [
-  "torvalds", "sindresorhus", "gaearon", "yyx990803", "tj",
-  "addyosmani", "getify", "kentcdodds", "trekhleb", "kamranahmedse",
-  "karpathy", "antirez", "mrdoob", "substack", "defunkt",
-  "mojombo", "matz", "fabpot", "taylorotwell", "dhh",
-  "wycats", "rauchg", "developit", "Rich-Harris", "swyx",
-  "ThePrimeagen", "tiangolo", "charliermarsh", "astral-sh", "shadcn",
-  "leerob", "cassidoo", "benawad", "thecodeholic", "fireship-io",
-  "wesbos", "bradtraversy", "traversymedia", "florinpop17", "john-smilga",
-  "jaredpalmer", "tannerlinsley", "pmndrs", "diegomura", "guilhermeborges",
-  "FiloSottile", "jessfraz", "bradfitz", "rsc", "robpike",
-  "mitchellh", "fatih", "junegunn", "sharkdp", "BurntSushi",
-  "dtolnay", "alexcrichton", "withoutboats", "matklad", "jonhoo",
-  "anuraghazra", "DenverCoder1", "Ileriayo", "abhisheknaiidu", "rahuldkjain",
-  "tiimgreen", "ikatyang", "caarlos0", "gorhill", "nicolo-ribaudo",
-  "ljharb", "isaacs", "domenic", "feross", "mafintosh",
-  "mcollina", "mikeal", "ry", "denoland", "lucacasonato",
-  "bartlomieju", "nickytonline", "JakeWharton", "chrisbanes",
-  "romainguy", "diogocautiero", "gabrielpinto",
-  "felipefialho", "omariosouto", "filipedeschamps",
-  "diego3g", "maykbrito", "rocketseat",
-  "jaydenseric", "apollographql", "leerob",
-  "vercel", "zeit", "facebook", "google", "microsoft",
-  "apple", "amazon", "netflix", "twitter",
+  "torvalds",
+  "sindresorhus",
+  "gaearon",
+  "yyx990803",
+  "tj",
+  "addyosmani",
+  "getify",
+  "kentcdodds",
+  "trekhleb",
+  "kamranahmedse",
+  "karpathy",
+  "antirez",
+  "mrdoob",
+  "substack",
+  "defunkt",
+  "mojombo",
+  "matz",
+  "fabpot",
+  "taylorotwell",
+  "dhh",
+  "wycats",
+  "rauchg",
+  "developit",
+  "Rich-Harris",
+  "swyx",
+  "ThePrimeagen",
+  "tiangolo",
+  "charliermarsh",
+  "astral-sh",
+  "shadcn",
+  "leerob",
+  "cassidoo",
+  "benawad",
+  "thecodeholic",
+  "fireship-io",
+  "wesbos",
+  "bradtraversy",
+  "traversymedia",
+  "florinpop17",
+  "john-smilga",
+  "jaredpalmer",
+  "tannerlinsley",
+  "pmndrs",
+  "diegomura",
+  "guilhermeborges",
+  "FiloSottile",
+  "jessfraz",
+  "bradfitz",
+  "rsc",
+  "robpike",
+  "mitchellh",
+  "fatih",
+  "junegunn",
+  "sharkdp",
+  "BurntSushi",
+  "dtolnay",
+  "alexcrichton",
+  "withoutboats",
+  "matklad",
+  "jonhoo",
+  "anuraghazra",
+  "DenverCoder1",
+  "Ileriayo",
+  "abhisheknaiidu",
+  "rahuldkjain",
+  "tiimgreen",
+  "ikatyang",
+  "caarlos0",
+  "gorhill",
+  "nicolo-ribaudo",
+  "ljharb",
+  "isaacs",
+  "domenic",
+  "feross",
+  "mafintosh",
+  "mcollina",
+  "mikeal",
+  "ry",
+  "denoland",
+  "lucacasonato",
+  "bartlomieju",
+  "nickytonline",
+  "JakeWharton",
+  "chrisbanes",
+  "romainguy",
+  "diogocautiero",
+  "gabrielpinto",
+  "felipefialho",
+  "omariosouto",
+  "filipedeschamps",
+  "diego3g",
+  "maykbrito",
+  "rocketseat",
+  "jaydenseric",
+  "apollographql",
+  "leerob",
+  "vercel",
+  "zeit",
+  "facebook",
+  "google",
+  "microsoft",
+  "apple",
+  "amazon",
+  "netflix",
+  "twitter",
 ];
 
 // ─── GitHub Helpers ──────────────────────────────────────────
@@ -75,12 +157,16 @@ function buildYearAliases(): string {
   const currentYear = new Date().getFullYear();
   const lines: string[] = [];
   for (let y = currentYear; y >= currentYear - 9; y--) {
-    lines.push(`y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { contributionCalendar { totalContributions } }`);
+    lines.push(
+      `y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { contributionCalendar { totalContributions } }`,
+    );
   }
   return lines.join("\n    ");
 }
 
-function computeStreaks(weeks: Array<{ contributionDays: Array<{ contributionCount: number; date: string }> }>): {
+function computeStreaks(
+  weeks: Array<{ contributionDays: Array<{ contributionCount: number; date: string }> }>,
+): {
   current_streak: number;
   longest_streak: number;
   active_days_last_year: number;
@@ -221,10 +307,9 @@ type RepoItem = {
 async function fetchAndUpsert(login: string): Promise<boolean> {
   try {
     // Fetch user profile
-    const userRes = await fetch(
-      `https://api.github.com/users/${encodeURIComponent(login)}`,
-      { headers: ghHeaders }
-    );
+    const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(login)}`, {
+      headers: ghHeaders,
+    });
 
     if (!userRes.ok) {
       console.log(`  [SKIP] ${login} - ${userRes.status}`);
@@ -243,7 +328,7 @@ async function fetchAndUpsert(login: string): Promise<boolean> {
       fetchExpandedGitHubData(ghUser.login),
       fetch(
         `https://api.github.com/users/${encodeURIComponent(login)}/repos?sort=pushed&per_page=100&page=1`,
-        { headers: ghHeaders }
+        { headers: ghHeaders },
       ),
     ]);
 
@@ -257,9 +342,9 @@ async function fetchAndUpsert(login: string): Promise<boolean> {
         [2, 3, 4, 5].map((page) =>
           fetch(
             `https://api.github.com/users/${encodeURIComponent(login)}/repos?sort=pushed&per_page=100&page=${page}`,
-            { headers: ghHeaders }
-          ).then((r) => (r.ok ? r.json() as Promise<RepoItem[]> : []))
-        )
+            { headers: ghHeaders },
+          ).then((r) => (r.ok ? (r.json() as Promise<RepoItem[]>) : [])),
+        ),
       );
       for (const page of extraPages) {
         if (page.length === 0) break;
@@ -275,8 +360,7 @@ async function fetchAndUpsert(login: string): Promise<boolean> {
     const uniqueLanguages = new Set<string>();
     for (const repo of ownRepos) {
       if (repo.language) {
-        langCounts[repo.language] =
-          (langCounts[repo.language] || 0) + repo.size;
+        langCounts[repo.language] = (langCounts[repo.language] || 0) + repo.size;
         uniqueLanguages.add(repo.language);
       }
     }
@@ -308,24 +392,26 @@ async function fetchAndUpsert(login: string): Promise<boolean> {
         top_repos: topRepos,
         fetched_at: new Date().toISOString(),
         // v2 fields
-        ...(expanded ? {
-          contributions_total: expanded.contributions_total,
-          contribution_years: expanded.contribution_years,
-          total_prs: expanded.total_prs,
-          total_reviews: expanded.total_reviews,
-          total_issues: expanded.total_issues,
-          repos_contributed_to: expanded.repos_contributed_to,
-          followers: expanded.followers,
-          following: expanded.following,
-          organizations_count: expanded.organizations_count,
-          account_created_at: expanded.account_created_at,
-          current_streak: expanded.current_streak,
-          longest_streak: expanded.longest_streak,
-          active_days_last_year: expanded.active_days_last_year,
-          language_diversity: uniqueLanguages.size,
-        } : {}),
+        ...(expanded
+          ? {
+              contributions_total: expanded.contributions_total,
+              contribution_years: expanded.contribution_years,
+              total_prs: expanded.total_prs,
+              total_reviews: expanded.total_reviews,
+              total_issues: expanded.total_issues,
+              repos_contributed_to: expanded.repos_contributed_to,
+              followers: expanded.followers,
+              following: expanded.following,
+              organizations_count: expanded.organizations_count,
+              account_created_at: expanded.account_created_at,
+              current_streak: expanded.current_streak,
+              longest_streak: expanded.longest_streak,
+              active_days_last_year: expanded.active_days_last_year,
+              language_diversity: uniqueLanguages.size,
+            }
+          : {}),
       },
-      { onConflict: "github_login" }
+      { onConflict: "github_login" },
     );
 
     if (error) {
@@ -334,7 +420,7 @@ async function fetchAndUpsert(login: string): Promise<boolean> {
     }
 
     console.log(
-      `  [OK]   ${ghUser.login} — ${contributions} contribs (total: ${expanded?.contributions_total ?? '?'}), ${totalStars} stars, ${repos.length} repos`
+      `  [OK]   ${ghUser.login} — ${contributions} contribs (total: ${expanded?.contributions_total ?? "?"}), ${totalStars} stars, ${repos.length} repos`,
     );
     return true;
   } catch (err) {

@@ -65,12 +65,16 @@ function buildYearAliases(): string {
   const currentYear = new Date().getFullYear();
   const lines: string[] = [];
   for (let y = currentYear; y >= currentYear - 9; y--) {
-    lines.push(`y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { contributionCalendar { totalContributions } }`);
+    lines.push(
+      `y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { contributionCalendar { totalContributions } }`,
+    );
   }
   return lines.join("\n    ");
 }
 
-function computeStreaks(weeks: Array<{ contributionDays: Array<{ contributionCount: number; date: string }> }>): {
+function computeStreaks(
+  weeks: Array<{ contributionDays: Array<{ contributionCount: number; date: string }> }>,
+): {
   current_streak: number;
   longest_streak: number;
   active_days_last_year: number;
@@ -224,10 +228,7 @@ async function fetchExpandedGitHubData(login: string): Promise<ExpandedGitHubDat
 
 // ─── Route Handler ───────────────────────────────────────────
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ username: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const sb = getSupabaseAdmin();
 
@@ -257,12 +258,14 @@ export async function GET(
     let key: string;
     try {
       const authClient = await createServerSupabase();
-      const { data: { user } } = await authClient.auth.getUser();
-      key = user ? `user:${user.id}` : (
-        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-        request.headers.get("x-real-ip") ??
-        "unknown"
-      );
+      const {
+        data: { user },
+      } = await authClient.auth.getUser();
+      key = user
+        ? `user:${user.id}`
+        : (request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+          request.headers.get("x-real-ip") ??
+          "unknown");
     } catch {
       key =
         request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -275,7 +278,7 @@ export async function GET(
     if (limited) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Max 10 lookups per hour." },
-        { status: 429 }
+        { status: 429 },
       );
     }
   }
@@ -292,28 +295,18 @@ export async function GET(
       size: number;
     };
 
-    const userRes = await fetch(
-      `https://api.github.com/users/${encodeURIComponent(username)}`,
-      { headers }
-    );
+    const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
+      headers,
+    });
 
     if (!userRes.ok) {
       if (userRes.status === 404) {
-        return NextResponse.json(
-          { error: "User not found" },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
       if (userRes.status === 403) {
-        return NextResponse.json(
-          { error: "GitHub API rate limit exceeded." },
-          { status: 429 }
-        );
+        return NextResponse.json({ error: "GitHub API rate limit exceeded." }, { status: 429 });
       }
-      return NextResponse.json(
-        { error: "Failed to fetch user data" },
-        { status: userRes.status }
-      );
+      return NextResponse.json({ error: "Failed to fetch user data" }, { status: userRes.status });
     }
 
     const ghUser = await userRes.json();
@@ -322,7 +315,7 @@ export async function GET(
     if (ghUser.type === "Organization") {
       return NextResponse.json(
         { error: "Organizations are not supported. Search for a user profile instead." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -331,7 +324,7 @@ export async function GET(
       fetchExpandedGitHubData(ghUser.login),
       fetch(
         `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=1`,
-        { headers }
+        { headers },
       ),
     ]);
 
@@ -341,7 +334,7 @@ export async function GET(
     if (contributions === 0 && ghUser.public_repos === 0) {
       return NextResponse.json(
         { error: "This user has no public activity on GitHub yet." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -353,9 +346,9 @@ export async function GET(
         [2, 3, 4, 5].map((page) =>
           fetch(
             `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=${page}`,
-            { headers }
-          ).then((r) => (r.ok ? r.json() as Promise<RepoItem[]> : []))
-        )
+            { headers },
+          ).then((r) => (r.ok ? (r.json() as Promise<RepoItem[]>) : [])),
+        ),
       );
       for (const page of extraPages) {
         if (page.length === 0) break;
@@ -365,24 +358,19 @@ export async function GET(
 
     // Derived fields
     const ownRepos = repos.filter((r) => !r.fork);
-    const totalStars = ownRepos.reduce(
-      (s, r) => s + r.stargazers_count,
-      0
-    );
+    const totalStars = ownRepos.reduce((s, r) => s + r.stargazers_count, 0);
 
     // Primary language by total repo size
     const langCounts: Record<string, number> = {};
     const uniqueLanguages = new Set<string>();
     for (const repo of ownRepos) {
       if (repo.language) {
-        langCounts[repo.language] =
-          (langCounts[repo.language] || 0) + repo.size;
+        langCounts[repo.language] = (langCounts[repo.language] || 0) + repo.size;
         uniqueLanguages.add(repo.language);
       }
     }
     const primaryLanguage =
-      Object.entries(langCounts).sort(([, a], [, b]) => b - a)[0]?.[0] ??
-      null;
+      Object.entries(langCounts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null;
 
     // Top 5 repos by stars
     const topRepos: TopRepo[] = ownRepos
@@ -414,23 +402,25 @@ export async function GET(
       top_repos: topRepos,
       fetched_at: new Date().toISOString(),
       // v2 fields
-      ...(expanded ? {
-        contributions_total: expanded.contributions_total,
-        contribution_years: expanded.contribution_years,
-        total_prs: expanded.total_prs,
-        total_reviews: expanded.total_reviews,
-        total_issues: expanded.total_issues,
-        repos_contributed_to: expanded.repos_contributed_to,
-        followers: expanded.followers,
-        following: expanded.following,
-        organizations_count: expanded.organizations_count,
-        account_created_at: expanded.account_created_at,
-        current_streak: expanded.current_streak,
-        longest_streak: expanded.longest_streak,
-        active_days_last_year: expanded.active_days_last_year,
-        language_diversity: uniqueLanguages.size,
-        current_week_contributions: expanded.current_week_contributions,
-      } : {}),
+      ...(expanded
+        ? {
+            contributions_total: expanded.contributions_total,
+            contribution_years: expanded.contribution_years,
+            total_prs: expanded.total_prs,
+            total_reviews: expanded.total_reviews,
+            total_issues: expanded.total_issues,
+            repos_contributed_to: expanded.repos_contributed_to,
+            followers: expanded.followers,
+            following: expanded.following,
+            organizations_count: expanded.organizations_count,
+            account_created_at: expanded.account_created_at,
+            current_streak: expanded.current_streak,
+            longest_streak: expanded.longest_streak,
+            active_days_last_year: expanded.active_days_last_year,
+            language_diversity: uniqueLanguages.size,
+            current_week_contributions: expanded.current_week_contributions,
+          }
+        : {}),
     };
 
     // Check if this dev already exists (to detect new buildings)
@@ -449,10 +439,7 @@ export async function GET(
 
     if (upsertError) {
       console.error("Upsert error:", upsertError);
-      return NextResponse.json(
-        { error: "Failed to save developer data" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to save developer data" }, { status: 500 });
     }
 
     // Recalculate GitHub XP and grant diff
@@ -499,9 +486,6 @@ export async function GET(
     });
   } catch (err) {
     console.error("Dev route error:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch GitHub data" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch GitHub data" }, { status: 500 });
   }
 }

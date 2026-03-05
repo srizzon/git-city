@@ -73,9 +73,7 @@ function ClickPreview({
 
       {/* Description */}
       {description ? (
-        <p className="mx-4 mb-4 text-xs text-cream normal-case leading-relaxed">
-          {description}
-        </p>
+        <p className="mx-4 mb-4 text-xs text-cream normal-case leading-relaxed">{description}</p>
       ) : (
         <p className="mx-4 mb-4 text-xs text-muted/30 normal-case leading-relaxed">
           Your description will appear here
@@ -129,8 +127,7 @@ export function SetupContent({
 
   const textOver = text.length > MAX_TEXT_LENGTH;
 
-  const linkValid =
-    !link || link.startsWith("https://") || link.startsWith("mailto:");
+  const linkValid = !link || link.startsWith("https://") || link.startsWith("mailto:");
 
   async function handleSave() {
     if (!linkValid || textOver || !text.trim()) return;
@@ -169,13 +166,7 @@ export function SetupContent({
       {/* Left: Previews (sticky on desktop) */}
       <div className="lg:sticky lg:top-8 lg:self-start space-y-6">
         {/* 3D Preview */}
-        <AdPreview
-          vehicle={ad.vehicle}
-          text={text}
-          color={ad.color}
-          bgColor={ad.bg_color}
-          tall
-        />
+        <AdPreview vehicle={ad.vehicle} text={text} color={ad.color} bgColor={ad.bg_color} tall />
 
         {/* Live click modal preview */}
         <div>
@@ -199,16 +190,13 @@ export function SetupContent({
           <span className="text-xs text-muted normal-case">(optional)</span>
         </h2>
         <p className="mt-2 text-xs text-muted normal-case">
-          These show when someone clicks your ad. You can always update them
-          later.
+          These show when someone clicks your ad. You can always update them later.
         </p>
 
         <div className="mt-5 space-y-5">
           {/* Ad text (shown on building) */}
           <div>
-            <label className="block text-xs text-muted normal-case">
-              Ad text
-            </label>
+            <label className="block text-xs text-muted normal-case">Ad text</label>
             <input
               type="text"
               value={text}
@@ -232,9 +220,7 @@ export function SetupContent({
 
           {/* Brand name */}
           <div>
-            <label className="block text-xs text-muted normal-case">
-              Brand name
-            </label>
+            <label className="block text-xs text-muted normal-case">Brand name</label>
             <input
               type="text"
               value={brand}
@@ -243,16 +229,12 @@ export function SetupContent({
               placeholder="Your Company"
               className="mt-1 w-full border-[3px] border-border bg-transparent px-3 py-2.5 font-pixel text-sm text-cream outline-none transition-colors focus:border-[#c8e64a]"
             />
-            <p className="mt-1 text-[11px] text-muted normal-case">
-              {brand.length}/60
-            </p>
+            <p className="mt-1 text-[11px] text-muted normal-case">{brand.length}/60</p>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs text-muted normal-case">
-              Description
-            </label>
+            <label className="block text-xs text-muted normal-case">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -262,16 +244,12 @@ export function SetupContent({
               className="mt-1 w-full resize-y border-[3px] border-border bg-transparent px-3 py-2.5 text-sm text-cream normal-case outline-none transition-colors focus:border-[#c8e64a]"
               style={{ fontFamily: "inherit", lineHeight: "1.6" }}
             />
-            <p className="mt-1 text-[11px] text-muted normal-case">
-              {description.length}/200
-            </p>
+            <p className="mt-1 text-[11px] text-muted normal-case">{description.length}/200</p>
           </div>
 
           {/* Link */}
           <div>
-            <label className="block text-xs text-muted normal-case">
-              Link
-            </label>
+            <label className="block text-xs text-muted normal-case">Link</label>
             <input
               type="url"
               value={link}
@@ -280,16 +258,11 @@ export function SetupContent({
               className="mt-1 w-full border-[3px] border-border bg-transparent px-3 py-2.5 font-pixel text-sm text-cream outline-none transition-colors focus:border-[#c8e64a]"
             />
             {link && !linkValid && (
-              <p
-                className="mt-1 text-[11px] normal-case"
-                style={{ color: "#ff6b6b" }}
-              >
+              <p className="mt-1 text-[11px] normal-case" style={{ color: "#ff6b6b" }}>
                 Must start with https:// or mailto:
               </p>
             )}
-            <p className="mt-1 text-[11px] text-muted normal-case">
-              Where should clicks go?
-            </p>
+            <p className="mt-1 text-[11px] text-muted normal-case">Where should clicks go?</p>
           </div>
 
           {/* Error */}

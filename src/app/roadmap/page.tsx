@@ -7,8 +7,7 @@ export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "Roadmap - Git City",
-  description:
-    "See what's coming next for Git City. Vote on the features you want most.",
+  description: "See what's coming next for Git City. Vote on the features you want most.",
 };
 
 export default async function RoadmapPage() {
@@ -68,10 +67,6 @@ export default async function RoadmapPage() {
   }
 
   return (
-    <RoadmapClient
-      voteCounts={voteCounts ?? {}}
-      userVotes={userVotes}
-      isLoggedIn={!!userLogin}
-    />
+    <RoadmapClient voteCounts={voteCounts ?? {}} userVotes={userVotes} isLoggedIn={!!userLogin} />
   );
 }

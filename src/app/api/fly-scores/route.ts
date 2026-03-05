@@ -159,15 +159,14 @@ export async function GET(request: Request) {
   const [{ data, error }, { data: devIds }] = await Promise.all([
     admin
       .from("fly_scores")
-      .select("score, collected, max_combo, flight_ms, created_at, developer_id, developers!inner(github_login, avatar_url)")
+      .select(
+        "score, collected, max_combo, flight_ms, created_at, developer_id, developers!inner(github_login, avatar_url)",
+      )
       .eq("seed", seed)
       .order("score", { ascending: false })
       .order("flight_ms", { ascending: true })
       .limit(200),
-    admin
-      .from("fly_scores")
-      .select("developer_id")
-      .eq("seed", seed),
+    admin.from("fly_scores").select("developer_id").eq("seed", seed),
   ]);
 
   if (error) {

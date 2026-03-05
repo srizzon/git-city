@@ -62,18 +62,15 @@ export default async function UnsubscribePage({
           <>
             <p style={{ fontSize: 18, color: "#ff6b6b" }}>Invalid or expired link</p>
             <p style={{ color: "#666", fontSize: 14 }}>
-              This unsubscribe link may have expired or is invalid.
-              You can manage your notifications from your Git City settings.
+              This unsubscribe link may have expired or is invalid. You can manage your
+              notifications from your Git City settings.
             </p>
           </>
         ) : success ? (
           <>
             <p style={{ fontSize: 18 }}>
               You&apos;ve been unsubscribed from{" "}
-              <strong style={{ color: "#c8e64a" }}>
-                {categoryLabels[category] ?? category}
-              </strong>
-              .
+              <strong style={{ color: "#c8e64a" }}>{categoryLabels[category] ?? category}</strong>.
             </p>
             <p style={{ color: "#666", fontSize: 14 }}>
               You can re-enable notifications anytime from your Git City settings.

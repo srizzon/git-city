@@ -4,10 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const from = Math.max(0, parseInt(searchParams.get("from") ?? "0", 10));
-  const to = Math.min(
-    from + 1000,
-    parseInt(searchParams.get("to") ?? "500", 10)
-  );
+  const to = Math.min(from + 1000, parseInt(searchParams.get("to") ?? "500", 10));
 
   const sb = getSupabaseAdmin();
 
@@ -16,7 +13,7 @@ export async function GET(request: Request) {
     sb
       .from("developers")
       .select(
-        "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, active_days_last_year, language_diversity, app_streak, rabbit_completed, district, district_chosen, xp_total, xp_level"
+        "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, active_days_last_year, language_diversity, app_streak, rabbit_completed, district, district_chosen, xp_total, xp_level",
       )
       .order("rank", { ascending: true })
       .range(from, to - 1),
@@ -33,12 +30,18 @@ export async function GET(request: Request) {
         developers: [],
         stats: statsResult.data ?? { total_developers: 0, total_contributions: 0 },
       },
-      { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } }
+      { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
     );
   }
 
   // Round 2: purchases + customizations + achievements + raid tags in parallel
-  const [purchasesResult, giftPurchasesResult, customizationsResult, achievementsResult, raidTagsResult] = await Promise.all([
+  const [
+    purchasesResult,
+    giftPurchasesResult,
+    customizationsResult,
+    achievementsResult,
+    raidTagsResult,
+  ] = await Promise.all([
     sb
       .from("purchases")
       .select("developer_id, item_id")
@@ -81,7 +84,10 @@ export async function GET(request: Request) {
   // Build customization maps
   const customColorMap: Record<number, string> = {};
   const billboardImagesMap: Record<number, string[]> = {};
-  const loadoutMap: Record<number, { crown: string | null; roof: string | null; aura: string | null }> = {};
+  const loadoutMap: Record<
+    number,
+    { crown: string | null; roof: string | null; aura: string | null }
+  > = {};
   for (const row of customizationsResult.data ?? []) {
     const config = row.config as Record<string, unknown>;
     if (row.item_id === "custom_color" && typeof config?.color === "string") {
@@ -111,7 +117,10 @@ export async function GET(request: Request) {
   }
 
   // Build raid tags map (1 active tag per building)
-  const raidTagMap: Record<number, { attacker_login: string; tag_style: string; expires_at: string }> = {};
+  const raidTagMap: Record<
+    number,
+    { attacker_login: string; tag_style: string; expires_at: string }
+  > = {};
   for (const row of raidTagsResult.data ?? []) {
     raidTagMap[row.building_id] = {
       attacker_login: row.attacker_login,
@@ -153,6 +162,6 @@ export async function GET(request: Request) {
       headers: {
         "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
       },
-    }
+    },
   );
 }

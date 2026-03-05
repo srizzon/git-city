@@ -15,19 +15,24 @@ export async function GET(request: Request) {
   // Piggyback cleanup: delete events older than 30 days (~1% chance per request)
   if (Math.random() < 0.01) {
     const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
-    sb.from("activity_feed").delete().lt("created_at", cutoff).then(() => {});
+    sb.from("activity_feed")
+      .delete()
+      .lt("created_at", cutoff)
+      .then(() => {});
   }
 
   let query = sb
     .from("activity_feed")
-    .select(`
+    .select(
+      `
       id,
       event_type,
       actor_id,
       target_id,
       metadata,
       created_at
-    `)
+    `,
+    )
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -75,7 +80,7 @@ export async function GET(request: Request) {
   if (events.length === 0) {
     return NextResponse.json(
       { events: [], has_more: false },
-      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } }
+      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } },
     );
   }
 
@@ -101,8 +106,8 @@ export async function GET(request: Request) {
   // Enrich events
   const enriched = events.map((e) => ({
     ...e,
-    actor: e.actor_id ? devMap[e.actor_id] ?? null : null,
-    target: e.target_id ? devMap[e.target_id] ?? null : null,
+    actor: e.actor_id ? (devMap[e.actor_id] ?? null) : null,
+    target: e.target_id ? (devMap[e.target_id] ?? null) : null,
   }));
 
   return NextResponse.json(
@@ -114,7 +119,7 @@ export async function GET(request: Request) {
       headers: {
         "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
       },
-    }
+    },
   );
 }
 
@@ -125,7 +130,9 @@ export async function GET(request: Request) {
 async function generateSyntheticEvents(sb: ReturnType<typeof getSupabaseAdmin>, count: number) {
   const { data: devs } = await sb
     .from("developers")
-    .select("id, github_login, contributions, total_stars, rank, contributions_total, current_streak, primary_language, public_repos")
+    .select(
+      "id, github_login, contributions, total_stars, rank, contributions_total, current_streak, primary_language, public_repos",
+    )
     .order("contributions", { ascending: false })
     .limit(50);
 

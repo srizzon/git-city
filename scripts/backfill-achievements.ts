@@ -18,7 +18,7 @@ for (const line of envContent.split("\n")) {
 const sb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
+  { auth: { persistSession: false } },
 );
 
 interface Achievement {
@@ -46,7 +46,9 @@ async function main() {
   // 2. Load all devs with stats
   const { data: devs, error: devErr } = await sb
     .from("developers")
-    .select("id, github_login, contributions, public_repos, total_stars, kudos_count, referral_count")
+    .select(
+      "id, github_login, contributions, public_repos, total_stars, kudos_count, referral_count",
+    )
     .order("rank");
 
   if (devErr || !devs) {
@@ -60,9 +62,7 @@ async function main() {
     .from("developer_achievements")
     .select("developer_id, achievement_id");
 
-  const existingSet = new Set(
-    (existing ?? []).map((r) => `${r.developer_id}_${r.achievement_id}`)
-  );
+  const existingSet = new Set((existing ?? []).map((r) => `${r.developer_id}_${r.achievement_id}`));
 
   // 4. Count gifts per dev
   const { data: giftsSent } = await sb
@@ -123,20 +123,36 @@ async function main() {
 
       let qualifies = false;
       switch (a.category) {
-        case "commits": qualifies = stats.contributions >= a.threshold; break;
-        case "repos": qualifies = stats.public_repos >= a.threshold; break;
-        case "stars": qualifies = stats.total_stars >= a.threshold; break;
-        case "social": qualifies = stats.referral_count >= a.threshold; break;
-        case "kudos": qualifies = stats.kudos_count >= a.threshold; break;
-        case "gifts_sent": qualifies = stats.gifts_sent >= a.threshold; break;
-        case "gifts_received": qualifies = stats.gifts_received >= a.threshold; break;
+        case "commits":
+          qualifies = stats.contributions >= a.threshold;
+          break;
+        case "repos":
+          qualifies = stats.public_repos >= a.threshold;
+          break;
+        case "stars":
+          qualifies = stats.total_stars >= a.threshold;
+          break;
+        case "social":
+          qualifies = stats.referral_count >= a.threshold;
+          break;
+        case "kudos":
+          qualifies = stats.kudos_count >= a.threshold;
+          break;
+        case "gifts_sent":
+          qualifies = stats.gifts_sent >= a.threshold;
+          break;
+        case "gifts_received":
+          qualifies = stats.gifts_received >= a.threshold;
+          break;
       }
 
       if (qualifies) newUnlocks.push(a);
     }
 
     if (newUnlocks.length > 0) {
-      console.log(`@${dev.github_login} → ${newUnlocks.map((a) => `${a.name} (${a.tier})`).join(", ")}`);
+      console.log(
+        `@${dev.github_login} → ${newUnlocks.map((a) => `${a.name} (${a.tier})`).join(", ")}`,
+      );
       totalUnlocks += newUnlocks.length;
 
       for (const a of newUnlocks) {
@@ -160,8 +176,17 @@ async function main() {
         actor_id: dev.id,
         metadata:
           newUnlocks.length === 1
-            ? { login: dev.github_login, achievement_id: newUnlocks[0].id, achievement_name: newUnlocks[0].name, tier: newUnlocks[0].tier }
-            : { login: dev.github_login, count: newUnlocks.length, achievements: newUnlocks.map((a) => ({ id: a.id, name: a.name, tier: a.tier })) },
+            ? {
+                login: dev.github_login,
+                achievement_id: newUnlocks[0].id,
+                achievement_name: newUnlocks[0].name,
+                tier: newUnlocks[0].tier,
+              }
+            : {
+                login: dev.github_login,
+                count: newUnlocks.length,
+                achievements: newUnlocks.map((a) => ({ id: a.id, name: a.name, tier: a.tier })),
+              },
       });
     }
   }

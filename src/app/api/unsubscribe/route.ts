@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyHmacToken, type NotificationCategory } from "@/lib/notifications";
 
-const VALID_CATEGORIES = ["transactional", "social", "digest", "marketing", "streak_reminders", "all"];
+const VALID_CATEGORIES = [
+  "transactional",
+  "social",
+  "digest",
+  "marketing",
+  "streak_reminders",
+  "all",
+];
 
 /**
  * POST /api/unsubscribe?dev={id}&cat={category}&token={hmac}
@@ -40,10 +47,7 @@ export async function POST(request: Request) {
     };
     await sb
       .from("notification_preferences")
-      .upsert(
-        { developer_id: devId, ...update },
-        { onConflict: "developer_id" },
-      );
+      .upsert({ developer_id: devId, ...update }, { onConflict: "developer_id" });
   }
 
   // Return 200 for email clients doing one-click unsubscribe (they just POST, no redirect)
@@ -88,13 +92,8 @@ export async function GET(request: Request) {
     };
     await sb
       .from("notification_preferences")
-      .upsert(
-        { developer_id: devId, ...update },
-        { onConflict: "developer_id" },
-      );
+      .upsert({ developer_id: devId, ...update }, { onConflict: "developer_id" });
   }
 
-  return NextResponse.redirect(
-    `${origin}/unsubscribe?success=true&cat=${category}`,
-  );
+  return NextResponse.redirect(`${origin}/unsubscribe?success=true&cat=${category}`);
 }

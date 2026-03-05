@@ -20,10 +20,7 @@ export async function POST() {
   ).toLowerCase();
 
   if (!githubLogin) {
-    return NextResponse.json(
-      { error: "No GitHub username" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "No GitHub username" }, { status: 400 });
   }
 
   const admin = getSupabaseAdmin();
@@ -36,18 +33,15 @@ export async function POST() {
     .single();
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
-    return NextResponse.json(
-      { error: "You must claim your building first" },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "You must claim your building first" }, { status: 403 });
   }
 
   const granted = await grantFreeClaimItem(dev.id);
 
-// grantFreeClaimItem is idempotent: returns false if already owned.
-    // Either way the user should see the success state — treat as 200 OK.
-    // (Returning 409 previously caused the frontend to silently reset
-    // the button without opening the gift modal — issue #11.)
+  // grantFreeClaimItem is idempotent: returns false if already owned.
+  // Either way the user should see the success state — treat as 200 OK.
+  // (Returning 409 previously caused the frontend to silently reset
+  // the button without opening the gift modal — issue #11.)
 
   return NextResponse.json({
     claimed: true,

@@ -95,7 +95,7 @@ export interface CityPlaza {
 }
 
 export interface CityDecoration {
-  type: 'tree' | 'streetLamp' | 'car' | 'bench' | 'fountain' | 'sidewalk' | 'roadMarking';
+  type: "tree" | "streetLamp" | "car" | "bench" | "fountain" | "sidewalk" | "roadMarking";
   position: [number, number, number];
   rotation: number;
   variant: number;
@@ -134,17 +134,17 @@ function spiralCoord(index: number): [number, number] {
 
 // ─── City Layout ─────────────────────────────────────────────
 
-const BLOCK_SIZE = 4;     // 4x4 buildings per city block
-const LOT_W = 38;        // lot width  (X axis) — tighter packing
-const LOT_D = 32;        // lot depth  (Z axis) — tighter packing
-const ALLEY_W = 3;       // narrow gap between buildings within a block
-const STREET_W = 12;     // street between blocks (within a district)
+const BLOCK_SIZE = 4; // 4x4 buildings per city block
+const LOT_W = 38; // lot width  (X axis) — tighter packing
+const LOT_D = 32; // lot depth  (Z axis) — tighter packing
+const ALLEY_W = 3; // narrow gap between buildings within a block
+const STREET_W = 12; // street between blocks (within a district)
 
 // Derived: total block footprint
 const BLOCK_FOOTPRINT_X = BLOCK_SIZE * LOT_W + (BLOCK_SIZE - 1) * ALLEY_W; // 4*38 + 3*3 = 161
 const BLOCK_FOOTPRINT_Z = BLOCK_SIZE * LOT_D + (BLOCK_SIZE - 1) * ALLEY_W; // 4*32 + 3*3 = 137
 
-const RIVER_MARGIN = 8;      // Margin on each side of the river
+const RIVER_MARGIN = 8; // Margin on each side of the river
 
 const MAX_BUILDING_HEIGHT = 600;
 const MIN_BUILDING_HEIGHT = 35;
@@ -166,12 +166,12 @@ function calcHeight(
   const rNorm = Math.min(publicRepos / 200, 1);
 
   // Power curves — exponent < 1 compresses, > 0.5 gives more contrast than sqrt
-  const cScore = Math.pow(Math.min(cNorm, 3), 0.55);   // contributions (allow up to 3x max)
-  const sScore = Math.pow(Math.min(sNorm, 3), 0.45);   // stars (more generous curve)
-  const rScore = Math.pow(rNorm, 0.5);                   // repos
+  const cScore = Math.pow(Math.min(cNorm, 3), 0.55); // contributions (allow up to 3x max)
+  const sScore = Math.pow(Math.min(sNorm, 3), 0.45); // stars (more generous curve)
+  const rScore = Math.pow(rNorm, 0.5); // repos
 
   // Weights: contributions dominate, but stars matter a lot
-  const composite = cScore * 0.55 + sScore * 0.35 + rScore * 0.10;
+  const composite = cScore * 0.55 + sScore * 0.35 + rScore * 0.1;
 
   const height = Math.min(MAX_BUILDING_HEIGHT, MIN_BUILDING_HEIGHT + composite * HEIGHT_RANGE);
   return { height, composite };
@@ -197,11 +197,14 @@ function calcHeightV2(
   const fNorm = Math.log10(Math.max(1, dev.followers ?? 0)) / Math.log10(50_000);
 
   // Consistency: years active / account age
-  const accountAgeYears = Math.max(1,
-    (Date.now() - new Date(dev.account_created_at || dev.created_at).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+  const accountAgeYears = Math.max(
+    1,
+    (Date.now() - new Date(dev.account_created_at || dev.created_at).getTime()) /
+      (365.25 * 24 * 60 * 60 * 1000),
   );
   const yearsActive = dev.contribution_years?.length || 1;
-  const consistencyRaw = (yearsActive / accountAgeYears) * Math.min(1, contribs / (accountAgeYears * 200));
+  const consistencyRaw =
+    (yearsActive / accountAgeYears) * Math.min(1, contribs / (accountAgeYears * 200));
   const consistencyNorm = Math.min(1, consistencyRaw);
 
   const cScore = Math.pow(Math.min(cNorm, 3), 0.55);
@@ -212,12 +215,7 @@ function calcHeightV2(
   const cnsScore = Math.pow(consistencyNorm, 0.6);
 
   const composite =
-    cScore  * 0.35 +
-    sScore  * 0.20 +
-    prScore * 0.15 +
-    extScore * 0.10 +
-    cnsScore * 0.10 +
-    fScore  * 0.10;
+    cScore * 0.35 + sScore * 0.2 + prScore * 0.15 + extScore * 0.1 + cnsScore * 0.1 + fScore * 0.1;
 
   const height = Math.min(MAX_BUILDING_HEIGHT, MIN_BUILDING_HEIGHT + composite * HEIGHT_RANGE);
   return { height, composite };
@@ -229,9 +227,9 @@ function calcWidthV2(dev: DeveloperRecord): number {
   const topStarNorm = Math.min(1, (dev.top_repos?.[0]?.stars ?? 0) / 50_000);
 
   const score =
-    Math.pow(repoNorm, 0.5) * 0.50 +
-    Math.pow(langNorm, 0.6) * 0.30 +
-    Math.pow(topStarNorm, 0.4) * 0.20;
+    Math.pow(repoNorm, 0.5) * 0.5 +
+    Math.pow(langNorm, 0.6) * 0.3 +
+    Math.pow(topStarNorm, 0.4) * 0.2;
 
   const jitter = (seededRandom(hashStr(dev.github_login)) - 0.5) * 4;
   return Math.round(14 + score * 24 + jitter);
@@ -241,14 +239,15 @@ function calcDepthV2(dev: DeveloperRecord): number {
   const extNorm = Math.min(1, (dev.repos_contributed_to ?? 0) / 100);
   const orgNorm = Math.min(1, (dev.organizations_count ?? 0) / 10);
   const prNorm = Math.min(1, (dev.total_prs ?? 0) / 1_000);
-  const ratioNorm = (dev.followers ?? 0) > 0
-    ? Math.min(1, ((dev.followers ?? 0) / Math.max(1, dev.following ?? 1)) / 10)
-    : 0;
+  const ratioNorm =
+    (dev.followers ?? 0) > 0
+      ? Math.min(1, (dev.followers ?? 0) / Math.max(1, dev.following ?? 1) / 10)
+      : 0;
 
   const score =
-    Math.pow(extNorm, 0.5) * 0.40 +
+    Math.pow(extNorm, 0.5) * 0.4 +
     Math.pow(orgNorm, 0.5) * 0.25 +
-    Math.pow(prNorm, 0.5) * 0.20 +
+    Math.pow(prNorm, 0.5) * 0.2 +
     Math.pow(ratioNorm, 0.5) * 0.15;
 
   const jitter = (seededRandom(hashStr(dev.github_login) + 99) - 0.5) * 4;
@@ -259,16 +258,14 @@ function calcLitPercentageV2(dev: DeveloperRecord): number {
   const activeDaysNorm = Math.min(1, (dev.active_days_last_year ?? 0) / 300);
   const streakNorm = Math.min(1, (dev.current_streak ?? 0) / 100);
 
-  const avgPerYear = (dev.contributions_total ?? 0) / Math.max(1, dev.contribution_years?.length ?? 1);
+  const avgPerYear =
+    (dev.contributions_total ?? 0) / Math.max(1, dev.contribution_years?.length ?? 1);
   const trendRaw = avgPerYear > 0 ? dev.contributions / avgPerYear : 1;
   const trendNorm = Math.min(2, Math.max(0, trendRaw)) / 2;
 
-  const score =
-    activeDaysNorm * 0.60 +
-    streakNorm * 0.25 +
-    trendNorm * 0.15;
+  const score = activeDaysNorm * 0.6 + streakNorm * 0.25 + trendNorm * 0.15;
 
-  return 0.05 + score * 0.90;
+  return 0.05 + score * 0.9;
 }
 
 export interface CityRiver {
@@ -314,50 +311,86 @@ function precomputeComposites(
 // ─── District Layout ────────────────────────────────────────
 
 export const DISTRICT_NAMES: Record<string, string> = {
-  downtown: 'Downtown',
-  frontend: 'Frontend', backend: 'Backend', fullstack: 'Full Stack',
-  mobile: 'Mobile', data_ai: 'Data & AI', devops: 'DevOps & Cloud',
-  security: 'Security', gamedev: 'GameDev', vibe_coder: 'Vibe Coder',
-  creator: 'Creator',
+  downtown: "Downtown",
+  frontend: "Frontend",
+  backend: "Backend",
+  fullstack: "Full Stack",
+  mobile: "Mobile",
+  data_ai: "Data & AI",
+  devops: "DevOps & Cloud",
+  security: "Security",
+  gamedev: "GameDev",
+  vibe_coder: "Vibe Coder",
+  creator: "Creator",
 };
 
 export const DISTRICT_COLORS: Record<string, string> = {
-  downtown: '#fbbf24',
-  frontend: '#3b82f6', backend: '#ef4444', fullstack: '#a855f7',
-  mobile: '#22c55e', data_ai: '#06b6d4', devops: '#f97316',
-  security: '#dc2626', gamedev: '#ec4899', vibe_coder: '#8b5cf6',
-  creator: '#eab308',
+  downtown: "#fbbf24",
+  frontend: "#3b82f6",
+  backend: "#ef4444",
+  fullstack: "#a855f7",
+  mobile: "#22c55e",
+  data_ai: "#06b6d4",
+  devops: "#f97316",
+  security: "#dc2626",
+  gamedev: "#ec4899",
+  vibe_coder: "#8b5cf6",
+  creator: "#eab308",
 };
 
 export const DISTRICT_DESCRIPTIONS: Record<string, string> = {
-  downtown: 'The elite core. Top 50 devs by global rank.',
-  frontend: 'Pixels, components, and beautiful interfaces.',
-  backend: 'APIs, systems, and server-side logic.',
-  fullstack: 'Jack of all trades. Ship everything.',
-  mobile: 'Native apps for iOS and Android.',
-  data_ai: 'Data science, ML, and AI.',
-  devops: 'Infrastructure, CI/CD, and cloud.',
-  security: 'Hacking, defense, and cryptography.',
-  gamedev: 'Game engines, physics, and fun.',
-  vibe_coder: 'Aesthetic code. Vibes over velocity.',
-  creator: 'Open-source tools and content.',
+  downtown: "The elite core. Top 50 devs by global rank.",
+  frontend: "Pixels, components, and beautiful interfaces.",
+  backend: "APIs, systems, and server-side logic.",
+  fullstack: "Jack of all trades. Ship everything.",
+  mobile: "Native apps for iOS and Android.",
+  data_ai: "Data science, ML, and AI.",
+  devops: "Infrastructure, CI/CD, and cloud.",
+  security: "Hacking, defense, and cryptography.",
+  gamedev: "Game engines, physics, and fun.",
+  vibe_coder: "Aesthetic code. Vibes over velocity.",
+  creator: "Open-source tools and content.",
 };
 
 const LANGUAGE_TO_DISTRICT: Record<string, string> = {
-  TypeScript: 'frontend', JavaScript: 'frontend', CSS: 'frontend',
-  HTML: 'frontend', SCSS: 'frontend', Vue: 'frontend', Svelte: 'frontend',
-  Java: 'backend', Go: 'backend', Rust: 'backend', 'C#': 'backend',
-  PHP: 'backend', Ruby: 'backend', Elixir: 'backend', C: 'backend',
-  'C++': 'backend', Assembly: 'backend', Verilog: 'backend', VHDL: 'backend',
-  Python: 'data_ai', 'Jupyter Notebook': 'data_ai', R: 'data_ai', Julia: 'data_ai',
-  Swift: 'mobile', Kotlin: 'mobile', Dart: 'mobile', 'Objective-C': 'mobile',
-  HCL: 'devops', Shell: 'devops', Dockerfile: 'devops', Nix: 'devops',
-  GDScript: 'gamedev', Lua: 'gamedev',
+  TypeScript: "frontend",
+  JavaScript: "frontend",
+  CSS: "frontend",
+  HTML: "frontend",
+  SCSS: "frontend",
+  Vue: "frontend",
+  Svelte: "frontend",
+  Java: "backend",
+  Go: "backend",
+  Rust: "backend",
+  "C#": "backend",
+  PHP: "backend",
+  Ruby: "backend",
+  Elixir: "backend",
+  C: "backend",
+  "C++": "backend",
+  Assembly: "backend",
+  Verilog: "backend",
+  VHDL: "backend",
+  Python: "data_ai",
+  "Jupyter Notebook": "data_ai",
+  R: "data_ai",
+  Julia: "data_ai",
+  Swift: "mobile",
+  Kotlin: "mobile",
+  Dart: "mobile",
+  "Objective-C": "mobile",
+  HCL: "devops",
+  Shell: "devops",
+  Dockerfile: "devops",
+  Nix: "devops",
+  GDScript: "gamedev",
+  Lua: "gamedev",
 };
 
 export function inferDistrict(lang: string | null): string {
-  if (!lang) return 'fullstack';
-  return LANGUAGE_TO_DISTRICT[lang] ?? 'fullstack';
+  if (!lang) return "fullstack";
+  return LANGUAGE_TO_DISTRICT[lang] ?? "fullstack";
 }
 
 function localBlockAxisPos(idx: number, footprint: number): number {
@@ -387,8 +420,16 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   const composites = precomputeComposites(devs, maxContrib, maxStars, maxContribV2);
 
   const DISTRICT_ORDER = [
-    'backend', 'frontend', 'fullstack', 'data_ai', 'devops',
-    'mobile', 'gamedev', 'vibe_coder', 'creator', 'security',
+    "backend",
+    "frontend",
+    "fullstack",
+    "data_ai",
+    "devops",
+    "mobile",
+    "gamedev",
+    "vibe_coder",
+    "creator",
+    "security",
   ];
 
   const districtGroups: Record<string, DeveloperRecord[]> = {};
@@ -411,34 +452,34 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   // ── Extract top 50 global devs as "downtown" (center, around the spire) ──
   const DOWNTOWN_COUNT = 50;
   const LOTS_PER_BLOCK = BLOCK_SIZE * BLOCK_SIZE; // 16
-  const allDevsSorted = [...devs].sort((a, b) =>
-    (composites.get(b.github_login) ?? 0) - (composites.get(a.github_login) ?? 0)
+  const allDevsSorted = [...devs].sort(
+    (a, b) => (composites.get(b.github_login) ?? 0) - (composites.get(a.github_login) ?? 0),
   );
   const downtownDevs = allDevsSorted.slice(0, DOWNTOWN_COUNT);
-  const downtownSet = new Set(downtownDevs.map(d => d.github_login));
+  const downtownSet = new Set(downtownDevs.map((d) => d.github_login));
 
   for (let i = 0; i < downtownDevs.length; i += LOTS_PER_BLOCK) {
     const end = Math.min(i + LOTS_PER_BLOCK, downtownDevs.length);
     const slice = downtownDevs.slice(i, end);
-    const shuffled = seededShuffle(slice, hashStr('downtown') + i);
+    const shuffled = seededShuffle(slice, hashStr("downtown") + i);
     for (let j = 0; j < shuffled.length; j++) downtownDevs[i + j] = shuffled[j];
   }
 
-  const downtownOverride = new Set(downtownDevs.map(d => d.github_login));
+  const downtownOverride = new Set(downtownDevs.map((d) => d.github_login));
 
   // ── Per-district dev arrays (sorted by composite, block-shuffled, minus downtown) ──
   const districtDevArrays: { did: string; devs: DeveloperRecord[] }[] = [];
   for (const did of DISTRICT_ORDER) {
     const group = districtGroups[did];
     if (!group || group.length === 0) continue;
-    const filtered = group.filter(d => !downtownSet.has(d.github_login));
+    const filtered = group.filter((d) => !downtownSet.has(d.github_login));
     if (filtered.length === 0) continue;
     // Full shuffle: organic mix of tall and short buildings
     districtDevArrays.push({ did, devs: seededShuffle(filtered, hashStr(did)) });
   }
   for (const [did, group] of Object.entries(districtGroups)) {
     if (!DISTRICT_ORDER.includes(did)) {
-      const filtered = group.filter(d => !downtownSet.has(d.github_login));
+      const filtered = group.filter((d) => !downtownSet.has(d.github_login));
       if (filtered.length === 0) continue;
       districtDevArrays.push({ did, devs: seededShuffle(filtered, hashStr(did)) });
     }
@@ -467,7 +508,8 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
 
   // ── Helper: create buildings + decorations for one block ──
   function placeBlockContent(
-    blockCX: number, blockCZ: number,
+    blockCX: number,
+    blockCZ: number,
     blockDevs: DeveloperRecord[],
     seedIdx: number,
   ) {
@@ -486,7 +528,13 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
         d = calcDepthV2(dev);
         litPercentage = calcLitPercentageV2(dev);
       } else {
-        ({ height, composite } = calcHeight(dev.contributions, dev.total_stars, dev.public_repos, maxContrib, maxStars));
+        ({ height, composite } = calcHeight(
+          dev.contributions,
+          dev.total_stars,
+          dev.public_repos,
+          maxContrib,
+          maxStars,
+        ));
         const seed1 = hashStr(dev.github_login);
         const repoFactor = Math.min(1, dev.public_repos / 100);
         const baseW = 14 + repoFactor * 12;
@@ -500,13 +548,16 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       const windowsPerFloor = Math.max(3, Math.floor(w / 5));
       const sideWindowsPerFloor = Math.max(3, Math.floor(d / 5));
       const did = downtownOverride.has(dev.github_login)
-        ? 'downtown'
+        ? "downtown"
         : (dev.district ?? inferDistrict(dev.primary_language));
 
       buildings.push({
         login: dev.github_login,
         rank: dev.rank ?? globalDevIndex + i + 1,
-        contributions: (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions,
+        contributions:
+          dev.contributions_total && dev.contributions_total > 0
+            ? dev.contributions_total
+            : dev.contributions,
         total_stars: dev.total_stars,
         public_repos: dev.public_repos,
         name: dev.name,
@@ -516,21 +567,29 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
         owned_items: dev.owned_items ?? [],
         custom_color: dev.custom_color ?? null,
         billboard_images: dev.billboard_images ?? [],
-        achievements: (dev as unknown as Record<string, unknown>).achievements as string[] ?? [],
-        kudos_count: (dev as unknown as Record<string, unknown>).kudos_count as number ?? 0,
-        visit_count: (dev as unknown as Record<string, unknown>).visit_count as number ?? 0,
-        loadout: (dev as unknown as Record<string, unknown>).loadout as CityBuilding["loadout"] ?? null,
-        app_streak: (dev as unknown as Record<string, unknown>).app_streak as number ?? 0,
-        raid_xp: (dev as unknown as Record<string, unknown>).raid_xp as number ?? 0,
-        current_week_contributions: (dev as unknown as Record<string, unknown>).current_week_contributions as number ?? 0,
-        current_week_kudos_given: (dev as unknown as Record<string, unknown>).current_week_kudos_given as number ?? 0,
-        current_week_kudos_received: (dev as unknown as Record<string, unknown>).current_week_kudos_received as number ?? 0,
-        active_raid_tag: (dev as unknown as Record<string, unknown>).active_raid_tag as CityBuilding["active_raid_tag"] ?? null,
-        rabbit_completed: (dev as unknown as Record<string, unknown>).rabbit_completed as boolean ?? false,
-        xp_total: (dev as unknown as Record<string, unknown>).xp_total as number ?? 0,
-        xp_level: (dev as unknown as Record<string, unknown>).xp_level as number ?? 1,
+        achievements: ((dev as unknown as Record<string, unknown>).achievements as string[]) ?? [],
+        kudos_count: ((dev as unknown as Record<string, unknown>).kudos_count as number) ?? 0,
+        visit_count: ((dev as unknown as Record<string, unknown>).visit_count as number) ?? 0,
+        loadout:
+          ((dev as unknown as Record<string, unknown>).loadout as CityBuilding["loadout"]) ?? null,
+        app_streak: ((dev as unknown as Record<string, unknown>).app_streak as number) ?? 0,
+        raid_xp: ((dev as unknown as Record<string, unknown>).raid_xp as number) ?? 0,
+        current_week_contributions:
+          ((dev as unknown as Record<string, unknown>).current_week_contributions as number) ?? 0,
+        current_week_kudos_given:
+          ((dev as unknown as Record<string, unknown>).current_week_kudos_given as number) ?? 0,
+        current_week_kudos_received:
+          ((dev as unknown as Record<string, unknown>).current_week_kudos_received as number) ?? 0,
+        active_raid_tag:
+          ((dev as unknown as Record<string, unknown>)
+            .active_raid_tag as CityBuilding["active_raid_tag"]) ?? null,
+        rabbit_completed:
+          ((dev as unknown as Record<string, unknown>).rabbit_completed as boolean) ?? false,
+        xp_total: ((dev as unknown as Record<string, unknown>).xp_total as number) ?? 0,
+        xp_level: ((dev as unknown as Record<string, unknown>).xp_level as number) ?? 1,
         district: did,
-        district_chosen: (dev as unknown as Record<string, unknown>).district_chosen as boolean ?? false,
+        district_chosen:
+          ((dev as unknown as Record<string, unknown>).district_chosen as boolean) ?? false,
         position: [posX, 0, posZ],
         width: w,
         depth: d,
@@ -543,7 +602,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
     }
 
     decorations.push({
-      type: 'sidewalk',
+      type: "sidewalk",
       position: [blockCX, 0.1, blockCZ],
       rotation: 0,
       variant: 0,
@@ -557,12 +616,22 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       const edge = Math.floor(seededRandom(seed) * 4);
       const alongX = (seededRandom(seed + 50) - 0.5) * BLOCK_FOOTPRINT_X;
       const alongZ = (seededRandom(seed + 50) - 0.5) * BLOCK_FOOTPRINT_Z;
-      let lx = blockCX, lz = blockCZ;
-      if (edge === 0) { lz -= BLOCK_FOOTPRINT_Z / 2 + 4; lx += alongX; }
-      else if (edge === 1) { lx += BLOCK_FOOTPRINT_X / 2 + 4; lz += alongZ; }
-      else if (edge === 2) { lz += BLOCK_FOOTPRINT_Z / 2 + 4; lx += alongX; }
-      else { lx -= BLOCK_FOOTPRINT_X / 2 + 4; lz += alongZ; }
-      decorations.push({ type: 'streetLamp', position: [lx, 0, lz], rotation: 0, variant: 0 });
+      let lx = blockCX,
+        lz = blockCZ;
+      if (edge === 0) {
+        lz -= BLOCK_FOOTPRINT_Z / 2 + 4;
+        lx += alongX;
+      } else if (edge === 1) {
+        lx += BLOCK_FOOTPRINT_X / 2 + 4;
+        lz += alongZ;
+      } else if (edge === 2) {
+        lz += BLOCK_FOOTPRINT_Z / 2 + 4;
+        lx += alongX;
+      } else {
+        lx -= BLOCK_FOOTPRINT_X / 2 + 4;
+        lz += alongZ;
+      }
+      decorations.push({ type: "streetLamp", position: [lx, 0, lz], rotation: 0, variant: 0 });
     }
 
     for (let bi = 0; bi < blockDevs.length; bi++) {
@@ -572,7 +641,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
         const side = seededRandom(carSeed + 1) > 0.5 ? 1 : -1;
         const carX = bld.position[0] + side * (bld.width / 2 + 6);
         decorations.push({
-          type: 'car',
+          type: "car",
           position: [carX, 0, bld.position[2]],
           rotation: seededRandom(carSeed + 2) > 0.5 ? 0 : Math.PI,
           variant: Math.floor(seededRandom(carSeed + 3) * 4),
@@ -587,13 +656,23 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       const edge = Math.floor(seededRandom(seed) * 4);
       const alongX = (seededRandom(seed + 50) - 0.5) * BLOCK_FOOTPRINT_X * 0.8;
       const alongZ = (seededRandom(seed + 50) - 0.5) * BLOCK_FOOTPRINT_Z * 0.8;
-      let tx = blockCX, tz = blockCZ;
-      if (edge === 0) { tz -= BLOCK_FOOTPRINT_Z / 2 + 6; tx += alongX; }
-      else if (edge === 1) { tx += BLOCK_FOOTPRINT_X / 2 + 6; tz += alongZ; }
-      else if (edge === 2) { tz += BLOCK_FOOTPRINT_Z / 2 + 6; tx += alongX; }
-      else { tx -= BLOCK_FOOTPRINT_X / 2 + 6; tz += alongZ; }
+      let tx = blockCX,
+        tz = blockCZ;
+      if (edge === 0) {
+        tz -= BLOCK_FOOTPRINT_Z / 2 + 6;
+        tx += alongX;
+      } else if (edge === 1) {
+        tx += BLOCK_FOOTPRINT_X / 2 + 6;
+        tz += alongZ;
+      } else if (edge === 2) {
+        tz += BLOCK_FOOTPRINT_Z / 2 + 6;
+        tx += alongX;
+      } else {
+        tx -= BLOCK_FOOTPRINT_X / 2 + 6;
+        tz += alongZ;
+      }
       decorations.push({
-        type: 'tree',
+        type: "tree",
         position: [tx, 0, tz],
         rotation: seededRandom(seed + 100) * Math.PI * 2,
         variant: Math.floor(seededRandom(seed + 200) * 3),
@@ -606,7 +685,8 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   // ── Helper: place a spiral of devs at grid origin (ogx, ogz) ──
   function placeSpiralCluster(
     clusterDevs: DeveloperRecord[],
-    ogx: number, ogz: number,
+    ogx: number,
+    ogz: number,
     addPlaza: boolean,
   ) {
     // Plaza at origin cell
@@ -633,7 +713,10 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       const gz = ogz + by;
       const key = `${gx},${gz}`;
 
-      if (occupiedCells.has(key)) { spiralIdx++; continue; }
+      if (occupiedCells.has(key)) {
+        spiralIdx++;
+        continue;
+      }
       occupiedCells.add(key);
 
       let [blockCX, blockCZ] = gridToWorld(gx, gz);
@@ -669,7 +752,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   const DASH_LENGTH = 6;
   const DASH_GAP = 8;
   const DASH_STEP = DASH_LENGTH + DASH_GAP;
-  const blockByGrid = new Map<string, typeof allBlocks[0]>();
+  const blockByGrid = new Map<string, (typeof allBlocks)[0]>();
   for (const b of allBlocks) blockByGrid.set(`${b.gx},${b.gz}`, b);
   for (const block of allBlocks) {
     const halfX = BLOCK_FOOTPRINT_X / 2;
@@ -680,7 +763,13 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       const zMin = Math.min(block.cz, right.cz) - halfZ;
       const zMax = Math.max(block.cz, right.cz) + halfZ;
       for (let z = zMin; z <= zMax; z += DASH_STEP) {
-        decorations.push({ type: 'roadMarking', position: [roadCX, 0.2, z], rotation: 0, variant: 0, size: [2, DASH_LENGTH] });
+        decorations.push({
+          type: "roadMarking",
+          position: [roadCX, 0.2, z],
+          rotation: 0,
+          variant: 0,
+          size: [2, DASH_LENGTH],
+        });
       }
     }
     const bottom = blockByGrid.get(`${block.gx},${block.gz + 1}`);
@@ -689,7 +778,13 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       const xMin = Math.min(block.cx, bottom.cx) - halfX;
       const xMax = Math.max(block.cx, bottom.cx) + halfX;
       for (let x = xMin; x <= xMax; x += DASH_STEP) {
-        decorations.push({ type: 'roadMarking', position: [x, 0.2, roadCZ], rotation: Math.PI / 2, variant: 0, size: [2, DASH_LENGTH] });
+        decorations.push({
+          type: "roadMarking",
+          position: [x, 0.2, roadCZ],
+          rotation: Math.PI / 2,
+          variant: 0,
+          size: [2, DASH_LENGTH],
+        });
       }
     }
   }
@@ -703,8 +798,12 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
     for (let t = 0; t < ptreeCount; t++) {
       const seed = pi * 10000 + t;
       decorations.push({
-        type: 'tree',
-        position: [px + (seededRandom(seed) - 0.5) * halfSize * 1.6, 0, pz + (seededRandom(seed + 50) - 0.5) * halfSize * 1.6],
+        type: "tree",
+        position: [
+          px + (seededRandom(seed) - 0.5) * halfSize * 1.6,
+          0,
+          pz + (seededRandom(seed + 50) - 0.5) * halfSize * 1.6,
+        ],
         rotation: seededRandom(seed + 100) * Math.PI * 2,
         variant: Math.floor(seededRandom(seed + 200) * 3),
       });
@@ -713,50 +812,63 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
     for (let b = 0; b < benchCount; b++) {
       const seed = pi * 20000 + b;
       decorations.push({
-        type: 'bench',
-        position: [px + (seededRandom(seed) - 0.5) * halfSize, 0, pz + (seededRandom(seed + 50) - 0.5) * halfSize],
+        type: "bench",
+        position: [
+          px + (seededRandom(seed) - 0.5) * halfSize,
+          0,
+          pz + (seededRandom(seed + 50) - 0.5) * halfSize,
+        ],
         rotation: seededRandom(seed + 100) * Math.PI * 2,
         variant: 0,
       });
     }
     if (pi === 0) {
-      decorations.push({ type: 'fountain', position: [px, 0, pz], rotation: 0, variant: 0 });
+      decorations.push({ type: "fountain", position: [px, 0, pz], rotation: 0, variant: 0 });
     }
   }
 
   // ── District zones (computed from actual building positions) ──
   const dzMap: Record<string, CityBuilding[]> = {};
   for (const b of buildings) {
-    const did = b.district ?? 'fullstack';
+    const did = b.district ?? "fullstack";
     if (!dzMap[did]) dzMap[did] = [];
     dzMap[did].push(b);
   }
   for (const [did, dBlds] of Object.entries(dzMap)) {
-    let mnX = Infinity, mxX = -Infinity, mnZ = Infinity, mxZ = -Infinity;
-    let sX = 0, sZ = 0;
+    let mnX = Infinity,
+      mxX = -Infinity,
+      mnZ = Infinity,
+      mxZ = -Infinity;
+    let sX = 0,
+      sZ = 0;
     for (const b of dBlds) {
-      mnX = Math.min(mnX, b.position[0]); mxX = Math.max(mxX, b.position[0]);
-      mnZ = Math.min(mnZ, b.position[2]); mxZ = Math.max(mxZ, b.position[2]);
-      sX += b.position[0]; sZ += b.position[2];
+      mnX = Math.min(mnX, b.position[0]);
+      mxX = Math.max(mxX, b.position[0]);
+      mnZ = Math.min(mnZ, b.position[2]);
+      mxZ = Math.max(mxZ, b.position[2]);
+      sX += b.position[0];
+      sZ += b.position[2];
     }
     districtZones.push({
-      id: did, name: DISTRICT_NAMES[did] ?? did,
+      id: did,
+      name: DISTRICT_NAMES[did] ?? did,
       center: [sX / dBlds.length, 0, sZ / dBlds.length],
       bounds: { minX: mnX, maxX: mxX, minZ: mnZ, maxZ: mxZ },
       population: dBlds.length,
-      color: DISTRICT_COLORS[did] ?? '#888888',
+      color: DISTRICT_COLORS[did] ?? "#888888",
     });
   }
 
   // ── River ──
   const riverCenterZ = RIVER_Z_THRESHOLD + RIVER_PUSH / 2 + STREET_W / 2;
-  let bMinX = 0, bMaxX = 0;
+  let bMinX = 0,
+    bMaxX = 0;
   for (const b of buildings) {
     if (b.position[0] < bMinX) bMinX = b.position[0];
     if (b.position[0] > bMaxX) bMaxX = b.position[0];
   }
   const riverPadding = 80;
-  const riverXExtent = (bMaxX - bMinX) + riverPadding * 2;
+  const riverXExtent = bMaxX - bMinX + riverPadding * 2;
   const riverCenterX = (bMinX + bMaxX) / 2;
   const river: CityRiver = {
     x: riverCenterX - riverXExtent / 2,
@@ -770,8 +882,16 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   const bridgeSpacing = riverXExtent / 4;
   const bridges: CityBridge[] = [
     { position: [riverCenterX, 0, riverCenterZ], width: bridgeWidth, rotation: Math.PI / 2 },
-    { position: [riverCenterX + bridgeSpacing, 0, riverCenterZ], width: bridgeWidth, rotation: Math.PI / 2 },
-    { position: [riverCenterX - bridgeSpacing, 0, riverCenterZ], width: bridgeWidth, rotation: Math.PI / 2 },
+    {
+      position: [riverCenterX + bridgeSpacing, 0, riverCenterZ],
+      width: bridgeWidth,
+      rotation: Math.PI / 2,
+    },
+    {
+      position: [riverCenterX - bridgeSpacing, 0, riverCenterZ],
+      width: bridgeWidth,
+      rotation: Math.PI / 2,
+    },
   ];
 
   return { buildings, plazas, decorations, river, bridges, districtZones };
@@ -791,11 +911,23 @@ export function calcBuildingDims(
   // V2 path when expanded data is available
   if (v2Data && (v2Data.contributions_total ?? 0) > 0) {
     const dev: DeveloperRecord = {
-      id: 0, github_login: githubLogin, github_id: null, name: null,
-      avatar_url: null, bio: null, contributions, public_repos: publicRepos,
-      total_stars: totalStars, primary_language: null, top_repos: [],
-      rank: null, fetched_at: '', created_at: '', claimed: false,
-      fetch_priority: 0, claimed_at: null,
+      id: 0,
+      github_login: githubLogin,
+      github_id: null,
+      name: null,
+      avatar_url: null,
+      bio: null,
+      contributions,
+      public_repos: publicRepos,
+      total_stars: totalStars,
+      primary_language: null,
+      top_repos: [],
+      rank: null,
+      fetched_at: "",
+      created_at: "",
+      claimed: false,
+      fetch_priority: 0,
+      claimed_at: null,
       ...v2Data,
     };
     const { height } = calcHeightV2(dev, maxContrib, maxStars);

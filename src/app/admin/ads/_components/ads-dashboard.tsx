@@ -212,9 +212,7 @@ export function AdsDashboard() {
           expandedId={expandedId}
           selectedIds={selectedIds}
           onSort={handleSort}
-          onToggleExpand={(id) =>
-            setExpandedId((prev) => (prev === id ? null : id))
-          }
+          onToggleExpand={(id) => setExpandedId((prev) => (prev === id ? null : id))}
           onToggleSelect={toggleSelect}
           onSelectAll={selectAll}
           onEdit={openEditModal}

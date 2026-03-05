@@ -66,17 +66,19 @@ export default function WhiteRabbit({ position, visible, onCaught }: WhiteRabbit
     // Cursor
     const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     let lastMove = 0;
-    const onMove = isTouch ? null : (e: PointerEvent) => {
-      const now = performance.now();
-      if (now - lastMove < 66) return;
-      lastMove = now;
-      if (hitsRabbit(e)) {
-        document.body.style.cursor = "pointer";
-        (window as any).__rabbitCursor = true;
-      } else if ((window as any).__rabbitCursor) {
-        (window as any).__rabbitCursor = false;
-      }
-    };
+    const onMove = isTouch
+      ? null
+      : (e: PointerEvent) => {
+          const now = performance.now();
+          if (now - lastMove < 66) return;
+          lastMove = now;
+          if (hitsRabbit(e)) {
+            document.body.style.cursor = "pointer";
+            (window as any).__rabbitCursor = true;
+          } else if ((window as any).__rabbitCursor) {
+            (window as any).__rabbitCursor = false;
+          }
+        };
 
     canvas.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointerup", onUp, true);
@@ -202,19 +204,21 @@ export default function WhiteRabbit({ position, visible, onCaught }: WhiteRabbit
       </mesh>
 
       {/* Subtle white glow */}
-      <pointLight
-        position={[0, 8, 0]}
-        color="#ffffff"
-        intensity={15}
-        distance={60}
-        decay={2}
-      />
+      <pointLight position={[0, 8, 0]} color="#ffffff" intensity={15} distance={60} decay={2} />
     </group>
   );
 }
 
 // Mini version for building crown effect
-export function MiniWhiteRabbit({ height, width, depth }: { height: number; width: number; depth: number }) {
+export function MiniWhiteRabbit({
+  height,
+  width,
+  depth,
+}: {
+  height: number;
+  width: number;
+  depth: number;
+}) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame(({ clock }) => {
@@ -225,7 +229,7 @@ export function MiniWhiteRabbit({ height, width, depth }: { height: number; widt
     // Occasional hop every ~5s
     const hopCycle = t % 5;
     if (hopCycle < 0.3) {
-      group.position.y = height + Math.sin(hopCycle / 0.3 * Math.PI) * 3;
+      group.position.y = height + Math.sin((hopCycle / 0.3) * Math.PI) * 3;
     } else {
       group.position.y = height;
     }

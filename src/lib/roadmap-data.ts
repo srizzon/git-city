@@ -220,14 +220,12 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
 
 // All valid item IDs (for server-side vote validation)
 export const VALID_ITEM_IDS = new Set(
-  ROADMAP_PHASES.flatMap((phase) => phase.items.map((item) => item.id))
+  ROADMAP_PHASES.flatMap((phase) => phase.items.map((item) => item.id)),
 );
 
 // Items that can be voted on (not done, not mystery)
 export const VOTABLE_ITEM_IDS = new Set(
   ROADMAP_PHASES.flatMap((phase) =>
-    phase.items
-      .filter((item) => item.status !== "done" && !item.mystery)
-      .map((item) => item.id)
-  )
+    phase.items.filter((item) => item.status !== "done" && !item.mystery).map((item) => item.id),
+  ),
 );

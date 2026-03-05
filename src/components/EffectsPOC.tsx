@@ -113,8 +113,7 @@ export const ShootingStar = memo(function ShootingStar({
     }
 
     if (trailRef.current && frameCount.current % 2 === 0) {
-      const arr = trailRef.current.geometry.attributes.position
-        .array as Float32Array;
+      const arr = trailRef.current.geometry.attributes.position.array as Float32Array;
       for (let i = 0; i < TRAIL_COUNT * 3; i++) {
         arr[i] = trailHistory.current[i] ?? 0;
       }
@@ -150,10 +149,7 @@ export const ShootingStar = memo(function ShootingStar({
       {/* Particle trail */}
       <points ref={trailRef}>
         <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[trailPositions, 3]}
-          />
+          <bufferAttribute attach="attributes-position" args={[trailPositions, 3]} />
         </bufferGeometry>
         <pointsMaterial
           color={color}
@@ -224,8 +220,7 @@ export const StarBeam = memo(function StarBeam({
 
     // Particles float upward
     if (particlesRef.current) {
-      const arr = particlesRef.current.geometry.attributes.position
-        .array as Float32Array;
+      const arr = particlesRef.current.geometry.attributes.position.array as Float32Array;
       for (let i = 0; i < BEAM_PARTICLES; i++) {
         arr[i * 3 + 1] += speeds[i] * 0.033;
         if (arr[i * 3 + 1] > beamH) {
@@ -284,10 +279,7 @@ export const StarBeam = memo(function StarBeam({
       {/* Star particles floating up */}
       <points ref={particlesRef}>
         <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[positions, 3]}
-          />
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
         </bufferGeometry>
         <pointsMaterial
           color={color}
@@ -366,7 +358,7 @@ export const Starfall = memo(function Starfall({
       m.position.set(
         s.x + Math.sin(t * s.swaySpeed + s.sway) * 2,
         s.y,
-        s.z + Math.cos(t * s.swaySpeed + s.sway) * 2
+        s.z + Math.cos(t * s.swaySpeed + s.sway) * 2,
       );
       m.rotation.y = t * s.rotSpeed;
       m.rotation.z = t * s.rotSpeed * 0.5;
@@ -381,11 +373,7 @@ export const Starfall = memo(function Starfall({
   return (
     <group ref={groupRef} position={[0, height * 0.5, 0]}>
       {stars.map((s, i) => (
-        <mesh
-          key={i}
-          position={[s.x, s.y, s.z]}
-          scale={[s.size, s.size, s.size * 0.3]}
-        >
+        <mesh key={i} position={[s.x, s.y, s.z]} scale={[s.size, s.size, s.size * 0.3]}>
           <octahedronGeometry args={[1, 0]} />
           <meshStandardMaterial
             color={color}
@@ -403,11 +391,7 @@ export const Starfall = memo(function Starfall({
 
 // ─── Shared: 5-pointed star shape ────────────────────────────
 
-function createStarShape(
-  outerR: number,
-  innerR: number,
-  points = 5
-): THREE.Shape {
+function createStarShape(outerR: number, innerR: number, points = 5): THREE.Shape {
   const shape = new THREE.Shape();
   for (let i = 0; i < points * 2; i++) {
     const angle = (i * Math.PI) / points - Math.PI / 2;
@@ -583,13 +567,8 @@ export const StarOrbit = memo(function StarOrbit({
   // Trail positions per star
   const TRAIL_PER_STAR = 12;
   const trailRef = useRef<THREE.Points>(null);
-  const trailPositions = useMemo(
-    () => new Float32Array(ORBIT_STARS * TRAIL_PER_STAR * 3),
-    []
-  );
-  const trailHistories = useRef<number[][]>(
-    Array.from({ length: ORBIT_STARS }, () => [])
-  );
+  const trailPositions = useMemo(() => new Float32Array(ORBIT_STARS * TRAIL_PER_STAR * 3), []);
+  const trailHistories = useRef<number[][]>(Array.from({ length: ORBIT_STARS }, () => []));
 
   useFrame((state) => {
     frameCount.current++;
@@ -659,10 +638,7 @@ export const StarOrbit = memo(function StarOrbit({
       {/* All trails as one point cloud */}
       <points ref={trailRef}>
         <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[trailPositions, 3]}
-          />
+          <bufferAttribute attach="attributes-position" args={[trailPositions, 3]} />
         </bufferGeometry>
         <pointsMaterial
           color={color}
@@ -713,7 +689,8 @@ export const CommitStream = memo(function CommitStream({
         sway: Math.random() * Math.PI * 2,
         swaySpeed: 0.2 + Math.random() * 0.5,
         color: green,
-        emissiveIntensity: green === "#39d353" ? 3.5 : green === "#26a641" ? 2.5 : green === "#006d32" ? 1.5 : 0.8,
+        emissiveIntensity:
+          green === "#39d353" ? 3.5 : green === "#26a641" ? 2.5 : green === "#006d32" ? 1.5 : 0.8,
       };
     });
   }, [spread, topY, botY]);
@@ -744,7 +721,7 @@ export const CommitStream = memo(function CommitStream({
       m.position.set(
         c.x + Math.sin(t * c.swaySpeed + c.sway) * 1.5,
         c.y,
-        c.z + Math.cos(t * c.swaySpeed + c.sway) * 1.5
+        c.z + Math.cos(t * c.swaySpeed + c.sway) * 1.5,
       );
       m.rotation.y = t * 0.3;
 
@@ -786,7 +763,14 @@ export const CommitStream = memo(function CommitStream({
 const POC_ZONES: Record<string, string[]> = {
   crown: [...ZONE_ITEMS.crown, "github_star"],
   roof: [...ZONE_ITEMS.roof],
-  aura: [...ZONE_ITEMS.aura, "shooting_star", "star_beam", "starfall", "star_orbit", "commit_stream"],
+  aura: [
+    ...ZONE_ITEMS.aura,
+    "shooting_star",
+    "star_beam",
+    "starfall",
+    "star_orbit",
+    "commit_stream",
+  ],
 };
 
 const POC_NAMES: Record<string, string> = {
@@ -809,7 +793,14 @@ const POC_EMOJIS: Record<string, string> = {
   commit_stream: "🟩",
 };
 
-const NEW_ITEMS = new Set(["shooting_star", "star_beam", "starfall", "github_star", "star_orbit", "commit_stream"]);
+const NEW_ITEMS = new Set([
+  "shooting_star",
+  "star_beam",
+  "starfall",
+  "github_star",
+  "star_orbit",
+  "commit_stream",
+]);
 
 // ─── Window texture (from ShopPreview) ───────────────────────
 
@@ -817,7 +808,7 @@ function createPreviewWindowTexture(
   rows: number,
   cols: number,
   seed: number,
-  faceColor?: string | null
+  faceColor?: string | null,
 ): THREE.CanvasTexture {
   const WS = 6;
   const GAP = 2;
@@ -842,8 +833,7 @@ function createPreviewWindowTexture(
       const x = PAD + c * (WS + GAP);
       const y = PAD + r * (WS + GAP);
       if (rand() < 0.65) {
-        ctx.fillStyle =
-          THEME.windowLit[Math.floor(rand() * THEME.windowLit.length)];
+        ctx.fillStyle = THEME.windowLit[Math.floor(rand() * THEME.windowLit.length)];
       } else {
         ctx.fillStyle = THEME.windowOff;
       }
@@ -866,13 +856,7 @@ interface BuildingDims {
   depth: number;
 }
 
-function EffectForItem({
-  itemId,
-  dims,
-}: {
-  itemId: string;
-  dims: BuildingDims;
-}) {
+function EffectForItem({ itemId, dims }: { itemId: string; dims: BuildingDims }) {
   switch (itemId) {
     // Existing effects
     case "neon_outline":
@@ -944,11 +928,7 @@ function PreviewScene({
   const textures = useMemo(() => {
     const seed = 42 * 137;
     const front = createPreviewWindowTexture(floors, windowsPerFloor, seed);
-    const side = createPreviewWindowTexture(
-      floors,
-      sideWindowsPerFloor,
-      seed + 7919
-    );
+    const side = createPreviewWindowTexture(floors, sideWindowsPerFloor, seed + 7919);
     return { front, side };
   }, [floors, windowsPerFloor, sideWindowsPerFloor]);
 
@@ -985,16 +965,8 @@ function PreviewScene({
     <>
       {/* Midnight theme — matching CityCanvas exactly */}
       <ambientLight intensity={0.55 * 3} color="#4060b0" />
-      <directionalLight
-        position={[300, 120, -200]}
-        intensity={0.75 * 3.5}
-        color="#7090d0"
-      />
-      <directionalLight
-        position={[-200, 60, 200]}
-        intensity={0.3 * 3}
-        color="#304080"
-      />
+      <directionalLight position={[300, 120, -200]} intensity={0.75 * 3.5} color="#7090d0" />
+      <directionalLight position={[-200, 60, 200]} intensity={0.3 * 3} color="#304080" />
       <hemisphereLight args={["#5080a0", "#202830", 0.5 * 3.5]} />
       <fog attach="fog" args={[THEME.fogColor, H * 3, H * 15]} />
 
@@ -1010,10 +982,7 @@ function PreviewScene({
         target={[0, H * 0.05, 0]}
       />
 
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -H / 2, 0]}
-      >
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -H / 2, 0]}>
         <planeGeometry args={[groundSize, groundSize]} />
         <meshStandardMaterial color={THEME.groundColor} />
       </mesh>
@@ -1030,9 +999,7 @@ function PreviewScene({
         <group position={[0, -H / 2, 0]}>
           {(["crown", "roof", "aura"] as const).map((zone) => {
             const itemId = loadout[zone];
-            return itemId ? (
-              <EffectForItem key={zone} itemId={itemId} dims={dims} />
-            ) : null;
+            return itemId ? <EffectForItem key={zone} itemId={itemId} dims={dims} /> : null;
           })}
         </group>
       </group>
@@ -1058,9 +1025,7 @@ function ZoneSelector({
   return (
     <div className="mb-5">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">
-          {label}
-        </h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">{label}</h3>
         {selected && (
           <button
             onClick={() => onSelect(null)}
@@ -1140,9 +1105,7 @@ export default function EffectsPOC() {
 
         {/* Active effects label */}
         <div className="absolute top-4 left-4">
-          <h1 className="text-sm font-bold uppercase tracking-widest text-white/40">
-            Effects POC
-          </h1>
+          <h1 className="text-sm font-bold uppercase tracking-widest text-white/40">Effects POC</h1>
           <div className="mt-2 flex flex-wrap gap-1">
             {(["crown", "roof", "aura"] as const).map((zone) => {
               const id = loadout[zone];
@@ -1175,9 +1138,7 @@ export default function EffectsPOC() {
           <h2 className="text-xs font-bold uppercase tracking-wider text-white/50">
             Building Effects
           </h2>
-          <p className="text-[10px] text-white/30 mt-1">
-            Select one effect per zone
-          </p>
+          <p className="text-[10px] text-white/30 mt-1">Select one effect per zone</p>
         </div>
 
         <ZoneSelector
@@ -1205,9 +1166,7 @@ export default function EffectsPOC() {
         />
 
         <div className="mt-auto pt-4 border-t border-white/10">
-          <p className="text-[9px] text-white/25 text-center">
-            Items marked NEW are experimental
-          </p>
+          <p className="text-[9px] text-white/25 text-center">Items marked NEW are experimental</p>
         </div>
       </div>
     </div>

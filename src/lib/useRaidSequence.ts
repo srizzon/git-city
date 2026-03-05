@@ -3,7 +3,13 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { CityBuilding } from "@/lib/github";
 import type { RaidPreviewResponse, RaidExecuteResponse } from "@/lib/raid";
-import { preloadRaidAudio, playRaidSound, stopRaidSound, fadeOutRaidSound, stopAllRaidSounds } from "@/lib/raidAudio";
+import {
+  preloadRaidAudio,
+  playRaidSound,
+  stopRaidSound,
+  fadeOutRaidSound,
+  stopAllRaidSounds,
+} from "@/lib/raidAudio";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -285,8 +291,5 @@ export function useRaidSequence(): [RaidState, RaidActions] {
     setState(INITIAL_STATE);
   }, []);
 
-  return [
-    state,
-    { startPreview, executeRaid, skipToShare, exitRaid, onPhaseComplete },
-  ];
+  return [state, { startPreview, executeRaid, skipToShare, exitRaid, onPhaseComplete }];
 }

@@ -64,17 +64,19 @@ export default function FounderSpire({ onClick }: FounderSpireProps) {
     // Cursor handling (throttled ~15Hz)
     const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     let lastMove = 0;
-    const onMove = isTouch ? null : (e: PointerEvent) => {
-      const now = performance.now();
-      if (now - lastMove < 66) return;
-      lastMove = now;
-      if (hitsSpire(e)) {
-        document.body.style.cursor = "pointer";
-        (window as any).__spireCursor = true;
-      } else if ((window as any).__spireCursor) {
-        (window as any).__spireCursor = false;
-      }
-    };
+    const onMove = isTouch
+      ? null
+      : (e: PointerEvent) => {
+          const now = performance.now();
+          if (now - lastMove < 66) return;
+          lastMove = now;
+          if (hitsSpire(e)) {
+            document.body.style.cursor = "pointer";
+            (window as any).__spireCursor = true;
+          } else if ((window as any).__spireCursor) {
+            (window as any).__spireCursor = false;
+          }
+        };
 
     canvas.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointerup", onUp, true);
@@ -250,7 +252,6 @@ export default function FounderSpire({ onClick }: FounderSpireProps) {
         distance={200}
         decay={2}
       />
-
     </group>
   );
 }

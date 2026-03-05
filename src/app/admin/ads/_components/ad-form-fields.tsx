@@ -49,9 +49,7 @@ export function AdFormFields({ form, onChange }: AdFormFieldsProps) {
 
       {/* Banner text */}
       <div className="sm:col-span-2 lg:col-span-3">
-        <label className="mb-1 block text-[11px] text-muted">
-          Banner text * (max 80)
-        </label>
+        <label className="mb-1 block text-[11px] text-muted">Banner text * (max 80)</label>
         <input
           required
           placeholder="YOUR BRAND MESSAGE HERE"
@@ -64,9 +62,7 @@ export function AdFormFields({ form, onChange }: AdFormFieldsProps) {
 
       {/* Description */}
       <div className="sm:col-span-2 lg:col-span-3">
-        <label className="mb-1 block text-[11px] text-muted">
-          Description
-        </label>
+        <label className="mb-1 block text-[11px] text-muted">Description</label>
         <textarea
           maxLength={200}
           rows={2}
@@ -91,9 +87,7 @@ export function AdFormFields({ form, onChange }: AdFormFieldsProps) {
       {/* Colors */}
       <div className="flex items-end gap-4">
         <div>
-          <label className="mb-1 block text-[11px] text-muted">
-            Text color
-          </label>
+          <label className="mb-1 block text-[11px] text-muted">Text color</label>
           <div className="flex items-center gap-2">
             <input
               type="color"

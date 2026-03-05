@@ -68,8 +68,7 @@ export function AdTable({
     return <SkeletonRows />;
   }
 
-  const allSelected =
-    ads.length > 0 && ads.every((ad) => selectedIds.has(ad.id));
+  const allSelected = ads.length > 0 && ads.every((ad) => selectedIds.has(ad.id));
 
   return (
     <div className={loading ? "opacity-60 transition-opacity" : ""}>
@@ -82,12 +81,48 @@ export function AdTable({
             onChange={onSelectAll}
             className="cursor-pointer accent-lime"
           />
-          <SortButton label="AD" sortKey="brand" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <SortButton label="IMP" sortKey="impressions" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <SortButton label="3D CLK" sortKey="clicks" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <SortButton label="CTA" sortKey="cta_clicks" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <SortButton label="CTR" sortKey="ctr" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <SortButton label="STATUS" sortKey="status" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortButton
+            label="AD"
+            sortKey="brand"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+          />
+          <SortButton
+            label="IMP"
+            sortKey="impressions"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+          />
+          <SortButton
+            label="3D CLK"
+            sortKey="clicks"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+          />
+          <SortButton
+            label="CTA"
+            sortKey="cta_clicks"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+          />
+          <SortButton
+            label="CTR"
+            sortKey="ctr"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+          />
+          <SortButton
+            label="STATUS"
+            sortKey="status"
+            currentSort={sortKey}
+            currentDir={sortDir}
+            onSort={onSort}
+          />
           <span className="text-right text-[11px] text-muted">ACTIONS</span>
         </div>
       )}

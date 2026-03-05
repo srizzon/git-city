@@ -8,13 +8,7 @@ interface SortButtonProps {
   onSort: (key: SortKey) => void;
 }
 
-export function SortButton({
-  label,
-  sortKey,
-  currentSort,
-  currentDir,
-  onSort,
-}: SortButtonProps) {
+export function SortButton({ label, sortKey, currentSort, currentDir, onSort }: SortButtonProps) {
   const isActive = currentSort === sortKey;
   return (
     <button
@@ -25,9 +19,7 @@ export function SortButton({
     >
       {label}
       {isActive && (
-        <span className="ml-1 text-[9px]">
-          {currentDir === "asc" ? "\u25B2" : "\u25BC"}
-        </span>
+        <span className="ml-1 text-[9px]">{currentDir === "asc" ? "\u25B2" : "\u25BC"}</span>
       )}
     </button>
   );

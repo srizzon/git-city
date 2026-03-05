@@ -38,9 +38,7 @@ export default function DailiesLeaderboard() {
 
   // Find user in leaderboard
   const userIndex = authLogin
-    ? leaderboard.findIndex(
-        (e) => e.github_login?.toLowerCase() === authLogin,
-      )
+    ? leaderboard.findIndex((e) => e.github_login?.toLowerCase() === authLogin)
     : -1;
   const userEntry = userIndex >= 0 ? leaderboard[userIndex] : null;
   const userRank = userIndex >= 0 ? userIndex + 1 : null;
@@ -107,25 +105,16 @@ export default function DailiesLeaderboard() {
         {!loading &&
           leaderboard.map((entry, i) => {
             const pos = i + 1;
-            const isYou =
-              authLogin &&
-              entry.github_login?.toLowerCase() === authLogin;
+            const isYou = authLogin && entry.github_login?.toLowerCase() === authLogin;
             return (
               <Link
                 key={entry.github_login}
                 href={`/dev/${entry.github_login}`}
                 className="flex items-center gap-4 border-b border-border/50 px-5 py-3.5 transition-colors hover:bg-bg-card"
-                style={
-                  isYou
-                    ? { backgroundColor: "rgba(200, 230, 74, 0.06)" }
-                    : undefined
-                }
+                style={isYou ? { backgroundColor: "rgba(200, 230, 74, 0.06)" } : undefined}
               >
                 <span className="w-10 text-center">
-                  <span
-                    className="text-sm font-bold"
-                    style={{ color: rankColor(pos) }}
-                  >
+                  <span className="text-sm font-bold" style={{ color: rankColor(pos) }}>
                     {pos}
                   </span>
                 </span>
@@ -145,10 +134,7 @@ export default function DailiesLeaderboard() {
                     <p className="truncate text-sm text-cream">
                       {entry.github_login}
                       {isYou && (
-                        <span
-                          className="ml-2 text-[10px]"
-                          style={{ color: ACCENT }}
-                        >
+                        <span className="ml-2 text-[10px]" style={{ color: ACCENT }}>
                           YOU
                         </span>
                       )}
@@ -163,10 +149,7 @@ export default function DailiesLeaderboard() {
                   {entry.dailies_streak}d
                 </span>
 
-                <span
-                  className="w-20 text-right text-sm"
-                  style={{ color: ACCENT }}
-                >
+                <span className="w-20 text-right text-sm" style={{ color: ACCENT }}>
                   {entry.dailies_completed}
                 </span>
               </Link>
@@ -174,9 +157,7 @@ export default function DailiesLeaderboard() {
           })}
 
         {loading && (
-          <div className="px-5 py-8 text-center text-xs text-muted normal-case">
-            Loading...
-          </div>
+          <div className="px-5 py-8 text-center text-xs text-muted normal-case">Loading...</div>
         )}
 
         {!loading && leaderboard.length === 0 && (

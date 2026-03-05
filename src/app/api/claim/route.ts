@@ -19,10 +19,7 @@ export async function POST() {
   ).toLowerCase();
 
   if (!githubLogin) {
-    return NextResponse.json(
-      { error: "No GitHub username in profile" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "No GitHub username in profile" }, { status: 400 });
   }
 
   const admin = getSupabaseAdmin();
@@ -35,10 +32,7 @@ export async function POST() {
     .maybeSingle();
 
   if (alreadyClaimed) {
-    return NextResponse.json(
-      { error: "You have already claimed a building" },
-      { status: 409 }
-    );
+    return NextResponse.json({ error: "You have already claimed a building" }, { status: 409 });
   }
 
   // Atomic claim: eq("claimed", false) + is("claimed_by", null) prevents race conditions
@@ -57,10 +51,7 @@ export async function POST() {
     .single();
 
   if (error || !data) {
-    return NextResponse.json(
-      { error: "Building not found or already claimed" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "Building not found or already claimed" }, { status: 404 });
   }
 
   // Insert feed event

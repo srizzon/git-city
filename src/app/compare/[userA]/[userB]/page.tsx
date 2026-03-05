@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
   const [{ data: devA }, { data: devB }] = await Promise.all([
@@ -36,8 +36,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
-  const contribsA = (devA.contributions_total && devA.contributions_total > 0) ? devA.contributions_total : devA.contributions;
-  const contribsB = (devB.contributions_total && devB.contributions_total > 0) ? devB.contributions_total : devB.contributions;
+  const contribsA =
+    devA.contributions_total && devA.contributions_total > 0
+      ? devA.contributions_total
+      : devA.contributions;
+  const contribsB =
+    devB.contributions_total && devB.contributions_total > 0
+      ? devB.contributions_total
+      : devB.contributions;
   const description = `@${devA.github_login} (#${devA.rank ?? "?"}, ${contribsA.toLocaleString()} contributions, ${devA.total_stars.toLocaleString()} stars) vs @${devB.github_login} (#${devB.rank ?? "?"}, ${contribsB.toLocaleString()} contributions, ${devB.total_stars.toLocaleString()} stars)`;
 
   return {

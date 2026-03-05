@@ -44,7 +44,7 @@ function totalItems() {
 function doneItems() {
   return ROADMAP_PHASES.reduce(
     (sum, p) => sum + p.items.filter((i) => i.status === "done").length,
-    0
+    0,
   );
 }
 
@@ -55,11 +55,7 @@ interface Props {
   isLoggedIn: boolean;
 }
 
-export default function RoadmapClient({
-  voteCounts,
-  userVotes,
-  isLoggedIn,
-}: Props) {
+export default function RoadmapClient({ voteCounts, userVotes, isLoggedIn }: Props) {
   const total = totalItems();
   const done = doneItems();
   const pct = Math.round((done / total) * 100);
@@ -78,10 +74,7 @@ export default function RoadmapClient({
       <div className="mx-auto max-w-2xl px-4 py-10">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-xs text-muted transition-colors hover:text-cream"
-          >
+          <Link href="/" className="text-xs text-muted transition-colors hover:text-cream">
             &larr; Back to City
           </Link>
         </div>
@@ -138,10 +131,7 @@ export default function RoadmapClient({
 
         {/* Sign-in modal */}
         {showSignIn && (
-          <SignInPrompt
-            onClose={() => setShowSignIn(false)}
-            onSignIn={handleSignIn}
-          />
+          <SignInPrompt onClose={() => setShowSignIn(false)} onSignIn={handleSignIn} />
         )}
 
         {/* Footer */}
@@ -264,7 +254,7 @@ function ItemRow({
     (state, _action: "toggle") => ({
       votes: state.hasVoted ? state.votes - 1 : state.votes + 1,
       hasVoted: !state.hasVoted,
-    })
+    }),
   );
 
   function handleVote() {
@@ -308,9 +298,7 @@ function ItemRow({
           {item.name}
         </p>
         {item.description && (
-          <p className="mt-0.5 text-[9px] text-muted normal-case">
-            {item.description}
-          </p>
+          <p className="mt-0.5 text-[9px] text-muted normal-case">{item.description}</p>
         )}
       </div>
 
@@ -323,9 +311,7 @@ function ItemRow({
           style={{
             borderColor: optimistic.hasVoted ? ACCENT : "#2a2a30",
             color: optimistic.hasVoted ? ACCENT : MUTED,
-            backgroundColor: optimistic.hasVoted
-              ? "rgba(200, 230, 74, 0.08)"
-              : "transparent",
+            backgroundColor: optimistic.hasVoted ? "rgba(200, 230, 74, 0.08)" : "transparent",
             opacity: isPending ? 0.6 : 1,
             cursor: isPending ? "wait" : "pointer",
           }}

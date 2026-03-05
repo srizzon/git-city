@@ -58,10 +58,7 @@ export async function POST(request: NextRequest) {
   if (body.text !== undefined) {
     const safeText = String(body.text).slice(0, MAX_TEXT_LENGTH).trim();
     if (!safeText) {
-      return NextResponse.json(
-        { error: "Ad text cannot be empty" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Ad text cannot be empty" }, { status: 400 });
     }
     const modText = containsBlockedContent(safeText);
     if (modText.blocked) {
@@ -75,7 +72,10 @@ export async function POST(request: NextRequest) {
     if (safeBrand) {
       const modBrand = containsBlockedContent(safeBrand);
       if (modBrand.blocked) {
-        return NextResponse.json({ error: modBrand.reason ?? "Brand not allowed" }, { status: 400 });
+        return NextResponse.json(
+          { error: modBrand.reason ?? "Brand not allowed" },
+          { status: 400 },
+        );
       }
     }
     update.brand = safeBrand || null;
@@ -86,7 +86,10 @@ export async function POST(request: NextRequest) {
     if (safeDesc) {
       const modDesc = containsBlockedContent(safeDesc);
       if (modDesc.blocked) {
-        return NextResponse.json({ error: modDesc.reason ?? "Description not allowed" }, { status: 400 });
+        return NextResponse.json(
+          { error: modDesc.reason ?? "Description not allowed" },
+          { status: 400 },
+        );
       }
     }
     update.description = safeDesc || null;
@@ -110,10 +113,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const { error: updateError } = await sb
-    .from("sky_ads")
-    .update(update)
-    .eq("id", ad.id);
+  const { error: updateError } = await sb.from("sky_ads").update(update).eq("id", ad.id);
 
   if (updateError) {
     console.error("Failed to update sky_ad:", updateError);

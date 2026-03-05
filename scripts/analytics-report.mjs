@@ -21,7 +21,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
       if (key && rest.length) process.env[key.trim()] = rest.join("=").trim();
     }
   } catch {
-    console.error("Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or create .env.local");
+    console.error(
+      "Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or create .env.local",
+    );
     process.exit(1);
   }
 }
@@ -57,7 +59,7 @@ async function fetchAll(table, params = "") {
           Authorization: `Bearer ${KEY}`,
           Prefer: "count=exact",
         },
-      }
+      },
     );
     const data = await res.json();
     all = all.concat(data);
@@ -99,45 +101,75 @@ async function main() {
 
   // 1. Developers (all fields we need)
   console.log("  Puxando developers...");
-  const devs = await fetchAll("developers", "select=id,github_login,contributions,contributions_total,public_repos,total_stars,kudos_count,visit_count,referral_count,created_at,claimed,claimed_at,primary_language,followers,following,total_prs,total_reviews,total_issues,app_streak,app_longest_streak,account_created_at&order=created_at.asc");
+  const devs = await fetchAll(
+    "developers",
+    "select=id,github_login,contributions,contributions_total,public_repos,total_stars,kudos_count,visit_count,referral_count,created_at,claimed,claimed_at,primary_language,followers,following,total_prs,total_reviews,total_issues,app_streak,app_longest_streak,account_created_at&order=created_at.asc",
+  );
   const devsByDay = groupByDay(devs, "created_at");
 
   // 2. Purchases
   console.log("  Puxando purchases...");
-  const purchases = await fetchAll("purchases", "select=id,developer_id,item_id,amount_cents,currency,status,provider,created_at,gifted_to&status=eq.completed&order=created_at.asc");
+  const purchases = await fetchAll(
+    "purchases",
+    "select=id,developer_id,item_id,amount_cents,currency,status,provider,created_at,gifted_to&status=eq.completed&order=created_at.asc",
+  );
   const purchasesByDay = groupByDay(purchases, "created_at");
 
   // 3. Sky Ads (paid)
   console.log("  Puxando sky ads...");
-  const ads = await fetchAll("sky_ads", "select=id,brand,vehicle,plan_id,purchaser_email,active,starts_at,ends_at,created_at&plan_id=not.is.null&order=created_at.asc");
+  const ads = await fetchAll(
+    "sky_ads",
+    "select=id,brand,vehicle,plan_id,purchaser_email,active,starts_at,ends_at,created_at&plan_id=not.is.null&order=created_at.asc",
+  );
   const paidAds = ads.filter((a) => a.purchaser_email);
   const abandonedAds = ads.filter((a) => !a.purchaser_email);
   const adsByDay = groupByDay(paidAds, "created_at");
 
   // 4. Ad Events (counts only, too many rows to fetch all)
   console.log("  Puxando ad events (counts)...");
-  const { count: impressionCount } = await query("sky_ad_events", "event_type=eq.impression&select=id&limit=1");
-  const { count: clickCount } = await query("sky_ad_events", "event_type=eq.click&select=id&limit=1");
-  const { count: ctaClickCount } = await query("sky_ad_events", "event_type=eq.cta_click&select=id&limit=1");
+  const { count: impressionCount } = await query(
+    "sky_ad_events",
+    "event_type=eq.impression&select=id&limit=1",
+  );
+  const { count: clickCount } = await query(
+    "sky_ad_events",
+    "event_type=eq.click&select=id&limit=1",
+  );
+  const { count: ctaClickCount } = await query(
+    "sky_ad_events",
+    "event_type=eq.cta_click&select=id&limit=1",
+  );
 
   // 5. Kudos
   console.log("  Puxando kudos...");
-  const kudos = await fetchAll("developer_kudos", "select=giver_id,receiver_id,given_date,created_at&order=created_at.asc");
+  const kudos = await fetchAll(
+    "developer_kudos",
+    "select=giver_id,receiver_id,given_date,created_at&order=created_at.asc",
+  );
   const kudosByDay = groupByDay(kudos, "created_at");
 
   // 6. Building visits
   console.log("  Puxando building visits...");
-  const visits = await fetchAll("building_visits", "select=visitor_id,building_id,visit_date,created_at&order=created_at.asc");
+  const visits = await fetchAll(
+    "building_visits",
+    "select=visitor_id,building_id,visit_date,created_at&order=created_at.asc",
+  );
   const visitsByDay = groupByDay(visits, "created_at");
 
   // 7. Achievements unlocked
   console.log("  Puxando achievements...");
-  const achievements = await fetchAll("developer_achievements", "select=developer_id,achievement_id,unlocked_at&order=unlocked_at.asc");
+  const achievements = await fetchAll(
+    "developer_achievements",
+    "select=developer_id,achievement_id,unlocked_at&order=unlocked_at.asc",
+  );
   const achievementsByDay = groupByDay(achievements, "unlocked_at");
 
   // 8. Streak checkins
   console.log("  Puxando streak checkins...");
-  const checkins = await fetchAll("streak_checkins", "select=developer_id,checkin_date,type&order=checkin_date.asc");
+  const checkins = await fetchAll(
+    "streak_checkins",
+    "select=developer_id,checkin_date,type&order=checkin_date.asc",
+  );
   const checkinsByDay = groupByDay(checkins, "checkin_date");
 
   // 9. City stats
@@ -181,7 +213,10 @@ async function main() {
   const topContribs = [...devs].sort((a, b) => b.contributions - a.contributions).slice(0, 10);
 
   // Top devs by referrals
-  const topReferrals = [...devs].filter((d) => d.referral_count > 0).sort((a, b) => b.referral_count - a.referral_count).slice(0, 10);
+  const topReferrals = [...devs]
+    .filter((d) => d.referral_count > 0)
+    .sort((a, b) => b.referral_count - a.referral_count)
+    .slice(0, 10);
 
   // Gifts
   const gifts = purchases.filter((p) => p.gifted_to);
@@ -196,7 +231,10 @@ async function main() {
   // Claimed vs unclaimed (logged in users)
   const claimedDevs = devs.filter((d) => d.claimed);
   const unclaimedDevs = devs.filter((d) => !d.claimed);
-  const claimedByDay = groupByDay(claimedDevs.filter((d) => d.claimed_at), "claimed_at");
+  const claimedByDay = groupByDay(
+    claimedDevs.filter((d) => d.claimed_at),
+    "claimed_at",
+  );
   const claimRate = ((claimedDevs.length / devs.length) * 100).toFixed(1);
 
   // Languages
@@ -205,7 +243,9 @@ async function main() {
     const lang = d.primary_language || "Unknown";
     langCounts[lang] = (langCounts[lang] || 0) + 1;
   }
-  const topLanguages = Object.entries(langCounts).sort(([, a], [, b]) => b - a).slice(0, 15);
+  const topLanguages = Object.entries(langCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 15);
 
   // Aggregate stats
   const totalStars = devs.reduce((s, d) => s + (d.total_stars || 0), 0);
@@ -214,23 +254,33 @@ async function main() {
   const totalReviews = devs.reduce((s, d) => s + (d.total_reviews || 0), 0);
   const totalIssues = devs.reduce((s, d) => s + (d.total_issues || 0), 0);
   const totalFollowers = devs.reduce((s, d) => s + (d.followers || 0), 0);
-  const totalContribsAll = devs.reduce((s, d) => s + (d.contributions_total || d.contributions || 0), 0);
+  const totalContribsAll = devs.reduce(
+    (s, d) => s + (d.contributions_total || d.contributions || 0),
+    0,
+  );
 
   // Notable devs (top by followers or stars)
-  const topByFollowers = [...devs].sort((a, b) => (b.followers || 0) - (a.followers || 0)).slice(0, 20);
-  const topByStars = [...devs].sort((a, b) => (b.total_stars || 0) - (a.total_stars || 0)).slice(0, 20);
+  const topByFollowers = [...devs]
+    .sort((a, b) => (b.followers || 0) - (a.followers || 0))
+    .slice(0, 20);
+  const topByStars = [...devs]
+    .sort((a, b) => (b.total_stars || 0) - (a.total_stars || 0))
+    .slice(0, 20);
 
   // Repeat ad customers
   const adCustomerCounts = {};
   for (const a of paidAds) {
     if (a.purchaser_email) {
       const key = a.purchaser_email;
-      if (!adCustomerCounts[key]) adCustomerCounts[key] = { email: key, brand: a.brand, count: 0, totalAds: [] };
+      if (!adCustomerCounts[key])
+        adCustomerCounts[key] = { email: key, brand: a.brand, count: 0, totalAds: [] };
       adCustomerCounts[key].count++;
       adCustomerCounts[key].totalAds.push(a.plan_id);
     }
   }
-  const repeatAdCustomers = Object.values(adCustomerCounts).filter((c) => c.count > 1).sort((a, b) => b.count - a.count);
+  const repeatAdCustomers = Object.values(adCustomerCounts)
+    .filter((c) => c.count > 1)
+    .sort((a, b) => b.count - a.count);
   const uniqueAdCustomers = Object.keys(adCustomerCounts).length;
 
   // Paid purchases only (excluding free achievement items, amount > 0)
@@ -240,11 +290,20 @@ async function main() {
   // Active streaks
   const activeStreaks = devs.filter((d) => d.app_streak > 0);
   const longestStreak = Math.max(...devs.map((d) => d.app_longest_streak || 0));
-  const avgStreak = activeStreaks.length > 0 ? (activeStreaks.reduce((s, d) => s + d.app_streak, 0) / activeStreaks.length).toFixed(1) : 0;
+  const avgStreak =
+    activeStreaks.length > 0
+      ? (activeStreaks.reduce((s, d) => s + d.app_streak, 0) / activeStreaks.length).toFixed(1)
+      : 0;
 
   // Countries can't be derived from DB, but GitHub account age can be interesting
-  const oldestAccounts = devs.filter((d) => d.account_created_at).sort((a, b) => new Date(a.account_created_at) - new Date(b.account_created_at)).slice(0, 10);
-  const newestAccounts = devs.filter((d) => d.account_created_at).sort((a, b) => new Date(b.account_created_at) - new Date(a.account_created_at)).slice(0, 5);
+  const oldestAccounts = devs
+    .filter((d) => d.account_created_at)
+    .sort((a, b) => new Date(a.account_created_at) - new Date(b.account_created_at))
+    .slice(0, 10);
+  const newestAccounts = devs
+    .filter((d) => d.account_created_at)
+    .sort((a, b) => new Date(b.account_created_at) - new Date(a.account_created_at))
+    .slice(0, 5);
 
   // Day-over-day growth
   const growthRates = [];
@@ -562,7 +621,10 @@ Gerado em: ${now} UTC
 - Maior dia: ${Math.max(...Object.values(Object.fromEntries(devsByDay)))} devs em 24h
 - Taxa de claim: ${claimRate}% (devs que logaram vs adicionados)
 - ${formatNum(repeatAdCustomers.length)} clientes compraram ads multiplos (prova de valor)
-- ${topLanguages.slice(0, 5).map(([l, c]) => `${l} (${c})`).join(", ")}
+- ${topLanguages
+    .slice(0, 5)
+    .map(([l, c]) => `${l} (${c})`)
+    .join(", ")}
 `;
 
   // Write report

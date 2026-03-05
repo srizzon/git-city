@@ -21,68 +21,66 @@ export default async function Image() {
   const dim = "#5c5c6c";
 
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: bg,
+        fontFamily: "Silkscreen",
+        border: `6px solid ${border}`,
+        gap: 40,
+      }}
+    >
+      {/* Logo */}
       <div
         style={{
-          width: "100%",
-          height: "100%",
           display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: bg,
-          fontFamily: "Silkscreen",
-          border: `6px solid ${border}`,
-          gap: 40,
+          alignItems: "baseline",
+          gap: 24,
+          textTransform: "uppercase",
         }}
       >
-        {/* Logo */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            gap: 24,
-            textTransform: "uppercase",
-          }}
-        >
-          <span style={{ fontSize: 120, color: cream }}>GIT</span>
-          <span style={{ fontSize: 120, color: accent }}>CITY</span>
-        </div>
-
-        {/* Pitch Deck label */}
-        <div
-          style={{
-            display: "flex",
-            border: `4px solid ${border}`,
-            padding: "12px 40px",
-            fontSize: 36,
-            textTransform: "uppercase",
-            color: muted,
-            gap: 16,
-          }}
-        >
-          <span>Pitch</span>
-          <span style={{ color: accent }}>Deck</span>
-        </div>
-
-        {/* Stats row */}
-        <div
-          style={{
-            display: "flex",
-            gap: 40,
-            fontSize: 20,
-            textTransform: "uppercase",
-            color: dim,
-          }}
-        >
-          <span>{stats.formattedDevelopers} devs</span>
-          <span style={{ color: border }}>|</span>
-          <span>{stats.formattedRevenue} revenue</span>
-          <span style={{ color: border }}>|</span>
-          <span>$0 marketing</span>
-        </div>
+        <span style={{ fontSize: 120, color: cream }}>GIT</span>
+        <span style={{ fontSize: 120, color: accent }}>CITY</span>
       </div>
-    ),
+
+      {/* Pitch Deck label */}
+      <div
+        style={{
+          display: "flex",
+          border: `4px solid ${border}`,
+          padding: "12px 40px",
+          fontSize: 36,
+          textTransform: "uppercase",
+          color: muted,
+          gap: 16,
+        }}
+      >
+        <span>Pitch</span>
+        <span style={{ color: accent }}>Deck</span>
+      </div>
+
+      {/* Stats row */}
+      <div
+        style={{
+          display: "flex",
+          gap: 40,
+          fontSize: 20,
+          textTransform: "uppercase",
+          color: dim,
+        }}
+      >
+        <span>{stats.formattedDevelopers} devs</span>
+        <span style={{ color: border }}>|</span>
+        <span>{stats.formattedRevenue} revenue</span>
+        <span style={{ color: border }}>|</span>
+        <span>$0 marketing</span>
+      </div>
+    </div>,
     {
       ...size,
       fonts: [
@@ -93,6 +91,6 @@ export default async function Image() {
           weight: 400 as const,
         },
       ],
-    }
+    },
   );
 }

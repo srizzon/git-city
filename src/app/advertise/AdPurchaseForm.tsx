@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { SKY_AD_PLANS, getPriceCents, getFullPriceCents, formatPrice, PROMO_DISCOUNT, PROMO_LABEL, type SkyAdPlanId, type AdCurrency } from "@/lib/skyAdPlans";
+import {
+  SKY_AD_PLANS,
+  getPriceCents,
+  getFullPriceCents,
+  formatPrice,
+  PROMO_DISCOUNT,
+  PROMO_LABEL,
+  type SkyAdPlanId,
+  type AdCurrency,
+} from "@/lib/skyAdPlans";
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
 
 const AdPreview = dynamic(() => import("@/components/AdPreview"), { ssr: false });
@@ -57,12 +66,7 @@ export function AdPurchaseForm() {
   const colorValid = hexValid(color);
   const bgColorValid = hexValid(bgColor);
 
-  const canSubmit =
-    text.trim().length > 0 &&
-    !textOver &&
-    colorValid &&
-    bgColorValid &&
-    !loading;
+  const canSubmit = text.trim().length > 0 && !textOver && colorValid && bgColorValid && !loading;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -117,13 +121,14 @@ export function AdPurchaseForm() {
 
       {/* ── Control Panel ── */}
       <div className="mt-4 border-[3px] border-border p-4 sm:p-5">
-
         {/* Row 1: Format selector */}
         <div>
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] text-muted normal-case">Format</p>
             <p className="text-[9px] text-dim normal-case">
-              {isSky ? "flies across the entire city skyline" : "mounted on the tallest buildings (top contributors)"}
+              {isSky
+                ? "flies across the entire city skyline"
+                : "mounted on the tallest buildings (top contributors)"}
             </p>
           </div>
           <div className="flex gap-1.5">
@@ -198,9 +203,7 @@ export function AdPurchaseForm() {
                 {formatPrice(fullPriceCents, currency)}
               </span>
             )}
-            <span className="ml-1 text-[9px] text-muted normal-case">
-              / {plan.duration_days}d
-            </span>
+            <span className="ml-1 text-[9px] text-muted normal-case">/ {plan.duration_days}d</span>
           </div>
         </div>
 
@@ -210,9 +213,7 @@ export function AdPurchaseForm() {
         {/* Row 3: Text input */}
         <div>
           <div className="flex items-baseline justify-between">
-            <label className="text-[10px] text-muted normal-case">
-              Banner text
-            </label>
+            <label className="text-[10px] text-muted normal-case">Banner text</label>
             <span
               className="text-[9px] normal-case"
               style={{ color: textOver ? "#ff6b6b" : "var(--color-muted)" }}
@@ -233,9 +234,7 @@ export function AdPurchaseForm() {
         {/* Row 4: Colors side by side */}
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[10px] text-muted normal-case">
-              Text color
-            </label>
+            <label className="text-[10px] text-muted normal-case">Text color</label>
             <div className="mt-1 flex items-center gap-2">
               <input
                 type="color"
@@ -253,9 +252,7 @@ export function AdPurchaseForm() {
             </div>
           </div>
           <div>
-            <label className="text-[10px] text-muted normal-case">
-              Background
-            </label>
+            <label className="text-[10px] text-muted normal-case">Background</label>
             <div className="mt-1 flex items-center gap-2">
               <input
                 type="color"

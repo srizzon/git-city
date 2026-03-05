@@ -51,22 +51,20 @@ export async function POST(request: Request) {
     .single();
 
   if (!dev || !dev.claimed) {
-    return NextResponse.json(
-      { error: "You must claim your building first" },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "You must claim your building first" }, { status: 403 });
   }
 
   // Validate claimed_by matches user
   if (dev.claimed_by !== user.id) {
-    return NextResponse.json(
-      { error: "This building is not yours" },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "This building is not yours" }, { status: 403 });
   }
 
   // Parse body
-  let body: { item_id: string; provider: "stripe" | "abacatepay" | "nowpayments"; gifted_to_login?: string };
+  let body: {
+    item_id: string;
+    provider: "stripe" | "abacatepay" | "nowpayments";
+    gifted_to_login?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -81,9 +79,7 @@ export async function POST(request: Request) {
 
   // Brazilian Stripe CNPJ can't charge USD to Brazilian cards.
   const country =
-    request.headers.get("x-vercel-ip-country") ??
-    request.headers.get("cf-ipcountry") ??
-    "";
+    request.headers.get("x-vercel-ip-country") ?? request.headers.get("cf-ipcountry") ?? "";
   const isBrazil = country.toUpperCase() === "BR";
   const stripeCurrency: "usd" | "brl" = isBrazil ? "brl" : "usd";
 
@@ -164,10 +160,7 @@ export async function POST(request: Request) {
       .single();
 
     if ((freezeDev?.streak_freezes_available ?? 0) >= 2) {
-      return NextResponse.json(
-        { error: "Maximum 2 streak freezes stored" },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: "Maximum 2 streak freezes stored" }, { status: 409 });
     }
   }
 
@@ -184,7 +177,9 @@ export async function POST(request: Request) {
     // Fetch building dimensions to calculate max slots
     const { data: devFull } = await sb
       .from("developers")
-      .select("github_login, contributions, public_repos, total_stars, rank, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, longest_streak, active_days_last_year, language_diversity, top_repos")
+      .select(
+        "github_login, contributions, public_repos, total_stars, rank, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, longest_streak, active_days_last_year, language_diversity, top_repos",
+      )
       .eq("id", dev.id)
       .single();
 
@@ -210,7 +205,7 @@ export async function POST(request: Request) {
       if ((billboardCount ?? 0) >= maxSlots) {
         return NextResponse.json(
           { error: `Max billboard slots reached (${maxSlots})` },
-          { status: 409 }
+          { status: 409 },
         );
       }
     }
@@ -264,7 +259,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Failed to create purchase" }, { status: 500 });
       }
 
-      const { url } = await createCheckoutSession(item_id, dev.id, githubLogin, stripeCurrency, user.email, giftedToDevId, gifted_to_login);
+      const { url } = await createCheckoutSession(
+        item_id,
+        dev.id,
+        githubLogin,
+        stripeCurrency,
+        user.email,
+        giftedToDevId,
+        gifted_to_login,
+      );
       return NextResponse.json({ url, purchase_id: purchase.id });
     } else if (provider === "nowpayments") {
       // Crypto via NOWPayments
@@ -318,18 +321,12 @@ export async function POST(request: Request) {
       const { brCode, brCodeBase64, pixId } = await createPixQrCode(item_id, dev.id, githubLogin);
 
       // Save PIX ID as provider_tx_id
-      await sb
-        .from("purchases")
-        .update({ provider_tx_id: pixId })
-        .eq("id", purchase.id);
+      await sb.from("purchases").update({ provider_tx_id: pixId }).eq("id", purchase.id);
 
       return NextResponse.json({ brCode, brCodeBase64, purchase_id: purchase.id });
     }
   } catch (err) {
     console.error("Checkout error:", err);
-    return NextResponse.json(
-      { error: "Failed to create checkout session" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 });
   }
 }

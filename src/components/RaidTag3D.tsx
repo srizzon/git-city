@@ -79,7 +79,10 @@ export default function RaidTag3D({ width, height, depth, attackerLogin, tagStyl
   );
 
   useEffect(() => {
-    return () => { tex.dispose(); ledMat.dispose(); };
+    return () => {
+      tex.dispose();
+      ledMat.dispose();
+    };
   }, [tex, ledMat]);
 
   // Scroll if text is long

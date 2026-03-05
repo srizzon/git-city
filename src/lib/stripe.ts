@@ -27,7 +27,7 @@ export async function createCheckoutSession(
   currency: "usd" | "brl" = "usd",
   customerEmail?: string,
   giftedToDevId?: number | null,
-  giftedToLogin?: string | null
+  giftedToLogin?: string | null,
 ): Promise<{ url: string }> {
   const sb = getSupabaseAdmin();
 

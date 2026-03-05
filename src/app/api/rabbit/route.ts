@@ -70,7 +70,10 @@ export async function POST(request: Request) {
     // Grant achievement
     await admin
       .from("developer_achievements")
-      .upsert({ developer_id: dev.id, achievement_id: "white_rabbit" }, { onConflict: "developer_id,achievement_id" });
+      .upsert(
+        { developer_id: dev.id, achievement_id: "white_rabbit" },
+        { onConflict: "developer_id,achievement_id" },
+      );
 
     // Grant white_rabbit item (free purchase record, skip if already owned)
     const { data: existingPurchase } = await admin
@@ -82,16 +85,14 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (!existingPurchase) {
-      await admin
-        .from("purchases")
-        .insert({
-          developer_id: dev.id,
-          item_id: "white_rabbit",
-          provider: "system",
-          amount_cents: 0,
-          currency: "usd",
-          status: "completed",
-        });
+      await admin.from("purchases").insert({
+        developer_id: dev.id,
+        item_id: "white_rabbit",
+        provider: "system",
+        amount_cents: 0,
+        currency: "usd",
+        status: "completed",
+      });
     }
 
     return NextResponse.json({ progress: 5, completed: true });
@@ -105,10 +106,7 @@ export async function POST(request: Request) {
     updates.rabbit_started_at = new Date().toISOString();
   }
 
-  const { error } = await admin
-    .from("developers")
-    .update(updates)
-    .eq("id", dev.id);
+  const { error } = await admin.from("developers").update(updates).eq("id", dev.id);
 
   if (error) {
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
@@ -168,7 +166,10 @@ export async function GET(request: Request) {
     completed_at: c.rabbit_completed_at,
   }));
 
-  return NextResponse.json({ completers: hall }, {
-    headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" },
-  });
+  return NextResponse.json(
+    { completers: hall },
+    {
+      headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" },
+    },
+  );
 }

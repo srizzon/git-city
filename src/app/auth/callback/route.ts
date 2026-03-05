@@ -62,7 +62,9 @@ export async function GET(request: Request) {
     try {
       const { data: dev } = await admin
         .from("developers")
-        .select("id, contributions, public_repos, total_stars, kudos_count, referral_count, referred_by")
+        .select(
+          "id, contributions, public_repos, total_stars, kudos_count, referral_count, referred_by",
+        )
         .eq("github_login", githubLogin)
         .single();
 
@@ -108,15 +110,19 @@ export async function GET(request: Request) {
             if (referrerFull) {
               const giftsSent = await countGifts(admin, referrer.id, "sent");
               const giftsReceived = await countGifts(admin, referrer.id, "received");
-              await checkAchievements(referrer.id, {
-                contributions: referrerFull.contributions,
-                public_repos: referrerFull.public_repos,
-                total_stars: referrerFull.total_stars,
-                referral_count: referrerFull.referral_count,
-                kudos_count: referrerFull.kudos_count,
-                gifts_sent: giftsSent,
-                gifts_received: giftsReceived,
-              }, referrer.github_login);
+              await checkAchievements(
+                referrer.id,
+                {
+                  contributions: referrerFull.contributions,
+                  public_repos: referrerFull.public_repos,
+                  total_stars: referrerFull.total_stars,
+                  referral_count: referrerFull.referral_count,
+                  kudos_count: referrerFull.kudos_count,
+                  gifts_sent: giftsSent,
+                  gifts_received: giftsReceived,
+                },
+                referrer.github_login,
+              );
             }
           }
         }
@@ -124,19 +130,25 @@ export async function GET(request: Request) {
         // Run achievement check for this developer
         const giftsSent = await countGifts(admin, dev.id, "sent");
         const giftsReceived = await countGifts(admin, dev.id, "received");
-        await checkAchievements(dev.id, {
-          contributions: dev.contributions,
-          public_repos: dev.public_repos,
-          total_stars: dev.total_stars,
-          referral_count: dev.referral_count ?? 0,
-          kudos_count: dev.kudos_count ?? 0,
-          gifts_sent: giftsSent,
-          gifts_received: giftsReceived,
-        }, githubLogin);
+        await checkAchievements(
+          dev.id,
+          {
+            contributions: dev.contributions,
+            public_repos: dev.public_repos,
+            total_stars: dev.total_stars,
+            referral_count: dev.referral_count ?? 0,
+            kudos_count: dev.kudos_count ?? 0,
+            gifts_sent: giftsSent,
+            gifts_received: giftsReceived,
+          },
+          githubLogin,
+        );
       }
     } catch {
       // Silently skip v2 features if tables/columns don't exist yet
-      console.warn("Auth callback: skipping v2 achievement/referral check (migration may not have run)");
+      console.warn(
+        "Auth callback: skipping v2 achievement/referral check (migration may not have run)",
+      );
     }
   }
 
@@ -160,7 +172,11 @@ export async function GET(request: Request) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function countGifts(admin: any, devId: number, direction: "sent" | "received"): Promise<number> {
+async function countGifts(
+  admin: any,
+  devId: number,
+  direction: "sent" | "received",
+): Promise<number> {
   const column = direction === "sent" ? "developer_id" : "gifted_to";
   const { count } = await admin
     .from("purchases")

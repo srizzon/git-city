@@ -37,10 +37,7 @@ export function AdRow({
         onClick={onToggleExpand}
       >
         {/* Checkbox */}
-        <div
-          className="hidden md:block"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="hidden md:block" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={isSelected}
@@ -110,9 +107,7 @@ export function AdRow({
         {/* Stats - mobile only */}
         <div className="mt-1.5 flex items-center gap-3 md:hidden">
           <StatusBadge status={status} />
-          <span className="text-[11px] text-cream">
-            {ad.impressions.toLocaleString()} imp
-          </span>
+          <span className="text-[11px] text-cream">{ad.impressions.toLocaleString()} imp</span>
           <span className="text-[11px] text-cream">
             {(ad.clicks + ad.cta_clicks).toLocaleString()} clicks
           </span>
@@ -190,9 +185,7 @@ export function AdRow({
             </div>
             <div>
               <span className="text-[10px] text-dim">Email</span>
-              <p className="mt-0.5 truncate text-[11px] text-cream">
-                {ad.purchaser_email || "-"}
-              </p>
+              <p className="mt-0.5 truncate text-[11px] text-cream">{ad.purchaser_email || "-"}</p>
             </div>
             <div>
               <span className="text-[10px] text-dim">Created</span>

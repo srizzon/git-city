@@ -18,13 +18,21 @@ const _sphere = /* @__PURE__ */ new THREE.SphereGeometry(1, 10, 8);
 // so the flag is always set before InstancedBuildings' pointerdown handler.
 
 let _adPointerTs = 0;
-export function markAdPointerConsumed() { _adPointerTs = performance.now(); }
-export function wasAdPointerConsumed() { return performance.now() - _adPointerTs < 300; }
+export function markAdPointerConsumed() {
+  _adPointerTs = performance.now();
+}
+export function wasAdPointerConsumed() {
+  return performance.now() - _adPointerTs < 300;
+}
 
 // Module-level registry of all clickable ad meshes (both sides of banners/screens)
 const _adMeshRegistry = new Set<THREE.Mesh>();
-export function registerAdMesh(mesh: THREE.Mesh) { _adMeshRegistry.add(mesh); }
-export function unregisterAdMesh(mesh: THREE.Mesh) { _adMeshRegistry.delete(mesh); }
+export function registerAdMesh(mesh: THREE.Mesh) {
+  _adMeshRegistry.add(mesh);
+}
+export function unregisterAdMesh(mesh: THREE.Mesh) {
+  _adMeshRegistry.delete(mesh);
+}
 
 // Capture-phase pointerdown guard — raycasts against ad meshes before building handlers
 function SkyAdPointerGuard() {
@@ -156,7 +164,7 @@ function BannerPlane({
 
   const { tex, needsScroll } = useMemo(
     () => createLedTexture(ad.text, ad.color, ad.bgColor),
-    [ad.text, ad.color, ad.bgColor]
+    [ad.text, ad.color, ad.bgColor],
   );
 
   // Single material — same texture for both sides (UV mapping is correct on both)
@@ -169,7 +177,7 @@ function BannerPlane({
         emissiveIntensity: 1.2,
         toneMapped: false,
       }),
-    [tex]
+    [tex],
   );
 
   // Banner dimensions
@@ -283,7 +291,8 @@ function BannerPlane({
         ref={(el: THREE.Mesh | null) => {
           side1Ref.current = el;
           if (typeof meshRef === "function") meshRef(el);
-          else if (meshRef && "current" in meshRef) (meshRef as React.MutableRefObject<THREE.Mesh | null>).current = el;
+          else if (meshRef && "current" in meshRef)
+            (meshRef as React.MutableRefObject<THREE.Mesh | null>).current = el;
         }}
         material={ledMat}
         position={[0.15, bannerY, bannerZ]}
@@ -303,7 +312,6 @@ function BannerPlane({
         geometry={_plane}
         scale={[BANNER_LENGTH, BANNER_HEIGHT, 1]}
       />
-
     </group>
   );
 }
@@ -331,7 +339,7 @@ function Blimp({
 
   const { tex, needsScroll } = useMemo(
     () => createLedTexture(ad.text, ad.color, ad.bgColor),
-    [ad.text, ad.color, ad.bgColor]
+    [ad.text, ad.color, ad.bgColor],
   );
 
   const ledMat = useMemo(
@@ -343,7 +351,7 @@ function Blimp({
         emissiveIntensity: 1.2,
         toneMapped: false,
       }),
-    [tex]
+    [tex],
   );
 
   useEffect(() => {
@@ -476,13 +484,28 @@ function Blimp({
       <mesh position={[2, -6.5, 3]} rotation={[0.15, 0, 0.2]} geometry={_box} scale={[0.3, 4, 0.3]}>
         <meshStandardMaterial color="#9098a8" emissive="#404860" emissiveIntensity={0.2} />
       </mesh>
-      <mesh position={[-2, -6.5, 3]} rotation={[0.15, 0, -0.2]} geometry={_box} scale={[0.3, 4, 0.3]}>
+      <mesh
+        position={[-2, -6.5, 3]}
+        rotation={[0.15, 0, -0.2]}
+        geometry={_box}
+        scale={[0.3, 4, 0.3]}
+      >
         <meshStandardMaterial color="#9098a8" emissive="#404860" emissiveIntensity={0.2} />
       </mesh>
-      <mesh position={[2, -6.5, -3]} rotation={[-0.15, 0, 0.2]} geometry={_box} scale={[0.3, 4, 0.3]}>
+      <mesh
+        position={[2, -6.5, -3]}
+        rotation={[-0.15, 0, 0.2]}
+        geometry={_box}
+        scale={[0.3, 4, 0.3]}
+      >
         <meshStandardMaterial color="#9098a8" emissive="#404860" emissiveIntensity={0.2} />
       </mesh>
-      <mesh position={[-2, -6.5, -3]} rotation={[-0.15, 0, -0.2]} geometry={_box} scale={[0.3, 4, 0.3]}>
+      <mesh
+        position={[-2, -6.5, -3]}
+        rotation={[-0.15, 0, -0.2]}
+        geometry={_box}
+        scale={[0.3, 4, 0.3]}
+      >
         <meshStandardMaterial color="#9098a8" emissive="#404860" emissiveIntensity={0.2} />
       </mesh>
 
@@ -510,7 +533,8 @@ function Blimp({
         ref={(el: THREE.Mesh | null) => {
           screen1Ref.current = el;
           if (typeof screenRef === "function") screenRef(el);
-          else if (screenRef && "current" in screenRef) (screenRef as React.MutableRefObject<THREE.Mesh | null>).current = el;
+          else if (screenRef && "current" in screenRef)
+            (screenRef as React.MutableRefObject<THREE.Mesh | null>).current = el;
         }}
         material={ledMat}
         position={[10.8, -2, 0]}
@@ -530,7 +554,6 @@ function Blimp({
         geometry={_plane}
         scale={[26, 9, 1]}
       />
-
     </group>
   );
 }

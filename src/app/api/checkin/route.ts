@@ -12,8 +12,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 // A12: Streak reward milestones — {milestone: days, pool: item_ids to pick from}
 const STREAK_MILESTONES = [
-  { milestone: 3,  pool: ["flag"] },
-  { milestone: 7,  pool: ["satellite_dish", "antenna_array", "rooftop_garden", "neon_trim"] },
+  { milestone: 3, pool: ["flag"] },
+  { milestone: 7, pool: ["satellite_dish", "antenna_array", "rooftop_garden", "neon_trim"] },
   { milestone: 14, pool: ["neon_outline", "rooftop_fire", "hologram_ring"] },
   { milestone: 30, pool: ["lightning_aura", "pool_party", "crown_item"] },
 ];
@@ -45,9 +45,10 @@ async function grantStreakReward(
     const ownedSet = new Set((ownedRows ?? []).map((r: { item_id: string }) => r.item_id));
 
     const unowned = tier.pool.filter((id) => !ownedSet.has(id));
-    const itemId = unowned.length > 0
-      ? unowned[Math.floor(Math.random() * unowned.length)]
-      : tier.pool[Math.floor(Math.random() * tier.pool.length)]; // fallback: grant anyway
+    const itemId =
+      unowned.length > 0
+        ? unowned[Math.floor(Math.random() * unowned.length)]
+        : tier.pool[Math.floor(Math.random() * tier.pool.length)]; // fallback: grant anyway
 
     // Grant the item
     await sb.from("purchases").insert({
@@ -159,7 +160,9 @@ export async function POST() {
   // Fetch developer (must be claimed)
   const { data: dev } = await sb
     .from("developers")
-    .select("id, claimed, contributions, public_repos, total_stars, kudos_count, app_streak, streak_freeze_30d_claimed, last_checkin_date")
+    .select(
+      "id, claimed, contributions, public_repos, total_stars, kudos_count, app_streak, streak_freeze_30d_claimed, last_checkin_date",
+    )
     .eq("github_login", githubLogin)
     .single();
 
@@ -212,7 +215,11 @@ export async function POST() {
 
   // Grant XP for check-in
   if (checkinResult.checked_in) {
-    const { data: xpData } = await sb.rpc("grant_xp", { p_developer_id: dev.id, p_source: "checkin", p_amount: 10 });
+    const { data: xpData } = await sb.rpc("grant_xp", {
+      p_developer_id: dev.id,
+      p_source: "checkin",
+      p_amount: 10,
+    });
     if (xpData) xpResult = xpData as { granted: number; new_total: number; new_level: number };
   }
 
@@ -222,24 +229,25 @@ export async function POST() {
     const giftsSent = 0;
     const giftsReceived = 0;
 
-    newAchievements = await checkAchievements(dev.id, {
-      contributions: dev.contributions,
-      public_repos: dev.public_repos,
-      total_stars: dev.total_stars,
-      referral_count: referralCount,
-      kudos_count: dev.kudos_count ?? 0,
-      gifts_sent: giftsSent,
-      gifts_received: giftsReceived,
-      app_streak: checkinResult.streak,
-    }, githubLogin);
+    newAchievements = await checkAchievements(
+      dev.id,
+      {
+        contributions: dev.contributions,
+        public_repos: dev.public_repos,
+        total_stars: dev.total_stars,
+        referral_count: referralCount,
+        kudos_count: dev.kudos_count ?? 0,
+        gifts_sent: giftsSent,
+        gifts_received: giftsReceived,
+        app_streak: checkinResult.streak,
+      },
+      githubLogin,
+    );
 
     // Grant 1 free freeze at 30-day streak milestone
     if (checkinResult.streak >= 30 && !dev.streak_freeze_30d_claimed) {
       await sb.rpc("grant_streak_freeze", { p_developer_id: dev.id });
-      await sb
-        .from("developers")
-        .update({ streak_freeze_30d_claimed: true })
-        .eq("id", dev.id);
+      await sb.from("developers").update({ streak_freeze_30d_claimed: true }).eq("id", dev.id);
       await sb.from("streak_freeze_log").insert({
         developer_id: dev.id,
         action: "granted_milestone",
@@ -304,14 +312,17 @@ export async function POST() {
     const lastCheckin = dev.last_checkin_date as string | null;
     const { data: recentRaids } = await sb
       .from("raids")
-      .select("attacker_id, success, created_at, attacker:developers!raids_attacker_id_fkey(github_login)")
+      .select(
+        "attacker_id, success, created_at, attacker:developers!raids_attacker_id_fkey(github_login)",
+      )
       .eq("defender_id", dev.id)
       .gt("created_at", lastCheckin ?? "1970-01-01")
       .order("created_at", { ascending: false })
       .limit(5);
 
     raidsSinceLast = (recentRaids ?? []).map((r) => ({
-      attacker_login: (r.attacker as unknown as { github_login: string })?.github_login ?? "unknown",
+      attacker_login:
+        (r.attacker as unknown as { github_login: string })?.github_login ?? "unknown",
       success: r.success,
       created_at: r.created_at,
     }));

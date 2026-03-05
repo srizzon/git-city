@@ -3,12 +3,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
-const ALLOWED_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-]);
+const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 export async function POST(request: Request) {
   // Auth required
@@ -28,10 +23,7 @@ export async function POST(request: Request) {
   ).toLowerCase();
 
   if (!githubLogin) {
-    return NextResponse.json(
-      { error: "No GitHub login found" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });
   }
 
   const sb = getSupabaseAdmin();
@@ -44,10 +36,7 @@ export async function POST(request: Request) {
     .single();
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
-    return NextResponse.json(
-      { error: "Building not found or not yours" },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "Building not found or not yours" }, { status: 403 });
   }
 
   // Count completed billboard purchases
@@ -59,10 +48,7 @@ export async function POST(request: Request) {
     .eq("status", "completed");
 
   if (!billboardCount || billboardCount === 0) {
-    return NextResponse.json(
-      { error: "You don't own the billboard item" },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "You don't own the billboard item" }, { status: 403 });
   }
 
   // Parse FormData
@@ -70,10 +56,7 @@ export async function POST(request: Request) {
   try {
     formData = await request.formData();
   } catch {
-    return NextResponse.json(
-      { error: "Invalid form data" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
 
   const file = formData.get("file") as File | null;
@@ -81,38 +64,29 @@ export async function POST(request: Request) {
   const slotIndex = slotIndexRaw !== null ? parseInt(slotIndexRaw as string, 10) : 0;
 
   if (isNaN(slotIndex) || slotIndex < 0) {
-    return NextResponse.json(
-      { error: "Invalid slot_index" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid slot_index" }, { status: 400 });
   }
 
   if (slotIndex >= billboardCount) {
     return NextResponse.json(
       { error: `Invalid slot_index (you have ${billboardCount} billboard slots)` },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   if (!file || !(file instanceof File)) {
-    return NextResponse.json(
-      { error: "No file provided" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
   if (!ALLOWED_TYPES.has(file.type)) {
     return NextResponse.json(
       { error: "Invalid file type. Use PNG, JPEG, WebP, or GIF." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    return NextResponse.json(
-      { error: "File too large (max 2 MB)" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "File too large (max 2 MB)" }, { status: 400 });
   }
 
   // Ensure billboards bucket exists
@@ -127,25 +101,18 @@ export async function POST(request: Request) {
   const filePath = `${dev.id}_${slotIndex}.${ext}`;
   const fileBuffer = await file.arrayBuffer();
 
-  const { error: uploadError } = await sb.storage
-    .from("billboards")
-    .upload(filePath, fileBuffer, {
-      contentType: file.type,
-      upsert: true,
-    });
+  const { error: uploadError } = await sb.storage.from("billboards").upload(filePath, fileBuffer, {
+    contentType: file.type,
+    upsert: true,
+  });
 
   if (uploadError) {
     console.error("Upload error:", uploadError);
-    return NextResponse.json(
-      { error: "Failed to upload image" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to upload image" }, { status: 500 });
   }
 
   // Get public URL
-  const { data: urlData } = sb.storage
-    .from("billboards")
-    .getPublicUrl(filePath);
+  const { data: urlData } = sb.storage.from("billboards").getPublicUrl(filePath);
 
   const imageUrl = urlData.publicUrl;
 
@@ -175,23 +142,18 @@ export async function POST(request: Request) {
   images[slotIndex] = imageUrl;
 
   // Upsert customization with images array
-  const { error: upsertError } = await sb
-    .from("developer_customizations")
-    .upsert(
-      {
-        developer_id: dev.id,
-        item_id: "billboard",
-        config: { images },
-      },
-      { onConflict: "developer_id,item_id" }
-    );
+  const { error: upsertError } = await sb.from("developer_customizations").upsert(
+    {
+      developer_id: dev.id,
+      item_id: "billboard",
+      config: { images },
+    },
+    { onConflict: "developer_id,item_id" },
+  );
 
   if (upsertError) {
     console.error("Upsert error:", upsertError);
-    return NextResponse.json(
-      { error: "Failed to save customization" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to save customization" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, image_url: imageUrl, slot_index: slotIndex, images });

@@ -22,11 +22,7 @@ export function LeaderboardAuthProvider({ children }: { children: React.ReactNod
     });
   }, []);
 
-  return (
-    <AuthLoginContext.Provider value={authLogin}>
-      {children}
-    </AuthLoginContext.Provider>
-  );
+  return <AuthLoginContext.Provider value={authLogin}>{children}</AuthLoginContext.Provider>;
 }
 
 export function useLeaderboardAuth() {

@@ -47,9 +47,7 @@ export async function GET() {
     .eq("developer_id", dev.id)
     .eq("mission_date", today);
 
-  const progressMap = new Map(
-    (progressRows ?? []).map((r) => [r.mission_id, r]),
-  );
+  const progressMap = new Map((progressRows ?? []).map((r) => [r.mission_id, r]));
 
   const missionData = missions.map((m) => {
     const prog = progressMap.get(m.id);

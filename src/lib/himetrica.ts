@@ -64,7 +64,12 @@ export function trackShopItemViewed(item_id: string, zone: string, price_cents: 
   hm()?.track("shop_item_viewed", { item_id, zone, price: price_cents / 100 });
 }
 
-export function trackCheckoutStarted(item_id: string, provider: string, price_cents: number, is_gift: boolean) {
+export function trackCheckoutStarted(
+  item_id: string,
+  provider: string,
+  price_cents: number,
+  is_gift: boolean,
+) {
   hm()?.track("checkout_started", { item_id, provider, price: price_cents / 100, is_gift });
 }
 

@@ -60,7 +60,9 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
   // Check if the logged-in user owns this building
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const authLogin = (
     user?.user_metadata?.user_name ??
     user?.user_metadata?.preferred_username ??
@@ -105,7 +107,18 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
   const sb = getSupabaseAdmin();
 
-  const [items, ownedItems, customizationsResult, billboardPurchasesResult, topDevResult, topStarsResult, achievementsResult, loadoutResult, raidLoadoutResult, allPurchasesResult] = await Promise.all([
+  const [
+    items,
+    ownedItems,
+    customizationsResult,
+    billboardPurchasesResult,
+    topDevResult,
+    topStarsResult,
+    achievementsResult,
+    loadoutResult,
+    raidLoadoutResult,
+    allPurchasesResult,
+  ] = await Promise.all([
     getActiveItems(),
     getOwnedItems(dev.id),
     sb
@@ -131,10 +144,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
       .order("total_stars", { ascending: false })
       .limit(1)
       .single(),
-    sb
-      .from("developer_achievements")
-      .select("achievement_id")
-      .eq("developer_id", dev.id),
+    sb.from("developer_achievements").select("achievement_id").eq("developer_id", dev.id),
     sb
       .from("developer_customizations")
       .select("config")
@@ -148,13 +158,12 @@ export default async function ShopPage({ params, searchParams }: Props) {
       .eq("item_id", "raid_loadout")
       .maybeSingle(),
     // A10+A13: Count purchases per item for popularity badges + social proof
-    sb
-      .from("purchases")
-      .select("item_id, created_at")
-      .eq("status", "completed"),
+    sb.from("purchases").select("item_id, created_at").eq("status", "completed"),
   ]);
 
-  const achievements = (achievementsResult.data ?? []).map((a: { achievement_id: string }) => a.achievement_id);
+  const achievements = (achievementsResult.data ?? []).map(
+    (a: { achievement_id: string }) => a.achievement_id,
+  );
 
   // A10: Compute top 3 most purchased items (min 5 purchases)
   const purchaseCounts: Record<string, number> = {};
@@ -171,7 +180,12 @@ export default async function ShopPage({ params, searchParams }: Props) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([id]) => id);
-  const initialLoadout = (loadoutResult.data?.config as { crown: string | null; roof: string | null; aura: string | null } | null) ?? null;
+  const initialLoadout =
+    (loadoutResult.data?.config as {
+      crown: string | null;
+      roof: string | null;
+      aura: string | null;
+    } | null) ?? null;
 
   const billboardSlots = billboardPurchasesResult.count ?? 0;
   const maxContrib = topDevResult.data?.contributions ?? dev.contributions;
@@ -248,7 +262,9 @@ export default async function ShopPage({ params, searchParams }: Props) {
           buildingDims={buildingDims}
           achievements={achievements}
           initialLoadout={initialLoadout}
-          initialRaidLoadout={(raidLoadoutResult?.data?.config as { vehicle: string; tag: string }) ?? null}
+          initialRaidLoadout={
+            (raidLoadoutResult?.data?.config as { vehicle: string; tag: string }) ?? null
+          }
           purchasedItem={purchasedItem ?? null}
           giftedItem={giftedItem ?? null}
           giftedTo={giftedTo ?? null}

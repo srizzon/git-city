@@ -75,10 +75,7 @@ export default function ActivityPanel({ initialEvents, open, onClose, onNavigate
         <h2 className="text-sm" style={{ color: ACCENT }}>
           CITY ACTIVITY
         </h2>
-        <button
-          onClick={onClose}
-          className="text-xs text-muted hover:text-cream"
-        >
+        <button onClick={onClose} className="text-xs text-muted hover:text-cream">
           &#10005;
         </button>
       </div>
@@ -110,9 +107,7 @@ export default function ActivityPanel({ initialEvents, open, onClose, onNavigate
                   ) : (
                     <div className="mt-0.5 h-5 w-5 shrink-0 border border-border bg-bg-card" />
                   )}
-                  <p className="text-[10px] text-cream normal-case">
-                    {formatEvent(e)}
-                  </p>
+                  <p className="text-[10px] text-cream normal-case">{formatEvent(e)}</p>
                 </div>
                 {login && (
                   <button
@@ -129,15 +124,11 @@ export default function ActivityPanel({ initialEvents, open, onClose, onNavigate
         )}
 
         {loading && (
-          <div className="px-4 py-3 text-center text-[9px] text-dim animate-pulse">
-            Loading...
-          </div>
+          <div className="px-4 py-3 text-center text-[9px] text-dim animate-pulse">Loading...</div>
         )}
 
         {!hasMore && events.length > 0 && (
-          <div className="px-4 py-3 text-center text-[9px] text-dim">
-            End of activity
-          </div>
+          <div className="px-4 py-3 text-center text-[9px] text-dim">End of activity</div>
         )}
       </div>
     </div>

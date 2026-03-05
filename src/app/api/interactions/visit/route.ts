@@ -79,13 +79,11 @@ export async function POST(request: Request) {
   }
 
   // Insert (ON CONFLICT DO NOTHING via PK constraint)
-  const { error: insertError } = await admin
-    .from("building_visits")
-    .insert({
-      visitor_id: visitor.id,
-      building_id: building.id,
-      visit_date: today,
-    });
+  const { error: insertError } = await admin.from("building_visits").insert({
+    visitor_id: visitor.id,
+    building_id: building.id,
+    visit_date: today,
+  });
 
   if (!insertError) {
     await admin.rpc("increment_visit_count", { target_dev_id: building.id });

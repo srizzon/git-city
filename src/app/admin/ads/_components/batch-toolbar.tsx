@@ -8,13 +8,7 @@ interface BatchToolbarProps {
   onClear: () => void;
 }
 
-export function BatchToolbar({
-  count,
-  onPause,
-  onResume,
-  onDelete,
-  onClear,
-}: BatchToolbarProps) {
+export function BatchToolbar({ count, onPause, onResume, onDelete, onClear }: BatchToolbarProps) {
   if (count === 0) return null;
 
   return (

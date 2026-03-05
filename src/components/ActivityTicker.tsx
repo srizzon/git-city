@@ -89,16 +89,13 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Pr
   if (events.length < 1) return null;
 
   return (
-    <div
-      className="fixed bottom-0 left-0 right-0 z-30 flex h-7 items-center border-t border-border/30 bg-bg/90 backdrop-blur-sm"
-    >
-      <div
-        className="min-w-0 flex-1 overflow-hidden cursor-pointer"
-        onClick={onOpenPanel}
-      >
+    <div className="fixed bottom-0 left-0 right-0 z-30 flex h-7 items-center border-t border-border/30 bg-bg/90 backdrop-blur-sm">
+      <div className="min-w-0 flex-1 overflow-hidden cursor-pointer" onClick={onOpenPanel}>
         <div
           className="ticker-scroll flex whitespace-nowrap"
-          style={{ "--ticker-duration": `${Math.max(20, tickerText.length)}s` } as React.CSSProperties}
+          style={
+            { "--ticker-duration": `${Math.max(20, tickerText.length)}s` } as React.CSSProperties
+          }
         >
           {[...tickerText, ...tickerText].map((item, i) => (
             <span
@@ -117,11 +114,23 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Pr
 
       {/* Footer links */}
       <div className="hidden sm:flex items-center gap-2 shrink-0 pr-3 pl-2 border-l border-border/30">
-        <a href="/terms" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">Terms</a>
+        <a href="/terms" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">
+          Terms
+        </a>
         <span className="text-[8px] text-cream/10">·</span>
-        <a href="/privacy" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">Privacy</a>
+        <a
+          href="/privacy"
+          className="text-[8px] text-cream/20 transition-colors hover:text-cream/50"
+        >
+          Privacy
+        </a>
         <span className="text-[8px] text-cream/10">·</span>
-        <a href="/support" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">Support</a>
+        <a
+          href="/support"
+          className="text-[8px] text-cream/20 transition-colors hover:text-cream/50"
+        >
+          Support
+        </a>
       </div>
 
       <style jsx>{`
@@ -132,8 +141,12 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Pr
           animation-play-state: paused;
         }
         @keyframes ticker {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
         }
       `}</style>
     </div>

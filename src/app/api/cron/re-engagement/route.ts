@@ -71,7 +71,9 @@ export async function GET(request: NextRequest) {
 
   for (const tier of TIERS) {
     const inactiveAfter = new Date(now.getTime() - tier.daysInactive * 86_400_000).toISOString();
-    const inactiveBefore = new Date(now.getTime() - (tier.daysInactive - 1) * 86_400_000).toISOString();
+    const inactiveBefore = new Date(
+      now.getTime() - (tier.daysInactive - 1) * 86_400_000,
+    ).toISOString();
 
     let offset = 0;
     const batchSize = 50;
@@ -96,9 +98,7 @@ export async function GET(request: NextRequest) {
         .select("developer_id, marketing")
         .in("developer_id", devIds);
 
-      const marketingMap = new Map(
-        (prefs ?? []).map((p) => [p.developer_id, p.marketing]),
-      );
+      const marketingMap = new Map((prefs ?? []).map((p) => [p.developer_id, p.marketing]));
 
       // Get extra info (kudos/raids received while away)
       const { data: recentKudos } = await sb
@@ -120,9 +120,10 @@ export async function GET(request: NextRequest) {
         }
 
         const kudos = kudosCounts.get(dev.id) ?? 0;
-        const extraInfo = kudos > 0
-          ? `<p style="color: #c8e64a; font-size: 14px;">You received ${kudos} kudos while you were away!</p>`
-          : "";
+        const extraInfo =
+          kudos > 0
+            ? `<p style="color: #c8e64a; font-size: 14px;">You received ${kudos} kudos while you were away!</p>`
+            : "";
 
         sendNotificationAsync({
           type: "re_engagement",

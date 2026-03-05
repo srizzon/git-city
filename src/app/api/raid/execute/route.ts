@@ -53,13 +53,10 @@ export async function POST(request: Request) {
   ).toLowerCase();
 
   // Fetch attacker + defender in parallel
-  const raidColumns = "id, claimed, github_login, avatar_url, contributions, public_repos, total_stars, kudos_count, app_streak, raid_xp, current_week_contributions, current_week_kudos_given, current_week_kudos_received";
+  const raidColumns =
+    "id, claimed, github_login, avatar_url, contributions, public_repos, total_stars, kudos_count, app_streak, raid_xp, current_week_contributions, current_week_kudos_given, current_week_kudos_received";
   const [attackerRes, defenderRes] = await Promise.all([
-    admin
-      .from("developers")
-      .select(raidColumns)
-      .eq("github_login", githubLogin)
-      .single(),
+    admin.from("developers").select(raidColumns).eq("github_login", githubLogin).single(),
     admin
       .from("developers")
       .select(raidColumns)
@@ -133,7 +130,8 @@ export async function POST(request: Request) {
       .single();
 
     if (boostPurchase) {
-      const meta = (boostPurchase.items as unknown as { metadata: { type: string; bonus: number } })?.metadata;
+      const meta = (boostPurchase.items as unknown as { metadata: { type: string; bonus: number } })
+        ?.metadata;
       if (meta?.type === "raid_boost" && meta.bonus > 0) {
         boostBonus = meta.bonus;
         boostItemId = boostPurchase.item_id;
@@ -275,8 +273,12 @@ export async function POST(request: Request) {
           .eq("id", defender.id),
       ]);
       // General XP: attacker wins 50, defender gets 30 for being raided
-      admin.rpc("grant_xp", { p_developer_id: attacker.id, p_source: "raid_win", p_amount: 50 }).then();
-      admin.rpc("grant_xp", { p_developer_id: defender.id, p_source: "raid_defend", p_amount: 30 }).then();
+      admin
+        .rpc("grant_xp", { p_developer_id: attacker.id, p_source: "raid_win", p_amount: 50 })
+        .then();
+      admin
+        .rpc("grant_xp", { p_developer_id: defender.id, p_source: "raid_defend", p_amount: 30 })
+        .then();
     } else {
       // Defender gets XP for successful defense
       await admin
@@ -284,8 +286,12 @@ export async function POST(request: Request) {
         .update({ raid_xp: (defender.raid_xp ?? 0) + XP_LOSE_DEFENDER })
         .eq("id", defender.id);
       // General XP: attacker loses 15, defender defends 30
-      admin.rpc("grant_xp", { p_developer_id: attacker.id, p_source: "raid_loss", p_amount: 15 }).then();
-      admin.rpc("grant_xp", { p_developer_id: defender.id, p_source: "raid_defend", p_amount: 30 }).then();
+      admin
+        .rpc("grant_xp", { p_developer_id: attacker.id, p_source: "raid_loss", p_amount: 15 })
+        .then();
+      admin
+        .rpc("grant_xp", { p_developer_id: defender.id, p_source: "raid_defend", p_amount: 30 })
+        .then();
     }
 
     // Activity feed

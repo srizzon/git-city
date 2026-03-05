@@ -18,7 +18,10 @@ async function fetchAll<T>(
   let from = 0;
 
   while (true) {
-    let q: any = sb.from(table).select(select).range(from, from + PAGE_SIZE - 1);
+    let q: any = sb
+      .from(table)
+      .select(select)
+      .range(from, from + PAGE_SIZE - 1);
     if (orderBy) q = q.order(orderBy, { ascending: true });
     if (apply) q = apply(q);
     const { data, error } = await q;
@@ -60,11 +63,8 @@ export async function GET(request: NextRequest) {
         "developer_id, item_id",
         (q) => q.is("gifted_to", null).eq("status", "completed"),
       ),
-      fetchAll<{ gifted_to: number; item_id: string }>(
-        sb,
-        "purchases",
-        "gifted_to, item_id",
-        (q) => q.not("gifted_to", "is", null).eq("status", "completed"),
+      fetchAll<{ gifted_to: number; item_id: string }>(sb, "purchases", "gifted_to, item_id", (q) =>
+        q.not("gifted_to", "is", null).eq("status", "completed"),
       ),
       fetchAll<{ developer_id: number; item_id: string; config: Record<string, unknown> }>(
         sb,
@@ -77,11 +77,13 @@ export async function GET(request: NextRequest) {
         "developer_achievements",
         "developer_id, achievement_id",
       ),
-      fetchAll<{ building_id: number; attacker_login: string; tag_style: string; expires_at: string }>(
-        sb,
-        "raid_tags",
-        "building_id, attacker_login, tag_style, expires_at",
-        (q) => q.eq("active", true),
+      fetchAll<{
+        building_id: number;
+        attacker_login: string;
+        tag_style: string;
+        expires_at: string;
+      }>(sb, "raid_tags", "building_id, attacker_login, tag_style, expires_at", (q) =>
+        q.eq("active", true),
       ),
       sb.from("city_stats").select("*").eq("id", 1).single(),
     ]);
@@ -98,7 +100,10 @@ export async function GET(request: NextRequest) {
   // Build customization maps
   const customColorMap: Record<number, string> = {};
   const billboardImagesMap: Record<number, string[]> = {};
-  const loadoutMap: Record<number, { crown: string | null; roof: string | null; aura: string | null }> = {};
+  const loadoutMap: Record<
+    number,
+    { crown: string | null; roof: string | null; aura: string | null }
+  > = {};
   for (const row of customizations) {
     const config = row.config;
     if (row.item_id === "custom_color" && typeof config?.color === "string") {
@@ -127,7 +132,10 @@ export async function GET(request: NextRequest) {
   }
 
   // Build raid tags map
-  const raidTagMap: Record<number, { attacker_login: string; tag_style: string; expires_at: string }> = {};
+  const raidTagMap: Record<
+    number,
+    { attacker_login: string; tag_style: string; expires_at: string }
+  > = {};
   for (const row of raidTags) {
     raidTagMap[row.building_id] = {
       attacker_login: row.attacker_login,

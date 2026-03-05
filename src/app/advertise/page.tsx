@@ -36,9 +36,7 @@ async function getStats() {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
 
   const [devResult, impressionResult, clickResult] = await Promise.all([
-    supabase
-      .from("developers")
-      .select("id", { count: "exact", head: true }),
+    supabase.from("developers").select("id", { count: "exact", head: true }),
     supabase
       .from("sky_ad_events")
       .select("id", { count: "exact", head: true })
@@ -55,7 +53,12 @@ async function getStats() {
   const clicks = clickResult.count ?? 0;
   const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
 
-  return { devCount: devResult.count ?? 0, monthlyImpressions: impressions, monthlyClicks: clicks, ctr };
+  return {
+    devCount: devResult.count ?? 0,
+    monthlyImpressions: impressions,
+    monthlyClicks: clicks,
+    ctr,
+  };
 }
 
 const COMPETITORS = [
@@ -87,44 +90,32 @@ export default async function AdvertisePage() {
 
       <div className="mx-auto max-w-3xl px-4 pt-6 pb-12">
         {/* Nav */}
-        <Link
-          href="/"
-          className="text-sm text-muted transition-colors hover:text-cream"
-        >
+        <Link href="/" className="text-sm text-muted transition-colors hover:text-cream">
           &larr; Back to City
         </Link>
 
         {/* ── Hero ── */}
         <div className="mt-10 text-center">
           <h1 className="text-3xl text-cream sm:text-4xl">
-            Advertise where developers{" "}
-            <span style={{ color: ACCENT }}>actually look</span>
+            Advertise where developers <span style={{ color: ACCENT }}>actually look</span>
           </h1>
           <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-muted normal-case">
-            Planes fly across the sky. Blimps float between buildings.
-            Billboards light up the tallest towers. {devCount.toLocaleString()}+ real
-            GitHub developers explore this city every week. Your ad lives inside it.
+            Planes fly across the sky. Blimps float between buildings. Billboards light up the
+            tallest towers. {devCount.toLocaleString()}+ real GitHub developers explore this city
+            every week. Your ad lives inside it.
           </p>
         </div>
 
         {/* ── Stats ── */}
         <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {statCards.map((s) => (
-            <div
-              key={s.label}
-              className="border-[3px] border-border p-4 text-center"
-            >
+            <div key={s.label} className="border-[3px] border-border p-4 text-center">
               <p className="text-2xl" style={{ color: ACCENT }}>
                 {s.value}
               </p>
-              <p className="mt-1 text-xs leading-tight text-muted normal-case">
-                {s.label}
-              </p>
+              <p className="mt-1 text-xs leading-tight text-muted normal-case">{s.label}</p>
               {s.sub && (
-                <p
-                  className="mt-1 text-[10px] normal-case"
-                  style={{ color: ACCENT }}
-                >
+                <p className="mt-1 text-[10px] normal-case" style={{ color: ACCENT }}>
                   {s.sub}
                 </p>
               )}
@@ -144,10 +135,7 @@ export default async function AdvertisePage() {
               "Global reach: US, EU, Brazil, India",
               "100% viewability. No ad blockers. No scroll-past",
             ].map((f) => (
-              <p
-                key={f}
-                className="flex items-start gap-2 text-sm text-muted normal-case"
-              >
+              <p key={f} className="flex items-start gap-2 text-sm text-muted normal-case">
                 <span className="mt-px" style={{ color: ACCENT }}>
                   +
                 </span>
@@ -160,9 +148,7 @@ export default async function AdvertisePage() {
         {/* ── CTR comparison ── */}
         {ctr > 0.5 && (
           <div className="mt-8 border-[3px] border-border p-5 sm:p-6">
-            <p className="text-base text-cream">
-              Git City vs traditional ads
-            </p>
+            <p className="text-base text-cream">Git City vs traditional ads</p>
             <p className="mt-1 text-xs text-muted normal-case">
               Click-through rate comparison (30-day average)
             </p>
@@ -182,10 +168,7 @@ export default async function AdvertisePage() {
                     }}
                   />
                 </div>
-                <span
-                  className="w-14 text-right text-sm font-bold"
-                  style={{ color: ACCENT }}
-                >
+                <span className="w-14 text-right text-sm font-bold" style={{ color: ACCENT }}>
                   {ctr.toFixed(1)}%
                 </span>
               </div>
@@ -202,16 +185,13 @@ export default async function AdvertisePage() {
                       style={{ width: `${(p.ctr / barMax) * 100}%` }}
                     />
                   </div>
-                  <span className="w-14 text-right text-sm text-muted">
-                    {p.ctr}%
-                  </span>
+                  <span className="w-14 text-right text-sm text-muted">{p.ctr}%</span>
                 </div>
               ))}
             </div>
 
             <p className="mt-4 text-xs text-dim normal-case">
-              3D ads inside the world, not banners people train
-              themselves to ignore.
+              3D ads inside the world, not banners people train themselves to ignore.
             </p>
           </div>
         )}
@@ -225,10 +205,7 @@ export default async function AdvertisePage() {
       {/* ═══════════════════════════════════════════
           ZONE 2: HOW IT WORKS + FAQ
           ═══════════════════════════════════════════ */}
-      <div
-        className="border-t-[3px] border-border"
-        style={{ backgroundColor: "#080e1c" }}
-      >
+      <div className="border-t-[3px] border-border" style={{ backgroundColor: "#080e1c" }}>
         <div className="mx-auto max-w-3xl px-4 py-16">
           {/* How it works */}
           <div className="grid gap-8 sm:grid-cols-4">
@@ -255,18 +232,14 @@ export default async function AdvertisePage() {
                   {s.n}
                 </span>
                 <h3 className="mt-1 text-base text-cream">{s.t}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-muted normal-case">
-                  {s.d}
-                </p>
+                <p className="mt-1 text-sm leading-relaxed text-muted normal-case">{s.d}</p>
               </div>
             ))}
           </div>
 
           {/* Every ad includes */}
           <div className="mt-14 grid gap-x-8 gap-y-3 sm:grid-cols-2">
-            <p className="mb-2 text-base text-cream sm:col-span-2">
-              Every ad includes
-            </p>
+            <p className="mb-2 text-base text-cream sm:col-span-2">Every ad includes</p>
             {[
               "Your text, your colors, your link",
               "Live 3D preview before you buy",
@@ -275,10 +248,7 @@ export default async function AdvertisePage() {
               "Goes live within minutes",
               "Change your ad anytime, no extra cost",
             ].map((f) => (
-              <p
-                key={f}
-                className="flex items-center gap-2 text-sm text-muted normal-case"
-              >
+              <p key={f} className="flex items-center gap-2 text-sm text-muted normal-case">
                 <span style={{ color: ACCENT }}>+</span>
                 {f}
               </p>
@@ -329,9 +299,7 @@ export default async function AdvertisePage() {
               ].map((item) => (
                 <div key={item.q} className="border-[2px] border-border p-5">
                   <h3 className="text-sm text-cream">{item.q}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted normal-case">
-                    {item.a}
-                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted normal-case">{item.a}</p>
                 </div>
               ))}
             </div>

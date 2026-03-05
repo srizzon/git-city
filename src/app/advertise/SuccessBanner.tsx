@@ -13,10 +13,7 @@ function SuccessBannerInner() {
   if (!token) return null;
 
   return (
-    <div
-      className="mt-6 border-[3px] p-5 text-center"
-      style={{ borderColor: ACCENT }}
-    >
+    <div className="mt-6 border-[3px] p-5 text-center" style={{ borderColor: ACCENT }}>
       <p className="text-sm text-cream">
         Payment <span style={{ color: ACCENT }}>confirmed!</span>
       </p>

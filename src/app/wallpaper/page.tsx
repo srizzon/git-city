@@ -50,7 +50,9 @@ function WallpaperInner() {
         const snapshot = await snapshotRes.json();
         allDevs = snapshot.developers;
       }
-    } catch { /* fall through to chunked */ }
+    } catch {
+      /* fall through to chunked */
+    }
 
     // Fallback to chunked API
     if (allDevs.length === 0) {
@@ -65,8 +67,9 @@ function WallpaperInner() {
         const promises: Promise<{ developers: typeof allDevs } | null>[] = [];
         for (let from = CHUNK; from < total; from += CHUNK) {
           promises.push(
-            fetch(`/api/city?from=${from}&to=${from + CHUNK}`)
-              .then((r) => (r.ok ? r.json() : null))
+            fetch(`/api/city?from=${from}&to=${from + CHUNK}`).then((r) =>
+              r.ok ? r.json() : null,
+            ),
           );
         }
         const chunks = await Promise.all(promises);
@@ -112,7 +115,15 @@ function WallpaperInner() {
 
 export default function WallpaperPage() {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", cursor: "none", overflow: "hidden" }}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "#000",
+        cursor: "none",
+        overflow: "hidden",
+      }}
+    >
       <Suspense fallback={null}>
         <WallpaperInner />
       </Suspense>

@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo, Suspense } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useMemo,
+  Suspense,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
@@ -38,7 +46,13 @@ import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/x
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
 import MiniMap from "@/components/MiniMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
-import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, isBuildingAd } from "@/lib/skyAds";
+import {
+  DEFAULT_SKY_ADS,
+  buildAdLink,
+  trackAdEvent,
+  trackAdEvents,
+  isBuildingAd,
+} from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
 import {
   identifyUser,
@@ -67,43 +81,95 @@ const MILESTONE_MODE: "stars" | "devs" = "stars"; // "stars" = GitHub stars road
 
 const THEMES = [
   { name: "Midnight", accent: "#6090e0", shadow: "#203870" },
-  { name: "Sunset",   accent: "#c8e64a", shadow: "#5a7a00" },
-  { name: "Neon",     accent: "#e040c0", shadow: "#600860" },
-  { name: "Emerald",  accent: "#f0c060", shadow: "#806020" },
+  { name: "Sunset", accent: "#c8e64a", shadow: "#5a7a00" },
+  { name: "Neon", accent: "#e040c0", shadow: "#600860" },
+  { name: "Emerald", accent: "#f0c060", shadow: "#806020" },
 ];
 
 // Achievement display data for profile card (client-side, mirrors DB)
 const TIER_COLORS_MAP: Record<string, string> = {
-  bronze: "#cd7f32", silver: "#c0c0c0", gold: "#ffd700", diamond: "#b9f2ff",
+  bronze: "#cd7f32",
+  silver: "#c0c0c0",
+  gold: "#ffd700",
+  diamond: "#b9f2ff",
 };
 const TIER_EMOJI_MAP: Record<string, string> = {
-  bronze: "\uD83D\uDFE4", silver: "\u26AA", gold: "\uD83D\uDFE1", diamond: "\uD83D\uDC8E",
+  bronze: "\uD83D\uDFE4",
+  silver: "\u26AA",
+  gold: "\uD83D\uDFE1",
+  diamond: "\uD83D\uDC8E",
 };
 const ACHIEVEMENT_TIERS_MAP: Record<string, string> = {
-  god_mode: "diamond", legend: "diamond", famous: "diamond", mayor: "diamond",
-  machine: "gold", popular: "gold", factory: "gold", influencer: "gold", philanthropist: "gold", icon: "gold", legendary: "gold",
-  grinder: "silver", architect: "silver", patron: "silver", beloved: "silver", admired: "silver",
-  first_push: "bronze", committed: "bronze", builder: "bronze", rising_star: "bronze",
-  recruiter: "bronze", generous: "bronze", gifted: "bronze", appreciated: "bronze",
-  on_fire: "bronze", generous_streak: "bronze",
+  god_mode: "diamond",
+  legend: "diamond",
+  famous: "diamond",
+  mayor: "diamond",
+  machine: "gold",
+  popular: "gold",
+  factory: "gold",
+  influencer: "gold",
+  philanthropist: "gold",
+  icon: "gold",
+  legendary: "gold",
+  grinder: "silver",
+  architect: "silver",
+  patron: "silver",
+  beloved: "silver",
+  admired: "silver",
+  first_push: "bronze",
+  committed: "bronze",
+  builder: "bronze",
+  rising_star: "bronze",
+  recruiter: "bronze",
+  generous: "bronze",
+  gifted: "bronze",
+  appreciated: "bronze",
+  on_fire: "bronze",
+  generous_streak: "bronze",
   dedicated: "silver",
   obsessed: "gold",
   no_life: "diamond",
   white_rabbit: "diamond",
-  daily_rookie: "bronze", daily_regular: "silver", daily_master: "gold", daily_legend: "diamond",
+  daily_rookie: "bronze",
+  daily_regular: "silver",
+  daily_master: "gold",
+  daily_legend: "diamond",
 };
 const ACHIEVEMENT_NAMES_MAP: Record<string, string> = {
-  god_mode: "God Mode", legend: "Legend", famous: "Famous", mayor: "Mayor",
-  machine: "Machine", popular: "Popular", factory: "Factory", influencer: "Influencer",
-  grinder: "Grinder", architect: "Architect", builder: "Builder", rising_star: "Rising Star",
-  recruiter: "Recruiter", committed: "Committed", first_push: "First Push",
-  philanthropist: "Philanthropist", patron: "Patron", generous: "Generous",
-  icon: "Icon", beloved: "Beloved", gifted: "Gifted",
-  legendary: "Legendary", admired: "Admired", appreciated: "Appreciated",
-  on_fire: "On Fire", dedicated: "Dedicated", obsessed: "Obsessed",
-  no_life: "No Life", generous_streak: "Generous Streak",
+  god_mode: "God Mode",
+  legend: "Legend",
+  famous: "Famous",
+  mayor: "Mayor",
+  machine: "Machine",
+  popular: "Popular",
+  factory: "Factory",
+  influencer: "Influencer",
+  grinder: "Grinder",
+  architect: "Architect",
+  builder: "Builder",
+  rising_star: "Rising Star",
+  recruiter: "Recruiter",
+  committed: "Committed",
+  first_push: "First Push",
+  philanthropist: "Philanthropist",
+  patron: "Patron",
+  generous: "Generous",
+  icon: "Icon",
+  beloved: "Beloved",
+  gifted: "Gifted",
+  legendary: "Legendary",
+  admired: "Admired",
+  appreciated: "Appreciated",
+  on_fire: "On Fire",
+  dedicated: "Dedicated",
+  obsessed: "Obsessed",
+  no_life: "No Life",
+  generous_streak: "Generous Streak",
   white_rabbit: "White Rabbit",
-  daily_rookie: "Daily Rookie", daily_regular: "Daily Regular", daily_master: "Daily Master", daily_legend: "Daily Legend",
+  daily_rookie: "Daily Rookie",
+  daily_regular: "Daily Regular",
+  daily_master: "Daily Master",
+  daily_legend: "Daily Legend",
 };
 
 // Dev "class" — funny RPG-style title, deterministic per username
@@ -155,44 +221,50 @@ const CELEBRATION_MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000,
 
 // ─── Loading phases for search feedback ─────────────────────
 const LOADING_PHASES = [
-  { delay: 0,     text: "Fetching GitHub profile..." },
-  { delay: 2000,  text: "Analyzing contributions..." },
-  { delay: 5000,  text: "Building the city block..." },
-  { delay: 9000,  text: "Almost there..." },
+  { delay: 0, text: "Fetching GitHub profile..." },
+  { delay: 2000, text: "Analyzing contributions..." },
+  { delay: 5000, text: "Building the city block..." },
+  { delay: 9000, text: "Almost there..." },
   { delay: 13000, text: "This one's a big profile. Hang tight..." },
 ];
 
 // Errors that won't change if you retry the same username
 const PERMANENT_ERROR_CODES = new Set(["not-found", "org", "no-activity"]);
 
-const ERROR_MESSAGES: Record<string, { primary: (u: string) => string; secondary: string; hasRetry?: boolean; hasLink?: boolean }> = {
+const ERROR_MESSAGES: Record<
+  string,
+  { primary: (u: string) => string; secondary: string; hasRetry?: boolean; hasLink?: boolean }
+> = {
   "not-found": {
     primary: (u) => `"@${u}" doesn't exist on GitHub`,
     secondary: "Check the spelling — could be a typo. GitHub usernames are case-insensitive.",
   },
-  "org": {
+  org: {
     primary: (u) => `"@${u}" is an organization, not a person`,
-    secondary: "Git City is for individual profiles. Try searching for one of its contributors by their personal username.",
+    secondary:
+      "Git City is for individual profiles. Try searching for one of its contributors by their personal username.",
   },
   "no-activity": {
     primary: (u) => `"@${u}" has no public activity yet`,
-    secondary: "Is this you? Open your profile settings, scroll to 'Contributions & activity', and enable 'Include private contributions'. Then search again.",
+    secondary:
+      "Is this you? Open your profile settings, scroll to 'Contributions & activity', and enable 'Include private contributions'. Then search again.",
     hasLink: true,
   },
   "rate-limit": {
     primary: () => "Search limit reached",
-    secondary: "You can look up 10 new profiles per hour. Developers already in the city are unlimited.",
+    secondary:
+      "You can look up 10 new profiles per hour. Developers already in the city are unlimited.",
   },
   "github-rate-limit": {
     primary: () => "GitHub's API is temporarily unavailable",
     secondary: "Too many requests to GitHub. Try again in a few minutes.",
   },
-  "network": {
+  network: {
     primary: () => "Couldn't reach the server",
     secondary: "Check your internet connection and try again.",
     hasRetry: true,
   },
-  "generic": {
+  generic: {
     primary: () => "Something went wrong",
     secondary: "An unexpected error occurred. Try again.",
     hasRetry: true,
@@ -214,9 +286,12 @@ function SearchFeedback({
 
   // Phased loading messages
   useEffect(() => {
-    if (feedback?.type !== "loading") { setPhaseIndex(0); return; }
+    if (feedback?.type !== "loading") {
+      setPhaseIndex(0);
+      return;
+    }
     const timers = LOADING_PHASES.map((phase, i) =>
-      setTimeout(() => setPhaseIndex(i), phase.delay)
+      setTimeout(() => setPhaseIndex(i), phase.delay),
     );
     return () => timers.forEach(clearTimeout);
   }, [feedback?.type]);
@@ -236,8 +311,13 @@ function SearchFeedback({
   if (feedback.type === "loading") {
     return (
       <div className="flex items-center gap-2 py-1 animate-[fade-in_0.15s_ease-out]">
-        <span className="blink-dot h-2 w-2 flex-shrink-0" style={{ backgroundColor: accentColor }} />
-        <span className="text-[11px] text-muted normal-case">{LOADING_PHASES[phaseIndex].text}</span>
+        <span
+          className="blink-dot h-2 w-2 flex-shrink-0"
+          style={{ backgroundColor: accentColor }}
+        />
+        <span className="text-[11px] text-muted normal-case">
+          {LOADING_PHASES[phaseIndex].text}
+        </span>
       </div>
     );
   }
@@ -252,7 +332,12 @@ function SearchFeedback({
       className="relative w-full max-w-md border-[3px] bg-bg-raised/90 px-4 py-3 backdrop-blur-sm animate-[fade-in_0.15s_ease-out]"
       style={{ borderColor: code === "rate-limit" ? accentColor + "66" : "rgba(248, 81, 73, 0.4)" }}
     >
-      <button onClick={onDismiss} className="absolute top-2 right-2 text-[10px] text-muted transition-colors hover:text-cream">&#10005;</button>
+      <button
+        onClick={onDismiss}
+        className="absolute top-2 right-2 text-[10px] text-muted transition-colors hover:text-cream"
+      >
+        &#10005;
+      </button>
       <p className="text-[11px] text-cream normal-case pr-4">{msg.primary(u)}</p>
       <p className="mt-1 text-[10px] text-muted normal-case">{msg.secondary}</p>
       {msg.hasLink && (
@@ -329,18 +414,12 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
               <span
                 className="text-[10px]"
                 style={{
-                  color:
-                    i === 0 ? "#ffd700"
-                    : i === 1 ? "#c0c0c0"
-                    : i === 2 ? "#cd7f32"
-                    : accent,
+                  color: i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : accent,
                 }}
               >
                 #{i + 1}
               </span>
-              <span className="truncate text-[10px] text-cream normal-case">
-                {b.login}
-              </span>
+              <span className="truncate text-[10px] text-cream normal-case">{b.login}</span>
             </span>
             <span className="ml-2 flex-shrink-0 text-[10px] text-muted">
               {(b[cat.key] as number).toLocaleString()}
@@ -359,7 +438,6 @@ function getStreakTierColor(streak: number) {
   if (streak >= 7) return "#ff8833";
   return "#4488ff";
 }
-
 
 function HomeContent() {
   const searchParams = useSearchParams();
@@ -385,7 +463,14 @@ function HomeContent() {
   const initialLoading = loadStage !== "done";
   const [feedback, setFeedback] = useState<{
     type: "loading" | "error";
-    code?: "not-found" | "org" | "no-activity" | "rate-limit" | "github-rate-limit" | "network" | "generic";
+    code?:
+      | "not-found"
+      | "org"
+      | "no-activity"
+      | "rate-limit"
+      | "github-rate-limit"
+      | "network"
+      | "generic";
     username?: string;
     raw?: string;
   } | null>(null);
@@ -405,23 +490,34 @@ function HomeContent() {
     }
   }, []);
 
-
   const [hud, setHud] = useState({ speed: 0, altitude: 0 });
   const [playerPos, setPlayerPos] = useState<{ x: number; z: number }>({ x: 0, z: 0 });
-  const [districtAnnouncement, setDistrictAnnouncement] = useState<{ name: string; color: string; population: number } | null>(null);
+  const [districtAnnouncement, setDistrictAnnouncement] = useState<{
+    name: string;
+    color: string;
+    population: number;
+  } | null>(null);
   const lastDistrictRef = useRef<string | null>(null);
   const announceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const announceCooldownRef = useRef(0);
   const [flyPaused, setFlyPaused] = useState(false);
   const [flyPauseSignal, setFlyPauseSignal] = useState(0);
-  const [flyScore, setFlyScore] = useState({ score: 0, earned: 0, combo: 0, collected: 0, maxCombo: 1 });
+  const [flyScore, setFlyScore] = useState({
+    score: 0,
+    earned: 0,
+    combo: 0,
+    collected: 0,
+    maxCombo: 1,
+  });
   const [flyPersonalBest, setFlyPersonalBest] = useState(0);
   const flyStartTime = useRef(0);
   const flyPausedAt = useRef(0);
   const flyTotalPauseMs = useRef(0);
   const [flyElapsedSec, setFlyElapsedSec] = useState(0);
   const [stats, setStats] = useState<CityStats>({ total_developers: 0, total_contributions: 0 });
-  const [milestoneCelebrations, setMilestoneCelebrations] = useState<{ milestone: number; reached_at: string }[]>([]);
+  const [milestoneCelebrations, setMilestoneCelebrations] = useState<
+    { milestone: number; reached_at: string }[]
+  >([]);
   const [focusedBuilding, setFocusedBuilding] = useState<string | null>(null);
   const [shareData, setShareData] = useState<{
     login: string;
@@ -447,7 +543,9 @@ function HomeContent() {
   const [comparePair, setComparePair] = useState<[CityBuilding, CityBuilding] | null>(null);
   const [compareSelfHint, setCompareSelfHint] = useState(false);
   const [giftModalOpen, setGiftModalOpen] = useState(false);
-  const [giftItems, setGiftItems] = useState<{ id: string; price_usd_cents: number; owned: boolean }[] | null>(null);
+  const [giftItems, setGiftItems] = useState<
+    { id: string; price_usd_cents: number; owned: boolean }[] | null
+  >(null);
   const [giftBuying, setGiftBuying] = useState<string | null>(null);
   const [compareCopied, setCompareCopied] = useState(false);
   const [compareLang, setCompareLang] = useState<"en" | "pt">("en");
@@ -487,8 +585,13 @@ function HomeContent() {
   const [showFlyHint, setShowFlyHint] = useState(false);
   const [showFlyControls, setShowFlyControls] = useState(false);
   const [showFlyResults, setShowFlyResults] = useState<{
-    score: number; collected: number; maxCombo: number; timeBonus: number;
-    isNewPB: boolean; rank: number; totalPilots: number;
+    score: number;
+    collected: number;
+    maxCombo: number;
+    timeBonus: number;
+    isNewPB: boolean;
+    rank: number;
+    totalPilots: number;
   } | null>(null);
   const dailyNudgeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const flyHintTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -502,17 +605,25 @@ function HomeContent() {
   // Raid system
   const [raidState, raidActions] = useRaidSequence();
   const prevRaidPhaseRef = useRef<string>("idle");
-  const lastSuccessfulRaidRef = useRef<{ defenderLogin: string; attackerLogin: string; tagStyle: string } | null>(null);
+  const lastSuccessfulRaidRef = useRef<{
+    defenderLogin: string;
+    attackerLogin: string;
+    tagStyle: string;
+  } | null>(null);
 
   // Fetch GitHub star count + Discord member count
   useEffect(() => {
     fetch("https://api.github.com/repos/srizzon/git-city")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d?.stargazers_count != null) setStarCount(d.stargazers_count); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.stargazers_count != null) setStarCount(d.stargazers_count);
+      })
       .catch(() => {});
     fetch("https://discord.com/api/v9/invites/2bTjFAkny7?with_counts=true")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d?.approximate_member_count != null) setDiscordMembers(d.approximate_member_count); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.approximate_member_count != null) setDiscordMembers(d.approximate_member_count);
+      })
       .catch(() => {});
   }, []);
 
@@ -532,7 +643,12 @@ function HomeContent() {
     const prev = prevRaidPhaseRef.current;
     prevRaidPhaseRef.current = raidState.phase;
 
-    if (raidState.phase === "idle" && prev !== "idle" && prev !== "preview" && lastSuccessfulRaidRef.current) {
+    if (
+      raidState.phase === "idle" &&
+      prev !== "idle" &&
+      prev !== "preview" &&
+      lastSuccessfulRaidRef.current
+    ) {
       const { defenderLogin, attackerLogin, tagStyle } = lastSuccessfulRaidRef.current;
       lastSuccessfulRaidRef.current = null;
       setBuildings((prev) =>
@@ -546,8 +662,8 @@ function HomeContent() {
                   expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
                 },
               }
-            : b
-        )
+            : b,
+        ),
       );
     }
   }, [raidState.phase]);
@@ -555,8 +671,10 @@ function HomeContent() {
   // Fetch ads from DB (fallback to DEFAULT_SKY_ADS on error)
   useEffect(() => {
     fetch("/api/sky-ads")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (Array.isArray(data) && data.length > 0) setSkyAds(data); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) setSkyAds(data);
+      })
       .catch(() => {});
   }, []);
 
@@ -593,17 +711,29 @@ function HomeContent() {
   // Auth state listener
   useEffect(() => {
     const supabase = createBrowserSupabase();
-    supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
-      setSession(s);
-      if (s) {
-        const login = (s.user?.user_metadata?.user_name ?? s.user?.user_metadata?.preferred_username ?? "").toLowerCase();
-        if (login) identifyUser({ github_login: login, email: s.user?.email ?? undefined });
-      }
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, s: Session | null) => {
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: s } }: { data: { session: Session | null } }) => {
+        setSession(s);
+        if (s) {
+          const login = (
+            s.user?.user_metadata?.user_name ??
+            s.user?.user_metadata?.preferred_username ??
+            ""
+          ).toLowerCase();
+          if (login) identifyUser({ github_login: login, email: s.user?.email ?? undefined });
+        }
+      });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event: string, s: Session | null) => {
       setSession(s);
       if (s && event !== "TOKEN_REFRESHED") {
-        const login = (s.user?.user_metadata?.user_name ?? s.user?.user_metadata?.preferred_username ?? "").toLowerCase();
+        const login = (
+          s.user?.user_metadata?.user_name ??
+          s.user?.user_metadata?.preferred_username ??
+          ""
+        ).toLowerCase();
         if (login) identifyUser({ github_login: login, email: s.user?.email ?? undefined });
       }
     });
@@ -630,8 +760,12 @@ function HomeContent() {
   // Dismiss fly onboarding overlays when entering fly mode
   useEffect(() => {
     if (flyMode) {
-      setShowDailyNudge(false); setShowFlyHint(false); setShowFlyResults(null);
-      clearTimeout(dailyNudgeTimerRef.current); clearTimeout(flyHintTimerRef.current); clearTimeout(flyResultsTimerRef.current);
+      setShowDailyNudge(false);
+      setShowFlyHint(false);
+      setShowFlyResults(null);
+      clearTimeout(dailyNudgeTimerRef.current);
+      clearTimeout(flyHintTimerRef.current);
+      clearTimeout(flyResultsTimerRef.current);
     }
   }, [flyMode]);
 
@@ -640,8 +774,10 @@ function HomeContent() {
   useEffect(() => {
     if (!sessionUserId) return;
     fetch("/api/raid/loadout")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data?.vehicle) setFlyVehicle(data.vehicle); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.vehicle) setFlyVehicle(data.vehicle);
+      })
       .catch(() => {});
   }, [sessionUserId]);
 
@@ -651,9 +787,14 @@ function HomeContent() {
     if (!sessionUserId || themeLoadedFromDb.current) return;
     themeLoadedFromDb.current = true;
     fetch("/api/preferences/theme")
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data && typeof data.city_theme === "number" && data.city_theme >= 0 && data.city_theme <= 3) {
+        if (
+          data &&
+          typeof data.city_theme === "number" &&
+          data.city_theme >= 0 &&
+          data.city_theme <= 3
+        ) {
           setThemeIndex(data.city_theme);
           localStorage.setItem("gitcity_theme", String(data.city_theme));
         }
@@ -683,8 +824,13 @@ function HomeContent() {
     if (ref) {
       trackReferralLinkLanded(ref);
       try {
-        localStorage.setItem("gc_ref", JSON.stringify({ login: ref, expires: Date.now() + 7 * 86400000 }));
-      } catch { /* ignore */ }
+        localStorage.setItem(
+          "gc_ref",
+          JSON.stringify({ login: ref, expires: Date.now() + 7 * 86400000 }),
+        );
+      } catch {
+        /* ignore */
+      }
     }
   }, [searchParams]);
 
@@ -701,7 +847,9 @@ function HomeContent() {
           redirectTo += `?ref=${encodeURIComponent(login)}`;
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     await supabase.auth.signInWithOAuth({
       provider: "github",
       options: { redirectTo },
@@ -717,11 +865,16 @@ function HomeContent() {
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled) setFeedEvents(data.events ?? []);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     fetchFeed();
     const interval = setInterval(fetchFeed, 120000);
-    return () => { cancelled = true; clearInterval(interval); };
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // Visit tracking: fire visit POST after 3s of profile card open
@@ -729,7 +882,7 @@ function HomeContent() {
     if (selectedBuilding && session && selectedBuilding.login.toLowerCase() !== authLogin) {
       visitTimerRef.current = setTimeout(async () => {
         try {
-          const building = buildings.find(b => b.login === selectedBuilding.login);
+          const building = buildings.find((b) => b.login === selectedBuilding.login);
           if (!building) return;
           await fetch("/api/interactions/visit", {
             method: "POST",
@@ -738,7 +891,9 @@ function HomeContent() {
           });
           trackMissionRef.current("visit_building");
           trackMissionRef.current("visit_3_buildings");
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }, 3000);
     }
     return () => {
@@ -768,8 +923,8 @@ function HomeContent() {
         setSelectedBuilding({ ...selectedBuilding, kudos_count: newCount });
         setBuildings((prev) =>
           prev.map((b) =>
-            b.login === selectedBuilding.login ? { ...b, kudos_count: newCount } : b
-          )
+            b.login === selectedBuilding.login ? { ...b, kudos_count: newCount } : b,
+          ),
         );
         setTimeout(() => setKudosSent(false), 3000);
       } else {
@@ -778,8 +933,11 @@ function HomeContent() {
         setKudosError(msg);
         setTimeout(() => setKudosError(null), 3000);
       }
-    } catch { /* ignore */ }
-    finally { setKudosSending(false); }
+    } catch {
+      /* ignore */
+    } finally {
+      setKudosSending(false);
+    }
   }, [selectedBuilding, kudosSending, kudosSent, session, authLogin]);
 
   // Gift: open modal with available items
@@ -797,30 +955,38 @@ function HomeContent() {
         .filter((i) => i.price_usd_cents > 0 && !NON_GIFTABLE.has(i.id))
         .map((i) => ({ ...i, owned: receiverOwned.has(i.id) }));
       setGiftItems(available);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [selectedBuilding, session]);
 
   // Gift: checkout for receiver
-  const handleGiftCheckout = useCallback(async (itemId: string) => {
-    if (!selectedBuilding || giftBuying) return;
-    setGiftBuying(itemId);
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          item_id: itemId,
-          provider: "stripe",
-          gifted_to_login: selectedBuilding.login,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.url) {
-        window.location.href = data.url;
+  const handleGiftCheckout = useCallback(
+    async (itemId: string) => {
+      if (!selectedBuilding || giftBuying) return;
+      setGiftBuying(itemId);
+      try {
+        const res = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item_id: itemId,
+            provider: "stripe",
+            gifted_to_login: selectedBuilding.login,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          window.location.href = data.url;
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setGiftBuying(null);
       }
-    } catch { /* ignore */ }
-    finally { setGiftBuying(null); }
-  }, [selectedBuilding, giftBuying]);
+    },
+    [selectedBuilding, giftBuying],
+  );
 
   const lastDistRef = useRef(999);
 
@@ -834,14 +1000,38 @@ function HomeContent() {
   // Outside fly mode: compare → share modal → profile card → focus → explore mode
   useEffect(() => {
     if (flyMode && !selectedBuilding) return;
-    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !rabbitCinematic && raidState.phase === "idle") return;
+    if (
+      !flyMode &&
+      !exploreMode &&
+      !focusedBuilding &&
+      !shareData &&
+      !selectedBuilding &&
+      !giftClaimed &&
+      !giftModalOpen &&
+      !comparePair &&
+      !compareBuilding &&
+      !founderMessageOpen &&
+      !pillModalOpen &&
+      !rabbitCinematic &&
+      raidState.phase === "idle"
+    )
+      return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
         // Founder modals take highest priority
-        if (founderMessageOpen) { setFounderMessageOpen(false); return; }
-        if (pillModalOpen) { setPillModalOpen(false); return; }
+        if (founderMessageOpen) {
+          setFounderMessageOpen(false);
+          return;
+        }
+        if (pillModalOpen) {
+          setPillModalOpen(false);
+          return;
+        }
         // Rabbit cinematic
-        if (rabbitCinematic) { endRabbitCinematic(); return; }
+        if (rabbitCinematic) {
+          endRabbitCinematic();
+          return;
+        }
         // Raid takes priority
         if (raidState.phase !== "idle") {
           if (raidState.phase === "preview") {
@@ -871,18 +1061,45 @@ function HomeContent() {
             setSelectedBuilding(compareBuilding);
             setFocusedBuilding(compareBuilding.login);
             setCompareBuilding(null);
-          } else if (giftModalOpen) { setGiftModalOpen(false); setGiftItems(null); }
-            else if (giftClaimed) setGiftClaimed(false);
-          else if (shareData) { setShareData(null); setSelectedBuilding(null); setFocusedBuilding(null); }
-          else if (selectedBuilding) { setSelectedBuilding(null); setFocusedBuilding(null); }
-          else if (focusedBuilding) setFocusedBuilding(null);
-          else if (exploreMode) { setExploreMode(false); setFocusedBuilding(savedFocusRef.current); savedFocusRef.current = null; }
+          } else if (giftModalOpen) {
+            setGiftModalOpen(false);
+            setGiftItems(null);
+          } else if (giftClaimed) setGiftClaimed(false);
+          else if (shareData) {
+            setShareData(null);
+            setSelectedBuilding(null);
+            setFocusedBuilding(null);
+          } else if (selectedBuilding) {
+            setSelectedBuilding(null);
+            setFocusedBuilding(null);
+          } else if (focusedBuilding) setFocusedBuilding(null);
+          else if (exploreMode) {
+            setExploreMode(false);
+            setFocusedBuilding(savedFocusRef.current);
+            savedFocusRef.current = null;
+          }
         }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions]);
+  }, [
+    flyMode,
+    exploreMode,
+    focusedBuilding,
+    shareData,
+    selectedBuilding,
+    giftClaimed,
+    giftModalOpen,
+    comparePair,
+    compareBuilding,
+    founderMessageOpen,
+    pillModalOpen,
+    rabbitCinematic,
+    endRabbitCinematic,
+    raidState.phase,
+    raidActions,
+  ]);
 
   // Rabbit cinematic text phase timing (8s total flyover)
   useEffect(() => {
@@ -907,7 +1124,8 @@ function HomeContent() {
         if (!res.ok) return;
         const data = await res.json();
         const serverProgress = data?.progress ?? 0;
-        const localProgress = parseInt(localStorage.getItem("gitcity_rabbit_progress") ?? "0", 10) || 0;
+        const localProgress =
+          parseInt(localStorage.getItem("gitcity_rabbit_progress") ?? "0", 10) || 0;
 
         // Sync local progress to server if ahead (silently fails if no claimed building)
         if (localProgress > serverProgress) {
@@ -1010,7 +1228,9 @@ function HomeContent() {
         allDevs = snapshot.developers;
         cityStats = snapshot.stats;
       }
-    } catch { /* fall through to chunked */ }
+    } catch {
+      /* fall through to chunked */
+    }
 
     // Fallback to chunked API
     if (allDevs.length === 0) {
@@ -1027,8 +1247,9 @@ function HomeContent() {
         const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
         for (let from = CHUNK; from < total; from += CHUNK) {
           promises.push(
-            fetch(`/api/city?from=${from}&to=${from + CHUNK}${cbParam}`)
-              .then(r => r.ok ? r.json() : null)
+            fetch(`/api/city?from=${from}&to=${from + CHUNK}${cbParam}`).then((r) =>
+              r.ok ? r.json() : null,
+            ),
           );
         }
         const results = await Promise.all(promises);
@@ -1125,7 +1346,9 @@ function HomeContent() {
             allDevs = snapshot.developers;
             cityStats = snapshot.stats;
           }
-        } catch { /* fall through to chunked */ }
+        } catch {
+          /* fall through to chunked */
+        }
 
         // Fallback to chunked API
         if (allDevs.length === 0) {
@@ -1141,8 +1364,9 @@ function HomeContent() {
             const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
             for (let from = CHUNK; from < total; from += CHUNK) {
               promises.push(
-                fetch(`/api/city?from=${from}&to=${from + CHUNK}`)
-                  .then((r) => (r.ok ? r.json() : null))
+                fetch(`/api/city?from=${from}&to=${from + CHUNK}`).then((r) =>
+                  r.ok ? r.json() : null,
+                ),
               );
             }
             const results = await Promise.all(promises);
@@ -1217,7 +1441,7 @@ function HomeContent() {
     }
 
     loadCity();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadStage]);
 
   // City reload on tab return removed — navigating back from shop already
@@ -1271,9 +1495,7 @@ function HomeContent() {
   useEffect(() => {
     if (!userParam || giftedParam || buildings.length === 0) return;
 
-    const found = buildings.find(
-      (b) => b.login.toLowerCase() === userParam.toLowerCase()
-    );
+    const found = buildings.find((b) => b.login.toLowerCase() === userParam.toLowerCase());
     if (!found) return; // Not loaded yet, wait for next chunk
 
     if (!didFocusUserParam.current) {
@@ -1284,8 +1506,8 @@ function HomeContent() {
       setExploreMode(true);
     } else {
       // Buildings array was replaced (full layout loaded) — keep selectedBuilding in sync
-      setSelectedBuilding(prev =>
-        prev && prev.login.toLowerCase() === userParam.toLowerCase() ? found : prev
+      setSelectedBuilding((prev) =>
+        prev && prev.login.toLowerCase() === userParam.toLowerCase() ? found : prev,
       );
     }
   }, [userParam, giftedParam, buildings]);
@@ -1295,11 +1517,11 @@ function HomeContent() {
   const didHandleCompareParam = useRef(false);
   useEffect(() => {
     if (!compareParam || buildings.length === 0 || didHandleCompareParam.current) return;
-    const parts = compareParam.split(",").map(s => s.trim().toLowerCase());
+    const parts = compareParam.split(",").map((s) => s.trim().toLowerCase());
     if (parts.length !== 2 || parts[0] === parts[1]) return;
 
-    const bA = buildings.find(b => b.login.toLowerCase() === parts[0]);
-    const bB = buildings.find(b => b.login.toLowerCase() === parts[1]);
+    const bA = buildings.find((b) => b.login.toLowerCase() === parts[0]);
+    const bB = buildings.find((b) => b.login.toLowerCase() === parts[1]);
 
     if (bA && bB) {
       didHandleCompareParam.current = true;
@@ -1313,9 +1535,7 @@ function HomeContent() {
     didHandleCompareParam.current = true;
     (async () => {
       const missing = [!bA ? parts[0] : null, !bB ? parts[1] : null].filter(Boolean);
-      await Promise.all(
-        missing.map(login => fetch(`/api/dev/${encodeURIComponent(login!)}`))
-      );
+      await Promise.all(missing.map((login) => fetch(`/api/dev/${encodeURIComponent(login!)}`)));
       const updated = await reloadCity(true);
       if (!updated) return;
       const foundA = updated.find((b: CityBuilding) => b.login.toLowerCase() === parts[0]);
@@ -1351,9 +1571,7 @@ function HomeContent() {
       reloadCity();
       // Focus on receiver's building
       setFocusedBuilding(userParam);
-      const found = buildings.find(
-        (b) => b.login.toLowerCase() === userParam.toLowerCase()
-      );
+      const found = buildings.find((b) => b.login.toLowerCase() === userParam.toLowerCase());
       if (found) {
         setSelectedBuilding(found);
         setExploreMode(true);
@@ -1395,16 +1613,20 @@ function HomeContent() {
       }
 
       // Check if dev already exists in the city before the fetch
-      const existedBefore = buildings.some(
-        (b) => b.login.toLowerCase() === trimmed
-      );
+      const existedBefore = buildings.some((b) => b.login.toLowerCase() === trimmed);
 
       // Add/refresh the developer
       const devRes = await fetch(`/api/dev/${encodeURIComponent(trimmed)}`);
       const devData = await devRes.json();
 
       if (!devRes.ok) {
-        let code: "not-found" | "org" | "no-activity" | "rate-limit" | "github-rate-limit" | "generic" = "generic";
+        let code:
+          | "not-found"
+          | "org"
+          | "no-activity"
+          | "rate-limit"
+          | "github-rate-limit"
+          | "generic" = "generic";
         if (devRes.status === 404) code = "not-found";
         else if (devRes.status === 429) {
           code = devData.error?.includes("GitHub") ? "github-rate-limit" : "rate-limit";
@@ -1450,7 +1672,10 @@ function HomeContent() {
         setRiver(layout.river);
         setBridges(layout.bridges);
         setDistrictZones(layout.districtZones);
-        setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 } });
+        setCityCache({
+          ...layout,
+          stats: stats ?? { total_developers: 0, total_contributions: 0 },
+        });
         updatedBuildings = layout.buildings;
       }
 
@@ -1458,11 +1683,7 @@ function HomeContent() {
       setFocusedBuilding(devData.github_login);
 
       // A8: Ghost preview — if user searched for themselves, show temporary effect
-      if (
-        authLogin &&
-        trimmed === authLogin &&
-        !ghostPreviewShownRef.current
-      ) {
+      if (authLogin && trimmed === authLogin && !ghostPreviewShownRef.current) {
         ghostPreviewShownRef.current = true;
         setGhostPreviewLogin(devData.github_login);
         setTimeout(() => setGhostPreviewLogin(null), 4000);
@@ -1470,9 +1691,7 @@ function HomeContent() {
 
       // Find the building in the current or updated city
       const searchPool = updatedBuildings ?? buildings;
-      const foundBuilding = searchPool.find(
-        (b: CityBuilding) => b.login.toLowerCase() === trimmed
-      );
+      const foundBuilding = searchPool.find((b: CityBuilding) => b.login.toLowerCase() === trimmed);
 
       // Compare pick mode: use snapshot so ESC mid-search doesn't cause stale state
       if (wasComparing && !comparePair && foundBuilding) {
@@ -1536,8 +1755,8 @@ function HomeContent() {
   };
 
   const handleClaimFreeGift = async () => {
-if (claimingGift) return;
-        setClaimingGift(true);
+    if (claimingGift) return;
+    setClaimingGift(true);
     try {
       const res = await fetch("/api/claim-free-item", { method: "POST" });
       if (res.ok) {
@@ -1551,22 +1770,15 @@ if (claimingGift) return;
   };
 
   // Determine if the logged-in user can claim their building
-  const myBuilding = authLogin
-    ? buildings.find((b) => b.login.toLowerCase() === authLogin)
-    : null;
+  const myBuilding = authLogin ? buildings.find((b) => b.login.toLowerCase() === authLogin) : null;
   const canClaim = !!session && !!myBuilding && !myBuilding.claimed;
 
   // Shop link: logged in + claimed → own shop, otherwise → /shop landing
-  const shopHref =
-    session && myBuilding?.claimed
-      ? `/shop/${myBuilding.login}`
-      : "/shop";
+  const shopHref = session && myBuilding?.claimed ? `/shop/${myBuilding.login}` : "/shop";
 
   // Show free gift CTA when user claimed but hasn't picked up the free item
   const hasFreeGift =
-    !!session &&
-    !!myBuilding?.claimed &&
-    !myBuilding.owned_items.includes("flag");
+    !!session && !!myBuilding?.claimed && !myBuilding.owned_items.includes("flag");
 
   // Show district chooser once per session when user hasn't chosen yet
   const shouldShowDistrictChooser =
@@ -1582,7 +1794,13 @@ if (claimingGift) return;
   const { streakData } = useStreakCheckin(session, !!myBuilding?.claimed);
 
   // Daily missions
-  const { data: dailiesData, trackClientMission, claim: claimDailies, refresh: refreshDailies, toasts: dailyToasts } = useDailies(session, !!myBuilding?.claimed);
+  const {
+    data: dailiesData,
+    trackClientMission,
+    claim: claimDailies,
+    refresh: refreshDailies,
+    toasts: dailyToasts,
+  } = useDailies(session, !!myBuilding?.claimed);
   // Stable ref so closures (visit useEffect, kudos callback) always use latest
   const trackMissionRef = useRef(trackClientMission);
   trackMissionRef.current = trackClientMission;
@@ -1617,8 +1835,10 @@ if (claimingGift) return;
   // Fetch milestone celebrations on mount
   useEffect(() => {
     fetch("/api/milestone-celebration")
-      .then((r) => r.ok ? r.json() : [])
-      .then((data) => { if (Array.isArray(data)) setMilestoneCelebrations(data); })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setMilestoneCelebrations(data);
+      })
       .catch(() => {});
   }, []);
 
@@ -1673,14 +1893,22 @@ if (claimingGift) return;
   useEffect(() => {
     if (loadStage !== "done" || isMobile || flyMode || introMode) return;
     try {
-      if (localStorage.getItem("gitcity_fly_history") || localStorage.getItem("gitcity_fly_hint_seen")) return;
-    } catch { return; }
+      if (
+        localStorage.getItem("gitcity_fly_history") ||
+        localStorage.getItem("gitcity_fly_hint_seen")
+      )
+        return;
+    } catch {
+      return;
+    }
     flyHintTimerRef.current = setTimeout(() => {
       setShowFlyHint(true);
       // Auto-dismiss after 10s
       const autoDismiss = setTimeout(() => {
         setShowFlyHint(false);
-        try { localStorage.setItem("gitcity_fly_hint_seen", "1"); } catch {}
+        try {
+          localStorage.setItem("gitcity_fly_hint_seen", "1");
+        } catch {}
       }, 10000);
       flyHintTimerRef.current = autoDismiss;
     }, 5000);
@@ -1708,18 +1936,28 @@ if (claimingGift) return;
           // Time bonus: % of base score scaled by how fast you finished (max +50% of base score)
           // Rewards efficiency without letting quick-quits dominate
           const FLY_TIME_LIMIT = 90;
-          const timeFraction = flyScore.collected > 0 ? Math.max(0, (FLY_TIME_LIMIT - flightMs / 1000) / FLY_TIME_LIMIT) : 0;
+          const timeFraction =
+            flyScore.collected > 0
+              ? Math.max(0, (FLY_TIME_LIMIT - flightMs / 1000) / FLY_TIME_LIMIT)
+              : 0;
           const timeBonus = Math.floor(flyScore.score * 0.5 * timeFraction);
           const finalScore = flyScore.score + timeBonus;
           // Read current PB fresh from localStorage (React state may be stale)
           let currentPB = flyPersonalBest;
-          try { currentPB = Math.max(currentPB, parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0); } catch {}
+          try {
+            currentPB = Math.max(
+              currentPB,
+              parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0,
+            );
+          } catch {}
           // Only show "New PB!" if there WAS a previous best to beat (not on first-ever flight)
           const isNewPB = currentPB > 0 && finalScore > currentPB;
           // Update personal best
           if (isNewPB) {
             setFlyPersonalBest(finalScore);
-            try { localStorage.setItem("gitcity_fly_pb", String(finalScore)); } catch {}
+            try {
+              localStorage.setItem("gitcity_fly_pb", String(finalScore));
+            } catch {}
           }
           // Update fly history (streak, days played, per-seed scores)
           if (finalScore > 0) {
@@ -1729,7 +1967,9 @@ if (claimingGift) return;
               const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
               const currentSeed = `${now.getFullYear()}-${dayOfYear}`;
               const raw = localStorage.getItem("gitcity_fly_history");
-              const hist = raw ? JSON.parse(raw) : { seeds: {}, currentStreak: 0, longestStreak: 0, lastPlayedSeed: "" };
+              const hist = raw
+                ? JSON.parse(raw)
+                : { seeds: {}, currentStreak: 0, longestStreak: 0, lastPlayedSeed: "" };
               const prev = hist.seeds[currentSeed];
               hist.seeds[currentSeed] = {
                 bestScore: Math.max(prev?.bestScore ?? 0, finalScore),
@@ -1738,7 +1978,10 @@ if (claimingGift) return;
               // Recalculate streak
               if (hist.lastPlayedSeed !== currentSeed) {
                 const yesterdayDay = dayOfYear - 1;
-                const yesterdaySeed = yesterdayDay >= 1 ? `${now.getFullYear()}-${yesterdayDay}` : `${now.getFullYear() - 1}-365`;
+                const yesterdaySeed =
+                  yesterdayDay >= 1
+                    ? `${now.getFullYear()}-${yesterdayDay}`
+                    : `${now.getFullYear() - 1}-365`;
                 if (hist.lastPlayedSeed === yesterdaySeed) {
                   hist.currentStreak = (hist.currentStreak || 0) + 1;
                 } else if (!hist.lastPlayedSeed) {
@@ -1753,10 +1996,20 @@ if (claimingGift) return;
             } catch {}
           }
           // Exit fly immediately (don't block on API)
-          setFlyMode(false); setFlyPaused(false); lastDistrictRef.current = null; setDistrictAnnouncement(null); clearTimeout(announceTimerRef.current);
+          setFlyMode(false);
+          setFlyPaused(false);
+          lastDistrictRef.current = null;
+          setDistrictAnnouncement(null);
+          clearTimeout(announceTimerRef.current);
           // Feature 4: Show post-flight results (rank fills in async)
           if (finalScore > 0) {
-            const captured = { score: finalScore, collected: flyScore.collected, maxCombo: flyScore.maxCombo, timeBonus, isNewPB };
+            const captured = {
+              score: finalScore,
+              collected: flyScore.collected,
+              maxCombo: flyScore.maxCombo,
+              timeBonus,
+              isNewPB,
+            };
             // Show immediately with rank=0, then update when POST returns
             setShowFlyResults({ ...captured, rank: 0, totalPilots: 0 });
             flyResultsTimerRef.current = setTimeout(() => setShowFlyResults(null), 12000);
@@ -1766,12 +2019,21 @@ if (claimingGift) return;
               fetch("/api/fly-scores", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ score: finalScore, collected: flyScore.collected, max_combo: maxComboVal, flight_ms: flightMs }),
+                body: JSON.stringify({
+                  score: finalScore,
+                  collected: flyScore.collected,
+                  max_combo: maxComboVal,
+                  flight_ms: flightMs,
+                }),
               })
-                .then((res) => res.ok ? res.json() : null)
+                .then((res) => (res.ok ? res.json() : null))
                 .then((data) => {
                   if (data) {
-                    setShowFlyResults((prev) => prev ? { ...prev, rank: data.rank_today ?? 0, totalPilots: data.total ?? 0 } : null);
+                    setShowFlyResults((prev) =>
+                      prev
+                        ? { ...prev, rank: data.rank_today ?? 0, totalPilots: data.total ?? 0 }
+                        : null,
+                    );
                   }
                 })
                 .catch(() => {});
@@ -1789,12 +2051,16 @@ if (claimingGift) return;
           let nearestDistrict: string | null = null;
           let bestDist = Infinity;
           for (const b of buildings) {
-            const dx = mapX - b.position[0], dz = mapZ - b.position[2];
+            const dx = mapX - b.position[0],
+              dz = mapZ - b.position[2];
             const dist = dx * dx + dz * dz;
-            if (dist < bestDist) { bestDist = dist; nearestDistrict = b.district ?? "fullstack"; }
+            if (dist < bestDist) {
+              bestDist = dist;
+              nearestDistrict = b.district ?? "fullstack";
+            }
           }
           const district = nearestDistrict
-            ? districtZones.find(d => d.id === nearestDistrict) ?? null
+            ? (districtZones.find((d) => d.id === nearestDistrict) ?? null)
             : null;
           const now = Date.now();
           if (district && district.id !== lastDistrictRef.current) {
@@ -1803,7 +2069,11 @@ if (claimingGift) return;
             if (now - announceCooldownRef.current > 5000) {
               announceCooldownRef.current = now;
               clearTimeout(announceTimerRef.current);
-              setDistrictAnnouncement({ name: district.name, color: district.color, population: district.population });
+              setDistrictAnnouncement({
+                name: district.name,
+                color: district.color,
+                population: district.population,
+              });
               announceTimerRef.current = setTimeout(() => setDistrictAnnouncement(null), 3000);
             }
           }
@@ -1817,7 +2087,9 @@ if (claimingGift) return;
           }
           setFlyPaused(p);
         }}
-        onCollect={(score, earned, combo, collected, maxCombo) => setFlyScore({ score, earned, combo, collected, maxCombo })}
+        onCollect={(score, earned, combo, collected, maxCombo) =>
+          setFlyScore({ score, earned, combo, collected, maxCombo })
+        }
         focusedBuilding={focusedBuilding}
         focusedBuildingB={focusedBuildingB}
         accentColor={theme.accent}
@@ -1848,7 +2120,11 @@ if (claimingGift) return;
               a.rel = "noopener noreferrer";
               a.click();
             }
-            try { setAdToast(ad.brand || new URL(ad.link).hostname.replace("www.", "")); } catch { setAdToast(ad.brand || "link"); }
+            try {
+              setAdToast(ad.brand || new URL(ad.link).hostname.replace("www.", ""));
+            } catch {
+              setAdToast(ad.brand || "link");
+            }
             setTimeout(() => setAdToast(null), 2500);
           } else {
             trackAdEvent(ad.id, "click", authLogin || undefined);
@@ -1868,7 +2144,7 @@ if (claimingGift) return;
             // sessionStorage unavailable — allow tracking
           }
           trackAdEvent(adId, "impression", authLogin || undefined);
-          const ad = skyAds.find(a => a.id === adId);
+          const ad = skyAds.find((a) => a.id === adId);
           if (ad) trackSkyAdImpression(ad.id, ad.vehicle, ad.brand);
         }}
         introMode={introMode}
@@ -1880,7 +2156,10 @@ if (claimingGift) return;
         raidAttacker={raidState.attackerBuilding}
         raidDefender={raidState.defenderBuilding}
         onRaidPhaseComplete={raidActions.onPhaseComplete}
-        onLandmarkClick={() => { setPillModalOpen(true); setSelectedBuilding(null); }}
+        onLandmarkClick={() => {
+          setPillModalOpen(true);
+          setSelectedBuilding(null);
+        }}
         rabbitSighting={rabbitSighting}
         onRabbitCaught={onRabbitCaught}
         rabbitCinematic={rabbitCinematic}
@@ -1924,7 +2203,7 @@ if (claimingGift) return;
           }
           if (flyMode) {
             // Auto-pause flight to show profile card
-            setFlyPauseSignal(s => s + 1);
+            setFlyPauseSignal((s) => s + 1);
           } else if (!exploreMode) {
             setExploreMode(true);
           }
@@ -1957,7 +2236,10 @@ if (claimingGift) return;
           />
 
           {/* Text in the lower bar area */}
-          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center" style={{ height: "18%" }}>
+          <div
+            className="absolute inset-x-0 bottom-0 flex items-center justify-center"
+            style={{ height: "18%" }}
+          >
             {/* Narrative texts (phases 0-2) */}
             {[
               "Somewhere in the internet...",
@@ -1991,8 +2273,7 @@ if (claimingGift) return;
                 className="text-center font-pixel uppercase text-cream"
                 style={{ fontSize: "clamp(1.2rem, 5vw, 2.8rem)" }}
               >
-                Welcome to{" "}
-                <span style={{ color: theme.accent }}>Git City</span>
+                Welcome to <span style={{ color: theme.accent }}>Git City</span>
               </p>
             </div>
           </div>
@@ -2001,7 +2282,14 @@ if (claimingGift) return;
           {introConfetti && (
             <div className="absolute inset-0 overflow-hidden">
               {Array.from({ length: 25 }).map((_, i) => {
-                const colors = [theme.accent, "#fff", theme.shadow, "#f0c060", "#e040c0", "#60c0f0"];
+                const colors = [
+                  theme.accent,
+                  "#fff",
+                  theme.shadow,
+                  "#f0c060",
+                  "#e040c0",
+                  "#60c0f0",
+                ];
                 const color = colors[i % colors.length];
                 const left = 10 + Math.random() * 80;
                 const delay = Math.random() * 0.6;
@@ -2050,11 +2338,11 @@ if (claimingGift) return;
                 className={`h-2 w-2 flex-shrink-0 ${flyPaused ? "" : "blink-dot"}`}
                 style={{ backgroundColor: flyPaused ? "#f85149" : theme.accent }}
               />
-              <span className="text-[10px] text-cream">
-                {flyPaused ? "Paused" : "Fly"}
-              </span>
+              <span className="text-[10px] text-cream">{flyPaused ? "Paused" : "Fly"}</span>
               <span className="mx-1 text-border">|</span>
-              <span className="text-[10px]" style={{ color: theme.accent }}>{flyScore.score}</span>
+              <span className="text-[10px]" style={{ color: theme.accent }}>
+                {flyScore.score}
+              </span>
               <span className="text-[10px] text-muted">PX</span>
               {flyScore.combo >= 2 && (
                 <span className="animate-pulse text-[10px] font-bold" style={{ color: "#ffd700" }}>
@@ -2068,7 +2356,13 @@ if (claimingGift) return;
           <div className="absolute top-4 right-3 text-right text-[9px] text-muted sm:right-4 sm:text-[10px]">
             <div>{flyScore.collected}/40 collected</div>
             <div className="mt-1 flex h-[4px] w-24 items-center border border-border/40 bg-bg/50 ml-auto">
-              <div className="h-full transition-all duration-150" style={{ width: `${(flyScore.collected / 40) * 100}%`, backgroundColor: theme.accent }} />
+              <div
+                className="h-full transition-all duration-150"
+                style={{
+                  width: `${(flyScore.collected / 40) * 100}%`,
+                  backgroundColor: theme.accent,
+                }}
+              />
             </div>
             <div className="mt-1.5 text-[8px]">
               <span className="text-muted">TIME </span>
@@ -2077,7 +2371,9 @@ if (claimingGift) return;
               </span>
             </div>
             {flyPersonalBest > 0 && (
-              <div className="mt-0.5 text-[8px] text-muted">BEST: <span style={{ color: theme.accent }}>{flyPersonalBest}</span></div>
+              <div className="mt-0.5 text-[8px] text-muted">
+                BEST: <span style={{ color: theme.accent }}>{flyPersonalBest}</span>
+              </div>
             )}
           </div>
 
@@ -2099,20 +2395,25 @@ if (claimingGift) return;
               </div>
             </div>
             <div>
-              ALT{" "}
-              <span style={{ color: theme.accent }}>
-                {Math.round(hud.altitude)}
-              </span>
+              ALT <span style={{ color: theme.accent }}>{Math.round(hud.altitude)}</span>
             </div>
           </div>
 
           {/* District announcement */}
           {districtAnnouncement && (
-            <div key={districtAnnouncement.name} className="absolute bottom-32 left-3 animate-district-in sm:left-4">
-              <div className="border-l-4 bg-bg/80 px-4 py-2 backdrop-blur-sm" style={{ borderColor: districtAnnouncement.color }}>
+            <div
+              key={districtAnnouncement.name}
+              className="absolute bottom-32 left-3 animate-district-in sm:left-4"
+            >
+              <div
+                className="border-l-4 bg-bg/80 px-4 py-2 backdrop-blur-sm"
+                style={{ borderColor: districtAnnouncement.color }}
+              >
                 <div className="text-[8px] uppercase tracking-widest text-muted">District</div>
                 <div className="font-pixel text-sm text-cream">{districtAnnouncement.name}</div>
-                <div className="text-[8px] text-muted">{districtAnnouncement.population.toLocaleString()} devs</div>
+                <div className="text-[8px] text-muted">
+                  {districtAnnouncement.population.toLocaleString()} devs
+                </div>
               </div>
             </div>
           )}
@@ -2189,9 +2490,13 @@ if (claimingGift) return;
             <button
               onClick={() => {
                 setShowFlyControls(false);
-                try { localStorage.setItem("gitcity_fly_controls_seen", "1"); } catch {}
+                try {
+                  localStorage.setItem("gitcity_fly_controls_seen", "1");
+                } catch {}
                 // Resume the paused flight by dispatching Space keydown
-                window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true }));
+                window.dispatchEvent(
+                  new KeyboardEvent("keydown", { code: "Space", bubbles: true }),
+                );
               }}
               className="btn-press mt-5 px-6 py-2 text-[10px] text-bg"
               style={{ backgroundColor: theme.accent, boxShadow: `3px 3px 0 0 ${theme.shadow}` }}
@@ -2245,7 +2550,9 @@ if (claimingGift) return;
             >
               <span style={{ color: theme.accent }}>&#9654;</span>
               <span className="text-cream">{theme.name}</span>
-              <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
+              <span className="text-dim">
+                {themeIndex + 1}/{THEMES.length}
+              </span>
             </button>
           </div>
 
@@ -2267,11 +2574,21 @@ if (claimingGift) return;
           {/* Navigation hints (bottom-right) — hidden when building card is open */}
           {!selectedBuilding && (
             <div className="absolute bottom-3 right-3 text-right text-[8px] leading-loose text-muted sm:bottom-4 sm:right-4 sm:text-[9px]">
-              <div><span className="text-cream">Drag</span> orbit</div>
-              <div><span className="text-cream">Scroll</span> zoom</div>
-              <div><span className="text-cream">Right-drag</span> pan</div>
-              <div><span className="text-cream">Click</span> building</div>
-              <div><span style={{ color: theme.accent }}>ESC</span> back</div>
+              <div>
+                <span className="text-cream">Drag</span> orbit
+              </div>
+              <div>
+                <span className="text-cream">Scroll</span> zoom
+              </div>
+              <div>
+                <span className="text-cream">Right-drag</span> pan
+              </div>
+              <div>
+                <span className="text-cream">Click</span> building
+              </div>
+              <div>
+                <span style={{ color: theme.accent }}>ESC</span> back
+              </div>
             </div>
           )}
         </div>
@@ -2281,14 +2598,24 @@ if (claimingGift) return;
 
       {/* ─── GitHub Badge (mobile: top-center, desktop: top-right) ─── */}
       {!flyMode && !introMode && !rabbitCinematic && (
-        <div className={`pointer-events-auto fixed top-3 left-1/2 z-30 -translate-x-1/2 items-center gap-2 sm:left-auto sm:right-4 sm:top-4 sm:translate-x-0 ${exploreMode ? "hidden lg:flex" : "flex"}`}>
+        <div
+          className={`pointer-events-auto fixed top-3 left-1/2 z-30 -translate-x-1/2 items-center gap-2 sm:left-auto sm:right-4 sm:top-4 sm:translate-x-0 ${exploreMode ? "hidden lg:flex" : "flex"}`}
+        >
           <a
             href="https://github.com/srizzon/git-city"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              className="text-cream"
+            >
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
+            </svg>
             <span style={{ color: theme.accent }}>&#9733;</span>
             {starCount != null && <span className="text-cream">{starCount.toLocaleString()}</span>}
           </a>
@@ -2298,9 +2625,19 @@ if (claimingGift) return;
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2]"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z"/></svg>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="text-[#5865F2]"
+            >
+              <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z" />
+            </svg>
             <span className="text-cream">Discord</span>
-            {discordMembers != null && <span className="text-cream">{discordMembers.toLocaleString()}</span>}
+            {discordMembers != null && (
+              <span className="text-cream">{discordMembers.toLocaleString()}</span>
+            )}
           </a>
           {liveStatus !== "error" && (
             <div className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm">
@@ -2325,8 +2662,7 @@ if (claimingGift) return;
           <div className="pointer-events-auto flex w-full max-w-2xl flex-col items-center gap-3 sm:gap-5">
             <div className="text-center">
               <h1 className="text-2xl text-cream sm:text-3xl md:text-5xl">
-                Git{" "}
-                <span style={{ color: theme.accent }}>City</span>
+                Git <span style={{ color: theme.accent }}>City</span>
               </h1>
               <p className="mt-2 text-[10px] leading-relaxed text-cream/80 normal-case">
                 {stats.total_developers > 0
@@ -2348,103 +2684,111 @@ if (claimingGift) return;
             </div>
 
             {/* Milestone progress banner */}
-            {MILESTONE_MODE === "stars" ? (
-              // ── GitHub Stars mode ──
-              (() => {
-                if (starCount == null) return null;
-                const STAR_MILESTONES = [100, 250, 500, 1000, 2500, 5000];
-                const target = STAR_MILESTONES.find((m) => starCount < m);
-                if (!target) return null;
-                const prev = STAR_MILESTONES[STAR_MILESTONES.indexOf(target) - 1] ?? 0;
-                const progress = ((starCount - prev) / (target - prev)) * 100;
-                const remaining = target - starCount;
-                const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
-                return (
-                  <a
-                    href="https://github.com/srizzon/git-city"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full max-w-sm group"
-                  >
-                    <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm transition-colors group-hover:border-[var(--hover-border)]" style={{ "--hover-border": theme.accent } as React.CSSProperties}>
-                      <div className="mb-2 flex items-baseline justify-between">
-                        <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
-                          ROAD TO {label} STARS
-                        </span>
-                        <span className="text-[9px] text-cream/60">
-                          {remaining.toLocaleString()} to go
-                        </span>
+            {MILESTONE_MODE === "stars"
+              ? // ── GitHub Stars mode ──
+                (() => {
+                  if (starCount == null) return null;
+                  const STAR_MILESTONES = [100, 250, 500, 1000, 2500, 5000];
+                  const target = STAR_MILESTONES.find((m) => starCount < m);
+                  if (!target) return null;
+                  const prev = STAR_MILESTONES[STAR_MILESTONES.indexOf(target) - 1] ?? 0;
+                  const progress = ((starCount - prev) / (target - prev)) * 100;
+                  const remaining = target - starCount;
+                  const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
+                  return (
+                    <a
+                      href="https://github.com/srizzon/git-city"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full max-w-sm group"
+                    >
+                      <div
+                        className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm transition-colors group-hover:border-[var(--hover-border)]"
+                        style={{ "--hover-border": theme.accent } as React.CSSProperties}
+                      >
+                        <div className="mb-2 flex items-baseline justify-between">
+                          <span
+                            className="text-[9px] tracking-wider"
+                            style={{ color: theme.accent }}
+                          >
+                            ROAD TO {label} STARS
+                          </span>
+                          <span className="text-[9px] text-cream/60">
+                            {remaining.toLocaleString()} to go
+                          </span>
+                        </div>
+                        <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
+                          <div
+                            className="absolute inset-y-0 left-0 transition-all duration-1000"
+                            style={{
+                              width: `${progress}%`,
+                              backgroundColor: theme.accent,
+                              boxShadow: `0 0 8px ${theme.accent}60`,
+                            }}
+                          />
+                        </div>
+                        <div className="mt-2 flex items-baseline justify-between">
+                          <span className="text-[10px] text-cream">
+                            {starCount.toLocaleString()}{" "}
+                            <span className="text-cream/40">/ {target.toLocaleString()}</span>
+                          </span>
+                          <span className="text-[8px] text-cream/40 normal-case group-hover:text-cream/60 transition-colors">
+                            Star us on GitHub
+                          </span>
+                        </div>
                       </div>
-                      <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
-                        <div
-                          className="absolute inset-y-0 left-0 transition-all duration-1000"
-                          style={{
-                            width: `${progress}%`,
-                            backgroundColor: theme.accent,
-                            boxShadow: `0 0 8px ${theme.accent}60`,
-                          }}
-                        />
-                      </div>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-[10px] text-cream">
-                          {starCount.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
-                        </span>
-                        <span className="text-[8px] text-cream/40 normal-case group-hover:text-cream/60 transition-colors">
-                          Star us on GitHub
-                        </span>
+                    </a>
+                  );
+                })()
+              : // ── Total Developers mode ──
+                (() => {
+                  const MILESTONES = [10000, 20000, 50000, 100000];
+                  const count = stats.total_developers;
+                  if (count <= 0) return null;
+
+                  const target = MILESTONES.find((m) => count < m);
+                  if (!target) return null;
+                  const prev = MILESTONES[MILESTONES.indexOf(target) - 1] ?? 0;
+                  const progress = ((count - prev) / (target - prev)) * 100;
+                  const remaining = target - count;
+                  const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
+                  return (
+                    <div className="w-full max-w-sm">
+                      <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm">
+                        <div className="mb-2 flex items-baseline justify-between">
+                          <span
+                            className="text-[9px] tracking-wider"
+                            style={{ color: theme.accent }}
+                          >
+                            ROAD TO {label}
+                          </span>
+                          <span className="text-[9px] text-cream/60">
+                            {remaining.toLocaleString()} to go
+                          </span>
+                        </div>
+                        <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
+                          <div
+                            className="absolute inset-y-0 left-0 transition-all duration-1000"
+                            style={{
+                              width: `${progress}%`,
+                              backgroundColor: theme.accent,
+                              boxShadow: `0 0 8px ${theme.accent}60`,
+                            }}
+                          />
+                        </div>
+                        <div className="mt-2 flex items-baseline justify-between">
+                          <span className="text-[10px] text-cream">
+                            {count.toLocaleString()}{" "}
+                            <span className="text-cream/40">/ {target.toLocaleString()}</span>
+                          </span>
+                          <span className="text-[8px] text-cream/40 normal-case">
+                            Something unlocks at {label}...
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </a>
-                );
-              })()
-            ) : (
-              // ── Total Developers mode ──
-              (() => {
-                const MILESTONES = [10000, 20000, 50000, 100000];
-                const count = stats.total_developers;
-                if (count <= 0) return null;
-
-                const target = MILESTONES.find((m) => count < m);
-                if (!target) return null;
-                const prev = MILESTONES[MILESTONES.indexOf(target) - 1] ?? 0;
-                const progress = ((count - prev) / (target - prev)) * 100;
-                const remaining = target - count;
-                const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
-                return (
-                  <div className="w-full max-w-sm">
-                    <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm">
-                      <div className="mb-2 flex items-baseline justify-between">
-                        <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
-                          ROAD TO {label}
-                        </span>
-                        <span className="text-[9px] text-cream/60">
-                          {remaining.toLocaleString()} to go
-                        </span>
-                      </div>
-                      <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
-                        <div
-                          className="absolute inset-y-0 left-0 transition-all duration-1000"
-                          style={{
-                            width: `${progress}%`,
-                            backgroundColor: theme.accent,
-                            boxShadow: `0 0 8px ${theme.accent}60`,
-                          }}
-                        />
-                      </div>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-[10px] text-cream">
-                          {count.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
-                        </span>
-                        <span className="text-[8px] text-cream/40 normal-case">
-                          Something unlocks at {label}...
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()
-            )}
-
+                  );
+                })()}
 
             {/* Search / Welcome CTA takeover */}
             {welcomeCtaVisible && !session ? (
@@ -2481,10 +2825,7 @@ if (claimingGift) return;
                 </button>
               </div>
             ) : (
-              <form
-                onSubmit={handleSubmit}
-                className="flex w-full max-w-md items-center gap-2"
-              >
+              <form onSubmit={handleSubmit} className="flex w-full max-w-md items-center gap-2">
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -2514,7 +2855,12 @@ if (claimingGift) return;
             )}
 
             {/* Search Feedback: loading phases + errors */}
-            <SearchFeedback feedback={feedback} accentColor={theme.accent} onDismiss={() => setFeedback(null)} onRetry={searchUser} />
+            <SearchFeedback
+              feedback={feedback}
+              accentColor={theme.accent}
+              onDismiss={() => setFeedback(null)}
+              onRetry={searchUser}
+            />
 
             {/* Loading indicator removed — LoadingScreen overlay handles this */}
           </div>
@@ -2561,7 +2907,13 @@ if (claimingGift) return;
                         flyPausedAt.current = 0;
                         flyTotalPauseMs.current = 0;
                         setFlyElapsedSec(0);
-                        try { setFlyPersonalBest(parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0); } catch { setFlyPersonalBest(0); }
+                        try {
+                          setFlyPersonalBest(
+                            parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0,
+                          );
+                        } catch {
+                          setFlyPersonalBest(0);
+                        }
                         // Feature 3: show controls overlay on first flight
                         if (!localStorage.getItem("gitcity_fly_controls_seen")) {
                           setShowFlyControls(true);
@@ -2598,7 +2950,9 @@ if (claimingGift) return;
                             onClick={() => {
                               setShowFlyHint(false);
                               clearTimeout(flyHintTimerRef.current);
-                              try { localStorage.setItem("gitcity_fly_hint_seen", "1"); } catch {}
+                              try {
+                                localStorage.setItem("gitcity_fly_hint_seen", "1");
+                              } catch {}
                             }}
                             className="mt-2 px-3 py-1 text-[9px] text-bg"
                             style={{ backgroundColor: theme.accent }}
@@ -2631,7 +2985,13 @@ if (claimingGift) return;
                       flyPausedAt.current = 0;
                       flyTotalPauseMs.current = 0;
                       setFlyElapsedSec(0);
-                      try { setFlyPersonalBest(parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0); } catch { setFlyPersonalBest(0); }
+                      try {
+                        setFlyPersonalBest(
+                          parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0,
+                        );
+                      } catch {
+                        setFlyPersonalBest(0);
+                      }
                       if (!localStorage.getItem("gitcity_fly_controls_seen")) {
                         setShowFlyControls(true);
                       }
@@ -2643,7 +3003,10 @@ if (claimingGift) return;
                     <span>Play &#8594;</span>
                   </button>
                   <button
-                    onClick={() => { setShowDailyNudge(false); clearTimeout(dailyNudgeTimerRef.current); }}
+                    onClick={() => {
+                      setShowDailyNudge(false);
+                      clearTimeout(dailyNudgeTimerRef.current);
+                    }}
                     className="text-[10px] text-muted transition-colors hover:text-cream"
                   >
                     &#10005;
@@ -2663,7 +3026,11 @@ if (claimingGift) return;
                 <Link
                   href="/advertise"
                   className="btn-press relative border-[3px] px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors"
-                  style={{ color: theme.accent, borderColor: theme.accent + "60", backgroundColor: theme.accent + "12" }}
+                  style={{
+                    color: theme.accent,
+                    borderColor: theme.accent + "60",
+                    backgroundColor: theme.accent + "12",
+                  }}
                 >
                   Place your Ad
                   <span
@@ -2710,11 +3077,18 @@ if (claimingGift) return;
                     <Link
                       href={`/dev/${authLogin}`}
                       className="flex items-center gap-1.5 border-[3px] border-border bg-bg/80 px-3 py-1.5 text-[10px] text-cream normal-case backdrop-blur-sm transition-colors hover:border-border-light"
-                      style={streakData && streakData.streak > 0 && streakData.checked_in ? { animation: "streak-pulse 1.5s ease-in-out 2" } : undefined}
+                      style={
+                        streakData && streakData.streak > 0 && streakData.checked_in
+                          ? { animation: "streak-pulse 1.5s ease-in-out 2" }
+                          : undefined
+                      }
                     >
                       @{authLogin}
                       {streakData && streakData.streak > 0 && (
-                        <span className="flex items-center gap-0.5" style={{ color: getStreakTierColor(streakData.streak) }}>
+                        <span
+                          className="flex items-center gap-0.5"
+                          style={{ color: getStreakTierColor(streakData.streak) }}
+                        >
                           <span className="text-[9px] leading-none">🔥</span>
                           <span className="font-bold">{streakData.streak}</span>
                         </span>
@@ -2775,7 +3149,9 @@ if (claimingGift) return;
             }}
           >
             <span className="text-base">🎁</span>
-            <span>{ITEM_NAMES[giftedInfo.item] ?? giftedInfo.item} sent to {giftedInfo.to}!</span>
+            <span>
+              {ITEM_NAMES[giftedInfo.item] ?? giftedInfo.item} sent to {giftedInfo.to}!
+            </span>
           </div>
         </div>
       )}
@@ -2840,7 +3216,9 @@ if (claimingGift) return;
               Neon Outline, Particle Aura, Spotlight, and more
             </p>
             <Link
-              href={myBuilding?.claimed ? `/shop/${ghostPreviewLogin}` : `/dev/${ghostPreviewLogin}`}
+              href={
+                myBuilding?.claimed ? `/shop/${ghostPreviewLogin}` : `/dev/${ghostPreviewLogin}`
+              }
               onClick={() => setGhostPreviewLogin(null)}
               className="btn-press block w-full py-2 text-center text-[10px] text-bg"
               style={{
@@ -2890,407 +3268,456 @@ if (claimingGift) return;
 
       {/* ─── Building Profile Card ─── */}
       {/* Desktop: right edge, vertically centered. Mobile: bottom sheet, centered. */}
-      {selectedBuilding && (!flyMode || flyPaused) && !comparePair && raidState.phase === "idle" && (
-        <>
-          {/* Nav hints — only on desktop, bottom-right */}
-          <div className="pointer-events-none fixed bottom-6 right-6 z-30 hidden text-right text-[9px] leading-loose text-muted sm:block">
-            <div><span className="text-cream">Drag</span> orbit</div>
-            <div><span className="text-cream">Scroll</span> zoom</div>
-            <div><span style={{ color: theme.accent }}>ESC</span> close</div>
-          </div>
+      {selectedBuilding &&
+        (!flyMode || flyPaused) &&
+        !comparePair &&
+        raidState.phase === "idle" && (
+          <>
+            {/* Nav hints — only on desktop, bottom-right */}
+            <div className="pointer-events-none fixed bottom-6 right-6 z-30 hidden text-right text-[9px] leading-loose text-muted sm:block">
+              <div>
+                <span className="text-cream">Drag</span> orbit
+              </div>
+              <div>
+                <span className="text-cream">Scroll</span> zoom
+              </div>
+              <div>
+                <span style={{ color: theme.accent }}>ESC</span> close
+              </div>
+            </div>
 
-          {/* Card container — mobile: bottom sheet, desktop: fixed right side */}
-          <div className="pointer-events-auto fixed z-40
+            {/* Card container — mobile: bottom sheet, desktop: fixed right side */}
+            <div
+              className="pointer-events-auto fixed z-40
             bottom-0 left-0 right-0
             sm:bottom-auto sm:left-auto sm:right-5 sm:top-1/2 sm:-translate-y-1/2"
-          >
-            <div className="relative border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
+            >
+              <div
+                className="relative border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
               w-full max-h-[50vh] overflow-y-auto sm:w-[320px] sm:border-[3px] sm:max-h-[85vh]
               animate-[slide-up_0.2s_ease-out] sm:animate-none"
-            >
-              {/* Close */}
-              <button
-                onClick={() => { setSelectedBuilding(null); setFocusedBuilding(null); }}
-                className="absolute top-2 right-3 text-[10px] text-muted transition-colors hover:text-cream z-10"
               >
-                ESC
-              </button>
+                {/* Close */}
+                <button
+                  onClick={() => {
+                    setSelectedBuilding(null);
+                    setFocusedBuilding(null);
+                  }}
+                  className="absolute top-2 right-3 text-[10px] text-muted transition-colors hover:text-cream z-10"
+                >
+                  ESC
+                </button>
 
-              {/* Drag handle on mobile */}
-              <div className="flex justify-center py-2 sm:hidden">
-                <div className="h-1 w-10 rounded-full bg-border" />
-              </div>
+                {/* Drag handle on mobile */}
+                <div className="flex justify-center py-2 sm:hidden">
+                  <div className="h-1 w-10 rounded-full bg-border" />
+                </div>
 
-              {/* Header with avatar + name */}
-              <div className="flex items-center gap-3 px-4 pb-3 sm:pt-4">
-                {selectedBuilding.avatar_url && (
-                  <Image
-                    src={selectedBuilding.avatar_url}
-                    alt={selectedBuilding.login}
-                    width={48}
-                    height={48}
-                    className="border-[2px] border-border flex-shrink-0"
-                    style={{ imageRendering: "pixelated" }}
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    {selectedBuilding.name && (
-                      <p className="truncate text-sm text-cream">{selectedBuilding.name}</p>
-                    )}
-                    {selectedBuilding.claimed && (
-                      <span
-                        className="flex-shrink-0 px-1.5 py-0.5 text-[7px] text-bg"
-                        style={{ backgroundColor: theme.accent }}
-                      >
-                        Claimed
-                      </span>
-                    )}
-                  </div>
-                  <p className="truncate text-[10px] text-muted">@{selectedBuilding.login}</p>
-                  {selectedBuilding.active_raid_tag && (
-                    <p className="text-[8px] text-red-400">
-                      Attacked by @{selectedBuilding.active_raid_tag.attacker_login}
-                    </p>
+                {/* Header with avatar + name */}
+                <div className="flex items-center gap-3 px-4 pb-3 sm:pt-4">
+                  {selectedBuilding.avatar_url && (
+                    <Image
+                      src={selectedBuilding.avatar_url}
+                      alt={selectedBuilding.login}
+                      width={48}
+                      height={48}
+                      className="border-[2px] border-border flex-shrink-0"
+                      style={{ imageRendering: "pixelated" }}
+                    />
                   )}
-                </div>
-              </div>
-
-              {/* XP Level badge + progress */}
-              {(() => {
-                const bTier = tierFromLevel(selectedBuilding.xp_level ?? 1);
-                const bRank = rankFromLevel(selectedBuilding.xp_level ?? 1);
-                const bProgress = levelProgress(selectedBuilding.xp_total ?? 0);
-                const bXpCurrent = (selectedBuilding.xp_total ?? 0) - xpForLevel(selectedBuilding.xp_level ?? 1);
-                const bXpNeeded = xpForLevel((selectedBuilding.xp_level ?? 1) + 1) - xpForLevel(selectedBuilding.xp_level ?? 1);
-                return (
-                  <div className="mx-4 mb-2 flex items-center gap-2">
-                    <span
-                      className="flex h-7 w-7 items-center justify-center border-[2px] text-xs font-bold"
-                      style={{ borderColor: bTier.color, color: bTier.color }}
-                    >
-                      {selectedBuilding.xp_level ?? 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold" style={{ color: bTier.color }}>
-                          Lv {selectedBuilding.xp_level ?? 1} · {bRank.title}
-                        </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      {selectedBuilding.name && (
+                        <p className="truncate text-sm text-cream">{selectedBuilding.name}</p>
+                      )}
+                      {selectedBuilding.claimed && (
                         <span
-                          className="px-1 py-px text-[7px] font-bold"
-                          style={{ backgroundColor: bTier.color + "22", color: bTier.color }}
+                          className="flex-shrink-0 px-1.5 py-0.5 text-[7px] text-bg"
+                          style={{ backgroundColor: theme.accent }}
                         >
-                          {bTier.name.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <div className="h-[4px] flex-1 bg-border">
-                          <div
-                            className="h-full"
-                            style={{ width: `${Math.max(2, Math.round(bProgress * 100))}%`, backgroundColor: bTier.color }}
-                          />
-                        </div>
-                        <span className="text-[7px] text-muted">{bXpCurrent}/{bXpNeeded}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* District badge */}
-              {selectedBuilding.district && (
-                <div className="px-4 pb-2">
-                  <span
-                    className="inline-block px-2 py-0.5 text-[8px] text-bg"
-                    style={{ backgroundColor: DISTRICT_COLORS[selectedBuilding.district] ?? '#888' }}
-                  >
-                    {DISTRICT_NAMES[selectedBuilding.district] ?? selectedBuilding.district}
-                  </span>
-                </div>
-              )}
-
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-px bg-border/30 mx-4 mb-3 border border-border/50">
-                {[
-                  { label: "Rank", value: `#${selectedBuilding.rank}` },
-                  { label: "Contribs", value: selectedBuilding.contributions.toLocaleString() },
-                  { label: "Repos", value: selectedBuilding.public_repos.toLocaleString() },
-                  { label: "Stars", value: selectedBuilding.total_stars.toLocaleString() },
-                  { label: "Kudos", value: (selectedBuilding.kudos_count ?? 0).toLocaleString() },
-                  { label: "Visits", value: (selectedBuilding.visit_count ?? 0).toLocaleString() },
-                ].map((s) => (
-                  <div key={s.label} className="bg-bg-card p-2 text-center">
-                    <div className="text-xs" style={{ color: theme.accent }}>{s.value}</div>
-                    <div className="text-[8px] text-muted mt-0.5">{s.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Achievements with tier colors, sorted by tier */}
-              {selectedBuilding.achievements && selectedBuilding.achievements.length > 0 && (
-                <div className="mx-4 mb-3 flex flex-wrap gap-1">
-                  {[...selectedBuilding.achievements]
-                    .sort((a, b) => {
-                      const tierOrder = ["diamond", "gold", "silver", "bronze"];
-                      const ta = tierOrder.indexOf(ACHIEVEMENT_TIERS_MAP[a] ?? "bronze");
-                      const tb = tierOrder.indexOf(ACHIEVEMENT_TIERS_MAP[b] ?? "bronze");
-                      return ta - tb;
-                    })
-                    .slice(0, 3)
-                    .map((ach) => {
-                      const tier = ACHIEVEMENT_TIERS_MAP[ach];
-                      const color = tier ? TIER_COLORS_MAP[tier] : undefined;
-                      const emoji = tier ? TIER_EMOJI_MAP[tier] : "";
-                      return (
-                        <span
-                          key={ach}
-                          className="px-1.5 py-0.5 text-[8px] border normal-case"
-                          style={{
-                            borderColor: color ?? "rgba(255,255,255,0.15)",
-                            color: color ?? "#a0a0b0",
-                          }}
-                        >
-                          {emoji} {ACHIEVEMENT_NAMES_MAP[ach] ?? ach.replace(/_/g, " ")}
-                        </span>
-                      );
-                    })}
-                  {selectedBuilding.achievements.length > 3 && (
-                    <Link
-                      href={`/dev/${selectedBuilding.login}`}
-                      className="px-1.5 py-0.5 text-[8px] transition-colors hover:text-cream"
-                      style={{ color: theme.accent }}
-                    >
-                      +{selectedBuilding.achievements.length - 3} more &rarr;
-                    </Link>
-                  )}
-                </div>
-              )}
-
-              {/* A7: Show equipped items on other devs' buildings (mimetic desire) */}
-              {selectedBuilding.login.toLowerCase() !== authLogin && (() => {
-                const equipped: string[] = [];
-                if (selectedBuilding.loadout?.crown) equipped.push(selectedBuilding.loadout.crown);
-                if (selectedBuilding.loadout?.roof) equipped.push(selectedBuilding.loadout.roof);
-                if (selectedBuilding.loadout?.aura) equipped.push(selectedBuilding.loadout.aura);
-                for (const fi of ["custom_color", "billboard", "led_banner"]) {
-                  if (selectedBuilding.owned_items.includes(fi)) equipped.push(fi);
-                }
-                if (equipped.length === 0) return null;
-                const shown = equipped.slice(0, 3);
-                const extra = equipped.length - 3;
-                return (
-                  <div
-                    className="mx-4 mb-3 border-[2px] p-2.5"
-                    style={{ borderColor: `${theme.accent}33`, backgroundColor: `${theme.accent}08` }}
-                  >
-                    <div className="flex flex-wrap gap-1.5">
-                      {shown.map((id) => (
-                        <span
-                          key={id}
-                          className="text-[9px] normal-case"
-                          style={{ color: theme.accent }}
-                        >
-                          {ITEM_EMOJIS[id] ?? "🎁"} {ITEM_NAMES[id] ?? id}
-                        </span>
-                      ))}
-                      {extra > 0 && (
-                        <span className="text-[9px] text-muted">
-                          +{extra} more
+                          Claimed
                         </span>
                       )}
                     </div>
-                    {session && (
+                    <p className="truncate text-[10px] text-muted">@{selectedBuilding.login}</p>
+                    {selectedBuilding.active_raid_tag && (
+                      <p className="text-[8px] text-red-400">
+                        Attacked by @{selectedBuilding.active_raid_tag.attacker_login}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* XP Level badge + progress */}
+                {(() => {
+                  const bTier = tierFromLevel(selectedBuilding.xp_level ?? 1);
+                  const bRank = rankFromLevel(selectedBuilding.xp_level ?? 1);
+                  const bProgress = levelProgress(selectedBuilding.xp_total ?? 0);
+                  const bXpCurrent =
+                    (selectedBuilding.xp_total ?? 0) - xpForLevel(selectedBuilding.xp_level ?? 1);
+                  const bXpNeeded =
+                    xpForLevel((selectedBuilding.xp_level ?? 1) + 1) -
+                    xpForLevel(selectedBuilding.xp_level ?? 1);
+                  return (
+                    <div className="mx-4 mb-2 flex items-center gap-2">
+                      <span
+                        className="flex h-7 w-7 items-center justify-center border-[2px] text-xs font-bold"
+                        style={{ borderColor: bTier.color, color: bTier.color }}
+                      >
+                        {selectedBuilding.xp_level ?? 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold" style={{ color: bTier.color }}>
+                            Lv {selectedBuilding.xp_level ?? 1} · {bRank.title}
+                          </span>
+                          <span
+                            className="px-1 py-px text-[7px] font-bold"
+                            style={{ backgroundColor: bTier.color + "22", color: bTier.color }}
+                          >
+                            {bTier.name.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <div className="h-[4px] flex-1 bg-border">
+                            <div
+                              className="h-full"
+                              style={{
+                                width: `${Math.max(2, Math.round(bProgress * 100))}%`,
+                                backgroundColor: bTier.color,
+                              }}
+                            />
+                          </div>
+                          <span className="text-[7px] text-muted">
+                            {bXpCurrent}/{bXpNeeded}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* District badge */}
+                {selectedBuilding.district && (
+                  <div className="px-4 pb-2">
+                    <span
+                      className="inline-block px-2 py-0.5 text-[8px] text-bg"
+                      style={{
+                        backgroundColor: DISTRICT_COLORS[selectedBuilding.district] ?? "#888",
+                      }}
+                    >
+                      {DISTRICT_NAMES[selectedBuilding.district] ?? selectedBuilding.district}
+                    </span>
+                  </div>
+                )}
+
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-px bg-border/30 mx-4 mb-3 border border-border/50">
+                  {[
+                    { label: "Rank", value: `#${selectedBuilding.rank}` },
+                    { label: "Contribs", value: selectedBuilding.contributions.toLocaleString() },
+                    { label: "Repos", value: selectedBuilding.public_repos.toLocaleString() },
+                    { label: "Stars", value: selectedBuilding.total_stars.toLocaleString() },
+                    { label: "Kudos", value: (selectedBuilding.kudos_count ?? 0).toLocaleString() },
+                    {
+                      label: "Visits",
+                      value: (selectedBuilding.visit_count ?? 0).toLocaleString(),
+                    },
+                  ].map((s) => (
+                    <div key={s.label} className="bg-bg-card p-2 text-center">
+                      <div className="text-xs" style={{ color: theme.accent }}>
+                        {s.value}
+                      </div>
+                      <div className="text-[8px] text-muted mt-0.5">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Achievements with tier colors, sorted by tier */}
+                {selectedBuilding.achievements && selectedBuilding.achievements.length > 0 && (
+                  <div className="mx-4 mb-3 flex flex-wrap gap-1">
+                    {[...selectedBuilding.achievements]
+                      .sort((a, b) => {
+                        const tierOrder = ["diamond", "gold", "silver", "bronze"];
+                        const ta = tierOrder.indexOf(ACHIEVEMENT_TIERS_MAP[a] ?? "bronze");
+                        const tb = tierOrder.indexOf(ACHIEVEMENT_TIERS_MAP[b] ?? "bronze");
+                        return ta - tb;
+                      })
+                      .slice(0, 3)
+                      .map((ach) => {
+                        const tier = ACHIEVEMENT_TIERS_MAP[ach];
+                        const color = tier ? TIER_COLORS_MAP[tier] : undefined;
+                        const emoji = tier ? TIER_EMOJI_MAP[tier] : "";
+                        return (
+                          <span
+                            key={ach}
+                            className="px-1.5 py-0.5 text-[8px] border normal-case"
+                            style={{
+                              borderColor: color ?? "rgba(255,255,255,0.15)",
+                              color: color ?? "#a0a0b0",
+                            }}
+                          >
+                            {emoji} {ACHIEVEMENT_NAMES_MAP[ach] ?? ach.replace(/_/g, " ")}
+                          </span>
+                        );
+                      })}
+                    {selectedBuilding.achievements.length > 3 && (
                       <Link
-                        href={`/shop/${authLogin}`}
-                        className="btn-press mt-2 block w-full py-1.5 text-center text-[9px] text-bg"
+                        href={`/dev/${selectedBuilding.login}`}
+                        className="px-1.5 py-0.5 text-[8px] transition-colors hover:text-cream"
+                        style={{ color: theme.accent }}
+                      >
+                        +{selectedBuilding.achievements.length - 3} more &rarr;
+                      </Link>
+                    )}
+                  </div>
+                )}
+
+                {/* A7: Show equipped items on other devs' buildings (mimetic desire) */}
+                {selectedBuilding.login.toLowerCase() !== authLogin &&
+                  (() => {
+                    const equipped: string[] = [];
+                    if (selectedBuilding.loadout?.crown)
+                      equipped.push(selectedBuilding.loadout.crown);
+                    if (selectedBuilding.loadout?.roof)
+                      equipped.push(selectedBuilding.loadout.roof);
+                    if (selectedBuilding.loadout?.aura)
+                      equipped.push(selectedBuilding.loadout.aura);
+                    for (const fi of ["custom_color", "billboard", "led_banner"]) {
+                      if (selectedBuilding.owned_items.includes(fi)) equipped.push(fi);
+                    }
+                    if (equipped.length === 0) return null;
+                    const shown = equipped.slice(0, 3);
+                    const extra = equipped.length - 3;
+                    return (
+                      <div
+                        className="mx-4 mb-3 border-[2px] p-2.5"
+                        style={{
+                          borderColor: `${theme.accent}33`,
+                          backgroundColor: `${theme.accent}08`,
+                        }}
+                      >
+                        <div className="flex flex-wrap gap-1.5">
+                          {shown.map((id) => (
+                            <span
+                              key={id}
+                              className="text-[9px] normal-case"
+                              style={{ color: theme.accent }}
+                            >
+                              {ITEM_EMOJIS[id] ?? "🎁"} {ITEM_NAMES[id] ?? id}
+                            </span>
+                          ))}
+                          {extra > 0 && (
+                            <span className="text-[9px] text-muted">+{extra} more</span>
+                          )}
+                        </div>
+                        {session && (
+                          <Link
+                            href={`/shop/${authLogin}`}
+                            className="btn-press mt-2 block w-full py-1.5 text-center text-[9px] text-bg"
+                            style={{
+                              backgroundColor: theme.accent,
+                              boxShadow: `2px 2px 0 0 ${theme.shadow}`,
+                            }}
+                          >
+                            Get these for your building
+                          </Link>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                {/* Kudos: give kudos (other's building, logged in) */}
+                {session && selectedBuilding.login.toLowerCase() !== authLogin && (
+                  <div className="relative mx-4 mb-3">
+                    {/* Floating emoji animation on success */}
+                    {kudosSent && (
+                      <div className="pointer-events-none absolute inset-0 overflow-visible">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <span
+                            key={i}
+                            className="kudos-float absolute text-sm"
+                            style={{
+                              left: `${15 + i * 14}%`,
+                              animationDelay: `${i * 0.08}s`,
+                            }}
+                          >
+                            {["👏", "⭐", "💛", "✨", "👏", "⭐"][i]}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      onClick={handleGiveKudos}
+                      disabled={kudosSending || kudosSent || !!kudosError}
+                      className={[
+                        "btn-press w-full py-2 text-[10px] text-bg transition-all duration-300",
+                        kudosSent ? "scale-[1.02]" : "",
+                      ].join(" ")}
+                      style={{
+                        backgroundColor: kudosError
+                          ? "#ff4444"
+                          : kudosSent
+                            ? "#39d353"
+                            : theme.accent,
+                        boxShadow: kudosError
+                          ? "0 0 12px rgba(255,68,68,0.4)"
+                          : kudosSent
+                            ? "0 0 12px rgba(57,211,83,0.4)"
+                            : `2px 2px 0 0 ${theme.shadow}`,
+                      }}
+                    >
+                      {kudosSending ? (
+                        <span className="animate-pulse">Sending...</span>
+                      ) : kudosError ? (
+                        <span>{kudosError}</span>
+                      ) : kudosSent ? (
+                        <span>+1 Kudos!</span>
+                      ) : (
+                        "Give Kudos"
+                      )}
+                    </button>
+                    <button
+                      onClick={handleOpenGift}
+                      className="btn-press mt-1.5 w-full border-[2px] border-border py-1.5 text-[9px] text-cream transition-colors hover:border-border-light"
+                    >
+                      Send Gift
+                    </button>
+                    {/* Raid button */}
+                    {raidState.phase === "idle" && raidState.error && (
+                      <p className="mt-1.5 text-center text-[10px] text-red-400">
+                        {raidState.error}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (authLogin && selectedBuilding) {
+                          raidActions.startPreview(selectedBuilding.login, buildings, authLogin);
+                        }
+                      }}
+                      disabled={raidState.loading}
+                      className="btn-press mt-1.5 w-full border-[3px] border-red-500/60 px-4 py-2 text-xs text-red-400 transition-colors hover:bg-red-500/10"
+                    >
+                      {raidState.loading ? "Loading..." : "\u2694\ufe0f BATTLE \u2014 Win +50 XP"}
+                    </button>
+                  </div>
+                )}
+
+                {/* A3: Disabled action buttons for non-logged users */}
+                {!session && (
+                  <div className="mx-4 mb-3 space-y-1.5">
+                    <button
+                      onClick={() => {
+                        trackDisabledButtonClicked("kudos");
+                        handleSignIn();
+                      }}
+                      className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
+                    >
+                      &#x1F512; Give Kudos
+                    </button>
+                    <button
+                      onClick={() => {
+                        trackDisabledButtonClicked("gift");
+                        handleSignIn();
+                      }}
+                      className="btn-press w-full py-1.5 text-[9px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
+                    >
+                      &#x1F512; Send Gift
+                    </button>
+                    <button
+                      onClick={() => {
+                        trackDisabledButtonClicked("raid");
+                        handleSignIn();
+                      }}
+                      className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-red-500/30 text-red-400/40 transition-colors hover:border-red-500/60 hover:text-red-400/70"
+                    >
+                      &#x1F512; &#x2694;&#xFE0F; BATTLE
+                    </button>
+                  </div>
+                )}
+
+                {/* Own building: copy invite link */}
+                {selectedBuilding.login.toLowerCase() === authLogin && (
+                  <div className="mx-4 mb-3">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${window.location.origin}/?ref=${authLogin}`,
+                        );
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="btn-press w-full border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                    >
+                      {copied ? "Copied!" : "\uD83D\uDCCB Copy Invite Link"}
+                    </button>
+                  </div>
+                )}
+
+                {/* Compare button */}
+                {!flyMode && (
+                  <div className="mx-4 mb-3">
+                    <button
+                      onClick={() => {
+                        setCompareBuilding(selectedBuilding);
+                        setSelectedBuilding(null);
+                        if (!exploreMode) setExploreMode(true);
+                      }}
+                      className="btn-press w-full border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                    >
+                      Compare
+                    </button>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 p-4 pt-0 pb-5 sm:pb-4">
+                  {selectedBuilding.login.toLowerCase() === authLogin ? (
+                    <>
+                      <Link
+                        href={`/shop/${selectedBuilding.login}?tab=loadout`}
+                        className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
                         style={{
                           backgroundColor: theme.accent,
                           boxShadow: `2px 2px 0 0 ${theme.shadow}`,
                         }}
                       >
-                        Get these for your building
+                        Loadout
                       </Link>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Kudos: give kudos (other's building, logged in) */}
-              {session && selectedBuilding.login.toLowerCase() !== authLogin && (
-                <div className="relative mx-4 mb-3">
-                  {/* Floating emoji animation on success */}
-                  {kudosSent && (
-                    <div className="pointer-events-none absolute inset-0 overflow-visible">
-                      {Array.from({ length: 6 }).map((_, i) => (
-                        <span
-                          key={i}
-                          className="kudos-float absolute text-sm"
-                          style={{
-                            left: `${15 + i * 14}%`,
-                            animationDelay: `${i * 0.08}s`,
-                          }}
-                        >
-                          {["👏", "⭐", "💛", "✨", "👏", "⭐"][i]}
-                        </span>
-                      ))}
-                    </div>
+                      <Link
+                        href={`/dev/${selectedBuilding.login}`}
+                        className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                      >
+                        Profile
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href={`/dev/${selectedBuilding.login}`}
+                        className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
+                        style={{
+                          backgroundColor: theme.accent,
+                          boxShadow: `2px 2px 0 0 ${theme.shadow}`,
+                        }}
+                      >
+                        View Profile
+                      </Link>
+                      <a
+                        href={`https://github.com/${selectedBuilding.login}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                      >
+                        GitHub
+                      </a>
+                    </>
                   )}
-                  <button
-                    onClick={handleGiveKudos}
-                    disabled={kudosSending || kudosSent || !!kudosError}
-                    className={[
-                      "btn-press w-full py-2 text-[10px] text-bg transition-all duration-300",
-                      kudosSent ? "scale-[1.02]" : "",
-                    ].join(" ")}
-                    style={{
-                      backgroundColor: kudosError ? "#ff4444" : kudosSent ? "#39d353" : theme.accent,
-                      boxShadow: kudosError
-                        ? "0 0 12px rgba(255,68,68,0.4)"
-                        : kudosSent
-                        ? "0 0 12px rgba(57,211,83,0.4)"
-                        : `2px 2px 0 0 ${theme.shadow}`,
-                    }}
-                  >
-                    {kudosSending ? (
-                      <span className="animate-pulse">Sending...</span>
-                    ) : kudosError ? (
-                      <span>{kudosError}</span>
-                    ) : kudosSent ? (
-                      <span>+1 Kudos!</span>
-                    ) : (
-                      "Give Kudos"
-                    )}
-                  </button>
-                  <button
-                    onClick={handleOpenGift}
-                    className="btn-press mt-1.5 w-full border-[2px] border-border py-1.5 text-[9px] text-cream transition-colors hover:border-border-light"
-                  >
-                    Send Gift
-                  </button>
-                  {/* Raid button */}
-                  {raidState.phase === "idle" && raidState.error && (
-                    <p className="mt-1.5 text-center text-[10px] text-red-400">{raidState.error}</p>
-                  )}
-                  <button
-                    onClick={() => {
-                      if (authLogin && selectedBuilding) {
-                        raidActions.startPreview(selectedBuilding.login, buildings, authLogin);
-                      }
-                    }}
-                    disabled={raidState.loading}
-                    className="btn-press mt-1.5 w-full border-[3px] border-red-500/60 px-4 py-2 text-xs text-red-400 transition-colors hover:bg-red-500/10"
-                  >
-                    {raidState.loading ? "Loading..." : "\u2694\ufe0f BATTLE \u2014 Win +50 XP"}
-                  </button>
                 </div>
-              )}
-
-              {/* A3: Disabled action buttons for non-logged users */}
-              {!session && (
-                <div className="mx-4 mb-3 space-y-1.5">
-                  <button
-                    onClick={() => { trackDisabledButtonClicked("kudos"); handleSignIn(); }}
-                    className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
-                  >
-                    &#x1F512; Give Kudos
-                  </button>
-                  <button
-                    onClick={() => { trackDisabledButtonClicked("gift"); handleSignIn(); }}
-                    className="btn-press w-full py-1.5 text-[9px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
-                  >
-                    &#x1F512; Send Gift
-                  </button>
-                  <button
-                    onClick={() => { trackDisabledButtonClicked("raid"); handleSignIn(); }}
-                    className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-red-500/30 text-red-400/40 transition-colors hover:border-red-500/60 hover:text-red-400/70"
-                  >
-                    &#x1F512; &#x2694;&#xFE0F; BATTLE
-                  </button>
-                </div>
-              )}
-
-              {/* Own building: copy invite link */}
-              {selectedBuilding.login.toLowerCase() === authLogin && (
-                <div className="mx-4 mb-3">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        `${window.location.origin}/?ref=${authLogin}`
-                      );
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }}
-                    className="btn-press w-full border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
-                  >
-                    {copied ? "Copied!" : "\uD83D\uDCCB Copy Invite Link"}
-                  </button>
-                </div>
-              )}
-
-              {/* Compare button */}
-              {!flyMode && (
-                <div className="mx-4 mb-3">
-                  <button
-                    onClick={() => {
-                      setCompareBuilding(selectedBuilding);
-                      setSelectedBuilding(null);
-                      if (!exploreMode) setExploreMode(true);
-                    }}
-                    className="btn-press w-full border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
-                  >
-                    Compare
-                  </button>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-2 p-4 pt-0 pb-5 sm:pb-4">
-                {selectedBuilding.login.toLowerCase() === authLogin ? (
-                  <>
-                    <Link
-                      href={`/shop/${selectedBuilding.login}?tab=loadout`}
-                      className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
-                      style={{
-                        backgroundColor: theme.accent,
-                        boxShadow: `2px 2px 0 0 ${theme.shadow}`,
-                      }}
-                    >
-                      Loadout
-                    </Link>
-                    <Link
-                      href={`/dev/${selectedBuilding.login}`}
-                      className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
-                    >
-                      Profile
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      href={`/dev/${selectedBuilding.login}`}
-                      className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
-                      style={{
-                        backgroundColor: theme.accent,
-                        boxShadow: `2px 2px 0 0 ${theme.shadow}`,
-                      }}
-                    >
-                      View Profile
-                    </Link>
-                    <a
-                      href={`https://github.com/${selectedBuilding.login}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
-                    >
-                      GitHub
-                    </a>
-                  </>
-                )}
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
 
       {/* ─── Compare Pick Prompt ─── */}
       {compareBuilding && !comparePair && !flyMode && (
@@ -3323,7 +3750,10 @@ if (claimingGift) return;
             )}
             {/* Search field for compare pick */}
             <form
-              onSubmit={(e) => { e.preventDefault(); searchUser(); }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                searchUser();
+              }}
               className="mt-2 flex items-center gap-2"
             >
               <input
@@ -3350,7 +3780,12 @@ if (claimingGift) return;
             </form>
             {feedback && (
               <div className="mt-1.5">
-                <SearchFeedback feedback={feedback} accentColor={theme.accent} onDismiss={() => setFeedback(null)} onRetry={searchUser} />
+                <SearchFeedback
+                  feedback={feedback}
+                  accentColor={theme.accent}
+                  onDismiss={() => setFeedback(null)}
+                  onRetry={searchUser}
+                />
               </div>
             )}
           </div>
@@ -3358,246 +3793,288 @@ if (claimingGift) return;
       )}
 
       {/* ─── Comparison Panel ─── */}
-      {comparePair && (() => {
-        const compareStatDefs: { label: string; key: keyof CityBuilding; invert?: boolean }[] = [
-          { label: "Rank", key: "rank", invert: true },
-          { label: "Contributions", key: "contributions" },
-          { label: "Stars", key: "total_stars" },
-          { label: "Repos", key: "public_repos" },
-          { label: "Kudos", key: "kudos_count" },
-        ];
-        let totalAWins = 0;
-        let totalBWins = 0;
-        const cmpRows = compareStatDefs.map((s) => {
-          const a = (comparePair[0][s.key] as number) ?? 0;
-          const b = (comparePair[1][s.key] as number) ?? 0;
-          let aW = false, bW = false;
-          if (s.invert) { aW = a > 0 && (a < b || b === 0); bW = b > 0 && (b < a || a === 0); }
-          else { aW = a > b; bW = b > a; }
-          if (aW) totalAWins++;
-          if (bW) totalBWins++;
-          return { ...s, a, b, aW, bW };
-        });
-        const cmpTie = totalAWins === totalBWins;
-        const cmpWinner = totalAWins > totalBWins ? comparePair[0].login : comparePair[1].login;
-        const cmpSummary = cmpTie
-          ? `Tie ${totalAWins}-${totalBWins}`
-          : `@${cmpWinner} wins ${Math.max(totalAWins, totalBWins)}-${Math.min(totalAWins, totalBWins)}`;
+      {comparePair &&
+        (() => {
+          const compareStatDefs: { label: string; key: keyof CityBuilding; invert?: boolean }[] = [
+            { label: "Rank", key: "rank", invert: true },
+            { label: "Contributions", key: "contributions" },
+            { label: "Stars", key: "total_stars" },
+            { label: "Repos", key: "public_repos" },
+            { label: "Kudos", key: "kudos_count" },
+          ];
+          let totalAWins = 0;
+          let totalBWins = 0;
+          const cmpRows = compareStatDefs.map((s) => {
+            const a = (comparePair[0][s.key] as number) ?? 0;
+            const b = (comparePair[1][s.key] as number) ?? 0;
+            let aW = false,
+              bW = false;
+            if (s.invert) {
+              aW = a > 0 && (a < b || b === 0);
+              bW = b > 0 && (b < a || a === 0);
+            } else {
+              aW = a > b;
+              bW = b > a;
+            }
+            if (aW) totalAWins++;
+            if (bW) totalBWins++;
+            return { ...s, a, b, aW, bW };
+          });
+          const cmpTie = totalAWins === totalBWins;
+          const cmpWinner = totalAWins > totalBWins ? comparePair[0].login : comparePair[1].login;
+          const cmpSummary = cmpTie
+            ? `Tie ${totalAWins}-${totalBWins}`
+            : `@${cmpWinner} wins ${Math.max(totalAWins, totalBWins)}-${Math.min(totalAWins, totalBWins)}`;
 
-        const closeCompare = () => { setSelectedBuilding(comparePair[0]); setFocusedBuilding(comparePair[0].login); setComparePair(null); setCompareBuilding(null); };
+          const closeCompare = () => {
+            setSelectedBuilding(comparePair[0]);
+            setFocusedBuilding(comparePair[0].login);
+            setComparePair(null);
+            setCompareBuilding(null);
+          };
 
-        return (
-        <>
-          {/* No fullscreen backdrop — let the user orbit the camera freely */}
-          <div className="pointer-events-auto fixed z-40
+          return (
+            <>
+              {/* No fullscreen backdrop — let the user orbit the camera freely */}
+              <div
+                className="pointer-events-auto fixed z-40
             bottom-0 left-0 right-0
             sm:bottom-auto sm:left-auto sm:right-5 sm:top-1/2 sm:-translate-y-1/2"
-          >
-            <div className="relative border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
+              >
+                <div
+                  className="relative border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
               w-full sm:w-[380px] sm:border-[3px] sm:max-h-[85vh] sm:overflow-y-auto
               max-h-[45vh] overflow-y-auto
               animate-[slide-up_0.2s_ease-out] sm:animate-none"
-            >
-              {/* Drag handle on mobile - swipe down to close */}
-              <div
-                className="flex justify-center py-2 sm:hidden"
-                onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
-                onTouchEnd={(e) => { const start = (e.currentTarget as any)._touchY; if (start != null && e.changedTouches[0].clientY - start > 50) closeCompare(); }}
-              >
-                <div className="h-1 w-10 rounded-full bg-border" />
-              </div>
-
-              {/* ── Header: Avatars + VS ── */}
-              <div className="flex items-start justify-center gap-5 px-5 pt-1 pb-4 sm:pt-4">
-                <Link href={`/dev/${comparePair[0].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
-                  {comparePair[0].avatar_url && (
-                    <Image
-                      src={comparePair[0].avatar_url}
-                      alt={comparePair[0].login}
-                      width={56}
-                      height={56}
-                      className="border-[3px] transition-colors group-hover:brightness-110"
-                      style={{
-                        imageRendering: "pixelated",
-                        borderColor: totalAWins >= totalBWins ? theme.accent : "#3a3a40",
-                      }}
-                    />
-                  )}
-                  <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[0].login}</p>
-                  <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[0].login)}</p>
-                </Link>
-
-                <span className="text-base shrink-0 pt-4" style={{ color: theme.accent }}>VS</span>
-
-                <Link href={`/dev/${comparePair[1].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
-                  {comparePair[1].avatar_url && (
-                    <Image
-                      src={comparePair[1].avatar_url}
-                      alt={comparePair[1].login}
-                      width={56}
-                      height={56}
-                      className="border-[3px] transition-colors group-hover:brightness-110"
-                      style={{
-                        imageRendering: "pixelated",
-                        borderColor: totalBWins >= totalAWins ? theme.accent : "#3a3a40",
-                      }}
-                    />
-                  )}
-                  <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[1].login}</p>
-                  <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[1].login)}</p>
-                </Link>
-              </div>
-
-              {/* ── Scoreboard ── */}
-              <div className="mx-4 border-[2px] border-border bg-bg-card">
-                {cmpRows.map((s, i) => (
+                >
+                  {/* Drag handle on mobile - swipe down to close */}
                   <div
-                    key={s.key}
-                    className={`flex items-center py-2 px-3 ${i < cmpRows.length - 1 ? "border-b border-border/40" : ""}`}
+                    className="flex justify-center py-2 sm:hidden"
+                    onTouchStart={(e) => {
+                      (e.currentTarget as any)._touchY = e.touches[0].clientY;
+                    }}
+                    onTouchEnd={(e) => {
+                      const start = (e.currentTarget as any)._touchY;
+                      if (start != null && e.changedTouches[0].clientY - start > 50) closeCompare();
+                    }}
                   >
-                    <span
-                      className="w-[72px] text-right text-[11px] tabular-nums"
-                      style={{ color: s.aW ? theme.accent : s.bW ? "#555" : "#888" }}
-                    >
-                      {s.key === "rank" ? (s.a > 0 ? `#${s.a}` : "-") : s.a.toLocaleString()}
-                    </span>
-                    <span className="flex-1 text-center text-[8px] text-muted uppercase tracking-wider">
-                      {s.label}
-                    </span>
-                    <span
-                      className="w-[72px] text-left text-[11px] tabular-nums"
-                      style={{ color: s.bW ? theme.accent : s.aW ? "#555" : "#888" }}
-                    >
-                      {s.key === "rank" ? (s.b > 0 ? `#${s.b}` : "-") : s.b.toLocaleString()}
-                    </span>
+                    <div className="h-1 w-10 rounded-full bg-border" />
                   </div>
-                ))}
-              </div>
 
-              {/* ── Winner banner ── */}
-              <div
-                className="mx-4 mt-3 py-2.5 text-center text-[11px] uppercase tracking-wide"
-                style={{
-                  backgroundColor: `${theme.accent}15`,
-                  border: `2px solid ${theme.accent}40`,
-                  color: theme.accent,
-                }}
-              >
-                {cmpSummary}
-              </div>
+                  {/* ── Header: Avatars + VS ── */}
+                  <div className="flex items-start justify-center gap-5 px-5 pt-1 pb-4 sm:pt-4">
+                    <Link
+                      href={`/dev/${comparePair[0].login}`}
+                      className="flex flex-col items-center gap-1.5 group w-[110px]"
+                    >
+                      {comparePair[0].avatar_url && (
+                        <Image
+                          src={comparePair[0].avatar_url}
+                          alt={comparePair[0].login}
+                          width={56}
+                          height={56}
+                          className="border-[3px] transition-colors group-hover:brightness-110"
+                          style={{
+                            imageRendering: "pixelated",
+                            borderColor: totalAWins >= totalBWins ? theme.accent : "#3a3a40",
+                          }}
+                        />
+                      )}
+                      <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">
+                        @{comparePair[0].login}
+                      </p>
+                      <p className="text-[8px] text-muted normal-case text-center">
+                        {getDevClass(comparePair[0].login)}
+                      </p>
+                    </Link>
 
-              {/* ── Actions ── */}
-              <div className="px-4 pt-3 pb-1 flex gap-2">
-                <a
-                  href={`https://x.com/intent/tweet?text=${encodeURIComponent(
-                    `I just compared my building with ${comparePair[1].login}'s in Git City. It wasn't even close. What's yours?`
-                  )}&url=${encodeURIComponent(
-                    `${typeof window !== "undefined" ? window.location.origin : ""}/compare/${comparePair[0].login}/${comparePair[1].login}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
-                  style={{
-                    backgroundColor: theme.accent,
-                    boxShadow: `2px 2px 0 0 ${theme.shadow}`,
-                  }}
-                >
-                  Share on X
-                </a>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      `${window.location.origin}/compare/${comparePair[0].login}/${comparePair[1].login}`
-                    );
-                    setCompareCopied(true);
-                    setTimeout(() => setCompareCopied(false), 2000);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
-                >
-                  {compareCopied ? "Copied!" : "Copy Link"}
-                </button>
-              </div>
+                    <span className="text-base shrink-0 pt-4" style={{ color: theme.accent }}>
+                      VS
+                    </span>
 
-              {/* Download with lang toggle */}
-              <div className="px-4 flex items-center gap-2 pb-1">
-                <div className="flex gap-0.5 shrink-0">
-                  {(["en", "pt"] as const).map((l) => (
-                    <button
-                      key={l}
-                      onClick={() => setCompareLang(l)}
-                      className="px-2 py-0.5 text-[9px] uppercase transition-colors"
+                    <Link
+                      href={`/dev/${comparePair[1].login}`}
+                      className="flex flex-col items-center gap-1.5 group w-[110px]"
+                    >
+                      {comparePair[1].avatar_url && (
+                        <Image
+                          src={comparePair[1].avatar_url}
+                          alt={comparePair[1].login}
+                          width={56}
+                          height={56}
+                          className="border-[3px] transition-colors group-hover:brightness-110"
+                          style={{
+                            imageRendering: "pixelated",
+                            borderColor: totalBWins >= totalAWins ? theme.accent : "#3a3a40",
+                          }}
+                        />
+                      )}
+                      <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">
+                        @{comparePair[1].login}
+                      </p>
+                      <p className="text-[8px] text-muted normal-case text-center">
+                        {getDevClass(comparePair[1].login)}
+                      </p>
+                    </Link>
+                  </div>
+
+                  {/* ── Scoreboard ── */}
+                  <div className="mx-4 border-[2px] border-border bg-bg-card">
+                    {cmpRows.map((s, i) => (
+                      <div
+                        key={s.key}
+                        className={`flex items-center py-2 px-3 ${i < cmpRows.length - 1 ? "border-b border-border/40" : ""}`}
+                      >
+                        <span
+                          className="w-[72px] text-right text-[11px] tabular-nums"
+                          style={{ color: s.aW ? theme.accent : s.bW ? "#555" : "#888" }}
+                        >
+                          {s.key === "rank" ? (s.a > 0 ? `#${s.a}` : "-") : s.a.toLocaleString()}
+                        </span>
+                        <span className="flex-1 text-center text-[8px] text-muted uppercase tracking-wider">
+                          {s.label}
+                        </span>
+                        <span
+                          className="w-[72px] text-left text-[11px] tabular-nums"
+                          style={{ color: s.bW ? theme.accent : s.aW ? "#555" : "#888" }}
+                        >
+                          {s.key === "rank" ? (s.b > 0 ? `#${s.b}` : "-") : s.b.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ── Winner banner ── */}
+                  <div
+                    className="mx-4 mt-3 py-2.5 text-center text-[11px] uppercase tracking-wide"
+                    style={{
+                      backgroundColor: `${theme.accent}15`,
+                      border: `2px solid ${theme.accent}40`,
+                      color: theme.accent,
+                    }}
+                  >
+                    {cmpSummary}
+                  </div>
+
+                  {/* ── Actions ── */}
+                  <div className="px-4 pt-3 pb-1 flex gap-2">
+                    <a
+                      href={`https://x.com/intent/tweet?text=${encodeURIComponent(
+                        `I just compared my building with ${comparePair[1].login}'s in Git City. It wasn't even close. What's yours?`,
+                      )}&url=${encodeURIComponent(
+                        `${typeof window !== "undefined" ? window.location.origin : ""}/compare/${comparePair[0].login}/${comparePair[1].login}`,
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
                       style={{
-                        color: compareLang === l ? theme.accent : "#666",
-                        borderBottom: compareLang === l ? `2px solid ${theme.accent}` : "2px solid transparent",
+                        backgroundColor: theme.accent,
+                        boxShadow: `2px 2px 0 0 ${theme.shadow}`,
                       }}
                     >
-                      {l}
+                      Share on X
+                    </a>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${window.location.origin}/compare/${comparePair[0].login}/${comparePair[1].login}`,
+                        );
+                        setCompareCopied(true);
+                        setTimeout(() => setCompareCopied(false), 2000);
+                      }}
+                      className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                    >
+                      {compareCopied ? "Copied!" : "Copy Link"}
                     </button>
-                  ))}
-                </div>
-                <button
-                  onClick={async () => {
-                    const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=landscape&lang=${compareLang}`);
-                    if (!res.ok) return;
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
-                >
-                  Card
-                </button>
-                <button
-                  onClick={async () => {
-                    const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=stories&lang=${compareLang}`);
-                    if (!res.ok) return;
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}-stories.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
-                >
-                  Stories
-                </button>
-              </div>
+                  </div>
 
-              {/* Compare Again + Close */}
-              <div className="flex gap-2 px-4 pt-1 pb-5 sm:pb-4">
-                <button
-                  onClick={() => {
-                    const first = comparePair[0];
-                    setComparePair(null);
-                    setCompareBuilding(first);
-                    setFocusedBuilding(first.login);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
-                >
-                  Compare Again
-                </button>
-                <button
-                  onClick={closeCompare}
-                  className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
-                >
-                  Close
-                </button>
+                  {/* Download with lang toggle */}
+                  <div className="px-4 flex items-center gap-2 pb-1">
+                    <div className="flex gap-0.5 shrink-0">
+                      {(["en", "pt"] as const).map((l) => (
+                        <button
+                          key={l}
+                          onClick={() => setCompareLang(l)}
+                          className="px-2 py-0.5 text-[9px] uppercase transition-colors"
+                          style={{
+                            color: compareLang === l ? theme.accent : "#666",
+                            borderBottom:
+                              compareLang === l
+                                ? `2px solid ${theme.accent}`
+                                : "2px solid transparent",
+                          }}
+                        >
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const res = await fetch(
+                          `/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=landscape&lang=${compareLang}`,
+                        );
+                        if (!res.ok) return;
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                    >
+                      Card
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const res = await fetch(
+                          `/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=stories&lang=${compareLang}`,
+                        );
+                        if (!res.ok) return;
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}-stories.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                    >
+                      Stories
+                    </button>
+                  </div>
+
+                  {/* Compare Again + Close */}
+                  <div className="flex gap-2 px-4 pt-1 pb-5 sm:pb-4">
+                    <button
+                      onClick={() => {
+                        const first = comparePair[0];
+                        setComparePair(null);
+                        setCompareBuilding(first);
+                        setFocusedBuilding(first.login);
+                      }}
+                      className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                    >
+                      Compare Again
+                    </button>
+                    <button
+                      onClick={closeCompare}
+                      className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </>
-        );
-      })()}
+            </>
+          );
+        })()}
 
       {/* ─── Share Modal ─── */}
       {shareData && !flyMode && !exploreMode && (
@@ -3605,14 +4082,22 @@ if (claimingGift) return;
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-bg/70 backdrop-blur-sm"
-            onClick={() => { setShareData(null); setSelectedBuilding(null); setFocusedBuilding(null); }}
+            onClick={() => {
+              setShareData(null);
+              setSelectedBuilding(null);
+              setFocusedBuilding(null);
+            }}
           />
 
           {/* Modal */}
           <div className="relative mx-3 border-[3px] border-border bg-bg-raised p-4 text-center sm:mx-0 sm:p-6">
             {/* Close */}
             <button
-              onClick={() => { setShareData(null); setSelectedBuilding(null); setFocusedBuilding(null); }}
+              onClick={() => {
+                setShareData(null);
+                setSelectedBuilding(null);
+                setFocusedBuilding(null);
+              }}
               className="absolute top-2 right-3 text-[10px] text-muted transition-colors hover:text-cream"
             >
               &#10005;
@@ -3637,7 +4122,10 @@ if (claimingGift) return;
             <p className="mt-2 text-[10px] text-muted normal-case">
               Rank <span style={{ color: theme.accent }}>#{shareData.rank ?? "?"}</span>
               {" · "}
-              <span style={{ color: theme.accent }}>{shareData.contributions.toLocaleString()}</span> contributions
+              <span style={{ color: theme.accent }}>
+                {shareData.contributions.toLocaleString()}
+              </span>{" "}
+              contributions
             </p>
 
             {/* Buttons */}
@@ -3646,7 +4134,7 @@ if (claimingGift) return;
                 onClick={() => {
                   if (!selectedBuilding && shareData) {
                     const b = buildings.find(
-                      (b) => b.login.toLowerCase() === shareData.login.toLowerCase()
+                      (b) => b.login.toLowerCase() === shareData.login.toLowerCase(),
                     );
                     if (b) setSelectedBuilding(b);
                   }
@@ -3664,10 +4152,8 @@ if (claimingGift) return;
 
               <a
                 href={`https://x.com/intent/tweet?text=${encodeURIComponent(
-                  `My GitHub just turned into a building. ${shareData.contributions.toLocaleString()} contributions, Rank #${shareData.rank ?? "?"}. What does yours look like?`
-                )}&url=${encodeURIComponent(
-                  `${window.location.origin}/dev/${shareData.login}`
-                )}`}
+                  `My GitHub just turned into a building. ${shareData.contributions.toLocaleString()} contributions, Rank #${shareData.rank ?? "?"}. What does yours look like?`,
+                )}&url=${encodeURIComponent(`${window.location.origin}/dev/${shareData.login}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => trackShareClicked("x")}
@@ -3679,9 +4165,7 @@ if (claimingGift) return;
               <button
                 onClick={() => {
                   trackShareClicked("copy_link");
-                  navigator.clipboard.writeText(
-                    `${window.location.origin}/dev/${shareData.login}`
-                  );
+                  navigator.clipboard.writeText(`${window.location.origin}/dev/${shareData.login}`);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
@@ -3707,7 +4191,9 @@ if (claimingGift) return;
         <div
           className="fixed inset-0 z-50 bg-black/50"
           onClick={() => setClickedAd(null)}
-          onKeyDown={(e) => { if (e.key === "Escape") setClickedAd(null); }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setClickedAd(null);
+          }}
           tabIndex={-1}
           ref={(el) => el?.focus()}
         >
@@ -3738,7 +4224,17 @@ if (claimingGift) return;
                   className="flex h-9 w-9 flex-shrink-0 items-center justify-center border-[2px]"
                   style={{ borderColor: clickedAd.color, color: clickedAd.color }}
                 >
-                  <span className="text-sm">{clickedAd.vehicle === "blimp" ? "\u25C6" : clickedAd.vehicle === "billboard" ? "\uD83D\uDCCB" : clickedAd.vehicle === "rooftop_sign" ? "\uD83D\uDD04" : clickedAd.vehicle === "led_wrap" ? "\uD83D\uDCA1" : "\u2708"}</span>
+                  <span className="text-sm">
+                    {clickedAd.vehicle === "blimp"
+                      ? "\u25C6"
+                      : clickedAd.vehicle === "billboard"
+                        ? "\uD83D\uDCCB"
+                        : clickedAd.vehicle === "rooftop_sign"
+                          ? "\uD83D\uDD04"
+                          : clickedAd.vehicle === "led_wrap"
+                            ? "\uD83D\uDCA1"
+                            : "\u2708"}
+                  </span>
                 </div>
                 <div className="min-w-0 flex-1">
                   {clickedAd.brand && (
@@ -3759,33 +4255,38 @@ if (claimingGift) return;
               )}
 
               {/* CTA */}
-              {clickedAd.link && (() => {
-                const ctaHref = buildAdLink(clickedAd) ?? clickedAd.link;
-                const isMailto = clickedAd.link.startsWith("mailto:");
-                return (
-                  <div className="px-4 pb-5 sm:pb-4">
-                    <a
-                      href={ctaHref}
-                      target={isMailto ? undefined : "_blank"}
-                      rel={isMailto ? undefined : "noopener noreferrer"}
-                      className="btn-press block w-full py-2.5 text-center text-[10px] text-bg"
-                      style={{
-                        backgroundColor: theme.accent,
-                        boxShadow: `4px 4px 0 0 ${theme.shadow}`,
-                      }}
-                      onClick={() => {
-                        track("sky_ad_click", { ad_id: clickedAd.id, vehicle: clickedAd.vehicle, brand: clickedAd.brand ?? "" });
-                        trackAdEvent(clickedAd.id, "cta_click", authLogin || undefined);
-                        trackSkyAdCtaClick(clickedAd.id, clickedAd.vehicle);
-                      }}
-                    >
-                      {isMailto
-                        ? "Send Email \u2192"
-                        : `Visit ${new URL(clickedAd.link!).hostname.replace("www.", "")} \u2192`}
-                    </a>
-                  </div>
-                );
-              })()}
+              {clickedAd.link &&
+                (() => {
+                  const ctaHref = buildAdLink(clickedAd) ?? clickedAd.link;
+                  const isMailto = clickedAd.link.startsWith("mailto:");
+                  return (
+                    <div className="px-4 pb-5 sm:pb-4">
+                      <a
+                        href={ctaHref}
+                        target={isMailto ? undefined : "_blank"}
+                        rel={isMailto ? undefined : "noopener noreferrer"}
+                        className="btn-press block w-full py-2.5 text-center text-[10px] text-bg"
+                        style={{
+                          backgroundColor: theme.accent,
+                          boxShadow: `4px 4px 0 0 ${theme.shadow}`,
+                        }}
+                        onClick={() => {
+                          track("sky_ad_click", {
+                            ad_id: clickedAd.id,
+                            vehicle: clickedAd.vehicle,
+                            brand: clickedAd.brand ?? "",
+                          });
+                          trackAdEvent(clickedAd.id, "cta_click", authLogin || undefined);
+                          trackSkyAdCtaClick(clickedAd.id, clickedAd.vehicle);
+                        }}
+                      >
+                        {isMailto
+                          ? "Send Email \u2192"
+                          : `Visit ${new URL(clickedAd.link!).hostname.replace("www.", "")} \u2192`}
+                      </a>
+                    </div>
+                  );
+                })()}
             </div>
           </div>
         </div>
@@ -3800,7 +4301,9 @@ if (claimingGift) return;
           >
             <span style={{ color: theme.accent }}>&#9654;</span>
             <span className="text-cream">{theme.name}</span>
-            <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
+            <span className="text-dim">
+              {themeIndex + 1}/{THEMES.length}
+            </span>
           </button>
           <div id="gc-radio-slot" />
           <button
@@ -3814,18 +4317,22 @@ if (claimingGift) return;
         </div>
       )}
 
-
       {/* ─── Daily Missions (quest tracker, right side) ─── */}
-      {session && myBuilding?.claimed && !flyMode && !introMode && !exploreMode && !rabbitCinematic && (
-        <DailiesWidget
-          data={dailiesData}
-          accent={theme.accent}
-          shadow={theme.shadow}
-          isMobile={isMobile}
-          onClaim={claimDailies}
-          onRefresh={refreshDailies}
-        />
-      )}
+      {session &&
+        myBuilding?.claimed &&
+        !flyMode &&
+        !introMode &&
+        !exploreMode &&
+        !rabbitCinematic && (
+          <DailiesWidget
+            data={dailiesData}
+            accent={theme.accent}
+            shadow={theme.shadow}
+            isMobile={isMobile}
+            onClaim={claimDailies}
+            onRefresh={refreshDailies}
+          />
+        )}
 
       {/* ─── Daily mission progress toasts (top-center, always visible) ─── */}
       {dailyToasts.length > 0 && (
@@ -3834,20 +4341,34 @@ if (claimingGift) return;
             <div
               key={t.id}
               className="pointer-events-none border-[2px] border-border bg-bg-raised/95 px-4 py-2 text-[11px] backdrop-blur-sm"
-              style={{ animation: "toastDrop 0.3s ease-out, toastOut 0.4s ease-in 2s forwards", borderColor: t.done ? theme.accent : undefined }}
+              style={{
+                animation: "toastDrop 0.3s ease-out, toastOut 0.4s ease-in 2s forwards",
+                borderColor: t.done ? theme.accent : undefined,
+              }}
             >
-              <span style={{ color: theme.accent }}>{t.done ? "\u2713" : "\u2606"}</span>
-              {" "}{t.title}{t.done ? " \u2014 Complete!" : ""}
+              <span style={{ color: theme.accent }}>{t.done ? "\u2713" : "\u2606"}</span> {t.title}
+              {t.done ? " \u2014 Complete!" : ""}
             </div>
           ))}
           <style jsx>{`
             @keyframes toastDrop {
-              from { opacity: 0; transform: translateY(-16px); }
-              to { opacity: 1; transform: translateY(0); }
+              from {
+                opacity: 0;
+                transform: translateY(-16px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
             }
             @keyframes toastOut {
-              from { opacity: 1; }
-              to { opacity: 0; transform: translateY(-8px); }
+              from {
+                opacity: 1;
+              }
+              to {
+                opacity: 0;
+                transform: translateY(-8px);
+              }
             }
           `}</style>
         </div>
@@ -3867,7 +4388,7 @@ if (claimingGift) return;
             const login = evt.actor?.login;
             if (login) {
               setFocusedBuilding(login);
-              const found = buildings.find(b => b.login.toLowerCase() === login.toLowerCase());
+              const found = buildings.find((b) => b.login.toLowerCase() === login.toLowerCase());
               if (found) {
                 setSelectedBuilding(found);
                 if (!exploreMode) setExploreMode(true);
@@ -3883,17 +4404,27 @@ if (claimingGift) return;
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
             className="absolute inset-0 bg-bg/70 backdrop-blur-sm"
-            onClick={() => { setGiftModalOpen(false); setGiftItems(null); }}
+            onClick={() => {
+              setGiftModalOpen(false);
+              setGiftItems(null);
+            }}
           />
           <div className="relative z-10 w-full max-w-[280px] border-[3px] border-border bg-bg-raised">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h3 className="text-xs" style={{ color: theme.accent }}>Send Gift</h3>
-                <p className="mt-0.5 text-[8px] text-muted normal-case">to @{selectedBuilding.login}</p>
+                <h3 className="text-xs" style={{ color: theme.accent }}>
+                  Send Gift
+                </h3>
+                <p className="mt-0.5 text-[8px] text-muted normal-case">
+                  to @{selectedBuilding.login}
+                </p>
               </div>
               <button
-                onClick={() => { setGiftModalOpen(false); setGiftItems(null); }}
+                onClick={() => {
+                  setGiftModalOpen(false);
+                  setGiftItems(null);
+                }}
                 className="text-xs text-muted hover:text-cream"
               >
                 &#10005;
@@ -3906,9 +4437,7 @@ if (claimingGift) return;
                 Loading...
               </p>
             ) : giftItems.length === 0 ? (
-              <p className="py-8 text-center text-[9px] text-dim normal-case">
-                No items available
-              </p>
+              <p className="py-8 text-center text-[9px] text-dim normal-case">No items available</p>
             ) : (
               <div className="max-h-72 overflow-y-auto scrollbar-thin">
                 {giftItems.map((item) => {
@@ -3924,8 +4453,15 @@ if (claimingGift) return;
                       <span className="flex-1 text-[10px] text-cream">
                         {ITEM_NAMES[item.id] ?? item.id}
                       </span>
-                      <span className="text-[10px] shrink-0" style={{ color: item.owned ? undefined : theme.accent }}>
-                        {item.owned ? "Owned" : isBuying ? "..." : `$${(item.price_usd_cents / 100).toFixed(2)}`}
+                      <span
+                        className="text-[10px] shrink-0"
+                        style={{ color: item.owned ? undefined : theme.accent }}
+                      >
+                        {item.owned
+                          ? "Owned"
+                          : isBuying
+                            ? "..."
+                            : `$${(item.price_usd_cents / 100).toFixed(2)}`}
                       </span>
                     </button>
                   );
@@ -3945,7 +4481,7 @@ if (claimingGift) return;
           if (compareBuilding || comparePair) return;
           setFeedPanelOpen(false);
           setFocusedBuilding(login);
-          const found = buildings.find(b => b.login.toLowerCase() === login.toLowerCase());
+          const found = buildings.find((b) => b.login.toLowerCase() === login.toLowerCase());
           if (found) {
             setSelectedBuilding(found);
             if (!exploreMode) setExploreMode(true);
@@ -3959,7 +4495,10 @@ if (claimingGift) return;
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-bg/70 backdrop-blur-sm"
-            onClick={() => { setShowFlyResults(null); clearTimeout(flyResultsTimerRef.current); }}
+            onClick={() => {
+              setShowFlyResults(null);
+              clearTimeout(flyResultsTimerRef.current);
+            }}
           />
           {/* Modal */}
           <div
@@ -3968,7 +4507,10 @@ if (claimingGift) return;
           >
             {/* Close */}
             <button
-              onClick={() => { setShowFlyResults(null); clearTimeout(flyResultsTimerRef.current); }}
+              onClick={() => {
+                setShowFlyResults(null);
+                clearTimeout(flyResultsTimerRef.current);
+              }}
               className="absolute top-2 right-3 text-[10px] text-muted transition-colors hover:text-cream"
             >
               ESC
@@ -4025,7 +4567,8 @@ if (claimingGift) return;
             <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-3">
               <button
                 onClick={() => {
-                  setShowFlyResults(null); clearTimeout(flyResultsTimerRef.current);
+                  setShowFlyResults(null);
+                  clearTimeout(flyResultsTimerRef.current);
                   setFocusedBuilding(null);
                   setFlyMode(true);
                   setFlyScore({ score: 0, earned: 0, combo: 0, collected: 0, maxCombo: 1 });
@@ -4033,7 +4576,13 @@ if (claimingGift) return;
                   flyPausedAt.current = 0;
                   flyTotalPauseMs.current = 0;
                   setFlyElapsedSec(0);
-                  try { setFlyPersonalBest(parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0); } catch { setFlyPersonalBest(0); }
+                  try {
+                    setFlyPersonalBest(
+                      parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0,
+                    );
+                  } catch {
+                    setFlyPersonalBest(0);
+                  }
                 }}
                 className="btn-press px-5 py-2 text-[10px] text-bg"
                 style={{ backgroundColor: theme.accent, boxShadow: `3px 3px 0 0 ${theme.shadow}` }}
@@ -4042,14 +4591,20 @@ if (claimingGift) return;
               </button>
               <Link
                 href="/leaderboard?mode=game"
-                onClick={() => { setShowFlyResults(null); clearTimeout(flyResultsTimerRef.current); }}
+                onClick={() => {
+                  setShowFlyResults(null);
+                  clearTimeout(flyResultsTimerRef.current);
+                }}
                 className="btn-press border-[2px] border-border px-5 py-2 text-[10px] transition-colors hover:border-border-light"
                 style={{ color: theme.accent }}
               >
                 See Leaderboard
               </Link>
               <button
-                onClick={() => { setShowFlyResults(null); clearTimeout(flyResultsTimerRef.current); }}
+                onClick={() => {
+                  setShowFlyResults(null);
+                  clearTimeout(flyResultsTimerRef.current);
+                }}
                 className="text-[9px] text-muted transition-colors hover:text-cream"
               >
                 Close
@@ -4085,15 +4640,11 @@ if (claimingGift) return;
 
             <p className="text-sm text-cream sm:text-base">Gift Unlocked!</p>
 
-            <div
-              className="mt-4 inline-flex items-center gap-3 border-[2px] border-border bg-bg-card px-5 py-3"
-            >
+            <div className="mt-4 inline-flex items-center gap-3 border-[2px] border-border bg-bg-card px-5 py-3">
               <span className="text-2xl">{"\uD83C\uDFC1"}</span>
               <div className="text-left">
                 <p className="text-xs text-cream">Flag</p>
-                <p className="text-[9px] text-muted normal-case">
-                  A flag on top of your building
-                </p>
+                <p className="text-[9px] text-muted normal-case">A flag on top of your building</p>
               </div>
             </div>
 
@@ -4115,13 +4666,8 @@ if (claimingGift) return;
                     className="flex flex-col items-center gap-1 border-[2px] border-border bg-bg-card px-2 py-2.5 transition-colors hover:border-border-light"
                   >
                     <span className="text-xl">{item.emoji}</span>
-                    <span className="text-[8px] text-cream leading-tight">
-                      {item.name}
-                    </span>
-                    <span
-                      className="text-[9px] font-bold"
-                      style={{ color: theme.accent }}
-                    >
+                    <span className="text-[8px] text-cream leading-tight">{item.name}</span>
+                    <span className="text-[9px] font-bold" style={{ color: theme.accent }}>
                       {item.price}
                     </span>
                   </Link>
@@ -4168,7 +4714,9 @@ if (claimingGift) return;
           preview={raidState.previewData}
           loading={raidState.loading}
           error={raidState.error}
-          onRaid={(boostPurchaseId, vehicleId) => raidActions.executeRaid(boostPurchaseId, vehicleId)}
+          onRaid={(boostPurchaseId, vehicleId) =>
+            raidActions.executeRaid(boostPurchaseId, vehicleId)
+          }
           onCancel={raidActions.exitRaid}
         />
       )}
@@ -4188,7 +4736,10 @@ if (claimingGift) return;
         <DistrictChooser
           currentDistrict={myBuilding.district ?? null}
           inferredDistrict={myBuilding.district ?? null}
-          onClose={() => { sessionStorage.setItem("district_dismissed", "1"); setDistrictChooserOpen(false); }}
+          onClose={() => {
+            sessionStorage.setItem("district_dismissed", "1");
+            setDistrictChooserOpen(false);
+          }}
           onChosen={(districtId) => {
             sessionStorage.setItem("district_dismissed", "1");
             setDistrictChooserOpen(false);
@@ -4197,8 +4748,8 @@ if (claimingGift) return;
               prev.map((b) =>
                 b.login === myBuilding.login
                   ? { ...b, district: districtId, district_chosen: true }
-                  : b
-              )
+                  : b,
+              ),
             );
           }}
         />
@@ -4221,9 +4772,7 @@ if (claimingGift) return;
           onClose={() => setPillModalOpen(false)}
         />
       )}
-      {founderMessageOpen && (
-        <FounderMessage onClose={() => setFounderMessageOpen(false)} />
-      )}
+      {founderMessageOpen && <FounderMessage onClose={() => setFounderMessageOpen(false)} />}
 
       {/* Rabbit Quest Cinematic Overlay */}
       {rabbitCinematic && (
@@ -4231,24 +4780,34 @@ if (claimingGift) return;
           {/* Letterbox bars */}
           <div
             className="absolute inset-x-0 top-0 origin-top bg-black/80 transition-transform duration-700"
-            style={{ height: "12%", transform: rabbitCinematicPhase >= 0 ? "scaleY(1)" : "scaleY(0)" }}
+            style={{
+              height: "12%",
+              transform: rabbitCinematicPhase >= 0 ? "scaleY(1)" : "scaleY(0)",
+            }}
           />
           <div
             className="absolute inset-x-0 bottom-0 origin-bottom bg-black/80 transition-transform duration-700"
-            style={{ height: "18%", transform: rabbitCinematicPhase >= 0 ? "scaleY(1)" : "scaleY(0)" }}
+            style={{
+              height: "18%",
+              transform: rabbitCinematicPhase >= 0 ? "scaleY(1)" : "scaleY(0)",
+            }}
           />
 
           {/* CRT scanlines */}
           <div
             className="absolute inset-0 opacity-[0.04]"
             style={{
-              backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,255,65,0.08) 1px, rgba(0,255,65,0.08) 2px)",
+              backgroundImage:
+                "repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,255,65,0.08) 1px, rgba(0,255,65,0.08) 2px)",
               backgroundSize: "100% 2px",
             }}
           />
 
           {/* Text in lower bar */}
-          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center" style={{ height: "18%" }}>
+          <div
+            className="absolute inset-x-0 bottom-0 flex items-center justify-center"
+            style={{ height: "18%" }}
+          >
             {["Follow the white rabbit...", "It hides among the plazas..."].map((text, i) => (
               <p
                 key={i}
@@ -4299,20 +4858,25 @@ if (claimingGift) return;
           </p>
           <style jsx>{`
             @keyframes rabbitHintAnim {
-              0% { opacity: 0; }
-              15% { opacity: 1; }
-              70% { opacity: 1; }
-              100% { opacity: 0; }
+              0% {
+                opacity: 0;
+              }
+              15% {
+                opacity: 1;
+              }
+              70% {
+                opacity: 1;
+              }
+              100% {
+                opacity: 0;
+              }
             }
           `}</style>
         </div>
       )}
 
       {/* Rabbit completion cinematic */}
-      {rabbitCompletion && (
-        <RabbitCompletion onComplete={() => setRabbitCompletion(false)} />
-      )}
-
+      {rabbitCompletion && <RabbitCompletion onComplete={() => setRabbitCompletion(false)} />}
     </main>
   );
 }

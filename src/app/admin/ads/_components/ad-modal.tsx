@@ -30,15 +30,7 @@ function adToForm(ad: AdStats): AdForm {
   };
 }
 
-export function AdModal({
-  open,
-  mode,
-  ad,
-  saving,
-  onClose,
-  onCreate,
-  onEdit,
-}: AdModalProps) {
+export function AdModal({ open, mode, ad, saving, onClose, onCreate, onEdit }: AdModalProps) {
   const [form, setForm] = useState<AdForm>(EMPTY_FORM);
 
   useEffect(() => {

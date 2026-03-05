@@ -6,15 +6,15 @@ import { Howl } from "howler";
 let raidSounds: Record<string, Howl> | null = null;
 
 const SOUND_DEFS: Record<string, { src: string; volume: number; loop?: boolean }> = {
-  takeoff:    { src: "/audio/raid/takeoff.mp3",     volume: 0.4 },
-  flight:     { src: "/audio/raid/flight-loop.mp3",  volume: 0.2, loop: true },
-  shoot:      { src: "/audio/raid/shoot.mp3",        volume: 0.3 },
-  impact:     { src: "/audio/raid/impact.mp3",       volume: 0.35 },
-  shield_hit: { src: "/audio/raid/shield-hit.mp3",   volume: 0.3 },
-  explosion:  { src: "/audio/raid/explosion.mp3",    volume: 0.4 },
-  victory:    { src: "/audio/raid/victory.mp3",      volume: 0.5 },
-  defeat:     { src: "/audio/raid/defeat.mp3",       volume: 0.4 },
-  crash:      { src: "/audio/raid/crash.mp3",        volume: 0.35 },
+  takeoff: { src: "/audio/raid/takeoff.mp3", volume: 0.4 },
+  flight: { src: "/audio/raid/flight-loop.mp3", volume: 0.2, loop: true },
+  shoot: { src: "/audio/raid/shoot.mp3", volume: 0.3 },
+  impact: { src: "/audio/raid/impact.mp3", volume: 0.35 },
+  shield_hit: { src: "/audio/raid/shield-hit.mp3", volume: 0.3 },
+  explosion: { src: "/audio/raid/explosion.mp3", volume: 0.4 },
+  victory: { src: "/audio/raid/victory.mp3", volume: 0.5 },
+  defeat: { src: "/audio/raid/defeat.mp3", volume: 0.4 },
+  crash: { src: "/audio/raid/crash.mp3", volume: 0.35 },
 };
 
 export function preloadRaidAudio() {

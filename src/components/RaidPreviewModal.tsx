@@ -102,7 +102,8 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
             <SpinningVehicle type={selectedVehicle} />
           </Canvas>
           <p className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] uppercase tracking-wider text-muted/70">
-            {preview.available_vehicles.find((v) => v.item_id === selectedVehicle)?.name ?? selectedVehicle}
+            {preview.available_vehicles.find((v) => v.item_id === selectedVehicle)?.name ??
+              selectedVehicle}
           </p>
         </div>
 
@@ -133,15 +134,9 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
           <div className="flex-1 text-center">
             <div className="mb-1 flex items-center justify-center gap-1.5">
               {preview.attacker_avatar && (
-                <img
-                  src={preview.attacker_avatar}
-                  alt=""
-                  className="h-4 w-4 rounded-full"
-                />
+                <img src={preview.attacker_avatar} alt="" className="h-4 w-4 rounded-full" />
               )}
-              <p className="truncate text-xs font-bold text-cream">
-                {preview.attacker_login}
-              </p>
+              <p className="truncate text-xs font-bold text-cream">{preview.attacker_login}</p>
             </div>
             <StrengthBar
               estimate={preview.attack_estimate}
@@ -156,21 +151,19 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
           <div className="flex-1 text-center">
             <div className="mb-1 flex items-center justify-center gap-1.5">
               {preview.defender_avatar && (
-                <img
-                  src={preview.defender_avatar}
-                  alt=""
-                  className="h-4 w-4 rounded-full"
-                />
+                <img src={preview.defender_avatar} alt="" className="h-4 w-4 rounded-full" />
               )}
-              <p className="truncate text-xs font-bold text-cream">
-                {preview.defender_login}
-              </p>
+              <p className="truncate text-xs font-bold text-cream">{preview.defender_login}</p>
             </div>
             <div className="flex flex-col items-center gap-1">
               <span className="text-[9px] uppercase tracking-wider text-muted">Defense</span>
               <div className="flex gap-1">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-4 w-3" style={{ backgroundColor: "#333", opacity: 0.3 }} />
+                  <div
+                    key={i}
+                    className="h-4 w-3"
+                    style={{ backgroundColor: "#333", opacity: 0.3 }}
+                  />
                 ))}
               </div>
               <span className="text-sm font-bold text-muted/50">???</span>
@@ -181,9 +174,7 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
         {/* Boost Selector */}
         {preview.available_boosts.length > 0 && (
           <div className="mb-4">
-            <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted">
-              Use Boost
-            </p>
+            <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted">Use Boost</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setSelectedBoost(null)}
@@ -215,9 +206,7 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
         )}
 
         {/* Error */}
-        {error && (
-          <p className="mb-3 text-center text-[10px] text-red-400">{error}</p>
-        )}
+        {error && <p className="mb-3 text-center text-[10px] text-red-400">{error}</p>}
 
         {/* Actions */}
         <div className="flex gap-2">

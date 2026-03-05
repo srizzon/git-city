@@ -149,22 +149,17 @@ export default function FlyLeaderboard() {
   const daysPlayed = history ? Object.keys(history.seeds).length : 0;
   const bestAllTime = history
     ? Math.max(0, ...Object.values(history.seeds).map((s) => s.bestScore))
-    : personalBest ?? 0;
+    : (personalBest ?? 0);
   const currentStreak = history?.currentStreak ?? 0;
   const hasStats = daysPlayed > 0;
 
   // Find user in leaderboard
   const userIndex = authLogin
-    ? leaderboard.findIndex(
-        (e) => e.github_login?.toLowerCase() === authLogin,
-      )
+    ? leaderboard.findIndex((e) => e.github_login?.toLowerCase() === authLogin)
     : -1;
   const userEntry = userIndex >= 0 ? leaderboard[userIndex] : null;
   const userRank = userIndex >= 0 ? userIndex + 1 : null;
-  const percentile =
-    userRank && total > 0
-      ? Math.round((userRank / total) * 100)
-      : null;
+  const percentile = userRank && total > 0 ? Math.round((userRank / total) * 100) : null;
 
   // Navigation handlers
   const goPrev = () => {
@@ -202,10 +197,7 @@ export default function FlyLeaderboard() {
           >
             {formatSeedDate(viewingSeed)}
             {isToday && (
-              <span
-                className="ml-2 text-[10px] font-bold"
-                style={{ color: ACCENT }}
-              >
+              <span className="ml-2 text-[10px] font-bold" style={{ color: ACCENT }}>
                 [TODAY]
               </span>
             )}
@@ -222,9 +214,7 @@ export default function FlyLeaderboard() {
           </button>
         </div>
         <p className="mt-2 text-[10px] text-muted normal-case">
-          {isToday
-            ? "Same course for all pilots today."
-            : "Challenge ended."}
+          {isToday ? "Same course for all pilots today." : "Challenge ended."}
         </p>
       </div>
 
@@ -238,17 +228,13 @@ export default function FlyLeaderboard() {
             >
               {currentStreak}
             </p>
-            <p className="text-[9px] text-muted">
-              DAY{currentStreak !== 1 ? "S" : ""} STREAK
-            </p>
+            <p className="text-[9px] text-muted">DAY{currentStreak !== 1 ? "S" : ""} STREAK</p>
           </div>
           <div className="flex-1 border-r border-border/50 px-3 py-3">
             <p className="text-lg font-bold" style={{ color: ACCENT }}>
               {daysPlayed}
             </p>
-            <p className="text-[9px] text-muted">
-              DAY{daysPlayed !== 1 ? "S" : ""} PLAYED
-            </p>
+            <p className="text-[9px] text-muted">DAY{daysPlayed !== 1 ? "S" : ""} PLAYED</p>
           </div>
           <div className="flex-1 px-3 py-3">
             <p className="text-lg font-bold" style={{ color: ACCENT }}>
@@ -277,12 +263,14 @@ export default function FlyLeaderboard() {
             <span className="font-bold" style={{ color: ACCENT }}>
               #{userRank}
             </span>{" "}
-            of{" "}
-            <span className="font-bold">{total} pilots</span>
+            of <span className="font-bold">{total} pilots</span>
             {percentile !== null && (
               <>
                 {" "}
-                · <span className="font-bold" style={{ color: ACCENT }}>Top {percentile}%</span>
+                ·{" "}
+                <span className="font-bold" style={{ color: ACCENT }}>
+                  Top {percentile}%
+                </span>
               </>
             )}
           </p>
@@ -318,24 +306,15 @@ export default function FlyLeaderboard() {
         {!loading &&
           leaderboard.map((entry, i) => {
             const pos = i + 1;
-            const isYou =
-              authLogin &&
-              entry.github_login?.toLowerCase() === authLogin;
+            const isYou = authLogin && entry.github_login?.toLowerCase() === authLogin;
             return (
               <div
                 key={`${entry.github_login}-${i}`}
                 className="flex items-center gap-4 border-b border-border/50 px-5 py-3.5 transition-colors hover:bg-bg-card"
-                style={
-                  isYou
-                    ? { backgroundColor: "rgba(200, 230, 74, 0.06)" }
-                    : undefined
-                }
+                style={isYou ? { backgroundColor: "rgba(200, 230, 74, 0.06)" } : undefined}
               >
                 <span className="w-10 text-center">
-                  <span
-                    className="text-sm font-bold"
-                    style={{ color: rankColor(pos) }}
-                  >
+                  <span className="text-sm font-bold" style={{ color: rankColor(pos) }}>
                     {pos}
                   </span>
                 </span>
@@ -355,10 +334,7 @@ export default function FlyLeaderboard() {
                     <p className="truncate text-sm text-cream">
                       {entry.github_login}
                       {isYou && (
-                        <span
-                          className="ml-2 text-[10px]"
-                          style={{ color: ACCENT }}
-                        >
+                        <span className="ml-2 text-[10px]" style={{ color: ACCENT }}>
                           YOU
                         </span>
                       )}
@@ -367,17 +343,15 @@ export default function FlyLeaderboard() {
                 </div>
 
                 <span className="hidden w-16 text-right text-xs text-muted sm:block">
-                  {Math.floor(entry.flight_ms / 60000)}:{String(Math.floor((entry.flight_ms % 60000) / 1000)).padStart(2, "0")}
+                  {Math.floor(entry.flight_ms / 60000)}:
+                  {String(Math.floor((entry.flight_ms % 60000) / 1000)).padStart(2, "0")}
                 </span>
 
                 <span className="hidden w-20 text-right text-xs text-muted sm:block">
                   {entry.collected}/40
                 </span>
 
-                <span
-                  className="w-24 text-right text-sm"
-                  style={{ color: ACCENT }}
-                >
+                <span className="w-24 text-right text-sm" style={{ color: ACCENT }}>
                   {entry.score} PX
                 </span>
               </div>
@@ -385,16 +359,12 @@ export default function FlyLeaderboard() {
           })}
 
         {loading && (
-          <div className="px-5 py-8 text-center text-xs text-muted normal-case">
-            Loading...
-          </div>
+          <div className="px-5 py-8 text-center text-xs text-muted normal-case">Loading...</div>
         )}
 
         {!loading && leaderboard.length === 0 && (
           <div className="px-5 py-8 text-center text-xs text-muted normal-case">
-            {isToday
-              ? "No flights recorded today. Be the first pilot!"
-              : "No flights recorded."}
+            {isToday ? "No flights recorded today. Be the first pilot!" : "No flights recorded."}
           </div>
         )}
       </div>
@@ -402,8 +372,7 @@ export default function FlyLeaderboard() {
       {/* Personal best — only show if no history stats (backward compat) */}
       {!hasStats && personalBest !== null && personalBest > 0 && (
         <div className="mt-4 text-center text-[10px] text-muted normal-case">
-          Your all-time best:{" "}
-          <span style={{ color: ACCENT }}>{personalBest} PX</span>
+          Your all-time best: <span style={{ color: ACCENT }}>{personalBest} PX</span>
         </div>
       )}
     </div>

@@ -41,10 +41,7 @@ export async function GET(request: NextRequest) {
             trackingUrl,
           );
 
-          await sb
-            .from("sky_ads")
-            .update({ expiry_notified: "expiring" })
-            .eq("id", ad.id);
+          await sb.from("sky_ads").update({ expiry_notified: "expiring" }).eq("id", ad.id);
 
           results.expiring++;
         } catch (err) {
@@ -96,10 +93,7 @@ export async function GET(request: NextRequest) {
             "https://thegitcity.com/advertise",
           );
 
-          await sb
-            .from("sky_ads")
-            .update({ expiry_notified: "expired" })
-            .eq("id", ad.id);
+          await sb.from("sky_ads").update({ expiry_notified: "expired" }).eq("id", ad.id);
 
           results.expired++;
         } catch (err) {

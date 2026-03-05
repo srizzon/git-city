@@ -64,9 +64,7 @@ const SUSPICIOUS_LINK_PATTERNS = [
   /https?:\/\/(?:[^/]*\.){4,}/,
 ];
 
-export function containsBlockedContent(
-  text: string,
-): { blocked: boolean; reason?: string } {
+export function containsBlockedContent(text: string): { blocked: boolean; reason?: string } {
   const lower = text.toLowerCase();
 
   for (const word of BLOCKED_WORDS) {

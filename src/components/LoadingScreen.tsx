@@ -94,7 +94,7 @@ export default function LoadingScreen({
   }, [fading, onFadeComplete]);
 
   const isError = stage === "error";
-  const message = isError ? error : STAGE_MESSAGES[stage] ?? "";
+  const message = isError ? error : (STAGE_MESSAGES[stage] ?? "");
 
   return (
     <div
@@ -141,10 +141,7 @@ export default function LoadingScreen({
 
       {/* Progress bar (hidden on error) */}
       {!isError && (
-        <div
-          className="mt-6 h-4 w-56 sm:w-72"
-          style={{ border: `3px solid ${accentColor}` }}
-        >
+        <div className="mt-6 h-4 w-56 sm:w-72" style={{ border: `3px solid ${accentColor}` }}>
           <div
             className="h-full transition-[width] duration-300"
             style={{

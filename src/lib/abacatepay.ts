@@ -14,7 +14,7 @@ interface PixQrCodeResponse {
 export async function createPixQrCode(
   itemId: string,
   developerId: number,
-  githubLogin: string
+  githubLogin: string,
 ): Promise<{ brCode: string; brCodeBase64: string; pixId: string }> {
   const sb = getSupabaseAdmin();
 

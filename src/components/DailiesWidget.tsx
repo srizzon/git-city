@@ -8,20 +8,34 @@ interface Props {
   accent: string;
   shadow: string;
   isMobile: boolean;
-  onClaim: () => Promise<{ ok: boolean; streak: number; total: number; freeze_granted: boolean } | null>;
+  onClaim: () => Promise<{
+    ok: boolean;
+    streak: number;
+    total: number;
+    freeze_granted: boolean;
+  } | null>;
   onRefresh: () => Promise<void>;
 }
 
 function getTimeUntilReset(): string {
   const now = new Date();
-  const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const tomorrow = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+  );
   const diff = tomorrow.getTime() - now.getTime();
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   return `${h}h ${m}m`;
 }
 
-export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim, onRefresh }: Props) {
+export default function DailiesWidget({
+  data,
+  accent,
+  shadow,
+  isMobile,
+  onClaim,
+  onRefresh,
+}: Props) {
   const [open, setOpen] = useState(!isMobile);
   const [claiming, setClaiming] = useState(false);
   const [claimResult, setClaimResult] = useState<{ freeze_granted: boolean } | null>(null);
@@ -43,13 +57,18 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
     setStarVerifying(true);
     try {
       const res = await fetch("/api/verify-github-star", { method: "POST" });
-      if (!res.ok) { setStarVerifying(false); return; }
+      if (!res.ok) {
+        setStarVerifying(false);
+        return;
+      }
       const json = await res.json();
       if (json.verified) {
         setStarVerified(true);
         setStarOpened(false);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setStarVerifying(false);
   }, [starVerifying, starVerified, data?.has_github_star]);
 
@@ -108,9 +127,7 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
         }`}
         style={canClaim ? { borderColor: accent, boxShadow: `0 0 8px 2px ${accent}40` } : undefined}
       >
-        <span style={{ color: accent }}>
-          {all_completed ? "\u2605" : "\u2606"}
-        </span>
+        <span style={{ color: accent }}>{all_completed ? "\u2605" : "\u2606"}</span>
         <span className="text-cream">{completed_count}/3</span>
       </button>
     );
@@ -161,16 +178,23 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
               <div className="min-w-0 flex-1">
                 <div
                   className={`leading-tight ${isMobile ? "text-[12px]" : "text-[10px]"}`}
-                  style={m.completed ? { color: accent, textDecoration: "line-through", opacity: 0.7 } : { color: "#e0d8cc" }}
+                  style={
+                    m.completed
+                      ? { color: accent, textDecoration: "line-through", opacity: 0.7 }
+                      : { color: "#e0d8cc" }
+                  }
                 >
                   {m.title}
                 </div>
                 {!m.completed && (
-                  <div className={`mt-0.5 leading-tight text-muted ${isMobile ? "text-[10px]" : "text-[9px]"}`}>
+                  <div
+                    className={`mt-0.5 leading-tight text-muted ${isMobile ? "text-[10px]" : "text-[9px]"}`}
+                  >
                     {m.description}
                     {m.threshold > 1 && (
                       <span style={{ color: accent, opacity: 0.8 }}>
-                        {" "}({m.progress}/{m.threshold})
+                        {" "}
+                        ({m.progress}/{m.threshold})
                       </span>
                     )}
                   </div>
@@ -199,11 +223,23 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
                 {starVerifying ? "\u231B" : "\u2B50"}
               </span>
               <div className="min-w-0 flex-1">
-                <div className={`leading-tight font-bold ${isMobile ? "text-[12px]" : "text-[10px]"}`} style={{ color: "#FFD700" }}>
-                  {starVerifying ? "Verifying..." : starOpened ? "I starred it — Verify" : "Star on GitHub"}
+                <div
+                  className={`leading-tight font-bold ${isMobile ? "text-[12px]" : "text-[10px]"}`}
+                  style={{ color: "#FFD700" }}
+                >
+                  {starVerifying
+                    ? "Verifying..."
+                    : starOpened
+                      ? "I starred it — Verify"
+                      : "Star on GitHub"}
                 </div>
-                <div className={`mt-0.5 leading-tight ${isMobile ? "text-[10px]" : "text-[9px]"}`} style={{ color: "#FFD700", opacity: 0.7 }}>
-                  {starOpened ? "Click to check or wait..." : "Star the repo to unlock an exclusive item"}
+                <div
+                  className={`mt-0.5 leading-tight ${isMobile ? "text-[10px]" : "text-[9px]"}`}
+                  style={{ color: "#FFD700", opacity: 0.7 }}
+                >
+                  {starOpened
+                    ? "Click to check or wait..."
+                    : "Star the repo to unlock an exclusive item"}
                 </div>
               </div>
             </button>
@@ -239,7 +275,9 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
             <div className="flex items-center justify-between text-[10px] text-muted">
               <span>Resets in {timeLeft}</span>
               {completed_count === 2 && (
-                <span className="font-bold" style={{ color: accent }}>1 more!</span>
+                <span className="font-bold" style={{ color: accent }}>
+                  1 more!
+                </span>
               )}
             </div>
           )}

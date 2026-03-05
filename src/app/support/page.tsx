@@ -65,9 +65,8 @@ function SupportContent() {
           Keep the <span style={{ color: ACCENT }}>Signal</span> Alive
         </h1>
         <p className="mt-2 text-xs text-muted normal-case sm:text-sm">
-          Git City runs on servers, databases, and API calls. Every new building
-          that goes up, the cost goes up with it. Your support keeps this city
-          running.
+          Git City runs on servers, databases, and API calls. Every new building that goes up, the
+          cost goes up with it. Your support keeps this city running.
         </p>
 
         {/* Thank you banner */}
@@ -118,11 +117,18 @@ function SupportContent() {
                   className="w-14 border-[2px] border-border bg-transparent px-2 py-2 text-xs text-cream outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <button
-                  disabled={loadingAmount !== null || !customAmount || parseInt(customAmount, 10) < 1}
+                  disabled={
+                    loadingAmount !== null || !customAmount || parseInt(customAmount, 10) < 1
+                  }
                   onClick={() => handleStripeCheckout(parseInt(customAmount, 10))}
                   className="btn-press border-[2px] border-border px-3 py-2 text-[10px] text-cream transition-colors hover:border-border-light disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  {loadingAmount && loadingAmount !== 5 && loadingAmount !== 10 && loadingAmount !== 25 ? "..." : "GO"}
+                  {loadingAmount &&
+                  loadingAmount !== 5 &&
+                  loadingAmount !== 10 &&
+                  loadingAmount !== 25
+                    ? "..."
+                    : "GO"}
                 </button>
               </div>
             </div>

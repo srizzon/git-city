@@ -7,17 +7,22 @@ const OWNER_LOGIN = "srizzon";
 // Historical baselines from Himetrica (tracking was lost in Supabase due to www origin bug).
 // These get added on top of live Supabase counts. Remove once Supabase data catches up.
 // To get per-ad numbers: filter Himetrica events by ad_id property.
-const HISTORICAL_BASELINES: Record<string, { impressions: number; clicks: number; cta_clicks: number }> = {
-  "gitcity":   { impressions: 311161, clicks: 2527, cta_clicks: 1110 },
-  "samuel":    { impressions: 280045, clicks: 2274, cta_clicks: 999 },
-  "build":     { impressions: 248929, clicks: 2022, cta_clicks: 888 },
-  "advertise": { impressions: 31116,  clicks: 253,  cta_clicks: 110 },
+const HISTORICAL_BASELINES: Record<
+  string,
+  { impressions: number; clicks: number; cta_clicks: number }
+> = {
+  gitcity: { impressions: 311161, clicks: 2527, cta_clicks: 1110 },
+  samuel: { impressions: 280045, clicks: 2274, cta_clicks: 999 },
+  build: { impressions: 248929, clicks: 2022, cta_clicks: 888 },
+  advertise: { impressions: 31116, clicks: 253, cta_clicks: 110 },
 };
 
 export async function GET(request: Request) {
   // Auth check
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -35,7 +40,9 @@ export async function GET(request: Request) {
   const period = searchParams.get("period") ?? "30d";
 
   // Refresh materialized view (ignore errors - view may be empty on first run)
-  try { await admin.rpc("refresh_sky_ad_stats"); } catch {}
+  try {
+    await admin.rpc("refresh_sky_ad_stats");
+  } catch {}
 
   // Build date filter
   let dayFilter: string | null = null;
@@ -46,7 +53,9 @@ export async function GET(request: Request) {
   }
 
   // Query aggregated stats
-  let query = admin.from("sky_ad_daily_stats").select("ad_id, day, impressions, clicks, cta_clicks");
+  let query = admin
+    .from("sky_ad_daily_stats")
+    .select("ad_id, day, impressions, clicks, cta_clicks");
   if (dayFilter) {
     query = query.gte("day", dayFilter);
   }
@@ -57,7 +66,11 @@ export async function GET(request: Request) {
   }
 
   // Get all ads with full details
-  const { data: allAds } = await admin.from("sky_ads").select("id, brand, text, description, color, bg_color, link, active, vehicle, priority, plan_id, starts_at, ends_at, purchaser_email, tracking_token, created_at");
+  const { data: allAds } = await admin
+    .from("sky_ads")
+    .select(
+      "id, brand, text, description, color, bg_color, link, active, vehicle, priority, plan_id, starts_at, ends_at, purchaser_email, tracking_token, created_at",
+    );
   const adMap = new Map((allAds ?? []).map((a) => [a.id, a]));
 
   // Aggregate by ad_id (live Supabase data + historical baselines)
@@ -78,7 +91,10 @@ export async function GET(request: Request) {
     aggregated.set(adId, cur);
   }
 
-  function buildAdEntry(id: string, s: { impressions: number; clicks: number; cta_clicks: number }) {
+  function buildAdEntry(
+    id: string,
+    s: { impressions: number; clicks: number; cta_clicks: number },
+  ) {
     const ad = adMap.get(id);
     const totalClicks = s.clicks + s.cta_clicks;
     return {

@@ -57,8 +57,8 @@ export default async function ShopLanding() {
           </h1>
 
           <p className="mt-4 text-center text-[10px] leading-relaxed text-muted normal-case">
-            Customize your building with effects, structures and identity items.
-            Make your building stand out in the city.
+            Customize your building with effects, structures and identity items. Make your building
+            stand out in the city.
           </p>
 
           {/* How it works */}
@@ -70,22 +70,20 @@ export default async function ShopLanding() {
               <div className="flex gap-3 border-[2px] border-border bg-bg-card px-4 py-3">
                 <span style={{ color: ACCENT }}>1.</span>
                 <span>
-                  Sign in with <span className="text-cream">GitHub</span> to
-                  connect your account
+                  Sign in with <span className="text-cream">GitHub</span> to connect your account
                 </span>
               </div>
               <div className="flex gap-3 border-[2px] border-border bg-bg-card px-4 py-3">
                 <span style={{ color: ACCENT }}>2.</span>
                 <span>
-                  Search your username and{" "}
-                  <span className="text-cream">claim</span> your building
+                  Search your username and <span className="text-cream">claim</span> your building
                 </span>
               </div>
               <div className="flex gap-3 border-[2px] border-border bg-bg-card px-4 py-3">
                 <span style={{ color: ACCENT }}>3.</span>
                 <span>
-                  Browse the shop and buy items to{" "}
-                  <span className="text-cream">customize</span> your building
+                  Browse the shop and buy items to <span className="text-cream">customize</span>{" "}
+                  your building
                 </span>
               </div>
             </div>
@@ -94,9 +92,7 @@ export default async function ShopLanding() {
           {/* Sign in */}
           <div className="mt-8 flex flex-col items-center gap-3">
             <SignInButton accent={ACCENT} />
-            <p className="text-[8px] text-dim normal-case">
-              We only read your public profile info
-            </p>
+            <p className="text-[8px] text-dim normal-case">We only read your public profile info</p>
           </div>
         </div>
 

@@ -8,9 +8,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_BASE_URL ??
-      (process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000")
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
   ),
   title: "Git City - Your GitHub as a 3D City",
   description:
@@ -46,16 +44,13 @@ export const metadata: Metadata = {
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ??
-  (process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000");
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   name: "Git City",
-  description:
-    "Your GitHub profile as a 3D pixel art building in an interactive city",
+  description: "Your GitHub profile as a 3D pixel art building in an interactive city",
   url: BASE_URL,
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Web",
@@ -84,11 +79,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap"
           rel="stylesheet"

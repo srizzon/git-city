@@ -108,10 +108,7 @@ export const ParticleAura = memo(function ParticleAura({
   return (
     <points ref={pointsRef}>
       <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
-        />
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
         color={color}
@@ -189,7 +186,14 @@ export const SpotlightEffect = memo(function SpotlightEffect({
       <group ref={beam1} position={[-spread, 0, -spread * 0.5]}>
         {/* Projector box base */}
         <mesh position={[0, 0.6, 0]} geometry={_box} scale={[2, 1.2, 2]}>
-          <meshStandardMaterial color="#333340" emissive="#666666" emissiveIntensity={2} toneMapped={false} metalness={0.7} roughness={0.3} />
+          <meshStandardMaterial
+            color="#333340"
+            emissive="#666666"
+            emissiveIntensity={2}
+            toneMapped={false}
+            metalness={0.7}
+            roughness={0.3}
+          />
         </mesh>
         {/* Inner beam */}
         <mesh position={[0, beamH / 2 + 1, 0]}>
@@ -206,7 +210,14 @@ export const SpotlightEffect = memo(function SpotlightEffect({
       {/* Beam 2 */}
       <group ref={beam2} position={[spread, 0, spread * 0.5]}>
         <mesh position={[0, 0.6, 0]} geometry={_box} scale={[2, 1.2, 2]}>
-          <meshStandardMaterial color="#333340" emissive="#666666" emissiveIntensity={2} toneMapped={false} metalness={0.7} roughness={0.3} />
+          <meshStandardMaterial
+            color="#333340"
+            emissive="#666666"
+            emissiveIntensity={2}
+            toneMapped={false}
+            metalness={0.7}
+            roughness={0.3}
+          />
         </mesh>
         <mesh position={[0, beamH / 2 + 1, 0]}>
           <coneGeometry args={[topR, beamH, 8, 1, true]} />
@@ -254,13 +265,16 @@ export const RooftopFire = memo(function RooftopFire({
   const fireW = Math.min(width, depth) * 0.4;
 
   // 5 blocky flame columns in a cluster
-  const flames = useMemo(() => [
-    { x: 0, z: 0, h: 8, color: "#ff6622" },
-    { x: fireW * 0.3, z: fireW * 0.2, h: 6, color: "#ff8833" },
-    { x: -fireW * 0.25, z: -fireW * 0.15, h: 7, color: "#ff5511" },
-    { x: fireW * 0.1, z: -fireW * 0.3, h: 5, color: "#ffaa44" },
-    { x: -fireW * 0.2, z: fireW * 0.25, h: 5.5, color: "#ff7722" },
-  ], [fireW]);
+  const flames = useMemo(
+    () => [
+      { x: 0, z: 0, h: 8, color: "#ff6622" },
+      { x: fireW * 0.3, z: fireW * 0.2, h: 6, color: "#ff8833" },
+      { x: -fireW * 0.25, z: -fireW * 0.15, h: 7, color: "#ff5511" },
+      { x: fireW * 0.1, z: -fireW * 0.3, h: 5, color: "#ffaa44" },
+      { x: -fireW * 0.2, z: fireW * 0.25, h: 5.5, color: "#ff7722" },
+    ],
+    [fireW],
+  );
 
   return (
     <group position={[0, height, 0]}>
@@ -334,10 +348,18 @@ export const Helipad = memo(function Helipad({
         <meshStandardMaterial color="#444455" roughness={0.7} />
       </mesh>
       {/* H marking - vertical bars */}
-      <mesh position={[-padSize * 0.15, 0.6, 0]} geometry={_box} scale={[padSize * 0.06, 0.2, padSize * 0.4]}>
+      <mesh
+        position={[-padSize * 0.15, 0.6, 0]}
+        geometry={_box}
+        scale={[padSize * 0.06, 0.2, padSize * 0.4]}
+      >
         <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={1} />
       </mesh>
-      <mesh position={[padSize * 0.15, 0.6, 0]} geometry={_box} scale={[padSize * 0.06, 0.2, padSize * 0.4]}>
+      <mesh
+        position={[padSize * 0.15, 0.6, 0]}
+        geometry={_box}
+        scale={[padSize * 0.06, 0.2, padSize * 0.4]}
+      >
         <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={1} />
       </mesh>
       {/* H marking - horizontal bar */}
@@ -401,18 +423,35 @@ export const AntennaArray = memo(function AntennaArray({
             const x = -totalW / 2 + panelW / 2 + c * (panelW + gapX);
             const z = -totalD / 2 + panelD / 2 + r * (panelD + gapZ);
             return (
-              <mesh key={`${r}-${c}`} position={[x, 1.2, z]} rotation={[-0.44, 0, 0]} geometry={_box} scale={[panelW, 0.2, panelD]}>
-                <meshStandardMaterial color="#223355" emissive="#334477" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
+              <mesh
+                key={`${r}-${c}`}
+                position={[x, 1.2, z]}
+                rotation={[-0.44, 0, 0]}
+                geometry={_box}
+                scale={[panelW, 0.2, panelD]}
+              >
+                <meshStandardMaterial
+                  color="#223355"
+                  emissive="#334477"
+                  emissiveIntensity={0.3}
+                  metalness={0.8}
+                  roughness={0.2}
+                />
               </mesh>
             );
-          })
+          }),
         )}
       </group>
       {/* Support struts under each row */}
       {Array.from({ length: rows }).map((_, r) => {
         const z = -totalD / 2 + panelD / 2 + r * (panelD + gapZ);
         return (
-          <mesh key={`strut-${r}`} position={[0, 0.7, z]} geometry={_box} scale={[totalW, 0.2, 0.2]}>
+          <mesh
+            key={`strut-${r}`}
+            position={[0, 0.7, z]}
+            geometry={_box}
+            scale={[totalW, 0.2, 0.2]}
+          >
             <meshStandardMaterial color="#555566" metalness={0.6} roughness={0.4} />
           </mesh>
         );
@@ -491,17 +530,30 @@ export const RooftopGarden = memo(function RooftopGarden({
           <mesh position={[0, t.trunkH / 2, 0]} geometry={_box} scale={[1.2, t.trunkH, 1.2]}>
             <meshStandardMaterial color="#5a3a1a" />
           </mesh>
-          <mesh position={[0, t.trunkH + t.canopySize / 2 - 0.5, 0]} geometry={_box} scale={[t.canopySize, t.canopySize, t.canopySize]}>
+          <mesh
+            position={[0, t.trunkH + t.canopySize / 2 - 0.5, 0]}
+            geometry={_box}
+            scale={[t.canopySize, t.canopySize, t.canopySize]}
+          >
             <meshStandardMaterial color={t.color} emissive={t.color} emissiveIntensity={0.3} />
           </mesh>
-          <mesh position={[0, t.trunkH + t.canopySize + 0.5, 0]} geometry={_box} scale={[t.canopySize * 0.6, t.canopySize * 0.5, t.canopySize * 0.6]}>
+          <mesh
+            position={[0, t.trunkH + t.canopySize + 0.5, 0]}
+            geometry={_box}
+            scale={[t.canopySize * 0.6, t.canopySize * 0.5, t.canopySize * 0.6]}
+          >
             <meshStandardMaterial color={t.color} emissive={t.color} emissiveIntensity={0.3} />
           </mesh>
         </group>
       ))}
       {/* Bushes — flat squished cubes */}
       {bushes.map((b, i) => (
-        <mesh key={`b${i}`} position={[b.x, 0.8 + b.size * 0.35, b.z]} geometry={_box} scale={[b.size * 1.4, b.size * 0.7, b.size * 1.4]}>
+        <mesh
+          key={`b${i}`}
+          position={[b.x, 0.8 + b.size * 0.35, b.z]}
+          geometry={_box}
+          scale={[b.size * 1.4, b.size * 0.7, b.size * 1.4]}
+        >
           <meshStandardMaterial color={b.color} emissive={b.color} emissiveIntensity={0.2} />
         </mesh>
       ))}
@@ -552,7 +604,12 @@ export const Spire = memo(function Spire({
         { pos: [1.5, legH * 0.35, 0] as const, size: [0.3, 0.3, 3] as const },
         { pos: [-1.5, legH * 0.35, 0] as const, size: [0.3, 0.3, 3] as const },
       ].map((b, i) => (
-        <mesh key={`b${i}`} position={[b.pos[0], b.pos[1], b.pos[2]]} geometry={_box} scale={[b.size[0], b.size[1], b.size[2]]}>
+        <mesh
+          key={`b${i}`}
+          position={[b.pos[0], b.pos[1], b.pos[2]]}
+          geometry={_box}
+          scale={[b.size[0], b.size[1], b.size[2]]}
+        >
           <meshStandardMaterial color="#555566" metalness={0.5} roughness={0.5} />
         </mesh>
       ))}
@@ -573,13 +630,23 @@ export const Spire = memo(function Spire({
       </mesh>
       {/* Ladder (boxes stacked on one side) */}
       {Array.from({ length: 6 }).map((_, i) => (
-        <mesh key={`l${i}`} position={[tankR - 0.5, 1.5 + i * 1.5, 0]} geometry={_box} scale={[0.4, 0.25, 1.2]}>
+        <mesh
+          key={`l${i}`}
+          position={[tankR - 0.5, 1.5 + i * 1.5, 0]}
+          geometry={_box}
+          scale={[0.4, 0.25, 1.2]}
+        >
           <meshStandardMaterial color="#777788" metalness={0.5} roughness={0.4} />
         </mesh>
       ))}
       {/* Ladder rails */}
       {[-0.5, 0.5].map((z, i) => (
-        <mesh key={`r${i}`} position={[tankR - 0.5, legH / 2 + 1, z]} geometry={_box} scale={[0.2, legH + 2, 0.2]}>
+        <mesh
+          key={`r${i}`}
+          position={[tankR - 0.5, legH / 2 + 1, z]}
+          geometry={_box}
+          scale={[0.2, legH + 2, 0.2]}
+        >
           <meshStandardMaterial color="#777788" metalness={0.5} roughness={0.4} />
         </mesh>
       ))}
@@ -623,7 +690,7 @@ function useBillboardTexture(imageUrl?: string | null) {
       undefined,
       () => {
         if (!cancelled) setTexture(null);
-      }
+      },
     );
 
     return () => {
@@ -883,7 +950,12 @@ export const NeonTrim = memo(function NeonTrim({
   const edges = useMemo(() => {
     const e: { pos: [number, number, number]; size: [number, number, number] }[] = [];
     // 4 vertical corner edges
-    for (const [x, z] of [[w2, d2], [-w2, d2], [w2, -d2], [-w2, -d2]] as [number, number][]) {
+    for (const [x, z] of [
+      [w2, d2],
+      [-w2, d2],
+      [w2, -d2],
+      [-w2, -d2],
+    ] as [number, number][]) {
       e.push({ pos: [x, height / 2, z], size: [lw, height + lw, lw] });
     }
     // 4 bottom horizontals
@@ -934,10 +1006,27 @@ export const NeonTrim = memo(function NeonTrim({
         {edges.map((edge, i) => (
           <group key={i}>
             <mesh position={edge.pos} geometry={_box} scale={edge.size}>
-              <meshBasicMaterial color={color} transparent opacity={0.45} blending={THREE.AdditiveBlending} depthWrite={false} />
+              <meshBasicMaterial
+                color={color}
+                transparent
+                opacity={0.45}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+              />
             </mesh>
-            <mesh position={edge.pos} geometry={_box} scale={[edge.size[0] + 1.2, edge.size[1] + 0.3, edge.size[2] + 1.2]}>
-              <meshBasicMaterial color={color} transparent opacity={0.07} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
+            <mesh
+              position={edge.pos}
+              geometry={_box}
+              scale={[edge.size[0] + 1.2, edge.size[1] + 0.3, edge.size[2] + 1.2]}
+            >
+              <meshBasicMaterial
+                color={color}
+                transparent
+                opacity={0.07}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+                side={THREE.DoubleSide}
+              />
             </mesh>
           </group>
         ))}
@@ -946,23 +1035,53 @@ export const NeonTrim = memo(function NeonTrim({
       {/* Scanning band that sweeps upward */}
       <group ref={scanRef}>
         <mesh position={[0, 0, d2]} geometry={_box} scale={[width + 1, 0.6, 0.6]}>
-          <meshBasicMaterial color={color} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={0.7}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
         </mesh>
         <mesh position={[0, 0, -d2]} geometry={_box} scale={[width + 1, 0.6, 0.6]}>
-          <meshBasicMaterial color={color} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={0.7}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
         </mesh>
         <mesh position={[w2, 0, 0]} geometry={_box} scale={[0.6, 0.6, depth + 1]}>
-          <meshBasicMaterial color={color} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={0.7}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
         </mesh>
         <mesh position={[-w2, 0, 0]} geometry={_box} scale={[0.6, 0.6, depth + 1]}>
-          <meshBasicMaterial color={color} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={0.7}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
         </mesh>
         {/* Glow plane */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} geometry={_plane} scale={[width + 3, depth + 3, 1]}>
-          <meshBasicMaterial color={color} transparent opacity={0.08} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={0.08}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
         </mesh>
       </group>
-
     </group>
   );
 });
@@ -1013,7 +1132,12 @@ export const SatelliteDish = memo(function SatelliteDish({
         {/* Signal light */}
         <mesh position={[0, 5.5, 0]}>
           <sphereGeometry args={[0.5, 8, 8]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} toneMapped={false} />
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={2}
+            toneMapped={false}
+          />
         </mesh>
       </group>
     </group>
@@ -1041,7 +1165,8 @@ export const CrownItem = memo(function CrownItem({
     frameCount.current++;
     if (frameCount.current % 3 !== 0) return;
     const t = state.clock.elapsedTime;
-    crownRef.current.position.y += (targetY + Math.sin(t * 1.5) * 1.5 - crownRef.current.position.y) * 0.15;
+    crownRef.current.position.y +=
+      (targetY + Math.sin(t * 1.5) * 1.5 - crownRef.current.position.y) * 0.15;
     crownRef.current.rotation.y = t * 0.5;
   });
 
@@ -1056,37 +1181,102 @@ export const CrownItem = memo(function CrownItem({
     <group ref={crownRef} position={[0, height + 24, 0]}>
       {/* Band — 4 walls forming a hollow square */}
       <mesh position={[0, bH / 2, S]} geometry={_box} scale={[S * 2 + bW, bH, bW]}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} toneMapped={false} metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={1.5}
+          toneMapped={false}
+          metalness={0.6}
+          roughness={0.3}
+        />
       </mesh>
       <mesh position={[0, bH / 2, -S]} geometry={_box} scale={[S * 2 + bW, bH, bW]}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} toneMapped={false} metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={1.5}
+          toneMapped={false}
+          metalness={0.6}
+          roughness={0.3}
+        />
       </mesh>
       <mesh position={[S, bH / 2, 0]} geometry={_box} scale={[bW, bH, S * 2 - bW]}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} toneMapped={false} metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={1.5}
+          toneMapped={false}
+          metalness={0.6}
+          roughness={0.3}
+        />
       </mesh>
       <mesh position={[-S, bH / 2, 0]} geometry={_box} scale={[bW, bH, S * 2 - bW]}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} toneMapped={false} metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={1.5}
+          toneMapped={false}
+          metalness={0.6}
+          roughness={0.3}
+        />
       </mesh>
 
       {/* 4 tall corner prongs + gems */}
-      {([[S, S], [-S, S], [S, -S], [-S, -S]] as [number, number][]).map(([x, z], i) => (
+      {(
+        [
+          [S, S],
+          [-S, S],
+          [S, -S],
+          [-S, -S],
+        ] as [number, number][]
+      ).map(([x, z], i) => (
         <group key={i}>
           <mesh position={[x, bH + pH / 2, z]} geometry={_box} scale={[pW, pH, pW]}>
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} toneMapped={false} metalness={0.6} roughness={0.3} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={1.5}
+              toneMapped={false}
+              metalness={0.6}
+              roughness={0.3}
+            />
           </mesh>
           <mesh position={[x, bH + pH + 0.6, z]} geometry={_box} scale={[1.1, 1.1, 1.1]}>
-            <meshStandardMaterial color={gemColors[i]} emissive={gemColors[i]} emissiveIntensity={3} toneMapped={false} />
+            <meshStandardMaterial
+              color={gemColors[i]}
+              emissive={gemColors[i]}
+              emissiveIntensity={3}
+              toneMapped={false}
+            />
           </mesh>
         </group>
       ))}
 
       {/* 4 shorter mid-wall prongs (zigzag crown silhouette) */}
-      {([[0, S], [0, -S], [S, 0], [-S, 0]] as [number, number][]).map(([x, z], i) => (
-        <mesh key={`m${i}`} position={[x, bH + pH * 0.35, z]} geometry={_box} scale={[pW * 0.7, pH * 0.45, pW * 0.7]}>
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} toneMapped={false} metalness={0.6} roughness={0.3} />
+      {(
+        [
+          [0, S],
+          [0, -S],
+          [S, 0],
+          [-S, 0],
+        ] as [number, number][]
+      ).map(([x, z], i) => (
+        <mesh
+          key={`m${i}`}
+          position={[x, bH + pH * 0.35, z]}
+          geometry={_box}
+          scale={[pW * 0.7, pH * 0.45, pW * 0.7]}
+        >
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={1.5}
+            toneMapped={false}
+            metalness={0.6}
+            roughness={0.3}
+          />
         </mesh>
       ))}
-
     </group>
   );
 });
@@ -1124,7 +1314,14 @@ export const PoolParty = memo(function PoolParty({
       </mesh>
       {/* Water */}
       <mesh ref={waterRef} position={[0, 1, 0]} geometry={_box} scale={[poolW, 0.8, poolD]}>
-        <meshStandardMaterial color="#40b0e0" emissive="#2080c0" emissiveIntensity={1.5} toneMapped={false} transparent opacity={0.85} />
+        <meshStandardMaterial
+          color="#40b0e0"
+          emissive="#2080c0"
+          emissiveIntensity={1.5}
+          toneMapped={false}
+          transparent
+          opacity={0.85}
+        />
       </mesh>
       {/* Lounge chairs (pixelated blocks) */}
       {[-1, 1].map((side) => (
@@ -1132,7 +1329,12 @@ export const PoolParty = memo(function PoolParty({
           <mesh position={[0, 0.5, 0]} geometry={_box} scale={[2, 0.4, 4]}>
             <meshStandardMaterial color="#e0d0a0" />
           </mesh>
-          <mesh position={[side * 0.8, 1.2, -1.5]} rotation={[0.3 * side, 0, 0]} geometry={_box} scale={[1.5, 1.5, 0.3]}>
+          <mesh
+            position={[side * 0.8, 1.2, -1.5]}
+            rotation={[0.3 * side, 0, 0]}
+            geometry={_box}
+            scale={[1.5, 1.5, 0.3]}
+          >
             <meshStandardMaterial color="#e0d0a0" />
           </mesh>
         </group>
@@ -1238,7 +1440,6 @@ export const HologramRing = memo(function HologramRing({
           />
         </mesh>
       </group>
-
     </group>
   );
 });
@@ -1280,16 +1481,21 @@ export const LightningAura = memo(function LightningAura({
         x: (Math.random() - 0.5) * spread * 1.6,
         z: (Math.random() - 0.5) * spread * 1.6,
         y: cloudY + (Math.random() - 0.5) * 3,
-        w: 4 + Math.random() * 8, h: 2 + Math.random() * 2, d: 4 + Math.random() * 8,
+        w: 4 + Math.random() * 8,
+        h: 2 + Math.random() * 2,
+        d: 4 + Math.random() * 8,
       });
     }
     for (let i = 0; i < 2; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = spread * (0.6 + Math.random() * 0.5);
       arr.push({
-        x: Math.cos(a) * r, z: Math.sin(a) * r,
+        x: Math.cos(a) * r,
+        z: Math.sin(a) * r,
         y: cloudY + (Math.random() - 0.5) * 2,
-        w: 3 + Math.random() * 5, h: 1.5 + Math.random() * 1.5, d: 3 + Math.random() * 5,
+        w: 3 + Math.random() * 5,
+        h: 1.5 + Math.random() * 1.5,
+        d: 3 + Math.random() * 5,
       });
     }
     return arr;
@@ -1323,7 +1529,7 @@ export const LightningAura = memo(function LightningAura({
     return slots;
   }, []);
 
-  const generateBolt = (segs: typeof boltState[0]) => {
+  const generateBolt = (segs: (typeof boltState)[0]) => {
     let cx = (Math.random() - 0.5) * spread;
     let cy = cloudY - 2;
     let cz = (Math.random() - 0.5) * spread;
@@ -1341,7 +1547,9 @@ export const LightningAura = memo(function LightningAura({
       segs[s].z = (cz + nz) / 2;
       segs[s].rZ = -Math.atan2(dx, dy);
       segs[s].len = len;
-      cx = nx; cy = ny; cz = nz;
+      cx = nx;
+      cy = ny;
+      cz = nz;
     }
   };
 
@@ -1416,7 +1624,13 @@ export const LightningAura = memo(function LightningAura({
       <group ref={cloudsRef}>
         {clouds.map((c, i) => (
           <mesh key={i} position={[c.x, c.y, c.z]} geometry={_box} scale={[c.w, c.h, c.d]}>
-            <meshStandardMaterial color="#1a1a28" emissive={color} emissiveIntensity={0} transparent opacity={0.85} />
+            <meshStandardMaterial
+              color="#1a1a28"
+              emissive={color}
+              emissiveIntensity={0}
+              transparent
+              opacity={0.85}
+            />
           </mesh>
         ))}
       </group>
@@ -1425,7 +1639,13 @@ export const LightningAura = memo(function LightningAura({
       <group ref={boltsRef}>
         {Array.from({ length: BOLT_SLOTS * BOLT_SEGS }).map((_, i) => (
           <mesh key={i} geometry={_box} scale={[0.5, 3, 0.5]}>
-            <meshBasicMaterial color="#ffffff" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
+            <meshBasicMaterial
+              color="#ffffff"
+              transparent
+              opacity={0}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
           </mesh>
         ))}
       </group>
@@ -1434,11 +1654,16 @@ export const LightningAura = memo(function LightningAura({
       <group ref={rainRef}>
         {drops.map((d, i) => (
           <mesh key={i} position={[d.x, d.y, d.z]} geometry={_box} scale={[0.1, d.len, 0.1]}>
-            <meshBasicMaterial color="#8899bb" transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} />
+            <meshBasicMaterial
+              color="#8899bb"
+              transparent
+              opacity={0.3}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
           </mesh>
         ))}
       </group>
-
     </group>
   );
 });
@@ -1468,12 +1693,15 @@ export const LEDBanner = memo(function LEDBanner({
   const hd = depth / 2 + 0.3;
 
   // Build face configs: each face has LED_SEGS scrolling blocks
-  const faces = useMemo(() => [
-    { axis: "x" as const, faceW: width, pos: [0, y, hd] as const, rot: 0 },      // front
-    { axis: "x" as const, faceW: width, pos: [0, y, -hd] as const, rot: 0 },     // back
-    { axis: "z" as const, faceW: depth, pos: [hw, y, 0] as const, rot: 0 },      // right
-    { axis: "z" as const, faceW: depth, pos: [-hw, y, 0] as const, rot: 0 },     // left
-  ], [width, depth, y, hw, hd]);
+  const faces = useMemo(
+    () => [
+      { axis: "x" as const, faceW: width, pos: [0, y, hd] as const, rot: 0 }, // front
+      { axis: "x" as const, faceW: width, pos: [0, y, -hd] as const, rot: 0 }, // back
+      { axis: "z" as const, faceW: depth, pos: [hw, y, 0] as const, rot: 0 }, // right
+      { axis: "z" as const, faceW: depth, pos: [-hw, y, 0] as const, rot: 0 }, // left
+    ],
+    [width, depth, y, hw, hd],
+  );
 
   useFrame((state) => {
     if (!groupRef.current) return;
@@ -1487,7 +1715,10 @@ export const LEDBanner = memo(function LEDBanner({
       const segW = face.faceW / LED_SEGS;
       for (let s = 0; s < LED_SEGS; s++) {
         const mesh = children[idx] as THREE.Mesh;
-        if (!mesh) { idx++; continue; }
+        if (!mesh) {
+          idx++;
+          continue;
+        }
         const mat = mesh.material as THREE.MeshStandardMaterial;
         const phase = (s / LED_SEGS + f * 0.25 + t * 0.4) % 1;
         const brightness = 0.3 + Math.pow(Math.sin(phase * Math.PI), 2) * 2.5;
@@ -1511,8 +1742,18 @@ export const LEDBanner = memo(function LEDBanner({
           const sizeX = face.axis === "x" ? segW - gap : 0.5;
           const sizeZ = face.axis === "z" ? segW - gap : 0.5;
           return (
-            <mesh key={`${f}-${s}`} position={[px, face.pos[1], pz]} geometry={_box} scale={[sizeX, bannerH, sizeZ]}>
-              <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} toneMapped={false} />
+            <mesh
+              key={`${f}-${s}`}
+              position={[px, face.pos[1], pz]}
+              geometry={_box}
+              scale={[sizeX, bannerH, sizeZ]}
+            >
+              <meshStandardMaterial
+                color={color}
+                emissive={color}
+                emissiveIntensity={0.5}
+                toneMapped={false}
+              />
             </mesh>
           );
         });
@@ -1539,7 +1780,18 @@ export const StreakFlame = memo(function StreakFlame({
   color?: string;
 }) {
   // Streak determines how far up the strips go (10% to 100%)
-  const fillPct = Math.min(1, streakDays <= 1 ? 0.1 : streakDays < 7 ? streakDays / 30 : streakDays < 14 ? 0.5 : streakDays < 30 ? 0.75 : 1);
+  const fillPct = Math.min(
+    1,
+    streakDays <= 1
+      ? 0.1
+      : streakDays < 7
+        ? streakDays / 30
+        : streakDays < 14
+          ? 0.5
+          : streakDays < 30
+            ? 0.75
+            : 1,
+  );
   const stripH = height * fillPct;
   const intensity = streakDays >= 30 ? 5 : streakDays >= 14 ? 4 : streakDays >= 7 ? 3 : 2;
   const stripW = 1.2;
@@ -1559,8 +1811,21 @@ export const StreakFlame = memo(function StreakFlame({
   return (
     <group>
       {corners.map((c, i) => (
-        <mesh key={i} position={[c.x, stripH / 2, c.z]} geometry={_box} scale={[stripW, stripH, stripW]}>
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={intensity} toneMapped={false} transparent opacity={0.85} depthWrite={false} />
+        <mesh
+          key={i}
+          position={[c.x, stripH / 2, c.z]}
+          geometry={_box}
+          scale={[stripW, stripH, stripW]}
+        >
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={intensity}
+            toneMapped={false}
+            transparent
+            opacity={0.85}
+            depthWrite={false}
+          />
         </mesh>
       ))}
     </group>
@@ -1742,23 +2007,65 @@ export const TierNeonTrim = memo(function TierNeonTrim({
   return (
     <group ref={groupRef}>
       {/* 4 vertical corner lines */}
-      {([[-hw, hd], [hw, hd], [-hw, -hd], [hw, -hd]] as [number, number][]).map(([x, z], i) => (
+      {(
+        [
+          [-hw, hd],
+          [hw, hd],
+          [-hw, -hd],
+          [hw, -hd],
+        ] as [number, number][]
+      ).map(([x, z], i) => (
         <mesh key={i} position={[x, height / 2, z]} geometry={_box} scale={[t, height, t]}>
-          <meshBasicMaterial color={color} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={0.6}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            toneMapped={false}
+          />
         </mesh>
       ))}
       {/* Top horizontal ring */}
       <mesh position={[0, height, hd]} geometry={_box} scale={[width + t * 2, t, t]}>
-        <meshBasicMaterial color={color} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.6}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
       </mesh>
       <mesh position={[0, height, -hd]} geometry={_box} scale={[width + t * 2, t, t]}>
-        <meshBasicMaterial color={color} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.6}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
       </mesh>
       <mesh position={[hw, height, 0]} geometry={_box} scale={[t, t, depth]}>
-        <meshBasicMaterial color={color} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.6}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
       </mesh>
       <mesh position={[-hw, height, 0]} geometry={_box} scale={[t, t, depth]}>
-        <meshBasicMaterial color={color} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.6}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
       </mesh>
     </group>
   );
@@ -1786,8 +2093,21 @@ export const TierBaseGlow = memo(function TierBaseGlow({
   });
 
   return (
-    <mesh ref={meshRef} position={[0, 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={_plane} scale={[width + 12, depth + 12, 1]}>
-      <meshBasicMaterial color={color} transparent opacity={0.2} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+    <mesh
+      ref={meshRef}
+      position={[0, 0.2, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      geometry={_plane}
+      scale={[width + 12, depth + 12, 1]}
+    >
+      <meshBasicMaterial
+        color={color}
+        transparent
+        opacity={0.2}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+        toneMapped={false}
+      />
     </mesh>
   );
 });
@@ -1822,7 +2142,14 @@ export const TierSkyBeam = memo(function TierSkyBeam({
 
   return (
     <mesh ref={meshRef} position={[0, height + beamH / 2, 0]} geometry={_box} scale={[3, beamH, 3]}>
-      <meshBasicMaterial color={color} transparent opacity={0.05} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      <meshBasicMaterial
+        color={color}
+        transparent
+        opacity={0.05}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+        toneMapped={false}
+      />
     </mesh>
   );
 });

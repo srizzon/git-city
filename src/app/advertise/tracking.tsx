@@ -22,12 +22,7 @@ export function AdvertiseCtaLink({
   children: React.ReactNode;
 }) {
   return (
-    <a
-      href={href}
-      className={className}
-      style={style}
-      onClick={() => trackAdvertiseCtaClick()}
-    >
+    <a href={href} className={className} style={style} onClick={() => trackAdvertiseCtaClick()}>
       {children}
     </a>
   );

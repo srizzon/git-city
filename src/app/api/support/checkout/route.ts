@@ -35,7 +35,10 @@ export async function POST(request: Request) {
   const { amount } = body;
 
   if (!Number.isFinite(amount) || amount < MIN_AMOUNT || Math.floor(amount) !== amount) {
-    return NextResponse.json({ error: `Amount must be a whole number of at least $${MIN_AMOUNT}` }, { status: 400 });
+    return NextResponse.json(
+      { error: `Amount must be a whole number of at least $${MIN_AMOUNT}` },
+      { status: 400 },
+    );
   }
 
   try {

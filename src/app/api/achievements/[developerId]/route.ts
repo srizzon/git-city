@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ developerId: string }> }
+  { params }: { params: Promise<{ developerId: string }> },
 ) {
   const { developerId: devIdStr } = await params;
   const developerId = parseInt(devIdStr, 10);
@@ -21,9 +21,7 @@ export async function GET(
       .eq("developer_id", developerId),
   ]);
 
-  const unlockedMap = new Map(
-    (unlockedRes.data ?? []).map((r) => [r.achievement_id, r])
-  );
+  const unlockedMap = new Map((unlockedRes.data ?? []).map((r) => [r.achievement_id, r]));
 
   const achievements = (allRes.data ?? []).map((a) => ({
     ...a,
@@ -34,6 +32,6 @@ export async function GET(
 
   return NextResponse.json(
     { achievements },
-    { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } }
+    { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } },
   );
 }

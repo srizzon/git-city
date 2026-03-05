@@ -40,7 +40,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { title: "Developer Not Found - Git City" };
   }
 
-  const contribs = (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions;
+  const contribs =
+    dev.contributions_total && dev.contributions_total > 0
+      ? dev.contributions_total
+      : dev.contributions;
   const title = `@${dev.github_login} - Git City | ${contribs.toLocaleString()} contributions`;
   const description = `See @${dev.github_login}'s building in Git City. ${contribs.toLocaleString()} contributions, ${dev.public_repos.toLocaleString()} repos, ${dev.total_stars.toLocaleString()} stars. Rank #${dev.rank ?? "?"} in the city.`;
 
@@ -81,11 +84,15 @@ export default async function DevPage({ params }: Props) {
     .from("developer_achievements")
     .select("achievement_id, achievements(name, tier)")
     .eq("developer_id", dev.id);
-  const achievements: AchievementRow[] = (devAchievements ?? []).map((a: Record<string, unknown>) => ({
-    achievement_id: a.achievement_id as string,
-    name: (a.achievements as Record<string, unknown>)?.name as string ?? (a.achievement_id as string),
-    tier: (a.achievements as Record<string, unknown>)?.tier as string ?? "bronze",
-  }));
+  const achievements: AchievementRow[] = (devAchievements ?? []).map(
+    (a: Record<string, unknown>) => ({
+      achievement_id: a.achievement_id as string,
+      name:
+        ((a.achievements as Record<string, unknown>)?.name as string) ??
+        (a.achievement_id as string),
+      tier: ((a.achievements as Record<string, unknown>)?.tier as string) ?? "bronze",
+    }),
+  );
 
   // Fetch referred developers (who this dev brought to the city)
   const { data: referredDevs } = await sb
@@ -97,7 +104,9 @@ export default async function DevPage({ params }: Props) {
 
   // Check if the logged-in user owns this building
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const authLogin = (
     user?.user_metadata?.user_name ??
     user?.user_metadata?.preferred_username ??
@@ -107,9 +116,7 @@ export default async function DevPage({ params }: Props) {
 
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ??
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
   const profileJsonLd = {
     "@context": "https://schema.org",
@@ -174,14 +181,15 @@ export default async function DevPage({ params }: Props) {
             )}
 
             <div className="flex-1 text-center sm:text-left">
-              {dev.name && (
-                <h1 className="text-xl text-cream sm:text-2xl">{dev.name}</h1>
-              )}
+              {dev.name && <h1 className="text-xl text-cream sm:text-2xl">{dev.name}</h1>}
               <p className="mt-1 text-sm text-muted">@{dev.github_login}</p>
 
               {/* Rank Badge */}
               {dev.rank && (
-                <div className="mt-3 inline-block border-[2px] px-3 py-1 text-sm" style={{ borderColor: accent, color: accent }}>
+                <div
+                  className="mt-3 inline-block border-[2px] px-3 py-1 text-sm"
+                  style={{ borderColor: accent, color: accent }}
+                >
                   #{dev.rank} in the city
                 </div>
               )}
@@ -191,13 +199,14 @@ export default async function DevPage({ params }: Props) {
                 <div className="mt-2 flex items-center gap-2">
                   <span
                     className="px-2 py-0.5 text-[10px] text-bg"
-                    style={{ backgroundColor: DISTRICT_COLORS[dev.district] ?? '#888' }}
+                    style={{ backgroundColor: DISTRICT_COLORS[dev.district] ?? "#888" }}
                   >
                     {DISTRICT_NAMES[dev.district] ?? dev.district}
                   </span>
                   {dev.district_rank && (
                     <span className="text-[10px] text-muted">
-                      {dev.district_rank === 1 ? 'Mayor' : `#${dev.district_rank}`} in {DISTRICT_NAMES[dev.district]}
+                      {dev.district_rank === 1 ? "Mayor" : `#${dev.district_rank}`} in{" "}
+                      {DISTRICT_NAMES[dev.district]}
                     </span>
                   )}
                 </div>
@@ -212,9 +221,7 @@ export default async function DevPage({ params }: Props) {
 
           {/* Bio */}
           {dev.bio && (
-            <p className="mt-5 text-sm leading-relaxed text-muted normal-case">
-              {dev.bio}
-            </p>
+            <p className="mt-5 text-sm leading-relaxed text-muted normal-case">{dev.bio}</p>
           )}
         </div>
 
@@ -302,7 +309,11 @@ export default async function DevPage({ params }: Props) {
           <div className="flex flex-wrap items-center justify-center gap-2">
             <ShareButtons
               login={dev.github_login}
-              contributions={(dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions}
+              contributions={
+                dev.contributions_total && dev.contributions_total > 0
+                  ? dev.contributions_total
+                  : dev.contributions
+              }
               rank={dev.rank}
               accent={accent}
               shadow={shadow}
@@ -314,17 +325,20 @@ export default async function DevPage({ params }: Props) {
         {/* Stats Grid */}
         <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
           {[
-            { label: "Contributions", value: ((dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions).toLocaleString() },
+            {
+              label: "Contributions",
+              value: (dev.contributions_total && dev.contributions_total > 0
+                ? dev.contributions_total
+                : dev.contributions
+              ).toLocaleString(),
+            },
             { label: "Repos", value: dev.public_repos.toLocaleString() },
             { label: "Stars", value: dev.total_stars.toLocaleString() },
             { label: "Kudos", value: (dev.kudos_count ?? 0).toLocaleString() },
             { label: "Visits", value: (dev.visit_count ?? 0).toLocaleString() },
             { label: "Referrals", value: (dev.referral_count ?? 0).toLocaleString() },
           ].map((stat) => (
-            <div
-              key={stat.label}
-              className="border-[3px] border-border bg-bg-card p-4 text-center"
-            >
+            <div key={stat.label} className="border-[3px] border-border bg-bg-card p-4 text-center">
               <div className="text-xl" style={{ color: accent }}>
                 {stat.value}
               </div>
@@ -392,7 +406,9 @@ export default async function DevPage({ params }: Props) {
           <div className="mt-5">
             <h2 className="mb-3 text-sm text-cream">
               Invited Devs
-              <span className="ml-2 text-[10px] text-muted">{dev.referral_count ?? referredDevs.length}</span>
+              <span className="ml-2 text-[10px] text-muted">
+                {dev.referral_count ?? referredDevs.length}
+              </span>
             </h2>
             <div className="flex flex-wrap gap-2">
               {referredDevs.map((rd) => (

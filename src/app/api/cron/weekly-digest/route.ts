@@ -89,7 +89,12 @@ export async function GET(request: NextRequest) {
         const weeklyAchievements = achievementsMap.get(dev.id) ?? 0;
 
         // Skip devs with zero activity
-        if (weeklyKudos === 0 && !weeklyRaids && weeklyAchievements === 0 && (dev.app_streak ?? 0) === 0) {
+        if (
+          weeklyKudos === 0 &&
+          !weeklyRaids &&
+          weeklyAchievements === 0 &&
+          (dev.app_streak ?? 0) === 0
+        ) {
           return Promise.resolve("skipped");
         }
 
@@ -99,7 +104,10 @@ export async function GET(request: NextRequest) {
         ];
 
         if (weeklyRaids) {
-          stats.push({ label: "Battles defended", value: `${weeklyRaids.defended}/${weeklyRaids.total}` });
+          stats.push({
+            label: "Battles defended",
+            value: `${weeklyRaids.defended}/${weeklyRaids.total}`,
+          });
         }
         if (weeklyAchievements > 0) {
           stats.push({ label: "Achievements", value: weeklyAchievements });
