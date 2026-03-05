@@ -60,10 +60,10 @@ export default function LivePage() {
             </span>
           </div>
           <p className="mt-3 text-xs normal-case text-muted">
-            These developers are coding right now. Their buildings are glowing in the city.
+            These developers are keeping the city alive. Their buildings are glowing right now.
           </p>
           <p className="mt-1 text-[10px] normal-case text-muted/60">
-            Only username and language are shown. Developers control what they share via VS Code Settings.
+            Only username and language are shown. Developers control what they share via VS Code settings.
           </p>
         </div>
 
@@ -72,9 +72,9 @@ export default function LivePage() {
           <div className="py-12 text-center text-sm text-muted">Loading...</div>
         ) : developers.length === 0 ? (
           <div className="border-[3px] border-border bg-bg/50 p-10 text-center">
-            <p className="mb-2 text-sm text-cream">No one is coding right now</p>
+            <p className="mb-2 text-sm text-cream">The city is dark right now</p>
             <p className="text-xs normal-case text-muted">
-              Install the VS Code extension to make your building glow when you code.
+              No one is coding. Install Pulse to be the first to light it up.
             </p>
           </div>
         ) : (
@@ -123,18 +123,18 @@ export default function LivePage() {
 
         {/* CTA */}
         <div className="mt-10 border-[3px] border-border bg-bg/50 p-8 text-center">
-          <p className="mb-2 text-sm text-cream">Want your building to glow?</p>
+          <p className="mb-2 text-sm text-cream">The city needs your signal</p>
           <p className="mb-5 text-xs normal-case text-muted">
-            Install the Git City VS Code extension and your building lights up when you code.
+            Every dev who codes keeps a building lit. Install Pulse to power yours.
           </p>
           <a
-            href="https://marketplace.visualstudio.com/items?itemName=gitcity.gitcity"
+            href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-press inline-block px-8 py-3 text-xs text-bg"
             style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
           >
-            Get the Extension
+            Get Pulse for VS Code
           </a>
         </div>
       </div>

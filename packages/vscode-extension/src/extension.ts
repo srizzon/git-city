@@ -47,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
         // Send a heartbeat immediately so the dev appears on the site within seconds
         sendImmediateHeartbeat();
         const action = await vscode.window.showInformationMessage(
-          "Git City: You're live! Your building is glowing in the city.",
+          "Pulse connected. Your building is powering the city.",
           "See my building",
         );
         if (action === "See my building") {
@@ -61,7 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
       await deleteKey();
       sendOfflineSignal();
       updateDisplay("connect");
-      vscode.window.showInformationMessage("Git City: API key removed.");
+      vscode.window.showInformationMessage("Pulse disconnected.");
     }),
 
     vscode.commands.registerCommand("gitCity.togglePause", () => {

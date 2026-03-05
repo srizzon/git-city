@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { SKY_AD_PLANS, getPriceCents, getFullPriceCents, formatPrice, PROMO_DISCOUNT, PROMO_LABEL, type SkyAdPlanId, type AdCurrency } from "@/lib/skyAdPlans";
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
@@ -24,11 +24,14 @@ function getPlanId(vehicle: Vehicle, duration: Duration): SkyAdPlanId {
   return `${vehicle}_${duration}` as SkyAdPlanId;
 }
 
-function detectCurrency(): AdCurrency {
-  if (typeof navigator === "undefined") return "usd";
+function detectLocale(): { currency: AdCurrency; isBrazil: boolean } {
+  if (typeof navigator === "undefined") return { currency: "usd", isBrazil: false };
   const lang = navigator.language || "";
-  return lang.startsWith("pt") ? "brl" : "usd";
+  const isBrazil = lang.startsWith("pt");
+  return { currency: isBrazil ? "brl" : "usd", isBrazil };
 }
+
+const PIX_EXPIRY_SECONDS = 900; // 15 minutes
 
 export function AdPurchaseForm() {
   const [currency, setCurrency] = useState<AdCurrency>("usd");
@@ -39,10 +42,57 @@ export function AdPurchaseForm() {
   const [bgColor, setBgColor] = useState("#1a1018");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isBrazil, setIsBrazil] = useState(false);
+  const [pixData, setPixData] = useState<{ brCode: string; brCodeBase64: string; trackingToken: string } | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
+  const [pixCountdown, setPixCountdown] = useState(PIX_EXPIRY_SECONDS);
+  const [pixPaid, setPixPaid] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    setCurrency(detectCurrency());
+    const locale = detectLocale();
+    setCurrency(locale.currency);
+    setIsBrazil(locale.isBrazil);
   }, []);
+
+  // PIX countdown timer
+  useEffect(() => {
+    if (!pixData || pixPaid) return;
+    setPixCountdown(PIX_EXPIRY_SECONDS);
+    const timer = setInterval(() => {
+      setPixCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setPixData(null);
+          setError("PIX expired. Please try again.");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [pixData, pixPaid]);
+
+  // Poll for payment confirmation
+  const checkAdPaid = useCallback(async (token: string) => {
+    try {
+      const res = await fetch(`/api/sky-ads/status?token=${token}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.active) {
+          setPixPaid(true);
+          if (pollRef.current) clearInterval(pollRef.current);
+          window.location.href = `/advertise/setup/${token}`;
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (!pixData || pixPaid) return;
+    pollRef.current = setInterval(() => checkAdPaid(pixData.trackingToken), 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [pixData, pixPaid, checkAdPaid]);
 
   const planId = getPlanId(vehicle, duration);
   const plan = SKY_AD_PLANS[planId];
@@ -64,10 +114,11 @@ export function AdPurchaseForm() {
     bgColorValid &&
     !loading;
 
-  async function handleSubmit() {
+  async function handleSubmit(provider: "stripe" | "abacatepay" = "stripe") {
     if (!canSubmit) return;
     setLoading(true);
     setError("");
+    setPixData(null);
     try {
       const res = await fetch("/api/sky-ads/checkout", {
         method: "POST",
@@ -78,6 +129,7 @@ export function AdPurchaseForm() {
           color,
           bgColor,
           currency,
+          provider,
         }),
       });
       const data = await res.json();
@@ -86,7 +138,12 @@ export function AdPurchaseForm() {
         setLoading(false);
         return;
       }
-      if (data.url) window.location.href = data.url;
+      if (data.brCode) {
+        setPixData({ brCode: data.brCode, brCodeBase64: data.brCodeBase64, trackingToken: data.trackingToken });
+        setLoading(false);
+      } else if (data.url) {
+        window.location.href = data.url;
+      }
     } catch {
       setError("Network error. Please try again.");
       setLoading(false);
@@ -274,7 +331,7 @@ export function AdPurchaseForm() {
           </div>
         </div>
 
-        {/* Row 5: Buy button */}
+        {/* Row 5: Buy buttons */}
         <div className="mt-5">
           {/* Error banner */}
           {error && (
@@ -285,21 +342,85 @@ export function AdPurchaseForm() {
               {error}
             </div>
           )}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="btn-press w-full py-3.5 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              backgroundColor: ACCENT,
-              boxShadow: "4px 4px 0 0 #5a7a00",
-            }}
-          >
-            {loading ? "Redirecting..." : `Buy for ${priceLabel}`}
-          </button>
-          <p className="mt-2.5 text-center text-[9px] text-muted normal-case">
-            Secure Stripe checkout. No account needed.
-          </p>
+
+          {pixData ? (
+            <div className="border-[3px] border-border p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-xs" style={{ color: ACCENT }}>
+                  PIX Payment
+                </p>
+                <p className="text-[9px] normal-case" style={{ color: pixCountdown < 120 ? "#ff6b6b" : "var(--color-muted)" }}>
+                  {Math.floor(pixCountdown / 60)}:{String(pixCountdown % 60).padStart(2, "0")}
+                </p>
+              </div>
+              {pixData.brCodeBase64 && (
+                <div className="mx-auto mb-3 w-fit border-[3px] border-border bg-white p-2">
+                  <img
+                    src={`data:image/png;base64,${pixData.brCodeBase64}`}
+                    alt="PIX QR Code"
+                    className="h-40 w-40"
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                </div>
+              )}
+              <div className="mb-3">
+                <p className="mb-1 text-[8px] text-muted normal-case">PIX code (copy & paste):</p>
+                <div className="flex gap-1">
+                  <input
+                    readOnly
+                    value={pixData.brCode}
+                    className="min-w-0 flex-1 border-[2px] border-border bg-transparent px-2 py-1.5 font-mono text-[8px] text-cream"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(pixData.brCode);
+                      setPixCopied(true);
+                      setTimeout(() => setPixCopied(false), 2000);
+                    }}
+                    className="border-[2px] border-border px-3 py-1.5 text-[9px] text-cream hover:bg-border/20"
+                  >
+                    {pixCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+              <p className="text-center text-[9px] text-muted normal-case">
+                {pixPaid ? "Payment confirmed! Redirecting..." : "Waiting for payment... You'll be redirected automatically."}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => handleSubmit("stripe")}
+                disabled={!canSubmit}
+                className="btn-press w-full py-3.5 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                style={{
+                  backgroundColor: ACCENT,
+                  boxShadow: "4px 4px 0 0 #5a7a00",
+                }}
+              >
+                {loading ? "Redirecting..." : `Buy for ${priceLabel}`}
+              </button>
+              {isBrazil && (
+                <button
+                  type="button"
+                  onClick={() => handleSubmit("abacatepay")}
+                  disabled={!canSubmit}
+                  className="btn-press w-full py-2.5 text-xs text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{
+                    backgroundColor: "#32bcad",
+                    boxShadow: "3px 3px 0 0 #1a7a6e",
+                  }}
+                >
+                  {loading ? "..." : `Pay with PIX (${formatPrice(getPriceCents(planId, "brl"), "brl")})`}
+                </button>
+              )}
+              <p className="mt-1 text-center text-[9px] text-muted normal-case">
+                Secure checkout. No account needed.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

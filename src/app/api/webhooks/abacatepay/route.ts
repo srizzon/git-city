@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { autoEquipIfSolo } from "@/lib/items";
 import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
+import { SKY_AD_PLANS, isValidPlanId } from "@/lib/skyAdPlans";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,11 @@ function extractPixId(data: any): string | undefined {
 }
 
 function verifySignature(rawBody: string, signature: string): boolean {
-  const publicKey = process.env.ABACATEPAY_PUBLIC_KEY;
-  if (!publicKey) return false;
+  const secret = process.env.ABACATEPAY_WEBHOOK_SECRET;
+  if (!secret) return false;
 
   const expected = crypto
-    .createHmac("sha256", publicKey)
+    .createHmac("sha256", secret)
     .update(Buffer.from(rawBody, "utf8"))
     .digest("base64");
 
@@ -66,7 +67,41 @@ export async function POST(request: Request) {
       case "pixQrCode.paid": {
         if (!pixId) break;
 
-        // Find purchase by pix ID
+        // --- Sky Ad purchase ---
+        const { data: ad } = await sb
+          .from("sky_ads")
+          .select("id, plan_id, active")
+          .eq("pix_id", pixId)
+          .maybeSingle();
+
+        if (ad && !ad.active) {
+          const planId = ad.plan_id;
+          if (planId && isValidPlanId(planId)) {
+            const plan = SKY_AD_PLANS[planId];
+            const now = new Date();
+            const endsAt = new Date(now.getTime() + plan.duration_days * 24 * 60 * 60 * 1000);
+
+            await sb
+              .from("sky_ads")
+              .update({
+                active: true,
+                starts_at: now.toISOString(),
+                ends_at: endsAt.toISOString(),
+              })
+              .eq("id", ad.id);
+
+            if (plan.vehicle === "plane") {
+              await sb
+                .from("sky_ads")
+                .update({ active: false })
+                .eq("id", "advertise")
+                .eq("active", true);
+            }
+          }
+          break;
+        }
+
+        // --- Shop item purchase ---
         const { data: purchase } = await sb
           .from("purchases")
           .select("id, status")
@@ -80,7 +115,6 @@ export async function POST(request: Request) {
             .update({ status: "completed" })
             .eq("id", purchase.id);
 
-          // Insert feed event
           const { data: fullPurchase } = await sb
             .from("purchases")
             .select("developer_id, item_id, gifted_to")
@@ -88,7 +122,6 @@ export async function POST(request: Request) {
             .single();
 
           if (fullPurchase) {
-            // Auto-equip if solo item in zone
             const itemOwner = fullPurchase.gifted_to ?? fullPurchase.developer_id;
             await autoEquipIfSolo(itemOwner, fullPurchase.item_id);
 
@@ -122,7 +155,6 @@ export async function POST(request: Request) {
             }
           }
         }
-        // If already completed, ignore (duplicate webhook)
         break;
       }
 
@@ -130,12 +162,20 @@ export async function POST(request: Request) {
       case "pixQrCode.expired": {
         if (!pixId) break;
 
+        // Expire shop purchases
         await sb
           .from("purchases")
           .update({ status: "expired" })
           .eq("provider_tx_id", pixId)
           .eq("status", "pending")
           .eq("provider", "abacatepay");
+
+        // Clean up expired sky ad rows
+        await sb
+          .from("sky_ads")
+          .delete()
+          .eq("pix_id", pixId)
+          .eq("active", false);
         break;
       }
     }

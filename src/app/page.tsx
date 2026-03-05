@@ -2459,7 +2459,7 @@ if (claimingGift) return;
                       {!session ? (
                         <div className="px-5 py-5 text-center">
                           <p className="mb-3 text-xs normal-case text-muted">
-                            Make your building glow when you code
+                            Keep your city alive while you code
                           </p>
                           <Link
                             href="/auth"
@@ -2472,7 +2472,7 @@ if (claimingGift) return;
                         </div>
                       ) : liveByLogin.has(authLogin) ? (
                         <div className="px-5 py-3.5 text-center text-xs normal-case text-[#4ade80]">
-                          Your building is live
+                          Your building is powering the city
                         </div>
                       ) : vsCodeKey ? (
                         <div className="px-5 py-5">
@@ -2493,8 +2493,8 @@ if (claimingGift) return;
                             </button>
                           </div>
                           <div className="space-y-2.5 text-xs normal-case text-muted">
-                            <p><span className="text-cream">1.</span> Install the <a href="https://marketplace.visualstudio.com/items?itemName=gitcity.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">VS Code extension</a></p>
-                            <p><span className="text-cream">2.</span> Cmd+Shift+P &rarr; &ldquo;Git City: Set API Key&rdquo;</p>
+                            <p><span className="text-cream">1.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code</p>
+                            <p><span className="text-cream">2.</span> Cmd+Shift+P &rarr; &ldquo;Pulse: Connect&rdquo;</p>
                             <p><span className="text-cream">3.</span> Paste your key and start coding</p>
                           </div>
                           <p className="mt-3 text-[10px] normal-case text-muted/50">
@@ -2507,11 +2507,14 @@ if (claimingGift) return;
                       ) : (
                         <div className="px-5 py-5">
                           <p className="mb-3 text-sm normal-case text-cream font-bold">
-                            Make your building glow live
+                            Keep your city alive
+                          </p>
+                          <p className="mb-3 text-[11px] normal-case text-muted">
+                            When you code, your building glows and the city stays lit. Every active dev powers the signal.
                           </p>
                           <div className="mb-4 space-y-2.5 text-xs normal-case text-muted">
                             <p><span className="text-cream">1.</span> Generate your key below</p>
-                            <p><span className="text-cream">2.</span> Install the <a href="https://marketplace.visualstudio.com/items?itemName=gitcity.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">VS Code extension</a></p>
+                            <p><span className="text-cream">2.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code</p>
                             <p><span className="text-cream">3.</span> Paste key in VS Code, start coding</p>
                           </div>
                           <button

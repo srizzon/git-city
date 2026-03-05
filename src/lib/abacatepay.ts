@@ -11,25 +11,12 @@ interface PixQrCodeResponse {
   };
 }
 
-export async function createPixQrCode(
-  itemId: string,
-  developerId: number,
-  githubLogin: string
-): Promise<{ brCode: string; brCodeBase64: string; pixId: string }> {
-  const sb = getSupabaseAdmin();
-
-  // Price ALWAYS from DB, never from frontend
-  const { data: item, error } = await sb
-    .from("items")
-    .select("*")
-    .eq("id", itemId)
-    .eq("is_active", true)
-    .single();
-
-  if (error || !item) {
-    throw new Error("Item not found or inactive");
-  }
-
+/** Low-level: create a PIX QR code with explicit amount/description. */
+export async function createPixQrCodeRaw(opts: {
+  amountCents: number;
+  description: string;
+  externalId: string;
+}): Promise<{ brCode: string; brCodeBase64: string; pixId: string }> {
   if (!process.env.ABACATEPAY_API_KEY) {
     throw new Error("ABACATEPAY_API_KEY is not set");
   }
@@ -41,12 +28,10 @@ export async function createPixQrCode(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      amount: item.price_brl_cents,
+      amount: opts.amountCents,
       expiresIn: 900,
-      description: `${item.name} — ${githubLogin}`,
-      metadata: {
-        externalId: `${developerId}:${itemId}`,
-      },
+      description: opts.description,
+      metadata: { externalId: opts.externalId },
     }),
   });
 
@@ -66,4 +51,30 @@ export async function createPixQrCode(
     brCodeBase64: data.data.brCodeBase64,
     pixId: data.data.id,
   };
+}
+
+/** Shop items: looks up price from DB. */
+export async function createPixQrCode(
+  itemId: string,
+  developerId: number,
+  githubLogin: string
+): Promise<{ brCode: string; brCodeBase64: string; pixId: string }> {
+  const sb = getSupabaseAdmin();
+
+  const { data: item, error } = await sb
+    .from("items")
+    .select("*")
+    .eq("id", itemId)
+    .eq("is_active", true)
+    .single();
+
+  if (error || !item) {
+    throw new Error("Item not found or inactive");
+  }
+
+  return createPixQrCodeRaw({
+    amountCents: item.price_brl_cents,
+    description: `${item.name} - ${githubLogin}`,
+    externalId: `${developerId}:${itemId}`,
+  });
 }

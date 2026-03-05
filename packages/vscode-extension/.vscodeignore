@@ -2,4 +2,5 @@ src/**
 node_modules/**
 tsconfig.json
 esbuild.mjs
+gen-icon.html
 .gitignore

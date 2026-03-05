@@ -27,25 +27,25 @@ export function updateDisplay(status: "active" | "idle" | "paused" | "connect") 
     case "active": {
       const seconds = getActiveSeconds();
       const timeStr = formatDuration(seconds);
-      statusBarItem.text = `$(broadcast) Git City: Live${timeStr ? ` (${timeStr})` : ""}`;
+      statusBarItem.text = `$(broadcast) Pulse: Transmitting${timeStr ? ` (${timeStr})` : ""}`;
       statusBarItem.backgroundColor = undefined;
-      statusBarItem.tooltip = "Click to pause tracking";
+      statusBarItem.tooltip = "Click to pause Pulse";
       break;
     }
     case "idle":
-      statusBarItem.text = "$(broadcast) Git City: Idle";
+      statusBarItem.text = "$(circle-outline) Pulse: Standby";
       statusBarItem.backgroundColor = undefined;
       statusBarItem.tooltip = "Waiting for activity...";
       break;
     case "paused":
-      statusBarItem.text = "$(debug-pause) Git City: Paused";
+      statusBarItem.text = "$(circle-slash) Pulse: Off";
       statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
-      statusBarItem.tooltip = "Click to resume tracking";
+      statusBarItem.tooltip = "Click to resume Pulse";
       break;
     case "connect":
-      statusBarItem.text = "$(key) Git City: Connect";
+      statusBarItem.text = "$(plug) Pulse: Disconnected";
       statusBarItem.backgroundColor = undefined;
-      statusBarItem.tooltip = "Click to set your API key";
+      statusBarItem.tooltip = "Click to connect your Pulse";
       statusBarItem.command = "gitCity.login";
       break;
   }

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pulse Icon Generator</title>
+  <style>
+    body { background: #1a1a1a; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 40px; font-family: monospace; color: #aaa; }
+    canvas { border: 1px solid #333; image-rendering: pixelated; }
+    .preview { display: flex; gap: 32px; align-items: end; }
+    button { background: #00ff41; color: #000; border: none; padding: 10px 24px; font-family: monospace; font-size: 14px; cursor: pointer; font-weight: bold; }
+    button:hover { background: #00cc34; }
+    .label { text-align: center; font-size: 11px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h2 style="color:#00ff41">Git City: Pulse — Icon</h2>
+
+  <div class="preview">
+    <div>
+      <canvas id="c128" width="128" height="128"></canvas>
+      <div class="label">128×128 (actual)</div>
+    </div>
+    <div>
+      <canvas id="c512" width="512" height="512" style="width:256px;height:256px"></canvas>
+      <div class="label">512×512 (4x preview)</div>
+    </div>
+    <div>
+      <canvas id="c16" width="16" height="16" style="width:128px;height:128px"></canvas>
+      <div class="label">16×16 (sidebar preview)</div>
+    </div>
+  </div>
+
+  <button onclick="download()">Download 128×128 PNG</button>
+
+  <script>
+    const BG = "#0d1117";
+    const GREEN = "#00ff41";
+    const DIM = "#00ff4130";
+    const GLOW = "#00ff4118";
+
+    // 32×32 logical grid → 4px per cell on 128×128
+    const CELL = 4;
+    const GRID = 32;
+
+    // ECG pulse wave path (x → y, baseline at y=16)
+    const BASELINE = 16;
+    const wave = [];
+
+    // Flat left
+    for (let x = 0; x <= 10; x++) wave.push([x, BASELINE]);
+
+    // Small P-wave bump
+    wave.push([11, 15]);
+    wave.push([12, 14]);
+    wave.push([13, 15]);
+
+    // Brief return
+    wave.push([14, BASELINE]);
+
+    // QRS complex — sharp spike
+    wave.push([15, 14]);
+    wave.push([16, 8]);
+    wave.push([17, 4]);   // peak
+    wave.push([18, 21]);
+    wave.push([19, 25]);  // valley
+    wave.push([20, 13]);
+
+    // Return to baseline
+    wave.push([21, BASELINE]);
+
+    // Small T-wave
+    wave.push([22, 15]);
+    wave.push([23, 14]);
+    wave.push([24, 14]);
+    wave.push([25, 15]);
+
+    // Flat right
+    for (let x = 26; x < GRID; x++) wave.push([x, BASELINE]);
+
+    function drawIcon(canvas, scale) {
+      const ctx = canvas.getContext("2d");
+      const s = scale; // pixels per grid cell
+
+      // Background
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Subtle horizontal grid line at baseline (very dim)
+      ctx.fillStyle = "#00ff4108";
+      for (let x = 0; x < GRID; x++) {
+        ctx.fillRect(x * s, BASELINE * s, s, s);
+      }
+
+      // Glow layer (larger, dimmer)
+      for (let i = 0; i < wave.length - 1; i++) {
+        const [x1, y1] = wave[i];
+        const [x2, y2] = wave[i + 1];
+
+        // Interpolate between points for smooth line
+        const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+        for (let t = 0; t <= steps; t++) {
+          const x = Math.round(x1 + (x2 - x1) * t / steps);
+          const y = Math.round(y1 + (y2 - y1) * t / steps);
+
+          // Glow (3×3 around each pixel)
+          ctx.fillStyle = GLOW;
+          ctx.fillRect((x - 1) * s, (y - 1) * s, s * 3, s * 3);
+        }
+      }
+
+      // Main line
+      for (let i = 0; i < wave.length - 1; i++) {
+        const [x1, y1] = wave[i];
+        const [x2, y2] = wave[i + 1];
+
+        const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+        for (let t = 0; t <= steps; t++) {
+          const x = Math.round(x1 + (x2 - x1) * t / steps);
+          const y = Math.round(y1 + (y2 - y1) * t / steps);
+
+          // Brighter at the peak
+          const distFromPeak = Math.abs(y - 4);
+          const brightness = distFromPeak < 6 ? 1 : 0.8;
+
+          ctx.fillStyle = brightness === 1 ? GREEN : DIM.replace("30", "cc");
+          ctx.fillRect(x * s, y * s, s, s);
+        }
+      }
+
+      // Bright dot at peak
+      ctx.fillStyle = "#aaffaa";
+      ctx.fillRect(17 * s, 4 * s, s, s);
+    }
+
+    // 16×16 needs its own simplified wave (16-col grid, baseline at 8)
+    const wave16 = [];
+    const B16 = 8;
+    for (let x = 0; x <= 4; x++) wave16.push([x, B16]);
+    wave16.push([5, 7]);
+    wave16.push([6, 6]); // small bump
+    wave16.push([7, 7]);
+    wave16.push([8, B16]);
+    wave16.push([9, 5]);
+    wave16.push([10, 2]); // peak
+    wave16.push([11, 11]);
+    wave16.push([12, 13]); // valley
+    wave16.push([13, 6]);
+    wave16.push([14, B16]);
+    wave16.push([15, B16]);
+
+    function drawIcon16(canvas) {
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, 16, 16);
+
+      // Main line
+      for (let i = 0; i < wave16.length - 1; i++) {
+        const [x1, y1] = wave16[i];
+        const [x2, y2] = wave16[i + 1];
+        const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+        for (let t = 0; t <= steps; t++) {
+          const x = Math.round(x1 + (x2 - x1) * t / steps);
+          const y = Math.round(y1 + (y2 - y1) * t / steps);
+          ctx.fillStyle = GREEN;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+
+      // Bright peak
+      ctx.fillStyle = "#aaffaa";
+      ctx.fillRect(10, 2, 1, 1);
+    }
+
+    // Render at different scales
+    drawIcon(document.getElementById("c128"), CELL);     // 128px
+    drawIcon(document.getElementById("c512"), CELL * 4); // 512px
+    drawIcon16(document.getElementById("c16"));          // 16px (simplified wave)
+
+    function download() {
+      const a = document.createElement("a");
+      a.download = "pulse-icon-128.png";
+      a.href = document.getElementById("c128").toDataURL("image/png");
+      a.click();
+    }
+  </script>
+</body>
+</html>
