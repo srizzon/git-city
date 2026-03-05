@@ -6,6 +6,7 @@
     { "path": "/api/cron/weekly-digest",   "schedule": "0 10 * * 1" },
     { "path": "/api/cron/monthly-digest",  "schedule": "0 10 1 * *" },
     { "path": "/api/cron/re-engagement",   "schedule": "0 14 * * *" },
-    { "path": "/api/cron/city-snapshot",   "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/city-snapshot",   "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/cleanup-sessions", "schedule": "*/5 * * * *" }
   ]
 }

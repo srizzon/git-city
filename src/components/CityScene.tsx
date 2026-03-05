@@ -7,6 +7,8 @@ import { createWindowAtlas, FocusBeacon } from "./Building3D";
 import InstancedBuildings from "./InstancedBuildings";
 import InstancedLabels from "./InstancedLabels";
 import EffectsLayer from "./EffectsLayer";
+import LiveDots from "./LiveDots";
+import type { LiveSession } from "@/lib/useCodingPresence";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
 
@@ -74,6 +76,8 @@ interface CitySceneProps {
   flyMode?: boolean;
   ghostPreviewLogin?: string | null;
   holdRise?: boolean;
+  liveByLogin?: Map<string, LiveSession>;
+  cityEnergy?: number;
 }
 
 export default function CityScene({
@@ -89,6 +93,8 @@ export default function CityScene({
   flyMode,
   ghostPreviewLogin,
   holdRise,
+  liveByLogin,
+  cityEnergy,
 }: CitySceneProps) {
   // Single atlas texture for all building windows (created once per theme)
   const atlasTexture = useMemo(() => createWindowAtlas(colors), [colors]);
@@ -161,7 +167,14 @@ export default function CityScene({
         introMode={introMode}
         onBuildingClick={onBuildingClick}
         holdRise={holdRise}
+        liveByLogin={liveByLogin}
+        cityEnergy={cityEnergy}
       />
+
+      {/* Live presence dots above active buildings */}
+      {liveByLogin && liveByLogin.size > 0 && (
+        <LiveDots buildings={buildings} liveByLogin={liveByLogin} />
+      )}
 
       {/* All labels: single instanced draw call with billboard shader */}
       <InstancedLabels

@@ -7,6 +7,7 @@ import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
+import type { LiveSession } from "@/lib/useCodingPresence";
 import type { CityBuilding, CityPlaza, CityDecoration, CityRiver, CityBridge } from "@/lib/github";
 import { seededRandom } from "@/lib/github";
 import SkyAds from "./SkyAds";
@@ -1895,12 +1896,31 @@ interface Props {
   celebrationActive?: boolean;
   wallpaperMode?: boolean;
   wallpaperSpeed?: number;
+  liveByLogin?: Map<string, LiveSession>;
+  cityEnergy?: number;
+}
+
+// Dynamically adjust scene exposure based on city energy (devs coding)
+function CityExposure({ cityEnergy }: { cityEnergy: number }) {
+  const gl = useThree((s) => s.gl);
+  const targetRef = useRef(1.3);
+  targetRef.current = 0.4 + 0.9 * Math.min(1, cityEnergy); // 0.4 at sleep, 1.3 at full
+
+  useFrame(() => {
+    const current = gl.toneMappingExposure;
+    const target = targetRef.current;
+    if (Math.abs(current - target) > 0.001) {
+      gl.toneMappingExposure += (target - current) * 0.02;
+    }
+  });
+
+  return null;
 }
 
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
   const [dpr, setDpr] = useState(1);
@@ -1924,6 +1944,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
+      <CityExposure cityEnergy={cityEnergy ?? 1} />
       <PerformanceMonitor
         onIncline={() => { setDpr(1.25); setBloomEnabled(true); }}
         onDecline={() => { setDpr(0.75); setBloomEnabled(false); }}
@@ -2019,6 +2040,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         flyMode={flyMode}
         ghostPreviewLogin={ghostPreviewLogin}
         holdRise={holdRise}
+        liveByLogin={liveByLogin}
+        cityEnergy={cityEnergy}
       />
 
       <InstancedDecorations items={decorations} roadMarkingColor={t.roadMarkingColor} sidewalkColor={t.sidewalkColor} />
@@ -2043,7 +2066,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
             mipmapBlur
             luminanceThreshold={1}
             luminanceSmoothing={0.3}
-            intensity={1.2}
+            intensity={1.2 * Math.max(0.1, cityEnergy ?? 1)}
           />
         </EffectComposer>
       )}

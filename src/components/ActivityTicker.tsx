@@ -79,9 +79,10 @@ interface Props {
   events: FeedEvent[];
   onEventClick?: (event: FeedEvent) => void;
   onOpenPanel?: () => void;
+  hasBottomBar?: boolean;
 }
 
-export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Props) {
+export default function ActivityTicker({ events, onEventClick, onOpenPanel, hasBottomBar = false }: Props) {
   const tickerText = useMemo(() => {
     return events.map((e) => ({ id: e.id, text: formatEvent(e), event: e }));
   }, [events]);
@@ -90,7 +91,7 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Pr
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-30 flex h-7 items-center border-t border-border/30 bg-bg/90 backdrop-blur-sm"
+      className={`fixed ${hasBottomBar ? "bottom-[46px]" : "bottom-0"} sm:bottom-0 left-0 right-0 z-30 flex h-7 items-center border-t border-border/30 bg-bg/90 backdrop-blur-sm`}
     >
       <div
         className="min-w-0 flex-1 overflow-hidden cursor-pointer"
