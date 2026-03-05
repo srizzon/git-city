@@ -51,14 +51,14 @@ Copy `.env.example` to `.env.local` and fill in the values. Here is a summary of
 - React Three Fiber (R3F) + drei for 3D
 - App Router (Next.js 16)
 
-Run `npm run lint` before submitting.
+Run `npm run format` and `npm run lint` before submitting.
 
 ## Making Changes
 
 1. Fork the repo
 2. Create a branch from `main` (`git checkout -b feat/my-feature`)
 3. Make your changes
-4. Run `npm run lint` and fix any issues
+4. Run `npm run format` and `npm run lint`, then fix any issues
 5. Commit with a clear message (e.g. `feat: add rain weather effect`)
 6. Open a Pull Request against `main`
 
