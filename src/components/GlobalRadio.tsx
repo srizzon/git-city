@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import LofiRadio from "./LofiRadio";
 
 export default function GlobalRadio() {
   const [mounted, setMounted] = useState(false);
-  const [slot, setSlot] = useState<Element | null>(null);
+  const [pageHandlesRadio, setPageHandlesRadio] = useState(false);
 
   // Delay activation past React's selective hydration window.
   // The layout hydrates (and fires effects) before Suspense-wrapped
@@ -22,20 +21,17 @@ export default function GlobalRadio() {
 
   useEffect(() => {
     if (!mounted) return;
-    const findSlot = () => document.getElementById("gc-radio-slot");
-    setSlot(findSlot());
+    const check = () => !!document.getElementById("gc-radio-slot");
+    setPageHandlesRadio(check());
 
-    const observer = new MutationObserver(() => setSlot(findSlot()));
+    const observer = new MutationObserver(() => setPageHandlesRadio(check()));
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [mounted]);
 
-  if (!mounted) return null;
+  if (!mounted || pageHandlesRadio) return null;
 
-  // When the main page provides a slot, portal into it (inline with theme/intro buttons)
-  if (slot) return createPortal(<LofiRadio />, slot);
-
-  // Fallback for other pages: fixed bottom-left
+  // Fallback for pages that don't render their own LofiRadio
   return (
     <div className="pointer-events-auto fixed bottom-4 left-3 z-[25] sm:left-4">
       <LofiRadio />

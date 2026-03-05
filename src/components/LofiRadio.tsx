@@ -299,7 +299,7 @@ export default function LofiRadio() {
       <button
         onClick={togglePlay}
         onContextMenu={(e) => { e.preventDefault(); setExpanded(true); }}
-        className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-all hover:border-border-light"
+        className="btn-press flex shrink-0 items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] whitespace-nowrap backdrop-blur-sm transition-all hover:border-border-light"
         style={{ borderColor: playing ? accent + "60" : undefined } as React.CSSProperties}
         title={playing ? "Pause music" : "Play music"}
       >

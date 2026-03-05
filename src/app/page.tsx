@@ -37,6 +37,7 @@ import LevelUpToast from "@/components/LevelUpToast";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
 import MiniMap from "@/components/MiniMap";
+import LofiRadio from "@/components/LofiRadio";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
@@ -2237,16 +2238,18 @@ if (claimingGift) return;
             </button>
           </div>
 
-          {/* Theme switcher (bottom-left) — same position as main controls */}
-          <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex items-center gap-2 sm:left-4">
+          {/* Theme switcher + Radio (bottom-left) */}
+          <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex flex-row flex-nowrap items-center gap-2 sm:left-4">
+            <div id="gc-radio-slot" className="hidden" />
             <button
               onClick={cycleTheme}
-              className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+              className="btn-press flex shrink-0 items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
             >
               <span style={{ color: theme.accent }}>&#9654;</span>
               <span className="text-cream">{theme.name}</span>
               <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
+            <LofiRadio />
           </div>
 
           {/* Feed toggle (top-right, below GitHub badges on desktop) */}
@@ -3793,19 +3796,20 @@ if (claimingGift) return;
 
       {/* ─── Bottom-left controls: Theme + Radio (portal slot) + Intro ─── */}
       {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (
-        <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex items-center gap-2 sm:left-4">
+        <div className="pointer-events-auto fixed bottom-10 left-3 z-[25] flex flex-row flex-nowrap items-center gap-2 sm:left-4">
+          <div id="gc-radio-slot" className="hidden" />
           <button
             onClick={cycleTheme}
-            className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+            className="btn-press flex shrink-0 items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
           >
             <span style={{ color: theme.accent }}>&#9654;</span>
             <span className="text-cream">{theme.name}</span>
             <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
           </button>
-          <div id="gc-radio-slot" />
+          <LofiRadio />
           <button
             onClick={replayIntro}
-            className="btn-press flex items-center gap-1 border-[3px] border-border bg-bg/70 px-2 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+            className="btn-press flex shrink-0 items-center gap-1 border-[3px] border-border bg-bg/70 px-2 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
             title="Replay intro"
           >
             <span style={{ color: theme.accent }}>&#9654;</span>
