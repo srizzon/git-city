@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useMemo } from "react";
+import { useRef, useEffect, useEffectEvent, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/drei";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
@@ -649,6 +649,30 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
       }
     }
   }, [pauseSignal, onPause]);
+
+  // Auto-pause when an overlay opens, auto-resume when it closes.
+  // useEffectEvent gives a stable identity that always reads the latest onPause
+  // without adding it to the effect's dependency array.
+  const notifyPause = useEffectEvent((p: boolean) => onPause(p));
+  useEffect(() => {
+    if (hasOverlay) {
+      if (!paused.current) {
+        paused.current = true;
+        setIsPaused(true);
+        notifyPause(true);
+      }
+    } else {
+      if (paused.current) {
+        paused.current = false;
+        setIsPaused(false);
+        wasJustUnpaused.current = true;
+        transitionProgress.current = 0;
+        transitionFrom.current.copy(camera.position);
+        transitionLookFrom.current.copy(camLook.current);
+        notifyPause(false);
+      }
+    }
+  }, [hasOverlay]);
 
   // Keyboard
   const hasOverlayRef = useRef(hasOverlay);
