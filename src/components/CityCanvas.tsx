@@ -21,6 +21,7 @@ import WhiteRabbit from "./WhiteRabbit";
 import CelebrationEffect from "./CelebrationEffect";
 import ComparePath from "./ComparePath";
 import WallpaperParallax from "./WallpaperParallax";
+import ThemeSkyFX from "./ThemeSkyFX";
 
 // ─── Theme Definitions ───────────────────────────────────────
 
@@ -1982,6 +1983,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       <hemisphereLight args={[t.hemiSky, t.hemiGround, t.hemiIntensity * 3.5]} key={`hemi-${themeIndex}`} />
 
       <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
+      <ThemeSkyFX key={`sky-fx-${themeIndex}`} themeIndex={themeIndex as 0 | 1 | 2 | 3} theme={t} />
 
       {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => { })} />}
 
