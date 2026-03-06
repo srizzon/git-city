@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
 import type { TopRepo } from "@/lib/github";
@@ -245,17 +246,6 @@ export async function GET(
     .eq("github_login", username.toLowerCase())
     .single();
 
-  if (cached) {
-    const age = Date.now() - new Date(cached.fetched_at).getTime();
-    if (age < 24 * 60 * 60 * 1000) {
-      return NextResponse.json(cached, {
-        headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
-        },
-      });
-    }
-  }
-
   // Rate limit only applies to brand-new developers (not in DB at all).
   // Stale refreshes for existing devs are unlimited ("already in the city").
   const isInternalBackfill =
@@ -303,12 +293,38 @@ export async function GET(
       size: number;
     };
 
+    // ETag conditional request: free 304s don't count against GitHub rate limit.
+    // However, the /users ETag only covers profile fields (name, bio, public_repos).
+    // Contributions (GraphQL) and stars (repos endpoint) have independent freshness,
+    // so a 304 only means "profile unchanged" — we still re-fetch the expensive
+    // pipelines once the cached row is older than FULL_REFRESH_INTERVAL.
+    const FULL_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour
+    const cachedAge = cached ? Date.now() - new Date(cached.fetched_at).getTime() : Infinity;
+    const needsFullRefresh = cachedAge >= FULL_REFRESH_INTERVAL;
+
     const userRes = await fetch(
       `https://api.github.com/users/${encodeURIComponent(username)}`,
-      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+      {
+        headers: {
+          ...headers,
+          ...(cached?.github_etag ? { "If-None-Match": cached.github_etag } : {}),
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      },
     );
 
-    if (!userRes.ok) {
+    if (userRes.status === 304 && !needsFullRefresh) {
+      return NextResponse.json(cached, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        },
+      });
+    }
+
+    // 304 but contributions/stars may be stale: reuse cached profile fields, re-fetch the rest
+    const profileNotModified = userRes.status === 304;
+
+    if (!profileNotModified && !userRes.ok) {
       if (userRes.status === 404) {
         return NextResponse.json(
           { error: "User not found" },
@@ -327,19 +343,21 @@ export async function GET(
       );
     }
 
-    const ghUser = await userRes.json();
+    const ghUser = profileNotModified ? null : await userRes.json();
 
-    // Reject organizations
-    if (ghUser.type === "Organization") {
+    // Reject organizations (only possible on a fresh 200 response)
+    if (ghUser?.type === "Organization") {
       return NextResponse.json(
         { error: "Organizations are not supported. Search for a user profile instead." },
         { status: 400 }
       );
     }
 
+    const login = ghUser?.login ?? cached!.github_login;
+
     // Fetch expanded GitHub data (GraphQL) and first page of repos in parallel
     const [expanded, reposPage1Res] = await Promise.all([
-      fetchExpandedGitHubData(ghUser.login),
+      fetchExpandedGitHubData(login),
       fetch(
         `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=1`,
         { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
@@ -348,8 +366,10 @@ export async function GET(
 
     const contributions = expanded?.contributions ?? 0;
 
+    const publicRepos = ghUser?.public_repos ?? cached!.public_repos;
+
     // Reject users with zero public activity
-    if (contributions === 0 && ghUser.public_repos === 0) {
+    if (contributions === 0 && publicRepos === 0) {
       return NextResponse.json(
         { error: "This user has no public activity on GitHub yet." },
         { status: 400 }
@@ -410,16 +430,17 @@ export async function GET(
 
     // Upsert into Supabase
     const record = {
-      github_login: ghUser.login.toLowerCase(),
-      github_id: ghUser.id,
-      name: ghUser.name,
-      avatar_url: ghUser.avatar_url,
-      bio: ghUser.bio,
+      github_login: login.toLowerCase(),
+      github_id: ghUser?.id ?? cached!.github_id,
+      name: ghUser?.name ?? cached!.name,
+      avatar_url: ghUser?.avatar_url ?? cached!.avatar_url,
+      bio: ghUser?.bio ?? cached!.bio,
       contributions,
-      public_repos: ghUser.public_repos,
+      public_repos: publicRepos,
       total_stars: totalStars,
       primary_language: primaryLanguage,
       top_repos: topRepos,
+      github_etag: (profileNotModified ? cached?.github_etag : userRes.headers.get("etag")) ?? null,
       fetched_at: new Date().toISOString(),
       // v2 fields
       ...(expanded ? {
@@ -469,7 +490,7 @@ export async function GET(
       const newGithubXp = calculateGithubXp({
         contributions: expanded?.contributions_total ?? contributions,
         total_stars: totalStars,
-        public_repos: ghUser.public_repos,
+        public_repos: publicRepos,
         total_prs: expanded?.total_prs ?? 0,
       });
       const prevGithubXp = (cached?.xp_github as number) ?? 0;
@@ -528,6 +549,8 @@ export async function GET(
       .select("*")
       .eq("github_login", record.github_login)
       .single();
+
+    revalidatePath(`/dev/${record.github_login}`);
 
     return NextResponse.json(withRank ?? upserted, {
       headers: {
