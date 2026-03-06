@@ -19,6 +19,7 @@ import type { RaidExecuteResponse } from "@/lib/raid";
 import FounderSpire from "./FounderSpire";
 import WhiteRabbit from "./WhiteRabbit";
 import CelebrationEffect from "./CelebrationEffect";
+import ComparePath from "./ComparePath";
 import WallpaperParallax from "./WallpaperParallax";
 
 // ─── Theme Definitions ───────────────────────────────────────
@@ -225,18 +226,18 @@ const TARGET_Y = 450;
 const INTRO_WAYPOINTS: [number, number, number][] = [
   [-1600, 800, 1800],   // WP0: Far, high, left - city hidden in fog
   [-1000, 700, 1300],   // WP1: Descending, silhouette appears
-  [-600,  600, 900],    // WP2: Ad plane level, buildings becoming clear
-  [-200,  550, 650],    // WP3: Skirting the city edge
-  [200,   600, 600],    // WP4: Crossing over
-  [500,   700, 700],    // WP5: Rising, pulling back
-  [700,   800, 900],    // WP6: Dramatic pullback
-  [800,   850, 1000],   // WP7: Final orbit position (wide panorama)
+  [-600, 600, 900],    // WP2: Ad plane level, buildings becoming clear
+  [-200, 550, 650],    // WP3: Skirting the city edge
+  [200, 600, 600],    // WP4: Crossing over
+  [500, 700, 700],    // WP5: Rising, pulling back
+  [700, 800, 900],    // WP6: Dramatic pullback
+  [800, 850, 1000],   // WP7: Final orbit position (wide panorama)
 ];
 
 // Look targets smoothly converge toward the founder building top
 const INTRO_LOOK_TARGETS: [number, number, number][] = [
-  [100,      300,      -200],      // WP0: Toward distant city, already high
-  [TARGET_X, 380,      TARGET_Z],  // WP1: Rising toward founder top
+  [100, 300, -200],      // WP0: Toward distant city, already high
+  [TARGET_X, 380, TARGET_Z],  // WP1: Rising toward founder top
   [TARGET_X, TARGET_Y, TARGET_Z],  // WP2: Locking on
   [TARGET_X, TARGET_Y, TARGET_Z],  // WP3: Holding
   [TARGET_X, TARGET_Y, TARGET_Z],  // WP4: Holding
@@ -496,7 +497,7 @@ function CameraFocus({
     if (controlsRef.current) {
       controlsRef.current.autoRotate = false;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedBuilding, focusedBuildingB, camera, controlsRef]);
 
   useFrame((_, delta) => {
@@ -1958,13 +1959,13 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
 
-      {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => {})} />}
+      {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => { })} />}
 
       {rabbitCinematic && rabbitCinematicTarget != null && (
         <RabbitFlyover
           targetPlazaIndex={RABBIT_PLAZA_INDICES[(rabbitCinematicTarget - 1)] ?? 1}
           plazas={plazas}
-          onEnd={onRabbitCinematicEnd ?? (() => {})}
+          onEnd={onRabbitCinematicEnd ?? (() => { })}
         />
       )}
 
@@ -1982,14 +1983,14 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
               attacker={raidAttacker ?? null}
               defender={raidDefender ?? null}
               raidData={raidData ?? null}
-              onPhaseComplete={onRaidPhaseComplete ?? (() => {})}
+              onPhaseComplete={onRaidPhaseComplete ?? (() => { })}
             />
           )}
 
           {!introMode && flyMode && (
             <>
-              <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => {})} onPause={onPause ?? (() => {})} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} />
-              <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => {})} cityRadius={cityRadius} />
+              <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} />
+              <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={cityRadius} />
             </>
           )}
         </>
@@ -1997,7 +1998,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />
 
-      <FounderSpire onClick={onLandmarkClick ?? (() => {})} />
+      <FounderSpire onClick={onLandmarkClick ?? (() => { })} />
 
       {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={cityRadius} />}
 
@@ -2010,7 +2011,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           <WhiteRabbit
             position={pos}
             visible={true}
-            onCaught={onRabbitCaught ?? (() => {})}
+            onCaught={onRabbitCaught ?? (() => { })}
           />
         );
       })()}
@@ -2042,6 +2043,13 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         holdRise={holdRise}
         liveByLogin={liveByLogin}
         cityEnergy={cityEnergy}
+      />
+
+      <ComparePath
+        buildings={buildings}
+        focusedBuilding={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidDefender?.login ?? focusedBuilding ?? null) : (focusedBuilding ?? null)}
+        focusedBuildingB={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : (focusedBuildingB ?? null)}
+        accentColor={t.building.accent}
       />
 
       <InstancedDecorations items={decorations} roadMarkingColor={t.roadMarkingColor} sidewalkColor={t.sidewalkColor} />
