@@ -327,7 +327,7 @@ export default async function AdvertisePage() {
                   a: "Refunds are evaluated on a case-by-case basis. Contact samuelrizzondev@gmail.com within the first 24 hours if there's an issue with your ad.",
                 },
               ].map((item) => (
-                <div key={item.q} className="border-[2px] border-border p-5">
+                <div key={item.q} className="border-2 border-border p-5">
                   <h3 className="text-sm text-cream">{item.q}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted normal-case">
                     {item.a}

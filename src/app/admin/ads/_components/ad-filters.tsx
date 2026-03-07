@@ -27,11 +27,10 @@ function ButtonGroup<T extends string>({
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`cursor-pointer border px-3 py-1.5 text-[11px] transition-colors ${
-            value === opt.value
-              ? "relative z-10 border-lime bg-lime/10 text-lime"
-              : "border-border text-muted hover:text-cream"
-          } ${i > 0 ? "-ml-px" : ""}`}
+          className={`cursor-pointer border px-3 py-1.5 text-[11px] transition-colors ${value === opt.value
+            ? "relative z-10 border-lime bg-lime/10 text-lime"
+            : "border-border text-muted hover:text-cream"
+            } ${i > 0 ? "-ml-px" : ""}`}
         >
           {opt.label}
         </button>
@@ -89,7 +88,7 @@ export function AdFilters({
             setSearchLocal(e.target.value);
             setFilter("q", e.target.value);
           }}
-          className="ml-auto min-w-[200px] border border-border bg-bg px-3 py-1.5 text-[11px] text-cream outline-none placeholder:text-dim focus:border-lime"
+          className="ml-auto min-w-50 border border-border bg-bg px-3 py-1.5 text-[11px] text-cream outline-none placeholder:text-dim focus:border-lime"
         />
 
         <button

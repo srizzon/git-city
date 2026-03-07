@@ -71,10 +71,10 @@ export default async function LeaderboardPage({
   // Contributors uses rank (based on contributions_total) for consistency
   const orderColumn = activeTab === "contributors" ? "rank"
     : activeTab === "stars" ? "total_stars"
-    : activeTab === "architects" ? "public_repos"
-    : activeTab === "recruiters" ? "referral_count"
-    : activeTab === "xp" ? "xp_total"
-    : "contributions"; // achievers handled separately
+      : activeTab === "architects" ? "public_repos"
+        : activeTab === "recruiters" ? "referral_count"
+          : activeTab === "xp" ? "xp_total"
+            : "contributions"; // achievers handled separately
   const orderAscending = activeTab === "contributors"; // rank is ascending (1 = best)
 
   let devs: Developer[] = [];
@@ -146,10 +146,10 @@ export default async function LeaderboardPage({
 
   const metricLabel = activeTab === "contributors" ? "Contributions"
     : activeTab === "stars" ? "Stars"
-    : activeTab === "architects" ? "Repos"
-    : activeTab === "achievers" ? "Achievements"
-    : activeTab === "xp" ? "XP"
-    : "Referrals";
+      : activeTab === "architects" ? "Repos"
+        : activeTab === "achievers" ? "Achievements"
+          : activeTab === "xp" ? "XP"
+            : "Referrals";
 
   // A4: Raw metric values for "You vs. Next" component
   function getMetricValueRaw(dev: Developer): number {
@@ -179,222 +179,222 @@ export default async function LeaderboardPage({
 
   return (
     <LeaderboardAuthProvider>
-    <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
-      <LeaderboardTracker tab={activeTab} />
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-xs text-muted transition-colors hover:text-cream"
-          >
-            &larr; Back to City
-          </Link>
-        </div>
-
-        <div className="mt-6 text-center">
-          <h1 className="text-3xl text-cream md:text-4xl">
-            Leader<span style={{ color: ACCENT }}>board</span>
-          </h1>
-          <p className="mt-3 text-xs text-muted normal-case">
-            Top developers ranked in Git City
-          </p>
-        </div>
-
-        {/* Mode toggle: Developers | Game */}
-        <div className="mt-6 flex justify-center">
-          <div className="flex border-[2px] border-border">
+      <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
+        <LeaderboardTracker tab={activeTab} />
+        <div className="mx-auto max-w-3xl px-4 py-10">
+          {/* Header */}
+          <div className="flex items-center justify-between">
             <Link
-              href="/leaderboard?mode=developers"
-              className="px-5 py-2 text-[11px] transition-colors"
-              style={{
-                color: mode === "developers" ? ACCENT : "var(--color-muted)",
-                backgroundColor: mode === "developers" ? "rgba(200, 230, 74, 0.1)" : "transparent",
-              }}
+              href="/"
+              className="text-xs text-muted transition-colors hover:text-cream"
             >
-              Developers
-            </Link>
-            <Link
-              href="/leaderboard?mode=game"
-              className="relative border-l-[2px] border-border px-5 py-2 text-[11px] transition-colors"
-              style={{
-                color: mode === "game" ? ACCENT : "var(--color-muted)",
-                backgroundColor: mode === "game" ? "rgba(200, 230, 74, 0.1)" : "transparent",
-              }}
-            >
-              Game
-            </Link>
-            <Link
-              href="/leaderboard?mode=dailies"
-              className="relative border-l-[2px] border-border px-5 py-2 text-[11px] transition-colors"
-              style={{
-                color: mode === "dailies" ? ACCENT : "var(--color-muted)",
-                backgroundColor: mode === "dailies" ? "rgba(200, 230, 74, 0.1)" : "transparent",
-              }}
-            >
-              Dailies
+              &larr; Back to City
             </Link>
           </div>
-        </div>
 
-        {mode === "dailies" ? (
-          <Suspense
-            fallback={
-              <div className="mt-10 text-center text-xs text-muted normal-case">
-                Loading dailies leaderboard...
-              </div>
-            }
-          >
-            <DailiesLeaderboard />
-          </Suspense>
-        ) : mode === "developers" ? (
-          <>
-            {/* Tabs */}
-            <div className="mt-6 flex flex-wrap justify-center gap-1">
-              {TABS.filter((t) => t.id !== "recruiters" || hasRecruiters).map((tab) => (
-                <Link
-                  key={tab.id}
-                  href={`/leaderboard?tab=${tab.id}`}
-                  className="px-3 py-1.5 text-[10px] transition-colors border-[2px]"
-                  style={{
-                    borderColor: activeTab === tab.id ? ACCENT : "var(--color-border)",
-                    color: activeTab === tab.id ? ACCENT : "var(--color-muted)",
-                    backgroundColor: activeTab === tab.id ? "rgba(200, 230, 74, 0.1)" : "transparent",
-                  }}
-                >
-                  {tab.label}
-                </Link>
-              ))}
+          <div className="mt-6 text-center">
+            <h1 className="text-3xl text-cream md:text-4xl">
+              Leader<span style={{ color: ACCENT }}>board</span>
+            </h1>
+            <p className="mt-3 text-xs text-muted normal-case">
+              Top developers ranked in Git City
+            </p>
+          </div>
+
+          {/* Mode toggle: Developers | Game */}
+          <div className="mt-6 flex justify-center">
+            <div className="flex border-2 border-border">
+              <Link
+                href="/leaderboard?mode=developers"
+                className="px-5 py-2 text-[11px] transition-colors"
+                style={{
+                  color: mode === "developers" ? ACCENT : "var(--color-muted)",
+                  backgroundColor: mode === "developers" ? "rgba(200, 230, 74, 0.1)" : "transparent",
+                }}
+              >
+                Developers
+              </Link>
+              <Link
+                href="/leaderboard?mode=game"
+                className="relative border-l-2 border-border px-5 py-2 text-[11px] transition-colors"
+                style={{
+                  color: mode === "game" ? ACCENT : "var(--color-muted)",
+                  backgroundColor: mode === "game" ? "rgba(200, 230, 74, 0.1)" : "transparent",
+                }}
+              >
+                Game
+              </Link>
+              <Link
+                href="/leaderboard?mode=dailies"
+                className="relative border-l-2 border-border px-5 py-2 text-[11px] transition-colors"
+                style={{
+                  color: mode === "dailies" ? ACCENT : "var(--color-muted)",
+                  backgroundColor: mode === "dailies" ? "rgba(200, 230, 74, 0.1)" : "transparent",
+                }}
+              >
+                Dailies
+              </Link>
             </div>
+          </div>
 
-            {/* A4: "You vs. Next" banner */}
-            <LeaderboardYouVsNext metrics={devMetrics} metricLabel={metricLabel} />
-
-            {/* Table */}
-            <div className="mt-6 border-[3px] border-border">
-              {/* Header row */}
-              <div className="flex items-center gap-4 border-b-[3px] border-border bg-bg-card px-5 py-3 text-xs text-muted">
-                <span className="w-10 text-center">#</span>
-                <span className="flex-1">Developer</span>
-                <span className="hidden w-24 text-right sm:block">{activeTab === "xp" ? "Rank" : "Language"}</span>
-                <span className="w-28 text-right">{metricLabel}</span>
+          {mode === "dailies" ? (
+            <Suspense
+              fallback={
+                <div className="mt-10 text-center text-xs text-muted normal-case">
+                  Loading dailies leaderboard...
+                </div>
+              }
+            >
+              <DailiesLeaderboard />
+            </Suspense>
+          ) : mode === "developers" ? (
+            <>
+              {/* Tabs */}
+              <div className="mt-6 flex flex-wrap justify-center gap-1">
+                {TABS.filter((t) => t.id !== "recruiters" || hasRecruiters).map((tab) => (
+                  <Link
+                    key={tab.id}
+                    href={`/leaderboard?tab=${tab.id}`}
+                    className="px-3 py-1.5 text-[10px] transition-colors border-2"
+                    style={{
+                      borderColor: activeTab === tab.id ? ACCENT : "var(--color-border)",
+                      color: activeTab === tab.id ? ACCENT : "var(--color-muted)",
+                      backgroundColor: activeTab === tab.id ? "rgba(200, 230, 74, 0.1)" : "transparent",
+                    }}
+                  >
+                    {tab.label}
+                  </Link>
+                ))}
               </div>
 
-              {/* Rows */}
-              {devs.map((dev, i) => {
-                const pos = i + 1;
-                return (
-                  <Link
-                    key={dev.github_login}
-                    href={`/dev/${dev.github_login}`}
-                    className="flex items-center gap-4 border-b border-border/50 px-5 py-3.5 transition-colors hover:bg-bg-card"
-                  >
-                    <span className="w-10 text-center">
-                      <span
-                        className="text-sm font-bold"
-                        style={{ color: rankColor(pos) }}
-                      >
-                        {pos}
-                      </span>
-                      {newLogins.has(dev.github_login.toLowerCase()) && (
-                        <span className="block text-[7px] font-bold" style={{ color: "#ffd700" }}>
-                          NEW
+              {/* A4: "You vs. Next" banner */}
+              <LeaderboardYouVsNext metrics={devMetrics} metricLabel={metricLabel} />
+
+              {/* Table */}
+              <div className="mt-6 border-[3px] border-border">
+                {/* Header row */}
+                <div className="flex items-center gap-4 border-b-[3px] border-border bg-bg-card px-5 py-3 text-xs text-muted">
+                  <span className="w-10 text-center">#</span>
+                  <span className="flex-1">Developer</span>
+                  <span className="hidden w-24 text-right sm:block">{activeTab === "xp" ? "Rank" : "Language"}</span>
+                  <span className="w-28 text-right">{metricLabel}</span>
+                </div>
+
+                {/* Rows */}
+                {devs.map((dev, i) => {
+                  const pos = i + 1;
+                  return (
+                    <Link
+                      key={dev.github_login}
+                      href={`/dev/${dev.github_login}`}
+                      className="flex items-center gap-4 border-b border-border/50 px-5 py-3.5 transition-colors hover:bg-bg-card"
+                    >
+                      <span className="w-10 text-center">
+                        <span
+                          className="text-sm font-bold"
+                          style={{ color: rankColor(pos) }}
+                        >
+                          {pos}
                         </span>
-                      )}
-                    </span>
-
-                    <div className="flex flex-1 items-center gap-3 overflow-hidden">
-                      {dev.avatar_url && (
-                        <Image
-                          src={dev.avatar_url}
-                          alt={dev.github_login}
-                          width={36}
-                          height={36}
-                          className="border-[2px] border-border"
-                          style={{ imageRendering: "pixelated" }}
-                        />
-                      )}
-                      <div className="overflow-hidden">
-                        <p className="truncate text-sm text-cream">
-                          {dev.name ?? dev.github_login}
-                          <LeaderboardYouBadge login={dev.github_login} />
-                        </p>
-                        {dev.name && (
-                          <p className="truncate text-[10px] text-muted">
-                            @{dev.github_login}
-                          </p>
+                        {newLogins.has(dev.github_login.toLowerCase()) && (
+                          <span className="block text-[7px] font-bold" style={{ color: "#ffd700" }}>
+                            NEW
+                          </span>
                         )}
-                      </div>
-                    </div>
+                      </span>
 
-                    <span className="hidden w-24 text-right text-xs text-muted sm:block">
-                      {activeTab === "xp"
-                        ? (() => {
+                      <div className="flex flex-1 items-center gap-3 overflow-hidden">
+                        {dev.avatar_url && (
+                          <Image
+                            src={dev.avatar_url}
+                            alt={dev.github_login}
+                            width={36}
+                            height={36}
+                            className="border-2 border-border"
+                            style={{ imageRendering: "pixelated" }}
+                          />
+                        )}
+                        <div className="overflow-hidden">
+                          <p className="truncate text-sm text-cream">
+                            {dev.name ?? dev.github_login}
+                            <LeaderboardYouBadge login={dev.github_login} />
+                          </p>
+                          {dev.name && (
+                            <p className="truncate text-[10px] text-muted">
+                              @{dev.github_login}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <span className="hidden w-24 text-right text-xs text-muted sm:block">
+                        {activeTab === "xp"
+                          ? (() => {
                             const badge = getXpBadge(dev);
                             return badge ? (
                               <span style={{ color: badge.color }}>{badge.title}</span>
                             ) : "\u2014";
                           })()
-                        : (dev.primary_language ?? "\u2014")}
-                    </span>
+                          : (dev.primary_language ?? "\u2014")}
+                      </span>
 
-                    <span className="w-28 text-right text-sm" style={{ color: activeTab === "xp" ? tierFromLevel(dev.xp_level ?? 1).color : ACCENT }}>
-                      {getMetricValue(dev)}
-                    </span>
-                  </Link>
-                );
-              })}
+                      <span className="w-28 text-right text-sm" style={{ color: activeTab === "xp" ? tierFromLevel(dev.xp_level ?? 1).color : ACCENT }}>
+                        {getMetricValue(dev)}
+                      </span>
+                    </Link>
+                  );
+                })}
 
-              {/* "YOU" row if not in top 50 — handled client-side */}
-              <LeaderboardUserPosition tab={activeTab} topLogins={topLogins} />
+                {/* "YOU" row if not in top 50 — handled client-side */}
+                <LeaderboardUserPosition tab={activeTab} topLogins={topLogins} />
 
-              {devs.length === 0 && (
-                <div className="px-5 py-8 text-center text-xs text-muted normal-case">
-                  No data for this category yet.
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <Suspense
-            fallback={
-              <div className="mt-10 text-center text-xs text-muted normal-case">
-                Loading daily scores...
+                {devs.length === 0 && (
+                  <div className="px-5 py-8 text-center text-xs text-muted normal-case">
+                    No data for this category yet.
+                  </div>
+                )}
               </div>
-            }
-          >
-            <FlyLeaderboard />
-          </Suspense>
-        )}
-
-        {/* Footer */}
-        <div className="mt-8 text-center">
-          <Link
-            href="/"
-            className="btn-press inline-block px-7 py-3.5 text-sm text-bg"
-            style={{
-              backgroundColor: ACCENT,
-              boxShadow: "4px 4px 0 0 #5a7a00",
-            }}
-          >
-            Enter the City
-          </Link>
-
-          <p className="mt-6 text-[9px] text-muted normal-case">
-            built by{" "}
-            <a
-              href="https://x.com/samuelrizzondev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-colors hover:text-cream"
-              style={{ color: ACCENT }}
+            </>
+          ) : (
+            <Suspense
+              fallback={
+                <div className="mt-10 text-center text-xs text-muted normal-case">
+                  Loading daily scores...
+                </div>
+              }
             >
-              @samuelrizzondev
-            </a>
-          </p>
+              <FlyLeaderboard />
+            </Suspense>
+          )}
+
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <Link
+              href="/"
+              className="btn-press inline-block px-7 py-3.5 text-sm text-bg"
+              style={{
+                backgroundColor: ACCENT,
+                boxShadow: "4px 4px 0 0 #5a7a00",
+              }}
+            >
+              Enter the City
+            </Link>
+
+            <p className="mt-6 text-[9px] text-muted normal-case">
+              built by{" "}
+              <a
+                href="https://x.com/samuelrizzondev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-cream"
+                style={{ color: ACCENT }}
+              >
+                @samuelrizzondev
+              </a>
+            </p>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
     </LeaderboardAuthProvider>
   );
 }

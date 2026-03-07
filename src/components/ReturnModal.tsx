@@ -69,7 +69,7 @@ export default function ReturnModal({ streakData, onClose }: Props) {
       }}
     >
       <div
-        className="flex items-center gap-3 border-[2px] bg-bg-raised/95 px-4 py-2.5 backdrop-blur-sm"
+        className="flex items-center gap-3 border-2 bg-bg-raised/95 px-4 py-2.5 backdrop-blur-sm"
         style={{ borderColor: color }}
       >
         <span className="text-lg font-bold" style={{ color }}>

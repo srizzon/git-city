@@ -258,7 +258,7 @@ export default function FounderMessage({ onClose, session, hasClaimed, onSignIn 
               >
                 {typedText}
                 <span
-                  className="inline-block w-[7px] h-[11px] ml-[1px] align-middle"
+                  className="inline-block w-1.75 h-2.75 ml-px align-middle"
                   style={{
                     background: cursorVisible ? "#00ff41" : "transparent",
                     transition: "background 0.1s",
@@ -271,7 +271,7 @@ export default function FounderMessage({ onClose, session, hasClaimed, onSignIn 
             {!allParagraphsDone && typedText.length === 0 && paragraphsDone.length > 0 && (
               <p className="font-pixel text-[10px] sm:text-[11px]">
                 <span
-                  className="inline-block w-[7px] h-[11px] align-middle"
+                  className="inline-block w-1.75 h-2.75 align-middle"
                   style={{
                     background: cursorVisible ? "#00ff41" : "transparent",
                     transition: "background 0.1s",
