@@ -9,9 +9,13 @@ Git City is actively developed. Security fixes are applied to the latest version
 | latest (`main`) | :white_check_mark: |
 | older commits   | :x:                |
 
+---
+
 ## Reporting a Vulnerability
 
 We take security seriously. If you discover a vulnerability in Git City, please **do not** open a public GitHub issue.
+
+---
 
 ### How to Report
 
@@ -23,6 +27,8 @@ Please report vulnerabilities by emailing the maintainer directly or using GitHu
 
 Alternatively, you can reach out to the maintainer via [X/Twitter](https://x.com/samuelrizzondev).
 
+---
+
 ### What to Include
 
 Please include as much of the following information as possible to help us understand and resolve the issue quickly:
@@ -31,6 +37,8 @@ Please include as much of the following information as possible to help us under
 - Steps to reproduce the issue
 - Any proof-of-concept or exploit code (if applicable)
 - Affected component(s) (e.g., auth flow, API route, Supabase RLS policy)
+
+---
 
 ## Sensitive Areas
 
@@ -42,11 +50,15 @@ Git City handles the following sensitive data — please pay special attention w
 - **API routes** — under `src/app/api/` — ensure proper authentication checks
 - **CRON endpoints** — protected by `CRON_SECRET`; unauthorized access could trigger unintended server actions
 
+---
+
 ## Response Timeline
 
 - **Acknowledgement:** Within 72 hours of receiving a report
 - **Status update:** Within 7 days
 - **Fix or mitigation:** Depends on severity; critical issues will be prioritized
+
+---
 
 ## Disclosure Policy
 
