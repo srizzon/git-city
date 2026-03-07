@@ -2,18 +2,25 @@
 
 Thanks for your interest in contributing! Here's how to get started.
 
+---
+
 ## Setup
 
 ```bash
 git clone https://github.com/srizzon/git-city.git
 cd git-city
+
 npm install
+
 cp .env.example .env.local
 # Fill in your keys (see .env.example for details)
+
 npm run dev
 ```
 
 The app runs on [http://localhost:3001](http://localhost:3001).
+
+---
 
 ## Requirements
 
@@ -21,6 +28,8 @@ The app runs on [http://localhost:3001](http://localhost:3001).
 - A Supabase project (free tier works)
 - A GitHub personal access token (for API calls)
 - Stripe test keys (only if working on payments)
+
+---
 
 ## Environment Variables
 
@@ -43,6 +52,8 @@ Copy `.env.example` to `.env.local` and fill in the values. Here is a summary of
 
 > **Tip:** For local development you only need the Supabase, GitHub token, and base URL variables. Stripe, AbacatePay, Resend, and Himetrica keys are only required if you are actively working on those features.
 
+---
+
 ## Code Style
 
 - TypeScript everywhere
@@ -53,6 +64,8 @@ Copy `.env.example` to `.env.local` and fill in the values. Here is a summary of
 
 Run `npm run lint` before submitting.
 
+---
+
 ## Making Changes
 
 1. Fork the repo
@@ -61,6 +74,8 @@ Run `npm run lint` before submitting.
 4. Run `npm run lint` and fix any issues
 5. Commit with a clear message (e.g. `feat: add rain weather effect`)
 6. Open a Pull Request against `main`
+
+---
 
 ## Commit Messages
 
@@ -91,10 +106,13 @@ Start with an emoji + type. Single line, present tense, concise.
 📦 refactor(command): improve component structure
 🚧 chore: update dependencies
 ```
+---
 
 ## Good First Issues
 
 Look for issues labeled [`good first issue`](https://github.com/srizzon/git-city/labels/good%20first%20issue). These are scoped tasks that don't require deep knowledge of the codebase.
+
+---
 
 ## Project Structure
 
@@ -107,6 +125,7 @@ src/
 public/         # Static assets (audio, images)
 supabase/       # Database migrations
 ```
+---
 
 ## 3D / Three.js
 
@@ -117,6 +136,8 @@ The city is rendered with React Three Fiber. Key files:
 - `src/lib/zones.ts` - Item definitions for building customization
 
 If you're adding a new building effect or item, start with `zones.ts`.
+
+---
 
 ## Troubleshooting
 
@@ -131,6 +152,8 @@ Kill the process using port 3001, or change `NEXT_PUBLIC_BASE_URL` and the dev s
 
 **TypeScript errors after pulling latest changes**
 Run `npm install` to pick up any new dependencies, then `npm run lint` to surface type issues.
+
+---
 
 ## Questions?
 

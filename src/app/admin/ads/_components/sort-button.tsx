@@ -19,9 +19,8 @@ export function SortButton({
   return (
     <button
       onClick={() => onSort(sortKey)}
-      className={`cursor-pointer text-left text-[11px] transition-colors ${
-        isActive ? "text-lime" : "text-muted hover:text-cream"
-      }`}
+      className={`cursor-pointer text-left text-[11px] transition-colors ${isActive ? "text-lime" : "text-muted hover:text-cream"
+        }`}
     >
       {label}
       {isActive && (

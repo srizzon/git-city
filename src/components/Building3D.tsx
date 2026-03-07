@@ -580,12 +580,12 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
     () =>
       labelTexture
         ? new THREE.SpriteMaterial({
-            map: labelTexture,
-            transparent: true,
-            depthTest: true,
-            sizeAttenuation: true,
-            fog: true,
-          })
+          map: labelTexture,
+          transparent: true,
+          depthTest: true,
+          sizeAttenuation: true,
+          fog: true,
+        })
         : null,
     [labelTexture]
   );

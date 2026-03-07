@@ -212,12 +212,12 @@ function calcHeightV2(
   const cnsScore = Math.pow(consistencyNorm, 0.6);
 
   const composite =
-    cScore  * 0.35 +
-    sScore  * 0.20 +
+    cScore * 0.35 +
+    sScore * 0.20 +
     prScore * 0.15 +
     extScore * 0.10 +
     cnsScore * 0.10 +
-    fScore  * 0.10;
+    fScore * 0.10;
 
   const height = Math.min(MAX_BUILDING_HEIGHT, MIN_BUILDING_HEIGHT + composite * HEIGHT_RANGE);
   return { height, composite };

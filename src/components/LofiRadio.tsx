@@ -20,7 +20,7 @@ const DEFAULT_SHADOW = "#203870";
 
 function destroyHowl(howl: Howl | null) {
   if (howl) {
-    try { howl.unload(); } catch {}
+    try { howl.unload(); } catch { }
   }
 }
 
@@ -233,65 +233,64 @@ export default function LofiRadio() {
       {/* Expanded panel — above button normally, to the right in fly mode */}
       {expanded && (
         <div
-          className={`absolute z-[25] border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm ${
-            flyMode ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2'
-          }`}
+          className={`absolute z-25 border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm ${flyMode ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2'
+            }`}
           style={{ animation: "fade-in 0.15s ease-out", boxShadow: `3px 3px 0 0 ${shadow}`, width: 200 }}
         >
-      {/* Track name + close */}
-      <div className="flex items-center justify-between gap-2 px-2.5 pt-2 pb-1">
-        <span className="truncate text-[10px] text-cream">{currentTrack?.title ?? "No track"}</span>
-        <button
-          onClick={() => setExpanded(false)}
-          className="btn-press shrink-0 text-[10px] text-muted hover:text-cream"
-          title="Close"
-        >
-          &times;
-        </button>
-      </div>
+          {/* Track name + close */}
+          <div className="flex items-center justify-between gap-2 px-2.5 pt-2 pb-1">
+            <span className="truncate text-[10px] text-cream">{currentTrack?.title ?? "No track"}</span>
+            <button
+              onClick={() => setExpanded(false)}
+              className="btn-press shrink-0 text-[10px] text-muted hover:text-cream"
+              title="Close"
+            >
+              &times;
+            </button>
+          </div>
 
-      {/* Big controls row */}
-      <div className="flex items-center justify-center gap-4 px-2.5 py-2">
-        <button onClick={skipPrev} className="btn-press text-[12px] text-muted hover:text-cream" title="Previous track">
-          {"\u25C0"}
-        </button>
-        <button
-          onClick={togglePlay}
-          className="btn-press flex h-[32px] w-[32px] items-center justify-center border-[2px] border-border hover:border-cream/40"
-          style={{ color: playing ? accent : "var(--color-cream)" }}
-          title={playing ? "Pause" : "Play"}
-        >
-          <span className="text-[14px]">{playing ? "\u23F8" : "\u25B6"}</span>
-        </button>
-        <button onClick={skipNext} className="btn-press text-[12px] text-muted hover:text-cream" title="Next track">
-          {"\u25B6"}
-        </button>
-      </div>
+          {/* Big controls row */}
+          <div className="flex items-center justify-center gap-4 px-2.5 py-2">
+            <button onClick={skipPrev} className="btn-press text-[12px] text-muted hover:text-cream" title="Previous track">
+              {"\u25C0"}
+            </button>
+            <button
+              onClick={togglePlay}
+              className="btn-press flex h-[32px] w-[32px] items-center justify-center  top-1 left-5.5 w-1.5 h-0.75 border-border hover:border-cream/40"
+              style={{ color: playing ? accent : "var(--color-cream)" }}
+              title={playing ? "Pause" : "Play"}
+            >
+              <span className="text-[14px]">{playing ? "\u23F8" : "\u25B6"}</span>
+            </button>
+            <button onClick={skipNext} className="btn-press text-[12px] text-muted hover:text-cream" title="Next track">
+              {"\u25B6"}
+            </button>
+          </div>
 
-      {/* Volume row */}
-      <div className="flex items-center gap-2 px-2.5 pb-2">
-        <button onClick={toggleMute} className="btn-press text-[9px] text-muted hover:text-cream shrink-0" title={muted ? "Unmute" : "Mute"}>
-          {muted || volume === 0 ? "\uD83D\uDD07" : "\uD83D\uDD0A"}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={muted ? 0 : volume}
-          onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-          className="radio-volume flex-1"
-          style={{ "--radio-accent": accent } as React.CSSProperties}
-        />
-        <button
-          onClick={() => { setShuffle((s) => { _shuffle = !s; return !s; }); }}
-          className="btn-press text-[9px] shrink-0"
-          style={{ color: shuffle ? accent : "var(--color-muted)" }}
-          title={shuffle ? "Shuffle: on" : "Shuffle: off"}
-        >
-          {"\uD83D\uDD00"}
-        </button>
-      </div>
+          {/* Volume row */}
+          <div className="flex items-center gap-2 px-2.5 pb-2">
+            <button onClick={toggleMute} className="btn-press text-[9px] text-muted hover:text-cream shrink-0" title={muted ? "Unmute" : "Mute"}>
+              {muted || volume === 0 ? "\uD83D\uDD07" : "\uD83D\uDD0A"}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={muted ? 0 : volume}
+              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+              className="radio-volume flex-1"
+              style={{ "--radio-accent": accent } as React.CSSProperties}
+            />
+            <button
+              onClick={() => { setShuffle((s) => { _shuffle = !s; return !s; }); }}
+              className="btn-press text-[9px] shrink-0"
+              style={{ color: shuffle ? accent : "var(--color-muted)" }}
+              title={shuffle ? "Shuffle: on" : "Shuffle: off"}
+            >
+              {"\uD83D\uDD00"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -306,7 +305,7 @@ export default function LofiRadio() {
         <span style={{ color: playing ? accent : "var(--color-muted)" }}>
           {playing ? "\u23F8" : "\u25B6"}
         </span>
-        <span className="text-cream max-w-[80px] truncate">
+        <span className="text-cream max-w-20 truncate">
           {playing ? currentTrack?.title : "Lo-fi"}
         </span>
         <span

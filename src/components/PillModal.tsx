@@ -43,7 +43,7 @@ export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onCl
         {Array.from({ length: 20 }).map((_, i) => (
           <div
             key={i}
-            className="absolute text-[10px] leading-[12px] font-mono"
+            className="absolute text-[10px] leading-3 font-mono"
             style={{
               left: `${(i / 20) * 100}%`,
               color: "#00ff41",
@@ -88,8 +88,8 @@ export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onCl
               }}
             >
               {/* Pixel highlight blocks */}
-              <div className="absolute top-[4px] left-[10px] w-[10px] h-[4px]" style={{ background: "#ff6666" }} />
-              <div className="absolute top-[4px] left-[22px] w-[6px] h-[3px]" style={{ background: "#ff4444" }} />
+              <div className="absolute top-1 left-2.5 w-2.5 h-1" style={{ background: "#ff6666" }} />
+              <div className="absolute top-1 left-5.5 w-1.5 h-0.75" style={{ background: "#ff4444" }} />
             </div>
             <span className="font-pixel text-[10px] sm:text-[12px] uppercase tracking-wider text-red-400 group-hover:text-red-300 transition-colors">
               The truth
@@ -107,9 +107,8 @@ export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onCl
           {/* Blue Pill */}
           <button
             onClick={() => { if (!rabbitCompleted) onBluePill(); }}
-            className={`group flex flex-col items-center gap-3 transition-transform duration-200 ${
-              !rabbitCompleted ? "cursor-pointer hover:scale-110" : "cursor-default"
-            }`}
+            className={`group flex flex-col items-center gap-3 transition-transform duration-200 ${!rabbitCompleted ? "cursor-pointer hover:scale-110" : "cursor-default"
+              }`}
           >
             <div
               className="relative w-20 h-12 sm:w-24 sm:h-14 rounded-full"
@@ -124,11 +123,11 @@ export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onCl
             >
               {/* Pixel highlight blocks */}
               <div
-                className="absolute top-[4px] left-[10px] w-[10px] h-[4px]"
+                className="absolute top-1 left-2.5 w-2.5 h-1"
                 style={{ background: rabbitCompleted ? "#3a4a5a" : "#6699ff" }}
               />
               <div
-                className="absolute top-[4px] left-[22px] w-[6px] h-[3px]"
+                className="absolute top-1 left-5.5 w-1.5 h-0.75"
                 style={{ background: rabbitCompleted ? "#2a3a4a" : "#4488ee" }}
               />
               {rabbitCompleted && (
@@ -141,11 +140,10 @@ export default function PillModal({ rabbitCompleted, onRedPill, onBluePill, onCl
               )}
             </div>
             <span
-              className={`font-pixel text-[10px] sm:text-[12px] uppercase tracking-wider transition-colors ${
-                rabbitCompleted
-                  ? "text-green-600"
-                  : "text-blue-400 group-hover:text-blue-300"
-              }`}
+              className={`font-pixel text-[10px] sm:text-[12px] uppercase tracking-wider transition-colors ${rabbitCompleted
+                ? "text-green-600"
+                : "text-blue-400 group-hover:text-blue-300"
+                }`}
             >
               {rabbitCompleted ? "Already found" : "The rabbit hole"}
             </span>

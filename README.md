@@ -18,6 +18,8 @@
 
 Git City transforms every GitHub profile into a unique pixel art building. The more you contribute, the taller your building grows. Explore an interactive 3D city, fly between buildings, and discover developers from around the world.
 
+---
+
 ## Features
 
 - **3D Pixel Art Buildings** — Each GitHub user becomes a building with height based on contributions, width based on repos, and lit windows representing activity
@@ -34,6 +36,8 @@ Git City transforms every GitHub profile into a unique pixel art building. The m
 <!-- ![Profile Page](assets/screenshot-profile.png) -->
 <!-- ![Compare Mode](assets/screenshot-compare.png) -->
 
+---
+
 ## How Buildings Work
 
 | Metric         | Affects           | Example                                |
@@ -45,14 +49,20 @@ Git City transforms every GitHub profile into a unique pixel art building. The m
 
 Buildings are rendered with instanced meshes and a LOD (Level of Detail) system for performance. Close buildings show full detail with animated windows; distant buildings use simplified geometry.
 
+---
+
 ## Tech Stack
 
-- **Framework:** [Next.js](https://nextjs.org) 16 (App Router, Turbopack)
-- **3D Engine:** [Three.js](https://threejs.org) via [@react-three/fiber](https://github.com/pmndrs/react-three-fiber) + [drei](https://github.com/pmndrs/drei)
-- **Database & Auth:** [Supabase](https://supabase.com) (PostgreSQL, GitHub OAuth, Row Level Security)
-- **Payments:** [Stripe](https://stripe.com)
-- **Styling:** [Tailwind CSS](https://tailwindcss.com) v4 with pixel font (Silkscreen)
-- **Hosting:** [Vercel](https://vercel.com)
+| Category        | Technology   | Details                                               |
+| --------------- | ------------ | ----------------------------------------------------- |
+| Framework       | [Next.js](https://nextjs.org) | Version 16, App Router, Turbopack |
+| 3D Engine       | [Three.js](https://threejs.org) | Used via [@react-three/fiber](https://github.com/pmndrs/react-three-fiber) and [drei](https://github.com/pmndrs/drei) |
+| Database & Auth | [Supabase](https://supabase.com) | PostgreSQL database, GitHub OAuth, Row Level Security |
+| Payments        | [Stripe](https://stripe.com) | Payment processing |
+| Styling         | [Tailwind CSS](https://tailwindcss.com) | v4 with Silkscreen pixel font |
+| Hosting         | [Vercel](https://vercel.com) | Deployment and hosting platform |
+
+---
 
 ## Getting Started
 
@@ -82,6 +92,8 @@ npm run dev
 ```
 
 Open [http://localhost:3001](http://localhost:3001) to see the city.
+
+---
 
 ## License
 

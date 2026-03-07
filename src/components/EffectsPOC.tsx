@@ -1080,10 +1080,9 @@ function ZoneSelector({
               onClick={() => onSelect(isActive ? null : id)}
               className={`
                 relative px-2 py-1.5 text-left text-[11px] rounded transition-all
-                ${
-                  isActive
-                    ? "bg-white/15 text-white ring-1 ring-white/30"
-                    : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                ${isActive
+                  ? "bg-white/15 text-white ring-1 ring-white/30"
+                  : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
                 }
                 ${isNew ? "ring-1 ring-amber-500/40" : ""}
               `}
@@ -1150,11 +1149,10 @@ export default function EffectsPOC() {
               return (
                 <span
                   key={zone}
-                  className={`text-[10px] px-2 py-0.5 rounded-full ${
-                    NEW_ITEMS.has(id)
-                      ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30"
-                      : "bg-white/10 text-white/60"
-                  }`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full ${NEW_ITEMS.has(id)
+                    ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30"
+                    : "bg-white/10 text-white/60"
+                    }`}
                 >
                   {POC_EMOJIS[id]} {POC_NAMES[id]}
                 </span>
@@ -1170,7 +1168,7 @@ export default function EffectsPOC() {
       </div>
 
       {/* Control Panel */}
-      <div className="w-[280px] bg-[#0d1220] border-l border-white/10 overflow-y-auto p-4 flex flex-col">
+      <div className="w-70 bg-[#0d1220] border-l border-white/10 overflow-y-auto p-4 flex flex-col">
         <div className="mb-4 pb-3 border-b border-white/10">
           <h2 className="text-xs font-bold uppercase tracking-wider text-white/50">
             Building Effects

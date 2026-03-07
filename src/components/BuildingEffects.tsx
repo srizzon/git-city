@@ -721,31 +721,31 @@ export const Billboards = memo(function Billboards({
       getPos: (along: number, y: number) => [number, number, number];
       rotation: [number, number, number];
     }> = [
-      {
-        // Front (+Z)
-        faceWidth: width,
-        getPos: (along, y) => [along, y, depth / 2 + 0.5],
-        rotation: [0, 0, 0],
-      },
-      {
-        // Right (+X)
-        faceWidth: depth,
-        getPos: (along, y) => [width / 2 + 0.5, y, along],
-        rotation: [0, -Math.PI / 2, 0],
-      },
-      {
-        // Back (-Z)
-        faceWidth: width,
-        getPos: (along, y) => [-along, y, -(depth / 2 + 0.5)],
-        rotation: [0, Math.PI, 0],
-      },
-      {
-        // Left (-X)
-        faceWidth: depth,
-        getPos: (along, y) => [-(width / 2 + 0.5), y, -along],
-        rotation: [0, Math.PI / 2, 0],
-      },
-    ];
+        {
+          // Front (+Z)
+          faceWidth: width,
+          getPos: (along, y) => [along, y, depth / 2 + 0.5],
+          rotation: [0, 0, 0],
+        },
+        {
+          // Right (+X)
+          faceWidth: depth,
+          getPos: (along, y) => [width / 2 + 0.5, y, along],
+          rotation: [0, -Math.PI / 2, 0],
+        },
+        {
+          // Back (-Z)
+          faceWidth: width,
+          getPos: (along, y) => [-along, y, -(depth / 2 + 0.5)],
+          rotation: [0, Math.PI, 0],
+        },
+        {
+          // Left (-X)
+          faceWidth: depth,
+          getPos: (along, y) => [-(width / 2 + 0.5), y, -along],
+          rotation: [0, Math.PI / 2, 0],
+        },
+      ];
 
     const result: Array<{
       position: [number, number, number];

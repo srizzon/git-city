@@ -156,8 +156,8 @@ export default function FlyLeaderboard() {
   // Find user in leaderboard
   const userIndex = authLogin
     ? leaderboard.findIndex(
-        (e) => e.github_login?.toLowerCase() === authLogin,
-      )
+      (e) => e.github_login?.toLowerCase() === authLogin,
+    )
     : -1;
   const userEntry = userIndex >= 0 ? leaderboard[userIndex] : null;
   const userRank = userIndex >= 0 ? userIndex + 1 : null;
@@ -347,7 +347,7 @@ export default function FlyLeaderboard() {
                       alt={entry.github_login}
                       width={36}
                       height={36}
-                      className="border-[2px] border-border"
+                      className="border-2 border-border"
                       style={{ imageRendering: "pixelated" }}
                     />
                   )}

@@ -1,16 +1,54 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Pulse Icon Generator</title>
   <style>
-    body { background: #1a1a1a; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 40px; font-family: monospace; color: #aaa; }
-    canvas { border: 1px solid #333; image-rendering: pixelated; }
-    .preview { display: flex; gap: 32px; align-items: end; }
-    button { background: #00ff41; color: #000; border: none; padding: 10px 24px; font-family: monospace; font-size: 14px; cursor: pointer; font-weight: bold; }
-    button:hover { background: #00cc34; }
-    .label { text-align: center; font-size: 11px; margin-top: 4px; }
+    body {
+      background: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      padding: 40px;
+      font-family: monospace;
+      color: #aaa;
+    }
+
+    canvas {
+      border: 1px solid #333;
+      image-rendering: pixelated;
+    }
+
+    .preview {
+      display: flex;
+      gap: 32px;
+      align-items: end;
+    }
+
+    button {
+      background: #00ff41;
+      color: #000;
+      border: none;
+      padding: 10px 24px;
+      font-family: monospace;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #00cc34;
+    }
+
+    .label {
+      text-align: center;
+      font-size: 11px;
+      margin-top: 4px;
+    }
   </style>
 </head>
+
 <body>
   <h2 style="color:#00ff41">Git City: Pulse — Icon</h2>
 
@@ -183,4 +221,5 @@
     }
   </script>
 </body>
+
 </html>

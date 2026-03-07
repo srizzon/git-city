@@ -35,11 +35,10 @@ export function AdFormFields({ form, onChange }: AdFormFieldsProps) {
               key={val}
               type="button"
               onClick={() => set("vehicle", val)}
-              className={`cursor-pointer border px-3 py-2.5 text-xs transition-colors ${
-                form.vehicle === val
-                  ? "border-lime bg-lime/10 text-lime"
-                  : "border-border text-muted hover:text-cream"
-              } ${i > 0 ? "border-l-0" : ""}`}
+              className={`cursor-pointer border px-3 py-2.5 text-xs transition-colors ${form.vehicle === val
+                ? "border-lime bg-lime/10 text-lime"
+                : "border-border text-muted hover:text-cream"
+                } ${i > 0 ? "border-l-0" : ""}`}
             >
               {VEHICLE_LABELS[val]}
             </button>
