@@ -613,7 +613,8 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
     if (addPlaza) {
       const key = `${ogx},${ogz}`;
       occupiedCells.add(key);
-      let [pcx, pcz] = gridToWorld(ogx, ogz);
+      const [pcx, initialPcz] = gridToWorld(ogx, ogz);
+      let pcz = initialPcz;
       if (pcz > RIVER_Z_THRESHOLD) pcz += RIVER_PUSH;
       plazas.push({
         position: [pcx, 0, pcz],
