@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
+      allow_promotion_codes: true,
       metadata: {
         sky_ad_id: adId,
         type: "sky_ad",
