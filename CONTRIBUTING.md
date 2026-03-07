@@ -112,6 +112,8 @@ Start with an emoji + type. Single line, present tense, concise.
 
 Look for issues labeled [`good first issue`](https://github.com/srizzon/git-city/labels/good%20first%20issue). These are scoped tasks that don't require deep knowledge of the codebase.
 
+---
+
 ## Project Structure
 
 ```
