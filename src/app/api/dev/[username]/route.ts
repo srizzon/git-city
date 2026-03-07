@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
 import type { TopRepo } from "@/lib/github";
 import { calculateGithubXp } from "@/lib/xp";
 
+// Allow up to 60s on Vercel (Pro plan). Hobby plan max is 10s.
+export const maxDuration = 60;
+
+// Timeout for external API calls (15 seconds)
+const FETCH_TIMEOUT_MS = 15_000;
+
+// ─── Rate Limiting ───────────────────────────────────────────
 async function hashKey(key: string): Promise<string> {
   const data = new TextEncoder().encode(key + (process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""));
   const buf = await crypto.subtle.digest("SHA-256", data);
@@ -159,6 +167,7 @@ async function fetchExpandedGitHubData(login: string): Promise<ExpandedGitHubDat
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ query, variables: { login } }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (!res.ok) return null;
@@ -237,21 +246,13 @@ export async function GET(
     .eq("github_login", username.toLowerCase())
     .single();
 
-  if (cached) {
-    const age = Date.now() - new Date(cached.fetched_at).getTime();
-    if (age < 24 * 60 * 60 * 1000) {
-      return NextResponse.json(cached, {
-        headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
-        },
-      });
-    }
-  }
-
   // Rate limit only applies to brand-new developers (not in DB at all).
   // Stale refreshes for existing devs are unlimited ("already in the city").
+  const isInternalBackfill =
+    request.headers.get("x-internal-backfill") === process.env.SUPABASE_SERVICE_ROLE_KEY;
+
   let rateLimitKey: string | null = null;
-  if (process.env.NODE_ENV !== "development" && !cached) {
+  if (process.env.NODE_ENV !== "development" && !cached && !isInternalBackfill) {
     // Auth user ID is preferred over IP to avoid shared-IP false positives
     // (e.g. users behind the same corporate/university NAT sharing a quota).
     let key: string;
@@ -292,12 +293,38 @@ export async function GET(
       size: number;
     };
 
+    // ETag conditional request: free 304s don't count against GitHub rate limit.
+    // However, the /users ETag only covers profile fields (name, bio, public_repos).
+    // Contributions (GraphQL) and stars (repos endpoint) have independent freshness,
+    // so a 304 only means "profile unchanged" — we still re-fetch the expensive
+    // pipelines once the cached row is older than FULL_REFRESH_INTERVAL.
+    const FULL_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour
+    const cachedAge = cached ? Date.now() - new Date(cached.fetched_at).getTime() : Infinity;
+    const needsFullRefresh = cachedAge >= FULL_REFRESH_INTERVAL;
+
     const userRes = await fetch(
       `https://api.github.com/users/${encodeURIComponent(username)}`,
-      { headers }
+      {
+        headers: {
+          ...headers,
+          ...(cached?.github_etag ? { "If-None-Match": cached.github_etag } : {}),
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      },
     );
 
-    if (!userRes.ok) {
+    if (userRes.status === 304 && !needsFullRefresh) {
+      return NextResponse.json(cached, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        },
+      });
+    }
+
+    // 304 but contributions/stars may be stale: reuse cached profile fields, re-fetch the rest
+    const profileNotModified = userRes.status === 304;
+
+    if (!profileNotModified && !userRes.ok) {
       if (userRes.status === 404) {
         return NextResponse.json(
           { error: "User not found" },
@@ -316,29 +343,33 @@ export async function GET(
       );
     }
 
-    const ghUser = await userRes.json();
+    const ghUser = profileNotModified ? null : await userRes.json();
 
-    // Reject organizations
-    if (ghUser.type === "Organization") {
+    // Reject organizations (only possible on a fresh 200 response)
+    if (ghUser?.type === "Organization") {
       return NextResponse.json(
         { error: "Organizations are not supported. Search for a user profile instead." },
         { status: 400 }
       );
     }
 
+    const login = ghUser?.login ?? cached!.github_login;
+
     // Fetch expanded GitHub data (GraphQL) and first page of repos in parallel
     const [expanded, reposPage1Res] = await Promise.all([
-      fetchExpandedGitHubData(ghUser.login),
+      fetchExpandedGitHubData(login),
       fetch(
         `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=1`,
-        { headers }
+        { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
       ),
     ]);
 
     const contributions = expanded?.contributions ?? 0;
 
+    const publicRepos = ghUser?.public_repos ?? cached!.public_repos;
+
     // Reject users with zero public activity
-    if (contributions === 0 && ghUser.public_repos === 0) {
+    if (contributions === 0 && publicRepos === 0) {
       return NextResponse.json(
         { error: "This user has no public activity on GitHub yet." },
         { status: 400 }
@@ -349,17 +380,14 @@ export async function GET(
     let repos: RepoItem[] = reposPage1Res.ok ? await reposPage1Res.json() : [];
 
     if (repos.length >= 100) {
-      const extraPages = await Promise.all(
-        [2, 3, 4, 5].map((page) =>
-          fetch(
-            `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=${page}`,
-            { headers }
-          ).then((r) => (r.ok ? r.json() as Promise<RepoItem[]> : []))
-        )
+      // Cap at 1 extra page (200 repos total) to avoid timeout
+      const page2Res = await fetch(
+        `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=2`,
+        { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
       );
-      for (const page of extraPages) {
-        if (page.length === 0) break;
-        repos = repos.concat(page);
+      if (page2Res.ok) {
+        const page2: RepoItem[] = await page2Res.json();
+        repos = repos.concat(page2);
       }
     }
 
@@ -402,16 +430,17 @@ export async function GET(
 
     // Upsert into Supabase
     const record = {
-      github_login: ghUser.login.toLowerCase(),
-      github_id: ghUser.id,
-      name: ghUser.name,
-      avatar_url: ghUser.avatar_url,
-      bio: ghUser.bio,
+      github_login: login.toLowerCase(),
+      github_id: ghUser?.id ?? cached!.github_id,
+      name: ghUser?.name ?? cached!.name,
+      avatar_url: ghUser?.avatar_url ?? cached!.avatar_url,
+      bio: ghUser?.bio ?? cached!.bio,
       contributions,
-      public_repos: ghUser.public_repos,
+      public_repos: publicRepos,
       total_stars: totalStars,
       primary_language: primaryLanguage,
       top_repos: topRepos,
+      github_etag: (profileNotModified ? cached?.github_etag : userRes.headers.get("etag")) ?? null,
       fetched_at: new Date().toISOString(),
       // v2 fields
       ...(expanded ? {
@@ -461,7 +490,7 @@ export async function GET(
       const newGithubXp = calculateGithubXp({
         contributions: expanded?.contributions_total ?? contributions,
         total_stars: totalStars,
-        public_repos: ghUser.public_repos,
+        public_repos: publicRepos,
         total_prs: expanded?.total_prs ?? 0,
       });
       const prevGithubXp = (cached?.xp_github as number) ?? 0;
@@ -481,9 +510,38 @@ export async function GET(
       });
     }
 
+    // Auto-claim: if an auth user exists for this github_login but dev is unclaimed, claim it now
+    if (devId && upserted && !upserted.claimed) {
+      const admin = getSupabaseAdmin();
+      const { data: matchedUsers } = await admin.rpc("find_auth_user_by_github_login", {
+        p_github_login: upserted.github_login,
+      });
+      const matchedUser = (matchedUsers as { id: string }[] | null)?.[0];
+      if (matchedUser?.id) {
+        await admin
+          .from("developers")
+          .update({
+            claimed: true,
+            claimed_by: matchedUser.id,
+            claimed_at: new Date().toISOString(),
+          })
+          .eq("id", devId)
+          .eq("claimed", false);
+      }
+    }
+
     // Assign last-place rank to new dev (lightweight, no full recalc)
     if (isNewDev && devId) {
       await sb.rpc("assign_new_dev_rank", { dev_id: devId });
+    }
+
+    // Fire-and-forget: recalculate ranks in background (don't block the response)
+    if (isNewDev) {
+      sb.rpc("recalculate_ranks").then(
+        () =>
+          console.log("Ranks recalculated for new dev:", record.github_login),
+        (err: unknown) => console.error("Rank recalculation failed:", err),
+      );
     }
 
     const { data: withRank } = await sb
@@ -492,6 +550,8 @@ export async function GET(
       .eq("github_login", record.github_login)
       .single();
 
+    revalidatePath(`/dev/${record.github_login}`);
+
     return NextResponse.json(withRank ?? upserted, {
       headers: {
         "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
@@ -499,9 +559,28 @@ export async function GET(
     });
   } catch (err) {
     console.error("Dev route error:", err);
+
+    // Graceful degradation: return stale cache if GitHub fetch failed
+    if (cached) {
+      return NextResponse.json(
+        { ...cached, _stale: true },
+        {
+          headers: {
+            "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+          },
+        },
+      );
+    }
+
+    const isTimeout =
+      err instanceof DOMException && err.name === "TimeoutError";
     return NextResponse.json(
-      { error: "Failed to fetch GitHub data" },
-      { status: 500 }
+      {
+        error: isTimeout
+          ? "GitHub API timed out. Please try again."
+          : "Failed to fetch GitHub data",
+      },
+      { status: isTimeout ? 504 : 500 },
     );
   }
 }

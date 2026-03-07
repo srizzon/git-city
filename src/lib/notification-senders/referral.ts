@@ -17,14 +17,10 @@ export function sendReferralJoinedNotification(
     title: `Your referral @${referredLogin} just joined Git City!`,
     body: `@${referredLogin} joined Git City through your referral link.`,
     html: `
-      <p style="color: #c8e64a; font-size: 16px;">Your referral joined!</p>
-      <p style="color: #f0f0f0;">
-        <strong>@${referredLogin}</strong> just claimed their building in Git City
-        through your referral link.
-      </p>
-      <p style="color: #666; font-size: 13px;">
-        Keep sharing your link to unlock referral achievements!
-      </p>
+      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">Referral joined</p>
+      <h1 style="margin:0 0 8px; font-size:24px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">@${referredLogin} is in Git City!</h1>
+      <p style="margin:0 0 28px; font-size:15px; color:#555555; line-height:1.6;">They just claimed their building through your referral link. Keep sharing to unlock referral achievements!</p>
+      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 28px;" />
       ${buildButton("Visit Their Building", `${BASE_URL}/?user=${referredLogin}`)}
     `,
     actionUrl: `${BASE_URL}/?user=${referredLogin}`,

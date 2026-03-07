@@ -16,38 +16,33 @@ export function sendRaidAlertNotification(
     ? `@${attackerLogin} attacked your building!`
     : `You defended against @${attackerLogin}!`;
 
-  const outcomeHtml = success
-    ? `<p style="color: #ff6b6b; font-size: 16px;">Your building was attacked!</p>
-       <p style="color: #f0f0f0;"><strong>@${attackerLogin}</strong> broke through your defenses.</p>`
-    : `<p style="color: #c8e64a; font-size: 16px;">Defense successful!</p>
-       <p style="color: #f0f0f0;">You held off <strong>@${attackerLogin}</strong>'s attack.</p>`;
+  const labelColor = success ? "#cc4444" : "#5a8a00";
+  const label = success ? "Building attacked" : "Defense successful";
+  const heading = success
+    ? `@${attackerLogin} broke through.`
+    : `You held off @${attackerLogin}.`;
+  const subtext = success
+    ? `Their attack score of ${attackScore} beat your defense of ${defenseScore}.`
+    : `Your defense score of ${defenseScore} stopped their attack of ${attackScore}.`;
 
   sendNotificationAsync({
     type: "raid_alert",
     category: "social",
     developerId: defenderId,
     dedupKey: `raid:${raidId}`,
-    skipIfActive: true, // Don't email if they're online watching it happen
+    skipIfActive: true,
     title: outcome,
     body: `Attack: ${attackScore} vs Defense: ${defenseScore}. ${outcome}`,
     html: `
-      ${outcomeHtml}
-      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-        <tr>
-          <td style="padding: 8px 12px; border: 1px solid #1c1c20; color: #ff6b6b; font-size: 18px; font-weight: bold;">${attackScore}</td>
-          <td style="padding: 8px 12px; border: 1px solid #1c1c20; color: #f0f0f0;">Attack</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 12px; border: 1px solid #1c1c20; color: #c8e64a; font-size: 18px; font-weight: bold;">${defenseScore}</td>
-          <td style="padding: 8px 12px; border: 1px solid #1c1c20; color: #f0f0f0;">Defense</td>
-        </tr>
-      </table>
+      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:${labelColor}; letter-spacing:1px; text-transform:uppercase;">${label}</p>
+      <h1 style="margin:0 0 8px; font-size:24px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${heading}</h1>
+      <p style="margin:0 0 28px; font-size:15px; color:#555555; line-height:1.6;">${subtext}</p>
+      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 28px;" />
       ${buildButton("View Your Building", `${BASE_URL}/?user=${defenderLogin}`)}
     `,
     actionUrl: `${BASE_URL}/?user=${defenderLogin}`,
     priority: "normal",
     channels: ["email"],
-    // Batch eligible: if user gets attacked 5 times in an hour, send 1 digest
     batchKey: `raids:${defenderId}`,
     batchWindowMinutes: 60,
     batchEventData: {

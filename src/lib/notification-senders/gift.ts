@@ -21,12 +21,10 @@ export function sendGiftReceivedNotification(
     title: `@${giverLogin} gifted you ${itemName}!`,
     body: `@${giverLogin} sent you ${itemName}. It's now on your building!`,
     html: `
-      <p style="color: #f0f0f0; font-size: 16px;">You received a gift!</p>
-      <p style="color: #f0f0f0;">
-        <strong>@${giverLogin}</strong> gifted you
-        <strong style="color: #c8e64a;">${itemName}</strong>.
-        It's now available on your building!
-      </p>
+      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">You received a gift</p>
+      <h1 style="margin:0 0 8px; font-size:24px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${itemName}</h1>
+      <p style="margin:0 0 28px; font-size:15px; color:#555555; line-height:1.6;"><strong>@${giverLogin}</strong> gifted this to you. It's now equipped on your building!</p>
+      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 28px;" />
       ${buildButton("Check Your Building", `${BASE_URL}/?user=${receiverLogin}`)}
     `,
     actionUrl: `${BASE_URL}/?user=${receiverLogin}`,

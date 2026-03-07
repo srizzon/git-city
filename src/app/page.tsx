@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo, Suspense } from "react";
+import { Menu, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
@@ -64,7 +65,7 @@ const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
 });
 
 // Feature flags — flip to switch milestone banner
-const MILESTONE_MODE: "stars" | "devs" = "stars"; // "stars" = GitHub stars road to 1K, "devs" = total developers
+const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road to 1K, "devs" = total developers
 
 const THEMES = [
   { name: "Midnight", accent: "#6090e0", shadow: "#203870" },
@@ -188,6 +189,11 @@ const ERROR_MESSAGES: Record<string, { primary: (u: string) => string; secondary
     primary: () => "GitHub's API is temporarily unavailable",
     secondary: "Too many requests to GitHub. Try again in a few minutes.",
   },
+  "timeout": {
+    primary: (u) => `Fetching "@${u}" took too long`,
+    secondary: "GitHub's API was slow to respond. This usually resolves itself — try again in a moment.",
+    hasRetry: true,
+  },
   "network": {
     primary: () => "Couldn't reach the server",
     secondary: "Check your internet connection and try again.",
@@ -226,7 +232,7 @@ function SearchFeedback({
   useEffect(() => {
     if (feedback?.type !== "error") return;
     const code = feedback.code ?? "generic";
-    if (code === "no-activity" || code === "network" || code === "generic") return;
+    if (code === "no-activity" || code === "network" || code === "generic" || code === "timeout") return;
     const timer = setTimeout(onDismiss, 8000);
     return () => clearTimeout(timer);
   }, [feedback, onDismiss]);
@@ -386,7 +392,7 @@ function HomeContent() {
   const initialLoading = loadStage !== "done";
   const [feedback, setFeedback] = useState<{
     type: "loading" | "error";
-    code?: "not-found" | "org" | "no-activity" | "rate-limit" | "github-rate-limit" | "network" | "generic";
+    code?: "not-found" | "org" | "no-activity" | "rate-limit" | "github-rate-limit" | "timeout" | "network" | "generic";
     username?: string;
     raw?: string;
   } | null>(null);
@@ -435,6 +441,8 @@ function HomeContent() {
   const [vsCodeKeyLoading, setVsCodeKeyLoading] = useState(false);
   const [vsCodeKeyCopied, setVsCodeKeyCopied] = useState(false);
   const [codingPanelOpen, setCodingPanelOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [codingInfoOpen, setCodingInfoOpen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [purchasedItem, setPurchasedItem] = useState<string | null>(null);
@@ -838,7 +846,7 @@ function HomeContent() {
   // During fly mode: only close overlays (profile card) — AirplaneFlight handles pause/exit
   // Outside fly mode: compare → share modal → profile card → focus → explore mode
   useEffect(() => {
-    if (flyMode && !selectedBuilding) return;
+    if (flyMode && !selectedBuilding && !pillModalOpen && !founderMessageOpen) return;
     if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !rabbitCinematic && raidState.phase === "idle") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
@@ -1441,8 +1449,9 @@ function HomeContent() {
       const devData = await devRes.json();
 
       if (!devRes.ok) {
-        let code: "not-found" | "org" | "no-activity" | "rate-limit" | "github-rate-limit" | "generic" = "generic";
+        let code: "not-found" | "org" | "no-activity" | "rate-limit" | "github-rate-limit" | "timeout" | "generic" = "generic";
         if (devRes.status === 404) code = "not-found";
+        else if (devRes.status === 504) code = "timeout";
         else if (devRes.status === 429) {
           code = devData.error?.includes("GitHub") ? "github-rate-limit" : "rate-limit";
         } else if (devRes.status === 400) {
@@ -1871,7 +1880,7 @@ if (claimingGift) return;
         accentColor={theme.accent}
         onClearFocus={() => setFocusedBuilding(null)}
         flyPauseSignal={flyPauseSignal}
-        flyHasOverlay={!!selectedBuilding}
+        flyHasOverlay={!!selectedBuilding || pillModalOpen || founderMessageOpen || rabbitCinematic}
         flyStartPaused={showFlyControls}
         holdRise={loadStage !== "done"}
         celebrationActive={celebrationActive}
@@ -2333,32 +2342,48 @@ if (claimingGift) return;
       {/* ─── GitHub Badge (mobile: top-center, desktop: top-right) ─── */}
       {!flyMode && !introMode && !rabbitCinematic && (
         <div className={`pointer-events-auto fixed top-3 left-3 z-30 items-center gap-1.5 sm:gap-2 sm:left-auto sm:right-4 sm:top-4 ${exploreMode ? "hidden lg:flex" : "flex"}`}>
-          <a
-            href="https://github.com/srizzon/git-city"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-            <span style={{ color: theme.accent }}>&#9733;</span>
-            {starCount != null && <span className="text-cream">{starCount.toLocaleString()}</span>}
-          </a>
+          {/* GitHub stars — only when loaded */}
+          {starCount != null && (
+            <a
+              href="https://github.com/srizzon/git-city"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              <span style={{ color: theme.accent }}>&#9733;</span>
+              <span className="text-cream">{starCount.toLocaleString()}</span>
+            </a>
+          )}
+          {/* Discord — desktop only, goes in mobile menu */}
           <a
             href="https://discord.gg/2bTjFAkny7"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+            className="hidden sm:flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2]"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z"/></svg>
             <span className="hidden sm:inline text-cream">Discord</span>
             {discordMembers != null && <span className="text-cream">{discordMembers.toLocaleString()}</span>}
           </a>
+          {/* Live users — desktop only */}
           {liveStatus !== "error" && (
-            <div className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm">
+            <div className="hidden sm:flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm">
               <span className="live-dot h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#4ade80]" />
               <span className="text-cream">{liveUsers.toLocaleString()}</span>
-              <span className="hidden sm:inline text-muted">live</span>
+              <span className="text-muted">live</span>
             </div>
+          )}
+          {/* Coding now — mobile: compact pulse badge; desktop: dropdown button */}
+          {codingCount > 0 && liveStatus !== "error" && (
+            <button
+              onClick={() => setCodingInfoOpen(true)}
+              className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm sm:hidden"
+            >
+              <span className="live-dot h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#4ade80]" />
+              <span className="text-cream">{codingCount}</span>
+              <span className="text-muted">coding</span>
+            </button>
           )}
           {(() => {
             const energyLabel = codingCount === 0 ? "City sleeping" : codingCount <= 2 ? "City waking up" : codingCount <= 9 ? "City alive" : "City buzzing";
@@ -2396,7 +2421,7 @@ if (claimingGift) return;
                     <div className="border-b border-border px-5 py-3 text-xs text-muted">
                       Coding right now
                     </div>
-                    <div className="max-h-60 overflow-y-auto">
+                    <div>
                       {displayDevs.map((dev) => {
                         const isCreator = dev.githubLogin.toLowerCase() === "srizzon";
                         return (
@@ -2442,17 +2467,15 @@ if (claimingGift) return;
                         );
                       })}
                     </div>
-                    {remaining > 0 && (
-                      <div className="border-t border-border">
-                        <Link
-                          href="/live"
-                          onClick={() => setCodingPanelOpen(false)}
-                          className="block px-4 py-2.5 text-center text-[11px] text-muted transition-colors hover:text-cream"
-                        >
-                          +{remaining} more &rarr;
-                        </Link>
-                      </div>
-                    )}
+                    <div className="border-t border-border">
+                      <Link
+                        href="/live"
+                        onClick={() => setCodingPanelOpen(false)}
+                        className="block px-4 py-2.5 text-center text-[11px] text-muted transition-colors hover:text-cream"
+                      >
+                        {remaining > 0 ? `+${remaining} more` : "View live page"} &rarr;
+                      </Link>
+                    </div>
 
                     {/* CTA: Go Live flow */}
                     <div className="border-t border-border">
@@ -2554,10 +2577,240 @@ if (claimingGift) return;
         </div>
       )}
 
+      {/* ─── Coding Info Modal (mobile) ─── */}
+      {codingInfoOpen && (
+        <div className="pointer-events-auto fixed inset-0 z-[50] flex items-end sm:hidden" onClick={() => setCodingInfoOpen(false)}>
+          <div
+            className="w-full border-t-[2px] border-border bg-bg px-5 py-6 animate-[slide-up_0.2s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="live-dot h-2 w-2 rounded-full bg-[#4ade80]" />
+                <span className="text-sm text-cream">{codingCount} coding right now</span>
+              </div>
+              <button onClick={() => setCodingInfoOpen(false)} className="text-muted">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mb-5 text-xs text-muted normal-case leading-relaxed">
+              Every developer coding right now is keeping the city alive. Their buildings light up in real time as they work.
+            </p>
+            <Link
+              href="/live"
+              onClick={() => setCodingInfoOpen(false)}
+              className="btn-press block w-full py-3 text-center text-xs text-bg"
+              style={{ backgroundColor: theme.accent, boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
+            >
+              See who&apos;s coding live
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Mobile Hamburger Button ─── */}
+      {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="pointer-events-auto fixed top-3 right-3 z-[40] flex h-8 w-8 items-center justify-center border-[2px] border-border bg-bg/80 backdrop-blur-sm sm:hidden"
+        >
+          <Menu size={16} className="text-cream" />
+        </button>
+      )}
+
+      {/* ─── Mobile Fullscreen Menu ─── */}
+      {mobileMenuOpen && (
+        <div className="pointer-events-auto fixed inset-0 z-[50] flex flex-col bg-bg sm:hidden animate-[slide-in-right_0.25s_ease-out]" style={{ background: "var(--color-bg)" }}>
+
+          {/* ── Profile / Auth header ── */}
+          {session ? (
+            <div className="px-5 pt-6 pb-5 border-b border-border" style={{ background: theme.accent + "0d" }}>
+              <div className="flex items-start justify-between">
+                <Link href={`/dev/${authLogin}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
+                  {myBuilding?.avatar_url && (
+                    <img src={myBuilding.avatar_url} alt="" className="h-12 w-12 rounded-full border-[2px]" style={{ borderColor: theme.accent }} />
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-cream font-bold">@{authLogin}</span>
+                      {streakData && streakData.streak > 0 && (
+                        <span className="flex items-center gap-0.5 text-xs" style={{ color: getStreakTierColor(streakData.streak) }}>
+                          🔥<span className="font-bold">{streakData.streak}</span>
+                        </span>
+                      )}
+                    </div>
+                    {myBuilding && (
+                      <div className="mt-0.5 text-[10px] text-muted normal-case">
+                        {myBuilding.district} district
+                        {myBuilding.claimed && <span className="ml-1.5 text-[#4ade80]">claimed</span>}
+                      </div>
+                    )}
+                    {liveByLogin.has(authLogin) && (
+                      <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: theme.accent }}>
+                        <span className="live-dot h-1.5 w-1.5 rounded-full bg-[#4ade80]" />
+                        coding now
+                      </div>
+                    )}
+                  </div>
+                </Link>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex h-8 w-8 items-center justify-center border-[2px] border-border text-muted"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              {canClaim && (
+                <button
+                  onClick={() => { handleClaim(); setMobileMenuOpen(false); }}
+                  disabled={claiming}
+                  className="btn-press mt-4 w-full py-2.5 text-xs text-bg disabled:opacity-40"
+                  style={{ backgroundColor: theme.accent, boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
+                >
+                  {claiming ? "..." : "Claim your building"}
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="px-5 pt-6 pb-5 border-b border-border">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs text-muted">GIT CITY</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex h-8 w-8 items-center justify-center border-[2px] border-border text-muted"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <p className="mb-3 text-xs text-muted normal-case leading-relaxed">Your GitHub commits build a real 3D city. Sign in to claim your building.</p>
+              <button
+                onClick={() => { handleSignIn(); setMobileMenuOpen(false); }}
+                className="btn-press w-full py-3 text-xs text-bg"
+                style={{ backgroundColor: theme.accent, boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
+              >
+                Sign in with GitHub
+              </button>
+            </div>
+          )}
+
+          {/* ── Nav ── */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="divide-y divide-border/40">
+              <Link
+                href={shopHref}
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+              >
+                <span className="text-sm text-cream">Shop</span>
+                <span className="text-xs text-muted" style={{ color: theme.accent }}>&#8594;</span>
+              </Link>
+              <Link
+                href="/live"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+              >
+                <span className="flex items-center gap-2 text-sm text-cream">
+                  {codingCount > 0 && <span className="live-dot h-2 w-2 rounded-full bg-[#4ade80]" />}
+                  Live
+                  {codingCount > 0 && (
+                    <span className="text-[10px] text-muted">{codingCount} coding now</span>
+                  )}
+                </span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </Link>
+              <Link
+                href="/leaderboard"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+              >
+                <span className="text-sm text-cream">&#9819; Leaderboard</span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </Link>
+              <Link
+                href="/advertise"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+              >
+                <span className="flex items-center gap-2 text-sm" style={{ color: theme.accent }}>
+                  Place your Ad
+                  <span className="px-1 py-px text-[8px] font-bold text-bg leading-none" style={{ backgroundColor: theme.accent }}>NEW</span>
+                </span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </Link>
+              <a
+                href="https://discord.gg/2bTjFAkny7"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+              >
+                <span className="flex items-center gap-2 text-sm text-cream">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2] flex-shrink-0"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z"/></svg>
+                  Discord
+                  {discordMembers != null && <span className="text-[10px] text-muted">{discordMembers.toLocaleString()} members</span>}
+                </span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </a>
+              <a
+                href="https://github.com/srizzon/git-city"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+              >
+                <span className="flex items-center gap-2 text-sm text-cream">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream flex-shrink-0"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                  GitHub
+                  {starCount != null && <span className="text-[10px] text-muted">&#9733; {starCount.toLocaleString()}</span>}
+                </span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </a>
+            </div>
+
+            {/* ── Theme ── */}
+            <div className="border-t border-border px-5 py-4">
+              <p className="mb-3 text-[10px] text-muted uppercase tracking-widest">Theme</p>
+              <div className="grid grid-cols-4 gap-2">
+                {THEMES.map((t, i) => (
+                  <button
+                    key={t.name}
+                    onClick={() => { setThemeIndex(i); try { localStorage.setItem("gitcity_theme", String(i)); } catch {} }}
+                    className="py-2.5 text-[10px] border-[2px] transition-colors"
+                    style={{
+                      borderColor: themeIndex === i ? t.accent : "var(--color-border)",
+                      color: themeIndex === i ? t.accent : "var(--color-muted)",
+                      backgroundColor: themeIndex === i ? t.accent + "18" : "transparent",
+                    }}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Stats footer ── */}
+            <div className="border-t border-border px-5 py-4 flex items-center gap-4">
+              <div className="flex items-center gap-1.5 text-[10px] text-muted">
+                <span style={{ color: theme.accent }}>&#9733;</span>
+                <span className="text-cream">{starCount?.toLocaleString() ?? "..."}</span>
+                <span>stars</span>
+              </div>
+              {liveStatus !== "error" && (
+                <div className="flex items-center gap-1.5 text-[10px] text-muted">
+                  <span className="live-dot h-1.5 w-1.5 rounded-full bg-[#4ade80]" />
+                  <span className="text-cream">{liveUsers.toLocaleString()}</span>
+                  <span>online now</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Main UI Overlay ─── */}
       {!flyMode && !exploreMode && !introMode && !rabbitCinematic && (
         <div
-          className="pointer-events-none fixed inset-0 z-20 flex flex-col items-center justify-between pt-10 pb-14 px-3 sm:py-8 sm:px-4"
+          className="pointer-events-none fixed inset-0 z-20 flex flex-col items-center justify-between pt-16 pb-4 px-3 sm:py-8 sm:px-4"
           style={{
             background:
               "linear-gradient(to bottom, rgba(13,13,15,0.88) 0%, rgba(13,13,15,0.55) 30%, transparent 60%, transparent 85%, rgba(13,13,15,0.5) 100%)",
@@ -2992,7 +3245,7 @@ if (claimingGift) return;
 
       {/* ─── Mobile Bottom Bar (game-style nav) ─── */}
       {!flyMode && !exploreMode && !introMode && !rabbitCinematic && buildings.length > 0 && (
-        <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-[35] flex items-center justify-around border-t-[2px] border-border bg-bg/95 px-1 py-2 backdrop-blur-md sm:hidden">
+        <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-[35] hidden items-center justify-around border-t-[2px] border-border bg-bg/95 px-1 py-2 backdrop-blur-md sm:hidden">
           <Link
             href={shopHref}
             className="btn-press border-[2px] border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
@@ -4101,7 +4354,7 @@ if (claimingGift) return;
 
       {/* ─── Bottom-left controls: Theme + Radio (portal slot) + Intro ─── */}
       {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (
-        <div className="pointer-events-auto fixed bottom-[82px] left-3 z-[25] flex items-center gap-2 sm:bottom-10 sm:left-4">
+        <div className="pointer-events-auto fixed bottom-8 left-3 z-[25] flex items-center gap-2 sm:bottom-10 sm:left-4">
           <button
             onClick={cycleTheme}
             className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
@@ -4170,7 +4423,7 @@ if (claimingGift) return;
       {!flyMode && !introMode && !rabbitCinematic && feedEvents.length >= 1 && (
         <ActivityTicker
           events={feedEvents}
-          hasBottomBar={!exploreMode && buildings.length > 0}
+          hasBottomBar={false}
           onEventClick={(evt) => {
             if (compareBuilding || comparePair) return;
             const login = evt.actor?.login;
@@ -4531,7 +4784,12 @@ if (claimingGift) return;
         />
       )}
       {founderMessageOpen && (
-        <FounderMessage onClose={() => setFounderMessageOpen(false)} />
+        <FounderMessage
+          onClose={() => setFounderMessageOpen(false)}
+          session={session}
+          hasClaimed={!!myBuilding?.claimed}
+          onSignIn={handleSignInWithRef}
+        />
       )}
 
       {/* Rabbit Quest Cinematic Overlay */}

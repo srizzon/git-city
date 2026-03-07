@@ -1,58 +1,63 @@
 const BASE_URL = "https://thegitcity.com";
-
 const FONT = `'Silkscreen', monospace`;
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');`;
 
 export function wrapInBaseTemplate(bodyHtml: string, unsubscribeUrl?: string): string {
   const footer = unsubscribeUrl
-    ? `<a href="${escapeHtml(unsubscribeUrl)}" style="color: #3a3a44; text-decoration: underline; font-family: ${FONT}; font-size: 11px;">unsubscribe</a>&nbsp;&middot;&nbsp;`
+    ? `<a href="${escapeHtml(unsubscribeUrl)}" style="color: #999999; text-decoration: underline; font-size: 12px; font-family: Helvetica, Arial, sans-serif;">unsubscribe</a> &middot; `
     : "";
 
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="color-scheme" content="light dark" />
-  <meta name="supported-color-schemes" content="light dark" />
-  <style>${FONT_IMPORT}</style>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <style>
+    ${FONT_IMPORT}
+    @media only screen and (max-width: 620px) {
+      .wrapper { width: 100% !important; padding: 0 !important; }
+      .content { padding: 24px 16px !important; }
+    }
+  </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0a0a0e; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0a0a0e;">
-  <tr>
-    <td align="center" style="padding: 48px 20px;">
-      <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="max-width: 520px; width: 100%;">
+<body style="margin: 0; padding: 0; background-color: #f4f5f6; font-family: Helvetica, Arial, sans-serif; -webkit-text-size-adjust: 100%;">
 
-        <!-- Logo -->
-        <tr>
-          <td align="center" style="padding-bottom: 44px;">
-            <span style="font-family: ${FONT}; font-size: 16px; font-weight: 400; letter-spacing: 6px;"><span style="color: #f0f0f0;">GIT</span> <span style="color: #c8e64a;">CITY</span></span>
-          </td>
-        </tr>
+  <!-- Preheader (hidden) -->
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;"></div>
 
-        <!-- Body -->
-        <tr><td>${bodyHtml}</td></tr>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f5f6" style="background-color: #f4f5f6;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" class="wrapper" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width: 560px; width: 100%;">
 
-        <!-- Footer divider -->
-        <tr>
-          <td style="padding: 24px 0;">
-            <div style="height: 1px; background-color: #1c1c20;"></div>
-          </td>
-        </tr>
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding-bottom: 24px;">
+              <img src="${BASE_URL}/icon-512.png" width="64" height="64" alt="Git City" style="display:block; border-radius:16px; border:0;" />
+            </td>
+          </tr>
 
-        <!-- Footer -->
-        <tr>
-          <td align="center">
-            <span style="font-family: ${FONT}; font-size: 11px; color: #3a3a44;">
-              ${footer}<a href="${BASE_URL}" style="color: #3a3a44; text-decoration: none; font-family: ${FONT}; font-size: 11px;">thegitcity.com</a>
-            </span>
-          </td>
-        </tr>
+          <!-- Card -->
+          <tr>
+            <td bgcolor="#ffffff" style="background-color: #ffffff; border-radius: 6px; padding: 40px 40px 32px;" class="content">
+              ${bodyHtml}
+            </td>
+          </tr>
 
-      </table>
-    </td>
-  </tr>
-</table>
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding-top: 24px;">
+              <p style="margin: 0; font-size: 12px; color: #999999; font-family: Helvetica, Arial, sans-serif;">
+                ${footer}<a href="${BASE_URL}" style="color: #999999; text-decoration: none; font-size: 12px;">thegitcity.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 }
@@ -66,17 +71,21 @@ export function escapeHtml(str: string): string {
 }
 
 export function buildButton(text: string, url: string): string {
-  return `<div style="text-align: center; margin: 24px 0;">
-  <a href="${escapeHtml(url)}" style="display: inline-block; padding: 16px 36px; background-color: #c8e64a; color: #0a0a0e; font-family: ${FONT}; font-weight: 700; font-size: 14px; text-decoration: none; letter-spacing: 1px;">
-    ${escapeHtml(text)}
-  </a>
-</div>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 28px auto 0;">
+  <tr>
+    <td align="center" bgcolor="#111111" style="border-radius: 4px;">
+      <a href="${escapeHtml(url)}" style="display: inline-block; padding: 14px 32px; background-color: #111111; border-radius: 4px; color: #ffffff; font-family: Helvetica, Arial, sans-serif; font-size: 14px; font-weight: bold; text-decoration: none; letter-spacing: 0.5px;">
+        ${escapeHtml(text)}
+      </a>
+    </td>
+  </tr>
+</table>`;
 }
 
 export function buildStatRow(label: string, value: string | number): string {
   return `<tr>
-  <td style="padding: 10px 14px; border: 1px solid #1c1c20; color: #c8e64a; font-size: 20px; font-weight: bold; font-family: ${FONT};">${value}</td>
-  <td style="padding: 10px 14px; border: 1px solid #1c1c20; color: #f0f0f0; font-family: ${FONT}; font-size: 14px;">${escapeHtml(String(label))}</td>
+  <td style="padding: 10px 14px; border: 1px solid #eeeeee; color: #111111; font-size: 20px; font-weight: bold; font-family: Helvetica, Arial, sans-serif;">${value}</td>
+  <td style="padding: 10px 14px; border: 1px solid #eeeeee; color: #555555; font-family: Helvetica, Arial, sans-serif; font-size: 14px;">${escapeHtml(String(label))}</td>
 </tr>`;
 }
 
