@@ -39,8 +39,8 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
         ghostEffectId === 0
           ? <NeonOutline width={building.width} height={building.height} depth={building.depth} color={accentColor} />
           : ghostEffectId === 1
-          ? <ParticleAura width={building.width} height={building.height} depth={building.depth} color={accentColor} />
-          : <SpotlightEffect height={building.height} width={building.width} depth={building.depth} color={accentColor} />
+            ? <ParticleAura width={building.width} height={building.height} depth={building.depth} color={accentColor} />
+            : <SpotlightEffect height={building.height} width={building.width} depth={building.depth} color={accentColor} />
       )}
       {building.app_streak > 0 && (
         <StreakFlame height={building.height} width={building.width} depth={building.depth} streakDays={building.app_streak} color={accentColor} />
@@ -284,8 +284,8 @@ export default function EffectsLayer({
           {ghostEffectId === 0
             ? <NeonOutline width={ghostBuilding.width} height={ghostBuilding.height} depth={ghostBuilding.depth} color={accentColor} />
             : ghostEffectId === 1
-            ? <ParticleAura width={ghostBuilding.width} height={ghostBuilding.height} depth={ghostBuilding.depth} color={accentColor} />
-            : <SpotlightEffect height={ghostBuilding.height} width={ghostBuilding.width} depth={ghostBuilding.depth} color={accentColor} />
+              ? <ParticleAura width={ghostBuilding.width} height={ghostBuilding.height} depth={ghostBuilding.depth} color={accentColor} />
+              : <SpotlightEffect height={ghostBuilding.height} width={ghostBuilding.width} depth={ghostBuilding.depth} color={accentColor} />
           }
         </group>
       )}
