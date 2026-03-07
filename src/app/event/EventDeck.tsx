@@ -12,7 +12,7 @@ const SLIDE_LABELS = [
   "Cover",
   "Cidade",
   "Audiência",
-  "Números",
+  "Performance",
   "Real Oficial",
   "Prova Real",
   "Formatos",
@@ -80,7 +80,7 @@ export default function EventDeck({ stats }: { stats: PitchStats }) {
     <SlideCover key="cover" stats={stats} />,
     <SlideCity key="city" stats={stats} />,
     <SlideAudience key="audience" />,
-    <SlideNumbers key="numbers" />,
+    <SlidePerformance key="perf" />,
     <SlideRealOficial key="real" />,
     <SlideSocialProof key="proof" />,
     <SlideFormats key="formats" />,
@@ -227,26 +227,20 @@ function SlideAudience() {
   );
 }
 
-function SlideNumbers() {
+function SlidePerformance() {
   return (
     <div className="flex flex-col items-center gap-10 text-center">
       <p className="text-xl text-cream normal-case sm:text-3xl">
-        Performance real
+        Performance total da plataforma
       </p>
       <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-14">
-        <BigStat value="83K+" label="impressões" />
-        <BigStat value="420+" label="cliques" />
-        <BigStat value="1.26%" label="melhor CTR" />
+        <BigStat value="1.9M" label="impressões" />
+        <BigStat value="15K+" label="cliques" />
       </div>
-      <div className="w-full max-w-xl space-y-4">
-        <CTRBar name="Git City" value={1.26} max={1.5} highlight />
-        <CTRBar name="X (Twitter)" value={0.8} max={1.5} />
-        <CTRBar name="Google Display" value={0.5} max={1.5} />
-        <CTRBar name="LinkedIn" value={0.4} max={1.5} />
+      <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-14">
+        <BigStat value="128" label="ads pagos" />
+        <BigStat value="1.17%" label="CTR" />
       </div>
-      <p className="text-lg normal-case sm:text-2xl" style={{ color: ACCENT }}>
-        2.5x a média da indústria
-      </p>
     </div>
   );
 }
@@ -355,37 +349,42 @@ function SlideFlow() {
 
 function SlideCTA() {
   return (
-    <div className="flex flex-col items-center justify-center gap-8 text-center">
-      <div className="text-5xl sm:text-7xl lg:text-[9rem]">
-        <span style={{ color: CREAM }}>GIT</span>{" "}
-        <span style={{ color: ACCENT }}>CITY</span>
-      </div>
+    <div className="flex flex-col items-center justify-center gap-6 text-center sm:gap-8">
       <p className="text-xl text-cream normal-case sm:text-3xl">
-        Seu produto na frente de devs reais
+        Escaneie e anuncie agora
       </p>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={QR_URL}
-        alt="QR Code para thegitcity.com/advertise"
-        width={220}
-        height={220}
-        className="border-[4px] border-border"
-        style={{ imageRendering: "pixelated" }}
-      />
-      <div className="border-[3px] px-8 py-4 sm:px-12 sm:py-5" style={{ borderColor: ACCENT, backgroundColor: ACCENT + "10" }}>
-        <p className="text-sm text-muted normal-case sm:text-base">
-          Cupom de desconto
-        </p>
-        <p className="mt-2 text-3xl sm:text-5xl" style={{ color: ACCENT }}>
-          GITCITY30
-        </p>
-        <p className="mt-2 text-base text-cream normal-case sm:text-xl">
-          30% off no primeiro mês
-        </p>
+      <div className="flex flex-col items-center gap-6 sm:flex-row sm:gap-12">
+        {/* QR Code */}
+        <div className="flex flex-col items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={QR_URL}
+            alt="QR Code para thegitcity.com/advertise"
+            width={240}
+            height={240}
+            className="border-[4px]"
+            style={{ borderColor: ACCENT, imageRendering: "pixelated" }}
+          />
+          <p className="text-sm text-muted normal-case sm:text-base">
+            thegitcity.com/advertise
+          </p>
+        </div>
+
+        {/* Cupom */}
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-base text-muted normal-case sm:text-lg">
+            Cupom exclusivo do evento
+          </p>
+          <div className="border-[4px] px-10 py-5 sm:px-14 sm:py-7" style={{ borderColor: ACCENT, backgroundColor: ACCENT + "10" }}>
+            <p className="text-4xl sm:text-6xl" style={{ color: ACCENT }}>
+              GITCITY30
+            </p>
+          </div>
+          <p className="text-xl text-cream normal-case sm:text-3xl">
+            30% off no primeiro mês
+          </p>
+        </div>
       </div>
-      <p className="text-base text-muted normal-case sm:text-lg">
-        thegitcity.com/advertise
-      </p>
     </div>
   );
 }
@@ -399,44 +398,6 @@ function BigStat({ value, label }: { value: string; label: string }) {
         {value}
       </p>
       <p className="text-sm text-muted normal-case sm:text-base">{label}</p>
-    </div>
-  );
-}
-
-function CTRBar({
-  name,
-  value,
-  max,
-  highlight,
-}: {
-  name: string;
-  value: number;
-  max: number;
-  highlight?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-4">
-      <span
-        className="w-32 shrink-0 text-right text-sm normal-case sm:text-base"
-        style={{ color: highlight ? CREAM : undefined }}
-      >
-        {name}
-      </span>
-      <div className="relative h-8 flex-1 overflow-hidden rounded-sm">
-        <div
-          className="absolute inset-y-0 left-0 rounded-sm"
-          style={{
-            width: `${(value / max) * 100}%`,
-            backgroundColor: highlight ? ACCENT : "#2a2a30",
-          }}
-        />
-      </div>
-      <span
-        className="w-16 text-right text-base font-bold sm:text-lg"
-        style={{ color: highlight ? ACCENT : undefined }}
-      >
-        {value.toFixed(1)}%
-      </span>
     </div>
   );
 }
