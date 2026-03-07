@@ -71,6 +71,30 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
         description: "10 specialized neighborhoods: Frontend, Backend, DevOps, and more",
         status: "done",
       },
+      {
+        id: "achievements",
+        name: "Achievements",
+        description: "Bronze to Diamond badges unlocked by milestones. Reward rare items and XP",
+        status: "done",
+      },
+      {
+        id: "notifications",
+        name: "Notifications & Emails",
+        description: "Achievement alerts, battle results, weekly digests, streak reminders",
+        status: "done",
+      },
+      {
+        id: "live-presence",
+        name: "Live Presence",
+        description: "See how many devs are online in the city right now",
+        status: "done",
+      },
+      {
+        id: "streak-checkin",
+        name: "Streak & Check-in",
+        description: "Daily check-in to keep your streak alive and earn XP",
+        status: "done",
+      },
     ],
   },
   {
@@ -80,22 +104,28 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
     status: "building",
     items: [
       {
+        id: "xp-leveling",
+        name: "XP & Leveling",
+        description: "Earn XP from coding and exploring. Rank up from Localhost to Founder",
+        status: "done",
+      },
+      {
+        id: "dailies",
+        name: "Standup / Dailies",
+        description: "Quick daily missions: visit buildings, give kudos, win battles, fly",
+        status: "done",
+      },
+      {
         id: "street-mode",
         name: "Street Mode",
         description: "Walk around the city in third person with WASD controls",
         status: "building",
       },
       {
-        id: "dailies",
-        name: "Standup / Dailies",
-        description: "Quick daily activities: Push, Code Review, Bug Hunt, Deploy",
-        status: "done",
-      },
-      {
-        id: "xp-leveling",
-        name: "XP & Leveling",
-        description: "Earn XP from coding and exploring. Rank up from Intern to Founder",
-        status: "planned",
+        id: "onboarding",
+        name: "Onboarding Tutorial",
+        description: "Guided first 90 seconds: fly, explore, visit, learn the loop",
+        status: "building",
       },
       {
         id: "pixels-currency",
@@ -108,12 +138,6 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
         name: "Git Log / Passport",
         description: "Collect stamps by visiting buildings. Complete districts for badges",
         status: "planned",
-      },
-      {
-        id: "onboarding",
-        name: "Onboarding Tutorial",
-        description: "Guided first 90 seconds: fly, explore, visit, learn the loop",
-        status: "building",
       },
     ],
   },

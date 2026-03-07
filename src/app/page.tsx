@@ -34,6 +34,7 @@ import PillModal from "@/components/PillModal";
 import FounderMessage from "@/components/FounderMessage";
 import RabbitCompletion from "@/components/RabbitCompletion";
 import DistrictChooser from "@/components/DistrictChooser";
+import InviteCard, { type InvitePreview } from "@/components/InviteCard";
 import XpBar from "@/components/XpBar";
 import LevelUpToast from "@/components/LevelUpToast";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
@@ -437,6 +438,7 @@ function HomeContent() {
     avatar_url: string | null;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [invitePreview, setInvitePreview] = useState<InvitePreview | null>(null);
   const [vsCodeKey, setVsCodeKey] = useState<string | null>(null);
   const [vsCodeKeyLoading, setVsCodeKeyLoading] = useState(false);
   const [vsCodeKeyCopied, setVsCodeKeyCopied] = useState(false);
@@ -847,7 +849,7 @@ function HomeContent() {
   // Outside fly mode: compare → share modal → profile card → focus → explore mode
   useEffect(() => {
     if (flyMode && !selectedBuilding && !pillModalOpen && !founderMessageOpen) return;
-    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !rabbitCinematic && raidState.phase === "idle") return;
+    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !rabbitCinematic && !invitePreview && raidState.phase === "idle") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
         // Founder modals take highest priority
@@ -886,6 +888,7 @@ function HomeContent() {
             setCompareBuilding(null);
           } else if (giftModalOpen) { setGiftModalOpen(false); setGiftItems(null); }
             else if (giftClaimed) setGiftClaimed(false);
+          else if (invitePreview) { setInvitePreview(null); }
           else if (shareData) { setShareData(null); setSelectedBuilding(null); setFocusedBuilding(null); }
           else if (selectedBuilding) { setSelectedBuilding(null); setFocusedBuilding(null); }
           else if (focusedBuilding) setFocusedBuilding(null);
@@ -895,7 +898,7 @@ function HomeContent() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions]);
+  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions, invitePreview]);
 
   // Rabbit cinematic text phase timing (8s total flyover)
   useEffect(() => {
@@ -1468,8 +1471,15 @@ function HomeContent() {
 
       setFeedback(null);
 
-      // If dev is new, inject into local raw array and regenerate layout instantly
-      // (no need to wait for the snapshot cron to include them)
+      // Dev not in the city yet: show invite card instead of creating a building
+      if (devData.exists === false && devData.preview) {
+        setInvitePreview(devData.preview);
+        setUsername("");
+        return;
+      }
+
+      // If dev was recently added (e.g. just logged in) but not in local city yet,
+      // inject into local raw array and regenerate layout instantly
       let updatedBuildings: CityBuilding[] | null = null;
       if (!existedBefore) {
         const newDev = {
@@ -4159,6 +4169,18 @@ if (claimingGift) return;
         </>
         );
       })()}
+
+      {/* ─── Invite Card (dev not in city yet) ─── */}
+      {invitePreview && !flyMode && (
+        <InviteCard
+          developer={invitePreview}
+          isLoggedIn={!!session}
+          onLogin={handleSignIn}
+          onClose={() => setInvitePreview(null)}
+          accent={theme.accent}
+          shadow={theme.shadow}
+        />
+      )}
 
       {/* ─── Share Modal ─── */}
       {shareData && !flyMode && !exploreMode && (
