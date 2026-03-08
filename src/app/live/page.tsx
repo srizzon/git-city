@@ -127,15 +127,26 @@ export default function LivePage() {
           <p className="mb-5 text-xs normal-case text-muted">
             Every dev who codes keeps a building lit. Install Pulse to power yours.
           </p>
-          <a
-            href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-press inline-block px-8 py-3 text-xs text-bg"
-            style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
-          >
-            Get Pulse for VS Code
-          </a>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-press inline-block px-8 py-3 text-xs text-bg"
+              style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
+            >
+              Get Pulse for VS Code
+            </a>
+            <a
+              href="https://github.com/srizzon/git-city/tree/main/packages/neovim-plugin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-press inline-block px-8 py-3 text-xs text-cream border-[2px] border-[#4ade80] bg-bg"
+              style={{ boxShadow: "2px 2px 0 0 #16a34a" }}
+            >
+              Get Pulse for Neovim
+            </a>
+          </div>
         </div>
       </div>
     </main>
