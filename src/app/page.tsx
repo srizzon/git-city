@@ -70,9 +70,9 @@ const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road 
 
 const THEMES = [
   { name: "Midnight", accent: "#6090e0", shadow: "#203870" },
-  { name: "Sunset",   accent: "#c8e64a", shadow: "#5a7a00" },
-  { name: "Neon",     accent: "#e040c0", shadow: "#600860" },
-  { name: "Emerald",  accent: "#f0c060", shadow: "#806020" },
+  { name: "Sunset", accent: "#c8e64a", shadow: "#5a7a00" },
+  { name: "Neon", accent: "#e040c0", shadow: "#600860" },
+  { name: "Emerald", accent: "#f0c060", shadow: "#806020" },
 ];
 
 // Achievement display data for profile card (client-side, mirrors DB)
@@ -158,10 +158,10 @@ const CELEBRATION_MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000,
 
 // ─── Loading phases for search feedback ─────────────────────
 const LOADING_PHASES = [
-  { delay: 0,     text: "Fetching GitHub profile..." },
-  { delay: 2000,  text: "Analyzing contributions..." },
-  { delay: 5000,  text: "Building the city block..." },
-  { delay: 9000,  text: "Almost there..." },
+  { delay: 0, text: "Fetching GitHub profile..." },
+  { delay: 2000, text: "Analyzing contributions..." },
+  { delay: 5000, text: "Building the city block..." },
+  { delay: 9000, text: "Almost there..." },
   { delay: 13000, text: "This one's a big profile. Hang tight..." },
 ];
 
@@ -339,9 +339,9 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
                 style={{
                   color:
                     i === 0 ? "#ffd700"
-                    : i === 1 ? "#c0c0c0"
-                    : i === 2 ? "#cd7f32"
-                    : accent,
+                      : i === 1 ? "#c0c0c0"
+                        : i === 2 ? "#cd7f32"
+                          : accent,
                 }}
               >
                 #{i + 1}
@@ -524,11 +524,11 @@ function HomeContent() {
     fetch("https://api.github.com/repos/srizzon/git-city")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.stargazers_count != null) setStarCount(d.stargazers_count); })
-      .catch(() => {});
+      .catch(() => { });
     fetch("https://discord.com/api/v9/invites/2bTjFAkny7?with_counts=true")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.approximate_member_count != null) setDiscordMembers(d.approximate_member_count); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Track successful raid data before state resets
@@ -554,13 +554,13 @@ function HomeContent() {
         prev.map((b) =>
           b.login === defenderLogin
             ? {
-                ...b,
-                active_raid_tag: {
-                  attacker_login: attackerLogin,
-                  tag_style: tagStyle,
-                  expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
-                },
-              }
+              ...b,
+              active_raid_tag: {
+                attacker_login: attackerLogin,
+                tag_style: tagStyle,
+                expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+              },
+            }
             : b
         )
       );
@@ -572,7 +572,7 @@ function HomeContent() {
     fetch("/api/sky-ads")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (Array.isArray(data) && data.length > 0) setSkyAds(data); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Derived — second focused building for dual-focus camera
@@ -657,7 +657,7 @@ function HomeContent() {
     fetch("/api/raid/loadout")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data?.vehicle) setFlyVehicle(data.vehicle); })
-      .catch(() => {});
+      .catch(() => { });
   }, [sessionUserId]);
 
   // Load theme from DB when logged in (overrides localStorage)
@@ -673,7 +673,7 @@ function HomeContent() {
           localStorage.setItem("gitcity_theme", String(data.city_theme));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [sessionUserId]);
 
   // Cycle theme: save to localStorage + sync to DB if logged in
@@ -686,7 +686,7 @@ function HomeContent() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ city_theme: next }),
-        }).catch(() => {});
+        }).catch(() => { });
       }
       return next;
     });
@@ -946,7 +946,7 @@ function HomeContent() {
         if (best >= 5 && serverProgress < 5 && localProgress >= 5) {
           setRabbitCompletion(true);
         }
-      } catch {}
+      } catch { }
     })();
   }, [session]);
 
@@ -1072,7 +1072,7 @@ function HomeContent() {
           localStorage.removeItem("gitcity:loadout_override");
         }
       }
-    } catch {}
+    } catch { }
 
     rawDevsRef.current = allDevs;
     setStats(cityStats);
@@ -1208,7 +1208,7 @@ function HomeContent() {
               localStorage.removeItem("gitcity:loadout_override");
             }
           }
-        } catch {}
+        } catch { }
 
         // Generate layout
         setLoadStage("generating");
@@ -1265,7 +1265,7 @@ function HomeContent() {
     }
 
     loadCity();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadStage]);
 
   // City reload on tab return removed — navigating back from shop already
@@ -1633,8 +1633,8 @@ function HomeContent() {
   };
 
   const handleClaimFreeGift = async () => {
-if (claimingGift) return;
-        setClaimingGift(true);
+    if (claimingGift) return;
+    setClaimingGift(true);
     try {
       const res = await fetch("/api/claim-free-item", { method: "POST" });
       if (res.ok) {
@@ -1727,7 +1727,7 @@ if (claimingGift) return;
     fetch("/api/milestone-celebration")
       .then((r) => r.ok ? r.json() : [])
       .then((data) => { if (Array.isArray(data)) setMilestoneCelebrations(data); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Record milestone when crossed
@@ -1751,7 +1751,7 @@ if (claimingGift) return;
           ]);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [stats.total_developers, milestoneCelebrations]);
 
   // Feature 1: Daily Challenge Nudge — show after load if user has history but hasn't played today
@@ -1772,7 +1772,7 @@ if (claimingGift) return;
         // Auto-dismiss after 15s
         const autoDismiss = setTimeout(() => setShowDailyNudge(false), 15000);
         dailyNudgeTimerRef.current = autoDismiss;
-      } catch {}
+      } catch { }
     }, 2000);
     return () => clearTimeout(dailyNudgeTimerRef.current);
   }, [loadStage, isMobile, session, flyMode, introMode]);
@@ -1788,7 +1788,7 @@ if (claimingGift) return;
       // Auto-dismiss after 10s
       const autoDismiss = setTimeout(() => {
         setShowFlyHint(false);
-        try { localStorage.setItem("gitcity_fly_hint_seen", "1"); } catch {}
+        try { localStorage.setItem("gitcity_fly_hint_seen", "1"); } catch { }
       }, 10000);
       flyHintTimerRef.current = autoDismiss;
     }, 5000);
@@ -1821,13 +1821,13 @@ if (claimingGift) return;
           const finalScore = flyScore.score + timeBonus;
           // Read current PB fresh from localStorage (React state may be stale)
           let currentPB = flyPersonalBest;
-          try { currentPB = Math.max(currentPB, parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0); } catch {}
+          try { currentPB = Math.max(currentPB, parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0); } catch { }
           // Only show "New PB!" if there WAS a previous best to beat (not on first-ever flight)
           const isNewPB = currentPB > 0 && finalScore > currentPB;
           // Update personal best
           if (isNewPB) {
             setFlyPersonalBest(finalScore);
-            try { localStorage.setItem("gitcity_fly_pb", String(finalScore)); } catch {}
+            try { localStorage.setItem("gitcity_fly_pb", String(finalScore)); } catch { }
           }
           // Update fly history (streak, days played, per-seed scores)
           if (finalScore > 0) {
@@ -1858,7 +1858,7 @@ if (claimingGift) return;
               }
               hist.longestStreak = Math.max(hist.longestStreak || 0, hist.currentStreak);
               localStorage.setItem("gitcity_fly_history", JSON.stringify(hist));
-            } catch {}
+            } catch { }
           }
           // Exit fly immediately (don't block on API)
           setFlyMode(false); setFlyPaused(false); lastDistrictRef.current = null; setDistrictAnnouncement(null); clearTimeout(announceTimerRef.current);
@@ -1882,7 +1882,7 @@ if (claimingGift) return;
                     setShowFlyResults((prev) => prev ? { ...prev, rank: data.rank_today ?? 0, totalPilots: data.total ?? 0 } : null);
                   }
                 })
-                .catch(() => {});
+                .catch(() => { });
             }
           }
         }}
@@ -1981,7 +1981,7 @@ if (claimingGift) return;
         }}
         introMode={introMode}
         onIntroEnd={endIntro}
-        onFocusInfo={() => {}}
+        onFocusInfo={() => { }}
         ghostPreviewLogin={ghostPreviewLogin}
         liveByLogin={liveByLogin}
         cityEnergy={cityEnergy}
@@ -2299,7 +2299,7 @@ if (claimingGift) return;
             <button
               onClick={() => {
                 setShowFlyControls(false);
-                try { localStorage.setItem("gitcity_fly_controls_seen", "1"); } catch {}
+                try { localStorage.setItem("gitcity_fly_controls_seen", "1"); } catch { }
                 // Resume the paused flight by dispatching Space keydown
                 window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true }));
               }}
@@ -2348,7 +2348,7 @@ if (claimingGift) return;
           </div>
 
           {/* Theme switcher + Radio (bottom-left) — above ticker */}
-          <div className="pointer-events-auto fixed bottom-10 left-3 z-[31] flex items-center gap-2 sm:left-4">
+          <div className="pointer-events-auto fixed bottom-10 left-3 z-[31] flex flex-col-reverse items-start gap-2 sm:left-4 sm:flex-row sm:items-center">
             <button
               onClick={cycleTheme}
               className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
@@ -2401,7 +2401,7 @@ if (claimingGift) return;
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
             >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
               <span style={{ color: theme.accent }}>&#9733;</span>
               <span className="text-cream">{starCount.toLocaleString()}</span>
             </a>
@@ -2413,7 +2413,7 @@ if (claimingGift) return;
             rel="noopener noreferrer"
             className="hidden sm:flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2]"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2]"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z" /></svg>
             <span className="hidden sm:inline text-cream">Discord</span>
             {discordMembers != null && <span className="text-cream">{discordMembers.toLocaleString()}</span>}
           </a>
@@ -2441,189 +2441,189 @@ if (claimingGift) return;
             const energyDotColor = codingCount === 0 ? "bg-muted/50" : codingCount <= 2 ? "bg-[#fbbf24]" : "bg-[#4ade80]";
             const energyDotAnim = codingCount === 0 ? "" : "live-dot";
             return (
-            <div className="relative hidden sm:block">
-              <button
-                onClick={() => setCodingPanelOpen((v) => !v)}
-                className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
-              >
-                <span className={`${energyDotAnim} h-1.5 w-1.5 flex-shrink-0 rounded-full ${energyDotColor}`} />
-                {codingCount > 0 ? (
-                  <>
-                    <span className="text-cream">{codingCount}</span>
-                    <span className="text-muted">coding now</span>
-                  </>
-                ) : (
-                  <span className="text-muted">{energyLabel}</span>
-                )}
-              </button>
-              {codingPanelOpen && (() => {
-                // Creator always first, then up to 4 others
-                const allDevs = Array.from(liveByLogin.values());
-                const creator = allDevs.find((d) => d.githubLogin.toLowerCase() === "srizzon");
-                const others = allDevs.filter((d) => d.githubLogin.toLowerCase() !== "srizzon");
-                const displayDevs = [
-                  ...(creator ? [creator] : []),
-                  ...others.slice(0, creator ? 4 : 5),
-                ];
-                const remaining = allDevs.length - displayDevs.length;
+              <div className="relative hidden sm:block">
+                <button
+                  onClick={() => setCodingPanelOpen((v) => !v)}
+                  className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+                >
+                  <span className={`${energyDotAnim} h-1.5 w-1.5 flex-shrink-0 rounded-full ${energyDotColor}`} />
+                  {codingCount > 0 ? (
+                    <>
+                      <span className="text-cream">{codingCount}</span>
+                      <span className="text-muted">coding now</span>
+                    </>
+                  ) : (
+                    <span className="text-muted">{energyLabel}</span>
+                  )}
+                </button>
+                {codingPanelOpen && (() => {
+                  // Creator always first, then up to 4 others
+                  const allDevs = Array.from(liveByLogin.values());
+                  const creator = allDevs.find((d) => d.githubLogin.toLowerCase() === "srizzon");
+                  const others = allDevs.filter((d) => d.githubLogin.toLowerCase() !== "srizzon");
+                  const displayDevs = [
+                    ...(creator ? [creator] : []),
+                    ...others.slice(0, creator ? 4 : 5),
+                  ];
+                  const remaining = allDevs.length - displayDevs.length;
 
-                return (
-                  <div className="absolute right-0 top-full mt-1 w-80 border-[3px] border-border bg-bg/95 backdrop-blur-sm">
-                    <div className="border-b border-border px-5 py-3 text-xs text-muted">
-                      Coding right now
-                    </div>
-                    <div>
-                      {displayDevs.map((dev) => {
-                        const isCreator = dev.githubLogin.toLowerCase() === "srizzon";
-                        return (
-                          <button
-                            key={dev.githubLogin}
-                            onClick={() => {
-                              const b = buildings.find(
-                                (b) => b.login.toLowerCase() === dev.githubLogin.toLowerCase(),
-                              );
-                              if (b) {
-                                setSelectedBuilding(null);
-                                setFocusedBuilding(b.login);
-                                setCodingPanelOpen(false);
-                              }
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
-                          >
-                            <div className="relative flex-shrink-0">
-                              {dev.avatarUrl && (
-                                <img
-                                  src={dev.avatarUrl}
-                                  alt=""
-                                  className="h-6 w-6 rounded-full"
-                                  style={isCreator ? { boxShadow: "0 0 6px #fbbf24" } : undefined}
-                                />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`truncate text-[11px] ${isCreator ? "text-[#fbbf24]" : "text-cream"}`}>
-                                  {dev.githubLogin}
-                                </span>
-                                {isCreator && (
-                                  <span className="shrink-0 text-[8px] text-[#fbbf24]/70">CREATOR</span>
+                  return (
+                    <div className="absolute right-0 top-full mt-1 w-80 border-[3px] border-border bg-bg/95 backdrop-blur-sm">
+                      <div className="border-b border-border px-5 py-3 text-xs text-muted">
+                        Coding right now
+                      </div>
+                      <div>
+                        {displayDevs.map((dev) => {
+                          const isCreator = dev.githubLogin.toLowerCase() === "srizzon";
+                          return (
+                            <button
+                              key={dev.githubLogin}
+                              onClick={() => {
+                                const b = buildings.find(
+                                  (b) => b.login.toLowerCase() === dev.githubLogin.toLowerCase(),
+                                );
+                                if (b) {
+                                  setSelectedBuilding(null);
+                                  setFocusedBuilding(b.login);
+                                  setCodingPanelOpen(false);
+                                }
+                              }}
+                              className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+                            >
+                              <div className="relative flex-shrink-0">
+                                {dev.avatarUrl && (
+                                  <img
+                                    src={dev.avatarUrl}
+                                    alt=""
+                                    className="h-6 w-6 rounded-full"
+                                    style={isCreator ? { boxShadow: "0 0 6px #fbbf24" } : undefined}
+                                  />
                                 )}
                               </div>
-                              <div className="truncate text-[10px] normal-case text-muted">
-                                {isCreator ? "building the city" : dev.language || ""}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`truncate text-[11px] ${isCreator ? "text-[#fbbf24]" : "text-cream"}`}>
+                                    {dev.githubLogin}
+                                  </span>
+                                  {isCreator && (
+                                    <span className="shrink-0 text-[8px] text-[#fbbf24]/70">CREATOR</span>
+                                  )}
+                                </div>
+                                <div className="truncate text-[10px] normal-case text-muted">
+                                  {isCreator ? "building the city" : dev.language || ""}
+                                </div>
                               </div>
-                            </div>
-                            <span className={`live-dot h-2 w-2 flex-shrink-0 rounded-full ${isCreator ? "bg-[#fbbf24]" : "bg-[#4ade80]"}`} />
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="border-t border-border">
-                      <Link
-                        href="/live"
-                        onClick={() => setCodingPanelOpen(false)}
-                        className="block px-4 py-2.5 text-center text-[11px] text-muted transition-colors hover:text-cream"
-                      >
-                        {remaining > 0 ? `+${remaining} more` : "View live page"} &rarr;
-                      </Link>
-                    </div>
-
-                    {/* CTA: Go Live flow */}
-                    <div className="border-t border-border">
-                      {!session ? (
-                        <div className="px-5 py-5 text-center">
-                          <p className="mb-3 text-xs normal-case text-muted">
-                            Keep your city alive while you code
-                          </p>
-                          <Link
-                            href="/auth"
-                            onClick={() => setCodingPanelOpen(false)}
-                            className="btn-press inline-block w-full py-2.5 text-center text-xs text-bg"
-                            style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
-                          >
-                            Sign in with GitHub
-                          </Link>
-                        </div>
-                      ) : liveByLogin.has(authLogin) ? (
-                        <div className="px-5 py-3.5 text-center text-xs normal-case text-[#4ade80]">
-                          Your building is powering the city
-                        </div>
-                      ) : vsCodeKey ? (
-                        <div className="px-5 py-5">
-                          <p className="mb-3 text-sm font-bold text-cream">Your API Key</p>
-                          <div className="mb-3 flex items-center gap-2">
-                            <code className="flex-1 truncate bg-white/5 px-3 py-2 text-[11px] normal-case text-cream">
-                              {vsCodeKey}
-                            </code>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(vsCodeKey);
-                                setVsCodeKeyCopied(true);
-                                setTimeout(() => setVsCodeKeyCopied(false), 2000);
-                              }}
-                              className="btn-press shrink-0 border border-border px-3 py-2 text-[11px] text-cream transition-colors hover:border-border-light"
-                            >
-                              {vsCodeKeyCopied ? "Copied!" : "Copy"}
+                              <span className={`live-dot h-2 w-2 flex-shrink-0 rounded-full ${isCreator ? "bg-[#fbbf24]" : "bg-[#4ade80]"}`} />
                             </button>
+                          );
+                        })}
+                      </div>
+                      <div className="border-t border-border">
+                        <Link
+                          href="/live"
+                          onClick={() => setCodingPanelOpen(false)}
+                          className="block px-4 py-2.5 text-center text-[11px] text-muted transition-colors hover:text-cream"
+                        >
+                          {remaining > 0 ? `+${remaining} more` : "View live page"} &rarr;
+                        </Link>
+                      </div>
+
+                      {/* CTA: Go Live flow */}
+                      <div className="border-t border-border">
+                        {!session ? (
+                          <div className="px-5 py-5 text-center">
+                            <p className="mb-3 text-xs normal-case text-muted">
+                              Keep your city alive while you code
+                            </p>
+                            <Link
+                              href="/auth"
+                              onClick={() => setCodingPanelOpen(false)}
+                              className="btn-press inline-block w-full py-2.5 text-center text-xs text-bg"
+                              style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
+                            >
+                              Sign in with GitHub
+                            </Link>
                           </div>
-                          <div className="space-y-2.5 text-xs normal-case text-muted">
-                            <p><span className="text-cream">1.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code</p>
-                            <p><span className="text-cream">2.</span> Cmd+Shift+P &rarr; &ldquo;Pulse: Connect&rdquo;</p>
-                            <p><span className="text-cream">3.</span> Paste your key and start coding</p>
+                        ) : liveByLogin.has(authLogin) ? (
+                          <div className="px-5 py-3.5 text-center text-xs normal-case text-[#4ade80]">
+                            Your building is powering the city
                           </div>
-                          <p className="mt-3 text-[10px] normal-case text-muted/50">
-                            Your building lights up in ~30s
-                          </p>
-                          <p className="mt-1.5 text-[10px] normal-case text-muted/50">
-                            Only your username and language are shared publicly. Control what&apos;s sent in VS Code Settings &gt; Git City &gt; Privacy.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="px-5 py-5">
-                          <p className="mb-3 text-sm normal-case text-cream font-bold">
-                            Keep your city alive
-                          </p>
-                          <p className="mb-3 text-[11px] normal-case text-muted">
-                            When you code, your building glows and the city stays lit. Every active dev powers the signal.
-                          </p>
-                          <div className="mb-4 space-y-2.5 text-xs normal-case text-muted">
-                            <p><span className="text-cream">1.</span> Generate your key below</p>
-                            <p><span className="text-cream">2.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code</p>
-                            <p><span className="text-cream">3.</span> Paste key in VS Code, start coding</p>
-                          </div>
-                          <button
-                            onClick={async () => {
-                              setVsCodeKeyLoading(true);
-                              try {
-                                const res = await fetch("/api/vscode-key", { method: "POST" });
-                                const data = await res.json();
-                                if (data.key) {
-                                  setVsCodeKey(data.key);
-                                  navigator.clipboard.writeText(data.key);
+                        ) : vsCodeKey ? (
+                          <div className="px-5 py-5">
+                            <p className="mb-3 text-sm font-bold text-cream">Your API Key</p>
+                            <div className="mb-3 flex items-center gap-2">
+                              <code className="flex-1 truncate bg-white/5 px-3 py-2 text-[11px] normal-case text-cream">
+                                {vsCodeKey}
+                              </code>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(vsCodeKey);
                                   setVsCodeKeyCopied(true);
                                   setTimeout(() => setVsCodeKeyCopied(false), 2000);
+                                }}
+                                className="btn-press shrink-0 border border-border px-3 py-2 text-[11px] text-cream transition-colors hover:border-border-light"
+                              >
+                                {vsCodeKeyCopied ? "Copied!" : "Copy"}
+                              </button>
+                            </div>
+                            <div className="space-y-2.5 text-xs normal-case text-muted">
+                              <p><span className="text-cream">1.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code</p>
+                              <p><span className="text-cream">2.</span> Cmd+Shift+P &rarr; &ldquo;Pulse: Connect&rdquo;</p>
+                              <p><span className="text-cream">3.</span> Paste your key and start coding</p>
+                            </div>
+                            <p className="mt-3 text-[10px] normal-case text-muted/50">
+                              Your building lights up in ~30s
+                            </p>
+                            <p className="mt-1.5 text-[10px] normal-case text-muted/50">
+                              Only your username and language are shared publicly. Control what&apos;s sent in VS Code Settings &gt; Git City &gt; Privacy.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="px-5 py-5">
+                            <p className="mb-3 text-sm normal-case text-cream font-bold">
+                              Keep your city alive
+                            </p>
+                            <p className="mb-3 text-[11px] normal-case text-muted">
+                              When you code, your building glows and the city stays lit. Every active dev powers the signal.
+                            </p>
+                            <div className="mb-4 space-y-2.5 text-xs normal-case text-muted">
+                              <p><span className="text-cream">1.</span> Generate your key below</p>
+                              <p><span className="text-cream">2.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code</p>
+                              <p><span className="text-cream">3.</span> Paste key in VS Code, start coding</p>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                setVsCodeKeyLoading(true);
+                                try {
+                                  const res = await fetch("/api/vscode-key", { method: "POST" });
+                                  const data = await res.json();
+                                  if (data.key) {
+                                    setVsCodeKey(data.key);
+                                    navigator.clipboard.writeText(data.key);
+                                    setVsCodeKeyCopied(true);
+                                    setTimeout(() => setVsCodeKeyCopied(false), 2000);
+                                  }
+                                } finally {
+                                  setVsCodeKeyLoading(false);
                                 }
-                              } finally {
-                                setVsCodeKeyLoading(false);
-                              }
-                            }}
-                            disabled={vsCodeKeyLoading}
-                            className="btn-press w-full py-2.5 text-center text-xs text-bg"
-                            style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
-                          >
-                            {vsCodeKeyLoading ? "Generating..." : vsCodeKeyCopied ? "Key copied to clipboard!" : "Generate API Key"}
-                          </button>
-                          <p className="mt-3 text-[10px] normal-case text-muted/50">
-                            Only your username and language are shared publicly. You can control this in VS Code Settings &gt; Git City &gt; Privacy.
-                          </p>
-                        </div>
-                      )}
+                              }}
+                              disabled={vsCodeKeyLoading}
+                              className="btn-press w-full py-2.5 text-center text-xs text-bg"
+                              style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
+                            >
+                              {vsCodeKeyLoading ? "Generating..." : vsCodeKeyCopied ? "Key copied to clipboard!" : "Generate API Key"}
+                            </button>
+                            <p className="mt-3 text-[10px] normal-case text-muted/50">
+                              Only your username and language are shared publicly. You can control this in VS Code Settings &gt; Git City &gt; Privacy.
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
-          );
+                  );
+                })()}
+              </div>
+            );
           })()}
         </div>
       )}
@@ -2796,7 +2796,7 @@ if (claimingGift) return;
                 className="flex items-center justify-between px-5 py-4 active:bg-white/5"
               >
                 <span className="flex items-center gap-2 text-sm text-cream">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2] flex-shrink-0"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2] flex-shrink-0"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z" /></svg>
                   Discord
                   {discordMembers != null && <span className="text-[10px] text-muted">{discordMembers.toLocaleString()} members</span>}
                 </span>
@@ -2810,7 +2810,7 @@ if (claimingGift) return;
                 className="flex items-center justify-between px-5 py-4 active:bg-white/5"
               >
                 <span className="flex items-center gap-2 text-sm text-cream">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream flex-shrink-0"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream flex-shrink-0"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
                   GitHub
                   {starCount != null && <span className="text-[10px] text-muted">&#9733; {starCount.toLocaleString()}</span>}
                 </span>
@@ -2825,7 +2825,7 @@ if (claimingGift) return;
                 {THEMES.map((t, i) => (
                   <button
                     key={t.name}
-                    onClick={() => { setThemeIndex(i); try { localStorage.setItem("gitcity_theme", String(i)); } catch {} }}
+                    onClick={() => { setThemeIndex(i); try { localStorage.setItem("gitcity_theme", String(i)); } catch { } }}
                     className="py-2.5 text-[10px] border-[2px] transition-colors"
                     style={{
                       borderColor: themeIndex === i ? t.accent : "var(--color-border)",
@@ -2895,102 +2895,102 @@ if (claimingGift) return;
 
             {/* Milestone progress banner — hidden on mobile to reduce clutter */}
             <div className="hidden sm:flex sm:justify-center w-full">
-            {MILESTONE_MODE === "stars" ? (
-              // ── GitHub Stars mode ──
-              (() => {
-                if (starCount == null) return null;
-                const STAR_MILESTONES = [100, 250, 500, 1000, 2500, 5000];
-                const target = STAR_MILESTONES.find((m) => starCount < m);
-                if (!target) return null;
-                const prev = STAR_MILESTONES[STAR_MILESTONES.indexOf(target) - 1] ?? 0;
-                const progress = ((starCount - prev) / (target - prev)) * 100;
-                const remaining = target - starCount;
-                const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
-                return (
-                  <a
-                    href="https://github.com/srizzon/git-city"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full max-w-sm group"
-                  >
-                    <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm transition-colors group-hover:border-[var(--hover-border)]" style={{ "--hover-border": theme.accent } as React.CSSProperties}>
-                      <div className="mb-2 flex items-baseline justify-between">
-                        <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
-                          ROAD TO {label} STARS
-                        </span>
-                        <span className="text-[9px] text-cream/60">
-                          {remaining.toLocaleString()} to go
-                        </span>
+              {MILESTONE_MODE === "stars" ? (
+                // ── GitHub Stars mode ──
+                (() => {
+                  if (starCount == null) return null;
+                  const STAR_MILESTONES = [100, 250, 500, 1000, 2500, 5000];
+                  const target = STAR_MILESTONES.find((m) => starCount < m);
+                  if (!target) return null;
+                  const prev = STAR_MILESTONES[STAR_MILESTONES.indexOf(target) - 1] ?? 0;
+                  const progress = ((starCount - prev) / (target - prev)) * 100;
+                  const remaining = target - starCount;
+                  const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
+                  return (
+                    <a
+                      href="https://github.com/srizzon/git-city"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full max-w-sm group"
+                    >
+                      <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm transition-colors group-hover:border-[var(--hover-border)]" style={{ "--hover-border": theme.accent } as React.CSSProperties}>
+                        <div className="mb-2 flex items-baseline justify-between">
+                          <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
+                            ROAD TO {label} STARS
+                          </span>
+                          <span className="text-[9px] text-cream/60">
+                            {remaining.toLocaleString()} to go
+                          </span>
+                        </div>
+                        <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
+                          <div
+                            className="absolute inset-y-0 left-0 transition-all duration-1000"
+                            style={{
+                              width: `${progress}%`,
+                              backgroundColor: theme.accent,
+                              boxShadow: `0 0 8px ${theme.accent}60`,
+                            }}
+                          />
+                        </div>
+                        <div className="mt-2 flex items-baseline justify-between">
+                          <span className="text-[10px] text-cream">
+                            {starCount.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
+                          </span>
+                          <span className="text-[8px] text-cream/40 normal-case group-hover:text-cream/60 transition-colors">
+                            Star us on GitHub
+                          </span>
+                        </div>
                       </div>
-                      <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
-                        <div
-                          className="absolute inset-y-0 left-0 transition-all duration-1000"
-                          style={{
-                            width: `${progress}%`,
-                            backgroundColor: theme.accent,
-                            boxShadow: `0 0 8px ${theme.accent}60`,
-                          }}
-                        />
-                      </div>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-[10px] text-cream">
-                          {starCount.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
-                        </span>
-                        <span className="text-[8px] text-cream/40 normal-case group-hover:text-cream/60 transition-colors">
-                          Star us on GitHub
-                        </span>
-                      </div>
-                    </div>
-                  </a>
-                );
-              })()
-            ) : (
-              // ── Total Developers mode ──
-              (() => {
-                const MILESTONES = [10000, 20000, 50000, 100000];
-                const count = stats.total_developers;
-                if (count <= 0) return null;
+                    </a>
+                  );
+                })()
+              ) : (
+                // ── Total Developers mode ──
+                (() => {
+                  const MILESTONES = [10000, 20000, 50000, 100000];
+                  const count = stats.total_developers;
+                  if (count <= 0) return null;
 
-                const target = MILESTONES.find((m) => count < m);
-                if (!target) return null;
-                const prev = MILESTONES[MILESTONES.indexOf(target) - 1] ?? 0;
-                const progress = ((count - prev) / (target - prev)) * 100;
-                const remaining = target - count;
-                const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
-                return (
-                  <div className="w-full max-w-sm">
-                    <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm">
-                      <div className="mb-2 flex items-baseline justify-between">
-                        <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
-                          ROAD TO {label}
-                        </span>
-                        <span className="text-[9px] text-cream/60">
-                          {remaining.toLocaleString()} to go
-                        </span>
-                      </div>
-                      <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
-                        <div
-                          className="absolute inset-y-0 left-0 transition-all duration-1000"
-                          style={{
-                            width: `${progress}%`,
-                            backgroundColor: theme.accent,
-                            boxShadow: `0 0 8px ${theme.accent}60`,
-                          }}
-                        />
-                      </div>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-[10px] text-cream">
-                          {count.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
-                        </span>
-                        <span className="text-[8px] text-cream/40 normal-case">
-                          Something unlocks at {label}...
-                        </span>
+                  const target = MILESTONES.find((m) => count < m);
+                  if (!target) return null;
+                  const prev = MILESTONES[MILESTONES.indexOf(target) - 1] ?? 0;
+                  const progress = ((count - prev) / (target - prev)) * 100;
+                  const remaining = target - count;
+                  const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
+                  return (
+                    <div className="w-full max-w-sm">
+                      <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm">
+                        <div className="mb-2 flex items-baseline justify-between">
+                          <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
+                            ROAD TO {label}
+                          </span>
+                          <span className="text-[9px] text-cream/60">
+                            {remaining.toLocaleString()} to go
+                          </span>
+                        </div>
+                        <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
+                          <div
+                            className="absolute inset-y-0 left-0 transition-all duration-1000"
+                            style={{
+                              width: `${progress}%`,
+                              backgroundColor: theme.accent,
+                              boxShadow: `0 0 8px ${theme.accent}60`,
+                            }}
+                          />
+                        </div>
+                        <div className="mt-2 flex items-baseline justify-between">
+                          <span className="text-[10px] text-cream">
+                            {count.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
+                          </span>
+                          <span className="text-[8px] text-cream/40 normal-case">
+                            Something unlocks at {label}...
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })()
-            )}
+                  );
+                })()
+              )}
             </div>
 
             {/* Search / Welcome CTA takeover */}
@@ -3145,7 +3145,7 @@ if (claimingGift) return;
                             onClick={() => {
                               setShowFlyHint(false);
                               clearTimeout(flyHintTimerRef.current);
-                              try { localStorage.setItem("gitcity_fly_hint_seen", "1"); } catch {}
+                              try { localStorage.setItem("gitcity_fly_hint_seen", "1"); } catch { }
                             }}
                             className="mt-2 px-3 py-1 text-[9px] text-bg"
                             style={{ backgroundColor: theme.accent }}
@@ -3759,8 +3759,8 @@ if (claimingGift) return;
                       boxShadow: kudosError
                         ? "0 0 12px rgba(255,68,68,0.4)"
                         : kudosSent
-                        ? "0 0 12px rgba(57,211,83,0.4)"
-                        : `2px 2px 0 0 ${theme.shadow}`,
+                          ? "0 0 12px rgba(57,211,83,0.4)"
+                          : `2px 2px 0 0 ${theme.shadow}`,
                     }}
                   >
                     {kudosSending ? (
@@ -3999,215 +3999,215 @@ if (claimingGift) return;
         const closeCompare = () => { setSelectedBuilding(comparePair[0]); setFocusedBuilding(comparePair[0].login); setComparePair(null); setCompareBuilding(null); };
 
         return (
-        <>
-          {/* No fullscreen backdrop — let the user orbit the camera freely */}
-          <div className="pointer-events-auto fixed z-40
+          <>
+            {/* No fullscreen backdrop — let the user orbit the camera freely */}
+            <div className="pointer-events-auto fixed z-40
             bottom-0 left-0 right-0
             sm:bottom-auto sm:left-auto sm:right-5 sm:top-1/2 sm:-translate-y-1/2"
-          >
-            <div className="relative border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
+            >
+              <div className="relative border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
               w-full sm:w-[380px] sm:border-[3px] sm:max-h-[85vh] sm:overflow-y-auto
               max-h-[45vh] overflow-y-auto
               animate-[slide-up_0.2s_ease-out] sm:animate-none"
-            >
-              {/* Drag handle on mobile - swipe down to close */}
-              <div
-                className="flex justify-center py-2 sm:hidden"
-                onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
-                onTouchEnd={(e) => { const start = (e.currentTarget as any)._touchY; if (start != null && e.changedTouches[0].clientY - start > 50) closeCompare(); }}
               >
-                <div className="h-1 w-10 rounded-full bg-border" />
-              </div>
-
-              {/* ── Header: Avatars + VS ── */}
-              <div className="flex items-start justify-center gap-5 px-5 pt-1 pb-4 sm:pt-4">
-                <Link href={`/dev/${comparePair[0].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
-                  {comparePair[0].avatar_url && (
-                    <Image
-                      src={comparePair[0].avatar_url}
-                      alt={comparePair[0].login}
-                      width={56}
-                      height={56}
-                      className="border-[3px] transition-colors group-hover:brightness-110"
-                      style={{
-                        imageRendering: "pixelated",
-                        borderColor: totalAWins >= totalBWins ? theme.accent : "#3a3a40",
-                      }}
-                    />
-                  )}
-                  <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[0].login}</p>
-                  <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[0].login)}</p>
-                </Link>
-
-                <span className="text-base shrink-0 pt-4" style={{ color: theme.accent }}>VS</span>
-
-                <Link href={`/dev/${comparePair[1].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
-                  {comparePair[1].avatar_url && (
-                    <Image
-                      src={comparePair[1].avatar_url}
-                      alt={comparePair[1].login}
-                      width={56}
-                      height={56}
-                      className="border-[3px] transition-colors group-hover:brightness-110"
-                      style={{
-                        imageRendering: "pixelated",
-                        borderColor: totalBWins >= totalAWins ? theme.accent : "#3a3a40",
-                      }}
-                    />
-                  )}
-                  <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[1].login}</p>
-                  <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[1].login)}</p>
-                </Link>
-              </div>
-
-              {/* ── Scoreboard ── */}
-              <div className="mx-4 border-[2px] border-border bg-bg-card">
-                {cmpRows.map((s, i) => (
-                  <div
-                    key={s.key}
-                    className={`flex items-center py-2 px-3 ${i < cmpRows.length - 1 ? "border-b border-border/40" : ""}`}
-                  >
-                    <span
-                      className="w-[72px] text-right text-[11px] tabular-nums"
-                      style={{ color: s.aW ? theme.accent : s.bW ? "#555" : "#888" }}
-                    >
-                      {s.key === "rank" ? (s.a > 0 ? `#${s.a}` : "-") : s.a.toLocaleString()}
-                    </span>
-                    <span className="flex-1 text-center text-[8px] text-muted uppercase tracking-wider">
-                      {s.label}
-                    </span>
-                    <span
-                      className="w-[72px] text-left text-[11px] tabular-nums"
-                      style={{ color: s.bW ? theme.accent : s.aW ? "#555" : "#888" }}
-                    >
-                      {s.key === "rank" ? (s.b > 0 ? `#${s.b}` : "-") : s.b.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* ── Winner banner ── */}
-              <div
-                className="mx-4 mt-3 py-2.5 text-center text-[11px] uppercase tracking-wide"
-                style={{
-                  backgroundColor: `${theme.accent}15`,
-                  border: `2px solid ${theme.accent}40`,
-                  color: theme.accent,
-                }}
-              >
-                {cmpSummary}
-              </div>
-
-              {/* ── Actions ── */}
-              <div className="px-4 pt-3 pb-1 flex gap-2">
-                <a
-                  href={`https://x.com/intent/tweet?text=${encodeURIComponent(
-                    `I just compared my building with ${comparePair[1].login}'s in Git City. It wasn't even close. What's yours?`
-                  )}&url=${encodeURIComponent(
-                    `${typeof window !== "undefined" ? window.location.origin : ""}/compare/${comparePair[0].login}/${comparePair[1].login}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
-                  style={{
-                    backgroundColor: theme.accent,
-                    boxShadow: `2px 2px 0 0 ${theme.shadow}`,
-                  }}
+                {/* Drag handle on mobile - swipe down to close */}
+                <div
+                  className="flex justify-center py-2 sm:hidden"
+                  onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
+                  onTouchEnd={(e) => { const start = (e.currentTarget as any)._touchY; if (start != null && e.changedTouches[0].clientY - start > 50) closeCompare(); }}
                 >
-                  Share on X
-                </a>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      `${window.location.origin}/compare/${comparePair[0].login}/${comparePair[1].login}`
-                    );
-                    setCompareCopied(true);
-                    setTimeout(() => setCompareCopied(false), 2000);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
-                >
-                  {compareCopied ? "Copied!" : "Copy Link"}
-                </button>
-              </div>
+                  <div className="h-1 w-10 rounded-full bg-border" />
+                </div>
 
-              {/* Download with lang toggle */}
-              <div className="px-4 flex items-center gap-2 pb-1">
-                <div className="flex gap-0.5 shrink-0">
-                  {(["en", "pt"] as const).map((l) => (
-                    <button
-                      key={l}
-                      onClick={() => setCompareLang(l)}
-                      className="px-2 py-0.5 text-[9px] uppercase transition-colors"
-                      style={{
-                        color: compareLang === l ? theme.accent : "#666",
-                        borderBottom: compareLang === l ? `2px solid ${theme.accent}` : "2px solid transparent",
-                      }}
+                {/* ── Header: Avatars + VS ── */}
+                <div className="flex items-start justify-center gap-5 px-5 pt-1 pb-4 sm:pt-4">
+                  <Link href={`/dev/${comparePair[0].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
+                    {comparePair[0].avatar_url && (
+                      <Image
+                        src={comparePair[0].avatar_url}
+                        alt={comparePair[0].login}
+                        width={56}
+                        height={56}
+                        className="border-[3px] transition-colors group-hover:brightness-110"
+                        style={{
+                          imageRendering: "pixelated",
+                          borderColor: totalAWins >= totalBWins ? theme.accent : "#3a3a40",
+                        }}
+                      />
+                    )}
+                    <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[0].login}</p>
+                    <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[0].login)}</p>
+                  </Link>
+
+                  <span className="text-base shrink-0 pt-4" style={{ color: theme.accent }}>VS</span>
+
+                  <Link href={`/dev/${comparePair[1].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
+                    {comparePair[1].avatar_url && (
+                      <Image
+                        src={comparePair[1].avatar_url}
+                        alt={comparePair[1].login}
+                        width={56}
+                        height={56}
+                        className="border-[3px] transition-colors group-hover:brightness-110"
+                        style={{
+                          imageRendering: "pixelated",
+                          borderColor: totalBWins >= totalAWins ? theme.accent : "#3a3a40",
+                        }}
+                      />
+                    )}
+                    <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[1].login}</p>
+                    <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[1].login)}</p>
+                  </Link>
+                </div>
+
+                {/* ── Scoreboard ── */}
+                <div className="mx-4 border-[2px] border-border bg-bg-card">
+                  {cmpRows.map((s, i) => (
+                    <div
+                      key={s.key}
+                      className={`flex items-center py-2 px-3 ${i < cmpRows.length - 1 ? "border-b border-border/40" : ""}`}
                     >
-                      {l}
-                    </button>
+                      <span
+                        className="w-[72px] text-right text-[11px] tabular-nums"
+                        style={{ color: s.aW ? theme.accent : s.bW ? "#555" : "#888" }}
+                      >
+                        {s.key === "rank" ? (s.a > 0 ? `#${s.a}` : "-") : s.a.toLocaleString()}
+                      </span>
+                      <span className="flex-1 text-center text-[8px] text-muted uppercase tracking-wider">
+                        {s.label}
+                      </span>
+                      <span
+                        className="w-[72px] text-left text-[11px] tabular-nums"
+                        style={{ color: s.bW ? theme.accent : s.aW ? "#555" : "#888" }}
+                      >
+                        {s.key === "rank" ? (s.b > 0 ? `#${s.b}` : "-") : s.b.toLocaleString()}
+                      </span>
+                    </div>
                   ))}
                 </div>
-                <button
-                  onClick={async () => {
-                    const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=landscape&lang=${compareLang}`);
-                    if (!res.ok) return;
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
-                >
-                  Card
-                </button>
-                <button
-                  onClick={async () => {
-                    const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=stories&lang=${compareLang}`);
-                    if (!res.ok) return;
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}-stories.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
-                >
-                  Stories
-                </button>
-              </div>
 
-              {/* Compare Again + Close */}
-              <div className="flex gap-2 px-4 pt-1 pb-5 sm:pb-4">
-                <button
-                  onClick={() => {
-                    const first = comparePair[0];
-                    setComparePair(null);
-                    setCompareBuilding(first);
-                    setFocusedBuilding(first.login);
+                {/* ── Winner banner ── */}
+                <div
+                  className="mx-4 mt-3 py-2.5 text-center text-[11px] uppercase tracking-wide"
+                  style={{
+                    backgroundColor: `${theme.accent}15`,
+                    border: `2px solid ${theme.accent}40`,
+                    color: theme.accent,
                   }}
-                  className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
                 >
-                  Compare Again
-                </button>
-                <button
-                  onClick={closeCompare}
-                  className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
-                >
-                  Close
-                </button>
+                  {cmpSummary}
+                </div>
+
+                {/* ── Actions ── */}
+                <div className="px-4 pt-3 pb-1 flex gap-2">
+                  <a
+                    href={`https://x.com/intent/tweet?text=${encodeURIComponent(
+                      `I just compared my building with ${comparePair[1].login}'s in Git City. It wasn't even close. What's yours?`
+                    )}&url=${encodeURIComponent(
+                      `${typeof window !== "undefined" ? window.location.origin : ""}/compare/${comparePair[0].login}/${comparePair[1].login}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
+                    style={{
+                      backgroundColor: theme.accent,
+                      boxShadow: `2px 2px 0 0 ${theme.shadow}`,
+                    }}
+                  >
+                    Share on X
+                  </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}/compare/${comparePair[0].login}/${comparePair[1].login}`
+                      );
+                      setCompareCopied(true);
+                      setTimeout(() => setCompareCopied(false), 2000);
+                    }}
+                    className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                  >
+                    {compareCopied ? "Copied!" : "Copy Link"}
+                  </button>
+                </div>
+
+                {/* Download with lang toggle */}
+                <div className="px-4 flex items-center gap-2 pb-1">
+                  <div className="flex gap-0.5 shrink-0">
+                    {(["en", "pt"] as const).map((l) => (
+                      <button
+                        key={l}
+                        onClick={() => setCompareLang(l)}
+                        className="px-2 py-0.5 text-[9px] uppercase transition-colors"
+                        style={{
+                          color: compareLang === l ? theme.accent : "#666",
+                          borderBottom: compareLang === l ? `2px solid ${theme.accent}` : "2px solid transparent",
+                        }}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=landscape&lang=${compareLang}`);
+                      if (!res.ok) return;
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                  >
+                    Card
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const res = await fetch(`/api/compare-card/${comparePair[0].login}/${comparePair[1].login}?format=stories&lang=${compareLang}`);
+                      if (!res.ok) return;
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `gitcity-${comparePair[0].login}-vs-${comparePair[1].login}-stories.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                  >
+                    Stories
+                  </button>
+                </div>
+
+                {/* Compare Again + Close */}
+                <div className="flex gap-2 px-4 pt-1 pb-5 sm:pb-4">
+                  <button
+                    onClick={() => {
+                      const first = comparePair[0];
+                      setComparePair(null);
+                      setCompareBuilding(first);
+                      setFocusedBuilding(first.login);
+                    }}
+                    className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                  >
+                    Compare Again
+                  </button>
+                  <button
+                    onClick={closeCompare}
+                    className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </>
+          </>
         );
       })()}
 
@@ -4417,7 +4417,7 @@ if (claimingGift) return;
 
       {/* ─── Bottom-left controls: Theme + Radio (portal slot) + Intro ─── */}
       {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (
-        <div className="pointer-events-auto fixed bottom-8 left-3 z-[25] flex items-center gap-2 sm:bottom-10 sm:left-4">
+        <div className="pointer-events-auto fixed bottom-8 left-3 z-[25] flex flex-col-reverse items-start gap-2 sm:bottom-10 sm:left-4 sm:flex-row sm:items-center">
           <button
             onClick={cycleTheme}
             className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
