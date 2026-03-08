@@ -8,7 +8,7 @@ const BASE_URL =
     : "http://localhost:3000");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  let developers: any[] = [];
+  let developers: { github_login: string; updated_at: string | null }[] = [];
   
   if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
     const supabase = getSupabaseAdmin();

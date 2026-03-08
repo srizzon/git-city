@@ -225,8 +225,8 @@ function SearchFeedback({
   // Phased loading messages
   useEffect(() => {
     if (feedback?.type !== "loading") { 
-      setTimeout(() => setPhaseIndex(0), 0); 
-      return; 
+      const timerId = setTimeout(() => setPhaseIndex(0), 0); 
+      return () => clearTimeout(timerId); 
     }
     const timers = LOADING_PHASES.map((phase, i) =>
       setTimeout(() => setPhaseIndex(i), phase.delay)
@@ -1675,7 +1675,7 @@ function HomeContent() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [username, buildings]);
+  }, [username, buildings, authLogin, compareBuilding, comparePair, stats]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2564,6 +2564,8 @@ if (claimingGift) return;
                                 <Image
                                   src={dev.avatarUrl}
                                   alt=""
+                                  width={24}
+                                  height={24}
                                   className="h-6 w-6 rounded-full"
                                   style={isCreator ? { boxShadow: "0 0 6px #fbbf24" } : undefined}
                                 />
