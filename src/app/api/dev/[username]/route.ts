@@ -193,9 +193,13 @@ export async function GET(
     };
 
     // ETag conditional request
-    const FULL_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour
-    const cachedAge = Date.now() - new Date(cached.fetched_at).getTime();
-    const needsFullRefresh = cachedAge >= FULL_REFRESH_INTERVAL;
+    // GitHub's /users ETag does not cover repo-derived stars or GraphQL contribution totals,
+    // so only short-circuit while our cached stats are still fresh.
+    const STATS_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    const cachedAge = cached.fetched_at
+      ? Date.now() - new Date(cached.fetched_at).getTime()
+      : Number.POSITIVE_INFINITY;
+    const needsStatsRefresh = Number.isNaN(cachedAge) || cachedAge >= STATS_REFRESH_INTERVAL;
 
     const userRes = await fetch(
       `https://api.github.com/users/${encodeURIComponent(username)}`,
@@ -208,10 +212,10 @@ export async function GET(
       },
     );
 
-    if (userRes.status === 304 && !needsFullRefresh) {
+    if (userRes.status === 304 && !needsStatsRefresh) {
       return NextResponse.json({ ...cached, exists: true }, {
         headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
         },
       });
     }
@@ -384,7 +388,7 @@ export async function GET(
 
     return NextResponse.json({ ...(withRank ?? upserted), exists: true }, {
       headers: {
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
       },
     });
   } catch (err) {
