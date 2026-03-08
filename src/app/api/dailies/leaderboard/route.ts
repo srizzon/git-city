@@ -4,6 +4,9 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 export const revalidate = 300; // ISR: regenerate every 5 min
 
 export async function GET() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return NextResponse.json({ leaderboard: [], total: 0 });
+  }
   const admin = getSupabaseAdmin();
 
   const { data, error } = await admin

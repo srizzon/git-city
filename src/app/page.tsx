@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
 import { Menu, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -16,30 +16,21 @@ import {
   type CityRiver,
   type CityBridge,
   type DistrictZone,
+  type DeveloperRecord,
 } from "@/lib/github";
 import Image from "next/image";
 import Link from "next/link";
 import ActivityTicker, { type FeedEvent } from "@/components/ActivityTicker";
-import ActivityPanel from "@/components/ActivityPanel";
 import { ITEM_NAMES, ITEM_EMOJIS } from "@/lib/zones";
 import { useStreakCheckin } from "@/lib/useStreakCheckin";
 import { useLiveUsers } from "@/lib/useLiveUsers";
 import { useCodingPresence } from "@/lib/useCodingPresence";
 import { useRaidSequence } from "@/lib/useRaidSequence";
 import { useDailies } from "@/lib/useDailies";
-import DailiesWidget from "@/components/DailiesWidget";
-import RaidPreviewModal from "@/components/RaidPreviewModal";
-import RaidOverlay from "@/components/RaidOverlay";
-import PillModal from "@/components/PillModal";
-import FounderMessage from "@/components/FounderMessage";
-import RabbitCompletion from "@/components/RabbitCompletion";
-import DistrictChooser from "@/components/DistrictChooser";
 import InviteCard, { type InvitePreview } from "@/components/InviteCard";
 import XpBar from "@/components/XpBar";
-import LevelUpToast from "@/components/LevelUpToast";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
-import MiniMap from "@/components/MiniMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
@@ -64,6 +55,17 @@ import {
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
   ssr: false,
 });
+
+const ActivityPanel = dynamic(() => import("@/components/ActivityPanel"), { ssr: false });
+const DailiesWidget = dynamic(() => import("@/components/DailiesWidget"), { ssr: false });
+const RaidPreviewModal = dynamic(() => import("@/components/RaidPreviewModal"), { ssr: false });
+const RaidOverlay = dynamic(() => import("@/components/RaidOverlay"), { ssr: false });
+const PillModal = dynamic(() => import("@/components/PillModal"), { ssr: false });
+const FounderMessage = dynamic(() => import("@/components/FounderMessage"), { ssr: false });
+const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
+const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
+const LevelUpToast = dynamic(() => import("@/components/LevelUpToast"), { ssr: false });
+const MiniMap = dynamic(() => import("@/components/MiniMap"), { ssr: false });
 
 // Feature flags — flip to switch milestone banner
 const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road to 1K, "devs" = total developers
@@ -222,7 +224,10 @@ function SearchFeedback({
 
   // Phased loading messages
   useEffect(() => {
-    if (feedback?.type !== "loading") { setPhaseIndex(0); return; }
+    if (feedback?.type !== "loading") { 
+      setTimeout(() => setPhaseIndex(0), 0); 
+      return; 
+    }
     const timers = LOADING_PHASES.map((phase, i) =>
       setTimeout(() => setPhaseIndex(i), phase.delay)
     );
@@ -378,8 +383,7 @@ function HomeContent() {
   const failedUsernamesRef = useRef<Map<string, string>>(new Map()); // username -> error code
   const [buildings, setBuildings] = useState<CityBuilding[]>([]);
   // Keep raw dev records so we can inject new devs and regenerate layout locally
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rawDevsRef = useRef<any[]>([]);
+  const rawDevsRef = useRef<DeveloperRecord[]>([]);
   const [plazas, setPlazas] = useState<CityPlaza[]>([]);
   const [decorations, setDecorations] = useState<CityDecoration[]>([]);
   const [river, setRiver] = useState<CityRiver | null>(null);
@@ -390,7 +394,6 @@ function HomeContent() {
   const [loadStage, setLoadStage] = useState<LoadingStage>("init");
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const initialLoading = loadStage !== "done";
   const [feedback, setFeedback] = useState<{
     type: "loading" | "error";
     code?: "not-found" | "org" | "no-activity" | "rate-limit" | "github-rate-limit" | "timeout" | "network" | "generic";
@@ -456,7 +459,6 @@ function HomeContent() {
   const [kudosSending, setKudosSending] = useState(false);
   const [kudosSent, setKudosSent] = useState(false);
   const [kudosError, setKudosError] = useState<string | null>(null);
-  const [focusDist, setFocusDist] = useState(999);
   const visitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [compareBuilding, setCompareBuilding] = useState<CityBuilding | null>(null);
   const [comparePair, setComparePair] = useState<[CityBuilding, CityBuilding] | null>(null);
@@ -507,7 +509,6 @@ function HomeContent() {
   } | null>(null);
   const dailyNudgeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const flyHintTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const flyControlsTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const flyResultsTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // A8: Ghost preview for own building
@@ -836,6 +837,7 @@ function HomeContent() {
     } catch { /* ignore */ }
     finally { setGiftBuying(null); }
   }, [selectedBuilding, giftBuying]);
+   
 
   const lastDistRef = useRef(999);
 
@@ -1009,7 +1011,6 @@ function HomeContent() {
 
   const reloadCity = useCallback(async (bustCache = false) => {
     if (bustCache) clearCityCache();
-    const cacheBust = bustCache ? `?_t=${Date.now()}` : "";
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let allDevs: any[] = [];
@@ -1268,7 +1269,6 @@ function HomeContent() {
     }
 
     loadCity();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadStage]);
 
   // City reload on tab return removed — navigating back from shop already
@@ -1298,6 +1298,7 @@ function HomeContent() {
 
     return () => timers.forEach(clearTimeout);
   }, [introMode]);
+   
 
   const endIntro = useCallback(() => {
     setIntroMode(false);
@@ -1341,7 +1342,7 @@ function HomeContent() {
           if (devData.exists === false) return;
 
           // Dedup: another effect may have already injected this dev
-          if (rawDevsRef.current.some((d: Record<string, unknown>) => (d.github_login as string)?.toLowerCase() === userParam.toLowerCase())) return;
+          if (rawDevsRef.current.some((d: DeveloperRecord) => d.github_login.toLowerCase() === userParam.toLowerCase())) return;
 
           const newDev = {
             ...devData,
@@ -1413,7 +1414,7 @@ function HomeContent() {
         if (devData.exists === false) return;
 
         // Dedup: another effect or search may have already injected this dev
-        if (rawDevsRef.current.some((d: Record<string, unknown>) => (d.github_login as string)?.toLowerCase() === authLogin)) return;
+        if (rawDevsRef.current.some((d: DeveloperRecord) => d.github_login.toLowerCase() === authLogin)) return;
 
         const newDev = {
           ...devData,
@@ -1529,7 +1530,7 @@ function HomeContent() {
     // Check if this username already failed with a permanent error
     const cachedError = failedUsernamesRef.current.get(trimmed);
     if (cachedError) {
-      setFeedback({ type: "error", code: cachedError as any, username: trimmed });
+      setFeedback({ type: "error", code: cachedError as NonNullable<typeof feedback>["code"], username: trimmed });
       return;
     }
 
@@ -1673,6 +1674,7 @@ function HomeContent() {
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, buildings]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -2095,7 +2097,6 @@ if (claimingGift) return;
           setKudosSent(false);
           setKudosError(null);
           lastDistRef.current = 999;
-          setFocusDist(999);
           // Track explore_district daily if clicking a building in a different district
           if (myBuilding?.district && b.district && b.district !== myBuilding.district) {
             trackMissionRef.current("explore_district");
@@ -2560,7 +2561,7 @@ if (claimingGift) return;
                           >
                             <div className="relative flex-shrink-0">
                               {dev.avatarUrl && (
-                                <img
+                                <Image
                                   src={dev.avatarUrl}
                                   alt=""
                                   className="h-6 w-6 rounded-full"
@@ -2747,7 +2748,7 @@ if (claimingGift) return;
               <div className="flex items-start justify-between">
                 <Link href={`/dev/${authLogin}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
                   {myBuilding?.avatar_url && (
-                    <img src={myBuilding.avatar_url} alt="" className="h-12 w-12 rounded-full border-[2px]" style={{ borderColor: theme.accent }} />
+                    <Image src={myBuilding.avatar_url} alt="" width={48} height={48} unoptimized={true} className="h-12 w-12 rounded-full border-[2px]" style={{ borderColor: theme.accent }} />
                   )}
                   <div>
                     <div className="flex items-center gap-2">
@@ -4081,8 +4082,8 @@ if (claimingGift) return;
               {/* Drag handle on mobile - swipe down to close */}
               <div
                 className="flex justify-center py-2 sm:hidden"
-                onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
-                onTouchEnd={(e) => { const start = (e.currentTarget as any)._touchY; if (start != null && e.changedTouches[0].clientY - start > 50) closeCompare(); }}
+                onTouchStart={(e) => { (e.currentTarget as HTMLElement & { _touchY?: number })._touchY = e.touches[0].clientY; }}
+                onTouchEnd={(e) => { const start = (e.currentTarget as HTMLElement & { _touchY?: number })._touchY; if (start != null && e.changedTouches[0].clientY - start > 50) closeCompare(); }}
               >
                 <div className="h-1 w-10 rounded-full bg-border" />
               </div>

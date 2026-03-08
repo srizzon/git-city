@@ -32,6 +32,9 @@ function formatK(n: number): string {
 }
 
 async function getStats() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { devCount: 0, monthlyImpressions: 0, monthlyClicks: 0, ctr: 0 };
+  }
   const supabase = getSupabaseAdmin();
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
 
