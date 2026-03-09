@@ -899,6 +899,7 @@ function HomeContent() {
             setCompareBuilding(null);
           } else if (giftModalOpen) { setGiftModalOpen(false); setGiftItems(null); }
           else if (giftClaimed) setGiftClaimed(false);
+          else if (invitePreview) { setInvitePreview(null); }
           else if (shareData) { setShareData(null); setSelectedBuilding(null); setFocusedBuilding(null); }
           else if (selectedBuilding) { setSelectedBuilding(null); setFocusedBuilding(null); }
           else if (focusedBuilding) setFocusedBuilding(null);
@@ -1623,8 +1624,8 @@ function HomeContent() {
       };
       rawDevsRef.current = existedBefore
         ? rawDevsRef.current.map((d) =>
-            d.github_login?.toLowerCase() === refreshedLogin ? syncedDev : d
-          )
+          d.github_login?.toLowerCase() === refreshedLogin ? syncedDev : d
+        )
         : [...rawDevsRef.current, syncedDev];
 
       const layout = generateCityLayout(rawDevsRef.current);

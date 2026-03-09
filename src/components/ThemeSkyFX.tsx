@@ -399,69 +399,6 @@ function makeSunsetCirrusDomeTexture(seed = 1, w = 1024, h = 512): THREE.CanvasT
     return tex;
 }
 
-/** Thin cirrus streak texture — wispy strokes, seamless on X, fades top/bottom. */
-function makeCirrusTexture(seed = 1, w = 1024, h = 256): THREE.CanvasTexture {
-    const rng = mulberry32(seed);
-    const c = document.createElement("canvas");
-    c.width = w; c.height = h;
-    const ctx = c.getContext("2d")!;
-    ctx.clearRect(0, 0, w, h);
-
-    ctx.globalCompositeOperation = "lighter";
-    ctx.lineCap = "round";
-
-    const streaks = 70;
-    for (let i = 0; i < streaks; i++) {
-        const y = (0.25 + rng() * 0.45) * h;
-        const len = (0.35 + rng() * 0.65) * w;
-        const x0 = rng() * w;
-        const x1 = x0 + len;
-        const amp = 8 + rng() * 24;
-        const lw = 1 + rng() * 5;
-        ctx.strokeStyle = `rgba(255,255,255,${0.03 + rng() * 0.06})`;
-        ctx.lineWidth = lw;
-
-        const draw = (dx: number) => {
-            ctx.beginPath();
-            ctx.moveTo(x0 + dx, y);
-            ctx.quadraticCurveTo(x0 + dx + len * 0.35, y - amp, x0 + dx + len * 0.70, y + amp * 0.6);
-            ctx.quadraticCurveTo(x0 + dx + len * 0.85, y + amp, x1 + dx, y + amp * 0.2);
-            ctx.stroke();
-        };
-        draw(0);
-        draw(-w); // wrap left
-        draw(+w); // wrap right
-    }
-
-    // Soft blur pass (reduces harsh stroke lines)
-    const tmp = document.createElement("canvas");
-    tmp.width = w; tmp.height = h;
-    const tctx = tmp.getContext("2d")!;
-    tctx.filter = "blur(2px)";
-    tctx.drawImage(c, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.drawImage(tmp, 0, 0);
-
-    // Vertical fade so sprite edges don't look rectangular
-    ctx.globalCompositeOperation = "destination-in";
-    const mask = ctx.createLinearGradient(0, 0, 0, h);
-    mask.addColorStop(0.00, "rgba(0,0,0,0)");
-    mask.addColorStop(0.20, "rgba(0,0,0,1)");
-    mask.addColorStop(0.80, "rgba(0,0,0,1)");
-    mask.addColorStop(1.00, "rgba(0,0,0,0)");
-    ctx.fillStyle = mask;
-    ctx.fillRect(0, 0, w, h);
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.repeat.set(1.6, 1);
-    return tex;
-}
-
 /** Patchy aurora curtain texture — two 1D noise layers create
  *  gaps where aurora fades out, giving a realistic non-uniform look.
  *  Blur pass smooths column edges. wrapS=Repeat enables UV drift. */
@@ -981,6 +918,11 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         else { slot.r = 0.7; slot.g = 2.0; slot.b = 1.0; }  // emerald
     };
 
+    // Refs to bypass direct mutability linter warnings in useFrame
+    const auroraMat0Ref = useRef(auroraRingMat0); auroraMat0Ref.current = auroraRingMat0;
+    const auroraMat1Ref = useRef(auroraRingMat1); auroraMat1Ref.current = auroraRingMat1;
+    const cirrusMatRef = useRef(sunsetCirrusMat); cirrusMatRef.current = sunsetCirrusMat;
+
     // ── Frame loop ───────────────────────────────────────────────
     const frameCounter = useRef(0);
 
@@ -998,37 +940,41 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         if (flyPointsRef.current) flyPointsRef.current.rotation.y += dt * 0.010;
 
         // ── Aurora ring scroll + pulse (Emerald) ─────────────────
-        if (themeIndex === 3 && auroraRingMat0 && auroraRingMat1) {
-            // Slower drift — patchy texture already has visual complexity
-            if (auroraRingMat0.map && auroraRingMat1.map) {
-                auroraRingMat0.map.offset.x = (auroraRingMat0.map.offset.x + dt * 0.010) % 1;
-                auroraRingMat1.map.offset.x = (auroraRingMat1.map.offset.x - dt * 0.006) % 1;
-            }
+        if (themeIndex === 3) {
+            const m0 = auroraMat0Ref.current;
+            const m1 = auroraMat1Ref.current;
+            if (m0 && m1) {
+                // Slower drift — patchy texture already has visual complexity
+                if (m0.map && m1.map) {
+                    m0.map.offset.x = (m0.map.offset.x + dt * 0.010) % 1;
+                    m1.map.offset.x = (m1.map.offset.x - dt * 0.006) % 1;
+                }
 
-            auroraPulse.current.nextIn -= dt;
-            if (auroraPulse.current.nextIn <= 0 && !auroraPulse.current.active) {
-                auroraPulse.current.active = true;
-                auroraPulse.current.t = 0;
-                auroraPulse.current.dur = 1.8;
-                auroraPulse.current.nextIn = randRange(rngRef.current, 10, 22);
-            }
-            if (auroraPulse.current.active) {
-                auroraPulse.current.t += dt;
-                const p01 = Math.min(1, auroraPulse.current.t / auroraPulse.current.dur);
-                const bump = Math.sin(p01 * Math.PI);
-                auroraRingMat0.opacity = 0.22 + bump * 0.15;
-                auroraRingMat1.opacity = 0.14 + bump * 0.11;
-                if (p01 >= 1) {
-                    auroraPulse.current.active = false;
-                    auroraRingMat0.opacity = 0.22;
-                    auroraRingMat1.opacity = 0.14;
+                auroraPulse.current.nextIn -= dt;
+                if (auroraPulse.current.nextIn <= 0 && !auroraPulse.current.active) {
+                    auroraPulse.current.active = true;
+                    auroraPulse.current.t = 0;
+                    auroraPulse.current.dur = 1.8;
+                    auroraPulse.current.nextIn = randRange(rngRef.current, 10, 22);
+                }
+                if (auroraPulse.current.active) {
+                    auroraPulse.current.t += dt;
+                    const p01 = Math.min(1, auroraPulse.current.t / auroraPulse.current.dur);
+                    const bump = Math.sin(p01 * Math.PI);
+                    m0.opacity = 0.22 + bump * 0.15;
+                    m1.opacity = 0.14 + bump * 0.11;
+                    if (p01 >= 1) {
+                        auroraPulse.current.active = false;
+                        m0.opacity = 0.22;
+                        m1.opacity = 0.14;
+                    }
                 }
             }
         }
 
         // ── Sunset cirrus drift ───────────────────────────────────────
-        if (themeIndex === 1 && sunsetCirrusMat?.map) {
-            sunsetCirrusMat.map.offset.x = (sunsetCirrusMat.map.offset.x + dt * 0.0012) % 1;
+        if (themeIndex === 1 && cirrusMatRef.current?.map) {
+            cirrusMatRef.current.map.offset.x = (cirrusMatRef.current.map.offset.x + dt * 0.0012) % 1;
         }
 
         // ── Streak spawner ───────────────────────────────────────
