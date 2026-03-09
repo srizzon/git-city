@@ -1075,7 +1075,7 @@ function HomeContent() {
       if (raw) {
         const { developerId, loadout, ts } = JSON.parse(raw);
         if (Date.now() - ts < 10 * 60 * 1000) {
-          const idx = allDevs.findIndex((d: Record<string, unknown>) => d.id === developerId);
+          const idx = allDevs.findIndex((d) => d.id === developerId);
           if (idx !== -1) {
             allDevs[idx] = { ...allDevs[idx], loadout };
           }
@@ -1212,7 +1212,7 @@ function HomeContent() {
           if (raw) {
             const { developerId, loadout, ts } = JSON.parse(raw);
             if (Date.now() - ts < 10 * 60 * 1000) {
-              const idx = allDevs.findIndex((d: Record<string, unknown>) => d.id === developerId);
+              const idx = allDevs.findIndex((d) => d.id === developerId);
               if (idx !== -1) {
                 allDevs[idx] = { ...allDevs[idx], loadout };
               }
@@ -1601,30 +1601,30 @@ function HomeContent() {
       let updatedBuildings: CityBuilding[] | null = null;
       const refreshedLogin = (devData.github_login ?? trimmed).toLowerCase();
       const existingDev = rawDevsRef.current.find(
-        (d: any) => d.github_login?.toLowerCase() === refreshedLogin
+        (d) => d.github_login?.toLowerCase() === refreshedLogin
       );
       const eAny = existingDev as any;
       const syncedDev = {
         ...(existingDev ?? {}),
         ...devData,
-        owned_items: (eAny?.owned_items as string[] | undefined) ?? [],
-        achievements: (eAny?.achievements as string[] | undefined) ?? [],
-        loadout: eAny?.loadout ?? null,
-        custom_color: (eAny?.custom_color as string | null | undefined) ?? null,
-        billboard_images: (eAny?.billboard_images as string[] | undefined) ?? [],
-        active_raid_tag: eAny?.active_raid_tag ?? null,
-        kudos_count: devData.kudos_count ?? eAny?.kudos_count ?? 0,
-        visit_count: devData.visit_count ?? eAny?.visit_count ?? 0,
-        app_streak: devData.app_streak ?? eAny?.app_streak ?? 0,
-        raid_xp: devData.raid_xp ?? eAny?.raid_xp ?? 0,
-        rabbit_completed: devData.rabbit_completed ?? eAny?.rabbit_completed ?? false,
-        xp_total: devData.xp_total ?? eAny?.xp_total ?? 0,
-        xp_level: devData.xp_level ?? eAny?.xp_level ?? 1,
-      } as any;
+        owned_items: existingDev?.owned_items ?? [],
+        achievements: existingDev?.achievements ?? [],
+        loadout: existingDev?.loadout ?? null,
+        custom_color: existingDev?.custom_color ?? null,
+        billboard_images: existingDev?.billboard_images ?? [],
+        active_raid_tag: existingDev?.active_raid_tag ?? null,
+        kudos_count: devData.kudos_count ?? existingDev?.kudos_count ?? 0,
+        visit_count: devData.visit_count ?? existingDev?.visit_count ?? 0,
+        app_streak: devData.app_streak ?? existingDev?.app_streak ?? 0,
+        raid_xp: devData.raid_xp ?? existingDev?.raid_xp ?? 0,
+        rabbit_completed: devData.rabbit_completed ?? existingDev?.rabbit_completed ?? false,
+        xp_total: devData.xp_total ?? existingDev?.xp_total ?? 0,
+        xp_level: devData.xp_level ?? existingDev?.xp_level ?? 1,
+      };
       rawDevsRef.current = existedBefore
-        ? rawDevsRef.current.map((d: any) =>
-          d.github_login?.toLowerCase() === refreshedLogin ? syncedDev : d
-        )
+        ? rawDevsRef.current.map((d) =>
+            d.github_login?.toLowerCase() === refreshedLogin ? syncedDev : d
+          )
         : [...rawDevsRef.current, syncedDev];
 
       const layout = generateCityLayout(rawDevsRef.current);

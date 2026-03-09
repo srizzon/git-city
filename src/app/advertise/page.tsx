@@ -315,7 +315,7 @@ export default async function AdvertisePage() {
                 },
                 {
                   q: "How many ad slots are available?",
-                  a: "8 plane slots, 4 blimp slots, 10 each for billboard, rooftop, and LED wrap. Limited inventory keeps your ad visible.",
+                  a: "15 plane slots, 8 blimp slots, 10 each for billboard, rooftop, and LED wrap. Limited inventory keeps your ad visible.",
                 },
                 {
                   q: "How do I pay?",

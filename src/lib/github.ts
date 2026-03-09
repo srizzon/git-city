@@ -41,6 +41,15 @@ export interface DeveloperRecord {
   xp_total?: number;
   xp_level?: number;
   xp_github?: number;
+  // Game fields
+  achievements?: string[];
+  kudos_count?: number;
+  visit_count?: number;
+  loadout?: { crown: string | null; roof: string | null; aura: string | null } | null;
+  app_streak?: number;
+  raid_xp?: number;
+  active_raid_tag?: { attacker_login: string; tag_style: string; expires_at: string } | null;
+  rabbit_completed?: boolean;
 }
 
 export interface TopRepo {
