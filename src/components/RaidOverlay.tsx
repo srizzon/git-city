@@ -118,11 +118,11 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[55]">
+    <div className="pointer-events-none fixed inset-0 z-55">
       {/* Screen flash on explosion */}
       {flashPhase !== "none" && (
         <div
-          className="fixed inset-0 z-[60] bg-white"
+          className="fixed inset-0 z-60 bg-white"
           style={{
             opacity: flashPhase === "peak" ? 0.9 : 0,
             transition: flashPhase === "fading" ? "opacity 0.6s ease-out" : "none",
@@ -255,7 +255,7 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
               {/* Stacked full-width buttons */}
               <button
                 onClick={onExit}
-                className="btn-press w-full border-[2px] border-cream/20 px-4 py-3 text-sm text-cream transition-colors hover:border-cream/40"
+                className="btn-press w-full border-2 border-cream/20 px-4 py-3 text-sm text-cream transition-colors hover:border-cream/40"
               >
                 Back to City
               </button>
@@ -267,7 +267,7 @@ export default function RaidOverlay({ phase, raidData, onSkip, onExit }: Props) 
                   const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent("https://thegitcity.com")}`;
                   window.open(url, "_blank");
                 }}
-                className="btn-press w-full border-[2px] border-blue-400/40 px-4 py-3 text-sm text-blue-400 transition-colors hover:bg-blue-400/10"
+                className="btn-press w-full border-2 border-blue-400/40 px-4 py-3 text-sm text-blue-400 transition-colors hover:bg-blue-400/10"
               >
                 Share on X
               </button>

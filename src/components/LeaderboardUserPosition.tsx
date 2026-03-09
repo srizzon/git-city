@@ -61,7 +61,7 @@ export default function LeaderboardUserPosition({
               alt={data.github_login}
               width={36}
               height={36}
-              className="border-[2px] border-border"
+              className="border-2 border-border"
               style={{ imageRendering: "pixelated" }}
             />
           )}

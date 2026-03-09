@@ -347,7 +347,7 @@ export default function FlyLeaderboard() {
                       alt={entry.github_login}
                       width={36}
                       height={36}
-                      className="border-[2px] border-border"
+                      className="border-2 border-border"
                       style={{ imageRendering: "pixelated" }}
                     />
                   )}

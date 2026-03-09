@@ -37,7 +37,7 @@ export default function GlobalRadio() {
 
   // Fallback for other pages: fixed bottom-left
   return (
-    <div className="pointer-events-auto fixed bottom-4 left-3 z-[25] sm:left-4">
+    <div className="pointer-events-auto fixed bottom-4 left-3 z-25 sm:left-4">
       <LofiRadio />
     </div>
   );

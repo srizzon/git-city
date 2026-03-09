@@ -56,7 +56,7 @@ export default function InviteCard({ developer, isLoggedIn, onLogin, onClose, ac
             alt={developer.github_login}
             width={48}
             height={48}
-            className="mx-auto mb-3 border-[2px] border-border"
+            className="mx-auto mb-3 border-2 border-border"
             style={{ imageRendering: "pixelated" }}
           />
         )}
