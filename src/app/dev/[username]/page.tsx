@@ -168,7 +168,7 @@ export default async function DevPage({ params }: Props) {
                 alt={dev.github_login}
                 width={100}
                 height={100}
-                className="border-[3px] border-border flex-shrink-0"
+                className="border-[3px] border-border shrink-0"
                 style={{ imageRendering: "pixelated" }}
               />
             )}
@@ -181,7 +181,7 @@ export default async function DevPage({ params }: Props) {
 
               {/* Rank Badge */}
               {dev.rank && (
-                <div className="mt-3 inline-block border-[2px] px-3 py-1 text-sm" style={{ borderColor: accent, color: accent }}>
+                <div className="mt-3 inline-block border-2 px-3 py-1 text-sm" style={{ borderColor: accent, color: accent }}>
                   #{dev.rank} in the city
                 </div>
               )}
@@ -231,7 +231,7 @@ export default async function DevPage({ params }: Props) {
             <div className="mt-5 border-[3px] border-border bg-bg-raised p-4">
               <div className="flex items-center gap-3">
                 <span
-                  className="flex h-10 w-10 items-center justify-center border-[2px] text-lg font-bold"
+                  className="flex h-10 w-10 items-center justify-center border-2 text-lg font-bold"
                   style={{ borderColor: tier.color, color: tier.color }}
                 >
                   {xpLevel}
@@ -249,7 +249,7 @@ export default async function DevPage({ params }: Props) {
                     </span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-2">
-                    <div className="h-[5px] flex-1 bg-border">
+                    <div className="h-1.25 flex-1 bg-border">
                       <div
                         className="h-full"
                         style={{
@@ -351,7 +351,7 @@ export default async function DevPage({ params }: Props) {
                   return (
                     <span
                       key={ach.achievement_id}
-                      className="border-[2px] px-3 py-1 text-[10px]"
+                      className="border-2 px-3 py-1 text-[10px]"
                       style={{ borderColor: color, color }}
                     >
                       {ach.name}
@@ -370,7 +370,7 @@ export default async function DevPage({ params }: Props) {
               {ownedItems.map((itemId) => (
                 <span
                   key={itemId}
-                  className="border-[2px] px-3 py-1 text-[10px]"
+                  className="border-2 px-3 py-1 text-[10px]"
                   style={{ borderColor: accent, color: accent }}
                 >
                   {ITEM_NAMES[itemId] ?? itemId}
@@ -399,7 +399,7 @@ export default async function DevPage({ params }: Props) {
                 <Link
                   key={rd.github_login}
                   href={`/dev/${rd.github_login}`}
-                  className="flex items-center gap-2 border-[2px] border-border px-3 py-1.5 text-[10px] text-muted transition-colors hover:border-border-light hover:text-cream"
+                  className="flex items-center gap-2 border-2 border-border px-3 py-1.5 text-[10px] text-muted transition-colors hover:border-border-light hover:text-cream"
                 >
                   {rd.avatar_url && (
                     <Image

@@ -95,7 +95,7 @@ function SupportContent() {
             </p>
             <Link
               href="/"
-              className="btn-press mt-4 inline-block border-[2px] px-5 py-2 text-xs transition-colors"
+              className="btn-press mt-4 inline-block border-2 px-5 py-2 text-xs transition-colors"
               style={{ borderColor: ACCENT, color: ACCENT }}
             >
               Go to the city →
@@ -114,7 +114,7 @@ function SupportContent() {
               href="https://discord.gg/2bTjFAkny7"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-press mt-4 inline-block border-[2px] border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
+              className="btn-press mt-4 inline-block border-2 border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
             >
               discord.gg/2bTjFAkny7
             </a>
@@ -132,7 +132,7 @@ function SupportContent() {
               href="https://github.com/srizzon/git-city"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-press mt-4 inline-block border-[2px] border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
+              className="btn-press mt-4 inline-block border-2 border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
             >
               github.com/srizzon/git-city
             </a>
@@ -152,7 +152,7 @@ function SupportContent() {
                   key={amount}
                   disabled={loadingAmount !== null}
                   onClick={() => handleStripeCheckout(amount)}
-                  className="btn-press border-[2px] border-border px-5 py-2 text-xs text-cream transition-colors hover:border-border-light disabled:cursor-wait disabled:opacity-50"
+                  className="btn-press border-2 border-border px-5 py-2 text-xs text-cream transition-colors hover:border-border-light disabled:cursor-wait disabled:opacity-50"
                 >
                   {loadingAmount === amount ? "..." : `$${amount}`}
                 </button>
@@ -170,12 +170,12 @@ function SupportContent() {
                       handleStripeCheckout(parseInt(customAmount, 10));
                     }
                   }}
-                  className="w-14 border-[2px] border-border bg-transparent px-2 py-2 text-xs text-cream outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-14 border-2 border-border bg-transparent px-2 py-2 text-xs text-cream outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <button
                   disabled={loadingAmount !== null || !customAmount || parseInt(customAmount, 10) < 1}
                   onClick={() => handleStripeCheckout(parseInt(customAmount, 10))}
-                  className="btn-press border-[2px] border-border px-3 py-2 text-[10px] text-cream transition-colors hover:border-border-light disabled:cursor-not-allowed disabled:opacity-30"
+                  className="btn-press border-2 border-border px-3 py-2 text-[10px] text-cream transition-colors hover:border-border-light disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   {loadingAmount && loadingAmount !== 5 && loadingAmount !== 10 && loadingAmount !== 25 ? "..." : "GO"}
                 </button>
@@ -197,7 +197,7 @@ function SupportContent() {
               href="https://github.com/sponsors/srizzon"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-press mt-4 inline-block border-[2px] border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
+              className="btn-press mt-4 inline-block border-2 border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
             >
               github.com/sponsors/srizzon
             </a>
@@ -214,7 +214,7 @@ function SupportContent() {
               </code>
               <button
                 onClick={copyEth}
-                className="btn-press shrink-0 border-[2px] border-border px-3 py-1.5 text-[10px] transition-colors hover:border-border-light"
+                className="btn-press shrink-0 border-2 border-border px-3 py-1.5 text-[10px] transition-colors hover:border-border-light"
                 style={{
                   color: copied ? "#0d0d0f" : ACCENT,
                   backgroundColor: copied ? ACCENT : "transparent",
@@ -235,7 +235,7 @@ function SupportContent() {
             </p>
             <Link
               href="/token"
-              className="btn-press mt-4 inline-block border-[2px] border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
+              className="btn-press mt-4 inline-block border-2 border-border px-5 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
             >
               Learn more & disclaimer
             </Link>

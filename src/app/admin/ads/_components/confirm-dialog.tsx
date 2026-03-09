@@ -11,7 +11,7 @@ export function ConfirmDialog({ state, onClose }: ConfirmDialogProps) {
   if (!state.open) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60">
+    <div className="fixed inset-0 z-90 flex items-center justify-center bg-black/60">
       <div className="w-full max-w-sm border-2 border-border bg-bg-raised p-6">
         <p className="text-sm text-cream">{state.title}</p>
         <p className="mt-2 text-xs text-muted">{state.message}</p>

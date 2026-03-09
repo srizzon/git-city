@@ -87,7 +87,7 @@ export default function LivePage() {
                   href={`/?focus=${dev.githubLogin}`}
                   className="flex items-center gap-4 border-[3px] border-border bg-bg/50 px-5 py-4 transition-colors hover:border-border-light"
                 >
-                  <div className="relative flex-shrink-0">
+                  <div className="relative shrink-0">
                     <img
                       src={dev.avatarUrl}
                       alt=""
