@@ -98,13 +98,13 @@ export default function LoadingScreen({
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0d0d0f] transition-opacity duration-[600ms] ${
+      className={`fixed inset-0 z-100 flex flex-col items-center justify-center bg-bg transition-opacity duration-600 ${
         fading ? "opacity-0" : "opacity-100"
       }`}
       onTransitionEnd={handleTransitionEnd}
     >
       {/* Skyline silhouette */}
-      <div className="absolute bottom-0 left-0 right-0 h-[140px] overflow-hidden opacity-20">
+      <div className="absolute bottom-0 left-0 right-0 h-35 overflow-hidden opacity-20">
         {SKYLINE_BUILDINGS.map(([w, h, left], i) => (
           <div
             key={i}
@@ -159,7 +159,7 @@ export default function LoadingScreen({
       {isError && (
         <button
           onClick={onRetry}
-          className="btn-press mt-6 px-6 py-2 font-pixel text-xs text-[#0d0d0f]"
+          className="btn-press mt-6 px-6 py-2 font-pixel text-xs text-bg"
           style={{ backgroundColor: accentColor }}
         >
           Retry

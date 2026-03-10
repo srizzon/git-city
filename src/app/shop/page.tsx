@@ -67,21 +67,21 @@ export default async function ShopLanding() {
               How it works
             </h2>
             <div className="space-y-2 text-[10px] text-muted normal-case">
-              <div className="flex gap-3 border-[2px] border-border bg-bg-card px-4 py-3">
+              <div className="flex gap-3 border-2 border-border bg-bg-card px-4 py-3">
                 <span style={{ color: ACCENT }}>1.</span>
                 <span>
                   Sign in with <span className="text-cream">GitHub</span> to
                   connect your account
                 </span>
               </div>
-              <div className="flex gap-3 border-[2px] border-border bg-bg-card px-4 py-3">
+              <div className="flex gap-3 border-2 border-border bg-bg-card px-4 py-3">
                 <span style={{ color: ACCENT }}>2.</span>
                 <span>
                   Search your username and{" "}
                   <span className="text-cream">claim</span> your building
                 </span>
               </div>
-              <div className="flex gap-3 border-[2px] border-border bg-bg-card px-4 py-3">
+              <div className="flex gap-3 border-2 border-border bg-bg-card px-4 py-3">
                 <span style={{ color: ACCENT }}>3.</span>
                 <span>
                   Browse the shop and buy items to{" "}

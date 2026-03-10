@@ -205,7 +205,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
-      <div className="mx-auto max-w-2xl px-3 py-6 sm:px-4 sm:py-10 lg:max-w-[960px]">
+      <div className="mx-auto max-w-2xl px-3 py-6 sm:px-4 sm:py-10 lg:max-w-240">
         {/* Header */}
         <Link
           href={`/dev/${dev.github_login}`}
@@ -223,7 +223,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
                 alt={dev.github_login}
                 width={56}
                 height={56}
-                className="border-[2px] border-border flex-shrink-0"
+                className="border-2 border-border shrink-0"
                 style={{ imageRendering: "pixelated" }}
               />
             )}

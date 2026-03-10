@@ -103,7 +103,7 @@ export default function RoadmapClient({
               {done}/{total} features ({pct}%)
             </span>
           </div>
-          <div className="mt-2 h-3 border-[2px] border-border bg-bg">
+          <div className="mt-2 h-3 border-2 border-border bg-bg">
             <div
               className="h-full transition-all duration-500"
               style={{
@@ -119,7 +119,7 @@ export default function RoadmapClient({
         <div className="relative mt-10">
           {/* Vertical line */}
           <div
-            className="absolute left-[11px] top-0 h-full w-[3px]"
+            className="absolute left-2.75 top-0 h-full w-0.75"
             style={{ backgroundColor: "#2a2a30" }}
           />
 
@@ -195,7 +195,7 @@ function PhaseBlock({
     <div className={`relative pb-10 ${isLast ? "pb-0" : ""}`}>
       {/* Timeline node */}
       <div
-        className="absolute left-0 top-0 z-10 h-[25px] w-[25px] border-[3px]"
+        className="absolute left-0 top-0 z-10 h-6.25 w-6.25 border-[3px]"
         style={{
           backgroundColor: "#0d0d0f",
           borderColor: cfg.border,
@@ -214,7 +214,7 @@ function PhaseBlock({
           <h2 className="text-lg text-cream">{phase.title}</h2>
           <span className="text-[10px] text-muted">{phase.quarter}</span>
           <span
-            className="border-[2px] px-2 py-0.5 text-[9px]"
+            className="border-2 px-2 py-0.5 text-[9px]"
             style={{
               color: cfg.color,
               borderColor: cfg.border,
@@ -288,7 +288,7 @@ function ItemRow({
       style={{ opacity: isDone ? 0.55 : 1 }}
     >
       {/* Checkbox */}
-      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border-[2px] border-border text-[8px]">
+      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border-2 border-border text-[8px]">
         {isDone ? (
           <span style={{ color: "#4ade80" }}>&#10003;</span>
         ) : item.status === "building" ? (
@@ -319,7 +319,7 @@ function ItemRow({
         <button
           onClick={handleVote}
           disabled={isPending}
-          className="flex shrink-0 items-center gap-1.5 border-[2px] px-2 py-1 text-[10px] transition-all"
+          className="flex shrink-0 items-center gap-1.5 border-2 px-2 py-1 text-[10px] transition-all"
           style={{
             borderColor: optimistic.hasVoted ? ACCENT : "#2a2a30",
             color: optimistic.hasVoted ? ACCENT : MUTED,
@@ -350,7 +350,7 @@ function SignInPrompt({ onClose, onSignIn }: { onClose: () => void; onSignIn: ()
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 border-[2px] border-border px-3 py-2 text-[10px] text-muted transition-colors hover:border-border-light hover:text-warm"
+            className="flex-1 border-2 border-border px-3 py-2 text-[10px] text-muted transition-colors hover:border-border-light hover:text-warm"
           >
             Cancel
           </button>

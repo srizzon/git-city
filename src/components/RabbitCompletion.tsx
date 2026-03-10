@@ -83,7 +83,7 @@ export default function RabbitCompletion({ onComplete }: RabbitCompletionProps) 
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[100] pointer-events-none" style={{ fontFamily: "'Silkscreen', monospace" }}>
+    <div className="fixed inset-0 z-100 pointer-events-none" style={{ fontFamily: "'Silkscreen', monospace" }}>
       {/* Glitch effect */}
       {phase === "glitch" && (
         <div

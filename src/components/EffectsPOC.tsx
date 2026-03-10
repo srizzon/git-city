@@ -1170,7 +1170,7 @@ export default function EffectsPOC() {
       </div>
 
       {/* Control Panel */}
-      <div className="w-[280px] bg-[#0d1220] border-l border-white/10 overflow-y-auto p-4 flex flex-col">
+      <div className="w-70 bg-[#0d1220] border-l border-white/10 overflow-y-auto p-4 flex flex-col">
         <div className="mb-4 pb-3 border-b border-white/10">
           <h2 className="text-xs font-bold uppercase tracking-wider text-white/50">
             Building Effects

@@ -153,7 +153,7 @@ export function AdPurchaseForm() {
         {/* Row 2: Currency + Price */}
         <div className="mt-4 flex items-center gap-3">
           {/* Currency toggle */}
-          <div className="flex border-[2px] border-border text-[9px]">
+          <div className="flex border-2 border-border text-[9px]">
             {(["usd", "brl"] as const).map((c) => (
               <button
                 key={c}
@@ -187,7 +187,7 @@ export function AdPurchaseForm() {
         </div>
 
         {/* Divider */}
-        <div className="my-4 border-t-[2px] border-border" />
+        <div className="my-4 border-t-2 border-border" />
 
         {/* Row 3: Text input */}
         <div>
@@ -208,7 +208,7 @@ export function AdPurchaseForm() {
             maxLength={MAX_TEXT_LENGTH + 10}
             rows={2}
             placeholder="YOUR BRAND MESSAGE HERE"
-            className="mt-1.5 w-full border-[3px] border-border bg-transparent px-3 py-2 font-pixel text-xs text-cream uppercase outline-none transition-colors focus:border-[#c8e64a]"
+            className="mt-1.5 w-full border-[3px] border-border bg-transparent px-3 py-2 font-pixel text-xs text-cream uppercase outline-none transition-colors focus:border-lime"
           />
         </div>
 
@@ -223,14 +223,14 @@ export function AdPurchaseForm() {
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="h-8 w-8 cursor-pointer border-[2px] border-border bg-transparent"
+                className="h-8 w-8 cursor-pointer border-2 border-border bg-transparent"
               />
               <input
                 type="text"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 maxLength={7}
-                className="w-full border-[2px] border-border bg-transparent px-2 py-1.5 font-pixel text-[10px] text-cream outline-none transition-colors focus:border-[#c8e64a]"
+                className="w-full border-2 border-border bg-transparent px-2 py-1.5 font-pixel text-[10px] text-cream outline-none transition-colors focus:border-lime"
               />
             </div>
           </div>
@@ -243,14 +243,14 @@ export function AdPurchaseForm() {
                 type="color"
                 value={bgColor}
                 onChange={(e) => setBgColor(e.target.value)}
-                className="h-8 w-8 cursor-pointer border-[2px] border-border bg-transparent"
+                className="h-8 w-8 cursor-pointer border-2 border-border bg-transparent"
               />
               <input
                 type="text"
                 value={bgColor}
                 onChange={(e) => setBgColor(e.target.value)}
                 maxLength={7}
-                className="w-full border-[2px] border-border bg-transparent px-2 py-1.5 font-pixel text-[10px] text-cream outline-none transition-colors focus:border-[#c8e64a]"
+                className="w-full border-2 border-border bg-transparent px-2 py-1.5 font-pixel text-[10px] text-cream outline-none transition-colors focus:border-lime"
               />
             </div>
           </div>

@@ -24,7 +24,7 @@ export default memo(function XpBar({ xpTotal, xpLevel }: XpBarProps) {
   const badge = TIER_BADGES[tier.id];
 
   return (
-    <div className="flex items-center gap-1.5 border-[2px] border-border bg-bg/80 px-2 py-1 backdrop-blur-sm">
+    <div className="flex items-center gap-1.5 border-2 border-border bg-bg/80 px-2 py-1 backdrop-blur-sm">
       {/* Level number */}
       <span
         className="text-sm font-bold leading-none"
@@ -43,7 +43,7 @@ export default memo(function XpBar({ xpTotal, xpLevel }: XpBarProps) {
             {badge}
           </span>
         )}
-        <div className="h-[4px] w-16 bg-border">
+        <div className="h-2 w-16 bg-border">
           <div
             className="h-full transition-all duration-700 ease-out"
             style={{

@@ -203,7 +203,7 @@ export default async function LeaderboardPage({
 
         {/* Mode toggle: Developers | Game */}
         <div className="mt-6 flex justify-center">
-          <div className="flex border-[2px] border-border">
+          <div className="flex border-2 border-border">
             <Link
               href="/leaderboard?mode=developers"
               className="px-5 py-2 text-[11px] transition-colors"
@@ -216,7 +216,7 @@ export default async function LeaderboardPage({
             </Link>
             <Link
               href="/leaderboard?mode=game"
-              className="relative border-l-[2px] border-border px-5 py-2 text-[11px] transition-colors"
+              className="relative border-l-2 border-border px-5 py-2 text-[11px] transition-colors"
               style={{
                 color: mode === "game" ? ACCENT : "var(--color-muted)",
                 backgroundColor: mode === "game" ? "rgba(200, 230, 74, 0.1)" : "transparent",
@@ -226,7 +226,7 @@ export default async function LeaderboardPage({
             </Link>
             <Link
               href="/leaderboard?mode=dailies"
-              className="relative border-l-[2px] border-border px-5 py-2 text-[11px] transition-colors"
+              className="relative border-l-2 border-border px-5 py-2 text-[11px] transition-colors"
               style={{
                 color: mode === "dailies" ? ACCENT : "var(--color-muted)",
                 backgroundColor: mode === "dailies" ? "rgba(200, 230, 74, 0.1)" : "transparent",
@@ -255,7 +255,7 @@ export default async function LeaderboardPage({
                 <Link
                   key={tab.id}
                   href={`/leaderboard?tab=${tab.id}`}
-                  className="px-3 py-1.5 text-[10px] transition-colors border-[2px]"
+                  className="px-3 py-1.5 text-[10px] transition-colors border-2"
                   style={{
                     borderColor: activeTab === tab.id ? ACCENT : "var(--color-border)",
                     color: activeTab === tab.id ? ACCENT : "var(--color-muted)",
@@ -310,7 +310,7 @@ export default async function LeaderboardPage({
                           alt={dev.github_login}
                           width={36}
                           height={36}
-                          className="border-[2px] border-border"
+                          className="border-2 border-border"
                           style={{ imageRendering: "pixelated" }}
                         />
                       )}

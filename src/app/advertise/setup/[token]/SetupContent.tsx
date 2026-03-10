@@ -44,7 +44,7 @@ function ClickPreview({
 
   /* Matches the real Sky Ad Card from page.tsx exactly */
   return (
-    <div className="w-full border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm sm:w-[340px]">
+    <div className="w-full border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm sm:w-85">
       {/* Drag handle (mobile indicator) */}
       <div className="flex justify-center py-2 sm:hidden">
         <div className="h-1 w-10 rounded-full bg-border" />
@@ -53,7 +53,7 @@ function ClickPreview({
       {/* Header: brand + sponsored tag */}
       <div className="flex items-center gap-3 px-4 pb-3 sm:pt-4">
         <div
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center border-[2px] text-sm font-bold"
+          className="flex h-9 w-9 shrink-0 items-center justify-center border-2 text-sm font-bold"
           style={{ borderColor: ACCENT, color: ACCENT }}
         >
           {brand ? brand[0].toUpperCase() : "?"}
@@ -215,7 +215,7 @@ export function SetupContent({
               onChange={(e) => setText(e.target.value)}
               maxLength={MAX_TEXT_LENGTH + 10}
               placeholder="YOUR BRAND"
-              className="mt-1 w-full border-[3px] border-border bg-transparent px-3 py-2.5 font-pixel text-sm text-cream outline-none transition-colors focus:border-[#c8e64a]"
+              className="mt-1 w-full border-[3px] border-border bg-transparent px-3 py-2.5 font-pixel text-sm text-cream outline-none transition-colors focus:border-lime"
             />
             <p
               className="mt-1 text-[11px] normal-case"
@@ -241,7 +241,7 @@ export function SetupContent({
               onChange={(e) => setBrand(e.target.value)}
               maxLength={60}
               placeholder="Your Company"
-              className="mt-1 w-full border-[3px] border-border bg-transparent px-3 py-2.5 font-pixel text-sm text-cream outline-none transition-colors focus:border-[#c8e64a]"
+              className="mt-1 w-full border-[3px] border-border bg-transparent px-3 py-2.5 font-pixel text-sm text-cream outline-none transition-colors focus:border-lime"
             />
             <p className="mt-1 text-[11px] text-muted normal-case">
               {brand.length}/60
@@ -259,7 +259,7 @@ export function SetupContent({
               maxLength={200}
               rows={4}
               placeholder="Tell visitors about your product or service. This shows when someone clicks your ad."
-              className="mt-1 w-full resize-y border-[3px] border-border bg-transparent px-3 py-2.5 text-sm text-cream normal-case outline-none transition-colors focus:border-[#c8e64a]"
+              className="mt-1 w-full resize-y border-[3px] border-border bg-transparent px-3 py-2.5 text-sm text-cream normal-case outline-none transition-colors focus:border-lime"
               style={{ fontFamily: "inherit", lineHeight: "1.6" }}
             />
             <p className="mt-1 text-[11px] text-muted normal-case">
@@ -277,7 +277,7 @@ export function SetupContent({
               value={link}
               onChange={(e) => setLink(e.target.value)}
               placeholder="https://yoursite.com"
-              className="mt-1 w-full border-[3px] border-border bg-transparent px-3 py-2.5 font-pixel text-sm text-cream outline-none transition-colors focus:border-[#c8e64a]"
+              className="mt-1 w-full border-[3px] border-border bg-transparent px-3 py-2.5 font-pixel text-sm text-cream outline-none transition-colors focus:border-lime"
             />
             {link && !linkValid && (
               <p

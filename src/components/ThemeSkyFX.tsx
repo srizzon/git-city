@@ -399,6 +399,7 @@ function makeSunsetCirrusDomeTexture(seed = 1, w = 1024, h = 512): THREE.CanvasT
     return tex;
 }
 
+
 /** Patchy aurora curtain texture — two 1D noise layers create
  *  gaps where aurora fades out, giving a realistic non-uniform look.
  *  Blur pass smooths column edges. wrapS=Repeat enables UV drift. */
@@ -611,6 +612,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
         geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
         return geo;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- skyD depends on camera.far, intentionally omitted
     }, [themeIndex]);
 
     const starMat = useMemo(() => {
@@ -661,6 +663,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
         geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
         return geo;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- skyD depends on camera.far, intentionally omitted
     }, [themeIndex]);
 
     const dustMat = useMemo(() => {
@@ -940,15 +943,13 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         if (flyPointsRef.current) flyPointsRef.current.rotation.y += dt * 0.010;
 
         // ── Aurora ring scroll + pulse (Emerald) ─────────────────
-        if (themeIndex === 3) {
-            const m0 = auroraMat0Ref.current;
-            const m1 = auroraMat1Ref.current;
-            if (m0 && m1) {
-                // Slower drift — patchy texture already has visual complexity
-                if (m0.map && m1.map) {
-                    m0.map.offset.x = (m0.map.offset.x + dt * 0.010) % 1;
-                    m1.map.offset.x = (m1.map.offset.x - dt * 0.006) % 1;
-                }
+        // eslint-disable-next-line react-compiler/react-compiler -- Three.js material mutation in animation loop
+        if (themeIndex === 3 && auroraRingMat0 && auroraRingMat1) {
+            // Slower drift — patchy texture already has visual complexity
+            if (auroraRingMat0.map && auroraRingMat1.map) {
+                auroraRingMat0.map.offset.x = (auroraRingMat0.map.offset.x + dt * 0.010) % 1;
+                auroraRingMat1.map.offset.x = (auroraRingMat1.map.offset.x - dt * 0.006) % 1;
+            }
 
                 auroraPulse.current.nextIn -= dt;
                 if (auroraPulse.current.nextIn <= 0 && !auroraPulse.current.active) {
@@ -973,8 +974,9 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         }
 
         // ── Sunset cirrus drift ───────────────────────────────────────
-        if (themeIndex === 1 && cirrusMatRef.current?.map) {
-            cirrusMatRef.current.map.offset.x = (cirrusMatRef.current.map.offset.x + dt * 0.0012) % 1;
+        // eslint-disable-next-line react-compiler/react-compiler -- Three.js material mutation in animation loop
+        if (themeIndex === 1 && sunsetCirrusMat?.map) {
+            sunsetCirrusMat.map.offset.x = (sunsetCirrusMat.map.offset.x + dt * 0.0012) % 1;
         }
 
         // ── Streak spawner ───────────────────────────────────────

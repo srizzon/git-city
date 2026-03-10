@@ -239,7 +239,7 @@ function PixModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="relative mx-4 w-full max-w-sm border-[2px] border-border bg-bg p-6">
+      <div className="relative mx-4 w-full max-w-sm border-2 border-border bg-bg p-6">
         {/* Close */}
         <button
           onClick={onClose}
@@ -273,7 +273,7 @@ function PixModal({
               </a>
               <button
                 onClick={() => onCompleted(data.purchaseId)}
-                className="border-[2px] border-border px-4 py-2 text-[10px] text-cream hover:border-border-light"
+                className="border-2 border-border px-4 py-2 text-[10px] text-cream hover:border-border-light"
               >
                 Close
               </button>
@@ -287,7 +287,7 @@ function PixModal({
             </p>
             <button
               onClick={onClose}
-              className="mt-3 border-[2px] border-border px-4 py-2 text-[10px] text-cream hover:border-border-light"
+              className="mt-3 border-2 border-border px-4 py-2 text-[10px] text-cream hover:border-border-light"
             >
               Close
             </button>
@@ -304,7 +304,7 @@ function PixModal({
                   style={{ imageRendering: "pixelated" }}
                 />
               ) : (
-                <div className="flex h-48 w-48 items-center justify-center border-[2px] border-border text-[9px] text-muted">
+                <div className="flex h-48 w-48 items-center justify-center border-2 border-border text-[9px] text-muted">
                   QR code unavailable
                 </div>
               )}
@@ -314,14 +314,14 @@ function PixModal({
             <div className="mb-4">
               <p className="mb-1 text-[8px] text-muted">PIX code (copy &amp; paste):</p>
               <div className="flex items-stretch gap-1">
-                <div className="flex-1 overflow-hidden border-[2px] border-border bg-bg-card px-2 py-1.5">
+                <div className="flex-1 overflow-hidden border-2 border-border bg-bg-card px-2 py-1.5">
                   <p className="truncate text-[8px] text-cream normal-case">
                     {data.brCode}
                   </p>
                 </div>
                 <button
                   onClick={copyCode}
-                  className="shrink-0 border-[2px] px-3 text-[9px] transition-colors"
+                  className="shrink-0 border-2 px-3 text-[9px] transition-colors"
                   style={{
                     borderColor: copied ? ACCENT : "var(--color-border)",
                     color: copied ? ACCENT : "var(--color-cream)",
@@ -403,12 +403,12 @@ function ColorPickerPanel({
   };
 
   return (
-    <div className="mt-2 flex items-center gap-3 border-[2px] border-border/50 bg-bg/50 px-3 py-2">
+    <div className="mt-2 flex items-center gap-3 border-2 border-border/50 bg-bg/50 px-3 py-2">
       <input
         type="color"
         value={color}
         onChange={(e) => handleChange(e.target.value)}
-        className="h-8 w-10 cursor-pointer border-[2px] border-border bg-transparent"
+        className="h-8 w-10 cursor-pointer border-2 border-border bg-transparent"
       />
       <span className="text-[10px] text-muted normal-case">{color}</span>
       {isOwned ? (
@@ -417,7 +417,7 @@ function ColorPickerPanel({
             <button
               onClick={handleRemove}
               disabled={saving}
-              className="border-[2px] border-border px-2 py-1 text-[10px] text-muted hover:text-cream disabled:opacity-40"
+              className="border-2 border-border px-2 py-1 text-[10px] text-muted hover:text-cream disabled:opacity-40"
             >
               {feedback === "removed" ? "Removed!" : "Remove"}
             </button>
@@ -512,16 +512,16 @@ function BillboardUploadPanel({
   const displaySlots = isOwned ? Math.max(slotCount, 1) : 1;
 
   return (
-    <div className="mt-2 border-[2px] border-border/50 bg-bg/50 px-3 py-2">
+    <div className="mt-2 border-2 border-border/50 bg-bg/50 px-3 py-2">
       {isOwned ? (
         <>
           {autoUploading && (
-            <div className="mb-2 border-[2px] border-dashed px-3 py-2 text-[10px] normal-case animate-pulse" style={{ borderColor: ACCENT, color: ACCENT }}>
+            <div className="mb-2 border-2 border-dashed px-3 py-2 text-[10px] normal-case animate-pulse" style={{ borderColor: ACCENT, color: ACCENT }}>
               Uploading your billboard image...
             </div>
           )}
           {!autoUploading && images.filter(Boolean).length === 0 && (
-            <div className="mb-2 border-[2px] border-dashed px-3 py-2 text-[10px] normal-case" style={{ borderColor: ACCENT, color: ACCENT }}>
+            <div className="mb-2 border-2 border-dashed px-3 py-2 text-[10px] normal-case" style={{ borderColor: ACCENT, color: ACCENT }}>
               Upload an image to each slot below to display on your building!
             </div>
           )}
@@ -537,7 +537,7 @@ function BillboardUploadPanel({
               return (
                 <div
                   key={i}
-                  className="flex flex-col items-center gap-1 border-[2px] border-border/30 bg-bg-card p-2"
+                  className="flex flex-col items-center gap-1 border-2 border-border/30 bg-bg-card p-2"
                 >
                   <p className="text-[8px] text-dim">Slot {i + 1}</p>
                   {img ? (
@@ -546,10 +546,10 @@ function BillboardUploadPanel({
                       alt={`Billboard ${i + 1}`}
                       width={120}
                       height={40}
-                      className="h-10 w-full border-[1px] border-border object-cover"
+                      className="h-10 w-full border border-border object-cover"
                     />
                   ) : (
-                    <div className="flex h-10 w-full items-center justify-center border-[1px] border-border/30 bg-bg/50 text-[8px] text-dim">
+                    <div className="flex h-10 w-full items-center justify-center border border-border/30 bg-bg/50 text-[8px] text-dim">
                       Empty
                     </div>
                   )}
@@ -558,7 +558,7 @@ function BillboardUploadPanel({
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/gif"
                     onChange={() => handleFileChange(i)}
-                    className="w-full text-[8px] text-muted normal-case file:mr-1 file:border-[1px] file:border-border file:bg-bg file:px-1 file:py-0.5 file:text-[8px] file:text-cream"
+                    className="w-full text-[8px] text-muted normal-case file:mr-1 file:border file:border-border file:bg-bg file:px-1 file:py-0.5 file:text-[8px] file:text-cream"
                   />
                   <button
                     onClick={() => handleUpload(i)}
@@ -591,7 +591,7 @@ function BillboardUploadPanel({
                 alt="Billboard preview"
                 width={56}
                 height={40}
-                className="h-10 w-14 border-[2px] border-border object-cover"
+                className="h-10 w-14 border-2 border-border object-cover"
               />
             )}
             <input
@@ -599,7 +599,7 @@ function BillboardUploadPanel({
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
               onChange={() => handleFileChange(0)}
-              className="min-w-0 flex-1 text-[9px] text-muted normal-case file:mr-2 file:border-[2px] file:border-border file:bg-bg-card file:px-2 file:py-1 file:text-[9px] file:text-cream"
+              className="min-w-0 flex-1 text-[9px] text-muted normal-case file:mr-2 file:border-2 file:border-border file:bg-bg-card file:px-2 file:py-1 file:text-[9px] file:text-cream"
             />
           </div>
           <p className="mt-1 text-[8px] text-dim normal-case">
@@ -1145,7 +1145,7 @@ export default function ShopClient({
       )}
 
       {error && (
-        <div className="mb-4 border-[2px] border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] text-red-400 normal-case">
+        <div className="mb-4 border-2 border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] text-red-400 normal-case">
           {error}
         </div>
       )}
@@ -1154,7 +1154,7 @@ export default function ShopClient({
       <div className="flex gap-2 mb-5">
         <button
           onClick={() => setActiveTab("building")}
-          className={`px-5 py-2 text-[11px] border-[2px] transition-colors ${
+          className={`px-5 py-2 text-[11px] border-2 transition-colors ${
             activeTab === "building"
               ? "bg-bg-card border-cream/20 text-cream"
               : "border-border text-muted hover:text-cream hover:border-border-light"
@@ -1164,7 +1164,7 @@ export default function ShopClient({
         </button>
         <button
           onClick={() => setActiveTab("raid")}
-          className={`px-5 py-2 text-[11px] border-[2px] transition-colors ${
+          className={`px-5 py-2 text-[11px] border-2 transition-colors ${
             activeTab === "raid"
               ? "bg-bg-card border-cream/20"
               : "border-border text-muted hover:text-cream hover:border-border-light"
@@ -1180,7 +1180,7 @@ export default function ShopClient({
         <>
           <div className="lg:flex lg:gap-6">
             {/* Left column: Preview (sticky on desktop) */}
-            <div className="lg:w-[360px] lg:shrink-0">
+            <div className="lg:w-90 lg:shrink-0">
               <div className="lg:sticky lg:top-6">
                 <ShopPreview
                   loadout={effectiveLoadout}
@@ -1321,8 +1321,8 @@ export default function ShopClient({
                           onMouseLeave={() => setHighlightItem(null)}
                           className={[
                             "flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                            isEquipped ? "border-[3px]" : "border-[2px]",
-                            isEquipped ? "border-[#39d353]" : isConfirming ? "border-[var(--color-border-light)]" : "border-border",
+                            isEquipped ? "border-[3px]" : "border-2",
+                            isEquipped ? "border-[#39d353]" : isConfirming ? "border-(--color-border-light)" : "border-border",
                             isEquipped ? "bg-[rgba(57,211,83,0.1)]" : "bg-bg-card",
                             !isOwned && !isEquipped ? "opacity-60" : "",
                             "hover:border-border-light",
@@ -1350,7 +1350,7 @@ export default function ShopClient({
 
                         {/* Buy confirmation popover */}
                         {isConfirming && shopItem && (
-                          <div data-buy-popover className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                          <div data-buy-popover className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                             <p className="text-[9px] text-cream text-center mb-1.5">
                               {ITEM_NAMES[itemId]}
                             </p>
@@ -1361,7 +1361,7 @@ export default function ShopClient({
                               <div className="flex gap-1">
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }}
-                                  className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream"
+                                  className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream"
                                 >
                                   Cancel
                                 </button>
@@ -1483,8 +1483,8 @@ export default function ShopClient({
                       onMouseLeave={() => setHighlightItem(null)}
                       className={[
                         "flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                        isFacesOwned ? "border-[3px] border-[#39d353] bg-[rgba(57,211,83,0.1)]" : "border-[2px] border-border bg-bg-card opacity-60",
-                        isConfirming ? "border-[var(--color-border-light)]" : "",
+                        isFacesOwned ? "border-[3px] border-[#39d353] bg-[rgba(57,211,83,0.1)]" : "border-2 border-border bg-bg-card opacity-60",
+                        isConfirming ? "border-(--color-border-light)" : "",
                         "hover:border-border-light",
                       ].join(" ")}
                     >
@@ -1508,7 +1508,7 @@ export default function ShopClient({
 
                     {/* Buy confirmation popover */}
                     {isConfirming && shopItem && (
-                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                         <p className="text-[9px] text-cream text-center mb-1.5">
                           {ITEM_NAMES[itemId]}
                         </p>
@@ -1519,7 +1519,7 @@ export default function ShopClient({
                           <div className="flex gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }}
-                              className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream"
+                              className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream"
                             >
                               Cancel
                             </button>
@@ -1638,8 +1638,8 @@ export default function ShopClient({
                       disabled={isBuying || atMax}
                       className={[
                         "flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                        "border-[2px]",
-                        isConfirming ? "border-[var(--color-border-light)]" : "border-border",
+                        "border-2",
+                        isConfirming ? "border-(--color-border-light)" : "border-border",
                         "bg-bg-card",
                         atMax ? "opacity-40" : "",
                         "hover:border-border-light",
@@ -1655,7 +1655,7 @@ export default function ShopClient({
                     </button>
 
                     {isConfirming && (
-                      <div data-buy-popover className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                      <div data-buy-popover className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                         <p className="text-[9px] text-cream text-center mb-1.5">
                           {ITEM_NAMES.streak_freeze}
                         </p>
@@ -1669,7 +1669,7 @@ export default function ShopClient({
                           <div className="flex gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }}
-                              className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream"
+                              className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream"
                             >
                               Cancel
                             </button>
@@ -1725,7 +1725,7 @@ export default function ShopClient({
 
       {/* ─── Raid Tab ─── */}
       {activeTab === "raid" && (
-        <div className="max-w-[640px] mx-auto space-y-5">
+        <div className="max-w-160 mx-auto space-y-5">
           <div className="border-[3px] border-border bg-bg-raised p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm" style={{ color: "#ff5555" }}>
@@ -1743,7 +1743,7 @@ export default function ShopClient({
               <button
                 onClick={() => handleSetRaidVehicle("airplane")}
                 className={[
-                  "w-full overflow-hidden transition-colors border-[2px]",
+                  "w-full overflow-hidden transition-colors border-2",
                   raidLoadout.vehicle === "airplane"
                     ? "border-[#39d353] bg-[rgba(57,211,83,0.05)]"
                     : "border-[#39d353]/40 bg-[rgba(57,211,83,0.02)] hover:border-[#39d353]/70",
@@ -1784,7 +1784,7 @@ export default function ShopClient({
                       disabled={isBuying}
                       className={[
                         "w-full overflow-hidden transition-colors",
-                        "border-[2px]",
+                        "border-2",
                         isOwned
                           ? isActive
                             ? "border-[#39d353] bg-[rgba(57,211,83,0.05)]"
@@ -1815,12 +1815,12 @@ export default function ShopClient({
                       </div>
                     </button>
                     {isConfirming && shopItem && (
-                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                         <p className="text-[9px] text-cream text-center mb-1.5">{ITEM_NAMES[itemId]}</p>
                         <p className="text-[10px] text-center mb-2" style={{ color: "#ff5555" }}>{formatPrice(shopItem)}</p>
                         <div className="flex flex-col gap-1">
                           <div className="flex gap-1">
-                            <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
+                            <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
                             <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId); }} disabled={isBuying} className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#ff5555", boxShadow: "1px 1px 0 0 #aa2222" }}>{isBuying ? "..." : "Buy"}</button>
                           </div>
                           <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId, "nowpayments"); }} disabled={isBuying} className="btn-press w-full py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#f7931a", boxShadow: "1px 1px 0 0 #b36a00" }}>{isBuying ? "..." : "Pay with Crypto"}</button>
@@ -1864,7 +1864,7 @@ export default function ShopClient({
                           disabled={isBuying}
                           className={[
                             "relative flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                            "border-[2px]",
+                            "border-2",
                             isOwned
                               ? "border-[#39d353] bg-[rgba(57,211,83,0.05)]"
                               : isConfirming
@@ -1883,12 +1883,12 @@ export default function ShopClient({
                           )}
                         </button>
                         {isConfirming && shopItem && (
-                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                             <p className="text-[9px] text-cream text-center mb-1.5">{ITEM_NAMES[itemId]}</p>
                             <p className="text-[10px] text-center mb-2" style={{ color: "#ff5555" }}>{formatPrice(shopItem)}</p>
                             <div className="flex flex-col gap-1">
                               <div className="flex gap-1">
-                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
+                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
                                 <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId); }} disabled={isBuying} className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#ff5555", boxShadow: "1px 1px 0 0 #aa2222" }}>{isBuying ? "..." : "Buy"}</button>
                               </div>
                               <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId, "nowpayments"); }} disabled={isBuying} className="btn-press w-full py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#f7931a", boxShadow: "1px 1px 0 0 #b36a00" }}>{isBuying ? "..." : "Pay with Crypto"}</button>
@@ -1932,7 +1932,7 @@ export default function ShopClient({
                           disabled={isBuying}
                           className={[
                             "relative flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                            "border-dashed border-[2px] border-orange-500/30",
+                            "border-dashed border-2 border-orange-500/30",
                             isConfirming ? "border-red-500/60 border-solid" : "",
                             "bg-bg-card hover:border-orange-500/50",
                           ].join(" ")}
@@ -1945,12 +1945,12 @@ export default function ShopClient({
                           <span className="mt-0.5 text-[8px] text-muted">{isBuying ? "..." : shopItem ? formatPrice(shopItem) : ""}</span>
                         </button>
                         {isConfirming && shopItem && (
-                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                             <p className="text-[9px] text-cream text-center mb-1.5">{ITEM_NAMES[itemId]}</p>
                             <p className="text-[10px] text-center mb-2" style={{ color: "#ff5555" }}>{formatPrice(shopItem)}</p>
                             <div className="flex flex-col gap-1">
                               <div className="flex gap-1">
-                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
+                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
                                 <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId); }} disabled={isBuying} className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#ff5555", boxShadow: "1px 1px 0 0 #aa2222" }}>{isBuying ? "..." : "Buy"}</button>
                               </div>
                               <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId, "nowpayments"); }} disabled={isBuying} className="btn-press w-full py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#f7931a", boxShadow: "1px 1px 0 0 #b36a00" }}>{isBuying ? "..." : "Pay with Crypto"}</button>

@@ -49,6 +49,8 @@ export async function createCheckoutSession(
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: customerEmail || undefined,
+    billing_address_collection: "required",
+    tax_id_collection: { enabled: true },
     line_items: [
       {
         price_data: {

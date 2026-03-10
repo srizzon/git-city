@@ -51,7 +51,7 @@ export function AdRow({
 
         {/* Ad info */}
         <div className="flex items-center gap-2 min-w-0">
-          <span className="shrink-0 w-[72px] text-[9px] text-dim uppercase tracking-wide">
+          <span className="shrink-0 w-18 text-[9px] text-dim uppercase tracking-wide">
             {VEHICLE_LABELS[ad.vehicle] ?? ad.vehicle}
           </span>
           <div className="min-w-0 flex-1">

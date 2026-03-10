@@ -233,7 +233,7 @@ export default function LofiRadio() {
       {/* Expanded panel — above button normally, to the right in fly mode */}
       {expanded && (
         <div
-          className={`absolute z-[25] border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm ${
+          className={`absolute z-25 border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm ${
             flyMode ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2'
           }`}
           style={{ animation: "fade-in 0.15s ease-out", boxShadow: `3px 3px 0 0 ${shadow}`, width: 200 }}
@@ -257,7 +257,7 @@ export default function LofiRadio() {
         </button>
         <button
           onClick={togglePlay}
-          className="btn-press flex h-[32px] w-[32px] items-center justify-center border-[2px] border-border hover:border-cream/40"
+          className="btn-press flex h-8 w-8 items-center justify-center border-2 border-border hover:border-cream/40"
           style={{ color: playing ? accent : "var(--color-cream)" }}
           title={playing ? "Pause" : "Play"}
         >
@@ -306,7 +306,7 @@ export default function LofiRadio() {
         <span style={{ color: playing ? accent : "var(--color-muted)" }}>
           {playing ? "\u23F8" : "\u25B6"}
         </span>
-        <span className="text-cream max-w-[80px] truncate">
+        <span className="text-cream max-w-20 truncate">
           {playing ? currentTrack?.title : "Lo-fi"}
         </span>
         <span

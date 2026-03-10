@@ -74,7 +74,7 @@ export function AdModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-black/60 pt-[5vh]">
+    <div className="fixed inset-0 z-80 flex items-start justify-center overflow-y-auto bg-black/60 pt-[5vh]">
       <div className="mb-[5vh] w-full max-w-2xl border-2 border-border bg-bg-raised p-6">
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-cream">

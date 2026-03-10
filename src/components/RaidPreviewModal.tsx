@@ -79,9 +79,9 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
   const [selectedVehicle, setSelectedVehicle] = useState(preview.vehicle);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div
-        className="mx-4 w-full max-w-sm border-[2px] border-red-500/60 bg-bg-raised/95 p-5 backdrop-blur-sm"
+        className="mx-4 w-full max-w-sm border-2 border-red-500/60 bg-bg-raised/95 p-5 backdrop-blur-sm"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -223,14 +223,14 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="btn-press flex-1 border-[2px] border-cream/20 px-3 py-2 text-xs text-muted transition-colors hover:border-cream/40 hover:text-cream"
+            className="btn-press flex-1 border-2 border-cream/20 px-3 py-2 text-xs text-muted transition-colors hover:border-cream/40 hover:text-cream"
           >
             Cancel
           </button>
           <button
             onClick={() => onRaid(selectedBoost?.purchase_id, selectedVehicle)}
             disabled={loading}
-            className="btn-press flex-1 border-[2px] border-red-500/60 px-3 py-2 text-xs font-bold text-red-400 transition-all hover:bg-red-500/10 disabled:opacity-50"
+            className="btn-press flex-1 border-2 border-red-500/60 px-3 py-2 text-xs font-bold text-red-400 transition-all hover:bg-red-500/10 disabled:opacity-50"
             style={{
               animation: loading ? "none" : "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
             }}

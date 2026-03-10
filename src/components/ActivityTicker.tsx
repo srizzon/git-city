@@ -91,7 +91,7 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel, hasB
 
   return (
     <div
-      className={`fixed ${hasBottomBar ? "bottom-[46px]" : "bottom-0"} sm:bottom-0 left-0 right-0 z-30 flex h-7 items-center border-t border-border/30 bg-bg/90 backdrop-blur-sm`}
+      className={`fixed ${hasBottomBar ? "bottom-11.5" : "bottom-0"} sm:bottom-0 left-0 right-0 z-30 flex h-7 items-center border-t border-border/30 bg-bg/90 backdrop-blur-sm`}
     >
       <div
         className="min-w-0 flex-1 overflow-hidden cursor-pointer"

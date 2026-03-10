@@ -122,7 +122,7 @@ export default function PitchDeck({ stats }: { stats: PitchStats }) {
       </div>
 
       {/* ── bottom bar ── */}
-      <div className="absolute bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm sm:px-8">
+      <div className="absolute bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t-2 border-border bg-bg/80 px-4 py-3 backdrop-blur-sm sm:px-8">
         {/* left: back + counter */}
         <div className="flex items-center gap-4">
           <Link
@@ -166,14 +166,14 @@ export default function PitchDeck({ stats }: { stats: PitchStats }) {
           <button
             onClick={prev}
             disabled={active === 0}
-            className="btn-press border-[2px] border-border px-3 py-1.5 text-sm text-cream transition-colors hover:border-border-light disabled:opacity-30 sm:px-4 sm:py-2 sm:text-base"
+            className="btn-press border-2 border-border px-3 py-1.5 text-sm text-cream transition-colors hover:border-border-light disabled:opacity-30 sm:px-4 sm:py-2 sm:text-base"
           >
             &larr;
           </button>
           <button
             onClick={next}
             disabled={active === TOTAL_SLIDES - 1}
-            className="btn-press border-[2px] border-border px-3 py-1.5 text-sm text-cream transition-colors hover:border-border-light disabled:opacity-30 sm:px-4 sm:py-2 sm:text-base"
+            className="btn-press border-2 border-border px-3 py-1.5 text-sm text-cream transition-colors hover:border-border-light disabled:opacity-30 sm:px-4 sm:py-2 sm:text-base"
           >
             &rarr;
           </button>
@@ -444,7 +444,7 @@ function SlideCompetition() {
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm normal-case sm:text-base">
           <thead>
-            <tr className="border-b-[2px] border-border text-muted">
+            <tr className="border-b-2 border-border text-muted">
               <th className="pb-3 pr-6 text-sm sm:text-base">Feature</th>
               <th className="pb-3 pr-6 text-sm sm:text-base" style={{ color: ACCENT }}>
                 Git City
@@ -528,7 +528,7 @@ function SlideFounder() {
               </p>
             </div>
           </div>
-          <div className="h-[2px] bg-border" />
+          <div className="h-0.5 bg-border" />
           <div className="grid gap-6 sm:grid-cols-3">
             <div>
               <p className="text-sm text-dim sm:text-base">Age</p>
@@ -644,7 +644,7 @@ function SlideHeader({ n, title }: { n: string; title: string }) {
 
 function Pill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="border-[2px] border-border px-3 py-1.5 text-xs text-muted sm:text-sm">
+    <span className="border-2 border-border px-3 py-1.5 text-xs text-muted sm:text-sm">
       {children}
     </span>
   );
@@ -766,7 +766,7 @@ function ModelCard({
       <p className="mb-4 text-sm leading-relaxed text-muted normal-case">
         {desc}
       </p>
-      <div className="h-[2px] bg-border" />
+      <div className="h-0.5 bg-border" />
       <div className="mt-3 flex justify-between text-sm">
         <span className="text-dim">Price</span>
         <span className="text-cream">{price}</span>

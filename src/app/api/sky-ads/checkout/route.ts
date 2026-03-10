@@ -127,6 +127,8 @@ export async function POST(request: NextRequest) {
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
+      billing_address_collection: "required",
+      tax_id_collection: { enabled: true },
       line_items: [
         {
           price_data: {

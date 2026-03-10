@@ -152,12 +152,24 @@ export async function POST(request: Request) {
           .eq("provider", "stripe")
           .maybeSingle();
 
+        const taxId = session.customer_details?.tax_ids?.[0];
+        const billingAddress = session.customer_details?.address;
+        const fiscalData = {
+          buyer_name: session.customer_details?.name ?? null,
+          buyer_email: session.customer_details?.email ?? null,
+          buyer_tax_id: taxId?.value ?? null,
+          buyer_tax_id_type: taxId?.type ?? null,
+          buyer_country: billingAddress?.country ?? null,
+          buyer_address: billingAddress ?? null,
+        };
+
         if (pending) {
           await sb
             .from("purchases")
             .update({
               status: "completed",
               provider_tx_id: paymentIntentId ?? session.id,
+              ...fiscalData,
             })
             .eq("id", pending.id);
 
@@ -233,6 +245,7 @@ export async function POST(request: Request) {
               amount_cents: session.amount_total ?? 0,
               currency: session.currency ?? "usd",
               status: "completed",
+              ...fiscalData,
             });
             await autoEquipIfSolo(Number(developerId), itemId);
           }

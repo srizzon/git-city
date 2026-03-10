@@ -249,7 +249,7 @@ function SearchFeedback({
   if (feedback.type === "loading") {
     return (
       <div className="flex items-center gap-2 py-1 animate-[fade-in_0.15s_ease-out]">
-        <span className="blink-dot h-2 w-2 flex-shrink-0" style={{ backgroundColor: accentColor }} />
+        <span className="blink-dot h-2 w-2 shrink-0" style={{ backgroundColor: accentColor }} />
         <span className="text-[11px] text-muted normal-case">{LOADING_PHASES[phaseIndex].text}</span>
       </div>
     );
@@ -282,7 +282,7 @@ function SearchFeedback({
       {msg.hasRetry && (
         <button
           onClick={onRetry}
-          className="btn-press mt-2 border-[2px] border-border px-3 py-1 text-[10px] text-cream transition-colors hover:border-border-light"
+          className="btn-press mt-2 border-2 border-border px-3 py-1 text-[10px] text-cream transition-colors hover:border-border-light"
         >
           Retry
         </button>
@@ -315,7 +315,7 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
     .slice(0, 5);
 
   return (
-    <div className="hidden w-[200px] sm:block">
+    <div className="hidden w-50 sm:block">
       <div className="mb-2 flex items-center justify-between">
         <button
           onClick={() => setCatIndex((i) => (i + 1) % LEADERBOARD_CATEGORIES.length)}
@@ -331,7 +331,7 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
           View all &rarr;
         </a>
       </div>
-      <div className="border-[2px] border-border bg-bg-raised/80 backdrop-blur-sm">
+      <div className="border-2 border-border bg-bg-raised/80 backdrop-blur-sm">
         {sorted.map((b, i) => (
           <a
             key={b.login}
@@ -355,7 +355,7 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
                 {b.login}
               </span>
             </span>
-            <span className="ml-2 flex-shrink-0 text-[10px] text-muted">
+            <span className="ml-2 shrink-0 text-[10px] text-muted">
               {(b[cat.key] as number).toLocaleString()}
             </span>
           </a>
@@ -2244,7 +2244,7 @@ function HomeContent() {
           <div className="absolute top-4 left-1/2 -translate-x-1/2">
             <div className="inline-flex items-center gap-3 border-[3px] border-border bg-bg/70 px-5 py-2.5 backdrop-blur-sm">
               <span
-                className={`h-2 w-2 flex-shrink-0 ${flyPaused ? "" : "blink-dot"}`}
+                className={`h-2 w-2 shrink-0 ${flyPaused ? "" : "blink-dot"}`}
                 style={{ backgroundColor: flyPaused ? "#f85149" : theme.accent }}
               />
               <span className="text-[10px] text-cream">
@@ -2264,7 +2264,7 @@ function HomeContent() {
           {/* Score HUD (top right) */}
           <div className="absolute top-4 right-3 text-right text-[9px] text-muted sm:right-4 sm:text-[10px]">
             <div>{flyScore.collected}/40 collected</div>
-            <div className="mt-1 flex h-[4px] w-24 items-center border border-border/40 bg-bg/50 ml-auto">
+            <div className="mt-1 flex h-1 w-24 items-center border border-border/40 bg-bg/50 ml-auto">
               <div className="h-full transition-all duration-150" style={{ width: `${(flyScore.collected / 40) * 100}%`, backgroundColor: theme.accent }} />
             </div>
             <div className="mt-1.5 text-[8px]">
@@ -2285,7 +2285,7 @@ function HomeContent() {
               <span style={{ color: theme.accent }} className="w-6 text-right">
                 {Math.round(hud.speed)}
               </span>
-              <div className="flex h-[6px] w-20 items-center border border-border/60 bg-bg/50">
+              <div className="flex h-1.5 w-20 items-center border border-border/60 bg-bg/50">
                 <div
                   className="h-full transition-all duration-150"
                   style={{
@@ -2315,7 +2315,7 @@ function HomeContent() {
           )}
 
           {/* Controls hint */}
-          <div className="absolute bottom-[140px] right-3 text-right text-[8px] leading-loose text-muted sm:right-4 sm:text-[9px]">
+          <div className="absolute bottom-35 right-3 text-right text-[8px] leading-loose text-muted sm:right-4 sm:text-[9px]">
             {flyPaused ? (
               <>
                 <div>
@@ -2435,7 +2435,7 @@ function HomeContent() {
           </div>
 
           {/* Theme switcher + Radio (bottom-left) — above ticker */}
-          <div className="pointer-events-auto fixed bottom-10 left-3 z-[31] flex flex-col-reverse items-start gap-2 sm:left-4 sm:flex-row sm:items-center">
+          <div className="pointer-events-auto fixed bottom-10 left-3 z-31 flex flex-col-reverse items-start gap-2 sm:left-4 sm:flex-row sm:items-center">
             <button
               onClick={cycleTheme}
               className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
@@ -2507,7 +2507,7 @@ function HomeContent() {
           {/* Live users — desktop only */}
           {liveStatus !== "error" && (
             <div className="hidden sm:flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm">
-              <span className="live-dot h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#4ade80]" />
+              <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#4ade80]" />
               <span className="text-cream">{liveUsers.toLocaleString()}</span>
               <span className="text-muted">live</span>
             </div>
@@ -2518,7 +2518,7 @@ function HomeContent() {
               onClick={() => setCodingInfoOpen(true)}
               className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm sm:hidden"
             >
-              <span className="live-dot h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#4ade80]" />
+              <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#4ade80]" />
               <span className="text-cream">{codingCount}</span>
               <span className="text-muted">coding</span>
             </button>
@@ -2717,9 +2717,9 @@ function HomeContent() {
 
       {/* ─── Coding Info Modal (mobile) ─── */}
       {codingInfoOpen && (
-        <div className="pointer-events-auto fixed inset-0 z-[50] flex items-end sm:hidden" onClick={() => setCodingInfoOpen(false)}>
+        <div className="pointer-events-auto fixed inset-0 z-50 flex items-end sm:hidden" onClick={() => setCodingInfoOpen(false)}>
           <div
-            className="w-full border-t-[2px] border-border bg-bg px-5 py-6 animate-[slide-up_0.2s_ease-out]"
+            className="w-full border-t-2 border-border bg-bg px-5 py-6 animate-[slide-up_0.2s_ease-out]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -2750,7 +2750,7 @@ function HomeContent() {
       {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (
         <button
           onClick={() => setMobileMenuOpen(true)}
-          className="pointer-events-auto fixed top-3 right-3 z-[40] flex h-8 w-8 items-center justify-center border-[2px] border-border bg-bg/80 backdrop-blur-sm sm:hidden"
+          className="pointer-events-auto fixed top-3 right-3 z-40 flex h-8 w-8 items-center justify-center border-2 border-border bg-bg/80 backdrop-blur-sm sm:hidden"
         >
           <Menu size={16} className="text-cream" />
         </button>
@@ -2758,7 +2758,7 @@ function HomeContent() {
 
       {/* ─── Mobile Fullscreen Menu ─── */}
       {mobileMenuOpen && (
-        <div className="pointer-events-auto fixed inset-0 z-[50] flex flex-col bg-bg sm:hidden animate-[slide-in-right_0.25s_ease-out]" style={{ background: "var(--color-bg)" }}>
+        <div className="pointer-events-auto fixed inset-0 z-50 flex flex-col bg-bg sm:hidden animate-[slide-in-right_0.25s_ease-out]" style={{ background: "var(--color-bg)" }}>
 
           {/* ── Profile / Auth header ── */}
           {session ? (
@@ -2766,7 +2766,7 @@ function HomeContent() {
               <div className="flex items-start justify-between">
                 <Link href={`/dev/${authLogin}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
                   {myBuilding?.avatar_url && (
-                    <Image src={myBuilding.avatar_url} alt="" width={48} height={48} unoptimized={true} className="h-12 w-12 rounded-full border-[2px]" style={{ borderColor: theme.accent }} />
+                    <Image src={myBuilding.avatar_url} alt="" width={48} height={48} unoptimized={true} className="h-12 w-12 rounded-full border-2" style={{ borderColor: theme.accent }} />
                   )}
                   <div>
                     <div className="flex items-center gap-2">
@@ -2793,7 +2793,7 @@ function HomeContent() {
                 </Link>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex h-8 w-8 items-center justify-center border-[2px] border-border text-muted"
+                  className="flex h-8 w-8 items-center justify-center border-2 border-border text-muted"
                 >
                   <X size={14} />
                 </button>
@@ -2815,7 +2815,7 @@ function HomeContent() {
                 <span className="text-xs text-muted">GIT CITY</span>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex h-8 w-8 items-center justify-center border-[2px] border-border text-muted"
+                  className="flex h-8 w-8 items-center justify-center border-2 border-border text-muted"
                 >
                   <X size={14} />
                 </button>
@@ -2883,7 +2883,7 @@ function HomeContent() {
                 className="flex items-center justify-between px-5 py-4 active:bg-white/5"
               >
                 <span className="flex items-center gap-2 text-sm text-cream">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2] flex-shrink-0"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z" /></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2] shrink-0"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z" /></svg>
                   Discord
                   {discordMembers != null && <span className="text-[10px] text-muted">{discordMembers.toLocaleString()} members</span>}
                 </span>
@@ -2897,7 +2897,7 @@ function HomeContent() {
                 className="flex items-center justify-between px-5 py-4 active:bg-white/5"
               >
                 <span className="flex items-center gap-2 text-sm text-cream">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream flex-shrink-0"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream shrink-0"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
                   GitHub
                   {starCount != null && <span className="text-[10px] text-muted">&#9733; {starCount.toLocaleString()}</span>}
                 </span>
@@ -2913,7 +2913,7 @@ function HomeContent() {
                   <button
                     key={t.name}
                     onClick={() => { setThemeIndex(i); try { localStorage.setItem("gitcity_theme", String(i)); } catch { } }}
-                    className="py-2.5 text-[10px] border-[2px] transition-colors"
+                    className="py-2.5 text-[10px] border-2 transition-colors"
                     style={{
                       borderColor: themeIndex === i ? t.accent : "var(--color-border)",
                       color: themeIndex === i ? t.accent : "var(--color-muted)",
@@ -3000,7 +3000,7 @@ function HomeContent() {
                       rel="noopener noreferrer"
                       className="block w-full max-w-sm group"
                     >
-                      <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm transition-colors group-hover:border-[var(--hover-border)]" style={{ "--hover-border": theme.accent } as React.CSSProperties}>
+                      <div className="border-2 border-border bg-bg/80 px-4 py-3 backdrop-blur-sm transition-colors group-hover:border-[var(--hover-border)]" style={{ "--hover-border": theme.accent } as React.CSSProperties}>
                         <div className="mb-2 flex items-baseline justify-between">
                           <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
                             ROAD TO {label} STARS
@@ -3009,7 +3009,7 @@ function HomeContent() {
                             {remaining.toLocaleString()} to go
                           </span>
                         </div>
-                        <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
+                        <div className="relative h-2.5 w-full overflow-hidden border-2 border-border bg-bg">
                           <div
                             className="absolute inset-y-0 left-0 transition-all duration-1000"
                             style={{
@@ -3095,7 +3095,7 @@ function HomeContent() {
                     localStorage.setItem("gitcity_welcome_seen", "true");
                     handleSignIn();
                   }}
-                  className="btn-press w-full max-w-[240px] py-2.5 text-[10px] text-bg"
+                  className="btn-press w-full max-w-60 py-2.5 text-[10px] text-bg"
                   style={{
                     backgroundColor: theme.accent,
                     boxShadow: `3px 3px 0 0 ${theme.shadow}`,
@@ -3136,7 +3136,7 @@ function HomeContent() {
                 <button
                   type="submit"
                   disabled={loading || !username.trim()}
-                  className="btn-press flex-shrink-0 px-4 py-2 text-xs text-bg disabled:opacity-40 sm:px-5 sm:py-2.5"
+                  className="btn-press shrink-0 px-4 py-2 text-xs text-bg disabled:opacity-40 sm:px-5 sm:py-2.5"
                   style={{
                     backgroundColor: theme.accent,
                     boxShadow: `4px 4px 0 0 ${theme.shadow}`,
@@ -3222,7 +3222,7 @@ function HomeContent() {
                     {showFlyHint && (
                       <div className="absolute bottom-full left-1/2 z-30 mb-3 -translate-x-1/2 animate-[fade-in_0.3s_ease-out]">
                         <div
-                          className="relative w-64 border-[2px] border-border bg-bg-raised px-4 py-3 text-center backdrop-blur-sm"
+                          className="relative w-64 border-2 border-border bg-bg-raised px-4 py-3 text-center backdrop-blur-sm"
                           style={{ borderColor: theme.accent + "60" }}
                         >
                           <p className="text-[10px] leading-relaxed text-cream normal-case">
@@ -3270,7 +3270,7 @@ function HomeContent() {
                         setShowFlyControls(true);
                       }
                     }}
-                    className="btn-press flex items-center gap-2 border-[2px] bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+                    className="btn-press flex items-center gap-2 border-2 bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
                     style={{ borderColor: theme.accent + "60", color: theme.accent }}
                   >
                     <span className="normal-case">Today&apos;s challenge is live</span>
@@ -3361,7 +3361,7 @@ function HomeContent() {
                     )}
                     <button
                       onClick={handleSignOut}
-                      className="border-[2px] border-border bg-bg/80 px-2 py-1 text-[9px] text-muted backdrop-blur-sm transition-colors hover:text-cream hover:border-border-light"
+                      className="border-2 border-border bg-bg/80 px-2 py-1 text-[9px] text-muted backdrop-blur-sm transition-colors hover:text-cream hover:border-border-light"
                     >
                       Sign Out
                     </button>
@@ -3383,17 +3383,17 @@ function HomeContent() {
 
       {/* ─── Mobile Bottom Bar (game-style nav) ─── */}
       {!flyMode && !exploreMode && !introMode && !rabbitCinematic && buildings.length > 0 && (
-        <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-[35] hidden items-center justify-around border-t-[2px] border-border bg-bg/95 px-1 py-2 backdrop-blur-md sm:hidden">
+        <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-35 hidden items-center justify-around border-t-2 border-border bg-bg/95 px-1 py-2 backdrop-blur-md sm:hidden">
           <Link
             href={shopHref}
-            className="btn-press border-[2px] border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
+            className="btn-press border-2 border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
             style={{ color: theme.accent }}
           >
             Shop
           </Link>
           <Link
             href="/advertise"
-            className="btn-press relative border-[2px] px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
+            className="btn-press relative border-2 px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
             style={{ color: theme.accent, borderColor: theme.accent + "60", backgroundColor: theme.accent + "12" }}
           >
             Ad
@@ -3406,7 +3406,7 @@ function HomeContent() {
           </Link>
           <Link
             href="/leaderboard"
-            className="btn-press border-[2px] border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
+            className="btn-press border-2 border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
             style={{ color: theme.accent }}
           >
             &#9819; Rank
@@ -3414,7 +3414,7 @@ function HomeContent() {
           {!session ? (
             <button
               onClick={handleSignIn}
-              className="btn-press border-[2px] border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
+              className="btn-press border-2 border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
             >
               <span style={{ color: theme.accent }}>G</span>{" "}
               <span className="text-cream">Sign in</span>
@@ -3433,7 +3433,7 @@ function HomeContent() {
               )}
               <Link
                 href={`/dev/${authLogin}`}
-                className="btn-press flex items-center gap-1 border-[2px] border-border px-3 py-1.5 text-[10px] text-cream normal-case transition-colors active:bg-white/5"
+                className="btn-press flex items-center gap-1 border-2 border-border px-3 py-1.5 text-[10px] text-cream normal-case transition-colors active:bg-white/5"
               >
                 @{authLogin.length > 8 ? authLogin.slice(0, 7) + "…" : authLogin}
                 {streakData && streakData.streak > 0 && (
@@ -3628,7 +3628,7 @@ function HomeContent() {
                     alt={selectedBuilding.login}
                     width={48}
                     height={48}
-                    className="border-[2px] border-border flex-shrink-0"
+                    className="border-2 border-border shrink-0"
                     style={{ imageRendering: "pixelated" }}
                   />
                 )}
@@ -3639,7 +3639,7 @@ function HomeContent() {
                     )}
                     {selectedBuilding.claimed && (
                       <span
-                        className="flex-shrink-0 px-1.5 py-0.5 text-[7px] text-bg"
+                        className="shrink-0 px-1.5 py-0.5 text-[7px] text-bg"
                         style={{ backgroundColor: theme.accent }}
                       >
                         Claimed
@@ -3665,7 +3665,7 @@ function HomeContent() {
                 return (
                   <div className="mx-4 mb-2 flex items-center gap-2">
                     <span
-                      className="flex h-7 w-7 items-center justify-center border-[2px] text-xs font-bold"
+                      className="flex h-7 w-7 items-center justify-center border-2 text-xs font-bold"
                       style={{ borderColor: bTier.color, color: bTier.color }}
                     >
                       {selectedBuilding.xp_level ?? 1}
@@ -3683,7 +3683,7 @@ function HomeContent() {
                         </span>
                       </div>
                       <div className="mt-1 flex items-center gap-1.5">
-                        <div className="h-[4px] flex-1 bg-border">
+                        <div className="h-1 flex-1 bg-border">
                           <div
                             className="h-full"
                             style={{ width: `${Math.max(2, Math.round(bProgress * 100))}%`, backgroundColor: bTier.color }}
@@ -3779,7 +3779,7 @@ function HomeContent() {
                 const extra = equipped.length - 3;
                 return (
                   <div
-                    className="mx-4 mb-3 border-[2px] p-2.5"
+                    className="mx-4 mb-3 border-2 p-2.5"
                     style={{ borderColor: `${theme.accent}33`, backgroundColor: `${theme.accent}08` }}
                   >
                     <div className="flex flex-wrap gap-1.5">
@@ -3862,7 +3862,7 @@ function HomeContent() {
                   </button>
                   <button
                     onClick={handleOpenGift}
-                    className="btn-press mt-1.5 w-full border-[2px] border-border py-1.5 text-[9px] text-cream transition-colors hover:border-border-light"
+                    className="btn-press mt-1.5 w-full border-2 border-border py-1.5 text-[9px] text-cream transition-colors hover:border-border-light"
                   >
                     Send Gift
                   </button>
@@ -3889,19 +3889,19 @@ function HomeContent() {
                 <div className="mx-4 mb-3 space-y-1.5">
                   <button
                     onClick={() => { trackDisabledButtonClicked("kudos"); handleSignIn(); }}
-                    className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
+                    className="btn-press w-full py-2 text-[10px] border-2 border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
                   >
                     &#x1F512; Give Kudos
                   </button>
                   <button
                     onClick={() => { trackDisabledButtonClicked("gift"); handleSignIn(); }}
-                    className="btn-press w-full py-1.5 text-[9px] border-[2px] border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
+                    className="btn-press w-full py-1.5 text-[9px] border-2 border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
                   >
                     &#x1F512; Send Gift
                   </button>
                   <button
                     onClick={() => { trackDisabledButtonClicked("raid"); handleSignIn(); }}
-                    className="btn-press w-full py-2 text-[10px] border-[2px] border-dashed border-red-500/30 text-red-400/40 transition-colors hover:border-red-500/60 hover:text-red-400/70"
+                    className="btn-press w-full py-2 text-[10px] border-2 border-dashed border-red-500/30 text-red-400/40 transition-colors hover:border-red-500/60 hover:text-red-400/70"
                   >
                     &#x1F512; &#x2694;&#xFE0F; BATTLE
                   </button>
@@ -3919,7 +3919,7 @@ function HomeContent() {
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
                     }}
-                    className="btn-press w-full border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                    className="btn-press w-full border-2 border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
                   >
                     {copied ? "Copied!" : "\uD83D\uDCCB Copy Invite Link"}
                   </button>
@@ -3935,7 +3935,7 @@ function HomeContent() {
                       setSelectedBuilding(null);
                       if (!exploreMode) setExploreMode(true);
                     }}
-                    className="btn-press w-full border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                    className="btn-press w-full border-2 border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
                   >
                     Compare
                   </button>
@@ -3958,7 +3958,7 @@ function HomeContent() {
                     </Link>
                     <Link
                       href={`/dev/${selectedBuilding.login}`}
-                      className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                      className="btn-press flex-1 border-2 border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
                     >
                       Profile
                     </Link>
@@ -3979,7 +3979,7 @@ function HomeContent() {
                       href={`https://github.com/${selectedBuilding.login}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn-press flex-1 border-[2px] border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
+                      className="btn-press flex-1 border-2 border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
                     >
                       GitHub
                     </a>
@@ -3997,7 +3997,7 @@ function HomeContent() {
           <div className="border-[3px] border-border bg-bg-raised/95 px-4 py-2.5 backdrop-blur-sm">
             <div className="flex items-center gap-3 min-w-0">
               <span
-                className="blink-dot h-2 w-2 flex-shrink-0"
+                className="blink-dot h-2 w-2 shrink-0"
                 style={{ backgroundColor: theme.accent }}
               />
               <span className="text-[10px] text-cream normal-case truncate min-w-0">
@@ -4009,7 +4009,7 @@ function HomeContent() {
                   setFocusedBuilding(compareBuilding.login);
                   setCompareBuilding(null);
                 }}
-                className="ml-1 flex-shrink-0 text-[9px] text-muted transition-colors hover:text-cream"
+                className="ml-1 shrink-0 text-[9px] text-muted transition-colors hover:text-cream"
               >
                 Cancel
               </button>
@@ -4033,7 +4033,7 @@ function HomeContent() {
                   if (feedback?.type === "error") setFeedback(null);
                 }}
                 placeholder="search username to compare"
-                className="min-w-0 flex-1 border-[2px] border-border bg-bg px-2.5 py-1.5 text-base sm:text-[10px] text-cream outline-none transition-colors placeholder:text-dim"
+                className="min-w-0 flex-1 border-2 border-border bg-bg px-2.5 py-1.5 text-base sm:text-[10px] text-cream outline-none transition-colors placeholder:text-dim"
                 onFocus={(e) => (e.currentTarget.style.borderColor = theme.accent)}
                 onBlur={(e) => (e.currentTarget.style.borderColor = "")}
                 autoFocus
@@ -4041,7 +4041,7 @@ function HomeContent() {
               <button
                 type="submit"
                 disabled={loading || !username.trim()}
-                className="btn-press flex-shrink-0 px-3 py-1.5 text-[10px] text-bg disabled:opacity-40"
+                className="btn-press shrink-0 px-3 py-1.5 text-[10px] text-bg disabled:opacity-40"
                 style={{ backgroundColor: theme.accent }}
               >
                 {loading ? "_" : "Go"}
@@ -4093,7 +4093,7 @@ function HomeContent() {
             sm:bottom-auto sm:left-auto sm:right-5 sm:top-1/2 sm:-translate-y-1/2"
             >
               <div className="relative border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
-              w-full sm:w-[380px] sm:border-[3px] sm:max-h-[85vh] sm:overflow-y-auto
+              w-full sm:w-95 sm:border-[3px] sm:max-h-[85vh] sm:overflow-y-auto
               max-h-[45vh] overflow-y-auto
               animate-[slide-up_0.2s_ease-out] sm:animate-none"
               >
@@ -4108,7 +4108,7 @@ function HomeContent() {
 
                 {/* ── Header: Avatars + VS ── */}
                 <div className="flex items-start justify-center gap-5 px-5 pt-1 pb-4 sm:pt-4">
-                  <Link href={`/dev/${comparePair[0].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
+                  <Link href={`/dev/${comparePair[0].login}`} className="flex flex-col items-center gap-1.5 group w-27.5">
                     {comparePair[0].avatar_url && (
                       <Image
                         src={comparePair[0].avatar_url}
@@ -4122,13 +4122,13 @@ function HomeContent() {
                         }}
                       />
                     )}
-                    <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[0].login}</p>
+                    <p className="truncate text-[10px] text-cream normal-case max-w-27.5 transition-colors group-hover:text-white">@{comparePair[0].login}</p>
                     <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[0].login)}</p>
                   </Link>
 
                   <span className="text-base shrink-0 pt-4" style={{ color: theme.accent }}>VS</span>
 
-                  <Link href={`/dev/${comparePair[1].login}`} className="flex flex-col items-center gap-1.5 group w-[110px]">
+                  <Link href={`/dev/${comparePair[1].login}`} className="flex flex-col items-center gap-1.5 group w-27.5">
                     {comparePair[1].avatar_url && (
                       <Image
                         src={comparePair[1].avatar_url}
@@ -4142,7 +4142,7 @@ function HomeContent() {
                         }}
                       />
                     )}
-                    <p className="truncate text-[10px] text-cream normal-case max-w-[110px] transition-colors group-hover:text-white">@{comparePair[1].login}</p>
+                    <p className="truncate text-[10px] text-cream normal-case max-w-27.5 transition-colors group-hover:text-white">@{comparePair[1].login}</p>
                     <p className="text-[8px] text-muted normal-case text-center">{getDevClass(comparePair[1].login)}</p>
                   </Link>
                 </div>
@@ -4248,7 +4248,7 @@ function HomeContent() {
                       a.remove();
                       URL.revokeObjectURL(url);
                     }}
-                    className="btn-press flex-1 border-[2px] border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                    className="btn-press flex-1 border-2 border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
                   >
                     Card
                   </button>
@@ -4336,7 +4336,7 @@ function HomeContent() {
                 alt={shareData.login}
                 width={48}
                 height={48}
-                className="mx-auto mb-3 border-[2px] border-border"
+                className="mx-auto mb-3 border-2 border-border"
                 style={{ imageRendering: "pixelated" }}
               />
             )}
@@ -4426,7 +4426,7 @@ function HomeContent() {
           <div className="pointer-events-none flex h-full items-end sm:items-center sm:justify-center">
             <div
               className="pointer-events-auto relative w-full border-t-[3px] border-border bg-bg-raised/95 backdrop-blur-sm
-                sm:w-[340px] sm:mx-4 sm:border-[3px]
+                sm:w-85 sm:mx-4 sm:border-[3px]
                 animate-[slide-up_0.2s_ease-out] sm:animate-[fade-in_0.15s_ease-out]"
               onClick={(e) => e.stopPropagation()}
             >
@@ -4446,7 +4446,7 @@ function HomeContent() {
               {/* Header: brand + sponsored tag */}
               <div className="flex items-center gap-3 px-4 pb-3 sm:pt-4">
                 <div
-                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center border-[2px]"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center border-2"
                   style={{ borderColor: clickedAd.color, color: clickedAd.color }}
                 >
                   <span className="text-sm">{clickedAd.vehicle === "blimp" ? "\u25C6" : clickedAd.vehicle === "billboard" ? "\uD83D\uDCCB" : clickedAd.vehicle === "rooftop_sign" ? "\uD83D\uDD04" : clickedAd.vehicle === "led_wrap" ? "\uD83D\uDCA1" : "\u2708"}</span>
@@ -4504,7 +4504,7 @@ function HomeContent() {
 
       {/* ─── Bottom-left controls: Theme + Radio (portal slot) + Intro ─── */}
       {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (
-        <div className="pointer-events-auto fixed bottom-8 left-3 z-[25] flex flex-col-reverse items-start gap-2 sm:bottom-10 sm:left-4 sm:flex-row sm:items-center">
+        <div className="pointer-events-auto fixed bottom-8 left-3 z-25 flex flex-col-reverse items-start gap-2 sm:bottom-10 sm:left-4 sm:flex-row sm:items-center">
           <button
             onClick={cycleTheme}
             className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
@@ -4540,11 +4540,11 @@ function HomeContent() {
 
       {/* ─── Daily mission progress toasts (top-center, always visible) ─── */}
       {dailyToasts.length > 0 && (
-        <div className="pointer-events-none fixed left-1/2 top-4 z-[60] flex -translate-x-1/2 flex-col items-center gap-1.5">
+        <div className="pointer-events-none fixed left-1/2 top-4 z-60 flex -translate-x-1/2 flex-col items-center gap-1.5">
           {dailyToasts.map((t) => (
             <div
               key={t.id}
-              className="pointer-events-none border-[2px] border-border bg-bg-raised/95 px-4 py-2 text-[11px] backdrop-blur-sm"
+              className="pointer-events-none border-2 border-border bg-bg-raised/95 px-4 py-2 text-[11px] backdrop-blur-sm"
               style={{ animation: "toastDrop 0.3s ease-out, toastOut 0.4s ease-in 2s forwards", borderColor: t.done ? theme.accent : undefined }}
             >
               <span style={{ color: theme.accent }}>{t.done ? "\u2713" : "\u2606"}</span>
@@ -4597,7 +4597,7 @@ function HomeContent() {
             className="absolute inset-0 bg-bg/70 backdrop-blur-sm"
             onClick={() => { setGiftModalOpen(false); setGiftItems(null); }}
           />
-          <div className="relative z-10 w-full max-w-[280px] border-[3px] border-border bg-bg-raised">
+          <div className="relative z-10 w-full max-w-70 border-[3px] border-border bg-bg-raised">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
@@ -4755,7 +4755,7 @@ function HomeContent() {
               <Link
                 href="/leaderboard?mode=game"
                 onClick={() => { setShowFlyResults(null); clearTimeout(flyResultsTimerRef.current); }}
-                className="btn-press border-[2px] border-border px-5 py-2 text-[10px] transition-colors hover:border-border-light"
+                className="btn-press border-2 border-border px-5 py-2 text-[10px] transition-colors hover:border-border-light"
                 style={{ color: theme.accent }}
               >
                 See Leaderboard
@@ -4798,7 +4798,7 @@ function HomeContent() {
             <p className="text-sm text-cream sm:text-base">Gift Unlocked!</p>
 
             <div
-              className="mt-4 inline-flex items-center gap-3 border-[2px] border-border bg-bg-card px-5 py-3"
+              className="mt-4 inline-flex items-center gap-3 border-2 border-border bg-bg-card px-5 py-3"
             >
               <span className="text-2xl">{"\uD83C\uDFC1"}</span>
               <div className="text-left">
@@ -4810,7 +4810,7 @@ function HomeContent() {
             </div>
 
             {/* Upsell strip */}
-            <div className="mt-5 w-full max-w-[280px]">
+            <div className="mt-5 w-full max-w-70">
               <p className="mb-2 text-[9px] tracking-widest text-muted uppercase">
                 Upgrade your building
               </p>
@@ -4824,7 +4824,7 @@ function HomeContent() {
                     key={item.name}
                     href={shopHref}
                     onClick={() => setGiftClaimed(false)}
-                    className="flex flex-col items-center gap-1 border-[2px] border-border bg-bg-card px-2 py-2.5 transition-colors hover:border-border-light"
+                    className="flex flex-col items-center gap-1 border-2 border-border bg-bg-card px-2 py-2.5 transition-colors hover:border-border-light"
                   >
                     <span className="text-xl">{item.emoji}</span>
                     <span className="text-[8px] text-cream leading-tight">
@@ -4986,7 +4986,7 @@ function HomeContent() {
 
           {/* Skip button */}
           <button
-            className="pointer-events-auto absolute top-4 right-4 z-[60] font-pixel text-[10px] sm:text-[12px] tracking-wider border border-[#00ff41]/40 px-3 py-1.5 transition-colors hover:bg-[#00ff41]/10"
+            className="pointer-events-auto absolute top-4 right-4 z-60 font-pixel text-[10px] sm:text-[12px] tracking-wider border border-[#00ff41]/40 px-3 py-1.5 transition-colors hover:bg-[#00ff41]/10"
             style={{
               color: "#00ff41",
               textShadow: "0 0 8px rgba(0,255,65,0.3)",

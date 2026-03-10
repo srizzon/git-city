@@ -556,7 +556,7 @@ export default function AdPreview({
 
   return (
     <div className="relative border-[3px] border-border" style={{ backgroundColor: THEME.fogColor }}>
-      <div className={tall ? "h-[360px] sm:h-[440px] lg:h-[500px]" : "h-[280px] sm:h-[360px] lg:h-[420px]"}>
+      <div className={tall ? "h-90 sm:h-110 lg:h-125" : "h-70 sm:h-90 lg:h-105"}>
         {contextLost ? (
           <div className="flex h-full items-center justify-center">
             <span className="font-pixel text-[10px] text-muted">Reloading preview...</span>

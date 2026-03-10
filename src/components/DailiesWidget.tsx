@@ -104,8 +104,8 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
     return (
       <button
         onClick={() => setOpen(true)}
-        className={`pointer-events-auto btn-press fixed z-[30] flex items-center gap-1.5 border-[2px] border-border bg-bg/80 px-2 py-1.5 text-[10px] backdrop-blur-sm transition-all hover:border-border-light ${
-          isMobile ? "top-3 right-[52px]" : "left-4 top-1/2 -translate-y-1/2"
+        className={`pointer-events-auto btn-press fixed z-30 flex items-center gap-1.5 border-2 border-border bg-bg/80 px-2 py-1.5 text-[10px] backdrop-blur-sm transition-all hover:border-border-light ${
+          isMobile ? "top-3 right-13" : "left-4 top-1/2 -translate-y-1/2"
         }`}
         style={canClaim ? { borderColor: accent, boxShadow: `0 0 8px 2px ${accent}40` } : undefined}
       >
@@ -124,7 +124,7 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
     <>
       {isMobile && (
         <div
-          className="pointer-events-auto fixed inset-0 z-[39] bg-bg/50"
+          className="pointer-events-auto fixed inset-0 z-39 bg-bg/50"
           onClick={() => setOpen(false)}
         />
       )}
@@ -219,7 +219,7 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
             <button
               onClick={handleClaim}
               disabled={claiming}
-              className={`btn-press w-full border-[2px] font-bold transition-all hover:brightness-110 ${isMobile ? "px-3 py-2 text-[12px]" : "px-2 py-1.5 text-[10px]"}`}
+              className={`btn-press w-full border-2 font-bold transition-all hover:brightness-110 ${isMobile ? "px-3 py-2 text-[12px]" : "px-2 py-1.5 text-[10px]"}`}
               style={{
                 borderColor: accent,
                 color: "#0d0f0e",
