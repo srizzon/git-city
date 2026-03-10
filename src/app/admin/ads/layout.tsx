@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
-
-const OWNER_LOGIN = "srizzon";
+import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
 
 export default async function AdminAdsLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabase();
@@ -9,13 +8,9 @@ export default async function AdminAdsLayout({ children }: { children: React.Rea
 
   if (!user) redirect("/");
 
-  const login = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  const login = getGithubLoginFromUser(user);
 
-  if (login !== OWNER_LOGIN) redirect("/");
+  if (!isAdminGithubLogin(login)) redirect("/");
 
   return <>{children}</>;
 }

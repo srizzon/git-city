@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-
-const OWNER_LOGIN = "srizzon";
+import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
 
 function generateToken(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -16,12 +15,8 @@ async function checkAdmin() {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const login = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-  return login === OWNER_LOGIN ? user : null;
+  const login = getGithubLoginFromUser(user);
+  return isAdminGithubLogin(login) ? user : null;
 }
 
 // Create a new ad

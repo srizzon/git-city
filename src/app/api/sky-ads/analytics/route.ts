@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-
-const OWNER_LOGIN = "srizzon";
+import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
 
 // Historical baselines from Himetrica (tracking was lost in Supabase due to www origin bug).
 // These get added on top of live Supabase counts. Remove once Supabase data catches up.
@@ -21,12 +20,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
-  const login = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-  if (login !== OWNER_LOGIN) {
+  const login = getGithubLoginFromUser(user);
+  if (!isAdminGithubLogin(login)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
