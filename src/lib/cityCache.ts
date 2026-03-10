@@ -15,6 +15,8 @@ interface CityCache {
   bridges: CityBridge[];
   districtZones: DistrictZone[];
   stats: { total_developers: number; total_contributions: number };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rawDevs: any[];
   timestamp: number;
 }
 

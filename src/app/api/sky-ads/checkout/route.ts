@@ -5,7 +5,6 @@ import { SKY_AD_PLANS, isValidPlanId, getPriceCents, type AdCurrency } from "@/l
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
 import { rateLimit } from "@/lib/rate-limit";
 import { containsBlockedContent } from "@/lib/ad-moderation";
-import { createPixQrCodeRaw } from "@/lib/abacatepay";
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -43,7 +42,6 @@ export async function POST(request: NextRequest) {
     color?: string;
     bgColor?: string;
     currency?: string;
-    provider?: "stripe" | "abacatepay";
   };
   try {
     body = await request.json();
@@ -123,47 +121,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to create ad" }, { status: 500 });
   }
 
-  const provider = body.provider === "abacatepay" ? "abacatepay" : "stripe";
   const baseUrl = getBaseUrl();
 
   try {
-    if (provider === "abacatepay") {
-      const priceBrl = getPriceCents(plan_id, "brl");
-      const { brCode, brCodeBase64, pixId } = await createPixQrCodeRaw({
-        amountCents: priceBrl,
-        description: `Git City Ad: ${plan.label}`,
-        externalId: `sky_ad:${adId}`,
-      });
-
-      await sb
-        .from("sky_ads")
-        .update({ pix_id: pixId })
-        .eq("id", adId);
-
-      return NextResponse.json({ brCode, brCodeBase64, trackingToken });
-    }
-
-    // Stripe
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 60, // 30 min
+      mode: "subscription",
       line_items: [
         {
           price_data: {
             currency,
             product_data: {
               name: `Git City Ad: ${plan.label}`,
-              description: `${plan.label} ad for ${plan.duration_days} days on Git City`,
+              description: `${plan.label} monthly ad subscription on Git City`,
             },
             unit_amount: getPriceCents(plan_id, currency),
+            recurring: { interval: "month" },
           },
           quantity: 1,
         },
       ],
+      allow_promotion_codes: true,
       metadata: {
         sky_ad_id: adId,
         type: "sky_ad",
+      },
+      subscription_data: {
+        metadata: {
+          sky_ad_id: adId,
+          type: "sky_ad",
+        },
       },
       success_url: `${baseUrl}/advertise/setup/${trackingToken}`,
       cancel_url: `${baseUrl}/advertise`,

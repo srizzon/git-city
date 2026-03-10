@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { SKY_AD_PLANS, getPriceCents, getFullPriceCents, formatPrice, PROMO_DISCOUNT, PROMO_LABEL, type SkyAdPlanId, type AdCurrency } from "@/lib/skyAdPlans";
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
@@ -10,7 +10,6 @@ const AdPreview = dynamic(() => import("@/components/AdPreview"), { ssr: false }
 const ACCENT = "#c8e64a";
 
 type Vehicle = "plane" | "blimp" | "billboard" | "rooftop_sign" | "led_wrap";
-type Duration = "weekly" | "monthly";
 
 const VEHICLES: { id: Vehicle; icon: string; name: string }[] = [
   { id: "plane", icon: "\u2708", name: "Plane" },
@@ -20,82 +19,31 @@ const VEHICLES: { id: Vehicle; icon: string; name: string }[] = [
   { id: "blimp", icon: "\u25C6", name: "Blimp" },
 ];
 
-function getPlanId(vehicle: Vehicle, duration: Duration): SkyAdPlanId {
-  return `${vehicle}_${duration}` as SkyAdPlanId;
+function getPlanId(vehicle: Vehicle): SkyAdPlanId {
+  return `${vehicle}_monthly` as SkyAdPlanId;
 }
 
-function detectLocale(): { currency: AdCurrency; isBrazil: boolean } {
-  if (typeof navigator === "undefined") return { currency: "usd", isBrazil: false };
+function detectLocale(): { currency: AdCurrency } {
+  if (typeof navigator === "undefined") return { currency: "usd" };
   const lang = navigator.language || "";
-  const isBrazil = lang.startsWith("pt");
-  return { currency: isBrazil ? "brl" : "usd", isBrazil };
+  return { currency: lang.startsWith("pt") ? "brl" : "usd" };
 }
-
-const PIX_EXPIRY_SECONDS = 900; // 15 minutes
 
 export function AdPurchaseForm() {
   const [currency, setCurrency] = useState<AdCurrency>("usd");
   const [vehicle, setVehicle] = useState<Vehicle>("plane");
-  const [duration, setDuration] = useState<Duration>("weekly");
   const [text, setText] = useState("");
   const [color, setColor] = useState("#f8d880");
   const [bgColor, setBgColor] = useState("#1a1018");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isBrazil, setIsBrazil] = useState(false);
-  const [pixData, setPixData] = useState<{ brCode: string; brCodeBase64: string; trackingToken: string } | null>(null);
-  const [pixCopied, setPixCopied] = useState(false);
-  const [pixCountdown, setPixCountdown] = useState(PIX_EXPIRY_SECONDS);
-  const [pixPaid, setPixPaid] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const locale = detectLocale();
     setCurrency(locale.currency);
-    setIsBrazil(locale.isBrazil);
   }, []);
 
-  // PIX countdown timer
-  useEffect(() => {
-    if (!pixData || pixPaid) return;
-    setPixCountdown(PIX_EXPIRY_SECONDS);
-    const timer = setInterval(() => {
-      setPixCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setPixData(null);
-          setError("PIX expired. Please try again.");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [pixData, pixPaid]);
-
-  // Poll for payment confirmation
-  const checkAdPaid = useCallback(async (token: string) => {
-    try {
-      const res = await fetch(`/api/sky-ads/status?token=${token}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.active) {
-          setPixPaid(true);
-          if (pollRef.current) clearInterval(pollRef.current);
-          window.location.href = `/advertise/setup/${token}`;
-        }
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
-    if (!pixData || pixPaid) return;
-    pollRef.current = setInterval(() => checkAdPaid(pixData.trackingToken), 5000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [pixData, pixPaid, checkAdPaid]);
-
-  const planId = getPlanId(vehicle, duration);
-  const plan = SKY_AD_PLANS[planId];
+  const planId = getPlanId(vehicle);
   const priceCents = getPriceCents(planId, currency);
   const priceLabel = formatPrice(priceCents, currency);
   const fullPriceCents = getFullPriceCents(planId, currency);
@@ -114,11 +62,10 @@ export function AdPurchaseForm() {
     bgColorValid &&
     !loading;
 
-  async function handleSubmit(provider: "stripe" | "abacatepay" = "stripe") {
+  async function handleSubmit() {
     if (!canSubmit) return;
     setLoading(true);
     setError("");
-    setPixData(null);
     try {
       const res = await fetch("/api/sky-ads/checkout", {
         method: "POST",
@@ -129,7 +76,6 @@ export function AdPurchaseForm() {
           color,
           bgColor,
           currency,
-          provider,
         }),
       });
       const data = await res.json();
@@ -138,10 +84,7 @@ export function AdPurchaseForm() {
         setLoading(false);
         return;
       }
-      if (data.brCode) {
-        setPixData({ brCode: data.brCode, brCodeBase64: data.brCodeBase64, trackingToken: data.trackingToken });
-        setLoading(false);
-      } else if (data.url) {
+      if (data.url) {
         window.location.href = data.url;
       }
     } catch {
@@ -164,7 +107,7 @@ export function AdPurchaseForm() {
         </div>
       )}
 
-      {/* ── 3D Preview (hero) ── */}
+      {/* 3D Preview (hero) */}
       <AdPreview
         vehicle={vehicle}
         text={text}
@@ -172,7 +115,7 @@ export function AdPurchaseForm() {
         bgColor={bgColorValid ? bgColor : "#1a1018"}
       />
 
-      {/* ── Control Panel ── */}
+      {/* Control Panel */}
       <div className="mt-4 border-[3px] border-border p-4 sm:p-5">
 
         {/* Row 1: Format selector */}
@@ -207,26 +150,8 @@ export function AdPurchaseForm() {
           </div>
         </div>
 
-        {/* Row 2: Duration + Currency + Price */}
+        {/* Row 2: Currency + Price */}
         <div className="mt-4 flex items-center gap-3">
-          {/* Duration toggle */}
-          <div className="flex border-[2px] border-border text-[9px]">
-            {(["weekly", "monthly"] as const).map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDuration(d)}
-                className="px-3 py-1.5 transition-colors"
-                style={{
-                  backgroundColor: duration === d ? ACCENT : "transparent",
-                  color: duration === d ? "#1a1018" : "var(--color-muted)",
-                }}
-              >
-                {d === "weekly" ? `7 days` : `30 days`}
-              </button>
-            ))}
-          </div>
-
           {/* Currency toggle */}
           <div className="flex border-[2px] border-border text-[9px]">
             {(["usd", "brl"] as const).map((c) => (
@@ -256,7 +181,7 @@ export function AdPurchaseForm() {
               </span>
             )}
             <span className="ml-1 text-[9px] text-muted normal-case">
-              / {plan.duration_days}d
+              /mo
             </span>
           </div>
         </div>
@@ -331,7 +256,7 @@ export function AdPurchaseForm() {
           </div>
         </div>
 
-        {/* Row 5: Buy buttons */}
+        {/* Row 5: Subscribe button */}
         <div className="mt-5">
           {/* Error banner */}
           {error && (
@@ -343,84 +268,23 @@ export function AdPurchaseForm() {
             </div>
           )}
 
-          {pixData ? (
-            <div className="border-[3px] border-border p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-xs" style={{ color: ACCENT }}>
-                  PIX Payment
-                </p>
-                <p className="text-[9px] normal-case" style={{ color: pixCountdown < 120 ? "#ff6b6b" : "var(--color-muted)" }}>
-                  {Math.floor(pixCountdown / 60)}:{String(pixCountdown % 60).padStart(2, "0")}
-                </p>
-              </div>
-              {pixData.brCodeBase64 && (
-                <div className="mx-auto mb-3 w-fit border-[3px] border-border bg-white p-2">
-                  <img
-                    src={`data:image/png;base64,${pixData.brCodeBase64}`}
-                    alt="PIX QR Code"
-                    className="h-40 w-40"
-                    style={{ imageRendering: "pixelated" }}
-                  />
-                </div>
-              )}
-              <div className="mb-3">
-                <p className="mb-1 text-[8px] text-muted normal-case">PIX code (copy & paste):</p>
-                <div className="flex gap-1">
-                  <input
-                    readOnly
-                    value={pixData.brCode}
-                    className="min-w-0 flex-1 border-[2px] border-border bg-transparent px-2 py-1.5 font-mono text-[8px] text-cream"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(pixData.brCode);
-                      setPixCopied(true);
-                      setTimeout(() => setPixCopied(false), 2000);
-                    }}
-                    className="border-[2px] border-border px-3 py-1.5 text-[9px] text-cream hover:bg-border/20"
-                  >
-                    {pixCopied ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-              </div>
-              <p className="text-center text-[9px] text-muted normal-case">
-                {pixPaid ? "Payment confirmed! Redirecting..." : "Waiting for payment... You'll be redirected automatically."}
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => handleSubmit("stripe")}
-                disabled={!canSubmit}
-                className="btn-press w-full py-3.5 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-                style={{
-                  backgroundColor: ACCENT,
-                  boxShadow: "4px 4px 0 0 #5a7a00",
-                }}
-              >
-                {loading ? "Redirecting..." : `Buy for ${priceLabel}`}
-              </button>
-              {isBrazil && (
-                <button
-                  type="button"
-                  onClick={() => handleSubmit("abacatepay")}
-                  disabled={!canSubmit}
-                  className="btn-press w-full py-2.5 text-xs text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{
-                    backgroundColor: "#32bcad",
-                    boxShadow: "3px 3px 0 0 #1a7a6e",
-                  }}
-                >
-                  {loading ? "..." : `Pay with PIX (${formatPrice(getPriceCents(planId, "brl"), "brl")})`}
-                </button>
-              )}
-              <p className="mt-1 text-center text-[9px] text-muted normal-case">
-                Secure checkout. No account needed.
-              </p>
-            </div>
-          )}
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => handleSubmit()}
+              disabled={!canSubmit}
+              className="btn-press w-full py-3.5 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                backgroundColor: ACCENT,
+                boxShadow: "4px 4px 0 0 #5a7a00",
+              }}
+            >
+              {loading ? "Redirecting..." : `Subscribe for ${priceLabel}/mo`}
+            </button>
+            <p className="mt-1 text-center text-[9px] text-muted normal-case">
+              Monthly subscription. Cancel anytime. Secure checkout via Stripe.
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -8,6 +8,9 @@ import { sendReferralJoinedNotification } from "@/lib/notification-senders/refer
 import { fetchGitHubDeveloperData } from "@/lib/github-api";
 import { calculateGithubXp } from "@/lib/xp";
 
+// Extend timeout for GitHub API calls during login
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");

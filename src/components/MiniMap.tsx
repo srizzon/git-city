@@ -147,7 +147,7 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
       set(ppx, ppy - 1); set(ppx, ppy + 1);
     }
 
-    ctx.putImageData(new ImageData(buf, RES, RES), 0, 0);
+    ctx.putImageData(new ImageData(new Uint8ClampedArray(buf.buffer as ArrayBuffer), RES, RES), 0, 0);
   }, [bPixels, w2p]); // no longer deps on playerX, playerZ, currentDistrict
 
   // Redraw when visibility or buildings change

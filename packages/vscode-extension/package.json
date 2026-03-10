@@ -2,7 +2,7 @@
   "name": "gitcity",
   "displayName": "Git City: Pulse",
   "description": "Keep your city alive. When you code, your building glows and powers the signal. Privacy-first: you control what gets shared.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "git-city",
   "license": "AGPL-3.0",
   "repository": {
@@ -14,7 +14,7 @@
     "url": "https://github.com/srizzon/git-city/issues"
   },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.93.0"
   },
   "categories": ["Other"],
   "activationEvents": ["onStartupFinished"],
@@ -85,7 +85,7 @@
     "package": "vsce package"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.93.0",
     "esbuild": "^0.20.0",
     "typescript": "^5.3.0"
   }

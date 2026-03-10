@@ -41,6 +41,15 @@ export interface DeveloperRecord {
   xp_total?: number;
   xp_level?: number;
   xp_github?: number;
+  // Game fields
+  achievements?: string[];
+  kudos_count?: number;
+  visit_count?: number;
+  loadout?: { crown: string | null; roof: string | null; aura: string | null } | null;
+  app_streak?: number;
+  raid_xp?: number;
+  active_raid_tag?: { attacker_login: string; tag_style: string; expires_at: string } | null;
+  rabbit_completed?: boolean;
 }
 
 export interface TopRepo {
@@ -613,7 +622,8 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
     if (addPlaza) {
       const key = `${ogx},${ogz}`;
       occupiedCells.add(key);
-      let [pcx, pcz] = gridToWorld(ogx, ogz);
+      const [pcx, initialPcz] = gridToWorld(ogx, ogz);
+      let pcz = initialPcz;
       if (pcz > RIVER_Z_THRESHOLD) pcz += RIVER_PUSH;
       plazas.push({
         position: [pcx, 0, pcz],

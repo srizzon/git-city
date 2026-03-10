@@ -12,8 +12,8 @@ export interface SkyAd {
   priority: number;
 }
 
-export const MAX_PLANES = 8;
-export const MAX_BLIMPS = 4;
+export const MAX_PLANES = 15;
+export const MAX_BLIMPS = 8;
 export const MAX_BILLBOARDS = 10;
 export const MAX_ROOFTOP_SIGNS = 10;
 export const MAX_LED_WRAPS = 10;

@@ -8,6 +8,7 @@ interface LevelUpToastProps {
   onDone: () => void;
 }
 
+
 export default memo(function LevelUpToast({ level, onDone }: LevelUpToastProps) {
   const [visible, setVisible] = useState(true);
   const rank = rankFromLevel(level);

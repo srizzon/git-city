@@ -72,10 +72,28 @@ export async function GET(
     .eq("github_login", username.toLowerCase())
     .single();
 
-  // ─── New dev: return preview without creating a building ───
+  // ─── New dev ───────────────────────────────────────────────
   if (!cached) {
+    // Check if authenticated user is looking up their own profile
+    let isOwnProfile = false;
+    let authUserId: string | null = null;
+    try {
+      const authClient = await createServerSupabase();
+      const { data: { user } } = await authClient.auth.getUser();
+      if (user) {
+        authUserId = user.id;
+        const authLogin = (
+          user.user_metadata.user_name ??
+          user.user_metadata.preferred_username ??
+          ""
+        ).toLowerCase();
+        isOwnProfile = authLogin === username.toLowerCase();
+      }
+    } catch {}
+
+    // Rate limit (skip for own profile — they just logged in)
     let rateLimitKey: string | null = null;
-    if (process.env.NODE_ENV !== "development") {
+    if (!isOwnProfile && process.env.NODE_ENV !== "development") {
       const key = await resolveRateLimitKey(request);
       rateLimitKey = key;
       const limited = await isRateLimited(key);
@@ -88,9 +106,53 @@ export async function GET(
     }
 
     try {
-      const data = await fetchGitHubDeveloperData(username);
+      const data = await fetchGitHubDeveloperData(username, isOwnProfile ? { allowEmpty: true } : undefined);
       if (rateLimitKey) await recordRateLimitRequest(rateLimitKey);
 
+      // Own profile: create building as fallback (auth callback may have failed)
+      if (isOwnProfile && authUserId) {
+        const { data: created, error: createErr } = await sb
+          .from("developers")
+          .upsert({
+            ...data,
+            fetched_at: new Date().toISOString(),
+            claimed: true,
+            claimed_by: authUserId,
+            claimed_at: new Date().toISOString(),
+            fetch_priority: 1,
+          }, { onConflict: "github_login" })
+          .select()
+          .single();
+
+        if (created && !createErr) {
+          // Rank + XP
+          await sb.rpc("assign_new_dev_rank", { dev_id: created.id });
+          sb.rpc("recalculate_ranks").then(() => {}, () => {});
+
+          const xp = calculateGithubXp({
+            contributions: data.contributions_total ?? data.contributions,
+            total_stars: data.total_stars,
+            public_repos: data.public_repos,
+            total_prs: data.total_prs ?? 0,
+          });
+          if (xp > 0) {
+            await sb.rpc("grant_xp", { p_developer_id: created.id, p_source: "github", p_amount: xp });
+            await sb.from("developers").update({ xp_github: xp }).eq("id", created.id);
+          }
+
+          // Re-fetch with assigned rank
+          const { data: withRank } = await sb
+            .from("developers")
+            .select("*")
+            .eq("id", created.id)
+            .single();
+
+          revalidatePath(`/dev/${data.github_login}`);
+          return NextResponse.json({ ...(withRank ?? created), exists: true });
+        }
+      }
+
+      // Not own profile (or creation failed): return preview
       return NextResponse.json({
         exists: false,
         preview: {
@@ -131,9 +193,13 @@ export async function GET(
     };
 
     // ETag conditional request
-    const FULL_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour
-    const cachedAge = Date.now() - new Date(cached.fetched_at).getTime();
-    const needsFullRefresh = cachedAge >= FULL_REFRESH_INTERVAL;
+    // GitHub's /users ETag does not cover repo-derived stars or GraphQL contribution totals,
+    // so only short-circuit while our cached stats are still fresh.
+    const STATS_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    const cachedAge = cached.fetched_at
+      ? Date.now() - new Date(cached.fetched_at).getTime()
+      : Number.POSITIVE_INFINITY;
+    const needsStatsRefresh = Number.isNaN(cachedAge) || cachedAge >= STATS_REFRESH_INTERVAL;
 
     const userRes = await fetch(
       `https://api.github.com/users/${encodeURIComponent(username)}`,
@@ -146,10 +212,10 @@ export async function GET(
       },
     );
 
-    if (userRes.status === 304 && !needsFullRefresh) {
+    if (userRes.status === 304 && !needsStatsRefresh) {
       return NextResponse.json({ ...cached, exists: true }, {
         headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
         },
       });
     }
@@ -322,7 +388,7 @@ export async function GET(
 
     return NextResponse.json({ ...(withRank ?? upserted), exists: true }, {
       headers: {
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
       },
     });
   } catch (err) {

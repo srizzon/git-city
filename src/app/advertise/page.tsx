@@ -9,11 +9,11 @@ const ACCENT = "#c8e64a";
 export const metadata: Metadata = {
   title: "Advertise on Git City",
   description:
-    "Reach 9,000+ GitHub developers. Planes, blimps, and billboards in a 3D city. 1%+ CTR (2x industry avg). From $9/week.",
+    "Reach 9,000+ GitHub developers. Planes, blimps, and billboards in a 3D city. 1%+ CTR (2x industry avg). From $29/mo.",
   openGraph: {
     title: "Advertise on Git City",
     description:
-      "Reach 9,000+ GitHub developers. Planes, blimps, and billboards in a 3D city. 1%+ CTR (2x industry avg). From $9/week.",
+      "Reach 9,000+ GitHub developers. Planes, blimps, and billboards in a 3D city. 1%+ CTR (2x industry avg). From $29/mo.",
     siteName: "Git City",
     type: "website",
     locale: "en_US",
@@ -32,6 +32,9 @@ function formatK(n: number): string {
 }
 
 async function getStats() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { devCount: 0, monthlyImpressions: 0, monthlyClicks: 0, ctr: 0 };
+  }
   const supabase = getSupabaseAdmin();
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
 
@@ -233,7 +236,7 @@ export default async function AdvertisePage() {
           {/* How it works */}
           <div className="grid gap-8 sm:grid-cols-4">
             {[
-              { n: "01", t: "Pick", d: "Sky or building ads. 5 formats, starting at $9/week" },
+              { n: "01", t: "Pick", d: "Sky or building ads. 5 formats, starting at $29/mo" },
               {
                 n: "02",
                 t: "Design",
@@ -312,19 +315,19 @@ export default async function AdvertisePage() {
                 },
                 {
                   q: "How many ad slots are available?",
-                  a: "8 plane slots, 4 blimp slots, 10 each for billboard, rooftop, and LED wrap. Limited inventory keeps your ad visible.",
+                  a: "15 plane slots, 8 blimp slots, 10 each for billboard, rooftop, and LED wrap. Limited inventory keeps your ad visible.",
                 },
                 {
                   q: "How do I pay?",
-                  a: "Credit card, Apple Pay, or Google Pay via Stripe. No account needed. Takes about 30 seconds.",
+                  a: "Credit card, Apple Pay, or Google Pay via Stripe. Monthly subscription, cancel anytime. No account needed.",
                 },
                 {
                   q: "Can I change my ad after buying?",
                   a: "Yes. You get a setup page where you can update your text, brand name, description, and link anytime. Unlimited changes, no extra cost.",
                 },
                 {
-                  q: "What if I want a refund?",
-                  a: "Refunds are evaluated on a case-by-case basis. Contact samuelrizzondev@gmail.com within the first 24 hours if there's an issue with your ad.",
+                  q: "What if I want to cancel?",
+                  a: "You can cancel your subscription anytime. Your ad stays active until the end of the current billing period. Contact samuelrizzondev@gmail.com if you need help.",
                 },
               ].map((item) => (
                 <div key={item.q} className="border-[2px] border-border p-5">

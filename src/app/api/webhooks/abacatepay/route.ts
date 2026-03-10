@@ -55,21 +55,22 @@ export async function POST(request: Request) {
           .maybeSingle();
 
         if (ad && !ad.active) {
+          const now = new Date();
+          // PIX ads are one-time, default to 30 days
+          const endsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+          await sb
+            .from("sky_ads")
+            .update({
+              active: true,
+              starts_at: now.toISOString(),
+              ends_at: endsAt.toISOString(),
+            })
+            .eq("id", ad.id);
+
           const planId = ad.plan_id;
           if (planId && isValidPlanId(planId)) {
             const plan = SKY_AD_PLANS[planId];
-            const now = new Date();
-            const endsAt = new Date(now.getTime() + plan.duration_days * 24 * 60 * 60 * 1000);
-
-            await sb
-              .from("sky_ads")
-              .update({
-                active: true,
-                starts_at: now.toISOString(),
-                ends_at: endsAt.toISOString(),
-              })
-              .eq("id", ad.id);
-
             if (plan.vehicle === "plane") {
               await sb
                 .from("sky_ads")

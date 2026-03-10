@@ -1,22 +1,24 @@
 /**
  * Activity Tracker
  *
+ * Detects developer activity from multiple sources:
+ * - Editor: text changes, saves, selection, file switches
+ * - Terminal: shell executions (Claude Code, Cursor agent, manual commands)
+ * - Debug: session start/end
+ * - Tasks: npm run, build, test, etc.
+ * - Filesystem: file create/delete/rename (agents modifying files)
+ * - Notebooks: Jupyter cell edits
+ *
  * Based on WakaTime's proven patterns:
- * - 50ms debounce on raw editor events
+ * - 50ms debounce on raw events
  * - Heartbeat sent when: file changed, file saved, or 120s elapsed
- * - Idle detected after configurable timeout of no editor events (default 5 min)
+ * - Idle detected after configurable timeout of no events (default 5 min)
  * - Explicit offline signal on idle/pause/close for instant presence updates
  *
  * States:
- *   ACTIVE  — dev is coding, heartbeats flowing
- *   IDLE    — no editor events for idleTimeout, offline signal sent
- *   PAUSED  — user manually paused tracking
- *
- * Transitions:
- *   active ──(no editor events for idleTimeout)──> idle    (sends offline signal)
- *   active ──(user pauses)───────────────────────> paused  (sends offline signal)
- *   idle   ──(any editor event)──────────────────> active  (sends immediate heartbeat)
- *   paused ──(user resumes)──────────────────────> active  (sends immediate heartbeat)
+ *   ACTIVE  - dev is coding, heartbeats flowing
+ *   IDLE    - no events for idleTimeout, offline signal sent
+ *   PAUSED  - user manually paused tracking
  *
  * Window focus/blur is NOT tracked. A dev with VS Code open on a second
  * monitor should stay "active" until the idle timeout fires naturally.
@@ -68,6 +70,38 @@ export function initTracker(
     vscode.workspace.onDidChangeTextDocument(() => scheduleEvent(false)),
     vscode.workspace.onDidSaveTextDocument(() => scheduleEvent(true)),
     vscode.window.onDidChangeTextEditorSelection(() => scheduleEvent(false)),
+  );
+
+  // Terminal events (Claude Code, Cursor agent, manual terminal usage)
+  context.subscriptions.push(
+    vscode.window.onDidStartTerminalShellExecution(() => scheduleEvent(false)),
+    vscode.window.onDidEndTerminalShellExecution(() => scheduleEvent(false)),
+    vscode.window.onDidOpenTerminal(() => scheduleEvent(false)),
+    vscode.window.onDidChangeActiveTerminal(() => scheduleEvent(false)),
+  );
+
+  // Debug events
+  context.subscriptions.push(
+    vscode.debug.onDidStartDebugSession(() => scheduleEvent(false)),
+    vscode.debug.onDidTerminateDebugSession(() => scheduleEvent(false)),
+  );
+
+  // Task events (npm run, build, test, etc.)
+  context.subscriptions.push(
+    vscode.tasks.onDidStartTask(() => scheduleEvent(false)),
+    vscode.tasks.onDidEndTask(() => scheduleEvent(false)),
+  );
+
+  // Filesystem events (agents creating/deleting/renaming files)
+  context.subscriptions.push(
+    vscode.workspace.onDidCreateFiles(() => scheduleEvent(true)),
+    vscode.workspace.onDidDeleteFiles(() => scheduleEvent(true)),
+    vscode.workspace.onDidRenameFiles(() => scheduleEvent(true)),
+  );
+
+  // Notebook events
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeNotebookDocument(() => scheduleEvent(false)),
   );
 
   // Track active seconds: every second while in active state, increment counter
