@@ -598,6 +598,18 @@ function HomeContent() {
     window.dispatchEvent(new CustomEvent("gc:radio-mode", { detail }));
   }, [flyMode, raidState.phase, theme.accent, theme.shadow]);
 
+  useEffect(() => {
+    const slotId =
+      exploreMode && !flyMode
+        ? "gc-radio-slot-explore"
+        : !flyMode && !introMode && !rabbitCinematic && !exploreMode
+          ? "gc-radio-slot-home"
+          : null;
+
+    (window as unknown as Record<string, unknown>).__gcRadioSlotId = slotId;
+    window.dispatchEvent(new CustomEvent("gc:radio-slot", { detail: slotId }));
+  }, [exploreMode, flyMode, introMode, rabbitCinematic]);
+
   // Detect mobile/touch device
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640 || "ontouchstart" in window);
@@ -2444,7 +2456,7 @@ function HomeContent() {
               <span className="text-cream">{theme.name}</span>
               <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
-            <div id="gc-radio-slot" />
+            <div id="gc-radio-slot-explore" suppressHydrationWarning />
           </div>
 
           {/* Feed toggle (top-right, below GitHub badges on desktop) */}
@@ -4513,7 +4525,7 @@ function HomeContent() {
             <span className="text-cream">{theme.name}</span>
             <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
           </button>
-          <div id="gc-radio-slot" suppressHydrationWarning />
+          <div id="gc-radio-slot-home" suppressHydrationWarning />
           <button
             onClick={replayIntro}
             className="btn-press flex items-center gap-1 border-[3px] border-border bg-bg/70 px-2 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"

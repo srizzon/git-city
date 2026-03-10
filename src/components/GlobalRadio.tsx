@@ -6,7 +6,7 @@ import LofiRadio from "./LofiRadio";
 
 export default function GlobalRadio() {
   const [mounted, setMounted] = useState(false);
-  const [slot, setSlot] = useState<Element | null>(null);
+  const [slotId, setSlotId] = useState<string | null>(null);
 
   // Delay activation past React's selective hydration window.
   // The layout hydrates (and fires effects) before Suspense-wrapped
@@ -22,15 +22,26 @@ export default function GlobalRadio() {
 
   useEffect(() => {
     if (!mounted) return;
-    const findSlot = () => document.getElementById("gc-radio-slot");
-    setSlot(findSlot());
 
-    const observer = new MutationObserver(() => setSlot(findSlot()));
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    const readSlotId = () => {
+      const next = (window as unknown as { __gcRadioSlotId?: unknown }).__gcRadioSlotId;
+      setSlotId(typeof next === "string" ? next : null);
+    };
+
+    readSlotId();
+
+    const handleSlotChange = (event: Event) => {
+      const detail = (event as CustomEvent<string | null>).detail;
+      setSlotId(typeof detail === "string" ? detail : null);
+    };
+
+    window.addEventListener("gc:radio-slot", handleSlotChange);
+    return () => window.removeEventListener("gc:radio-slot", handleSlotChange);
   }, [mounted]);
 
   if (!mounted) return null;
+
+  const slot = slotId ? document.getElementById(slotId) : null;
 
   // When the main page provides a slot, portal into it (inline with theme/intro buttons)
   if (slot) return createPortal(<LofiRadio />, slot);
