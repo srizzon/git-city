@@ -114,7 +114,7 @@ Create a token, copy it once, and place it in `GITHUB_TOKEN` inside `.env.local`
 
 ## Database Setup
 
-This repository contains the database schema as SQL migrations in [`supabase/migrations`](/c:/Users/MaikRolandDamm/Documents/git-city/supabase/migrations). Those files create the tables, policies, RPCs, and some reference data used by the app.
+This repository contains the database schema as SQL migrations in `supabase/migrations`. Those files create the tables, policies, RPCs, and some reference data used by the app.
 
 ### 1. Create the tables
 
@@ -143,7 +143,7 @@ If you do not want to use the CLI, the manual SQL Editor route also works. The i
 
 ### 2. Seed developer data
 
-After the schema is in place, you can seed the `developers` table with the curated GitHub accounts from [`scripts/seed.ts`](/c:/Users/MaikRolandDamm/Documents/git-city/scripts/seed.ts).
+After the schema is in place, you can seed the `developers` table with the curated GitHub accounts from `scripts/seed.ts`.
 
 Required env vars:
 
