@@ -23,6 +23,8 @@ import SponsoredLandmark from "@/lib/sponsors/SponsoredLandmark";
 import WhiteRabbit from "./WhiteRabbit";
 import CelebrationEffect from "./CelebrationEffect";
 import ComparePath from "./ComparePath";
+import CompareCinematic from "./CompareCinematic";
+import LocalizedFireworks from "./LocalizedFireworks";
 import WallpaperParallax from "./WallpaperParallax";
 import ThemeSkyFX from "./ThemeSkyFX";
 
@@ -2003,7 +2005,7 @@ function Waterfront({ river, dockColor }: { river: CityRiver; dockColor: string 
 
 // ─── Orbit Scene (controls + focus) ──────────────────────────
 
-function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null }) {
+function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition, isCompareCinematicPlaying }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null; isCompareCinematicPlaying?: boolean }) {
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
 
@@ -2015,7 +2017,9 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPositio
 
   return (
     <>
-      <CameraFocus buildings={buildings} focusedBuilding={focusedBuilding} focusedBuildingB={focusedBuildingB} controlsRef={controlsRef} focusPosition={focusPosition} />
+      {!isCompareCinematicPlaying && (
+        <CameraFocus buildings={buildings} focusedBuilding={focusedBuilding} focusedBuildingB={focusedBuildingB} controlsRef={controlsRef} focusPosition={focusPosition} />
+      )}
       <OrbitControls
         ref={controlsRef}
         enableDamping
@@ -2141,6 +2145,30 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
 export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy }: Props) {
+  const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
+  const prevComparePairRef = useRef<string>("");
+
+  useEffect(() => {
+    // Determine if we just entered a new comparison
+    if (focusedBuilding && focusedBuildingB) {
+      const pairId = `${focusedBuilding}-${focusedBuildingB}`;
+      if (prevComparePairRef.current !== pairId) {
+        setIsCompareCinematicPlaying(true);
+        prevComparePairRef.current = pairId;
+      }
+    } else {
+      setIsCompareCinematicPlaying(false);
+      prevComparePairRef.current = "";
+    }
+  }, [focusedBuilding, focusedBuildingB]);
+
+  const compareWinner = useMemo(() => {
+    if (!focusedBuilding || !focusedBuildingB) return null;
+    const bA = buildings.find(b => b.login.toLowerCase() === focusedBuilding.toLowerCase());
+    const bB = buildings.find(b => b.login.toLowerCase() === focusedBuildingB.toLowerCase());
+    if (!bA || !bB) return null;
+    return bA.contributions >= bB.contributions ? bA : bB;
+  }, [buildings, focusedBuilding, focusedBuildingB]);
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
   const [dpr, setDpr] = useState(1);
@@ -2194,7 +2222,31 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       ) : (
         <>
           {!introMode && !rabbitCinematic && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
-            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} />
+            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} isCompareCinematicPlaying={isCompareCinematicPlaying} />
+          )}
+
+          {isCompareCinematicPlaying && focusedBuilding && focusedBuildingB && (() => {
+            const bA = buildings.find((b) => b.login.toLowerCase() === focusedBuilding.toLowerCase());
+            const bB = buildings.find((b) => b.login.toLowerCase() === focusedBuildingB.toLowerCase());
+            if (bA && bB) {
+              return (
+                <CompareCinematic
+                  buildingA={bA}
+                  buildingB={bB}
+                  controlsRef={{ current: null }} // Let the cinematic own the camera completely while running
+                  onEnd={() => setIsCompareCinematicPlaying(false)}
+                />
+              );
+            }
+            return null;
+          })()}
+
+          {!isCompareCinematicPlaying && compareWinner && focusedBuildingB && (
+            <LocalizedFireworks
+              originX={compareWinner.position[0]}
+              originY={compareWinner.height}
+              originZ={compareWinner.position[2]}
+            />
           )}
 
           {raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && (
@@ -2283,12 +2335,14 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         dimAll={!!sponsorFocusPos}
       />
 
-      <ComparePath
-        buildings={buildings}
-        focusedBuilding={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidDefender?.login ?? focusedBuilding ?? null) : (focusedBuilding ?? null)}
-        focusedBuildingB={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : (focusedBuildingB ?? null)}
-        accentColor={t.building.accent}
-      />
+      {!isCompareCinematicPlaying && (
+        <ComparePath
+          buildings={buildings}
+          focusedBuilding={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidDefender?.login ?? focusedBuilding ?? null) : (focusedBuilding ?? null)}
+          focusedBuildingB={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : (focusedBuildingB ?? null)}
+          accentColor={t.building.accent}
+        />
+      )}
 
       <InstancedDecorations items={decorations} roadMarkingColor={t.roadMarkingColor} sidewalkColor={t.sidewalkColor} />
 
