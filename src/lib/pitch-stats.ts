@@ -46,6 +46,33 @@ function fmtRounded(n: number): string {
 }
 
 export async function getPitchStats(): Promise<PitchStats> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return {
+      developers: 0,
+      claimed: 0,
+      adCampaigns: 0,
+      uniqueBrands: 0,
+      shopPurchases: 0,
+      kudos: 0,
+      buildingVisits: 0,
+      achievements: 0,
+      daysOld: 0,
+      conversionRate: "0%",
+      formattedDevelopers: "0",
+      formattedClaimed: "0",
+      formattedAdCampaigns: "0",
+      formattedUniqueBrands: "0",
+      formattedShopPurchases: "0",
+      formattedKudos: "0",
+      formattedBuildingVisits: "0",
+      formattedAchievements: "0",
+      formattedDaysOld: "0 days old",
+      formattedRevenue: "R$0",
+      formattedAdRevenue: "R$0",
+      formattedShopRevenue: "R$0",
+    };
+  }
+
   const admin = getSupabaseAdmin();
 
   const [

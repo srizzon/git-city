@@ -196,11 +196,12 @@ function BannerPlane({
     };
   }, [tex, ledMat, ropeLine]);
 
-  // Flight
-  const rx = cityRadius * 0.55;
-  const rz = cityRadius * 0.4;
-  const altitude = 200 + index * 25;
-  const speed = 35;
+  // Flight — spread planes across multiple orbit radii so they cover the whole city
+  const radiusFraction = 0.25 + (index / Math.max(total - 1, 1)) * 0.5; // 25-75% of city radius
+  const rx = cityRadius * radiusFraction * (0.9 + (index % 3) * 0.1);
+  const rz = cityRadius * radiusFraction * (0.8 + ((index + 1) % 3) * 0.1);
+  const altitude = 180 + index * 20 + (index % 3) * 40;
+  const speed = 30 + (index % 4) * 5;
   const phaseOffset = (index * Math.PI * 2) / total;
   const angle = useRef(phaseOffset);
 
@@ -353,10 +354,12 @@ function Blimp({
     };
   }, [tex, ledMat]);
 
-  const r = cityRadius * 0.2;
-  const altitude = 280 + index * 30;
-  const speed = 6;
-  const phaseOffset = (index * Math.PI) / Math.max(total, 1);
+  // Spread blimps across the city instead of clustering near center
+  const radiusFraction = 0.15 + (index / Math.max(total - 1, 1)) * 0.45; // 15-60% of city radius
+  const r = cityRadius * radiusFraction;
+  const altitude = 260 + index * 25 + (index % 2) * 30;
+  const speed = 5 + (index % 3) * 2;
+  const phaseOffset = (index * Math.PI * 2) / Math.max(total, 1);
   const angle = useRef(phaseOffset);
 
   useFrame((state, delta) => {

@@ -40,11 +40,11 @@ export async function GET() {
   const sb = getSupabaseAdmin();
   const { data: dev } = await sb
     .from("developers")
-    .select("vscode_api_key_hash")
+    .select("vscode_api_key")
     .eq("id", auth.devId)
     .single();
 
-  return NextResponse.json({ hasKey: !!dev?.vscode_api_key_hash });
+  return NextResponse.json({ key: dev?.vscode_api_key ?? null });
 }
 
 export async function POST() {
@@ -53,12 +53,27 @@ export async function POST() {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const newKey = crypto.randomBytes(32).toString("base64url");
   const sb = getSupabaseAdmin();
+
+  // Check if key already exists
+  const { data: existing } = await sb
+    .from("developers")
+    .select("vscode_api_key")
+    .eq("id", auth.devId)
+    .single();
+
+  if (existing?.vscode_api_key) {
+    return NextResponse.json({ key: existing.vscode_api_key });
+  }
+
+  const newKey = crypto.randomBytes(32).toString("base64url");
 
   const { error } = await sb
     .from("developers")
-    .update({ vscode_api_key_hash: hashKey(newKey) })
+    .update({
+      vscode_api_key: newKey,
+      vscode_api_key_hash: hashKey(newKey),
+    })
     .eq("id", auth.devId);
 
   if (error) {

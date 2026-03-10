@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Track terminal activity (Claude Code, Cursor agent, manual commands)
+- Track debug sessions, task runner, file operations, and notebook edits
+- Your building now stays lit when coding via AI agents or terminal
+- Minimum VS Code version bumped to 1.93
+
 ## 0.2.0
 
 - Rebranded to **Git City: Pulse**

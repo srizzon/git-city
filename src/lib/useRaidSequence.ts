@@ -59,6 +59,7 @@ export function useRaidSequence(): [RaidState, RaidActions] {
   const [state, setState] = useState<RaidState>(INITIAL_STATE);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const targetLoginRef = useRef<string>("");
+  const setPhaseRef = useRef<((phase: RaidPhase) => void) | null>(null);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -67,24 +68,6 @@ export function useRaidSequence(): [RaidState, RaidActions] {
       stopAllRaidSounds();
     };
   }, []);
-
-  // Visibility change handling
-  useEffect(() => {
-    if (state.phase === "idle" || state.phase === "preview" || state.phase === "share") return;
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Pause timer
-        if (timerRef.current) {
-          clearTimeout(timerRef.current);
-          timerRef.current = null;
-        }
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [state.phase]);
 
   const setPhase = useCallback((phase: RaidPhase) => {
     setState((prev) => ({ ...prev, phase, error: null }));
@@ -128,12 +111,35 @@ export function useRaidSequence(): [RaidState, RaidActions] {
     const duration = PHASE_DURATIONS[phase];
     if (duration) {
       timerRef.current = setTimeout(() => {
-        if (phase === "intro") setPhase("flight");
-        else if (phase === "outro_win") setPhase("share");
-        else if (phase === "outro_lose") setPhase("share");
+        if (phase === "intro") setPhaseRef.current?.("flight");
+        else if (phase === "outro_win") setPhaseRef.current?.("share");
+        else if (phase === "outro_lose") setPhaseRef.current?.("share");
       }, duration);
     }
   }, []);
+
+  // Keep ref updated
+  useEffect(() => {
+    setPhaseRef.current = setPhase;
+  });
+
+  // Visibility change handling
+  useEffect(() => {
+    if (state.phase === "idle" || state.phase === "preview" || state.phase === "share") return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Pause timer
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [state.phase]);
 
   const startPreview = useCallback(
     async (targetLogin: string, buildings: CityBuilding[], myLogin: string) => {

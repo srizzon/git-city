@@ -12,13 +12,17 @@ export const metadata: Metadata = {
 };
 
 export default async function RoadmapPage() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return <RoadmapClient voteCounts={{}} userVotes={[]} isLoggedIn={false} />;
+  }
+
   const admin = getSupabaseAdmin();
 
   // Fetch vote counts per item
   const { data: voteCounts } = await admin
     .from("roadmap_votes")
     .select("item_id")
-    .then(({ data }) => {
+    .then(({ data }: { data: { item_id: string }[] | null }) => {
       // Aggregate counts manually since Supabase JS doesn't support GROUP BY directly
       const counts: Record<string, number> = {};
       for (const row of data ?? []) {
@@ -59,7 +63,7 @@ export default async function RoadmapPage() {
             .select("item_id")
             .eq("developer_id", dev.id);
 
-          userVotes = (votes ?? []).map((v) => v.item_id);
+          userVotes = (votes ?? []).map((v: { item_id: string }) => v.item_id);
         }
       }
     }

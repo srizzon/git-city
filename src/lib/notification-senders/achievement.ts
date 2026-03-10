@@ -10,17 +10,11 @@ interface AchievementInfo {
   tier: string;
 }
 
-/**
- * Send achievement unlocked notification.
- * Only sends for gold and diamond tier (bronze/silver too frequent).
- * Multiple achievements at once = ONE notification listing all.
- */
 export function sendAchievementNotification(
   devId: number,
   login: string,
   achievements: AchievementInfo[],
 ) {
-  // Filter to gold/diamond only
   const notable = achievements.filter((a) => a.tier === "gold" || a.tier === "diamond");
   if (notable.length === 0) return;
 
@@ -42,10 +36,7 @@ export function sendAchievementNotification(
   const achievementListHtml = notable
     .map((a) => {
       const emoji = TIER_EMOJI[a.tier] ?? "";
-      return `<li style="margin-bottom: 6px; color: #f0f0f0;">
-        ${emoji} <strong style="color: #c8e64a;">${a.name}</strong>
-        <span style="color: #666;">(${a.tier})</span>
-      </li>`;
+      return `<li style="margin-bottom:8px; font-size:15px; color:#555555;">${emoji} <strong style="color:#111111;">${a.name}</strong> <span style="color:#999;">(${a.tier})</span></li>`;
     })
     .join("");
 
@@ -57,18 +48,17 @@ export function sendAchievementNotification(
     title,
     body,
     html: `
-      <p style="color: #c8e64a; font-size: 16px;">
-        ${isSingle ? "Achievement Unlocked!" : `${notable.length} Achievements Unlocked!`}
-      </p>
-      <ul style="padding-left: 20px; margin: 16px 0; list-style: none;">
+      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">Achievement${isSingle ? "" : "s"} unlocked</p>
+      <h1 style="margin:0 0 20px; font-size:24px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${isSingle ? first.name : `${notable.length} new achievements`}</h1>
+      <ul style="margin:0 0 28px; padding-left:20px; list-style:none;">
         ${achievementListHtml}
       </ul>
+      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 28px;" />
       ${buildButton("View Achievements", `${BASE_URL}/?user=${login}`)}
     `,
     actionUrl: `${BASE_URL}/?user=${login}`,
     priority: "low",
     channels: ["email"],
-    // Batch eligible in case user unlocks multiple across separate calls
     batchKey: `achievements:${devId}`,
     batchWindowMinutes: 30,
     batchEventData: {

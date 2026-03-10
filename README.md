@@ -65,7 +65,16 @@ cd git-city
 npm install
 
 # Set up environment variables
+
+# Linux / macOS
 cp .env.example .env.local
+
+# Windows (Command Prompt)
+copy .env.example .env.local
+
+# Windows (PowerShell)
+Copy-Item .env.example .env.local
+
 # Fill in Supabase and Stripe keys
 
 # Run the dev server

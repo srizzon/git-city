@@ -4,49 +4,42 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 interface FounderMessageProps {
   onClose: () => void;
+  session: { user: { user_metadata?: { user_name?: string; preferred_username?: string } } } | null;
+  hasClaimed: boolean;
+  onSignIn: () => void;
 }
 
 type Lang = "en" | "pt";
 
 const MESSAGES: Record<Lang, string[]> = {
   en: [
-    "You chose the truth. Good choice.",
-    "Everything you see here... the buildings, the lights, the streets... it's code. Every pixel, every lit window, every shadow. It's all a simulation. But you already knew that.",
-    "What you might not know is that behind this entire city, there's a single dev. A guy who decided to build this alone, because he could.",
-    "Git City was born on a weekend. The idea was simple: what if we stopped looking at green squares on a chart and started seeing what they really are? People. Building things. Every day.",
-    "In one week, over 6,000 devs showed up. 6,000 buildings in a city that didn't exist 7 days before. You built this. I just turned on the signal.",
-    "This antenna you clicked? It's real. It transmits Git City. And keeping this signal on the air costs. Servers, database, API calls... every new building that goes up, the cost goes up with it.",
-    "If Git City means something to you, help me keep the signal on. Any support keeps this city alive.",
-    "Thank you for being here. Thank you for building. The city is yours.",
-    "See you on the streets.",
+    "This is a transmission. You're receiving it because you found the antenna, and the antenna only responds to people paying attention.",
+    "Behind every building you see, there's a real commit. Behind every lit window, a real dev. I built this to make the invisible visible. One dev, a few weekends, and a signal that reached over two million people in two weeks. Fifty thousand buildings. Zero ads. Just developers finding their city and passing the signal forward.",
+    "Transmitting costs something. Servers, database, API calls. Every building that goes up, the cost goes up with it. Right now, I'm the one keeping this antenna on.",
+    "If this city means something to you, help me keep the signal alive.",
   ],
   pt: [
-    "Voce escolheu a verdade. Boa escolha.",
-    "Tudo que voce ve aqui... os predios, as luzes, as ruas... e codigo. Cada pixel, cada janela acesa, cada sombra. E tudo uma simulacao. Mas voce ja sabia disso.",
-    "O que voce talvez nao saiba e que por tras dessa cidade inteira, existe um unico dev. Um cara que decidiu construir isso sozinho, porque podia.",
-    "A Git City nasceu num final de semana. A ideia era simples: e se a gente parasse de olhar pra quadrados verdes num grafico e comecasse a ver o que eles realmente sao? Pessoas. Construindo coisas. Todo dia.",
-    "Em uma semana, mais de 6.000 devs apareceram. 6.000 predios numa cidade que nao existia 7 dias antes. Voces construiram isso. Eu so liguei o sinal.",
-    "Essa antena que voce clicou? E real. Ela transmite a Git City. E manter esse sinal no ar custa. Servidores, banco de dados, API calls... cada novo predio que sobe, o custo sobe junto.",
-    "Se a Git City significa algo pra voce, me ajuda a manter o sinal ligado. Qualquer apoio mantem essa cidade viva.",
-    "Obrigado por estar aqui. Obrigado por construir. A cidade e de voces.",
-    "Nos vemos nas ruas.",
+    "Isso é uma transmissão. Você está recebendo porque encontrou a antena, e a antena só responde para quem está prestando atenção.",
+    "Por trás de cada prédio que você vê, existe um commit real. Por trás de cada janela acesa, um dev real. Eu construí isso para tornar o invisível visível. Um dev, alguns fins de semana, e um sinal que chegou em mais de dois milhões de pessoas em duas semanas. Cinquenta mil prédios. Zero ads. Só devs encontrando sua cidade e passando o sinal adiante.",
+    "Transmitir custa. Servidores, banco de dados, API calls. Cada prédio que sobe, o custo sobe junto. Por enquanto, sou eu que mantenho essa antena ligada.",
+    "Se essa cidade significa algo pra você, me ajuda a manter o sinal vivo.",
   ],
 };
 
 const SIGNATURE: Record<Lang, string> = {
   en: "// samuel, founder, solo dev, citizen #1",
-  pt: "// samuel, fundador, dev solo, cidadao #1",
+  pt: "// samuel, fundador, dev solo, cidadão #1",
 };
 
 const PS_TEXT: Record<Lang, string> = {
   en: "P.S. Would the white rabbit have found you if you had chosen the other one?",
-  pt: "P.S. Sera que o coelho branco te encontraria se voce tivesse escolhido a outra?",
+  pt: "P.S. Será que o coelho branco te encontraria se você tivesse escolhido a outra?",
 };
 
 const CHAR_DELAY = 25;
 const PARAGRAPH_PAUSE = 400;
 
-export default function FounderMessage({ onClose }: FounderMessageProps) {
+export default function FounderMessage({ onClose, session, hasClaimed, onSignIn }: FounderMessageProps) {
   const [lang, setLang] = useState<Lang>("en");
   const [typedText, setTypedText] = useState("");
   const [currentParagraph, setCurrentParagraph] = useState(0);
@@ -300,33 +293,94 @@ export default function FounderMessage({ onClose }: FounderMessageProps) {
             {SIGNATURE[lang]}
           </p>
 
-          {/* Support button */}
+          {/* CTAs */}
           <div
-            className="mt-6 transition-all duration-700"
+            className="mt-6 flex flex-col gap-3 transition-all duration-700"
             style={{
               opacity: showSupport ? 1 : 0,
               transform: showSupport ? "translateY(0)" : "translateY(8px)",
             }}
           >
+            {/* Primary CTA */}
+            {!session || !hasClaimed ? (
+              <button
+                onClick={() => { onClose(); onSignIn(); }}
+                className="inline-block font-pixel text-[10px] sm:text-[11px] px-4 py-2 uppercase tracking-wider transition-all duration-300 cursor-pointer text-left"
+                style={{
+                  color: "#0d0d0f",
+                  background: "#00ff41",
+                  border: "2px solid #00ff41",
+                  boxShadow: "3px 3px 0px rgba(0, 255, 65, 0.3)",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#00cc33"; e.currentTarget.style.borderColor = "#00cc33"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "#00ff41"; e.currentTarget.style.borderColor = "#00ff41"; }}
+              >
+                {lang === "en" ? "Connect with GitHub — get your building" : "Conectar com GitHub — resgatar seu prédio"}
+              </button>
+            ) : (
+              <a
+                href="https://discord.gg/2bTjFAkny7"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block font-pixel text-[10px] sm:text-[11px] px-4 py-2 uppercase tracking-wider transition-all duration-300"
+                style={{
+                  color: "#0d0d0f",
+                  background: "#00ff41",
+                  border: "2px solid #00ff41",
+                  boxShadow: "3px 3px 0px rgba(0, 255, 65, 0.3)",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#00cc33"; e.currentTarget.style.borderColor = "#00cc33"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "#00ff41"; e.currentTarget.style.borderColor = "#00ff41"; }}
+              >
+                {lang === "en" ? "Join the Discord" : "Entrar no Discord"}
+              </a>
+            )}
+
+            {/* Secondary CTA */}
+            {session && hasClaimed ? (
+              <a
+                href={`/?user=${session.user.user_metadata?.user_name ?? session.user.user_metadata?.preferred_username}`}
+                onClick={onClose}
+                className="inline-block font-pixel text-[10px] sm:text-[11px] px-4 py-2 uppercase tracking-wider transition-all duration-300"
+                style={{
+                  color: "#00ff41",
+                  border: "2px solid rgba(0, 255, 65, 0.4)",
+                  background: "rgba(0, 255, 65, 0.05)",
+                  boxShadow: "3px 3px 0px rgba(0, 255, 65, 0.15)",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 255, 65, 0.15)"; e.currentTarget.style.borderColor = "#00ff41"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0, 255, 65, 0.05)"; e.currentTarget.style.borderColor = "rgba(0, 255, 65, 0.4)"; }}
+              >
+                {lang === "en" ? "See your building" : "Ver seu prédio"}
+              </a>
+            ) : (
+              <a
+                href="https://github.com/srizzon/git-city"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block font-pixel text-[10px] sm:text-[11px] px-4 py-2 uppercase tracking-wider transition-all duration-300"
+                style={{
+                  color: "#00ff41",
+                  border: "2px solid rgba(0, 255, 65, 0.4)",
+                  background: "rgba(0, 255, 65, 0.05)",
+                  boxShadow: "3px 3px 0px rgba(0, 255, 65, 0.15)",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 255, 65, 0.15)"; e.currentTarget.style.borderColor = "#00ff41"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0, 255, 65, 0.05)"; e.currentTarget.style.borderColor = "rgba(0, 255, 65, 0.4)"; }}
+              >
+                {lang === "en" ? "Star on GitHub" : "Dar estrela no GitHub"}
+              </a>
+            )}
+
+            {/* Tertiary — always visible */}
             <a
               href="/support"
-              className="inline-block font-pixel text-[10px] sm:text-[11px] px-4 py-2 uppercase tracking-wider transition-all duration-300 cursor-pointer"
-              style={{
-                color: "#00ff41",
-                border: "2px solid rgba(0, 255, 65, 0.4)",
-                background: "rgba(0, 255, 65, 0.05)",
-                boxShadow: "3px 3px 0px rgba(0, 255, 65, 0.15)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(0, 255, 65, 0.15)";
-                e.currentTarget.style.borderColor = "#00ff41";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(0, 255, 65, 0.05)";
-                e.currentTarget.style.borderColor = "rgba(0, 255, 65, 0.4)";
-              }}
+              className="font-pixel text-[9px] uppercase tracking-wider transition-colors"
+              style={{ color: "rgba(0, 255, 65, 0.4)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#00ff41")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(0, 255, 65, 0.4)")}
             >
-              {lang === "en" ? "Keep the signal alive" : "Mantenha o sinal vivo"}
+              {lang === "en" ? "Keep the signal alive →" : "Manter o sinal vivo →"}
             </a>
           </div>
 

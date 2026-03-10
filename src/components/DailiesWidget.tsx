@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { ListChecks, X } from "lucide-react";
 import type { DailiesData } from "@/lib/useDailies";
 
 interface Props {
@@ -103,14 +104,12 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
     return (
       <button
         onClick={() => setOpen(true)}
-        className={`pointer-events-auto btn-press fixed z-[30] flex items-center gap-1.5 border-[2px] border-border bg-bg/80 px-2.5 py-1.5 text-[10px] backdrop-blur-sm transition-all hover:border-border-light ${
-          isMobile ? "top-3 right-3" : "left-4 top-1/2 -translate-y-1/2"
+        className={`pointer-events-auto btn-press fixed z-[30] flex items-center gap-1.5 border-[2px] border-border bg-bg/80 px-2 py-1.5 text-[10px] backdrop-blur-sm transition-all hover:border-border-light ${
+          isMobile ? "top-3 right-[52px]" : "left-4 top-1/2 -translate-y-1/2"
         }`}
         style={canClaim ? { borderColor: accent, boxShadow: `0 0 8px 2px ${accent}40` } : undefined}
       >
-        <span style={{ color: accent }}>
-          {all_completed ? "\u2605" : "\u2606"}
-        </span>
+        <ListChecks size={13} style={{ color: accent }} />
         <span className="text-cream">{completed_count}/3</span>
       </button>
     );
@@ -134,7 +133,7 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
           <div className="flex items-center gap-1.5">
-            <span style={{ color: accent }}>{all_completed ? "\u2605" : "\u2606"}</span>
+            <ListChecks size={13} style={{ color: accent }} />
             <span className="text-[11px] font-bold tracking-wider" style={{ color: accent }}>
               DAILY MISSIONS
             </span>
@@ -142,9 +141,9 @@ export default function DailiesWidget({ data, accent, shadow, isMobile, onClaim,
           </div>
           <button
             onClick={() => setOpen(false)}
-            className="px-1 text-[14px] leading-none text-muted transition-colors hover:text-cream"
+            className="flex items-center justify-center text-muted transition-colors hover:text-cream"
           >
-            &times;
+            <X size={14} />
           </button>
         </div>
 
