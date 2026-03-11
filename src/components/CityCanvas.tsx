@@ -24,6 +24,7 @@ import WhiteRabbit from "./WhiteRabbit";
 import CelebrationEffect from "./CelebrationEffect";
 import ComparePath from "./ComparePath";
 import CompareCinematic from "./CompareCinematic";
+import CompareSplitScreen from "./CompareSplitScreen";
 import LocalizedFireworks from "./LocalizedFireworks";
 import WallpaperParallax from "./WallpaperParallax";
 import ThemeSkyFX from "./ThemeSkyFX";
@@ -2241,13 +2242,23 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
             return null;
           })()}
 
-          {!isCompareCinematicPlaying && compareWinner && focusedBuildingB && (
-            <LocalizedFireworks
-              originX={compareWinner.position[0]}
-              originY={compareWinner.height}
-              originZ={compareWinner.position[2]}
-            />
-          )}
+          {!isCompareCinematicPlaying && compareWinner && focusedBuildingB && (() => {
+            const bA = buildings.find((b) => b.login.toLowerCase() === focusedBuilding?.toLowerCase());
+            const bB = buildings.find((b) => b.login.toLowerCase() === focusedBuildingB.toLowerCase());
+            if (bA && bB) {
+              return (
+                <>
+                  <LocalizedFireworks
+                    originX={compareWinner.position[0]}
+                    originY={compareWinner.height}
+                    originZ={compareWinner.position[2]}
+                  />
+                  <CompareSplitScreen buildingA={bA} buildingB={bB} />
+                </>
+              );
+            }
+            return null;
+          })()}
 
           {raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && (
             <RaidSequence3D
@@ -2317,25 +2328,28 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         <Bridge key={`bridge-${i}`} bridge={b} />
       ))}
 
-      <CityScene
-        buildings={buildings}
-        colors={t.building}
-        focusedBuilding={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidDefender?.login ?? focusedBuilding) : focusedBuilding}
-        focusedBuildingB={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : focusedBuildingB}
-        hideEffectsFor={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : null}
-        accentColor={t.building.accent}
-        onBuildingClick={onBuildingClick}
-        onFocusInfo={onFocusInfo}
-        introMode={introMode}
-        flyMode={flyMode}
-        ghostPreviewLogin={ghostPreviewLogin}
-        holdRise={holdRise}
-        liveByLogin={liveByLogin}
-        cityEnergy={cityEnergy}
-        dimAll={!!sponsorFocusPos}
-      />
+      {/* Only show default full city if we are NOT in a split-screen compare */}
+      {(!focusedBuilding || !focusedBuildingB) && (
+        <CityScene
+          buildings={buildings}
+          colors={t.building}
+          focusedBuilding={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidDefender?.login ?? focusedBuilding) : focusedBuilding}
+          focusedBuildingB={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : focusedBuildingB}
+          hideEffectsFor={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : null}
+          accentColor={t.building.accent}
+          onBuildingClick={onBuildingClick}
+          onFocusInfo={onFocusInfo}
+          introMode={introMode}
+          flyMode={flyMode}
+          ghostPreviewLogin={ghostPreviewLogin}
+          holdRise={holdRise}
+          liveByLogin={liveByLogin}
+          cityEnergy={cityEnergy}
+          dimAll={!!sponsorFocusPos}
+        />
+      )}
 
-      {!isCompareCinematicPlaying && (
+      {!isCompareCinematicPlaying && (!focusedBuilding || !focusedBuildingB) && (
         <ComparePath
           buildings={buildings}
           focusedBuilding={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidDefender?.login ?? focusedBuilding ?? null) : (focusedBuilding ?? null)}
