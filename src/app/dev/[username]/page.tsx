@@ -11,6 +11,7 @@ import { DISTRICT_NAMES, DISTRICT_COLORS } from "@/lib/github";
 import { ITEM_NAMES } from "@/lib/zones";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import ClaimButton from "@/components/ClaimButton";
+import DeleteAccountButton from "@/components/DeleteAccountButton";
 import ShareButtons from "@/components/ShareButtons";
 import CompareChallenge from "@/components/CompareChallenge";
 import ReferralCTA from "@/components/ReferralCTA";
@@ -430,8 +431,23 @@ export default async function DevPage({ params }: Props) {
           </a>
         </div>
 
+        {/* Danger Zone — owner only */}
+        {isOwner && (
+          <div className="mt-8 border-[3px] border-red-500/40 p-5">
+            <h2 className="text-xs text-red-400">Danger Zone</h2>
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[10px] text-muted normal-case">
+                  Permanently delete your account, your building, and all associated data.
+                </p>
+              </div>
+              <DeleteAccountButton />
+            </div>
+          </div>
+        )}
+
         {/* Creator credit */}
-        <div className="mt-10 border-t border-border/50 pt-4 text-center">
+        <div className="mt-6 border-t border-border/50 pt-4 text-center">
           <p className="text-[9px] text-muted normal-case">
             built by{" "}
             <a
