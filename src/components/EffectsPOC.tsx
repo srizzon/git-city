@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo, memo } from "react";
+import { useState, useRef, useMemo, useEffect, memo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -189,6 +189,7 @@ export const StarBeam = memo(function StarBeam({
   const outerRef = useRef<THREE.Mesh>(null);
   const particlesRef = useRef<THREE.Points>(null);
   const frameCount = useRef(0);
+  const recycleCountsRef = useRef(new Uint16Array(BEAM_PARTICLES));
 
   const beamH = height * 2.5;
   const beamRadius = Math.min(width, depth) * 0.15;
@@ -197,14 +198,18 @@ export const StarBeam = memo(function StarBeam({
     const pos = new Float32Array(BEAM_PARTICLES * 3);
     const spd = new Float32Array(BEAM_PARTICLES);
     for (let i = 0; i < BEAM_PARTICLES; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * beamRadius * 2;
+      const angle = pseudoRandom(i * 13.37 + beamRadius * 0.19 + beamH * 0.03) * Math.PI * 2;
+      const r = pseudoRandom(i * 19.91 + beamRadius * 0.11 + beamH * 0.07) * beamRadius * 2;
       pos[i * 3] = Math.cos(angle) * r;
-      pos[i * 3 + 1] = Math.random() * beamH;
+      pos[i * 3 + 1] = pseudoRandom(i * 23.17 + beamH * 0.13) * beamH;
       pos[i * 3 + 2] = Math.sin(angle) * r;
-      spd[i] = 8 + Math.random() * 15;
+      spd[i] = 8 + pseudoRandom(i * 29.73 + beamRadius * 0.17) * 15;
     }
     return { positions: pos, speeds: spd };
+  }, [beamH, beamRadius]);
+
+  useEffect(() => {
+    recycleCountsRef.current.fill(0);
   }, [beamH, beamRadius]);
 
   useFrame((state) => {
@@ -229,9 +234,11 @@ export const StarBeam = memo(function StarBeam({
       for (let i = 0; i < BEAM_PARTICLES; i++) {
         arr[i * 3 + 1] += speeds[i] * 0.033;
         if (arr[i * 3 + 1] > beamH) {
+          recycleCountsRef.current[i] += 1;
+          const n = recycleCountsRef.current[i];
+          const angle = pseudoRandom((i + 1) * 31.7 + n * 7.9 + beamRadius * 0.23) * Math.PI * 2;
+          const r = pseudoRandom((i + 1) * 47.3 + n * 11.1 + beamH * 0.17) * beamRadius * 2;
           arr[i * 3 + 1] = 0;
-          const angle = Math.random() * Math.PI * 2;
-          const r = Math.random() * beamRadius * 2;
           arr[i * 3] = Math.cos(angle) * r;
           arr[i * 3 + 2] = Math.sin(angle) * r;
         }
@@ -308,6 +315,38 @@ export const StarBeam = memo(function StarBeam({
 
 const STARFALL_COUNT = 40;
 
+type StarfallParticle = {
+  x: number;
+  y: number;
+  z: number;
+  speed: number;
+  rotSpeed: number;
+  size: number;
+  sway: number;
+  swaySpeed: number;
+  seed: number;
+  resets: number;
+};
+
+function createStarfallParticles(spread: number, topY: number, botY: number): StarfallParticle[] {
+  const rangeY = topY - botY;
+  return Array.from({ length: STARFALL_COUNT }, (_, i) => {
+    const seed = i * 21.713 + spread * 0.09 + topY * 0.05 + botY * 0.03;
+    return {
+      x: (pseudoRandom(seed + 0.21) - 0.5) * spread * 2,
+      y: botY + pseudoRandom(seed + 1.21) * rangeY,
+      z: (pseudoRandom(seed + 2.21) - 0.5) * spread * 2,
+      speed: 2 + pseudoRandom(seed + 3.21) * 4,
+      rotSpeed: (pseudoRandom(seed + 4.21) - 0.5) * 3,
+      size: 0.8 + pseudoRandom(seed + 5.21) * 1.2,
+      sway: pseudoRandom(seed + 6.21) * Math.PI * 2,
+      swaySpeed: 0.3 + pseudoRandom(seed + 7.21) * 0.7,
+      seed,
+      resets: 0,
+    };
+  });
+}
+
 export const Starfall = memo(function Starfall({
   width,
   height,
@@ -327,18 +366,15 @@ export const Starfall = memo(function Starfall({
   const topY = height * 1.3;
   const botY = -height * 0.4;
 
-  const stars = useMemo(() => {
-    return Array.from({ length: STARFALL_COUNT }, () => ({
-      x: (Math.random() - 0.5) * spread * 2,
-      y: botY + Math.random() * (topY - botY),
-      z: (Math.random() - 0.5) * spread * 2,
-      speed: 2 + Math.random() * 4,
-      rotSpeed: (Math.random() - 0.5) * 3,
-      size: 0.8 + Math.random() * 1.2,
-      sway: Math.random() * Math.PI * 2,
-      swaySpeed: 0.3 + Math.random() * 0.7,
-    }));
-  }, [spread, topY, botY]);
+  const initialStars = useMemo(
+    () => createStarfallParticles(spread, topY, botY),
+    [spread, topY, botY],
+  );
+  const starsRef = useRef<StarfallParticle[]>(initialStars.map((s) => ({ ...s })));
+
+  useEffect(() => {
+    starsRef.current = initialStars.map((s) => ({ ...s }));
+  }, [initialStars]);
 
   useFrame((state, delta) => {
     accDelta.current += delta;
@@ -351,6 +387,8 @@ export const Starfall = memo(function Starfall({
     const t = state.clock.elapsedTime;
     const ch = groupRef.current.children;
 
+    const stars = starsRef.current;
+
     for (let i = 0; i < STARFALL_COUNT; i++) {
       const s = stars[i];
       const m = ch[i] as THREE.Mesh;
@@ -358,9 +396,12 @@ export const Starfall = memo(function Starfall({
 
       s.y -= s.speed * dt;
       if (s.y < botY) {
+        s.resets += 1;
+        const rx = pseudoRandom(s.seed + s.resets * 9.17);
+        const rz = pseudoRandom(s.seed + s.resets * 13.37);
         s.y = topY;
-        s.x = (Math.random() - 0.5) * spread * 2;
-        s.z = (Math.random() - 0.5) * spread * 2;
+        s.x = (rx - 0.5) * spread * 2;
+        s.z = (rz - 0.5) * spread * 2;
       }
 
       m.position.set(
@@ -380,7 +421,7 @@ export const Starfall = memo(function Starfall({
 
   return (
     <group ref={groupRef} position={[0, height * 0.5, 0]}>
-      {stars.map((s, i) => (
+      {initialStars.map((s, i) => (
         <mesh
           key={i}
           position={[s.x, s.y, s.z]}
@@ -571,14 +612,14 @@ export const StarOrbit = memo(function StarOrbit({
   const orbits = useMemo(() => {
     return Array.from({ length: ORBIT_STARS }, (_, i) => ({
       offset: (i / ORBIT_STARS) * Math.PI * 2,
-      speed: 0.4 + Math.random() * 0.4,
+      speed: 0.4 + pseudoRandom(i * 17.7 + height * 0.03 + orbitRadius * 0.01) * 0.4,
       yBase: height * (0.15 + (i / ORBIT_STARS) * 0.7),
-      yAmp: 2 + Math.random() * 3,
-      radius: orbitRadius * (0.85 + Math.random() * 0.3),
-      scale: 1.2 + Math.random() * 1.0,
-      tilt: (Math.random() - 0.5) * 0.4,
+      yAmp: 2 + pseudoRandom(i * 23.3 + height * 0.05) * 3,
+      radius: orbitRadius * (0.85 + pseudoRandom(i * 29.1 + depth * 0.07) * 0.3),
+      scale: 1.2 + pseudoRandom(i * 31.9 + width * 0.09) * 1.0,
+      tilt: (pseudoRandom(i * 37.5 + orbitRadius * 0.11) - 0.5) * 0.4,
     }));
-  }, [height, orbitRadius]);
+  }, [height, orbitRadius, depth, width]);
 
   // Trail positions per star
   const TRAIL_PER_STAR = 12;
@@ -684,6 +725,61 @@ export const StarOrbit = memo(function StarOrbit({
 const COMMIT_COUNT = 50;
 const COMMIT_GREENS = ["#0e4429", "#006d32", "#26a641", "#39d353"];
 
+type CommitParticle = {
+  x: number;
+  y: number;
+  z: number;
+  speed: number;
+  size: number;
+  sway: number;
+  swaySpeed: number;
+  color: string;
+  emissiveIntensity: number;
+  seed: number;
+  resets: number;
+};
+
+function pseudoRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+function createCommitParticles(spread: number, topY: number, botY: number): CommitParticle[] {
+  const rangeY = topY - botY;
+  return Array.from({ length: COMMIT_COUNT }, (_, i) => {
+    const seed = i * 17.731 + spread * 0.13 + topY * 0.07 + botY * 0.11;
+    const r0 = pseudoRandom(seed + 0.11);
+    const r1 = pseudoRandom(seed + 1.11);
+    const r2 = pseudoRandom(seed + 2.11);
+    const r3 = pseudoRandom(seed + 3.11);
+    const r4 = pseudoRandom(seed + 4.11);
+    const r5 = pseudoRandom(seed + 5.11);
+    const r6 = pseudoRandom(seed + 6.11);
+    const green = COMMIT_GREENS[Math.floor(r0 * COMMIT_GREENS.length)];
+
+    return {
+      x: (r1 - 0.5) * spread * 2,
+      y: botY + r2 * rangeY,
+      z: (r3 - 0.5) * spread * 2,
+      speed: 3 + r4 * 6,
+      size: 0.5 + r5 * 0.8,
+      sway: r6 * Math.PI * 2,
+      swaySpeed: 0.2 + pseudoRandom(seed + 7.11) * 0.5,
+      color: green,
+      emissiveIntensity:
+        green === "#39d353"
+          ? 3.5
+          : green === "#26a641"
+            ? 2.5
+            : green === "#006d32"
+              ? 1.5
+              : 0.8,
+      seed,
+      resets: 0,
+    };
+  });
+}
+
 export const CommitStream = memo(function CommitStream({
   width,
   height,
@@ -701,22 +797,15 @@ export const CommitStream = memo(function CommitStream({
   const topY = height * 1.4;
   const botY = -height * 0.1;
 
-  const commits = useMemo(() => {
-    return Array.from({ length: COMMIT_COUNT }, () => {
-      const green = COMMIT_GREENS[Math.floor(Math.random() * COMMIT_GREENS.length)];
-      return {
-        x: (Math.random() - 0.5) * spread * 2,
-        y: botY + Math.random() * (topY - botY),
-        z: (Math.random() - 0.5) * spread * 2,
-        speed: 3 + Math.random() * 6,
-        size: 0.5 + Math.random() * 0.8,
-        sway: Math.random() * Math.PI * 2,
-        swaySpeed: 0.2 + Math.random() * 0.5,
-        color: green,
-        emissiveIntensity: green === "#39d353" ? 3.5 : green === "#26a641" ? 2.5 : green === "#006d32" ? 1.5 : 0.8,
-      };
-    });
-  }, [spread, topY, botY]);
+  const initialCommits = useMemo(
+    () => createCommitParticles(spread, topY, botY),
+    [spread, topY, botY],
+  );
+  const commitsRef = useRef<CommitParticle[]>(initialCommits.map((c) => ({ ...c })));
+
+  useEffect(() => {
+    commitsRef.current = initialCommits.map((c) => ({ ...c }));
+  }, [initialCommits]);
 
   useFrame((state, delta) => {
     accDelta.current += delta;
@@ -729,6 +818,8 @@ export const CommitStream = memo(function CommitStream({
     const t = state.clock.elapsedTime;
     const ch = groupRef.current.children;
 
+    const commits = commitsRef.current;
+
     for (let i = 0; i < COMMIT_COUNT; i++) {
       const c = commits[i];
       const m = ch[i] as THREE.Mesh;
@@ -736,9 +827,12 @@ export const CommitStream = memo(function CommitStream({
 
       c.y += c.speed * dt;
       if (c.y > topY) {
+        c.resets += 1;
+        const rr1 = pseudoRandom(c.seed + c.resets * 11.17);
+        const rr2 = pseudoRandom(c.seed + c.resets * 19.43);
         c.y = botY;
-        c.x = (Math.random() - 0.5) * spread * 2;
-        c.z = (Math.random() - 0.5) * spread * 2;
+        c.x = (rr1 - 0.5) * spread * 2;
+        c.z = (rr2 - 0.5) * spread * 2;
       }
 
       m.position.set(
@@ -758,7 +852,7 @@ export const CommitStream = memo(function CommitStream({
 
   return (
     <group ref={groupRef} position={[0, height * 0.5, 0]}>
-      {commits.map((c, i) => (
+      {initialCommits.map((c, i) => (
         <mesh
           key={i}
           position={[c.x, c.y, c.z]}

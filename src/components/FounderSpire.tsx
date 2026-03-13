@@ -11,6 +11,11 @@ interface FounderSpireProps {
   onClick: () => void;
 }
 
+type SpireWindowFlags = Window & {
+  __spireClicked?: boolean;
+  __spireCursor?: boolean;
+};
+
 export default function FounderSpire({ onClick }: FounderSpireProps) {
   const groupRef = useRef<THREE.Group>(null);
   const pulseRef = useRef<THREE.Mesh>(null);
@@ -23,12 +28,16 @@ export default function FounderSpire({ onClick }: FounderSpireProps) {
   const raycaster = useRef(new THREE.Raycaster());
   const ndc = useRef(new THREE.Vector2());
   const onClickRef = useRef(onClick);
-  onClickRef.current = onClick;
+
+  useEffect(() => {
+    onClickRef.current = onClick;
+  }, [onClick]);
 
   // Native capture-phase handlers for click + cursor
   // Capture phase fires BEFORE bubble phase, so this runs before InstancedBuildings' handlers
   useEffect(() => {
     const canvas = gl.domElement;
+    const w = window as SpireWindowFlags;
 
     const hitsSpire = (e: PointerEvent): boolean => {
       const group = groupRef.current;
@@ -45,13 +54,13 @@ export default function FounderSpire({ onClick }: FounderSpireProps) {
 
     const onDown = (e: PointerEvent) => {
       if (hitsSpire(e)) {
-        (window as any).__spireClicked = true;
+        w.__spireClicked = true;
         tap = { time: performance.now(), x: e.clientX, y: e.clientY };
       }
     };
 
     const onUp = (e: PointerEvent) => {
-      (window as any).__spireClicked = false;
+      w.__spireClicked = false;
       if (!tap) return;
       const elapsed = performance.now() - tap.time;
       const dx = e.clientX - tap.x;
@@ -70,9 +79,9 @@ export default function FounderSpire({ onClick }: FounderSpireProps) {
       lastMove = now;
       if (hitsSpire(e)) {
         document.body.style.cursor = "pointer";
-        (window as any).__spireCursor = true;
-      } else if ((window as any).__spireCursor) {
-        (window as any).__spireCursor = false;
+        w.__spireCursor = true;
+      } else if (w.__spireCursor) {
+        w.__spireCursor = false;
       }
     };
 
@@ -84,8 +93,8 @@ export default function FounderSpire({ onClick }: FounderSpireProps) {
       canvas.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointerup", onUp, true);
       if (onMove) canvas.removeEventListener("pointermove", onMove, true);
-      (window as any).__spireClicked = false;
-      (window as any).__spireCursor = false;
+      w.__spireClicked = false;
+      w.__spireCursor = false;
     };
   }, [gl, camera]);
 

@@ -10,6 +10,11 @@ interface WhiteRabbitProps {
   onCaught: () => void;
 }
 
+type RabbitWindowFlags = Window & {
+  __rabbitClicked?: boolean;
+  __rabbitCursor?: boolean;
+};
+
 const WHITE = "#f0f0f0";
 const RED_EYE = "#ff0000";
 
@@ -22,7 +27,10 @@ export default function WhiteRabbit({ position, visible, onCaught }: WhiteRabbit
   const raycaster = useRef(new THREE.Raycaster());
   const ndc = useRef(new THREE.Vector2());
   const onCaughtRef = useRef(onCaught);
-  onCaughtRef.current = onCaught;
+
+  useEffect(() => {
+    onCaughtRef.current = onCaught;
+  }, [onCaught]);
 
   const [caught, setCaught] = useState(false);
   const catchTimeRef = useRef(0);
@@ -31,6 +39,7 @@ export default function WhiteRabbit({ position, visible, onCaught }: WhiteRabbit
   useEffect(() => {
     if (!visible || caught) return;
     const canvas = gl.domElement;
+    const w = window as RabbitWindowFlags;
 
     const hitsRabbit = (e: PointerEvent): boolean => {
       const group = groupRef.current;
@@ -46,13 +55,13 @@ export default function WhiteRabbit({ position, visible, onCaught }: WhiteRabbit
 
     const onDown = (e: PointerEvent) => {
       if (hitsRabbit(e)) {
-        (window as any).__rabbitClicked = true;
+        w.__rabbitClicked = true;
         tap = { time: performance.now(), x: e.clientX, y: e.clientY };
       }
     };
 
     const onUp = (e: PointerEvent) => {
-      (window as any).__rabbitClicked = false;
+      w.__rabbitClicked = false;
       if (!tap) return;
       const elapsed = performance.now() - tap.time;
       const dx = e.clientX - tap.x;
@@ -72,9 +81,9 @@ export default function WhiteRabbit({ position, visible, onCaught }: WhiteRabbit
       lastMove = now;
       if (hitsRabbit(e)) {
         document.body.style.cursor = "pointer";
-        (window as any).__rabbitCursor = true;
-      } else if ((window as any).__rabbitCursor) {
-        (window as any).__rabbitCursor = false;
+        w.__rabbitCursor = true;
+      } else if (w.__rabbitCursor) {
+        w.__rabbitCursor = false;
       }
     };
 
@@ -86,8 +95,8 @@ export default function WhiteRabbit({ position, visible, onCaught }: WhiteRabbit
       canvas.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointerup", onUp, true);
       if (onMove) canvas.removeEventListener("pointermove", onMove, true);
-      (window as any).__rabbitClicked = false;
-      (window as any).__rabbitCursor = false;
+      w.__rabbitClicked = false;
+      w.__rabbitCursor = false;
     };
   }, [gl, camera, visible, caught]);
 

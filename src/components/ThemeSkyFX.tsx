@@ -943,7 +943,6 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         if (flyPointsRef.current) flyPointsRef.current.rotation.y += dt * 0.010;
 
         // ── Aurora ring scroll + pulse (Emerald) ─────────────────
-        // eslint-disable-next-line react-compiler/react-compiler -- Three.js material mutation in animation loop
         if (themeIndex === 3 && auroraRingMat0 && auroraRingMat1) {
             // Slower drift — patchy texture already has visual complexity
             if (auroraRingMat0.map && auroraRingMat1.map) {
@@ -974,7 +973,6 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
 
 
         // ── Sunset cirrus drift ───────────────────────────────────────
-        // eslint-disable-next-line react-compiler/react-compiler -- Three.js material mutation in animation loop
         if (themeIndex === 1 && sunsetCirrusMat?.map) {
             sunsetCirrusMat.map.offset.x = (sunsetCirrusMat.map.offset.x + dt * 0.0012) % 1;
         }
