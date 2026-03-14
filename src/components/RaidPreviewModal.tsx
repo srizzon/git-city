@@ -86,11 +86,18 @@ export default function RaidPreviewModal({ preview, loading, error, onRaid, onCa
       >
         {/* Header */}
         <div className="mb-3 text-center">
+          {preview.special_event === "friday13" && (
+            <p className="mb-1 font-silkscreen text-[10px] uppercase tracking-wider text-orange-400 animate-pulse">
+              Friday the 13th - Unlimited Battles
+            </p>
+          )}
           <h2 className="font-silkscreen text-sm uppercase tracking-wider text-red-400">
             Battle Preview
           </h2>
           <p className="mt-1 text-[10px] text-muted">
-            {preview.raids_today}/{preview.raids_max} battles used today
+            {preview.special_event === "friday13"
+              ? `${preview.raids_today} battles today - NO LIMITS`
+              : `${preview.raids_today}/${preview.raids_max} battles used today`}
           </p>
         </div>
 

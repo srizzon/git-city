@@ -26,6 +26,7 @@ import { useStreakCheckin } from "@/lib/useStreakCheckin";
 import { useLiveUsers } from "@/lib/useLiveUsers";
 import { useCodingPresence } from "@/lib/useCodingPresence";
 import { useRaidSequence } from "@/lib/useRaidSequence";
+import { isFridayThe13th } from "@/lib/raid";
 import { useDailies } from "@/lib/useDailies";
 import InviteCard, { type InvitePreview } from "@/components/InviteCard";
 import XpBar from "@/components/XpBar";
@@ -3162,6 +3163,20 @@ function HomeContent() {
             <SearchFeedback feedback={feedback} accentColor={theme.accent} onDismiss={() => setFeedback(null)} onRetry={searchUser} />
 
             {/* Loading indicator removed — LoadingScreen overlay handles this */}
+
+            {/* ─── Friday the 13th Event Banner (inline) ─── */}
+            {isFridayThe13th() && (
+              <div className="flex items-center gap-2 border-2 border-red-500/40 bg-red-950/30 px-3 py-1.5 sm:px-4 sm:py-2">
+                <span className="text-sm shrink-0">&#128128;</span>
+                <span className="font-silkscreen text-[9px] sm:text-[10px] uppercase tracking-wider text-red-400 whitespace-nowrap">
+                  Friday the 13th
+                </span>
+                <span className="text-[9px] text-red-400/40">|</span>
+                <span className="text-[9px] sm:text-[10px] text-orange-300/80 whitespace-nowrap">
+                  Unlimited battles, no cooldowns
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Center - Explore buttons + Shop + Auth */}
