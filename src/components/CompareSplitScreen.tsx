@@ -29,8 +29,8 @@ export default function CompareSplitScreen({ buildingA, buildingB }: CompareSpli
     }, [buildingB, size.width, size.height]);
 
     // Target positions for the cameras to orbit around
-    const targetA = useMemo(() => new THREE.Vector3(buildingA.position[0], buildingA.height * 0.5, buildingA.position[2]), [buildingA]);
-    const targetB = useMemo(() => new THREE.Vector3(buildingB.position[0], buildingB.height * 0.5, buildingB.position[2]), [buildingB]);
+    const targetA = useMemo(() => new THREE.Vector3(buildingA.position[0], buildingA.height * 0.7, buildingA.position[2]), [buildingA]);
+    const targetB = useMemo(() => new THREE.Vector3(buildingB.position[0], buildingB.height * 0.7, buildingB.position[2]), [buildingB]);
 
     // Update aspect ratios when canvas size changes
     useEffect(() => {
@@ -71,6 +71,7 @@ export default function CompareSplitScreen({ buildingA, buildingB }: CompareSpli
         gl.setViewport(0, 0, size.width, size.height);
         gl.setScissor(0, 0, size.width, size.height);
         gl.setScissorTest(false);
+        gl.autoClear = true;
 
     }, 1); // priority 1 to hijack the render loop
 

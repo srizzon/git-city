@@ -35,13 +35,14 @@ export default function CompareCinematic({
     const _look = useRef(new THREE.Vector3());
 
     // Build the cinematic path
-    const { posCurve, lookCurve } = useMemo(() => {
+    const { posCurve, lookCurve, duration } = useMemo(() => {
         const posA = new THREE.Vector3(buildingA.position[0], buildingA.height, buildingA.position[2]);
         const posB = new THREE.Vector3(buildingB.position[0], buildingB.height, buildingB.position[2]);
 
         // Create a vector from A to B
         const aToB = new THREE.Vector3().subVectors(posB, posA);
         const distance = aToB.length();
+        const computedDuration = Math.max(3.5, Math.min(8, distance / 80));
 
         // Find the midpoint
         const midPoint = new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5);
@@ -81,7 +82,7 @@ export default function CompareCinematic({
         cPosCurve.getLength();
         cLookCurve.getLength();
 
-        return { posCurve: cPosCurve, lookCurve: cLookCurve };
+        return { posCurve: cPosCurve, lookCurve: cLookCurve, duration: computedDuration };
     }, [buildingA, buildingB]);
 
     // Take over OrbitControls temporarily
@@ -95,7 +96,7 @@ export default function CompareCinematic({
         if (ended.current) return;
         elapsed.current += delta;
 
-        const rawT = Math.min(elapsed.current / CINEMATIC_DURATION, 1);
+        const rawT = Math.min(elapsed.current / duration, 1);
         const t = introEase(rawT);
 
         posCurve.getPointAt(t, _pos.current);
@@ -109,7 +110,7 @@ export default function CompareCinematic({
             camera.lookAt(_look.current);
         }
 
-        if (elapsed.current >= CINEMATIC_DURATION) {
+        if (elapsed.current >= duration) {
             ended.current = true;
             onEnd();
         }

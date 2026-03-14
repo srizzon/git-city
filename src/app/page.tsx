@@ -486,6 +486,15 @@ function HomeContent() {
   const visitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [compareBuilding, setCompareBuilding] = useState<CityBuilding | null>(null);
   const [comparePair, setComparePair] = useState<[CityBuilding, CityBuilding] | null>(null);
+  const [compareCinematicPlaying, setCompareCinematicPlaying] = useState(false);
+
+  useEffect(() => {
+    if (comparePair) {
+      setCompareCinematicPlaying(true);
+    } else {
+      setCompareCinematicPlaying(false);
+    }
+  }, [comparePair]);
   const [compareSelfHint, setCompareSelfHint] = useState(false);
   const [giftModalOpen, setGiftModalOpen] = useState(false);
   const [giftItems, setGiftItems] = useState<{ id: string; price_usd_cents: number; owned: boolean }[] | null>(null);
@@ -2096,6 +2105,7 @@ function HomeContent() {
     <main className="relative min-h-screen overflow-hidden bg-bg font-pixel uppercase text-warm">
       {/* 3D Canvas */}
       <CityCanvas
+        onCompareCinematicEnd={() => setCompareCinematicPlaying(false)}
         buildings={buildings}
         plazas={plazas}
         decorations={decorations}
@@ -4626,7 +4636,7 @@ function HomeContent() {
       )}
 
       {/* ─── Comparison Panel ─── */}
-      {comparePair && (() => {
+      {!compareCinematicPlaying && comparePair && (() => {
         const compareStatDefs: { label: string; key: keyof CityBuilding; invert?: boolean }[] = [
           { label: "Rank", key: "rank", invert: true },
           { label: "Contributions", key: "contributions" },
