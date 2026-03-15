@@ -3914,7 +3914,7 @@ function HomeContent() {
                           {dropPulling ? "Pulling..." : "Pull"}
                         </button>
                         <a
-                          href={`https://x.com/intent/tweet?text=${encodeURIComponent(`Found a ${drop.rarity} drop on @${selectedBuilding.login}'s building in Git City! +${drop.points} pts`)}&url=${encodeURIComponent("https://git.city")}`}
+                          href={`https://x.com/intent/tweet?text=${encodeURIComponent(`just pulled a ${drop.rarity} drop in Git City 👀 how many are you walking past?`)}&url=${encodeURIComponent("https://thegitcity.com")}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn-press border-2 px-3 py-1.5 text-[10px] transition-colors hover:border-border-light"
