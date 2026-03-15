@@ -85,7 +85,10 @@ export default function RaidTag3D({ width, height, depth, attackerLogin, tagStyl
   // Scroll if text is long
   useFrame(({ clock }) => {
     if (needsScroll) {
-      tex.offset.x = (clock.elapsedTime * 0.15) % 1;
+      
+      const textureObj = tex as THREE.Texture;
+      // eslint-disable-next-line react-hooks/immutability
+      textureObj.offset.x = (clock.elapsedTime * 0.15) % 1;
     }
   });
 

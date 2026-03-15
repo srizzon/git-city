@@ -227,7 +227,8 @@ function BannerPlane({
 
     // Scroll LED text
     if (needsScroll) {
-      tex.offset.x = (t * SCROLL_SPEED) % 1;
+      // eslint-disable-next-line react-hooks/immutability
+      (tex as THREE.Texture).offset.x = (t * SCROLL_SPEED) % 1;
     }
   });
 
@@ -249,7 +250,7 @@ function BannerPlane({
     };
   }, []);
 
-  const handleClick = (e: any) => {
+  const handleClick = (e: import("@react-three/fiber").ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     if (flyMode) return;
     onAdClick?.(ad);
@@ -283,8 +284,13 @@ function BannerPlane({
       <mesh
         ref={(el: THREE.Mesh | null) => {
           side1Ref.current = el;
-          if (typeof meshRef === "function") meshRef(el);
-          else if (meshRef && "current" in meshRef) (meshRef as React.MutableRefObject<THREE.Mesh | null>).current = el;
+          const refProp = meshRef;
+          if (typeof refProp === "function") refProp(el);
+          else if (refProp && "current" in refProp) {
+            const mutableRef = refProp as React.MutableRefObject<THREE.Mesh | null>;
+                        // eslint-disable-next-line react-hooks/immutability
+            mutableRef.current = el;
+          }
         }}
         material={ledMat}
         position={[0.15, bannerY, bannerZ]}
@@ -381,7 +387,8 @@ function Blimp({
 
     // Scroll LED text
     if (needsScroll) {
-      tex.offset.x = (t * SCROLL_SPEED) % 1;
+      // eslint-disable-next-line react-hooks/immutability
+      (tex as THREE.Texture).offset.x = (t * SCROLL_SPEED) % 1;
     }
   });
 
@@ -403,7 +410,7 @@ function Blimp({
     };
   }, []);
 
-  const handleClick = (e: any) => {
+  const handleClick = (e: import("@react-three/fiber").ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     if (flyMode) return;
     onAdClick?.(ad);
@@ -512,8 +519,13 @@ function Blimp({
       <mesh
         ref={(el: THREE.Mesh | null) => {
           screen1Ref.current = el;
-          if (typeof screenRef === "function") screenRef(el);
-          else if (screenRef && "current" in screenRef) (screenRef as React.MutableRefObject<THREE.Mesh | null>).current = el;
+          const refProp = screenRef;
+          if (typeof refProp === "function") refProp(el);
+          else if (refProp && "current" in refProp) {
+            const mutableRef = refProp as React.MutableRefObject<THREE.Mesh | null>;
+                        // eslint-disable-next-line react-hooks/immutability
+            mutableRef.current = el;
+          }
         }}
         material={ledMat}
         position={[10.8, -2, 0]}

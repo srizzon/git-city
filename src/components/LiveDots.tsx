@@ -94,8 +94,14 @@ export default function LiveDots({ buildings, liveByLogin }: LiveDotsProps) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     const pulse = 0.6 + 0.4 * Math.sin(t * 2);
-    if (count > 0) mat.opacity = pulse;
-    if (creatorIndex !== null) creatorMat.opacity = pulse;
+    if (count > 0 && meshRef.current) {
+      const material = meshRef.current.material as THREE.Material;
+      material.opacity = pulse;
+    }
+    if (creatorIndex !== null && creatorMeshRef.current) {
+      const cMaterial = creatorMeshRef.current.material as THREE.Material;
+      cMaterial.opacity = pulse;
+    }
   });
 
   // Cleanup
