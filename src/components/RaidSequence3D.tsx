@@ -688,12 +688,12 @@ function FireGlow({ active, position }: { active: boolean; position: THREE.Vecto
 
 // ─── Shield Dome ──────────────────────────────────────────────
 
-function ShieldDome({ active, position, size, strength, hitIntensity }: {
+function ShieldDome({ active, position, size, strength, hitIntensityRef }: {
   active: boolean;
   position: THREE.Vector3;
   size: number;
   strength: "weak" | "medium" | "strong";
-  hitIntensity: number;
+  hitIntensityRef: React.MutableRefObject<number>;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const wireRef = useRef<THREE.Mesh>(null);
@@ -702,7 +702,7 @@ function ShieldDome({ active, position, size, strength, hitIntensity }: {
     if (!active || !meshRef.current) return;
     const mat = meshRef.current.material as THREE.MeshBasicMaterial;
     const basePulse = Math.sin(clock.elapsedTime * 4) * 0.05;
-    const hitPulse = hitIntensity * 0.3;
+    const hitPulse = hitIntensityRef.current * 0.3;
     const baseOpacity = strength === "strong" ? 0.15 : strength === "medium" ? 0.1 : 0.05;
     mat.opacity = baseOpacity + basePulse + hitPulse;
 
@@ -863,9 +863,9 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
   // Reusable vectors (avoid GC)
   const _camTarget = useMemo(() => new THREE.Vector3(), []);
   const _tempVec = useMemo(() => new THREE.Vector3(), []);
-  const _vehicleTarget = useMemo(() => new THREE.Vector3(), []);
+  const _vehicleTargetRef = useRef(new THREE.Vector3());
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     phaseTimeRef.current += delta;
     const t = phaseTimeRef.current;
 
@@ -874,9 +874,9 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
     if (s.intensity > 0.01) {
       s.elapsed += delta;
       const decay = Math.exp(-s.elapsed * 5);
-      camera.position.x += Math.sin(s.elapsed * 25) * s.intensity * decay;
-      camera.position.y += Math.cos(s.elapsed * 30) * s.intensity * 0.6 * decay;
-      camera.rotation.z += Math.sin(s.elapsed * 20) * s.intensity * 0.012 * decay;
+      state.camera.position.x += Math.sin(s.elapsed * 25) * s.intensity * decay;
+      state.camera.position.y += Math.cos(s.elapsed * 30) * s.intensity * 0.6 * decay;
+      state.camera.rotation.z += Math.sin(s.elapsed * 20) * s.intensity * 0.012 * decay;
 
       if (decay < 0.01) s.intensity = 0;
     }
@@ -931,12 +931,12 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
           );
 
           // Face toward defender
-          _vehicleTarget.set(
+          _vehicleTargetRef.current.set(
             defenderTopPos.x,
             rooftopY + liftEase * 10,
             defenderTopPos.z,
           );
-          vehicleRef.current.lookAt(_vehicleTarget);
+          vehicleRef.current.lookAt(_vehicleTargetRef.current);
           vehicleRef.current.rotateY(Math.PI); // nose is -Z
           vehicleRef.current.rotateX(liftProgress * 0.08); // slight nose-up tilt
           vehicleRef.current.scale.setScalar(2);
@@ -1015,12 +1015,12 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
           vehicleRef.current.scale.setScalar(2);
 
           // Look along orbit tangent (direction of travel)
-          _vehicleTarget.set(
+          _vehicleTargetRef.current.set(
             vehicleX + tangentX * 30,
             vehicleY - 2,
             vehicleZ + tangentZ * 30,
           );
-          vehicleRef.current.lookAt(_vehicleTarget);
+          vehicleRef.current.lookAt(_vehicleTargetRef.current);
           vehicleRef.current.rotateY(Math.PI); // flip: nose faces travel direction
 
           // Bank into the turn (sign flipped due to rotateY)
@@ -1128,12 +1128,12 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
 
           const vTangentX = Math.sin(victoryAngle);
           const vTangentZ = -Math.cos(victoryAngle);
-          _vehicleTarget.set(
+          _vehicleTargetRef.current.set(
             vehicleRef.current.position.x + vTangentX * 30,
             vehicleRef.current.position.y,
             vehicleRef.current.position.z + vTangentZ * 30,
           );
-          vehicleRef.current.lookAt(_vehicleTarget);
+          vehicleRef.current.lookAt(_vehicleTargetRef.current);
           vehicleRef.current.rotateY(Math.PI);
           vehicleRef.current.rotateZ(0.15);
         }
@@ -1159,9 +1159,9 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
           vehicleRef.current.rotation.z = Math.sin(t * 8) * 0.3 * (1 - progress);
 
           // Face retreat direction
-          _vehicleTarget.copy(vehicleRef.current.position).addScaledVector(_tempVec, 20);
-          _vehicleTarget.y = vehicleRef.current.position.y;
-          vehicleRef.current.lookAt(_vehicleTarget);
+          _vehicleTargetRef.current.copy(vehicleRef.current.position).addScaledVector(_tempVec, 20);
+          _vehicleTargetRef.current.y = vehicleRef.current.position.y;
+          vehicleRef.current.lookAt(_vehicleTargetRef.current);
           vehicleRef.current.rotateY(Math.PI);
 
           const scale = Math.max(0.01, 2 * (1 - progress * 0.5));
@@ -1235,16 +1235,19 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
         position={defenderTopPos}
         size={Math.max(defender?.width ?? 10, defender?.depth ?? 10)}
         strength={defenseStrength}
-        hitIntensity={hitIntensityRef.current}
+        hitIntensityRef={hitIntensityRef}
       />
 
       {/* Shockwave ring */}
+      {/* eslint-disable-next-line react-hooks/refs */}
       <Shockwave active={(isAttack || isOutro) && !!raidData?.success && climaxTriggered.current} position={defenderTopPos} />
 
       {/* Debris */}
+      {/* eslint-disable-next-line react-hooks/refs */}
       <DebrisParticles active={(isAttack || isOutro) && !!raidData?.success && climaxTriggered.current} origin={defenderTopPos} />
 
       {/* Fire glow */}
+      {/* eslint-disable-next-line react-hooks/refs */}
       <FireGlow active={(isAttack || isOutro) && !!raidData?.success && climaxTriggered.current} position={defenderTopPos} />
     </group>
   );

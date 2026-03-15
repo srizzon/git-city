@@ -359,15 +359,17 @@ function RenderStats({ mode, count }: { mode: string; count: number }) {
   const { gl } = useThree();
   const statsRef = useRef<HTMLDivElement | null>(null);
   const fpsFrames = useRef<number[]>([]);
-  const lastTime = useRef(performance.now());
+  const lastTime = useRef(0);
 
   useEffect(() => {
     // Create stats div in the DOM
     const div = document.getElementById("poc-stats");
     if (div) statsRef.current = div as HTMLDivElement;
+    lastTime.current = performance.now();
   }, []);
 
   useFrame(() => {
+    if (lastTime.current === 0) lastTime.current = performance.now();
     const now = performance.now();
     const delta = now - lastTime.current;
     lastTime.current = now;

@@ -402,6 +402,7 @@ function CameraFocus({
   buildings: CityBuilding[];
   focusedBuilding: string | null;
   focusedBuildingB?: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   controlsRef: React.RefObject<any>;
 }) {
   const { camera } = useThree();
@@ -558,6 +559,7 @@ const _yAxis = new THREE.Vector3(0, 1, 0);
 function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, startPaused = false, vehicleType = "airplane", posRef, cityRadius = 3500 }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; startPaused?: boolean; vehicleType?: string; posRef?: React.MutableRefObject<THREE.Vector3>; cityRadius?: number }) {
   const { camera } = useThree();
   const ref = useRef<THREE.Group>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const orbitRef = useRef<any>(null);
 
   const mouse = useRef({ x: 0, y: 0 });
@@ -587,10 +589,14 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
 
   // Contrail / speed trail
   const TRAIL_POINTS = 48;
-  const trailPositions = useRef(new Float32Array(TRAIL_POINTS * 3));
-  const trailColors = useRef(new Float32Array(TRAIL_POINTS * 4));
+  const initialPositions = useMemo(() => new Float32Array(TRAIL_POINTS * 3), []);
+  const initialColors = useMemo(() => new Float32Array(TRAIL_POINTS * 4), []);
+  const trailPositions = useRef(initialPositions);
+  const trailColors = useRef(initialColors);
   const trailGeomRef = useRef<THREE.BufferGeometry>(null);
   const trailInit = useRef(false);
+
+  const initialOrbitTarget = useMemo(() => [0, 120, 400] as [number, number, number], []);
 
   const hudTimer = useRef(0);
   const lastHudSpeed = useRef(-1);
@@ -653,6 +659,7 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
       prevSignal.current = pauseSignal;
       if (!paused.current) {
         paused.current = true;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsPaused(true);
         onPause(true);
       }
@@ -667,12 +674,14 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     if (hasOverlay) {
       if (!paused.current) {
         paused.current = true;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsPaused(true);
         notifyPause(true);
       }
     } else {
       if (paused.current) {
         paused.current = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsPaused(false);
         wasJustUnpaused.current = true;
         transitionProgress.current = 0;
@@ -685,20 +694,22 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
 
   // Keyboard
   const hasOverlayRef = useRef(hasOverlay);
-  hasOverlayRef.current = hasOverlay;
+  useEffect(() => { hasOverlayRef.current = hasOverlay; }, [hasOverlay]);
 
   useEffect(() => {
     const doPause = () => {
       if (paused.current) return;
       paused.current = true;
-      setIsPaused(true);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+        setIsPaused(true);
       onPause(true);
     };
 
     const doResume = () => {
       if (!paused.current) return;
       paused.current = false;
-      setIsPaused(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+        setIsPaused(false);
       // Skip camera transition on first resume from startPaused — camera is already behind the plane
       if (isFirstResume.current) {
         isFirstResume.current = false;
@@ -920,8 +931,8 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     <>
       <line>
         <bufferGeometry ref={trailGeomRef}>
-          <bufferAttribute attach="attributes-position" args={[trailPositions.current, 3]} count={TRAIL_POINTS} />
-          <bufferAttribute attach="attributes-color" args={[trailColors.current, 4]} count={TRAIL_POINTS} />
+          <bufferAttribute attach="attributes-position" args={[initialPositions, 3]} count={TRAIL_POINTS} />
+          <bufferAttribute attach="attributes-color" args={[initialColors, 4]} count={TRAIL_POINTS} />
         </bufferGeometry>
         <lineBasicMaterial transparent vertexColors depthWrite={false} blending={THREE.AdditiveBlending} linewidth={2} />
       </line>
@@ -940,7 +951,7 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
           minDistance={20}
           maxDistance={300}
           maxPolarAngle={Math.PI / 2.1}
-          target={pos.current.toArray() as [number, number, number]}
+          target={initialOrbitTarget}
         />
       )}
     </>
@@ -1703,7 +1714,6 @@ function River({ river, waterColor, waterEmissive }: { river: CityRiver; waterCo
 
 function RiverText({ river }: { river: CityRiver }) {
   const [fontReady, setFontReady] = useState(false);
-  const texRef = useRef<THREE.CanvasTexture | null>(null);
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontReady(true));
@@ -1740,13 +1750,12 @@ function RiverText({ river }: { river: CityRiver }) {
 
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
-    texRef.current = tex;
     return tex;
   }, [fontReady]);
 
   useEffect(() => {
-    return () => { texRef.current?.dispose(); };
-  }, []);
+    return () => { texture?.dispose(); };
+  }, [texture]);
 
   if (!texture) return null;
 
@@ -1891,6 +1900,7 @@ function Waterfront({ river, dockColor }: { river: CityRiver; dockColor: string 
 // ─── Orbit Scene (controls + focus) ──────────────────────────
 
 function OrbitScene({ buildings, focusedBuilding, focusedBuildingB }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
 
@@ -1921,6 +1931,7 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB }: { building
 // ─── Wallpaper Orbit (no interaction, auto-rotate + parallax) ─
 
 function WallpaperOrbitScene({ speed }: { speed: number }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
 
@@ -2001,15 +2012,12 @@ interface Props {
 
 // Dynamically adjust scene exposure based on city energy (devs coding)
 function CityExposure({ cityEnergy }: { cityEnergy: number }) {
-  const gl = useThree((s) => s.gl);
-  const targetRef = useRef(1.3);
-  targetRef.current = 0.4 + 0.9 * Math.min(1, cityEnergy); // 0.4 at sleep, 1.3 at full
+  const target = 0.4 + 0.9 * Math.min(1, cityEnergy); // 0.4 at sleep, 1.3 at full
 
-  useFrame(() => {
-    const current = gl.toneMappingExposure;
-    const target = targetRef.current;
+  useFrame((state) => {
+    const current = state.gl.toneMappingExposure;
     if (Math.abs(current - target) > 0.001) {
-      gl.toneMappingExposure += (target - current) * 0.02;
+      state.gl.toneMappingExposure += (target - current) * 0.02;
     }
   });
 
