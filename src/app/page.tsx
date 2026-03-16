@@ -378,6 +378,7 @@ function HomeContent() {
   const { t, locale, toggleLocale } = useI18n();
   const searchParams = useSearchParams();
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [weatherType, setWeatherType] = useState<"clear" | "rain" | "snow">("clear");
   const userParam = searchParams.get("user");
   const giftedParam = searchParams.get("gifted");
 
@@ -2277,6 +2278,7 @@ function HomeContent() {
             setExploreMode(true);
           }
         }}
+        weatherType={weatherType}
       />
 
       {/* Loading screen overlay */}
@@ -2602,6 +2604,21 @@ function HomeContent() {
             >
               <Languages size={12} style={{ color: theme.accent }} />
               <span className="text-cream">{locale === "en" ? "EN" : "中文"}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const types: ("clear" | "rain" | "snow")[] = ["clear", "rain", "snow"];
+                const nextIdx = (types.indexOf(weatherType) + 1) % types.length;
+                setWeatherType(types[nextIdx]);
+              }}
+              className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+              title={t("ui.weather.title")}
+            >
+              <span style={{ color: theme.accent }}>
+                {weatherType === "clear" ? "☀" : weatherType === "rain" ? "🌧" : "❄"}
+              </span>
+              <span className="text-cream">{t(`ui.weather.${weatherType}`)}</span>
             </button>
 
             {availableYears.length > 0 && (

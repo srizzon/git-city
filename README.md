@@ -20,6 +20,8 @@ Git City transforms every GitHub profile into a unique pixel art building. The m
 
 ## Features
 
+- **Interactive Weather System** — Toggle between Clear, Rain, and Snow modes to change the city's atmosphere in real-time
+- **Spider-Man Easter Egg** — Keep an eye out for Spider-Man swinging or hanging between buildings!
 - **District System** — Users are grouped into districts based on their primary coding language (JavaScript, Python, Rust, etc.)
 - **3D District Labels** — Explore the city and see clearly defined neighborhoods with their names and developer populations
 - **Multi-language Support** — Full internationalization (i18n) support, starting with English and Chinese

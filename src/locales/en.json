@@ -72,6 +72,12 @@
       "Neon": "Neon",
       "Emerald": "Emerald"
     },
+    "weather": {
+      "title": "Weather",
+      "clear": "Clear",
+      "rain": "Rain",
+      "snow": "Snow"
+    },
     "online_now": "online now",
     "coding_now": "coding now",
     "back": "Back",

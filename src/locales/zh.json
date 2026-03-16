@@ -72,6 +72,12 @@
       "Neon": "霓虹",
       "Emerald": "翡翠"
     },
+    "weather": {
+      "title": "天气",
+      "clear": "晴朗",
+      "rain": "下雨",
+      "snow": "下雪"
+    },
     "online_now": "当前在线",
     "coding_now": "正在写代码",
     "back": "返回",

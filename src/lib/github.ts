@@ -106,7 +106,7 @@ export interface CityPlaza {
 }
 
 export interface CityDecoration {
-  type: 'tree' | 'streetLamp' | 'car' | 'bench' | 'fountain' | 'sidewalk' | 'roadMarking';
+  type: 'tree' | 'streetLamp' | 'car' | 'bench' | 'fountain' | 'sidewalk' | 'roadMarking' | 'spider_man';
   position: [number, number, number];
   rotation: number;
   variant: number;
@@ -559,6 +559,24 @@ export function generateCityLayout(
         sideWindowsPerFloor,
         litPercentage,
       });
+
+      // Randomly place Spider-Man on some buildings
+      if (seededRandom(globalBlockSeed * 555 + i) < 0.05) {
+        const wall = Math.floor(seededRandom(globalBlockSeed * 666 + i) * 4);
+        let spx = posX, spz = posZ;
+        let srot = 0;
+        if (wall === 0) { spx += w / 2 + 1; srot = Math.PI / 2; }
+        else if (wall === 1) { spx -= w / 2 + 1; srot = -Math.PI / 2; }
+        else if (wall === 2) { spz += d / 2 + 1; srot = 0; }
+        else { spz -= d / 2 + 1; srot = Math.PI; }
+
+        decorations.push({
+          type: 'spider_man',
+          position: [spx, height * 0.6, spz],
+          rotation: srot,
+          variant: 0,
+        });
+      }
     }
 
     decorations.push({
