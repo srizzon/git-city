@@ -8,7 +8,8 @@ import * as THREE from "three";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
 import type { LiveSession } from "@/lib/useCodingPresence";
-import type { CityBuilding, CityPlaza, CityDecoration, CityRiver, CityBridge } from "@/lib/github";
+import DistrictLabels from "./DistrictLabels";
+import type { CityBuilding, CityPlaza, CityDecoration, CityRiver, CityBridge, DistrictZone } from "@/lib/github";
 import { seededRandom } from "@/lib/github";
 import SkyAds from "./SkyAds";
 import BuildingAds from "./BuildingAds";
@@ -18,6 +19,8 @@ import type { RaidPhase } from "@/lib/useRaidSequence";
 import type { RaidExecuteResponse } from "@/lib/raid";
 import FounderSpire from "./FounderSpire";
 import WhiteRabbit from "./WhiteRabbit";
+import SpiderMan from "./SpiderMan";
+import Weather from "./Weather";
 import CelebrationEffect from "./CelebrationEffect";
 import ComparePath from "./ComparePath";
 import WallpaperParallax from "./WallpaperParallax";
@@ -1330,6 +1333,7 @@ function Decorations({ items }: { items: CityDecoration[] }) {
           case 'bench': return <ParkBench key={`bench-${i}`} position={d.position} rotation={d.rotation} />;
           case 'fountain': return <Fountain key={`fountain-${i}`} position={d.position} />;
           case 'sidewalk': return <Sidewalk key={`walk-${i}`} position={d.position} size={d.size!} />;
+          case 'spider_man': return <SpiderMan key={`spider-${i}`} position={d.position} rotation={d.rotation} />;
           default: return null;
         }
       })}
@@ -1958,6 +1962,7 @@ interface Props {
   decorations: CityDecoration[];
   river?: CityRiver | null;
   bridges?: CityBridge[];
+  districtZones: DistrictZone[];
   flyMode: boolean;
   flyVehicle?: string;
   onExitFly: () => void;
@@ -1997,6 +2002,7 @@ interface Props {
   wallpaperSpeed?: number;
   liveByLogin?: Map<string, LiveSession>;
   cityEnergy?: number;
+  weatherType?: "clear" | "rain" | "snow";
 }
 
 // Dynamically adjust scene exposure based on city energy (devs coding)
@@ -2019,7 +2025,7 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, weatherType }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
   const [dpr, setDpr] = useState(1);
@@ -2057,6 +2063,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
       <ThemeSkyFX key={`sky-fx-${themeIndex}`} themeIndex={themeIndex as 0 | 1 | 2 | 3} theme={t} />
+
+      <Weather type={weatherType ?? "clear"} cityRadius={cityRadius} />
 
       {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => { })} />}
 
@@ -2127,6 +2135,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         <Bridge key={`bridge-${i}`} bridge={b} />
       ))}
 
+      <DistrictLabels districtZones={districtZones} visible={!flyMode && !introMode && !rabbitCinematic} />
+
       <CityScene
         buildings={buildings}
         colors={t.building}
@@ -2152,6 +2162,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       />
 
       <InstancedDecorations items={decorations} roadMarkingColor={t.roadMarkingColor} sidewalkColor={t.sidewalkColor} />
+      <Decorations items={decorations.filter(d => d.type === 'spider_man')} />
 
       {!wallpaperMode && skyAds && skyAds.length > 0 && (
         <>

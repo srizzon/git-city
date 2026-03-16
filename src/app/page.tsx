@@ -1,7 +1,8 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
 import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Languages } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
@@ -159,57 +160,6 @@ interface CityStats {
 // Milestones that trigger 24h celebration effects
 const CELEBRATION_MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000, 100000];
 
-// ─── Loading phases for search feedback ─────────────────────
-const LOADING_PHASES = [
-  { delay: 0, text: "Fetching GitHub profile..." },
-  { delay: 2000, text: "Analyzing contributions..." },
-  { delay: 5000, text: "Building the city block..." },
-  { delay: 9000, text: "Almost there..." },
-  { delay: 13000, text: "This one's a big profile. Hang tight..." },
-];
-
-// Errors that won't change if you retry the same username
-const PERMANENT_ERROR_CODES = new Set(["not-found", "org", "no-activity"]);
-
-const ERROR_MESSAGES: Record<string, { primary: (u: string) => string; secondary: string; hasRetry?: boolean; hasLink?: boolean }> = {
-  "not-found": {
-    primary: (u) => `"@${u}" doesn't exist on GitHub`,
-    secondary: "Check the spelling — could be a typo. GitHub usernames are case-insensitive.",
-  },
-  "org": {
-    primary: (u) => `"@${u}" is an organization, not a person`,
-    secondary: "Git City is for individual profiles. Try searching for one of its contributors by their personal username.",
-  },
-  "no-activity": {
-    primary: (u) => `"@${u}" has no public activity yet`,
-    secondary: "Is this you? Open your profile settings, scroll to 'Contributions & activity', and enable 'Include private contributions'. Then search again.",
-    hasLink: true,
-  },
-  "rate-limit": {
-    primary: () => "Search limit reached",
-    secondary: "You can look up 10 new profiles per hour. Developers already in the city are unlimited.",
-  },
-  "github-rate-limit": {
-    primary: () => "GitHub's API is temporarily unavailable",
-    secondary: "Too many requests to GitHub. Try again in a few minutes.",
-  },
-  "timeout": {
-    primary: (u) => `Fetching "@${u}" took too long`,
-    secondary: "GitHub's API was slow to respond. This usually resolves itself — try again in a moment.",
-    hasRetry: true,
-  },
-  "network": {
-    primary: () => "Couldn't reach the server",
-    secondary: "Check your internet connection and try again.",
-    hasRetry: true,
-  },
-  "generic": {
-    primary: () => "Something went wrong",
-    secondary: "An unexpected error occurred. Try again.",
-    hasRetry: true,
-  },
-};
-
 function SearchFeedback({
   feedback,
   accentColor,
@@ -221,7 +171,55 @@ function SearchFeedback({
   onDismiss: () => void;
   onRetry: () => void;
 }) {
+  const { t } = useI18n();
   const [phaseIndex, setPhaseIndex] = useState(0);
+
+  const LOADING_PHASES = [
+    { delay: 0, text: t("search.loading.profile") },
+    { delay: 2000, text: t("search.loading.contributions") },
+    { delay: 5000, text: t("search.loading.city") },
+    { delay: 9000, text: t("search.loading.almost") },
+    { delay: 13000, text: t("search.loading.big_profile") },
+  ];
+
+  const ERROR_MESSAGES: Record<string, { primary: (u: string) => string; secondary: string; hasRetry?: boolean; hasLink?: boolean }> = {
+    "not-found": {
+      primary: (u) => t("search.error.not_found", { username: u }),
+      secondary: t("search.error.not_found_desc"),
+    },
+    "org": {
+      primary: (u) => t("search.error.org", { username: u }),
+      secondary: t("search.error.org_desc"),
+    },
+    "no-activity": {
+      primary: (u) => t("search.error.no_activity", { username: u }),
+      secondary: t("search.error.no_activity_desc"),
+      hasLink: true,
+    },
+    "rate-limit": {
+      primary: () => t("search.error.rate_limit"),
+      secondary: t("search.error.rate_limit_desc"),
+    },
+    "github-rate-limit": {
+      primary: () => t("search.error.github_rate_limit"),
+      secondary: t("search.error.github_rate_limit_desc"),
+    },
+    "timeout": {
+      primary: (u) => t("search.error.timeout", { username: u }),
+      secondary: t("search.error.timeout_desc"),
+      hasRetry: true,
+    },
+    "network": {
+      primary: () => t("search.error.network"),
+      secondary: t("search.error.network_desc"),
+      hasRetry: true,
+    },
+    "generic": {
+      primary: () => t("search.error.generic"),
+      secondary: t("search.error.generic_desc"),
+      hasRetry: true,
+    },
+  };
 
   // Phased loading messages
   useEffect(() => {
@@ -292,14 +290,15 @@ function SearchFeedback({
   );
 }
 
-const LEADERBOARD_CATEGORIES = [
-  { label: "Contributors", key: "contributions" as const, tab: "contributors" },
-  { label: "Stars", key: "total_stars" as const, tab: "stars" },
-  { label: "Repos", key: "public_repos" as const, tab: "architects" },
-] as const;
-
 function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; accent: string }) {
+  const { t } = useI18n();
   const [catIndex, setCatIndex] = useState(0);
+
+  const LEADERBOARD_CATEGORIES = [
+    { label: t("ui.contributors"), key: "contributions" as const, tab: "contributors" },
+    { label: t("ui.stars"), key: "total_stars" as const, tab: "stars" },
+    { label: t("ui.repos"), key: "public_repos" as const, tab: "architects" },
+  ] as const;
 
   // Auto-rotate every 10s
   useEffect(() => {
@@ -376,7 +375,10 @@ function getStreakTierColor(streak: number) {
 
 
 function HomeContent() {
+  const { t, locale, toggleLocale } = useI18n();
   const searchParams = useSearchParams();
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [weatherType, setWeatherType] = useState<"clear" | "rain" | "snow">("clear");
   const userParam = searchParams.get("user");
   const giftedParam = searchParams.get("gifted");
 
@@ -594,8 +596,27 @@ function HomeContent() {
   const focusedBuildingB = comparePair ? comparePair[1].login : null;
 
   const [isMobile, setIsMobile] = useState(false);
-
   const theme = THEMES[themeIndex];
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    developers.forEach(dev => {
+      dev.contribution_years?.forEach(y => years.add(y));
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [developers]);
+
+  useEffect(() => {
+    if (developers.length > 0) {
+      const layout = generateCityLayout(developers, selectedYear);
+      setBuildings(layout.buildings);
+      setPlazas(layout.plazas);
+      setDecorations(layout.decorations);
+      setRiver(layout.river);
+      setBridges(layout.bridges);
+      setDistrictZones(layout.districtZones);
+    }
+  }, [selectedYear, developers]);
   const didInit = useRef(false);
   const savedFocusRef = useRef<string | null>(null);
 
@@ -2024,6 +2045,7 @@ function HomeContent() {
         decorations={decorations}
         river={river}
         bridges={bridges}
+        districtZones={districtZones}
         flyMode={flyMode}
         flyVehicle={flyVehicle}
         onExitFly={() => {
@@ -2256,6 +2278,7 @@ function HomeContent() {
             setExploreMode(true);
           }
         }}
+        weatherType={weatherType}
       />
 
       {/* Loading screen overlay */}
@@ -2494,23 +2517,23 @@ function HomeContent() {
             className="border-[3px] border-border bg-bg-raised px-8 py-6 text-center animate-[fade-in_0.3s_ease-out]"
             style={{ borderColor: theme.accent + "60" }}
           >
-            <p className="mb-4 text-xs tracking-widest text-muted">FLIGHT CONTROLS</p>
+            <p className="mb-4 text-xs tracking-widest text-muted">{t("ui.controls.fly.title")}</p>
             <div className="flex flex-col gap-2.5 text-[11px]">
               <div className="flex items-center justify-between gap-6">
-                <span className="text-cream">Mouse</span>
-                <span className="text-muted">Steer</span>
+                <span className="text-cream">{t("ui.controls.fly.mouse")}</span>
+                <span className="text-muted">{t("ui.controls.fly.steer")}</span>
               </div>
               <div className="flex items-center justify-between gap-6">
-                <span className="text-cream">Scroll</span>
-                <span className="text-muted">Speed</span>
+                <span className="text-cream">{t("ui.controls.fly.scroll")}</span>
+                <span className="text-muted">{t("ui.controls.fly.scroll")}</span>
               </div>
               <div className="flex items-center justify-between gap-6">
                 <span className="text-cream">Shift / Alt</span>
-                <span className="text-muted">Boost / Slow</span>
+                <span className="text-muted">{t("ui.controls.fly.boost")} / {t("ui.controls.fly.boost")}</span>
               </div>
               <div className="flex items-center justify-between gap-6">
-                <span style={{ color: theme.accent }}>ESC</span>
-                <span className="text-muted">Pause &amp; Exit</span>
+                <span style={{ color: theme.accent }}>{t("ui.controls.fly.esc").split(" / ")[0]}</span>
+                <span className="text-muted">{t("ui.controls.fly.exit")}</span>
               </div>
             </div>
             <button
@@ -2523,7 +2546,7 @@ function HomeContent() {
               className="btn-press mt-5 px-6 py-2 text-[10px] text-bg"
               style={{ backgroundColor: theme.accent, boxShadow: `3px 3px 0 0 ${theme.shadow}` }}
             >
-              Got it, let&apos;s fly!
+              {locale === "en" ? "Got it, let's fly!" : "明白了，开始飞行！"}
             </button>
           </div>
         </div>
@@ -2564,16 +2587,56 @@ function HomeContent() {
             </button>
           </div>
 
-          {/* Theme switcher + Radio (bottom-left) — above ticker */}
+          {/* Theme switcher + Language + Radio (bottom-left) — above ticker */}
           <div className="pointer-events-auto fixed bottom-10 left-3 z-31 flex flex-col-reverse items-start gap-2 sm:left-4 sm:flex-row sm:items-center">
             <button
               onClick={cycleTheme}
               className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
             >
               <span style={{ color: theme.accent }}>&#9654;</span>
-              <span className="text-cream">{theme.name}</span>
+              <span className="text-cream">{t(`ui.themes.${theme.name}`)}</span>
               <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
+            <button
+              onClick={toggleLocale}
+              className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+              title={locale === "en" ? "Switch to Chinese" : "切换为英文"}
+            >
+              <Languages size={12} style={{ color: theme.accent }} />
+              <span className="text-cream">{locale === "en" ? "EN" : "中文"}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const types: ("clear" | "rain" | "snow")[] = ["clear", "rain", "snow"];
+                const nextIdx = (types.indexOf(weatherType) + 1) % types.length;
+                setWeatherType(types[nextIdx]);
+              }}
+              className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+              title={t("ui.weather.title")}
+            >
+              <span style={{ color: theme.accent }}>
+                {weatherType === "clear" ? "☀" : weatherType === "rain" ? "🌧" : "❄"}
+              </span>
+              <span className="text-cream">{t(`ui.weather.${weatherType}`)}</span>
+            </button>
+
+            {availableYears.length > 0 && (
+              <div className="flex items-center gap-1 border-[3px] border-border bg-bg/70 px-2 py-1 text-[10px] backdrop-blur-sm">
+                <span className="text-dim mr-1">{t("ui.live").split(" ")[0]}</span>
+                <select
+                  value={selectedYear || ""}
+                  onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : null)}
+                  className="bg-transparent text-cream outline-none cursor-pointer"
+                  style={{ color: theme.accent }}
+                >
+                  <option value="" className="bg-bg text-cream">{t("ui.view_all")}</option>
+                  {availableYears.map(year => (
+                    <option key={year} value={year} className="bg-bg text-cream">{year}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div id="gc-radio-slot" />
           </div>
 
@@ -2967,7 +3030,7 @@ function HomeContent() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center justify-between px-5 py-4 active:bg-white/5"
               >
-                <span className="text-sm text-cream">Shop</span>
+                <span className="text-sm text-cream">{t("ui.shop")}</span>
                 <span className="text-xs text-muted" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
               <Link
@@ -2977,9 +3040,9 @@ function HomeContent() {
               >
                 <span className="flex items-center gap-2 text-sm text-cream">
                   {codingCount > 0 && <span className="live-dot h-2 w-2 rounded-full bg-[#4ade80]" />}
-                  Live
+                  {t("ui.live")}
                   {codingCount > 0 && (
-                    <span className="text-[10px] text-muted">{codingCount} coding now</span>
+                    <span className="text-[10px] text-muted">{codingCount} {t("ui.coding_now")}</span>
                   )}
                 </span>
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
@@ -2989,7 +3052,7 @@ function HomeContent() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center justify-between px-5 py-4 active:bg-white/5"
               >
-                <span className="text-sm text-cream">&#9819; Leaderboard</span>
+                <span className="text-sm text-cream">&#9819; {t("ui.leaderboard")}</span>
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
               <Link
@@ -2998,8 +3061,8 @@ function HomeContent() {
                 className="flex items-center justify-between px-5 py-4 active:bg-white/5"
               >
                 <span className="flex items-center gap-2 text-sm" style={{ color: theme.accent }}>
-                  Place your Ad
-                  <span className="px-1 py-px text-[8px] font-bold text-bg leading-none" style={{ backgroundColor: theme.accent }}>NEW</span>
+                  {t("ui.place_ad")}
+                  <span className="px-1 py-px text-[8px] font-bold text-bg leading-none" style={{ backgroundColor: theme.accent }}>{t("ui.new")}</span>
                 </span>
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
@@ -3035,7 +3098,7 @@ function HomeContent() {
 
             {/* ── Theme ── */}
             <div className="border-t border-border px-5 py-4">
-              <p className="mb-3 text-[10px] text-muted uppercase tracking-widest">Theme</p>
+              <p className="mb-3 text-[10px] text-muted uppercase tracking-widest">{t("ui.theme")}</p>
               <div className="grid grid-cols-4 gap-2">
                 {THEMES.map((t, i) => (
                   <button
@@ -3048,7 +3111,7 @@ function HomeContent() {
                       backgroundColor: themeIndex === i ? t.accent + "18" : "transparent",
                     }}
                   >
-                    {t.name}
+                    {t(`ui.themes.${t.name}`)}
                   </button>
                 ))}
               </div>
@@ -3059,12 +3122,12 @@ function HomeContent() {
               <div className="flex items-center gap-1.5 text-[10px] text-muted">
                 <span style={{ color: theme.accent }}>&#9733;</span>
                 <span className="text-cream">{starCount?.toLocaleString() ?? "..."}</span>
-                <span>stars</span>
+                <span>{t("ui.stars").toLowerCase()}</span>
               </div>
               <div className="flex items-center gap-1.5 text-[10px] text-muted">
                 <span className="live-dot h-1.5 w-1.5 rounded-full bg-[#4ade80]" />
                 <span className="text-cream">{liveUsers.toLocaleString()}</span>
-                <span>online now</span>
+                <span>{t("ui.online_now")}</span>
               </div>
             </div>
           </div>
@@ -3089,11 +3152,11 @@ function HomeContent() {
               </h1>
               <p className="mt-2 text-[10px] leading-relaxed text-cream/80 normal-case">
                 {stats.total_developers > 0
-                  ? `A city of ${stats.total_developers.toLocaleString()} GitHub developers. Find yourself.`
-                  : "A global city of GitHub developers. Find yourself."}
+                  ? t("header.subtitle", { count: stats.total_developers.toLocaleString() })
+                  : t("header.subtitle_fallback")}
               </p>
               <p className="pointer-events-auto mt-1 text-[9px] text-cream/50 normal-case hidden sm:block">
-                built by{" "}
+                {t("header.built_by")}{" "}
                 <a
                   href="https://x.com/samuelrizzondev"
                   target="_blank"
@@ -3129,10 +3192,10 @@ function HomeContent() {
                       <div className="border-2 border-border bg-bg/80 px-4 py-3 backdrop-blur-sm transition-colors group-hover:border-[var(--hover-border)]" style={{ "--hover-border": theme.accent } as React.CSSProperties}>
                         <div className="mb-2 flex items-baseline justify-between">
                           <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
-                            ROAD TO {label} STARS
+                            {t("milestone.stars", { label: label })}
                           </span>
                           <span className="text-[9px] text-cream/60">
-                            {remaining.toLocaleString()} to go
+                            {t("milestone.to_go", { count: remaining.toLocaleString() })}
                           </span>
                         </div>
                         <div className="relative h-2.5 w-full overflow-hidden border-2 border-border bg-bg">
@@ -3150,7 +3213,7 @@ function HomeContent() {
                             {starCount.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
                           </span>
                           <span className="text-[8px] text-cream/40 normal-case group-hover:text-cream/60 transition-colors">
-                            Star us on GitHub
+                            {t("milestone.star_cta")}
                           </span>
                         </div>
                       </div>
@@ -3175,10 +3238,10 @@ function HomeContent() {
                       <div className="border-[2px] border-border bg-bg/80 px-4 py-3 backdrop-blur-sm">
                         <div className="mb-2 flex items-baseline justify-between">
                           <span className="text-[9px] tracking-wider" style={{ color: theme.accent }}>
-                            ROAD TO {label}
+                            {t("milestone.devs", { label: label })}
                           </span>
                           <span className="text-[9px] text-cream/60">
-                            {remaining.toLocaleString()} to go
+                            {t("milestone.to_go", { count: remaining.toLocaleString() })}
                           </span>
                         </div>
                         <div className="relative h-2.5 w-full overflow-hidden border-[2px] border-border bg-bg">
@@ -3196,7 +3259,7 @@ function HomeContent() {
                             {count.toLocaleString()} <span className="text-cream/40">/ {target.toLocaleString()}</span>
                           </span>
                           <span className="text-[8px] text-cream/40 normal-case">
-                            Something unlocks at {label}...
+                            {t("milestone.unlock_cta", { label: label })}
                           </span>
                         </div>
                       </div>
@@ -3213,7 +3276,7 @@ function HomeContent() {
                 style={{ borderColor: theme.accent }}
               >
                 <p className="text-[11px] text-cream normal-case leading-relaxed">
-                  Find your building in the city
+                  {t("welcome.title")}
                 </p>
                 <button
                   onClick={() => {
@@ -3227,7 +3290,7 @@ function HomeContent() {
                     boxShadow: `3px 3px 0 0 ${theme.shadow}`,
                   }}
                 >
-                  Sign in with GitHub
+                  {t("welcome.signin")}
                 </button>
                 <button
                   onClick={() => {
@@ -3237,7 +3300,7 @@ function HomeContent() {
                   }}
                   className="text-[9px] text-dim transition-colors hover:text-muted normal-case"
                 >
-                  or type your username
+                  {t("welcome.or_type")}
                 </button>
               </div>
             ) : (
@@ -3253,7 +3316,7 @@ function HomeContent() {
                     setUsername(e.target.value);
                     if (feedback?.type === "error") setFeedback(null);
                   }}
-                  placeholder={session ? "search any GitHub username" : "type your GitHub username"}
+                  placeholder={session ? t("search.placeholder_auth") : t("search.placeholder_no_auth")}
                   className="min-w-0 flex-1 border-[3px] border-border bg-bg-raised px-3 py-2 text-base sm:text-xs text-cream outline-none transition-colors placeholder:text-dim sm:px-4 sm:py-2.5"
                   style={{ borderColor: undefined }}
                   onFocus={(e) => (e.currentTarget.style.borderColor = theme.accent)}
@@ -3268,7 +3331,7 @@ function HomeContent() {
                     boxShadow: `4px 4px 0 0 ${theme.shadow}`,
                   }}
                 >
-                  {loading ? <span className="blink-dot inline-block">_</span> : "Search"}
+                  {loading ? <span className="blink-dot inline-block">_</span> : t("search.search_button")}
                 </button>
               </form>
             )}

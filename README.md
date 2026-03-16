@@ -20,7 +20,11 @@ Git City transforms every GitHub profile into a unique pixel art building. The m
 
 ## Features
 
-- **3D Pixel Art Buildings** — Each GitHub user becomes a building with height based on contributions, width based on repos, and lit windows representing activity
+- **Interactive Weather System** — Toggle between Clear, Rain, and Snow modes to change the city's atmosphere in real-time
+- **Spider-Man Easter Egg** — Keep an eye out for Spider-Man swinging or hanging between buildings!
+- **District System** — Users are grouped into districts based on their primary coding language (JavaScript, Python, Rust, etc.)
+- **3D District Labels** — Explore the city and see clearly defined neighborhoods with their names and developer populations
+- **Multi-language Support** — Full internationalization (i18n) support, starting with English and Chinese
 - **Free Flight Mode** — Fly through the city with smooth camera controls, visit any building, and explore the skyline
 - **Profile Pages** — Dedicated pages for each developer with stats, achievements, and top repositories
 - **Achievement System** — Unlock achievements based on contributions, stars, repos, referrals, and more

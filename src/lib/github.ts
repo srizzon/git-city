@@ -106,7 +106,7 @@ export interface CityPlaza {
 }
 
 export interface CityDecoration {
-  type: 'tree' | 'streetLamp' | 'car' | 'bench' | 'fountain' | 'sidewalk' | 'roadMarking';
+  type: 'tree' | 'streetLamp' | 'car' | 'bench' | 'fountain' | 'sidewalk' | 'roadMarking' | 'spider_man';
   position: [number, number, number];
   rotation: number;
   variant: number;
@@ -194,7 +194,7 @@ function isV2Dev(dev: DeveloperRecord): boolean {
   return (dev.contributions_total ?? 0) > 0;
 }
 
-function calcHeightV2(
+export function calcHeightV2(
   dev: DeveloperRecord,
   maxContribV2: number,
   maxStars: number,
@@ -378,7 +378,10 @@ function localBlockAxisPos(idx: number, footprint: number): number {
   return sign * (abs * footprint + abs * STREET_W);
 }
 
-export function generateCityLayout(devs: DeveloperRecord[]): {
+export function generateCityLayout(
+  devs: DeveloperRecord[],
+  selectedYear?: number | null,
+): {
   buildings: CityBuilding[];
   plazas: CityPlaza[];
   decorations: CityDecoration[];
@@ -395,7 +398,11 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   const maxContribV2 = devs.reduce((max, d) => Math.max(max, d.contributions_total ?? 0), 1);
 
   // ── 1. Group by district, sort within each, concat in priority order ──
-  const composites = precomputeComposites(devs, maxContrib, maxStars, maxContribV2);
+  const filteredDevs = selectedYear 
+    ? devs.filter(d => d.contribution_years?.includes(selectedYear))
+    : devs;
+
+  const composites = precomputeComposites(filteredDevs, maxContrib, maxStars, maxContribV2);
 
   const DISTRICT_ORDER = [
     'backend', 'frontend', 'fullstack', 'data_ai', 'devops',
@@ -403,7 +410,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   ];
 
   const districtGroups: Record<string, DeveloperRecord[]> = {};
-  for (const dev of devs) {
+  for (const dev of filteredDevs) {
     const did = dev.district ?? inferDistrict(dev.primary_language);
     if (!districtGroups[did]) districtGroups[did] = [];
     districtGroups[did].push(dev);
@@ -422,7 +429,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   // ── Extract top 50 global devs as "downtown" (center, around the spire) ──
   const DOWNTOWN_COUNT = 50;
   const LOTS_PER_BLOCK = BLOCK_SIZE * BLOCK_SIZE; // 16
-  const allDevsSorted = [...devs].sort((a, b) =>
+  const allDevsSorted = [...filteredDevs].sort((a, b) =>
     (composites.get(b.github_login) ?? 0) - (composites.get(a.github_login) ?? 0)
   );
   const downtownDevs = allDevsSorted.slice(0, DOWNTOWN_COUNT);
@@ -552,6 +559,24 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
         sideWindowsPerFloor,
         litPercentage,
       });
+
+      // Randomly place Spider-Man on some buildings
+      if (seededRandom(globalBlockSeed * 555 + i) < 0.05) {
+        const wall = Math.floor(seededRandom(globalBlockSeed * 666 + i) * 4);
+        let spx = posX, spz = posZ;
+        let srot = 0;
+        if (wall === 0) { spx += w / 2 + 1; srot = Math.PI / 2; }
+        else if (wall === 1) { spx -= w / 2 + 1; srot = -Math.PI / 2; }
+        else if (wall === 2) { spz += d / 2 + 1; srot = 0; }
+        else { spz -= d / 2 + 1; srot = Math.PI; }
+
+        decorations.push({
+          type: 'spider_man',
+          position: [spx, height * 0.6, spz],
+          rotation: srot,
+          variant: 0,
+        });
+      }
     }
 
     decorations.push({
