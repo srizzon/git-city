@@ -24,7 +24,7 @@ export interface DeveloperRecord {
   billboard_images?: string[];
   // v2 fields (optional for backward compat)
   contributions_total?: number;
-  contribution_years?: { year: number; total: number }[];
+  contribution_years?: number[];
   total_prs?: number;
   total_reviews?: number;
   total_issues?: number;
@@ -198,14 +198,8 @@ export function calcHeightV2(
   dev: DeveloperRecord,
   maxContribV2: number,
   maxStars: number,
-  selectedYear?: number | null,
 ): { height: number; composite: number } {
-  let contribs = dev.contributions_total! > 0 ? dev.contributions_total! : dev.contributions;
-
-  if (selectedYear) {
-    const yearData = dev.contribution_years?.find(y => y.year === selectedYear);
-    contribs = yearData ? yearData.total : 0;
-  }
+  const contribs = dev.contributions_total! > 0 ? dev.contributions_total! : dev.contributions;
 
   const cNorm = contribs / Math.max(1, Math.min(maxContribV2, 50_000));
   const sNorm = dev.total_stars / Math.max(1, Math.min(maxStars, 200_000));
@@ -317,12 +311,11 @@ function precomputeComposites(
   maxContrib: number,
   maxStars: number,
   maxContribV2: number,
-  selectedYear?: number | null,
 ): Map<string, number> {
   const map = new Map<string, number>();
   for (const dev of devs) {
     const { composite } = isV2Dev(dev)
-      ? calcHeightV2(dev, maxContribV2, maxStars, selectedYear)
+      ? calcHeightV2(dev, maxContribV2, maxStars)
       : calcHeight(dev.contributions, dev.total_stars, dev.public_repos, maxContrib, maxStars);
     map.set(dev.github_login, composite);
   }
@@ -405,7 +398,11 @@ export function generateCityLayout(
   const maxContribV2 = devs.reduce((max, d) => Math.max(max, d.contributions_total ?? 0), 1);
 
   // ── 1. Group by district, sort within each, concat in priority order ──
-  const composites = precomputeComposites(devs, maxContrib, maxStars, maxContribV2, selectedYear);
+  const filteredDevs = selectedYear 
+    ? devs.filter(d => d.contribution_years?.includes(selectedYear))
+    : devs;
+
+  const composites = precomputeComposites(filteredDevs, maxContrib, maxStars, maxContribV2);
 
   const DISTRICT_ORDER = [
     'backend', 'frontend', 'fullstack', 'data_ai', 'devops',
@@ -413,7 +410,7 @@ export function generateCityLayout(
   ];
 
   const districtGroups: Record<string, DeveloperRecord[]> = {};
-  for (const dev of devs) {
+  for (const dev of filteredDevs) {
     const did = dev.district ?? inferDistrict(dev.primary_language);
     if (!districtGroups[did]) districtGroups[did] = [];
     districtGroups[did].push(dev);
@@ -432,7 +429,7 @@ export function generateCityLayout(
   // ── Extract top 50 global devs as "downtown" (center, around the spire) ──
   const DOWNTOWN_COUNT = 50;
   const LOTS_PER_BLOCK = BLOCK_SIZE * BLOCK_SIZE; // 16
-  const allDevsSorted = [...devs].sort((a, b) =>
+  const allDevsSorted = [...filteredDevs].sort((a, b) =>
     (composites.get(b.github_login) ?? 0) - (composites.get(a.github_login) ?? 0)
   );
   const downtownDevs = allDevsSorted.slice(0, DOWNTOWN_COUNT);
@@ -502,7 +499,7 @@ export function generateCityLayout(
       let height: number, composite: number, w: number, d: number, litPercentage: number;
 
       if (isV2Dev(dev)) {
-        ({ height, composite } = calcHeightV2(dev, maxContribV2, maxStars, selectedYear));
+        ({ height, composite } = calcHeightV2(dev, maxContribV2, maxStars));
         w = calcWidthV2(dev);
         d = calcDepthV2(dev);
         litPercentage = calcLitPercentageV2(dev);
@@ -527,9 +524,7 @@ export function generateCityLayout(
       buildings.push({
         login: dev.github_login,
         rank: dev.rank ?? globalDevIndex + i + 1,
-        contributions: selectedYear 
-          ? (dev.contribution_years?.find(y => y.year === selectedYear)?.total ?? 0)
-          : ((dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions),
+        contributions: (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions,
         total_stars: dev.total_stars,
         public_repos: dev.public_repos,
         name: dev.name,

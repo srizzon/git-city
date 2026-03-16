@@ -600,7 +600,7 @@ function HomeContent() {
   const availableYears = useMemo(() => {
     const years = new Set<number>();
     developers.forEach(dev => {
-      dev.contribution_years?.forEach(y => years.add(y.year));
+      dev.contribution_years?.forEach(y => years.add(y));
     });
     return Array.from(years).sort((a, b) => b - a);
   }, [developers]);
