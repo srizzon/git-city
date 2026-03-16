@@ -24,7 +24,7 @@ export interface DeveloperRecord {
   billboard_images?: string[];
   // v2 fields (optional for backward compat)
   contributions_total?: number;
-  contribution_years?: number[];
+  contribution_years?: { year: number; total: number }[];
   total_prs?: number;
   total_reviews?: number;
   total_issues?: number;
@@ -194,12 +194,18 @@ function isV2Dev(dev: DeveloperRecord): boolean {
   return (dev.contributions_total ?? 0) > 0;
 }
 
-function calcHeightV2(
+export function calcHeightV2(
   dev: DeveloperRecord,
   maxContribV2: number,
   maxStars: number,
+  selectedYear?: number | null,
 ): { height: number; composite: number } {
-  const contribs = dev.contributions_total! > 0 ? dev.contributions_total! : dev.contributions;
+  let contribs = dev.contributions_total! > 0 ? dev.contributions_total! : dev.contributions;
+
+  if (selectedYear) {
+    const yearData = dev.contribution_years?.find(y => y.year === selectedYear);
+    contribs = yearData ? yearData.total : 0;
+  }
 
   const cNorm = contribs / Math.max(1, Math.min(maxContribV2, 50_000));
   const sNorm = dev.total_stars / Math.max(1, Math.min(maxStars, 200_000));
@@ -311,11 +317,12 @@ function precomputeComposites(
   maxContrib: number,
   maxStars: number,
   maxContribV2: number,
+  selectedYear?: number | null,
 ): Map<string, number> {
   const map = new Map<string, number>();
   for (const dev of devs) {
     const { composite } = isV2Dev(dev)
-      ? calcHeightV2(dev, maxContribV2, maxStars)
+      ? calcHeightV2(dev, maxContribV2, maxStars, selectedYear)
       : calcHeight(dev.contributions, dev.total_stars, dev.public_repos, maxContrib, maxStars);
     map.set(dev.github_login, composite);
   }
@@ -378,7 +385,10 @@ function localBlockAxisPos(idx: number, footprint: number): number {
   return sign * (abs * footprint + abs * STREET_W);
 }
 
-export function generateCityLayout(devs: DeveloperRecord[]): {
+export function generateCityLayout(
+  devs: DeveloperRecord[],
+  selectedYear?: number | null,
+): {
   buildings: CityBuilding[];
   plazas: CityPlaza[];
   decorations: CityDecoration[];
@@ -395,7 +405,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   const maxContribV2 = devs.reduce((max, d) => Math.max(max, d.contributions_total ?? 0), 1);
 
   // ── 1. Group by district, sort within each, concat in priority order ──
-  const composites = precomputeComposites(devs, maxContrib, maxStars, maxContribV2);
+  const composites = precomputeComposites(devs, maxContrib, maxStars, maxContribV2, selectedYear);
 
   const DISTRICT_ORDER = [
     'backend', 'frontend', 'fullstack', 'data_ai', 'devops',
@@ -492,7 +502,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       let height: number, composite: number, w: number, d: number, litPercentage: number;
 
       if (isV2Dev(dev)) {
-        ({ height, composite } = calcHeightV2(dev, maxContribV2, maxStars));
+        ({ height, composite } = calcHeightV2(dev, maxContribV2, maxStars, selectedYear));
         w = calcWidthV2(dev);
         d = calcDepthV2(dev);
         litPercentage = calcLitPercentageV2(dev);
@@ -517,7 +527,9 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
       buildings.push({
         login: dev.github_login,
         rank: dev.rank ?? globalDevIndex + i + 1,
-        contributions: (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions,
+        contributions: selectedYear 
+          ? (dev.contribution_years?.find(y => y.year === selectedYear)?.total ?? 0)
+          : ((dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions),
         total_stars: dev.total_stars,
         public_repos: dev.public_repos,
         name: dev.name,

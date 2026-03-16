@@ -8,7 +8,8 @@ import * as THREE from "three";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
 import type { LiveSession } from "@/lib/useCodingPresence";
-import type { CityBuilding, CityPlaza, CityDecoration, CityRiver, CityBridge } from "@/lib/github";
+import DistrictLabels from "./DistrictLabels";
+import type { CityBuilding, CityPlaza, CityDecoration, CityRiver, CityBridge, DistrictZone } from "@/lib/github";
 import { seededRandom } from "@/lib/github";
 import SkyAds from "./SkyAds";
 import BuildingAds from "./BuildingAds";
@@ -1958,6 +1959,7 @@ interface Props {
   decorations: CityDecoration[];
   river?: CityRiver | null;
   bridges?: CityBridge[];
+  districtZones: DistrictZone[];
   flyMode: boolean;
   flyVehicle?: string;
   onExitFly: () => void;
@@ -2126,6 +2128,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       {bridges?.map((b, i) => (
         <Bridge key={`bridge-${i}`} bridge={b} />
       ))}
+
+      <DistrictLabels districtZones={districtZones} visible={!flyMode && !introMode && !rabbitCinematic} />
 
       <CityScene
         buildings={buildings}

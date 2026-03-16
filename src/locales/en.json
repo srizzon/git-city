@@ -1,0 +1,94 @@
+{
+  "header": {
+    "title": "Git City",
+    "subtitle": "A city of {{count}} GitHub developers. Find yourself.",
+    "subtitle_fallback": "A global city of GitHub developers. Find yourself.",
+    "built_by": "built by"
+  },
+  "milestone": {
+    "stars": "ROAD TO {{label}} STARS",
+    "devs": "ROAD TO {{label}}",
+    "to_go": "{{count}} to go",
+    "star_cta": "Star us on GitHub",
+    "unlock_cta": "Something unlocks at {{label}}..."
+  },
+  "search": {
+    "placeholder": "Enter GitHub username",
+    "placeholder_auth": "search any GitHub username",
+    "placeholder_no_auth": "type your GitHub username",
+    "button": "Go",
+    "search_button": "Search",
+    "loading": {
+      "profile": "Fetching GitHub profile...",
+      "contributions": "Analyzing contributions...",
+      "city": "Building the city block...",
+      "almost": "Almost there...",
+      "big_profile": "This one's a big profile. Hang tight..."
+    },
+    "error": {
+      "not_found": "\"@{{username}}\" doesn't exist on GitHub",
+      "not_found_desc": "Check the spelling — could be a typo. GitHub usernames are case-insensitive.",
+      "org": "\"@{{username}}\" is an organization, not a person",
+      "org_desc": "Git City is for individual profiles. Try searching for one of its contributors by their personal username.",
+      "no_activity": "\"@{{username}}\" has no public activity yet",
+      "no_activity_desc": "Is this you? Open your profile settings, scroll to 'Contributions & activity', and enable 'Include private contributions'. Then search again.",
+      "rate_limit": "Search limit reached",
+      "rate_limit_desc": "You can look up 10 new profiles per hour. Developers already in the city are unlimited.",
+      "github_rate_limit": "GitHub's API is temporarily unavailable",
+      "github_rate_limit_desc": "Too many requests to GitHub. Try again in a few minutes.",
+      "timeout": "Fetching \"@{{username}}\" took too long",
+      "timeout_desc": "GitHub's API was slow to respond. This usually resolves itself — try again in a moment.",
+      "network": "Couldn't reach the server",
+      "network_desc": "Check your internet connection and try again.",
+      "generic": "Something went wrong",
+      "generic_desc": "An unexpected error occurred. Try again.",
+      "open_settings": "Open Profile Settings",
+      "retry": "Retry"
+    }
+  },
+  "welcome": {
+    "title": "Find your building in the city",
+    "signin": "Sign in with GitHub",
+    "or_type": "or type your username"
+  },
+  "ui": {
+    "contributors": "Contributors",
+    "stars": "Stars",
+    "repos": "Repos",
+    "view_all": "View all",
+    "loading_city": "Entering Git City...",
+    "loading_assets": "Loading assets...",
+    "loading_map": "Preparing map...",
+    "loading_devs": "Loading developers...",
+    "shop": "Shop",
+    "live": "Live",
+    "leaderboard": "Leaderboard",
+    "place_ad": "Place your Ad",
+    "new": "NEW",
+    "theme": "Theme",
+    "themes": {
+      "Midnight": "Midnight",
+      "Sunset": "Sunset",
+      "Neon": "Neon",
+      "Emerald": "Emerald"
+    },
+    "online_now": "online now",
+    "coding_now": "coding now",
+    "back": "Back",
+    "feed": "Feed",
+    "controls": {
+      "fly": {
+        "title": "FLIGHT CONTROLS",
+        "mouse": "MOUSE",
+        "steer": "STEER",
+        "scroll": "SPEED",
+        "wasd": "WASD / ARROWS",
+        "climb": "CLIMB / TURN",
+        "shift": "SHIFT",
+        "boost": "BOOST",
+        "esc": "ESC / SPACE",
+        "exit": "EXIT / PAUSE"
+      }
+    }
+  }
+}
