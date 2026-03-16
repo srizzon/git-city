@@ -104,6 +104,7 @@ interface EffectsLayerProps {
   introMode?: boolean;
   flyMode?: boolean;
   ghostPreviewLogin?: string | null;
+  authLogin?: string | null;
 }
 
 export default function EffectsLayer({
@@ -117,6 +118,7 @@ export default function EffectsLayer({
   introMode,
   flyMode,
   ghostPreviewLogin,
+  authLogin,
 }: EffectsLayerProps) {
   const lastUpdate = useRef(-1);
   const activeSetRef = useRef(new Set<number>());
@@ -199,6 +201,12 @@ export default function EffectsLayer({
     }
     if (focusedBLower) {
       const fi = loginToIdx.get(focusedBLower);
+      if (fi !== undefined) newSet.add(fi);
+    }
+
+    // Always include logged-in user's building
+    if (authLogin) {
+      const fi = loginToIdx.get(authLogin.toLowerCase());
       if (fi !== undefined) newSet.add(fi);
     }
 

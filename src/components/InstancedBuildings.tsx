@@ -181,6 +181,7 @@ interface InstancedBuildingsProps {
   holdRise?: boolean;
   liveByLogin?: Map<string, unknown>;
   cityEnergy?: number;
+  authLogin?: string | null;
 }
 
 // Rise animation tracking
@@ -209,6 +210,7 @@ export default memo(function InstancedBuildings({
   holdRise,
   liveByLogin,
   cityEnergy = 1.0,
+  authLogin,
 }: InstancedBuildingsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = buildings.length;
@@ -267,7 +269,9 @@ export default memo(function InstancedBuildings({
       const b = buildings[i];
       const seed = b.login.split("").reduce((a, c) => a + c.charCodeAt(0), 0) * 137;
 
-      const bandIndex = Math.min(5, Math.max(0, Math.round(b.litPercentage * 5)));
+      const bandIndex = (authLogin && b.login.toLowerCase() === authLogin.toLowerCase()) 
+        ? 5 
+        : Math.min(5, Math.max(0, Math.round(b.litPercentage * 5)));
       const bandRowOffset = bandIndex * ATLAS_BAND_ROWS;
 
       // Front face UV
@@ -303,7 +307,7 @@ export default memo(function InstancedBuildings({
     }
 
     return { uvFrontData: uvF, uvSideData: uvS, riseData: rise, tintData: tint };
-  }, [buildings, count]);
+  }, [buildings, count, authLogin]);
 
   // Live presence attribute (updated dynamically)
   const liveData = useMemo(() => new Float32Array(count), [count]);
@@ -423,11 +427,12 @@ export default memo(function InstancedBuildings({
 
     for (let i = 0; i < count; i++) {
       const login = buildings[i].login.toLowerCase();
+      const isAuthBuilding = authLogin && login === authLogin.toLowerCase();
       // Creator gets an overdriven glow (1.5 overshoots the mix, extra bright)
-      arr[i] = liveByLogin?.has(login) ? (login === "srizzon" ? 1.5 : 1.0) : 0.0;
+      arr[i] = (liveByLogin?.has(login) || isAuthBuilding) ? (login === "srizzon" ? 1.5 : 1.0) : 0.0;
     }
     liveAttr.needsUpdate = true;
-  }, [liveByLogin, buildings, count]);
+  }, [liveByLogin, buildings, count, authLogin]);
 
   // Rise animation + staggered init
   useFrame(({ clock }) => {

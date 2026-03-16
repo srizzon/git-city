@@ -189,6 +189,7 @@ interface InstancedLabelsProps {
   flyMode?: boolean;
   focusedBuilding?: string | null;
   focusedBuildingB?: string | null;
+  authLogin?: string | null;
 }
 
 export default memo(function InstancedLabels({
@@ -197,6 +198,7 @@ export default memo(function InstancedLabels({
   flyMode,
   focusedBuilding,
   focusedBuildingB,
+  authLogin,
 }: InstancedLabelsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = Math.min(buildings.length, MAX_LABELS);
@@ -347,6 +349,12 @@ export default memo(function InstancedLabels({
             const distSq = dx * dx + dz * dz;
             targets[i] = distSq < LABEL_VISIBLE_RADIUS_SQ ? 1 : 0;
           }
+        }
+
+        // Always show the logged-in user's label
+        if (authLogin) {
+          const authIdx = loginsLower.indexOf(authLogin.toLowerCase());
+          if (authIdx !== -1) targets[authIdx] = 1;
         }
       }
 

@@ -249,6 +249,7 @@ function createFarLabel(building: CityBuilding): THREE.CanvasTexture {
       ctx.fillStyle = tier.color;
       ctx.shadowColor = tier.color;
     }
+  
     ctx.shadowBlur = 8;
   } else {
     ctx.fillStyle = "rgba(140, 140, 160, 0.6)";
