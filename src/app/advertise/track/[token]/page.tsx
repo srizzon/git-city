@@ -177,13 +177,20 @@ export default async function TrackingPage({ params }: Props) {
           </div>
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 flex items-center justify-center gap-6">
           <Link
             href={`/advertise/setup/${token}`}
             className="text-[10px] normal-case transition-colors hover:text-cream"
             style={{ color: ACCENT }}
           >
             Edit ad details &rarr;
+          </Link>
+          <Link
+            href="/ads/login"
+            className="text-[10px] normal-case transition-colors hover:text-cream"
+            style={{ color: ACCENT }}
+          >
+            Advertiser Dashboard &rarr;
           </Link>
         </div>
 

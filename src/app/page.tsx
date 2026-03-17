@@ -18,6 +18,8 @@ import {
   type DistrictZone,
   type DeveloperRecord,
 } from "@/lib/github";
+import { SPONSORS, gridToWorldPos } from "@/lib/sponsors/registry";
+import { getLandmarkAdId } from "@/lib/sponsors/landmarkAdIds";
 import Image from "next/image";
 import Link from "next/link";
 import ActivityTicker, { type FeedEvent } from "@/components/ActivityTicker";
@@ -51,6 +53,8 @@ import {
   trackSignInPromptShown,
   trackSignInPromptClicked,
   trackDisabledButtonClicked,
+  trackEArcadeClicked,
+  trackLandmarkClicked,
 } from "@/lib/himetrica";
 
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
@@ -63,6 +67,8 @@ const RaidPreviewModal = dynamic(() => import("@/components/RaidPreviewModal"), 
 const RaidOverlay = dynamic(() => import("@/components/RaidOverlay"), { ssr: false });
 const PillModal = dynamic(() => import("@/components/PillModal"), { ssr: false });
 const FounderMessage = dynamic(() => import("@/components/FounderMessage"), { ssr: false });
+const EArcadeCard = dynamic(() => import("@/components/EArcadeCard"), { ssr: false });
+const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ssr: false });
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
 const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
 const LevelUpToast = dynamic(() => import("@/components/LevelUpToast"), { ssr: false });
@@ -465,6 +471,19 @@ function HomeContent() {
   const [kudosSending, setKudosSending] = useState(false);
   const [kudosSent, setKudosSent] = useState(false);
   const [kudosError, setKudosError] = useState<string | null>(null);
+  const [dropPulling, setDropPulling] = useState(false);
+  const [myDropPulls, setMyDropPulls] = useState<Record<string, { points: number }>>({});
+  const myDropPullsLoaded = useRef(false);
+  const [dropHint, setDropHint] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [dropPlantOpen, setDropPlantOpen] = useState(false);
+  const [dropPlantRarity, setDropPlantRarity] = useState("common");
+  const [dropPlantDuration, setDropPlantDuration] = useState(24);
+  const [dropPlantMaxPulls, setDropPlantMaxPulls] = useState(50);
+  const [dropPlantItem, setDropPlantItem] = useState("");
+  const [dropPlantItems, setDropPlantItems] = useState<{ id: string; name: string; category: string }[]>([]);
+  const [dropPlanting, setDropPlanting] = useState(false);
+  const [dropPlantResult, setDropPlantResult] = useState<string | null>(null);
   const visitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [compareBuilding, setCompareBuilding] = useState<CityBuilding | null>(null);
   const [comparePair, setComparePair] = useState<[CityBuilding, CityBuilding] | null>(null);
@@ -480,6 +499,8 @@ function HomeContent() {
   const [discordMembers, setDiscordMembers] = useState<number | null>(null);
   const [pillModalOpen, setPillModalOpen] = useState(false);
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
+  const [eArcadeOpen, setEArcadeOpen] = useState(false);
+  const [activeSponsor, setActiveSponsor] = useState<string | null>(null);
   const [districtChooserOpen, setDistrictChooserOpen] = useState(false);
   const [rabbitCinematic, setRabbitCinematic] = useState(false);
   const [rabbitCinematicPhase, setRabbitCinematicPhase] = useState(-1);
@@ -647,6 +668,72 @@ function HomeContent() {
       .catch(() => { });
   }, [session]);
 
+  // Fetch user's drop pulls from DB (source of truth, survives refresh/device changes)
+  useEffect(() => {
+    if (!session || buildings.length === 0 || myDropPullsLoaded.current) return;
+    const hasDrops = buildings.some((b) => b.active_drop);
+    if (!hasDrops) return;
+    myDropPullsLoaded.current = true;
+
+    let cancelled = false;
+    fetch("/api/drops/my-pulls")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.pulls) return;
+        const pullMap: Record<string, { points: number }> = {};
+        for (const [dropId, info] of Object.entries(data.pulls as Record<string, { points: number; pull_count: number }>)) {
+          pullMap[dropId] = { points: info.points };
+        }
+        if (Object.keys(pullMap).length > 0) {
+          setMyDropPulls(pullMap);
+        }
+        // Patch stale pull_count on buildings with fresh DB values
+        setBuildings((prev) =>
+          prev.map((b) => {
+            const fresh = b.active_drop && (data.pulls as Record<string, { pull_count: number }>)[b.active_drop.id];
+            if (!fresh) return b;
+            return { ...b, active_drop: { ...b.active_drop!, pull_count: fresh.pull_count } };
+          })
+        );
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [session, buildings]);
+
+  // Show drop hint once after city loads
+  const dropHintShown = useRef(false);
+  const [dropHintText, setDropHintText] = useState("");
+  useEffect(() => {
+    if (dropHintShown.current || loadStage !== "done" || buildings.length === 0) return;
+    const dropsBuildings = buildings.filter((b) => b.active_drop);
+    if (dropsBuildings.length === 0) return;
+    dropHintShown.current = true;
+    const districts = [...new Set(dropsBuildings.map((b) => b.district).filter(Boolean))];
+    const shown = districts.slice(0, 2).map((d) => DISTRICT_NAMES[d!] ?? d);
+    const extra = districts.length - shown.length;
+    let text = "Drops are hidden in the city";
+    if (shown.length > 0) {
+      text = `Drops hidden in ${shown.join(", ")}${extra > 0 ? ` +${extra} more` : ""}`;
+    }
+    setDropHintText(text);
+    const timer = setTimeout(() => {
+      setDropHint(true);
+      setTimeout(() => setDropHint(false), 5000);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [loadStage, buildings]);
+
+  // Admin check (client-side, for UI only - real auth is on the server endpoints)
+  useEffect(() => {
+    const adminLogins = (process.env.NEXT_PUBLIC_ADMIN_GITHUB_LOGINS ?? "")
+      .split(",").map(l => l.trim().toLowerCase()).filter(Boolean);
+    const admin = !!authLogin && adminLogins.includes(authLogin);
+    setIsAdmin(admin);
+    if (admin) {
+      fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => {});
+    }
+  }, [authLogin]);
+
   // Fly timer — ticks every second while flying and not paused
   useEffect(() => {
     if (!flyMode || flyPaused) return;
@@ -813,6 +900,71 @@ function HomeContent() {
     finally { setKudosSending(false); }
   }, [selectedBuilding, kudosSending, kudosSent, session, authLogin]);
 
+  // Drop pull handler
+  const handleDropPull = useCallback(async (dropId: string) => {
+    if (dropPulling || !session) return;
+    setDropPulling(true);
+    try {
+      const res = await fetch("/api/drops/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ drop_id: dropId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setMyDropPulls((prev) => ({ ...prev, [dropId]: { points: data.points_earned } }));
+        // Update pull_count locally (only if not already_pulled, to avoid double increment)
+        if (!data.already_pulled && selectedBuilding?.active_drop?.id === dropId) {
+          const updatedDrop = { ...selectedBuilding.active_drop, pull_count: selectedBuilding.active_drop.pull_count + 1 };
+          setSelectedBuilding({ ...selectedBuilding, active_drop: updatedDrop });
+          setBuildings((prev) =>
+            prev.map((b) =>
+              b.active_drop?.id === dropId ? { ...b, active_drop: updatedDrop } : b
+            )
+          );
+        }
+      }
+    } catch { /* ignore */ }
+    finally { setDropPulling(false); }
+  }, [dropPulling, session, selectedBuilding]);
+
+  // Admin: plant drop on selected building
+  const handlePlantDrop = useCallback(async () => {
+    if (!selectedBuilding || dropPlanting) return;
+    setDropPlanting(true);
+    setDropPlantResult(null);
+    try {
+      const res = await fetch("/api/admin/drops", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          building_login: selectedBuilding.login,
+          rarity: dropPlantRarity,
+          duration_hours: dropPlantDuration,
+          max_pulls: dropPlantMaxPulls,
+          item_reward: dropPlantRarity === "legendary" && dropPlantItem ? dropPlantItem : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDropPlantResult(data.error ?? "Failed");
+      } else {
+        // Update building locally with the new drop
+        const drop = data.drop;
+        const activeDrop = { id: drop.id, rarity: drop.rarity, points: drop.points, max_pulls: drop.max_pulls, pull_count: 0, expires_at: drop.expires_at };
+        setSelectedBuilding({ ...selectedBuilding, active_drop: activeDrop });
+        setBuildings((prev) => prev.map((b) => b.login === selectedBuilding.login ? { ...b, active_drop: activeDrop } : b));
+        setDropPlantOpen(false);
+        setDropPlantResult("Planted!");
+        setTimeout(() => setDropPlantResult(null), 2000);
+      }
+    } catch {
+      setDropPlantResult("Network error");
+    } finally {
+      setDropPlanting(false);
+    }
+  }, [selectedBuilding, dropPlanting, dropPlantRarity, dropPlantDuration, dropPlantMaxPulls, dropPlantItem]);
+
   // Gift: open modal with available items
   const handleOpenGift = useCallback(async () => {
     if (!selectedBuilding || !session) return;
@@ -865,13 +1017,15 @@ function HomeContent() {
   // During fly mode: only close overlays (profile card) — AirplaneFlight handles pause/exit
   // Outside fly mode: compare → share modal → profile card → focus → explore mode
   useEffect(() => {
-    if (flyMode && !selectedBuilding && !pillModalOpen && !founderMessageOpen) return;
-    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !rabbitCinematic && !invitePreview && raidState.phase === "idle") return;
+    if (flyMode && !selectedBuilding && !pillModalOpen && !founderMessageOpen && !eArcadeOpen && !activeSponsor) return;
+    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !eArcadeOpen && !activeSponsor && !rabbitCinematic && !invitePreview && raidState.phase === "idle") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
         // Founder modals take highest priority
         if (founderMessageOpen) { setFounderMessageOpen(false); return; }
         if (pillModalOpen) { setPillModalOpen(false); return; }
+        if (eArcadeOpen) { setEArcadeOpen(false); return; }
+        if (activeSponsor) { setActiveSponsor(null); return; }
         // Rabbit cinematic
         if (rabbitCinematic) { endRabbitCinematic(); return; }
         // Raid takes priority
@@ -915,7 +1069,7 @@ function HomeContent() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions, invitePreview]);
+  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, eArcadeOpen, activeSponsor, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions, invitePreview]);
 
   // Rabbit cinematic text phase timing (8s total flyover)
   useEffect(() => {
@@ -1031,6 +1185,8 @@ function HomeContent() {
     let allDevs: any[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let cityStats: any = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let dropsPayload: any[] = [];
 
     // Skip snapshot when busting cache — go straight to DB for fresh data
     if (!bustCache) {
@@ -1045,37 +1201,12 @@ function HomeContent() {
           const snapshot = await new Response(stream).json();
           allDevs = snapshot.developers;
           cityStats = snapshot.stats;
+          dropsPayload = snapshot._d ?? [];
         }
       } catch { /* fall through to chunked */ }
     }
 
-    // Fetch from API (primary when busting cache, fallback otherwise)
-    if (allDevs.length === 0) {
-      const cbParam = bustCache ? `&_t=${Date.now()}` : "";
-      const CHUNK = 1000;
-      const res = await fetch(`/api/city?from=0&to=${CHUNK}${cbParam}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      allDevs = data.developers ?? [];
-      cityStats = data.stats;
-
-      const total = cityStats?.total_developers ?? 0;
-      if (total > CHUNK && allDevs.length > 0) {
-        const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
-        for (let from = CHUNK; from < total; from += CHUNK) {
-          promises.push(
-            fetch(`/api/city?from=${from}&to=${from + CHUNK}${cbParam}`)
-              .then(r => r.ok ? r.json() : null)
-          );
-        }
-        const results = await Promise.all(promises);
-        for (const chunk of results) {
-          if (chunk?.developers?.length) {
-            allDevs = [...allDevs, ...chunk.developers];
-          }
-        }
-      }
-    }
+    // Snapshot is the only data source. No chunked API fallback.
 
     if (allDevs.length === 0) return null;
 
@@ -1098,6 +1229,19 @@ function HomeContent() {
     rawDevsRef.current = allDevs;
     setStats(cityStats);
     const layout = generateCityLayout(allDevs);
+
+    // Decode obfuscated drops (_d) and merge into buildings by rank
+    if (dropsPayload.length > 0) {
+      const dropByRank = new Map<number, typeof dropsPayload[0]>();
+      for (const d of dropsPayload) dropByRank.set(d.n, d);
+      for (const b of layout.buildings) {
+        const d = dropByRank.get(b.rank);
+        if (d) {
+          b.active_drop = { id: d.id, rarity: d.r, points: d.p, max_pulls: d.m, pull_count: d.c, expires_at: d.x };
+        }
+      }
+    }
+
     setBuildings(layout.buildings);
     setPlazas(layout.plazas);
     setDecorations(layout.decorations);
@@ -1168,6 +1312,8 @@ function HomeContent() {
         let allDevs: any[] = [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let cityStats: any = null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let dropsPayload: any[] = [];
 
         // Try pre-computed snapshot first (single file from Supabase CDN)
         try {
@@ -1181,35 +1327,9 @@ function HomeContent() {
             const snapshot = await new Response(stream).json();
             allDevs = snapshot.developers;
             cityStats = snapshot.stats;
+            dropsPayload = snapshot._d ?? [];
           }
-        } catch { /* fall through to chunked */ }
-
-        // Fallback to chunked API
-        if (allDevs.length === 0) {
-          const CHUNK = 1000;
-          const res = await fetch(`/api/city?from=0&to=${CHUNK}`);
-          if (!res.ok) throw new Error("Failed to fetch city data");
-          const data = await res.json();
-          allDevs = data.developers ?? [];
-          cityStats = data.stats;
-
-          const total = cityStats?.total_developers ?? 0;
-          if (total > CHUNK && allDevs.length > 0) {
-            const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
-            for (let from = CHUNK; from < total; from += CHUNK) {
-              promises.push(
-                fetch(`/api/city?from=${from}&to=${from + CHUNK}`)
-                  .then((r) => (r.ok ? r.json() : null))
-              );
-            }
-            const results = await Promise.all(promises);
-            for (const chunk of results) {
-              if (chunk?.developers?.length) {
-                allDevs = [...allDevs, ...chunk.developers];
-              }
-            }
-          }
-        }
+        } catch { /* snapshot failed */ }
 
         setLoadProgress(30);
 
@@ -1243,6 +1363,19 @@ function HomeContent() {
         rawDevsRef.current = allDevs;
         setStats(cityStats);
         const finalLayout = generateCityLayout(allDevs);
+
+        // Decode obfuscated drops (_d) and merge into buildings by rank
+        if (dropsPayload.length > 0) {
+          const dropByRank = new Map<number, typeof dropsPayload[0]>();
+          for (const d of dropsPayload) dropByRank.set(d.n, d);
+          for (const b of finalLayout.buildings) {
+            const d = dropByRank.get(b.rank);
+            if (d) {
+              b.active_drop = { id: d.id, rarity: d.r, points: d.p, max_pulls: d.m, pull_count: d.c, expires_at: d.x };
+            }
+          }
+        }
+
         setBuildings(finalLayout.buildings);
         setPlazas(finalLayout.plazas);
         setDecorations(finalLayout.decorations);
@@ -2031,7 +2164,7 @@ function HomeContent() {
         accentColor={theme.accent}
         onClearFocus={() => setFocusedBuilding(null)}
         flyPauseSignal={flyPauseSignal}
-        flyHasOverlay={!!selectedBuilding || pillModalOpen || founderMessageOpen || rabbitCinematic}
+        flyHasOverlay={!!selectedBuilding || pillModalOpen || founderMessageOpen || eArcadeOpen || !!activeSponsor || rabbitCinematic}
         flyStartPaused={showFlyControls}
         holdRise={loadStage !== "done"}
         celebrationActive={celebrationActive}
@@ -2091,6 +2224,24 @@ function HomeContent() {
         raidDefender={raidState.defenderBuilding}
         onRaidPhaseComplete={raidActions.onPhaseComplete}
         onLandmarkClick={() => { setPillModalOpen(true); setSelectedBuilding(null); }}
+        onEArcadeClick={() => { trackEArcadeClicked(); setEArcadeOpen(true); setSelectedBuilding(null); }}
+        onSponsorClick={(slug) => {
+          trackLandmarkClicked(slug);
+          const adId = getLandmarkAdId(slug);
+          if (adId) fetch("/api/sky-ads/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad_id: adId, event_type: "click" }) }).catch(() => {});
+          if (!exploreMode) setExploreMode(true);
+          setActiveSponsor(slug);
+          setSelectedBuilding(null);
+          setFocusedBuilding(null);
+        }}
+        sponsorFocusPos={(() => {
+          if (!activeSponsor) return null;
+          const sp = SPONSORS.find(s => s.slug === activeSponsor);
+          if (!sp) return null;
+          const pos = gridToWorldPos(sp.gridX, sp.gridZ);
+          return [pos[0], sp.hitboxHeight * 0.6, pos[2]] as [number, number, number];
+        })()}
+        activeSponsorSlug={activeSponsor}
         rabbitSighting={rabbitSighting}
         onRabbitCaught={onRabbitCaught}
         rabbitCinematic={rabbitCinematic}
@@ -3791,6 +3942,62 @@ function HomeContent() {
                 </div>
               )}
 
+              {/* Drop banner: show when building has an active drop */}
+              {selectedBuilding.active_drop && (() => {
+                const drop = selectedBuilding.active_drop;
+                const rarityColors: Record<string, string> = { common: "#00ff88", rare: "#0088ff", epic: "#aa00ff", legendary: "#ffaa00" };
+                const dropColor = rarityColors[drop.rarity] ?? rarityColors.common;
+                const myPull = myDropPulls[drop.id];
+                const exhausted = drop.pull_count >= drop.max_pulls;
+                return (
+                  <div
+                    className="mx-4 mb-3 border-2 p-3"
+                    style={{ borderColor: dropColor, backgroundColor: `${dropColor}10` }}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-bold" style={{ color: dropColor }}>
+                        DROP FOUND!
+                      </span>
+                      <span className="text-[9px] text-muted">
+                        {drop.pull_count}/{drop.max_pulls} pulled
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-cream mb-2">
+                      +{drop.points} pts <span className="text-muted capitalize">({drop.rarity})</span>
+                    </div>
+                    {myPull ? (
+                      <div className="text-[10px] text-center py-1.5" style={{ color: dropColor }}>
+                        Already pulled +{myPull.points} pts
+                      </div>
+                    ) : exhausted ? (
+                      <div className="text-[10px] text-center py-1.5 text-muted">
+                        Fully pulled ({drop.max_pulls}/{drop.max_pulls})
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDropPull(drop.id)}
+                          disabled={dropPulling}
+                          className="btn-press flex-1 py-1.5 text-[10px] text-bg"
+                          style={{ backgroundColor: dropColor, boxShadow: `2px 2px 0 0 ${dropColor}66` }}
+                        >
+                          {dropPulling ? "Pulling..." : "Pull"}
+                        </button>
+                        <a
+                          href={`https://x.com/intent/tweet?text=${encodeURIComponent(`just pulled a ${drop.rarity} drop in Git City 👀 how many are you walking past?`)}&url=${encodeURIComponent("https://thegitcity.com")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-press border-2 px-3 py-1.5 text-[10px] transition-colors hover:border-border-light"
+                          style={{ borderColor: `${dropColor}66`, color: dropColor }}
+                        >
+                          Share
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* A7: Show equipped items on other devs' buildings (mimetic desire) */}
               {selectedBuilding.login.toLowerCase() !== authLogin && (() => {
                 const equipped: string[] = [];
@@ -3965,6 +4172,84 @@ function HomeContent() {
                   >
                     Compare
                   </button>
+                </div>
+              )}
+
+              {/* Admin: Plant Drop */}
+              {isAdmin && !selectedBuilding.active_drop && (
+                <div className="mx-4 mb-3">
+                  {!dropPlantOpen ? (
+                    <button
+                      onClick={() => setDropPlantOpen(true)}
+                      className="btn-press w-full border-2 border-yellow-500/40 py-1.5 text-[9px] text-yellow-400 transition-colors hover:border-yellow-500/70 hover:bg-yellow-500/5"
+                    >
+                      Plant Drop
+                    </button>
+                  ) : (
+                    <div className="border-2 border-yellow-500/30 bg-yellow-500/5 p-3 space-y-2">
+                      <div className="flex gap-2">
+                        <select
+                          value={dropPlantRarity}
+                          onChange={(e) => setDropPlantRarity(e.target.value)}
+                          className="flex-1 border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
+                        >
+                          <option value="common">Common 10pts</option>
+                          <option value="rare">Rare 50pts</option>
+                          <option value="epic">Epic 200pts</option>
+                          <option value="legendary">Legendary 500pts</option>
+                        </select>
+                        <select
+                          value={dropPlantDuration}
+                          onChange={(e) => setDropPlantDuration(Number(e.target.value))}
+                          className="border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
+                        >
+                          <option value={24}>24h</option>
+                          <option value={48}>48h</option>
+                          <option value={72}>72h</option>
+                        </select>
+                      </div>
+                      <input
+                        type="number"
+                        value={dropPlantMaxPulls}
+                        onChange={(e) => setDropPlantMaxPulls(Number(e.target.value))}
+                        className="w-full border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
+                        placeholder="Max pulls"
+                        min={1}
+                        max={500}
+                      />
+                      {dropPlantRarity === "legendary" && (
+                        <select
+                          value={dropPlantItem}
+                          onChange={(e) => setDropPlantItem(e.target.value)}
+                          className="w-full border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
+                        >
+                          <option value="">Select item reward...</option>
+                          {dropPlantItems.map((item) => (
+                            <option key={item.id} value={item.id}>{item.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      {dropPlantResult && (
+                        <p className={`text-[9px] ${dropPlantResult === "Planted!" ? "text-lime" : "text-red-400"}`}>{dropPlantResult}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handlePlantDrop}
+                          disabled={dropPlanting || (dropPlantRarity === "legendary" && !dropPlantItem)}
+                          className="btn-press flex-1 py-1.5 text-[9px] text-bg disabled:opacity-50"
+                          style={{ backgroundColor: "#ffaa00" }}
+                        >
+                          {dropPlanting ? "..." : "Plant"}
+                        </button>
+                        <button
+                          onClick={() => { setDropPlantOpen(false); setDropPlantResult(null); }}
+                          className="border border-border px-3 py-1.5 text-[9px] text-muted hover:text-cream"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -4564,6 +4849,19 @@ function HomeContent() {
         />
       )}
 
+      {/* ─── Drop hint toast (only when city is fully visible) ─── */}
+      {dropHint && !introMode && loadStage === "done" && (
+        <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 sm:bottom-24">
+          <div
+            className="border-2 border-border bg-bg-raised/95 px-5 py-2.5 text-[11px] text-cream backdrop-blur-sm"
+            style={{ borderColor: "#ffaa0044", animation: "toastDrop 0.3s ease-out, toastOut 0.4s ease-in 4s forwards" }}
+          >
+            <span style={{ color: "#ffaa00" }}>&#9679;</span>{" "}
+            {dropHintText}
+          </div>
+        </div>
+      )}
+
       {/* ─── Daily mission progress toasts (top-center, always visible) ─── */}
       {dailyToasts.length > 0 && (
         <div className="pointer-events-none fixed left-1/2 top-4 z-60 flex -translate-x-1/2 flex-col items-center gap-1.5">
@@ -4779,7 +5077,7 @@ function HomeContent() {
                 Fly Again
               </button>
               <Link
-                href="/leaderboard?mode=game"
+                href="/leaderboard?mode=game&tab=flight"
                 onClick={() => { setShowFlyResults(null); clearTimeout(flyResultsTimerRef.current); }}
                 className="btn-press border-2 border-border px-5 py-2 text-[10px] transition-colors hover:border-border-light"
                 style={{ color: theme.accent }}
@@ -4967,6 +5265,25 @@ function HomeContent() {
           onSignIn={handleSignInWithRef}
         />
       )}
+
+      {/* E.Arcade card */}
+      {eArcadeOpen && (
+        <EArcadeCard
+          onClose={() => setEArcadeOpen(false)}
+          onEnter={() => {
+            // TODO: Navigate to E.Arcade lobby
+            setEArcadeOpen(false);
+          }}
+          session={session}
+          onSignIn={handleSignInWithRef}
+        />
+      )}
+
+      {/* Sponsored landmark card */}
+      {activeSponsor && (() => {
+        const cfg = SPONSORS.find((s) => s.slug === activeSponsor);
+        return cfg ? <SponsoredCard config={cfg} onClose={() => setActiveSponsor(null)} /> : null;
+      })()}
 
       {/* Rabbit Quest Cinematic Overlay */}
       {rabbitCinematic && (

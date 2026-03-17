@@ -1,4 +1,4 @@
-export type AdVehicle = "plane" | "blimp" | "billboard" | "rooftop_sign" | "led_wrap";
+export type AdVehicle = "plane" | "blimp" | "billboard" | "rooftop_sign" | "led_wrap" | "landmark";
 
 export interface SkyAd {
   id: string;
@@ -17,6 +17,7 @@ export const MAX_BLIMPS = 8;
 export const MAX_BILLBOARDS = 10;
 export const MAX_ROOFTOP_SIGNS = 10;
 export const MAX_LED_WRAPS = 10;
+export const MAX_LANDMARKS = 3;
 export const MAX_TEXT_LENGTH = 80;
 
 const ALLOWED_LINK_PATTERN = /^(https:\/\/|mailto:)/;
@@ -24,6 +25,10 @@ const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 export function isBuildingAd(vehicle: string): vehicle is "billboard" | "rooftop_sign" | "led_wrap" {
   return vehicle === "billboard" || vehicle === "rooftop_sign" || vehicle === "led_wrap";
+}
+
+export function isLandmarkAd(vehicle: string): vehicle is "landmark" {
+  return vehicle === "landmark";
 }
 
 export function validateAds(ads: SkyAd[]): SkyAd[] {

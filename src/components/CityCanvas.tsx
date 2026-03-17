@@ -17,6 +17,9 @@ import RaidSequence3D, { VehicleMesh } from "./RaidSequence3D";
 import type { RaidPhase } from "@/lib/useRaidSequence";
 import type { RaidExecuteResponse } from "@/lib/raid";
 import FounderSpire from "./FounderSpire";
+import EArcadeLandmark from "./EArcadeLandmark";
+import { SPONSORS } from "@/lib/sponsors/registry";
+import SponsoredLandmark from "@/lib/sponsors/SponsoredLandmark";
 import WhiteRabbit from "./WhiteRabbit";
 import CelebrationEffect from "./CelebrationEffect";
 import ComparePath from "./ComparePath";
@@ -398,11 +401,13 @@ function CameraFocus({
   focusedBuilding,
   focusedBuildingB,
   controlsRef,
+  focusPosition,
 }: {
   buildings: CityBuilding[];
   focusedBuilding: string | null;
   focusedBuildingB?: string | null;
   controlsRef: React.RefObject<any>;
+  focusPosition?: [number, number, number] | null;
 }) {
   const { camera } = useThree();
   const startPos = useRef(new THREE.Vector3());
@@ -417,13 +422,14 @@ function CameraFocus({
   buildingsRef.current = buildings;
 
   useEffect(() => {
-    if (!focusedBuilding) {
+    if (!focusedBuilding && !focusPosition) {
       // Re-enable auto-rotate when focus is cleared
       if (controlsRef.current) {
         controlsRef.current.autoRotate = true;
       }
       return;
     }
+    if (!focusedBuilding) return; // focusPosition is handled by its own useEffect
 
     const bA = buildingsRef.current.find(
       (b) => b.login.toLowerCase() === focusedBuilding.toLowerCase()
@@ -478,17 +484,22 @@ function CameraFocus({
       // and pull camera further back to show more of the building
       const isMobile = window.innerWidth < 640;
       const mobileOffset = isMobile ? 60 : 0;
-      const dist = isMobile ? 250 : 80;
-      const camHeight = isMobile ? 160 : 60;
+      const dist = isMobile ? 300 : 180;
+      const camHeight = isMobile ? 200 : 120;
+
+      // Camera goes to the outside of the building (away from center) so it looks
+      // at the front face without other buildings blocking the view
+      const bx = bA.position[0], bz = bA.position[2];
+      const bLen = Math.sqrt(bx * bx + bz * bz) || 1;
       endPos.current.set(
-        bA.position[0] + dist,
+        bx + (bx / bLen) * dist,
         bA.height + camHeight,
-        bA.position[2] + dist
+        bz + (bz / bLen) * dist
       );
       endLook.current.set(
-        bA.position[0],
+        bx,
         Math.max(0, bA.height + 15 - mobileOffset),
-        bA.position[2]
+        bz
       );
     }
 
@@ -500,6 +511,36 @@ function CameraFocus({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedBuilding, focusedBuildingB, camera, controlsRef]);
+
+  // Focus on a fixed position (sponsored landmarks)
+  useEffect(() => {
+    if (!focusPosition || focusedBuilding) return;
+
+    startPos.current.copy(camera.position);
+    if (controlsRef.current) {
+      startLook.current.copy(controlsRef.current.target);
+    }
+
+    const [px, py, pz] = focusPosition;
+    const isMobile = window.innerWidth < 640;
+    const dist = isMobile ? 400 : 280;
+    const camH = isMobile ? 300 : 220;
+    const mobileOffset = isMobile ? 60 : 0;
+
+    // Position camera OUTSIDE the building looking INWARD (toward center)
+    // so the front face (with text) is visible
+    const len = Math.sqrt(px * px + pz * pz) || 1;
+    endPos.current.set(px + (px / len) * dist, py + camH, pz + (pz / len) * dist);
+    endLook.current.set(px, Math.max(0, py - mobileOffset), pz);
+
+    progress.current = 0;
+    active.current = true;
+
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPosition, camera, controlsRef]);
 
   useFrame((_, delta) => {
     if (!active.current || progress.current >= 1) return;
@@ -1890,7 +1931,7 @@ function Waterfront({ river, dockColor }: { river: CityRiver; dockColor: string 
 
 // ─── Orbit Scene (controls + focus) ──────────────────────────
 
-function OrbitScene({ buildings, focusedBuilding, focusedBuildingB }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null }) {
+function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null }) {
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
 
@@ -1902,7 +1943,7 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB }: { building
 
   return (
     <>
-      <CameraFocus buildings={buildings} focusedBuilding={focusedBuilding} focusedBuildingB={focusedBuildingB} controlsRef={controlsRef} />
+      <CameraFocus buildings={buildings} focusedBuilding={focusedBuilding} focusedBuildingB={focusedBuildingB} controlsRef={controlsRef} focusPosition={focusPosition} />
       <OrbitControls
         ref={controlsRef}
         enableDamping
@@ -1985,6 +2026,10 @@ interface Props {
   raidDefender?: CityBuilding | null;
   onRaidPhaseComplete?: (phase: RaidPhase) => void;
   onLandmarkClick?: () => void;
+  onEArcadeClick?: () => void;
+  onSponsorClick?: (slug: string) => void;
+  sponsorFocusPos?: [number, number, number] | null;
+  activeSponsorSlug?: string | null;
   rabbitSighting?: number | null;
   onRabbitCaught?: () => void;
   rabbitCinematic?: boolean;
@@ -2019,7 +2064,7 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
   const [dpr, setDpr] = useState(1);
@@ -2073,7 +2118,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       ) : (
         <>
           {!introMode && !rabbitCinematic && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
-            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} />
+            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} />
           )}
 
           {raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && (
@@ -2097,6 +2142,23 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />
 
+      <EArcadeLandmark
+        onClick={onEArcadeClick ?? (() => { })}
+        themeAccent={t.building.accent}
+        themeWindowLit={t.building.windowLit}
+        themeFace={t.building.face}
+      />
+      {SPONSORS.map((s) => (
+        <SponsoredLandmark
+          key={s.slug}
+          config={s}
+          onClick={() => onSponsorClick?.(s.slug)}
+          themeAccent={t.building.accent}
+          themeWindowLit={t.building.windowLit}
+          themeFace={t.building.face}
+          dimmed={!!activeSponsorSlug && activeSponsorSlug !== s.slug}
+        />
+      ))}
       <FounderSpire onClick={onLandmarkClick ?? (() => { })} />
 
       {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={cityRadius} />}
@@ -2142,6 +2204,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         holdRise={holdRise}
         liveByLogin={liveByLogin}
         cityEnergy={cityEnergy}
+        dimAll={!!sponsorFocusPos}
       />
 
       <ComparePath

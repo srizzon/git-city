@@ -8,27 +8,84 @@ interface AdFormFieldsProps {
   onChange: (form: AdForm) => void;
 }
 
+const inputCls = "w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime";
+const labelCls = "mb-1 block text-[11px] text-muted";
+
+function toLocalDatetime(iso: string): string {
+  if (!iso) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(iso)) return iso;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return localIso(d);
+}
+
+function localIso(d: Date): string {
+  const Y = d.getFullYear();
+  const M = String(d.getMonth() + 1).padStart(2, "0");
+  const D = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${Y}-${M}-${D}T${h}:${m}`;
+}
+
+function DatePicker({ label, value, onChange, quickDays }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  quickDays?: number[];
+}) {
+  return (
+    <div>
+      <label className={labelCls}>{label}</label>
+      <input
+        type="datetime-local"
+        value={toLocalDatetime(value)}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputCls}
+      />
+      {quickDays && (
+        <div className="mt-1.5 flex gap-1.5">
+          {quickDays.map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => {
+                const date = new Date();
+                date.setDate(date.getDate() + d);
+                date.setHours(23, 59, 0, 0);
+                onChange(localIso(date));
+              }}
+              className="cursor-pointer border border-border px-2 py-1 text-[10px] text-muted transition-colors hover:border-lime hover:text-lime"
+            >
+              +{d}d
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              onChange(localIso(new Date()));
+            }}
+            className="cursor-pointer border border-border px-2 py-1 text-[10px] text-muted transition-colors hover:border-lime hover:text-lime"
+          >
+            now
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdFormFields({ form, onChange }: AdFormFieldsProps) {
   const set = <K extends keyof AdForm>(key: K, value: AdForm[K]) =>
     onChange({ ...form, [key]: value });
 
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {/* Brand */}
-      <div>
-        <label className="mb-1 block text-[11px] text-muted">Brand *</label>
-        <input
-          required
-          placeholder="Acme Inc"
-          value={form.brand}
-          onChange={(e) => set("brand", e.target.value)}
-          className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-        />
-      </div>
+  const isLandmark = form.vehicle === "landmark";
 
-      {/* Vehicle */}
-      <div className="sm:col-span-2">
-        <label className="mb-1 block text-[11px] text-muted">Vehicle</label>
+  return (
+    <div className="space-y-5">
+      {/* Vehicle selector */}
+      <div>
+        <label className={labelCls}>Type</label>
         <div className="flex flex-wrap">
           {VEHICLES.map((val, i) => (
             <button
@@ -47,125 +104,128 @@ export function AdFormFields({ form, onChange }: AdFormFieldsProps) {
         </div>
       </div>
 
-      {/* Banner text */}
-      <div className="sm:col-span-2 lg:col-span-3">
-        <label className="mb-1 block text-[11px] text-muted">
-          Banner text * (max 80)
-        </label>
-        <input
-          required
-          placeholder="YOUR BRAND MESSAGE HERE"
-          maxLength={80}
-          value={form.text}
-          onChange={(e) => set("text", e.target.value)}
-          className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-        />
+      {isLandmark ? <LandmarkFields form={form} set={set} /> : <SkyAdFields form={form} set={set} />}
+    </div>
+  );
+}
+
+// ─── Landmark-specific fields ───────────────────────────
+function LandmarkFields({ form, set }: { form: AdForm; set: <K extends keyof AdForm>(key: K, value: AdForm[K]) => void }) {
+  return (
+    <>
+      {/* Row: Brand + Slug */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className={labelCls}>Brand name *</label>
+          <input required placeholder="Dinzo" value={form.brand} onChange={(e) => set("brand", e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Slug * <span className="text-dim">(must match registry.tsx)</span></label>
+          <input required placeholder="dinzo" value={form.text} onChange={(e) => set("text", e.target.value)} className={inputCls} />
+        </div>
       </div>
 
-      {/* Description */}
-      <div className="sm:col-span-2 lg:col-span-3">
-        <label className="mb-1 block text-[11px] text-muted">
-          Description
-        </label>
-        <textarea
-          maxLength={200}
-          rows={2}
-          placeholder="Internal note"
-          value={form.description}
-          onChange={(e) => set("description", e.target.value)}
-          className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-        />
+      {/* Sponsor email */}
+      <div>
+        <label className={labelCls}>Sponsor email <span className="text-dim">(creates dashboard access automatically)</span></label>
+        <input type="email" placeholder="sponsor@company.com" value={form.purchaser_email} onChange={(e) => set("purchaser_email", e.target.value)} className={inputCls} />
       </div>
 
       {/* Link */}
-      <div className="sm:col-span-2 lg:col-span-3">
-        <label className="mb-1 block text-[11px] text-muted">Link</label>
-        <input
-          placeholder="https://example.com"
-          value={form.link}
-          onChange={(e) => set("link", e.target.value)}
-          className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-        />
+      <div>
+        <label className={labelCls}>Website URL</label>
+        <input placeholder="https://example.com" value={form.link} onChange={(e) => set("link", e.target.value)} className={inputCls} />
       </div>
 
-      {/* Colors */}
-      <div className="flex items-end gap-4">
+      {/* Description */}
+      <div>
+        <label className={labelCls}>Internal note</label>
+        <input placeholder="R$500/month, paid via Pix" value={form.description} onChange={(e) => set("description", e.target.value)} className={inputCls} />
+      </div>
+
+      {/* Dates with quick buttons */}
+      <div className="grid grid-cols-2 gap-4">
+        <DatePicker label="Starts at" value={form.starts_at} onChange={(v) => set("starts_at", v)} quickDays={[]} />
+        <DatePicker label="Ends at" value={form.ends_at} onChange={(v) => set("ends_at", v)} quickDays={[30, 60, 90]} />
+      </div>
+    </>
+  );
+}
+
+// ─── Sky Ad fields (plane, blimp, billboard, etc.) ──────
+function SkyAdFields({ form, set }: { form: AdForm; set: <K extends keyof AdForm>(key: K, value: AdForm[K]) => void }) {
+  return (
+    <>
+      {/* Brand */}
+      <div>
+        <label className={labelCls}>Brand *</label>
+        <input required placeholder="Acme Inc" value={form.brand} onChange={(e) => set("brand", e.target.value)} className={inputCls} />
+      </div>
+
+      {/* Banner text */}
+      <div>
+        <label className={labelCls}>Banner text * <span className="text-dim">(max 80)</span></label>
+        <input required placeholder="YOUR BRAND MESSAGE HERE" maxLength={80} value={form.text} onChange={(e) => set("text", e.target.value)} className={inputCls} />
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className={labelCls}>Description</label>
+        <textarea maxLength={200} rows={2} placeholder="Internal note" value={form.description} onChange={(e) => set("description", e.target.value)} className={inputCls} />
+      </div>
+
+      {/* Link */}
+      <div>
+        <label className={labelCls}>Link</label>
+        <input placeholder="https://example.com" value={form.link} onChange={(e) => set("link", e.target.value)} className={inputCls} />
+      </div>
+
+      {/* Colors + Priority */}
+      <div className="flex flex-wrap items-end gap-4">
         <div>
-          <label className="mb-1 block text-[11px] text-muted">
-            Text color
-          </label>
+          <label className={labelCls}>Text color</label>
           <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={form.color}
-              onChange={(e) => set("color", e.target.value)}
-              className="h-9 w-9 cursor-pointer border border-border bg-bg"
-            />
+            <input type="color" value={form.color} onChange={(e) => set("color", e.target.value)} className="h-9 w-9 cursor-pointer border border-border bg-bg" />
             <span className="text-xs text-dim">{form.color}</span>
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-[11px] text-muted">BG color</label>
+          <label className={labelCls}>BG color</label>
           <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={form.bg_color}
-              onChange={(e) => set("bg_color", e.target.value)}
-              className="h-9 w-9 cursor-pointer border border-border bg-bg"
-            />
+            <input type="color" value={form.bg_color} onChange={(e) => set("bg_color", e.target.value)} className="h-9 w-9 cursor-pointer border border-border bg-bg" />
             <span className="text-xs text-dim">{form.bg_color}</span>
           </div>
         </div>
+        <div>
+          <label className={labelCls}>Priority</label>
+          <input type="number" value={form.priority} onChange={(e) => set("priority", parseInt(e.target.value) || 50)} className="w-20 border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime" />
+        </div>
       </div>
 
-      {/* Priority */}
+      {/* Purchaser email */}
       <div>
-        <label className="mb-1 block text-[11px] text-muted">Priority</label>
-        <input
-          type="number"
-          value={form.priority}
-          onChange={(e) => set("priority", parseInt(e.target.value) || 50)}
-          className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-        />
+        <label className={labelCls}>Purchaser email</label>
+        <input type="email" placeholder="buyer@company.com" value={form.purchaser_email} onChange={(e) => set("purchaser_email", e.target.value)} className={inputCls} />
       </div>
 
-      {/* Dates */}
-      <div>
-        <label className="mb-1 block text-[11px] text-muted">Starts at</label>
-        <input
-          type="datetime-local"
-          value={form.starts_at}
-          onChange={(e) => set("starts_at", e.target.value)}
-          className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-        />
-      </div>
-      <div>
-        <label className="mb-1 block text-[11px] text-muted">Ends at</label>
-        <input
-          type="datetime-local"
-          value={form.ends_at}
-          onChange={(e) => set("ends_at", e.target.value)}
-          className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-        />
+      {/* Dates with quick buttons */}
+      <div className="grid grid-cols-2 gap-4">
+        <DatePicker label="Starts at" value={form.starts_at} onChange={(v) => set("starts_at", v)} quickDays={[]} />
+        <DatePicker label="Ends at" value={form.ends_at} onChange={(v) => set("ends_at", v)} quickDays={[7, 30, 90]} />
       </div>
 
       {/* Banner preview */}
       {form.text && (
-        <div className="sm:col-span-2 lg:col-span-3">
+        <div>
           <p className="mb-1 text-[11px] text-muted">Preview</p>
           <div
             className="overflow-hidden px-4 py-2 text-center text-xs tracking-widest"
-            style={{
-              backgroundColor: form.bg_color,
-              color: form.color,
-              fontFamily: "monospace",
-              letterSpacing: "0.12em",
-            }}
+            style={{ backgroundColor: form.bg_color, color: form.color, fontFamily: "monospace", letterSpacing: "0.12em" }}
           >
             {form.text}
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

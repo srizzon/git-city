@@ -149,33 +149,64 @@ export async function POST(request: Request) {
   return NextResponse.json({ id: row.id, score, rank_today, total });
 }
 
+function getWeekStart(): string {
+  const now = new Date();
+  const day = now.getUTCDay(); // 0=Sun, 1=Mon, ...
+  const diff = day === 0 ? 6 : day - 1; // days since Monday
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diff));
+  return monday.toISOString();
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const seed = searchParams.get("seed") || getTodaySeed();
+  const mode = searchParams.get("mode"); // "speedrun" or default (score)
+  const period = searchParams.get("period") || "day"; // "day" | "week" | "all"
+  const isSpeedrun = mode === "speedrun";
 
   const admin = getSupabaseAdmin();
 
-  // Fetch top 200 rows + all developer_ids for unique pilot count (in parallel)
+  // Build query based on mode + period
+  let query = admin
+    .from("fly_scores")
+    .select("score, collected, max_combo, flight_ms, created_at, developer_id, developers!inner(github_login, avatar_url)");
+
+  // Apply period filter
+  if (period === "week") {
+    query = query.gte("created_at", getWeekStart());
+  } else if (period === "all") {
+    // no date filter
+  } else {
+    query = query.eq("seed", seed);
+  }
+
+  if (isSpeedrun) {
+    query = query.eq("collected", 40).order("flight_ms", { ascending: true }).order("score", { ascending: false });
+  } else {
+    query = query.order("score", { ascending: false }).order("flight_ms", { ascending: true });
+  }
+
+  // Count query uses same period filter
+  let countQuery = admin.from("fly_scores").select("developer_id");
+  if (period === "week") {
+    countQuery = countQuery.gte("created_at", getWeekStart());
+  } else if (period === "all") {
+    // no filter
+  } else {
+    countQuery = countQuery.eq("seed", seed);
+  }
+
   const [{ data, error }, { data: devIds }] = await Promise.all([
-    admin
-      .from("fly_scores")
-      .select("score, collected, max_combo, flight_ms, created_at, developer_id, developers!inner(github_login, avatar_url)")
-      .eq("seed", seed)
-      .order("score", { ascending: false })
-      .order("flight_ms", { ascending: true })
-      .limit(200),
-    admin
-      .from("fly_scores")
-      .select("developer_id")
-      .eq("seed", seed),
+    query.limit(200),
+    countQuery,
   ]);
 
   if (error) {
     return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
   }
 
-  // Keep only best score per developer (data is sorted by score desc,
-  // so first occurrence of each developer_id is their best)
+  // Keep only best entry per developer (first occurrence is their best
+  // since data is already sorted by the primary metric)
   const seen = new Set<number>();
   const unique = (data ?? []).filter((row: any) => {
     if (seen.has(row.developer_id)) return false;
@@ -193,7 +224,7 @@ export async function GET(request: Request) {
     avatar_url: row.developers?.avatar_url,
   }));
 
-  // Total = unique pilots for this seed (for percentile calculation)
+  // Total = unique pilots for this period
   const total = new Set((devIds ?? []).map((r: any) => r.developer_id)).size;
 
   return NextResponse.json(

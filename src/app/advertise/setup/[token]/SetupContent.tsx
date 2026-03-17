@@ -124,7 +124,9 @@ export function SetupContent({
   const [brand, setBrand] = useState(ad.brand ?? "");
   const [description, setDescription] = useState(ad.description ?? "");
   const [link, setLink] = useState(ad.link ?? "");
+  const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState("");
 
   const textOver = text.length > MAX_TEXT_LENGTH;
@@ -132,8 +134,11 @@ export function SetupContent({
   const linkValid =
     !link || link.startsWith("https://") || link.startsWith("mailto:");
 
+  const emailTrimmed = email.trim().toLowerCase();
+  const emailValid = !emailTrimmed || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed);
+
   async function handleSave() {
-    if (!linkValid || textOver || !text.trim()) return;
+    if (!linkValid || textOver || !text.trim() || !emailValid) return;
     setSaving(true);
     setError("");
 
@@ -147,12 +152,25 @@ export function SetupContent({
           brand: brand || undefined,
           description: description || undefined,
           link: link || undefined,
+          email: emailTrimmed || undefined,
         }),
       });
 
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "Something went wrong");
+        setSaving(false);
+        return;
+      }
+
+      // Send magic link if email was provided
+      if (emailTrimmed) {
+        await fetch("/api/ads/auth/send-magic-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailTrimmed }),
+        });
+        setEmailSent(true);
         setSaving(false);
         return;
       }
@@ -292,6 +310,29 @@ export function SetupContent({
             </p>
           </div>
 
+          {/* Email nudge */}
+          <div className="border-[2px] border-border p-4">
+            <label className="block text-xs text-muted normal-case">
+              Your email
+              <span className="ml-1 text-[10px] text-dim">(optional)</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@company.com"
+              className="mt-1 w-full border-[3px] border-border bg-transparent px-3 py-2.5 font-pixel text-sm text-cream outline-none transition-colors focus:border-lime"
+            />
+            {email && !emailValid && (
+              <p className="mt-1 text-[11px] normal-case" style={{ color: "#ff6b6b" }}>
+                Invalid email
+              </p>
+            )}
+            <p className="mt-1.5 text-[11px] text-muted normal-case">
+              We{"'"}ll send you a login link for the full dashboard with stats, editing, and billing.
+            </p>
+          </div>
+
           {/* Error */}
           {error && (
             <div
@@ -306,27 +347,53 @@ export function SetupContent({
             </div>
           )}
 
-          {/* CTAs */}
-          <div className="flex flex-col items-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !linkValid || textOver || !text.trim()}
-              className="btn-press w-full py-3.5 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-              style={{
-                backgroundColor: ACCENT,
-                boxShadow: "4px 4px 0 0 #5a7a00",
-              }}
-            >
-              {saving ? "Saving..." : "Save & Go to Dashboard"}
-            </button>
-            <Link
-              href={`/advertise/track/${token}`}
-              className="text-xs text-muted normal-case transition-colors hover:text-cream"
-            >
-              Skip to dashboard &rarr;
-            </Link>
-          </div>
+          {/* Email sent confirmation */}
+          {emailSent ? (
+            <div className="flex flex-col items-center gap-4 pt-2">
+              <div
+                className="w-full border-[3px] px-4 py-4 text-center"
+                style={{ borderColor: ACCENT, backgroundColor: `${ACCENT}10` }}
+              >
+                <p className="text-sm" style={{ color: ACCENT }}>&#10003; Check your email!</p>
+                <p className="mt-1 text-[11px] text-muted normal-case">
+                  We sent a login link to <strong className="text-cream">{emailTrimmed}</strong>.
+                  Click it to access your full dashboard.
+                </p>
+              </div>
+              <Link
+                href={`/advertise/track/${token}`}
+                className="btn-press w-full py-3.5 text-center text-sm text-bg"
+                style={{
+                  backgroundColor: ACCENT,
+                  boxShadow: "4px 4px 0 0 #5a7a00",
+                }}
+              >
+                View ad stats
+              </Link>
+            </div>
+          ) : (
+            /* CTAs */
+            <div className="flex flex-col items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || !linkValid || !emailValid || textOver || !text.trim()}
+                className="btn-press w-full py-3.5 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                style={{
+                  backgroundColor: ACCENT,
+                  boxShadow: "4px 4px 0 0 #5a7a00",
+                }}
+              >
+                {saving ? "Saving..." : "Save & Go to Dashboard"}
+              </button>
+              <Link
+                href={`/advertise/track/${token}`}
+                className="text-xs text-muted normal-case transition-colors hover:text-cream"
+              >
+                Skip to dashboard &rarr;
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -18,7 +18,6 @@ export default function RabbitCompletion({ onComplete }: RabbitCompletionProps) 
   const [line2, setLine2] = useState("");
   const [showCursor, setShowCursor] = useState(true);
   const charIdx = useRef(0);
-  const mountTime = useRef(Date.now());
 
   // Phase transitions
   useEffect(() => {

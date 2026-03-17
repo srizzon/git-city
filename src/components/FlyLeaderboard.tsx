@@ -98,13 +98,23 @@ function rankColor(rank: number): string {
   return ACCENT;
 }
 
+function formatTime(ms: number): string {
+  const mins = Math.floor(ms / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  const centis = Math.floor((ms % 1000) / 10);
+  return `${mins}:${String(secs).padStart(2, "0")}.${String(centis).padStart(2, "0")}`;
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 
-export default function FlyLeaderboard() {
+type LeaderboardPeriod = "day" | "week" | "all";
+
+export default function FlyLeaderboard({ mode = "score" }: { mode?: "score" | "speedrun" }) {
   const authLogin = useLeaderboardAuth();
   const [leaderboard, setLeaderboard] = useState<FlyEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [viewingSeed, setViewingSeed] = useState(getTodaySeed);
+  const [period, setPeriod] = useState<LeaderboardPeriod>("day");
   const [loading, setLoading] = useState(true);
   const [personalBest, setPersonalBest] = useState<number | null>(null);
   const [history, setHistory] = useState<FlyHistory | null>(null);
@@ -112,15 +122,21 @@ export default function FlyLeaderboard() {
 
   const todaySeed = getTodaySeed();
   const isToday = viewingSeed === todaySeed;
+  const isSpeedrun = mode === "speedrun";
 
-  // Fetch leaderboard for the viewing seed
+  // Fetch leaderboard for the viewing seed + mode + period
   useEffect(() => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setLoading(true);
 
-    fetch(`/api/fly-scores?seed=${viewingSeed}`, { signal: ctrl.signal })
+    const params = new URLSearchParams();
+    if (period === "day") params.set("seed", viewingSeed);
+    params.set("period", period);
+    if (mode === "speedrun") params.set("mode", "speedrun");
+
+    fetch(`/api/fly-scores?${params}`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((data) => {
         if (!ctrl.signal.aborted) {
@@ -134,7 +150,7 @@ export default function FlyLeaderboard() {
       });
 
     return () => ctrl.abort();
-  }, [viewingSeed]);
+  }, [viewingSeed, mode, period]);
 
   // Load personal best + history on mount
   useEffect(() => {
@@ -182,51 +198,65 @@ export default function FlyLeaderboard() {
 
   return (
     <div className="mt-6">
-      {/* Day navigator */}
-      <div className="text-center">
-        <div className="flex items-center justify-center gap-3">
+      {/* Period selector */}
+      <div className="flex justify-center gap-6">
+        {([["day", "Today"], ["week", "This Week"], ["all", "All-Time"]] as const).map(([p, label]) => (
           <button
-            onClick={goPrev}
-            disabled={!canGoPrev}
-            className="px-2 py-1 text-sm transition-opacity disabled:opacity-20"
-            style={{ color: ACCENT }}
-            aria-label="Previous day"
+            key={p}
+            onClick={() => { setPeriod(p); if (p === "day") setViewingSeed(todaySeed); }}
+            className="pb-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors"
+            style={{
+              color: period === p ? ACCENT : "var(--color-muted)",
+              borderBottom: period === p ? `2px solid ${ACCENT}` : "2px solid transparent",
+            }}
           >
-            &#9664;
+            {label}
           </button>
-
-          <button
-            onClick={goToday}
-            className="text-sm text-cream hover:underline"
-            title="Go to today"
-          >
-            {formatSeedDate(viewingSeed)}
-            {isToday && (
-              <span
-                className="ml-2 text-[10px] font-bold"
-                style={{ color: ACCENT }}
-              >
-                [TODAY]
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={goNext}
-            disabled={!canGoNext}
-            className="px-2 py-1 text-sm transition-opacity disabled:opacity-20"
-            style={{ color: ACCENT }}
-            aria-label="Next day"
-          >
-            &#9654;
-          </button>
-        </div>
-        <p className="mt-2 text-[10px] text-muted normal-case">
-          {isToday
-            ? "Same course for all pilots today."
-            : "Challenge ended."}
-        </p>
+        ))}
       </div>
+
+      {/* Day navigator — only for daily period */}
+      {period === "day" && (
+        <div className="mt-3 text-center">
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={goPrev}
+              disabled={!canGoPrev}
+              className="px-2 py-1 text-sm transition-opacity disabled:opacity-20"
+              style={{ color: ACCENT }}
+              aria-label="Previous day"
+            >
+              &#9664;
+            </button>
+            <button
+              onClick={goToday}
+              className="text-sm text-cream hover:underline"
+              title="Go to today"
+            >
+              {formatSeedDate(viewingSeed)}
+              {isToday && (
+                <span className="ml-2 text-[10px] font-bold" style={{ color: ACCENT }}>
+                  [TODAY]
+                </span>
+              )}
+            </button>
+            <button
+              onClick={goNext}
+              disabled={!canGoNext}
+              className="px-2 py-1 text-sm transition-opacity disabled:opacity-20"
+              style={{ color: ACCENT }}
+              aria-label="Next day"
+            >
+              &#9654;
+            </button>
+          </div>
+          <p className="mt-1.5 text-[10px] text-muted normal-case">
+            {isToday
+              ? "Same course for all pilots today."
+              : "Challenge ended."}
+          </p>
+        </div>
+      )}
 
       {/* Stats bar */}
       {hasStats && (
@@ -269,11 +299,22 @@ export default function FlyLeaderboard() {
           }}
         >
           <p className="text-xs normal-case text-cream">
-            You scored{" "}
-            <span className="font-bold" style={{ color: ACCENT }}>
-              {userEntry.score} PX
-            </span>{" "}
-            · Rank{" "}
+            {isSpeedrun ? (
+              <>
+                Your time{" "}
+                <span className="font-bold" style={{ color: ACCENT }}>
+                  {formatTime(userEntry.flight_ms)}
+                </span>
+              </>
+            ) : (
+              <>
+                You scored{" "}
+                <span className="font-bold" style={{ color: ACCENT }}>
+                  {userEntry.score} PX
+                </span>
+              </>
+            )}
+            {" "}· Rank{" "}
             <span className="font-bold" style={{ color: ACCENT }}>
               #{userRank}
             </span>{" "}
@@ -289,8 +330,8 @@ export default function FlyLeaderboard() {
         </div>
       )}
 
-      {/* CTA — only show for today */}
-      {isToday && !userEntry && (
+      {/* CTA — only show for today's daily view */}
+      {period === "day" && isToday && !userEntry && (
         <Link
           href="/"
           className="btn-press mt-5 block border-[3px] px-5 py-4 text-center text-xs normal-case transition-colors"
@@ -309,9 +350,18 @@ export default function FlyLeaderboard() {
         <div className="flex items-center gap-4 border-b-[3px] border-border bg-bg-card px-5 py-3 text-xs text-muted">
           <span className="w-10 text-center">#</span>
           <span className="flex-1">Pilot</span>
-          <span className="hidden w-16 text-right sm:block">Time</span>
-          <span className="hidden w-20 text-right sm:block">Collected</span>
-          <span className="w-24 text-right">Score</span>
+          {isSpeedrun ? (
+            <>
+              <span className="hidden w-20 text-right sm:block">Score</span>
+              <span className="w-24 text-right">Time</span>
+            </>
+          ) : (
+            <>
+              <span className="hidden w-16 text-right sm:block">Time</span>
+              <span className="hidden w-20 text-right sm:block">Collected</span>
+              <span className="w-24 text-right">Score</span>
+            </>
+          )}
         </div>
 
         {/* Rows */}
@@ -366,20 +416,34 @@ export default function FlyLeaderboard() {
                   </div>
                 </div>
 
-                <span className="hidden w-16 text-right text-xs text-muted sm:block">
-                  {Math.floor(entry.flight_ms / 60000)}:{String(Math.floor((entry.flight_ms % 60000) / 1000)).padStart(2, "0")}
-                </span>
-
-                <span className="hidden w-20 text-right text-xs text-muted sm:block">
-                  {entry.collected}/40
-                </span>
-
-                <span
-                  className="w-24 text-right text-sm"
-                  style={{ color: ACCENT }}
-                >
-                  {entry.score} PX
-                </span>
+                {isSpeedrun ? (
+                  <>
+                    <span className="hidden w-20 text-right text-xs text-muted sm:block">
+                      {entry.score} PX
+                    </span>
+                    <span
+                      className="w-24 text-right text-sm"
+                      style={{ color: ACCENT }}
+                    >
+                      {formatTime(entry.flight_ms)}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="hidden w-16 text-right text-xs text-muted sm:block">
+                      {formatTime(entry.flight_ms)}
+                    </span>
+                    <span className="hidden w-20 text-right text-xs text-muted sm:block">
+                      {entry.collected}/40
+                    </span>
+                    <span
+                      className="w-24 text-right text-sm"
+                      style={{ color: ACCENT }}
+                    >
+                      {entry.score} PX
+                    </span>
+                  </>
+                )}
               </div>
             );
           })}
@@ -392,9 +456,21 @@ export default function FlyLeaderboard() {
 
         {!loading && leaderboard.length === 0 && (
           <div className="px-5 py-8 text-center text-xs text-muted normal-case">
-            {isToday
-              ? "No flights recorded today. Be the first pilot!"
-              : "No flights recorded."}
+            {isSpeedrun
+              ? period === "day"
+                ? isToday
+                  ? "No one collected all 40 coins yet. Be the first!"
+                  : "No 100% completions recorded."
+                : period === "week"
+                  ? "No 100% completions this week."
+                  : "No 100% completions recorded yet."
+              : period === "day"
+                ? isToday
+                  ? "No flights recorded today. Be the first pilot!"
+                  : "No flights recorded."
+                : period === "week"
+                  ? "No flights this week."
+                  : "No flights recorded yet."}
           </div>
         )}
       </div>

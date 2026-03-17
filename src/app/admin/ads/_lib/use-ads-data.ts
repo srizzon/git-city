@@ -101,9 +101,9 @@ export function useAdsData({ filters, onToast }: UseAdsDataOptions) {
     return result;
   }, [ads, filters]);
 
-  // Totals
+  // Totals (respect active filters)
   const totals = useMemo(() => {
-    const t = ads.reduce(
+    const t = filteredAndSorted.reduce(
       (acc, a) => ({
         impressions: acc.impressions + a.impressions,
         clicks: acc.clicks + a.clicks,
@@ -116,7 +116,7 @@ export function useAdsData({ filters, onToast }: UseAdsDataOptions) {
         ? (((t.clicks + t.cta_clicks) / t.impressions) * 100).toFixed(2) + "%"
         : "0%";
     return { ...t, ctr: totalCtr };
-  }, [ads]);
+  }, [filteredAndSorted]);
 
   const activeCount = useMemo(
     () => ads.filter((a) => getAdStatus(a) === "active").length,

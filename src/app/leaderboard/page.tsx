@@ -9,6 +9,7 @@ import LeaderboardUserPosition from "@/components/LeaderboardUserPosition";
 import LeaderboardYouVsNext from "@/components/LeaderboardYouVsNext";
 import FlyLeaderboard from "@/components/FlyLeaderboard";
 import DailiesLeaderboard from "@/components/DailiesLeaderboard";
+import DropsLeaderboard from "@/components/DropsLeaderboard";
 import { rankFromLevel, tierFromLevel } from "@/lib/xp";
 
 export const revalidate = 300; // ISR: regenerate every 5 min
@@ -36,15 +37,23 @@ interface Developer {
   xp_level?: number;
 }
 
-type TabId = "contributors" | "stars" | "architects" | "achievers" | "recruiters" | "xp";
+type DevTabId = "contributors" | "stars" | "architects" | "achievers" | "recruiters" | "xp";
+type GameTabId = "flight" | "speedrun" | "dailies" | "drops";
 
-const TABS: { id: TabId; label: string; metric: string }[] = [
-  { id: "contributors", label: "Contributors", metric: "contributions" },
-  { id: "stars", label: "Stars", metric: "total_stars" },
-  { id: "architects", label: "Architects", metric: "public_repos" },
-  { id: "achievers", label: "Achievers", metric: "achievements" },
-  { id: "recruiters", label: "Recruiters", metric: "referral_count" },
-  { id: "xp", label: "XP", metric: "xp_total" },
+const DEV_TABS: { id: DevTabId; label: string }[] = [
+  { id: "contributors", label: "Contributors" },
+  { id: "stars", label: "Stars" },
+  { id: "architects", label: "Architects" },
+  { id: "achievers", label: "Achievers" },
+  { id: "recruiters", label: "Recruiters" },
+  { id: "xp", label: "XP" },
+];
+
+const GAME_TABS: { id: GameTabId; label: string }[] = [
+  { id: "flight", label: "Flight" },
+  { id: "speedrun", label: "Speedrun" },
+  { id: "dailies", label: "Dailies" },
+  { id: "drops", label: "Drops" },
 ];
 
 const ACCENT = "#c8e64a";
@@ -63,24 +72,26 @@ export default async function LeaderboardPage({
 }) {
   const params = await searchParams;
   const mode = params.mode ?? "developers";
-  const activeTab = (params.tab ?? "contributors") as TabId;
+  const activeDevTab = (params.tab ?? "contributors") as DevTabId;
+  const activeGameTab = (params.tab ?? "flight") as GameTabId;
 
   const supabase = getSupabaseAdmin();
 
-  // Fetch devs sorted by the active metric
-  // Contributors uses rank (based on contributions_total) for consistency
-  const orderColumn = activeTab === "contributors" ? "rank"
-    : activeTab === "stars" ? "total_stars"
-    : activeTab === "architects" ? "public_repos"
-    : activeTab === "recruiters" ? "referral_count"
-    : activeTab === "xp" ? "xp_total"
-    : "contributions"; // achievers handled separately
-  const orderAscending = activeTab === "contributors"; // rank is ascending (1 = best)
+  // Fetch devs sorted by the active metric (only for dev mode)
+  const orderColumn = activeDevTab === "contributors" ? "rank"
+    : activeDevTab === "stars" ? "total_stars"
+    : activeDevTab === "architects" ? "public_repos"
+    : activeDevTab === "recruiters" ? "referral_count"
+    : activeDevTab === "xp" ? "xp_total"
+    : "contributions";
+  const orderAscending = activeDevTab === "contributors";
 
   let devs: Developer[] = [];
   let achieverCounts: Record<string, number> = {};
 
-  if (activeTab === "achievers") {
+  if (mode !== "developers") {
+    // Game mode — no server-side dev data needed
+  } else if (activeDevTab === "achievers") {
     // DB-side aggregation: get top 50 devs by achievement count
     const { data: topAchievers } = await supabase
       .rpc("top_achievers", { lim: 50 });
@@ -119,14 +130,14 @@ export default async function LeaderboardPage({
   }
 
   // Check if recruiters tab should be hidden (no referral data)
-  const hasRecruiters = activeTab === "recruiters"
+  const hasRecruiters = activeDevTab === "recruiters"
     ? devs.some((d) => (d.referral_count ?? 0) > 0)
     : true;
 
   const topLogins = devs.map((d) => d.github_login.toLowerCase());
 
   function getMetricValue(dev: Developer): string {
-    switch (activeTab) {
+    switch (activeDevTab) {
       case "contributors": return ((dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions).toLocaleString();
       case "stars": return dev.total_stars.toLocaleString();
       case "architects": return dev.public_repos.toLocaleString();
@@ -138,22 +149,22 @@ export default async function LeaderboardPage({
   }
 
   function getXpBadge(dev: Developer): { title: string; color: string } | null {
-    if (activeTab !== "xp" || !dev.xp_level) return null;
+    if (activeDevTab !== "xp" || !dev.xp_level) return null;
     const rank = rankFromLevel(dev.xp_level);
     const tier = tierFromLevel(dev.xp_level);
     return { title: `Lv${dev.xp_level} ${rank.title}`, color: tier.color };
   }
 
-  const metricLabel = activeTab === "contributors" ? "Contributions"
-    : activeTab === "stars" ? "Stars"
-    : activeTab === "architects" ? "Repos"
-    : activeTab === "achievers" ? "Achievements"
-    : activeTab === "xp" ? "XP"
+  const metricLabel = activeDevTab === "contributors" ? "Contributions"
+    : activeDevTab === "stars" ? "Stars"
+    : activeDevTab === "architects" ? "Repos"
+    : activeDevTab === "achievers" ? "Achievements"
+    : activeDevTab === "xp" ? "XP"
     : "Referrals";
 
   // A4: Raw metric values for "You vs. Next" component
   function getMetricValueRaw(dev: Developer): number {
-    switch (activeTab) {
+    switch (activeDevTab) {
       case "contributors": return (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions;
       case "stars": return dev.total_stars;
       case "architects": return dev.public_repos;
@@ -180,7 +191,7 @@ export default async function LeaderboardPage({
   return (
     <LeaderboardAuthProvider>
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
-      <LeaderboardTracker tab={activeTab} />
+      <LeaderboardTracker tab={mode === "developers" ? activeDevTab : activeGameTab} />
       <div className="mx-auto max-w-3xl px-4 py-10">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -215,7 +226,7 @@ export default async function LeaderboardPage({
               Developers
             </Link>
             <Link
-              href="/leaderboard?mode=game"
+              href="/leaderboard?mode=game&tab=flight"
               className="relative border-l-2 border-border px-5 py-2 text-[11px] transition-colors"
               style={{
                 color: mode === "game" ? ACCENT : "var(--color-muted)",
@@ -224,42 +235,74 @@ export default async function LeaderboardPage({
             >
               Game
             </Link>
-            <Link
-              href="/leaderboard?mode=dailies"
-              className="relative border-l-2 border-border px-5 py-2 text-[11px] transition-colors"
-              style={{
-                color: mode === "dailies" ? ACCENT : "var(--color-muted)",
-                backgroundColor: mode === "dailies" ? "rgba(200, 230, 74, 0.1)" : "transparent",
-              }}
-            >
-              Dailies
-            </Link>
           </div>
         </div>
 
-        {mode === "dailies" ? (
-          <Suspense
-            fallback={
-              <div className="mt-10 text-center text-xs text-muted normal-case">
-                Loading dailies leaderboard...
-              </div>
-            }
-          >
-            <DailiesLeaderboard />
-          </Suspense>
-        ) : mode === "developers" ? (
+        {mode === "game" ? (
           <>
-            {/* Tabs */}
+            {/* Game sub-tabs */}
             <div className="mt-6 flex flex-wrap justify-center gap-1">
-              {TABS.filter((t) => t.id !== "recruiters" || hasRecruiters).map((tab) => (
+              {GAME_TABS.map((tab) => (
+                <Link
+                  key={tab.id}
+                  href={`/leaderboard?mode=game&tab=${tab.id}`}
+                  className="border-2 px-3 py-1.5 text-[10px] transition-colors"
+                  style={{
+                    borderColor: activeGameTab === tab.id ? ACCENT : "var(--color-border)",
+                    color: activeGameTab === tab.id ? ACCENT : "var(--color-muted)",
+                    backgroundColor: activeGameTab === tab.id ? "rgba(200, 230, 74, 0.1)" : "transparent",
+                  }}
+                >
+                  {tab.label}
+                </Link>
+              ))}
+            </div>
+
+            {activeGameTab === "drops" ? (
+              <Suspense
+                fallback={
+                  <div className="mt-10 text-center text-xs text-muted normal-case">
+                    Loading drops leaderboard...
+                  </div>
+                }
+              >
+                <DropsLeaderboard />
+              </Suspense>
+            ) : activeGameTab === "dailies" ? (
+              <Suspense
+                fallback={
+                  <div className="mt-10 text-center text-xs text-muted normal-case">
+                    Loading dailies leaderboard...
+                  </div>
+                }
+              >
+                <DailiesLeaderboard />
+              </Suspense>
+            ) : (
+              <Suspense
+                fallback={
+                  <div className="mt-10 text-center text-xs text-muted normal-case">
+                    Loading flight scores...
+                  </div>
+                }
+              >
+                <FlyLeaderboard mode={activeGameTab === "speedrun" ? "speedrun" : "score"} />
+              </Suspense>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Developer sub-tabs */}
+            <div className="mt-6 flex flex-wrap justify-center gap-1">
+              {DEV_TABS.filter((t) => t.id !== "recruiters" || hasRecruiters).map((tab) => (
                 <Link
                   key={tab.id}
                   href={`/leaderboard?tab=${tab.id}`}
-                  className="px-3 py-1.5 text-[10px] transition-colors border-2"
+                  className="border-2 px-3 py-1.5 text-[10px] transition-colors"
                   style={{
-                    borderColor: activeTab === tab.id ? ACCENT : "var(--color-border)",
-                    color: activeTab === tab.id ? ACCENT : "var(--color-muted)",
-                    backgroundColor: activeTab === tab.id ? "rgba(200, 230, 74, 0.1)" : "transparent",
+                    borderColor: activeDevTab === tab.id ? ACCENT : "var(--color-border)",
+                    color: activeDevTab === tab.id ? ACCENT : "var(--color-muted)",
+                    backgroundColor: activeDevTab === tab.id ? "rgba(200, 230, 74, 0.1)" : "transparent",
                   }}
                 >
                   {tab.label}
@@ -276,7 +319,7 @@ export default async function LeaderboardPage({
               <div className="flex items-center gap-4 border-b-[3px] border-border bg-bg-card px-5 py-3 text-xs text-muted">
                 <span className="w-10 text-center">#</span>
                 <span className="flex-1">Developer</span>
-                <span className="hidden w-24 text-right sm:block">{activeTab === "xp" ? "Rank" : "Language"}</span>
+                <span className="hidden w-24 text-right sm:block">{activeDevTab === "xp" ? "Rank" : "Language"}</span>
                 <span className="w-28 text-right">{metricLabel}</span>
               </div>
 
@@ -328,7 +371,7 @@ export default async function LeaderboardPage({
                     </div>
 
                     <span className="hidden w-24 text-right text-xs text-muted sm:block">
-                      {activeTab === "xp"
+                      {activeDevTab === "xp"
                         ? (() => {
                             const badge = getXpBadge(dev);
                             return badge ? (
@@ -338,7 +381,7 @@ export default async function LeaderboardPage({
                         : (dev.primary_language ?? "\u2014")}
                     </span>
 
-                    <span className="w-28 text-right text-sm" style={{ color: activeTab === "xp" ? tierFromLevel(dev.xp_level ?? 1).color : ACCENT }}>
+                    <span className="w-28 text-right text-sm" style={{ color: activeDevTab === "xp" ? tierFromLevel(dev.xp_level ?? 1).color : ACCENT }}>
                       {getMetricValue(dev)}
                     </span>
                   </Link>
@@ -346,7 +389,7 @@ export default async function LeaderboardPage({
               })}
 
               {/* "YOU" row if not in top 50 — handled client-side */}
-              <LeaderboardUserPosition tab={activeTab} topLogins={topLogins} />
+              <LeaderboardUserPosition tab={activeDevTab} topLogins={topLogins} />
 
               {devs.length === 0 && (
                 <div className="px-5 py-8 text-center text-xs text-muted normal-case">
@@ -355,16 +398,6 @@ export default async function LeaderboardPage({
               )}
             </div>
           </>
-        ) : (
-          <Suspense
-            fallback={
-              <div className="mt-10 text-center text-xs text-muted normal-case">
-                Loading daily scores...
-              </div>
-            }
-          >
-            <FlyLeaderboard />
-          </Suspense>
         )}
 
         {/* Footer */}

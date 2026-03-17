@@ -31,3 +31,23 @@ export function getStatusOrder(status: AdStatus): number {
   const order: Record<AdStatus, number> = { active: 0, paused: 1, expired: 2 };
   return order[status];
 }
+
+export function fmtEndsIn(endsAt: string | null): string {
+  if (!endsAt) return "-";
+  const now = new Date();
+  const end = new Date(endsAt);
+  const diffMs = end.getTime() - now.getTime();
+  if (diffMs <= 0) {
+    const month = end.toLocaleDateString("en", { month: "short" });
+    return `${month} ${end.getDate()}`;
+  }
+  const days = Math.ceil(diffMs / 86400000);
+  if (days === 1) return "1d left";
+  if (days <= 30) return `${days}d left`;
+  return `${Math.round(days / 30)}mo left`;
+}
+
+export function fmtDateShort(d: string | null): string {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" });
+}

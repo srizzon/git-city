@@ -6,6 +6,15 @@ const VALID_EVENTS = new Set(["impression", "click", "cta_click"]);
 
 const BOT_UA_PATTERNS = /bot|crawler|spider|headless|phantomjs|selenium|puppeteer|wget|curl|python-requests|scrapy|slurp|mediapartners/i;
 
+const MOBILE_UA = /Mobile|Android|iPhone/i;
+const TABLET_UA = /iPad|Tablet/i;
+
+function parseDevice(ua: string): string {
+  if (TABLET_UA.test(ua)) return "tablet";
+  if (MOBILE_UA.test(ua)) return "mobile";
+  return "desktop";
+}
+
 const ALLOWED_ORIGINS = new Set([
   "https://thegitcity.com",
   "https://www.thegitcity.com",
@@ -88,7 +97,9 @@ export async function POST(request: NextRequest) {
   const ipHash = await hashIP(ip);
   const userAgent = request.headers.get("user-agent")?.slice(0, 256) ?? null;
   const login = typeof github_login === "string" ? github_login.slice(0, 39).toLowerCase() : null;
-  const country = request.headers.get("x-vercel-ip-country") ?? null;
+  const country = request.headers.get("x-vercel-ip-country") ?? request.headers.get("cf-ipcountry") ?? null;
+  const region = request.headers.get("x-vercel-ip-country-region") ?? null;
+  const device = ua ? parseDevice(ua) : null;
 
   const sb = getSupabaseAdmin();
 
@@ -112,7 +123,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const finalTypes = [...nonClickTypes, ...dedupedClickTypes];
+  // ── Impression dedup: same ip_hash + ad_id within 30 min = skip ──
+  const impressionTypes = nonClickTypes.filter((t) => t === "impression");
+  const otherTypes = nonClickTypes.filter((t) => t !== "impression");
+
+  let dedupedImpressionTypes = impressionTypes;
+  if (impressionTypes.length > 0) {
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { count } = await sb
+      .from("sky_ad_events")
+      .select("id", { count: "exact", head: true })
+      .eq("ad_id", ad_id)
+      .eq("ip_hash", ipHash)
+      .eq("event_type", "impression")
+      .gte("created_at", thirtyMinAgo);
+
+    if ((count ?? 0) > 0) {
+      dedupedImpressionTypes = [];
+    }
+  }
+
+  const finalTypes = [...otherTypes, ...dedupedImpressionTypes, ...dedupedClickTypes];
 
   if (finalTypes.length === 0) {
     // All events deduped, return 201 silently
@@ -126,6 +157,8 @@ export async function POST(request: NextRequest) {
     user_agent: userAgent,
     github_login: login,
     country,
+    region,
+    device,
   }));
 
   await sb.from("sky_ad_events").insert(rows);

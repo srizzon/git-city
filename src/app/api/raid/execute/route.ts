@@ -385,6 +385,20 @@ export async function POST(request: Request) {
     });
   }
 
-  // If RPC succeeded (future-proofing)
+  // If RPC succeeded — still need to run application-level side effects
+  // that aren't handled inside the database function.
+  touchLastActive(attacker.id);
+  trackDailyMission(attacker.id, "attempt_battle");
+  if (success) trackDailyMission(attacker.id, "win_battle");
+  sendRaidAlertNotification(
+    defender.id,
+    defender.github_login,
+    attacker.github_login,
+    raidRow?.raid_id ?? 0,
+    success,
+    attack.total,
+    defense.total,
+  );
+
   return NextResponse.json(raidRow);
 }

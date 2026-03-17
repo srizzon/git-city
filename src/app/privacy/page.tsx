@@ -85,7 +85,20 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section n={5} title="Data Retention">
+          <Section n={5} title="Sponsored Content & Advertising">
+            <p>
+              Git City features sponsored landmark buildings and sky advertisements
+              from third-party brands. We track aggregate impressions (when the
+              sponsored content is visible on screen) and clicks (when you interact
+              with it) to provide performance reports to sponsors. We do not share
+              any personally identifiable information with sponsors. All reports
+              contain only aggregate, anonymized data (total impressions, total
+              clicks, geographic breakdown by country). Outbound links to sponsor
+              websites include UTM parameters for their own analytics.
+            </p>
+          </Section>
+
+          <Section n={6} title="Data Retention">
             <p>
               Your data is stored as long as your account exists. If you want
               your data removed, contact us and we will delete your account and
@@ -93,7 +106,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section n={6} title="Your Rights">
+          <Section n={7} title="Your Rights">
             <p>You have the right to:</p>
             <ul className="mt-1 flex flex-col gap-1">
               <Li>Access the data we store about you</Li>
@@ -103,7 +116,7 @@ export default function PrivacyPage() {
             </ul>
           </Section>
 
-          <Section n={7} title="Security">
+          <Section n={8} title="Security">
             <p>
               We use industry-standard security measures including encrypted
               connections (HTTPS), Row-Level Security on our database, and secure
@@ -112,7 +125,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section n={8} title="Children">
+          <Section n={9} title="Children">
             <p>
               Git City is not intended for children under 13. We do not knowingly
               collect data from children under 13. If you believe a child has
@@ -120,7 +133,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section n={9} title="Changes">
+          <Section n={10} title="Changes">
             <p>
               We may update this policy at any time. Continued use of Git City
               after changes constitutes acceptance.

@@ -29,7 +29,8 @@ export type XpSourceType =
   | "kudos_received"
   | "referral"
   | "gift_sent"
-  | "github";
+  | "github"
+  | "survey";
 
 // ─── Constants ──────────────────────────────────────────────
 

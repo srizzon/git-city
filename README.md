@@ -75,13 +75,40 @@ copy .env.example .env.local
 # Windows (PowerShell)
 Copy-Item .env.example .env.local
 
-# Fill in Supabase and Stripe keys
+# Fill in your environment variables
 
 # Run the dev server
 npm run dev
 ```
 
 Open [http://localhost:3001](http://localhost:3001) to see the city.
+
+## Environment Setup
+
+After copying `.env.example` to `.env.local`, fill in these values:
+
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `GITHUB_TOKEN`
+- `ADMIN_GITHUB_LOGINS` if you want access to `/admin/ads`
+
+### Where to find the Supabase values
+
+Open your Supabase project dashboard, then go to `Project Settings -> API`.
+
+- `NEXT_PUBLIC_SUPABASE_URL`: your project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: the public anon key
+- `SUPABASE_SERVICE_ROLE_KEY`: the service role key for server-side admin access
+
+For local GitHub login to work, you also need to configure the GitHub OAuth provider in Supabase and add your local callback URL if required by your setup.
+
+### Where to find the GitHub token
+
+Open GitHub and go to `Settings -> Developer settings -> Personal access tokens`.
+
+- Fine-grained tokens are recommended if you only want to grant the minimum repository/profile access this app needs.
+- Classic tokens also work if that fits your setup better.
+
+Create a token, copy it once, and place it in `GITHUB_TOKEN` inside `.env.local`.
 
 ## License
 
