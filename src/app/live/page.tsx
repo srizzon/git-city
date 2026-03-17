@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { X } from "lucide-react";
 import type { LiveSession } from "@/lib/useCodingPresence";
 
 const CREATOR_LOGIN = "srizzon";
@@ -16,6 +17,10 @@ interface PresenceDev {
 export default function LivePage() {
   const [developers, setDevelopers] = useState<PresenceDev[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [loadingKey, setLoadingKey] = useState(false);
+  const [keyCopied, setKeyCopied] = useState(false);
 
   useEffect(() => {
     const fetchPresence = () => {
@@ -127,17 +132,116 @@ export default function LivePage() {
           <p className="mb-5 text-xs normal-case text-muted">
             Every dev who codes keeps a building lit. Install Pulse to power yours.
           </p>
-          <a
-            href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-press inline-block px-8 py-3 text-xs text-bg"
-            style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
-          >
-            Get Pulse for VS Code
-          </a>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-press inline-block px-8 py-3 text-xs text-bg"
+              style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
+            >
+              Get Pulse for VS Code
+            </a>
+            <button
+              onClick={() => setShowSetupModal(true)}
+              className="btn-press inline-block px-8 py-3 text-xs text-cream border-[2px] border-[#4ade80] bg-bg"
+              style={{ boxShadow: "2px 2px 0 0 #16a34a" }}
+            >
+              Get Pulse for Neovim
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* ─── Neovim Setup Modal ─── */}
+      {showSetupModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm p-4"
+          onClick={() => setShowSetupModal(false)}
+        >
+          <div 
+            className="w-full max-w-md border-[3px] border-border bg-bg p-6 sm:p-8 animate-[slide-up_0.2s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl text-cream">Neovim Setup</h2>
+              <button 
+                onClick={() => setShowSetupModal(false)}
+                className="text-muted hover:text-cream transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-6 text-sm text-muted normal-case">
+              <div>
+                <p className="mb-2"><span className="text-cream text-xs uppercase tracking-widest block mb-1">Step 1</span></p>
+                <p>Install the <a href="https://github.com/srizzon/git-city/tree/main/packages/neovim-plugin" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">gitcity.nvim</a> plugin using your preferred package manager.</p>
+              </div>
+
+              <div>
+                <p className="mb-2"><span className="text-cream text-xs uppercase tracking-widest block mb-1">Step 2</span></p>
+                {!apiKey ? (
+                  <>
+                    <p className="mb-3">Generate your universal Git City API key.</p>
+                    <button
+                      onClick={async () => {
+                        setLoadingKey(true);
+                        try {
+                          const res = await fetch("/api/neovim-key", { method: "POST" });
+                          const data = await res.json();
+                          if (data.key) {
+                            setApiKey(data.key);
+                            navigator.clipboard.writeText(data.key);
+                            setKeyCopied(true);
+                            setTimeout(() => setKeyCopied(false), 2000);
+                          }
+                        } finally {
+                          setLoadingKey(false);
+                        }
+                      }}
+                      disabled={loadingKey}
+                      className="btn-press w-full py-2.5 text-center text-xs text-bg"
+                      style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
+                    >
+                      {loadingKey ? "Generating..." : "Generate API Key"}
+                    </button>
+                  </>
+                ) : (
+                  <div>
+                    <p className="mb-2 text-cream font-bold">Your API Key</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 truncate bg-white/5 px-3 py-2 text-[11px] normal-case text-cream border border-border">
+                        {apiKey}
+                      </code>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(apiKey);
+                          setKeyCopied(true);
+                          setTimeout(() => setKeyCopied(false), 2000);
+                        }}
+                        className="btn-press shrink-0 border border-border px-4 py-2 text-[11px] text-cream transition-colors hover:border-border-light bg-bg"
+                        style={{ boxShadow: "2px 2px 0 0 var(--color-border)" }}
+                      >
+                        {keyCopied ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-2"><span className="text-cream text-xs uppercase tracking-widest block mb-1">Step 3</span></p>
+                <p>In Neovim, run <code>:GitCityLogin</code> and paste the key. Your building will light up in ~30 seconds.</p>
+              </div>
+            </div>
+            
+            <p className="mt-8 text-[10px] normal-case text-muted/50 text-center">
+              Only your username and language are shared publicly. Control what gets sent in your Neovim plugin settings.
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
