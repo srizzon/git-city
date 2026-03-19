@@ -17,6 +17,7 @@ import CompareChallenge from "@/components/CompareChallenge";
 import ProfileDistrict from "@/components/ProfileDistrict";
 import ReferralCTA from "@/components/ReferralCTA";
 import ProfileTracker from "@/components/ProfileTracker";
+import ProfileEvolutionTimeline, { type EvolutionPoint } from "@/components/ProfileEvolutionTimeline";
 
 export const revalidate = 3600; // ISR: regenerate every 1 hour
 
@@ -67,6 +68,45 @@ interface AchievementRow {
   tier: string;
 }
 
+function buildEvolutionPoints(dev: Record<string, unknown>): EvolutionPoint[] {
+  const totalContrib = Number((dev.contributions_total as number) ?? (dev.contributions as number) ?? 0);
+  const totalXp = Number((dev.xp_total as number) ?? 0);
+  const totalStars = Number((dev.total_stars as number) ?? 0);
+  const totalRepos = Number((dev.public_repos as number) ?? 0);
+
+  const startDate = new Date((dev.account_created_at as string) ?? (dev.created_at as string) ?? Date.now());
+  const startYear = Number.isFinite(startDate.getFullYear()) ? startDate.getFullYear() : new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
+
+  const yearAnchors = Array.isArray(dev.contribution_years) && dev.contribution_years.length > 0
+    ? (dev.contribution_years as number[]).sort((a, b) => a - b)
+    : [startYear, currentYear];
+
+  const stages = [
+    { id: "foundation", label: "Foundation", ratio: 0.08 },
+    { id: "momentum", label: "Momentum", ratio: 0.24 },
+    { id: "breakthrough", label: "Breakthrough", ratio: 0.5 },
+    { id: "city-impact", label: "City Impact", ratio: 0.78 },
+    { id: "today", label: "Today", ratio: 1 },
+  ];
+
+  return stages.map((stage, idx) => {
+    const anchorIndex = Math.min(yearAnchors.length - 1, Math.round((yearAnchors.length - 1) * stage.ratio));
+    const year = yearAnchors[anchorIndex] ?? currentYear;
+    const smoothRatio = Math.pow(stage.ratio, 0.85);
+    const isFinal = idx === stages.length - 1;
+    return {
+      id: stage.id,
+      label: stage.label,
+      subtitle: isFinal ? `${currentYear} snapshot` : `${year} season`,
+      contributions: isFinal ? totalContrib : Math.round(totalContrib * smoothRatio),
+      xp: isFinal ? totalXp : Math.round(totalXp * smoothRatio),
+      stars: isFinal ? totalStars : Math.round(totalStars * Math.pow(smoothRatio, 0.92)),
+      repos: isFinal ? totalRepos : Math.round(totalRepos * Math.pow(smoothRatio, 0.88)),
+    };
+  });
+}
+
 export default async function DevPage({ params }: Props) {
   const { username } = await params;
   const dev = await getDeveloper(username);
@@ -76,6 +116,7 @@ export default async function DevPage({ params }: Props) {
   const accent = "#c8e64a";
   const shadow = "#5a7a00";
   const ownedItems = await getOwnedItems(dev.id);
+  const evolutionPoints = buildEvolutionPoints(dev as unknown as Record<string, unknown>);
 
   // Fetch achievements with name+tier from DB (no hardcoded maps)
   const sb = getSupabaseAdmin();
@@ -330,6 +371,12 @@ export default async function DevPage({ params }: Props) {
             </div>
           ))}
         </div>
+
+        <ProfileEvolutionTimeline
+          accent={accent}
+          shadow={shadow}
+          points={evolutionPoints}
+        />
 
         {/* Achievements */}
         {achievements.length > 0 && (

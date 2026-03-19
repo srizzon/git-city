@@ -9,6 +9,8 @@ interface MiniMapProps {
   playerZ: number;
   visible: boolean;
   currentDistrict?: string | null;
+  hotspots?: { x: number; z: number; intensity: number }[];
+  pings?: { x: number; z: number; kind: "ally" | "threat" }[];
 }
 
 // 64px internal → 128px display = clean 2x pixel art
@@ -30,7 +32,15 @@ const DISTRICT_RGB: Record<string, [number, number, number]> = {
   creator: [187, 143, 6],
 };
 
-export default function MiniMap({ buildings, playerX, playerZ, visible, currentDistrict }: MiniMapProps) {
+export default function MiniMap({
+  buildings,
+  playerX,
+  playerZ,
+  visible,
+  currentDistrict,
+  hotspots = [],
+  pings = [],
+}: MiniMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Refs for high-frequency values so draw() doesn't re-create every frame.
@@ -43,6 +53,12 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
     playerZRef.current = playerZ;
     currentDistrictRef.current = currentDistrict;
   }, [playerX, playerZ, currentDistrict]);
+  const hotspotsRef = useRef(hotspots);
+  const pingsRef = useRef(pings);
+  useLayoutEffect(() => {
+    hotspotsRef.current = hotspots;
+    pingsRef.current = pings;
+  }, [hotspots, pings]);
 
   // Stable pixel buffer — allocated once, reused on every draw to avoid GC churn
   const bufRef = useRef<Uint8ClampedArray | null>(null);
@@ -131,6 +147,30 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
       buf[idx + 3] = 255;
     }
 
+    // Heatmap hotspots (live activity) - additive tint around hot zones
+    for (const hotspot of hotspotsRef.current) {
+      const [hx, hy] = w2p(hotspot.x, hotspot.z);
+      const radius = Math.max(2, Math.min(9, Math.round(2 + hotspot.intensity * 7)));
+      const base = Math.max(25, Math.min(120, Math.round(40 + hotspot.intensity * 80)));
+      for (let yy = -radius; yy <= radius; yy++) {
+        for (let xx = -radius; xx <= radius; xx++) {
+          const x = hx + xx;
+          const y = hy + yy;
+          if (x < 0 || x >= RES || y < 0 || y >= RES) continue;
+          const dist = Math.hypot(xx, yy);
+          if (dist > radius) continue;
+          const strength = 1 - dist / radius;
+          const i = (y * RES + x) * 4;
+          const addR = Math.round(base * strength * 0.25);
+          const addG = Math.round(base * strength * 0.55);
+          const addB = Math.round(base * strength);
+          buf[i] = Math.min(255, buf[i] + addR);
+          buf[i + 1] = Math.min(255, buf[i + 1] + addG);
+          buf[i + 2] = Math.min(255, buf[i + 2] + addB);
+        }
+      }
+    }
+
     // Player cross (white, 5px)
     const [ppx, ppy] = w2p(playerXRef.current, playerZRef.current);
     const set = (x: number, y: number) => {
@@ -148,6 +188,23 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
     }
 
     ctx.putImageData(new ImageData(new Uint8ClampedArray(buf.buffer as ArrayBuffer), RES, RES), 0, 0);
+
+    // Team/threat pings
+    const pulse = 0.55 + (Math.sin(Date.now() * 0.01) + 1) * 0.2;
+    for (const ping of pingsRef.current) {
+      const [px, py] = w2p(ping.x, ping.z);
+      if (px < -6 || px > RES + 6 || py < -6 || py > RES + 6) continue;
+      ctx.beginPath();
+      ctx.arc(px, py, ping.kind === "threat" ? 3.2 + pulse : 2.8 + pulse * 0.7, 0, Math.PI * 2);
+      ctx.strokeStyle = ping.kind === "threat" ? "rgba(255,95,95,0.95)" : "rgba(95,255,190,0.9)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = ping.kind === "threat" ? "#ff6666" : "#6affd0";
+      ctx.fill();
+    }
 
     // Off-map indicator
     const inBounds = ppx >= 0 && ppx < RES && ppy >= 0 && ppy < RES;
@@ -184,7 +241,7 @@ export default function MiniMap({ buildings, playerX, playerZ, visible, currentD
         ctx.fillText(`${(dist / 1000).toFixed(1)}km`, cx, RES - 4);
       }
     }
-  }, [bPixels, w2p]); // no longer deps on playerX, playerZ, currentDistrict
+  }, [bPixels, w2p]); // refs hold live values for player/hotspots/pings
 
   // Redraw when visibility or buildings change
   useEffect(() => { if (visible) draw(true); }, [visible, draw]);
