@@ -3,7 +3,7 @@
 import { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabase } from "@/lib/supabase";
-import type { PlayerState, ChatBubble, Direction, AvatarConfig } from "@/lib/arcade/types";
+import type { PlayerState, ChatBubble, ChatLogEntry, Direction, AvatarConfig } from "@/lib/arcade/types";
 import { startGameLoop } from "@/lib/arcade/engine/gameLoop";
 import { loadSpritesheet, updateSpriteAnimation, resetSprites } from "@/lib/arcade/engine/sprites";
 import { loadMap, resetMap, type GameMap } from "@/lib/arcade/engine/tileMap";
@@ -42,6 +42,7 @@ import type { ConnectionStatus } from "@/lib/arcade/network/client";
 
 const LERP_DURATION = 0.12;
 const BUBBLE_DURATION = 5;
+const CHAT_LOG_MAX = 30;
 const SPRITE_NAMES = ["Marcus", "Ginger", "Zuri", "Frost", "Kai", "Guard"];
 
 const ELEVATOR_NOTICES = [
@@ -118,6 +119,9 @@ export default function ArcadePage() {
   const [showMessage, setShowMessage] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState<{ title: string; body: string } | null>(null);
   const [playerCount, setPlayerCount] = useState(0);
+  const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
+  const [chatLogOpen, setChatLogOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(0);
 
   // Mobile
   const [isMobile, setIsMobile] = useState(false);
@@ -141,6 +145,8 @@ export default function ArcadePage() {
 
   const playersRef = useRef<Map<string, InterpolatedPlayer>>(new Map());
   const bubblesRef = useRef<ChatBubble[]>([]);
+  const chatLogRef = useRef<ChatLogEntry[]>([]);
+  const chatLogOpenRef = useRef(false);
   const sittingRef = useRef(false);
   const promptRef = useRef<InteractionPrompt | null>(null);
   const gameMessageRef = useRef<string | null>(null);
@@ -247,6 +253,18 @@ export default function ArcadePage() {
         bubblesRef.current = bubblesRef.current.filter((b) => b !== oldest);
       }
       bubblesRef.current.push({ id, text, timer: BUBBLE_DURATION });
+
+      // Add to chat log
+      const player = playersRef.current.get(id);
+      const username = player?.github_login ?? "???";
+      const entry: ChatLogEntry = { username, text, ts: Date.now() };
+      chatLogRef.current = [...chatLogRef.current.slice(-(CHAT_LOG_MAX - 1)), entry];
+      setChatLog(chatLogRef.current);
+      setChatUnread((n) => chatLogOpenRef.current ? 0 : n + 1);
+    },
+    onChatHistory(entries) {
+      chatLogRef.current = entries.slice(-CHAT_LOG_MAX);
+      setChatLog(chatLogRef.current);
     },
     onSit(id, x, y, dir) {
       const p = playersRef.current.get(id);
@@ -965,6 +983,63 @@ export default function ArcadePage() {
                       boxShadow: "inset 0 0 30px rgba(0,0,0,0.08)",
                     }}
                   />
+                )}
+
+                {/* Chat log overlay */}
+                {!loading && chatLog.length > 0 && !(isMobile && chatOpen) && (
+                  <div
+                    className="absolute z-[51]"
+                    style={isMobile
+                      ? { bottom: 8, left: 8, right: 8 }
+                      : { bottom: 8, left: 8, maxWidth: 280 }
+                    }
+                  >
+                    {chatLogOpen ? (
+                      <div
+                        className="rounded-lg overflow-hidden"
+                        style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+                      >
+                        {/* Header */}
+                        <button
+                          onClick={() => { setChatLogOpen(false); chatLogOpenRef.current = false; setChatUnread(0); }}
+                          className="cursor-pointer w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/5 transition-colors"
+                        >
+                          <span className="text-[10px] text-white/50 font-medium tracking-wide uppercase">Chat</span>
+                          <span className="text-[10px] text-white/30">▾</span>
+                        </button>
+                        {/* Messages */}
+                        <div
+                          className="overflow-y-auto px-3 pb-2 flex flex-col gap-0.5 scrollbar-thin"
+                          style={{ maxHeight: isMobile ? 120 : 160 }}
+                          ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}
+                        >
+                          {chatLog.map((entry, i) => (
+                            <div key={i} className="text-[11px] leading-[16px] break-words">
+                              <span className="text-[#7eb8ff] font-medium">{entry.username}</span>
+                              <span className="text-white/70"> {entry.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setChatLogOpen(true); chatLogOpenRef.current = true; setChatUnread(0); }}
+                        className="cursor-pointer flex items-center gap-1.5 rounded-md px-2.5 py-1 hover:bg-white/10 transition-colors"
+                        style={{ background: "rgba(0,0,0,0.5)" }}
+                      >
+                        <span className="text-[10px] text-white/50 font-medium tracking-wide uppercase">Chat</span>
+                        {chatUnread > 0 && (
+                          <span
+                            className="text-[9px] text-white font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1"
+                            style={{ background: "#e05050" }}
+                          >
+                            {chatUnread > 99 ? "99+" : chatUnread}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-white/30">▸</span>
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

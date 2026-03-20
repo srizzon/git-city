@@ -1,5 +1,5 @@
 import PartySocket from "partysocket";
-import type { ClientMsg, ServerMsg, PlayerState } from "../types";
+import type { ClientMsg, ServerMsg, PlayerState, ChatLogEntry } from "../types";
 
 export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "error";
 
@@ -9,6 +9,7 @@ export interface ArcadeCallbacks {
   onLeave: (id: string) => void;
   onMove: (id: string, x: number, y: number, dir: PlayerState["dir"]) => void;
   onChat: (id: string, text: string) => void;
+  onChatHistory: (entries: ChatLogEntry[]) => void;
   onSit: (id: string, x: number, y: number, dir: PlayerState["dir"]) => void;
   onStand: (id: string, x: number, y: number) => void;
   onAvatar: (id: string, spriteId: number) => void;
@@ -77,6 +78,9 @@ export function connect(token: string, callbacks: ArcadeCallbacks, spriteId?: nu
         break;
       case "chat":
         callbacks.onChat(msg.id, msg.text);
+        break;
+      case "chat_history":
+        callbacks.onChatHistory(msg.entries);
         break;
       case "sit":
         callbacks.onSit(msg.id, msg.x, msg.y, msg.dir);

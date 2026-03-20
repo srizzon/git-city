@@ -24,12 +24,19 @@ type ClientMsg =
   | { type: "stand" }
   | { type: "avatar"; sprite_id: number };
 
+interface ChatLogEntry {
+  username: string;
+  text: string;
+  ts: number;
+}
+
 type ServerMsg =
   | { type: "sync"; players: PlayerState[] }
   | { type: "join"; player: PlayerState }
   | { type: "leave"; id: string }
   | { type: "move"; id: string; x: number; y: number; dir: Direction }
   | { type: "chat"; id: string; text: string }
+  | { type: "chat_history"; entries: ChatLogEntry[] }
   | { type: "sit"; id: string; x: number; y: number; dir: Direction }
   | { type: "stand"; id: string; x: number; y: number }
   | { type: "avatar"; id: string; sprite_id: number };
@@ -74,6 +81,7 @@ const SPAM_MAX_DUPLICATES = 3; // max same message in window
 const MUTE_STRIKES_THRESHOLD = 5; // blocked messages before mute
 const MUTE_STRIKES_WINDOW_MS = 60_000; // 1min window for strikes
 const MUTE_DURATIONS_MS = [30_000, 120_000, 300_000]; // 30s, 2min, 5min (progressive)
+const CHAT_LOG_MAX = 30; // recent messages kept in memory for chat log
 
 // ─── Chat filter ─────────────────────────────────────────────
 // 1. Profanity — glin-profanity: EN + PT-BR, leetspeak, unicode homoglyphs, char repetition
@@ -152,6 +160,7 @@ export default class ArcadeServer implements Party.Server {
   readonly muteStates = new Map<string, MuteState>();
   readonly occupiedSeats = new Set<string>();
   readonly seatedAt = new Map<string, string>();
+  readonly chatLog: ChatLogEntry[] = [];
 
   constructor(readonly room: Party.Room) {}
 
@@ -281,6 +290,12 @@ export default class ArcadeServer implements Party.Server {
       players: [...this.players.values()],
     };
     conn.send(JSON.stringify(syncMsg));
+
+    // Send recent chat history
+    if (this.chatLog.length > 0) {
+      const historyMsg: ServerMsg = { type: "chat_history", entries: this.chatLog };
+      conn.send(JSON.stringify(historyMsg));
+    }
 
     // Broadcast join to everyone else
     const joinMsg: ServerMsg = { type: "join", player };
@@ -452,6 +467,10 @@ export default class ArcadeServer implements Party.Server {
 
       const chatMsg: ServerMsg = { type: "chat", id: userId, text: filtered };
       this.room.broadcast(JSON.stringify(chatMsg));
+
+      // Append to chat log buffer
+      this.chatLog.push({ username: player.github_login, text: filtered, ts: now });
+      if (this.chatLog.length > CHAT_LOG_MAX) this.chatLog.shift();
     }
   }
 

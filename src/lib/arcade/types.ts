@@ -24,6 +24,13 @@ export interface ChatBubble {
   timer: number; // seconds remaining
 }
 
+// ─── Chat log entry (persisted in server memory) ──────────────
+export interface ChatLogEntry {
+  username: string;
+  text: string;
+  ts: number; // timestamp (ms)
+}
+
 // ─── Protocol: Client → Server ────────────────────────────────
 export type ClientMsg =
   | { type: "move"; dir: Direction }
@@ -39,6 +46,7 @@ export type ServerMsg =
   | { type: "leave"; id: string }
   | { type: "move"; id: string; x: number; y: number; dir: Direction }
   | { type: "chat"; id: string; text: string }
+  | { type: "chat_history"; entries: ChatLogEntry[] }
   | { type: "sit"; id: string; x: number; y: number; dir: Direction }
   | { type: "stand"; id: string; x: number; y: number }
   | { type: "avatar"; id: string; sprite_id: number };
