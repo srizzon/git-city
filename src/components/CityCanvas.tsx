@@ -25,6 +25,8 @@ import CelebrationEffect from "./CelebrationEffect";
 import ComparePath from "./ComparePath";
 import WallpaperParallax from "./WallpaperParallax";
 import ThemeSkyFX from "./ThemeSkyFX";
+import SeasonSkyFX from "./SeasonSkyFX";
+import WeatherFX, { type WeatherMode } from "./WeatherFX";
 
 // ─── Theme Definitions ───────────────────────────────────────
 
@@ -2076,6 +2078,8 @@ interface Props {
   onExitFly: () => void;
   onCollect?: (score: number, earned: number, combo: number, collected: number, maxCombo: number) => void;
   themeIndex: number;
+  seasonIndex?: number;
+  weatherMode?: WeatherMode;
   onHud?: (speed: number, altitude: number, x: number, z: number, yaw: number) => void;
   onPause?: (paused: boolean) => void;
   focusedBuilding?: string | null;
@@ -2140,8 +2144,10 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, seasonIndex = 0, weatherMode = "clear", onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
+  const fogNear = weatherMode === "fog" ? t.fogNear * 0.55 : weatherMode === "storm" ? t.fogNear * 0.72 : t.fogNear;
+  const fogFar = weatherMode === "fog" ? t.fogFar * 0.58 : weatherMode === "storm" ? t.fogFar * 0.7 : t.fogFar;
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
   const [dpr, setDpr] = useState(1);
   const [bloomEnabled, setBloomEnabled] = useState(false);
@@ -2169,7 +2175,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         onIncline={() => { setDpr(1.25); setBloomEnabled(true); }}
         onDecline={() => { setDpr(0.75); setBloomEnabled(false); }}
       />
-      <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
+      <fog attach="fog" args={[t.fogColor, fogNear, fogFar]} key={`fog-${themeIndex}-${weatherMode}`} />
 
       <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
       <directionalLight position={t.sunPos} intensity={t.sunIntensity * 3.5} color={t.sunColor} />
@@ -2178,6 +2184,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
       <ThemeSkyFX key={`sky-fx-${themeIndex}`} themeIndex={themeIndex as 0 | 1 | 2 | 3} theme={t} />
+      <SeasonSkyFX seasonIndex={seasonIndex as 0 | 1 | 2 | 3} />
+      <WeatherFX mode={weatherMode} />
 
       {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => { })} />}
 

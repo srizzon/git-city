@@ -21,6 +21,9 @@ interface Props {
 // ─── Constants ────────────────────────────────────────────────
 
 const ATTACK_DURATION = 6;
+const SLOWMO_START = 4.45;
+const SLOWMO_END = 5.25;
+const SLOWMO_FACTOR = 0.32;
 const ORBIT_RADIUS = 55;
 const ORBIT_HEIGHT = 30;
 const ORBIT_SPEED = 0.8;
@@ -1000,11 +1003,22 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
         const topY = defenderTopPos.y;
         const topZ = defenderTopPos.z;
 
+        // Slow-mo finisher window around the climax for successful raids
+        const shouldSlowMo = !!raidData?.success && t >= SLOWMO_START;
+        const slowMoTime = shouldSlowMo
+          ? t <= SLOWMO_END
+            ? SLOWMO_START + (t - SLOWMO_START) * SLOWMO_FACTOR
+            : SLOWMO_START + (SLOWMO_END - SLOWMO_START) * SLOWMO_FACTOR + (t - SLOWMO_END)
+          : t;
+        const slowMoBlend = shouldSlowMo && t <= SLOWMO_END
+          ? Math.min(1, (t - SLOWMO_START) / (SLOWMO_END - SLOWMO_START))
+          : 0;
+
         // Vehicle position on orbit circle
-        const orbitAngle = orbitStartAngle - t * ORBIT_SPEED;
+        const orbitAngle = orbitStartAngle - slowMoTime * ORBIT_SPEED;
         const vehicleX = topX + Math.cos(orbitAngle) * ORBIT_RADIUS;
         const vehicleZ = topZ + Math.sin(orbitAngle) * ORBIT_RADIUS;
-        const vehicleY = topY + ORBIT_HEIGHT + Math.sin(t * 2) * 3;
+        const vehicleY = topY + ORBIT_HEIGHT + Math.sin(slowMoTime * 2) * 3;
 
         // Orbit tangent (direction of travel for counter-clockwise)
         const tangentX = Math.sin(orbitAngle);
@@ -1028,17 +1042,17 @@ export default function RaidSequence3D({ phase, attacker, defender, raidData, on
         }
 
         // ── Smooth continuous camera (no discrete act jumps) ──
-        const ap = t / ATTACK_DURATION; // 0 → 1
+        const ap = slowMoTime / ATTACK_DURATION; // 0 → 1
 
         // Camera orbit: offset behind vehicle, slowly sweeping
         const camOrbitOffset = Math.PI * 0.5;
         const camAngle = orbitAngle + camOrbitOffset + ap * Math.PI * 0.25;
 
         // Camera distance: wide enough to see over neighboring buildings
-        const camDist = ORBIT_RADIUS * 1.5;
+        const camDist = THREE.MathUtils.lerp(ORBIT_RADIUS * 1.5, ORBIT_RADIUS * 0.95, slowMoBlend);
 
         // Camera height: above building top to clear skyline, cinematic angle ~20-25°
-        const camY = topY + 30 + ap * 10;
+        const camY = topY + 30 + ap * 10 - slowMoBlend * 8;
 
         _camTarget.set(
           topX + Math.cos(camAngle) * camDist,

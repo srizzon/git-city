@@ -84,6 +84,21 @@ const THEMES = [
   { name: "Emerald", accent: "#f0c060", shadow: "#806020" },
 ];
 
+const SEASONS = [
+  { name: "Spring", icon: "BLOOM" },
+  { name: "Summer", icon: "SOL" },
+  { name: "Autumn", icon: "LEAF" },
+  { name: "Winter", icon: "FROST" },
+] as const;
+
+type WeatherMode = "clear" | "rain" | "fog" | "storm";
+const WEATHER_LABELS: Record<WeatherMode, string> = {
+  clear: "Clear Sky",
+  rain: "Rain Front",
+  fog: "Low Fog",
+  storm: "Storm Cell",
+};
+
 // Achievement display data for profile card (client-side, mirrors DB)
 const TIER_COLORS_MAP: Record<string, string> = {
   bronze: "#cd7f32", silver: "#c0c0c0", gold: "#ffd700", diamond: "#b9f2ff",
@@ -413,6 +428,10 @@ function HomeContent() {
   const [introPhase, setIntroPhase] = useState(-1); // -1 = not started, 0-3 = text phases, 4 = done
   const [exploreMode, setExploreMode] = useState(false);
   const [themeIndex, setThemeIndex] = useState(0);
+  const [seasonIndex, setSeasonIndex] = useState(0);
+  const [weatherMode, setWeatherMode] = useState<WeatherMode>("clear");
+  const [weatherBannerHot, setWeatherBannerHot] = useState(false);
+  const weatherBannerTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -420,6 +439,11 @@ function HomeContent() {
     if (saved !== null) {
       const n = parseInt(saved, 10);
       if (n >= 0 && n <= 3) setThemeIndex(n);
+    }
+    const savedSeason = localStorage.getItem("gitcity_season");
+    if (savedSeason !== null) {
+      const n = parseInt(savedSeason, 10);
+      if (n >= 0 && n <= 3) setSeasonIndex(n);
     }
   }, []);
 
@@ -803,6 +827,44 @@ function HomeContent() {
       return next;
     });
   }, [sessionUserId]);
+
+  const cycleSeason = useCallback(() => {
+    setSeasonIndex((i) => {
+      const next = (i + 1) % SEASONS.length;
+      localStorage.setItem("gitcity_season", String(next));
+      return next;
+    });
+  }, []);
+
+  // Dynamic weather events (rotates every 65s, season-weighted)
+  useEffect(() => {
+    const weatherBySeason: Record<number, WeatherMode[]> = {
+      0: ["clear", "rain", "clear", "fog"],        // spring
+      1: ["clear", "clear", "rain", "storm"],      // summer
+      2: ["fog", "clear", "rain", "storm"],        // autumn
+      3: ["fog", "fog", "clear", "storm"],         // winter
+    };
+
+    const pickNextWeather = () => {
+      const pool = weatherBySeason[seasonIndex] ?? weatherBySeason[0];
+      const next = pool[Math.floor(Math.random() * pool.length)] ?? "clear";
+      setWeatherMode((prev) => {
+        if (next !== prev) {
+          setWeatherBannerHot(true);
+          clearTimeout(weatherBannerTimerRef.current);
+          weatherBannerTimerRef.current = setTimeout(() => setWeatherBannerHot(false), 3000);
+        }
+        return next;
+      });
+    };
+
+    pickNextWeather();
+    const interval = setInterval(pickNextWeather, 65_000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(weatherBannerTimerRef.current);
+    };
+  }, [seasonIndex]);
 
   // Save ?ref= to localStorage (7-day expiry)
   useEffect(() => {
@@ -2003,6 +2065,53 @@ function HomeContent() {
     return Math.min(1.4, 1.2 + (codingCount - 15) * 0.02); // 25+->1.4 cap
   }, [codingCount]);
 
+  const minimapHotspots = useMemo(() => {
+    if (liveByLogin.size === 0 || buildings.length === 0) return [];
+    const byLogin = new Map(buildings.map((b) => [b.login.toLowerCase(), b] as const));
+    return Array.from(liveByLogin.values())
+      .map((session) => {
+        const b = byLogin.get(session.githubLogin.toLowerCase());
+        if (!b) return null;
+        return {
+          x: b.position[0],
+          z: b.position[2],
+          intensity: session.status === "active" ? 1 : 0.55,
+        };
+      })
+      .filter((v): v is { x: number; z: number; intensity: number } => v != null);
+  }, [liveByLogin, buildings]);
+
+  const minimapPings = useMemo(() => {
+    const byLogin = new Map(buildings.map((b) => [b.login.toLowerCase(), b] as const));
+    const ally = Array.from(liveByLogin.values())
+      .slice(0, 8)
+      .map((session) => {
+        const b = byLogin.get(session.githubLogin.toLowerCase());
+        if (!b) return null;
+        return { x: b.position[0], z: b.position[2], kind: "ally" as const };
+      })
+      .filter((v): v is { x: number; z: number; kind: "ally" } => v != null);
+
+    const threat: { x: number; z: number; kind: "threat" }[] = [];
+    if (raidState.phase !== "idle" && raidState.phase !== "preview") {
+      if (raidState.attackerBuilding) {
+        threat.push({
+          x: raidState.attackerBuilding.position[0],
+          z: raidState.attackerBuilding.position[2],
+          kind: "threat",
+        });
+      }
+      if (raidState.defenderBuilding) {
+        threat.push({
+          x: raidState.defenderBuilding.position[0],
+          z: raidState.defenderBuilding.position[2],
+          kind: "threat",
+        });
+      }
+    }
+    return [...ally, ...threat];
+  }, [liveByLogin, buildings, raidState.phase, raidState.attackerBuilding, raidState.defenderBuilding]);
+
   // ─── Milestone celebration system ──────────────────────────
   const forceCelebrate = searchParams.has("celebrate");
 
@@ -2224,6 +2333,8 @@ function HomeContent() {
         focusedBuilding={focusedBuilding}
         focusedBuildingB={focusedBuildingB}
         accentColor={theme.accent}
+        seasonIndex={seasonIndex}
+        weatherMode={weatherMode}
         onClearFocus={() => setFocusedBuilding(null)}
         flyPauseSignal={flyPauseSignal}
         isMobile={isMobile}
@@ -2773,6 +2884,8 @@ function HomeContent() {
         playerZ={playerPos.z}
         visible={flyMode && !isMobile}
         currentDistrict={lastDistrictRef.current}
+        hotspots={minimapHotspots}
+        pings={minimapPings}
       />
 
       {/* ─── Explore Mode: minimal UI ─── */}
@@ -2811,7 +2924,25 @@ function HomeContent() {
               <span className="text-cream">{theme.name}</span>
               <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
+            <button
+              onClick={cycleSeason}
+              className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+            >
+              <span style={{ color: theme.accent }}>{SEASONS[seasonIndex]?.icon ?? "SEASON"}</span>
+              <span className="text-cream">{SEASONS[seasonIndex]?.name ?? "Season"}</span>
+            </button>
             <div id="gc-radio-slot" />
+          </div>
+
+          {/* Weather status */}
+          <div className="pointer-events-none fixed bottom-22 left-3 z-31 sm:bottom-20 sm:left-4">
+            <div
+              className="border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[9px] backdrop-blur-sm transition-opacity duration-500"
+              style={{ opacity: weatherBannerHot ? 1 : 0.86 }}
+            >
+              <span className="text-muted">Weather</span>{" "}
+              <span style={{ color: theme.accent }}>{WEATHER_LABELS[weatherMode]}</span>
+            </div>
           </div>
 
           {/* Feed toggle (top-right, below GitHub badges on desktop) */}
