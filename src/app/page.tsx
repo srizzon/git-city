@@ -499,6 +499,7 @@ function HomeContent() {
   const [pillModalOpen, setPillModalOpen] = useState(false);
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
   const [eArcadeOpen, setEArcadeOpen] = useState(false);
+  const [arcadeOnline, setArcadeOnline] = useState<number>(0);
   const [activeSponsor, setActiveSponsor] = useState<string | null>(null);
   const [districtChooserOpen, setDistrictChooserOpen] = useState(false);
   const [rabbitCinematic, setRabbitCinematic] = useState(false);
@@ -546,7 +547,7 @@ function HomeContent() {
   const prevRaidPhaseRef = useRef<string>("idle");
   const lastSuccessfulRaidRef = useRef<{ defenderLogin: string; attackerLogin: string; tagStyle: string } | null>(null);
 
-  // Fetch GitHub star count + Discord member count
+  // Fetch GitHub star count + Discord member count + Arcade player count
   useEffect(() => {
     fetch("https://api.github.com/repos/srizzon/git-city")
       .then((r) => r.ok ? r.json() : null)
@@ -556,6 +557,14 @@ function HomeContent() {
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.approximate_member_count != null) setDiscordMembers(d.approximate_member_count); })
       .catch(() => { });
+    const pkHost = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
+    if (pkHost) {
+      const base = pkHost.startsWith("http") ? pkHost : `${pkHost.includes("localhost") ? "http" : "https"}://${pkHost}`;
+      fetch(`${base}/parties/main/lobby`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((d: { count?: number } | null) => { if (d?.count) setArcadeOnline(d.count); })
+        .catch(() => { });
+    }
   }, []);
 
   // Track successful raid data before state resets
@@ -3197,6 +3206,29 @@ function HomeContent() {
                 <span className="text-sm text-cream">Shop</span>
                 <span className="text-xs text-muted" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (session) {
+                    window.location.href = "/arcade";
+                  } else {
+                    trackEArcadeClicked();
+                    setEArcadeOpen(true);
+                  }
+                }}
+                className="flex w-full items-center justify-between px-5 py-4 active:bg-white/5"
+              >
+                <span className="flex items-center gap-2 text-sm text-cream">
+                  Lobby
+                  {arcadeOnline > 0 && (
+                    <span className="flex items-center gap-1 text-[10px] text-muted">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#4ade80] animate-pulse" />
+                      {arcadeOnline} online
+                    </span>
+                  )}
+                </span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </button>
               <Link
                 href="/live"
                 onClick={() => setMobileMenuOpen(false)}
@@ -3550,6 +3582,27 @@ function HomeContent() {
                   }}
                 >
                   Explore City
+                  <span className="block text-[8px] opacity-60 normal-case">Browse Buildings</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (session) {
+                      window.location.href = "/arcade";
+                    } else {
+                      trackEArcadeClicked();
+                      setEArcadeOpen(true);
+                    }
+                  }}
+                  className="btn-press px-7 py-3 text-xs sm:py-3.5 sm:text-sm text-bg"
+                  style={{
+                    backgroundColor: theme.accent,
+                    boxShadow: `4px 4px 0 0 ${theme.shadow}`,
+                  }}
+                >
+                  Lobby
+                  <span className="block text-[8px] opacity-60 normal-case">
+                    {arcadeOnline > 0 ? `${arcadeOnline} online` : "Meet other devs"}
+                  </span>
                 </button>
                 {(
                   <div className="relative">
@@ -3574,15 +3627,7 @@ function HomeContent() {
                         boxShadow: `4px 4px 0 0 ${theme.shadow}`,
                       }}
                     >
-                      <span className="relative">
-                        &#9992; Fly
-                        <span
-                          className="absolute -top-3 -right-8 animate-pulse rounded-sm px-1 py-px text-[7px] font-bold leading-none text-bg"
-                          style={{ backgroundColor: theme.accent }}
-                        >
-                          NEW
-                        </span>
-                      </span>
+                      Fly
                       <span className="block text-[8px] opacity-60 normal-case">Collect PX</span>
                     </button>
                     {/* Feature 2: First-Fly Tooltip */}
@@ -3771,6 +3816,28 @@ function HomeContent() {
               NEW
             </span>
           </Link>
+          <button
+            onClick={() => {
+              if (session) {
+                window.location.href = "/arcade";
+              } else {
+                trackEArcadeClicked();
+                setEArcadeOpen(true);
+              }
+            }}
+            className="btn-press relative border-2 border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
+            style={{ color: theme.accent }}
+          >
+            Lobby
+            {arcadeOnline > 0 && (
+              <span
+                className="absolute -top-1.5 -right-1.5 rounded-full px-1 py-px text-[7px] font-bold leading-none text-bg"
+                style={{ backgroundColor: theme.accent }}
+              >
+                {arcadeOnline}
+              </span>
+            )}
+          </button>
           <Link
             href="/leaderboard"
             className="btn-press border-2 border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"

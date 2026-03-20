@@ -28,8 +28,8 @@ export default function EArcadeCard({ onClose, onEnter, session, onSignIn }: EAr
   useEffect(() => {
     const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
     if (!host) return;
-    const protocol = host.includes("localhost") ? "http" : "https";
-    fetch(`${protocol}://${host}/parties/main/lobby`)
+    const base = host.startsWith("http") ? host : `${host.includes("localhost") ? "http" : "https"}://${host}`;
+    fetch(`${base}/parties/main/lobby`)
       .then((r) => r.json())
       .then((d: { count?: number }) => setOnlineCount(d.count ?? 0))
       .catch(() => {});

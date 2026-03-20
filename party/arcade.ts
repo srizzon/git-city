@@ -164,12 +164,16 @@ export default class ArcadeServer implements Party.Server {
 
   constructor(readonly room: Party.Room) {}
 
-  // Restore player state from storage after hibernation wake
+  // Restore player state + chat log from storage after hibernation wake
   async onStart() {
     const stored = await this.room.storage.list<PlayerState>({ prefix: "player:" });
     for (const [key, player] of stored) {
       const userId = key.slice("player:".length);
       this.players.set(userId, player);
+    }
+    const savedLog = await this.room.storage.get<ChatLogEntry[]>("chatLog");
+    if (savedLog) {
+      this.chatLog.push(...savedLog);
     }
     // Rebuild occupied seats from stored players
     // (seats are lost on hibernate but players sitting are still at seat coords)
@@ -468,9 +472,10 @@ export default class ArcadeServer implements Party.Server {
       const chatMsg: ServerMsg = { type: "chat", id: userId, text: filtered };
       this.room.broadcast(JSON.stringify(chatMsg));
 
-      // Append to chat log buffer
+      // Append to chat log buffer and persist for hibernation
       this.chatLog.push({ username: player.github_login, text: filtered, ts: now });
       if (this.chatLog.length > CHAT_LOG_MAX) this.chatLog.shift();
+      this.room.storage.put("chatLog", this.chatLog);
     }
   }
 
