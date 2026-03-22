@@ -197,7 +197,7 @@ const MAX_RISE_TOTAL = 4; // cap total stagger to 4s regardless of building coun
 // surviving component remounts caused by Next.js navigation.
 let hasPlayedRiseGlobal = false;
 
-export default memo(function InstancedBuildings({
+export const InstancedArchetypeGroup = memo(function InstancedArchetypeGroup({
   buildings,
   colors,
   atlasTexture,
@@ -211,7 +211,9 @@ export default memo(function InstancedBuildings({
   liveByLogin,
   cityEnergy = 1.0,
   dimAll,
-}: InstancedBuildingsProps) {
+  geometry,
+  isInitialMount,
+}: InstancedBuildingsProps & { geometry: THREE.BufferGeometry; isInitialMount: boolean }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = buildings.length;
 
@@ -224,8 +226,8 @@ export default memo(function InstancedBuildings({
     return map;
   }, [buildings]);
 
-  // Shared geometry (unit box)
-  const geo = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
+  // Shared geometry (passed down)
+  const geo = geometry;
 
   // Shader material (created once, uniforms updated reactively)
   const material = useMemo(() => {
@@ -246,7 +248,7 @@ export default memo(function InstancedBuildings({
       vertexShader,
       fragmentShader,
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update theme-dependent uniforms without recreating the material
@@ -363,7 +365,7 @@ export default memo(function InstancedBuildings({
     mesh.geometry.setAttribute("aTint", tintAttr);
     mesh.geometry.setAttribute("aLive", liveAttr);
 
-    if (hasPlayedRiseGlobal) {
+    if (!isInitialMount) {
       // Skip rise animation on return visits / subsequent updates
       // Show all buildings at full height immediately
       for (let i = 0; i < count; i++) riseData[i] = 1;
@@ -372,7 +374,6 @@ export default memo(function InstancedBuildings({
       risingRef.current = [];
     } else {
       // First mount this session: play the staggered rise animation
-      hasPlayedRiseGlobal = true;
       riseInitialized.current = false;
       risingRef.current = [];
     }
@@ -593,11 +594,11 @@ export default memo(function InstancedBuildings({
 
   // Cleanup
   useEffect(() => {
+    // Parent handles geo.dispose()
     return () => {
-      geo.dispose();
       material.dispose();
     };
-  }, [geo, material]);
+  }, [material]);
 
   if (count === 0) return null;
 
@@ -607,5 +608,61 @@ export default memo(function InstancedBuildings({
       args={[geo, material, count]}
       frustumCulled={false}
     />
+  );
+});
+
+export default memo(function InstancedBuildings(props: InstancedBuildingsProps) {
+  const { buildings } = props;
+
+  // Group buildings by silhouetteId
+  const groups = useMemo(() => {
+    const map = new Map<number, CityBuilding[]>();
+    for (const b of buildings) {
+      const sId = b.silhouetteId || 0;
+      if (!map.has(sId)) map.set(sId, []);
+      map.get(sId)!.push(b);
+    }
+    return Array.from(map.entries()).map(([id, bs]) => ({ id, buildings: bs }));
+  }, [buildings]);
+
+  // Geometries for archetypes
+  const geometries = useMemo(() => {
+    return {
+      0: new THREE.BoxGeometry(1, 1, 1),       // Default
+      1: new THREE.BoxGeometry(0.8, 1, 0.8),   // Frontend: Tower
+      2: new THREE.BoxGeometry(1.2, 1, 1.2),   // Backend: Monolith
+      3: new THREE.BoxGeometry(0.85, 1, 0.85), // Data & AI: Spire
+      4: new THREE.BoxGeometry(1.1, 1.1, 1.1), // GameDev: Arcade
+    };
+  }, []);
+
+  useEffect(() => {
+    const geos = geometries;
+    return () => {
+      Object.values(geos).forEach((g: any) => g.dispose());
+    };
+  }, [geometries]);
+
+  const isInitialMount = useMemo(() => {
+    const initial = !hasPlayedRiseGlobal;
+    hasPlayedRiseGlobal = true;
+    return initial;
+  }, []);
+
+  return (
+    <group>
+      {groups.map((group: { id: number; buildings: CityBuilding[] }) => {
+        const geo = geometries[group.id as keyof typeof geometries] || geometries[0];
+        return (
+          <InstancedArchetypeGroup
+            key={group.id}
+            {...props}
+            buildings={group.buildings}
+            geometry={geo}
+            isInitialMount={isInitialMount}
+          />
+        );
+      })}
+    </group>
   );
 });

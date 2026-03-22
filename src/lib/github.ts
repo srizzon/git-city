@@ -91,6 +91,7 @@ export interface CityBuilding {
   xp_level: number;
   district?: string;
   district_chosen?: boolean;
+  silhouetteId: number;
   position: [number, number, number];
   width: number;
   depth: number;
@@ -225,12 +226,12 @@ function calcHeightV2(
   const cnsScore = Math.pow(consistencyNorm, 0.6);
 
   const composite =
-    cScore  * 0.35 +
-    sScore  * 0.20 +
+    cScore * 0.35 +
+    sScore * 0.20 +
     prScore * 0.15 +
     extScore * 0.10 +
     cnsScore * 0.10 +
-    fScore  * 0.10;
+    fScore * 0.10;
 
   const height = Math.min(MAX_BUILDING_HEIGHT, MIN_BUILDING_HEIGHT + composite * HEIGHT_RANGE);
   return { height, composite };
@@ -367,6 +368,18 @@ const LANGUAGE_TO_DISTRICT: Record<string, string> = {
   HCL: 'devops', Shell: 'devops', Dockerfile: 'devops', Nix: 'devops',
   GDScript: 'gamedev', Lua: 'gamedev',
 };
+
+export const LANGUAGE_TO_ARCHETYPE: Record<string, number> = {
+  TypeScript: 1, JavaScript: 1, CSS: 1, HTML: 1, SCSS: 1, Vue: 1, Svelte: 1,
+  Java: 2, Go: 2, Rust: 2, 'C#': 2, PHP: 2, Ruby: 2, Elixir: 2, C: 2, 'C++': 2, Assembly: 2, Verilog: 2, VHDL: 2,
+  Python: 3, 'Jupyter Notebook': 3, R: 3, Julia: 3,
+  GDScript: 4, Lua: 4,
+};
+
+export function inferSilhouetteId(lang: string | null): number {
+  if (!lang) return 0;
+  return LANGUAGE_TO_ARCHETYPE[lang] ?? 0;
+}
 
 export function inferDistrict(lang: string | null): string {
   if (!lang) return 'fullstack';
@@ -545,6 +558,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
         xp_level: (dev as unknown as Record<string, unknown>).xp_level as number ?? 1,
         district: did,
         district_chosen: (dev as unknown as Record<string, unknown>).district_chosen as boolean ?? false,
+        silhouetteId: inferSilhouetteId(dev.primary_language),
         position: [posX, 0, posZ],
         width: w,
         depth: d,
