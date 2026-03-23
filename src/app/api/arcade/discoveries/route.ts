@@ -19,7 +19,9 @@ export async function GET() {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  return NextResponse.json({ commands: data?.commands ?? [] });
+  return NextResponse.json({ commands: data?.commands ?? [] }, {
+    headers: { "Cache-Control": "private, max-age=10" },
+  });
 }
 
 export async function POST(request: Request) {

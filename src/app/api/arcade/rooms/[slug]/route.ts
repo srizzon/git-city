@@ -30,7 +30,9 @@ export async function GET(
     // Not authenticated — skip visit tracking
   }
 
-  return NextResponse.json({ room: data });
+  return NextResponse.json({ room: data }, {
+    headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30" },
+  });
 }
 
 // POST /api/arcade/rooms/[slug] — invalidate PartyKit cache (admin only)

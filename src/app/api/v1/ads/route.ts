@@ -32,5 +32,7 @@ export async function GET(request: NextRequest) {
     .eq("advertiser_id", advertiserId)
     .order("created_at", { ascending: false });
 
-  return NextResponse.json({ ads: ads ?? [] });
+  return NextResponse.json({ ads: ads ?? [] }, {
+    headers: { "Cache-Control": "private, max-age=60" },
+  });
 }

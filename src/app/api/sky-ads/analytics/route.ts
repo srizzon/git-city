@@ -141,5 +141,7 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ads });
+  return NextResponse.json({ ads }, {
+    headers: { "Cache-Control": "private, max-age=30" },
+  });
 }

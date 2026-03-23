@@ -86,5 +86,7 @@ export async function GET(
     ctr,
     conv_rate,
     daily,
+  }, {
+    headers: { "Cache-Control": "private, max-age=60" },
   });
 }

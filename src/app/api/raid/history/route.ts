@@ -69,5 +69,7 @@ export async function GET(request: Request) {
     raids: allRaids,
     total: (totalAttacker.count ?? 0) + (totalDefender.count ?? 0),
     active_tag: activeTagRes.data ?? null,
+  }, {
+    headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" },
   });
 }

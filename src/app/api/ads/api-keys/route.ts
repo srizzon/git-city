@@ -16,7 +16,9 @@ export async function GET() {
     .eq("advertiser_id", advertiser.id)
     .order("created_at", { ascending: false });
 
-  return NextResponse.json({ keys: keys ?? [] });
+  return NextResponse.json({ keys: keys ?? [] }, {
+    headers: { "Cache-Control": "private, max-age=60" },
+  });
 }
 
 export async function POST(request: NextRequest) {

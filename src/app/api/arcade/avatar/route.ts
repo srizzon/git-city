@@ -19,7 +19,9 @@ export async function GET() {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  return NextResponse.json({ config: data?.config ?? null });
+  return NextResponse.json({ config: data?.config ?? null }, {
+    headers: { "Cache-Control": "private, max-age=30" },
+  });
 }
 
 export async function POST(request: Request) {

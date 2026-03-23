@@ -73,5 +73,7 @@ export async function GET(req: NextRequest) {
     limit,
     favorites,
     recentVisits,
+  }, {
+    headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30" },
   });
 }
