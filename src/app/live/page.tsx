@@ -18,12 +18,13 @@ export default function LivePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     const fetchPresence = () => {
       fetch("/api/presence")
         .then((r) => r.json())
         .then((data) => {
           if (data.developers) {
-            // Creator first, then alphabetical
             const sorted = [...data.developers].sort((a: PresenceDev, b: PresenceDev) => {
               if (a.githubLogin.toLowerCase() === CREATOR_LOGIN) return -1;
               if (b.githubLogin.toLowerCase() === CREATOR_LOGIN) return 1;
@@ -36,9 +37,33 @@ export default function LivePage() {
         .catch(() => setLoading(false));
     };
 
-    fetchPresence();
-    const interval = setInterval(fetchPresence, 15_000);
-    return () => clearInterval(interval);
+    function start() {
+      fetchPresence();
+      interval = setInterval(fetchPresence, 30_000);
+    }
+
+    function stop() {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    }
+
+    function onVisibilityChange() {
+      if (document.hidden) {
+        stop();
+      } else {
+        start();
+      }
+    }
+
+    start();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 
   return (

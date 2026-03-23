@@ -9,12 +9,12 @@ export function useLiveUsers() {
   const sessionId = useRef("");
 
   useEffect(() => {
-    // Generate a stable session ID per tab
     if (!sessionId.current) {
       sessionId.current = crypto.randomUUID();
     }
 
     let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
 
     async function heartbeat() {
       try {
@@ -33,12 +33,33 @@ export function useLiveUsers() {
       }
     }
 
-    heartbeat();
-    const interval = setInterval(heartbeat, HEARTBEAT_INTERVAL);
+    function start() {
+      heartbeat();
+      interval = setInterval(heartbeat, HEARTBEAT_INTERVAL);
+    }
+
+    function stop() {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    }
+
+    function onVisibilityChange() {
+      if (document.hidden) {
+        stop();
+      } else {
+        start();
+      }
+    }
+
+    start();
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
