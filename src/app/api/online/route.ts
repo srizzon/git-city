@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-// POST: client heartbeat — upsert + prune + count via Postgres RPC
+// POST: client heartbeat — lightweight upsert only
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const sessionId = typeof body?.sessionId === "string" ? body.sessionId : null;
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   }
 
   const sb = getSupabaseAdmin();
-  const { data: count, error } = await sb.rpc("heartbeat_visitor", {
+  const { error } = await sb.rpc("heartbeat_visitor", {
     p_session_id: sessionId,
   });
 
@@ -18,10 +18,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ count: count ?? 1 });
+  return NextResponse.json({ ok: true });
 }
 
-// GET: just return current count
+// GET: CDN-cached visitor count (shared across all users)
 export async function GET() {
   const sb = getSupabaseAdmin();
   const { count, error } = await sb
@@ -34,6 +34,10 @@ export async function GET() {
 
   return NextResponse.json(
     { count: count ?? 0 },
-    { headers: { "Cache-Control": "no-store" } },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=10, stale-while-revalidate=20",
+      },
+    },
   );
 }

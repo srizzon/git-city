@@ -41,9 +41,18 @@ export async function GET(request: NextRequest) {
     .lt("last_heartbeat_at", idleCutoff)
     .select("id");
 
+  // Prune stale site visitors (heartbeat window is 90s)
+  const visitorCutoff = new Date(now - 90_000).toISOString();
+  const { data: prunedVisitors } = await sb
+    .from("site_visitors")
+    .delete()
+    .lt("last_seen", visitorCutoff)
+    .select("session_id");
+
   return NextResponse.json({
     ok: true,
     offlined: offlinedRows?.length ?? 0,
     idled: idledRows?.length ?? 0,
+    pruned_visitors: prunedVisitors?.length ?? 0,
   });
 }
