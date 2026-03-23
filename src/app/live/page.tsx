@@ -37,7 +37,7 @@ export default function LivePage() {
     };
 
     fetchPresence();
-    const interval = setInterval(fetchPresence, 15_000);
+    const interval = setInterval(fetchPresence, 30_000);
     return () => clearInterval(interval);
   }, []);
 

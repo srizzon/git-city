@@ -47,7 +47,7 @@ export async function GET() {
     { count: developers.length, developers },
     {
       headers: {
-        "Cache-Control": "s-maxage=10, stale-while-revalidate=20",
+        "Cache-Control": "s-maxage=15, stale-while-revalidate=30",
       },
     },
   );
