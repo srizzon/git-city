@@ -20,6 +20,41 @@ function parseDevice(ua: string): string {
   return "desktop";
 }
 
+// In-memory dedup cache: skip Supabase query if we've seen this combo recently.
+// Key: `${ipHash}:${adId}:${eventType}`, Value: timestamp (ms)
+const recentEvents = new Map<string, number>();
+const DEDUP_CACHE_MAX = 10_000;
+const IMPRESSION_WINDOW_MS = 30 * 60 * 1000; // 30 min
+const CLICK_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+// Prune stale entries every 5 min
+if (typeof setInterval !== "undefined") {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, ts] of recentEvents) {
+      if (now - ts > CLICK_WINDOW_MS) recentEvents.delete(key);
+    }
+  }, 5 * 60 * 1000);
+}
+
+function isDedupedInMemory(ipHash: string, adId: string, eventType: string): boolean {
+  const key = `${ipHash}:${adId}:${eventType}`;
+  const ts = recentEvents.get(key);
+  if (!ts) return false;
+  const window = eventType === "impression" ? IMPRESSION_WINDOW_MS : CLICK_WINDOW_MS;
+  return Date.now() - ts < window;
+}
+
+function markSeen(ipHash: string, adId: string, eventType: string) {
+  const key = `${ipHash}:${adId}:${eventType}`;
+  recentEvents.set(key, Date.now());
+  // Evict oldest if too large
+  if (recentEvents.size > DEDUP_CACHE_MAX) {
+    const firstKey = recentEvents.keys().next().value;
+    if (firstKey) recentEvents.delete(firstKey);
+  }
+}
+
 const ALLOWED_ORIGINS = new Set([
   "https://thegitcity.com",
   "https://www.thegitcity.com",
@@ -114,17 +149,26 @@ export async function POST(request: NextRequest) {
 
   let dedupedClickTypes = clickTypes;
   if (clickTypes.length > 0) {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await sb
-      .from("sky_ad_events")
-      .select("id", { count: "exact", head: true })
-      .eq("ad_id", ad_id)
-      .eq("ip_hash", ipHash)
-      .in("event_type", clickTypes)
-      .gte("created_at", oneHourAgo);
+    // Check in-memory cache first
+    const allCachedClicks = clickTypes.every((t) => isDedupedInMemory(ipHash, ad_id, t));
+    if (allCachedClicks) {
+      dedupedClickTypes = [];
+    } else {
+      // Fall back to Supabase check
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { count } = await sb
+        .from("sky_ad_events")
+        .select("id", { count: "exact", head: true })
+        .eq("ad_id", ad_id)
+        .eq("ip_hash", ipHash)
+        .in("event_type", clickTypes)
+        .gte("created_at", oneHourAgo);
 
-    if ((count ?? 0) > 0) {
-      dedupedClickTypes = []; // already clicked recently, skip
+      if ((count ?? 0) > 0) {
+        dedupedClickTypes = [];
+        // Mark in cache so future checks skip Supabase
+        for (const t of clickTypes) markSeen(ipHash, ad_id, t);
+      }
     }
   }
 
@@ -134,17 +178,23 @@ export async function POST(request: NextRequest) {
 
   let dedupedImpressionTypes = impressionTypes;
   if (impressionTypes.length > 0) {
-    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-    const { count } = await sb
-      .from("sky_ad_events")
-      .select("id", { count: "exact", head: true })
-      .eq("ad_id", ad_id)
-      .eq("ip_hash", ipHash)
-      .eq("event_type", "impression")
-      .gte("created_at", thirtyMinAgo);
-
-    if ((count ?? 0) > 0) {
+    const allCachedImpressions = impressionTypes.every((t) => isDedupedInMemory(ipHash, ad_id, t));
+    if (allCachedImpressions) {
       dedupedImpressionTypes = [];
+    } else {
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const { count } = await sb
+        .from("sky_ad_events")
+        .select("id", { count: "exact", head: true })
+        .eq("ad_id", ad_id)
+        .eq("ip_hash", ipHash)
+        .eq("event_type", "impression")
+        .gte("created_at", thirtyMinAgo);
+
+      if ((count ?? 0) > 0) {
+        dedupedImpressionTypes = [];
+        for (const t of impressionTypes) markSeen(ipHash, ad_id, t);
+      }
     }
   }
 
@@ -172,6 +222,11 @@ export async function POST(request: NextRequest) {
   }));
 
   await sb.from("sky_ad_events").insert(rows);
+
+  // Mark inserted events in dedup cache
+  for (const row of rows) {
+    markSeen(ipHash, ad_id, row.event_type);
+  }
 
   return NextResponse.json({ ok: true, ...(clickId ? { click_id: clickId } : {}) }, { status: 201 });
 }
