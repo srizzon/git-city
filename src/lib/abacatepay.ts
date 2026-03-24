@@ -16,6 +16,7 @@ export async function createPixQrCodeRaw(opts: {
   amountCents: number;
   description: string;
   externalId: string;
+  extraMetadata?: Record<string, string>;
 }): Promise<{ brCode: string; brCodeBase64: string; pixId: string }> {
   if (!process.env.ABACATEPAY_API_KEY) {
     throw new Error("ABACATEPAY_API_KEY is not set");
@@ -31,7 +32,7 @@ export async function createPixQrCodeRaw(opts: {
       amount: opts.amountCents,
       expiresIn: 900,
       description: opts.description,
-      metadata: { externalId: opts.externalId },
+      metadata: { externalId: opts.externalId, ...opts.extraMetadata },
     }),
   });
 

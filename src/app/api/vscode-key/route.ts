@@ -44,7 +44,9 @@ export async function GET() {
     .eq("id", auth.devId)
     .single();
 
-  return NextResponse.json({ key: dev?.vscode_api_key ?? null });
+  return NextResponse.json({ key: dev?.vscode_api_key ?? null }, {
+    headers: { "Cache-Control": "private, max-age=300" },
+  });
 }
 
 export async function POST() {

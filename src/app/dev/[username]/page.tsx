@@ -7,13 +7,14 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getOwnedItems } from "@/lib/items";
 import { TIER_COLORS } from "@/lib/achievements";
-import { DISTRICT_NAMES, DISTRICT_COLORS } from "@/lib/github";
+import { inferDistrict } from "@/lib/github";
 import { ITEM_NAMES } from "@/lib/zones";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import ClaimButton from "@/components/ClaimButton";
 import DeleteAccountButton from "@/components/DeleteAccountButton";
 import ShareButtons from "@/components/ShareButtons";
 import CompareChallenge from "@/components/CompareChallenge";
+import ProfileDistrict from "@/components/ProfileDistrict";
 import ReferralCTA from "@/components/ReferralCTA";
 import ProfileTracker from "@/components/ProfileTracker";
 
@@ -189,19 +190,15 @@ export default async function DevPage({ params }: Props) {
 
               {/* District badge */}
               {dev.district && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span
-                    className="px-2 py-0.5 text-[10px] text-bg"
-                    style={{ backgroundColor: DISTRICT_COLORS[dev.district] ?? '#888' }}
-                  >
-                    {DISTRICT_NAMES[dev.district] ?? dev.district}
-                  </span>
-                  {dev.district_rank && (
-                    <span className="text-[10px] text-muted">
-                      {dev.district_rank === 1 ? 'Mayor' : `#${dev.district_rank}`} in {DISTRICT_NAMES[dev.district]}
-                    </span>
-                  )}
-                </div>
+                <ProfileDistrict
+                  district={dev.district}
+                  districtRank={dev.district_rank}
+                  inferredDistrict={inferDistrict(dev.primary_language)}
+                  isOwner={isOwner}
+                  districtChosen={dev.district_chosen ?? false}
+                  districtChangesCount={dev.district_changes_count ?? 0}
+                  districtChangedAt={dev.district_changed_at ?? null}
+                />
               )}
 
               {/* Claim */}

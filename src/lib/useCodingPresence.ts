@@ -70,7 +70,9 @@ export function useCodingPresence() {
       .subscribe();
 
     // Periodically re-fetch to stay in sync with server state
-    const pruneInterval = setInterval(() => {
+    const pruneRef = { current: null as ReturnType<typeof setInterval> | null };
+
+    function fetchPresenceData() {
       fetch("/api/presence")
         .then((r) => r.json())
         .then((data) => {
@@ -89,12 +91,36 @@ export function useCodingPresence() {
           }
         })
         .catch(() => {});
-    }, 30_000);
+    }
+
+    function startPruning() {
+      fetchPresenceData();
+      pruneRef.current = setInterval(fetchPresenceData, 30_000);
+    }
+
+    function stopPruning() {
+      if (pruneRef.current) {
+        clearInterval(pruneRef.current);
+        pruneRef.current = null;
+      }
+    }
+
+    function onVisibilityChange() {
+      if (document.hidden) {
+        stopPruning();
+      } else {
+        startPruning();
+      }
+    }
+
+    startPruning();
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       channel.unsubscribe();
       channelRef.current = null;
-      clearInterval(pruneInterval);
+      stopPruning();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [updateMap]);
 

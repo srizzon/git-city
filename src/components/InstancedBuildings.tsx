@@ -181,6 +181,7 @@ interface InstancedBuildingsProps {
   holdRise?: boolean;
   liveByLogin?: Map<string, unknown>;
   cityEnergy?: number;
+  dimAll?: boolean;
 }
 
 // Rise animation tracking
@@ -209,6 +210,7 @@ export default memo(function InstancedBuildings({
   holdRise,
   liveByLogin,
   cityEnergy = 1.0,
+  dimAll,
 }: InstancedBuildingsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = buildings.length;
@@ -409,9 +411,10 @@ export default memo(function InstancedBuildings({
     if (!material.uniforms) return;
     const idA = focusedBuilding ? loginToIdx.get(focusedBuilding.toLowerCase()) : undefined;
     const idB = focusedBuildingB ? loginToIdx.get(focusedBuildingB.toLowerCase()) : undefined;
-    material.uniforms.uFocusedId.value = idA !== undefined ? idA : -1.0;
+    // dimAll: set focusedId to a value that matches no building, but hasFocus=true so all dim
+    material.uniforms.uFocusedId.value = dimAll ? 999999.0 : (idA !== undefined ? idA : -1.0);
     material.uniforms.uFocusedIdB.value = idB !== undefined ? idB : -1.0;
-  }, [focusedBuilding, focusedBuildingB, loginToIdx, material]);
+  }, [focusedBuilding, focusedBuildingB, dimAll, loginToIdx, material]);
 
   // Update live presence glow
   useEffect(() => {
@@ -535,7 +538,7 @@ export default memo(function InstancedBuildings({
     const onPointerDown = (e: PointerEvent) => {
       if (introRef.current) return;
       if (wasAdPointerConsumed()) return;
-      if ((window as any).__spireClicked) return;
+      if ((window as any).__spireClicked || (window as any).__arcadeClicked || (window as any).__sponsorClicked) return;
       const id = raycastInstance(e.clientX, e.clientY);
       if (id !== null && id < buildingsRef.current.length) {
         tapRef.current = { time: performance.now(), id, x: e.clientX, y: e.clientY };

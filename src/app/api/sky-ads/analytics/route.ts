@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-
-const OWNER_LOGIN = "srizzon";
+import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
 
 // Historical baselines from Himetrica (tracking was lost in Supabase due to www origin bug).
 // These get added on top of live Supabase counts. Remove once Supabase data catches up.
@@ -21,12 +20,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
-  const login = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-  if (login !== OWNER_LOGIN) {
+  const login = getGithubLoginFromUser(user);
+  if (!isAdminGithubLogin(login)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -38,19 +33,19 @@ export async function GET(request: Request) {
   try { await admin.rpc("refresh_sky_ad_stats"); } catch {}
 
   // Build date filter
-  let dayFilter: string | null = null;
+  let since: string | null = null;
   if (period === "7d") {
-    dayFilter = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+    since = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
   } else if (period === "30d") {
-    dayFilter = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
+    since = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
   }
 
-  // Query aggregated stats
-  let query = admin.from("sky_ad_daily_stats").select("ad_id, day, impressions, clicks, cta_clicks");
-  if (dayFilter) {
-    query = query.gte("day", dayFilter);
-  }
-  const { data: stats, error } = await query;
+  // Aggregate in Postgres via RPC (no row limit issues)
+  const { data: stats, error } = await admin.rpc("get_ad_stats", {
+    p_since: since,
+    p_until: null,
+    p_ad_ids: null,
+  });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -60,27 +55,58 @@ export async function GET(request: Request) {
   const { data: allAds } = await admin.from("sky_ads").select("id, brand, text, description, color, bg_color, link, active, vehicle, priority, plan_id, starts_at, ends_at, purchaser_email, tracking_token, created_at");
   const adMap = new Map((allAds ?? []).map((a) => [a.id, a]));
 
-  // Aggregate by ad_id (live Supabase data + historical baselines)
+  // Build aggregated map from RPC results + historical baselines
   const aggregated = new Map<string, { impressions: number; clicks: number; cta_clicks: number }>();
   for (const row of stats ?? []) {
-    const cur = aggregated.get(row.ad_id) ?? { impressions: 0, clicks: 0, cta_clicks: 0 };
-    cur.impressions += Number(row.impressions);
-    cur.clicks += Number(row.clicks);
-    cur.cta_clicks += Number(row.cta_clicks);
-    aggregated.set(row.ad_id, cur);
+    aggregated.set(row.ad_id, {
+      impressions: Number(row.impressions),
+      clicks: Number(row.clicks),
+      cta_clicks: Number(row.cta_clicks),
+    });
   }
-  // Merge historical baselines
-  for (const [adId, baseline] of Object.entries(HISTORICAL_BASELINES)) {
-    const cur = aggregated.get(adId) ?? { impressions: 0, clicks: 0, cta_clicks: 0 };
-    cur.impressions += baseline.impressions;
-    cur.clicks += baseline.clicks;
-    cur.cta_clicks += baseline.cta_clicks;
-    aggregated.set(adId, cur);
+
+  // Merge historical baselines (only for "all" period since these predate Supabase tracking)
+  if (period === "all") {
+    for (const [adId, baseline] of Object.entries(HISTORICAL_BASELINES)) {
+      const cur = aggregated.get(adId) ?? { impressions: 0, clicks: 0, cta_clicks: 0 };
+      cur.impressions += baseline.impressions;
+      cur.clicks += baseline.clicks;
+      cur.cta_clicks += baseline.cta_clicks;
+      aggregated.set(adId, cur);
+    }
+  }
+
+  // Fetch last 7 days of daily stats for spark charts
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+  const { data: dailyStats } = await admin.rpc("get_ad_daily_stats", {
+    p_since: sevenDaysAgo,
+    p_until: null,
+    p_ad_ids: null,
+  });
+
+  // Build daily map: ad_id -> { day -> impressions }
+  const dailyByAd = new Map<string, Map<string, number>>();
+  for (const row of dailyStats ?? []) {
+    let dayMap = dailyByAd.get(row.ad_id);
+    if (!dayMap) {
+      dayMap = new Map();
+      dailyByAd.set(row.ad_id, dayMap);
+    }
+    dayMap.set(row.day, (dayMap.get(row.day) ?? 0) + Number(row.impressions));
+  }
+
+  // Generate ordered array of last 7 days
+  const last7Days: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    last7Days.push(new Date(Date.now() - i * 86400000).toISOString().split("T")[0]);
   }
 
   function buildAdEntry(id: string, s: { impressions: number; clicks: number; cta_clicks: number }) {
     const ad = adMap.get(id);
     const totalClicks = s.clicks + s.cta_clicks;
+    const dayMap = dailyByAd.get(id);
+    const daily = last7Days.map((d) => dayMap?.get(d) ?? 0);
+
     return {
       id,
       brand: ad?.brand ?? id,
@@ -102,6 +128,7 @@ export async function GET(request: Request) {
       clicks: s.clicks,
       cta_clicks: s.cta_clicks,
       ctr: s.impressions > 0 ? ((totalClicks / s.impressions) * 100).toFixed(2) + "%" : "0%",
+      daily,
     };
   }
 
@@ -114,5 +141,7 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ads });
+  return NextResponse.json({ ads }, {
+    headers: { "Cache-Control": "private, max-age=30" },
+  });
 }

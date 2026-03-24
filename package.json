@@ -36,10 +36,12 @@
     "@types/three": "^0.183.0",
     "@vercel/analytics": "^1.6.1",
     "@vercel/speed-insights": "^1.3.1",
-    "dotenv": "^17.3.1",
+    "glin-profanity": "^3.3.0",
     "howler": "^2.2.4",
     "lucide-react": "^0.577.0",
-    "next": "16.1.6",
+    "next": "16.2.0",
+    "partykit": "^0.0.115",
+    "partysocket": "^1.1.16",
     "postprocessing": "^6.38.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -49,6 +51,7 @@
     "three": "^0.183.0"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "^0.1.97",
     "@tailwindcss/postcss": "^4",
     "@types/howler": "^2.2.12",
     "@types/node": "^20",

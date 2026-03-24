@@ -56,8 +56,11 @@ export async function POST(request: Request) {
 
         if (ad && !ad.active) {
           const now = new Date();
-          // PIX ads are one-time, default to 30 days
-          const endsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          // Use period from metadata if available, default to 30 days
+          const periodMeta = body.data?.metadata?.period;
+          const PERIOD_DAYS: Record<string, number> = { "1w": 7, "7d": 7, "14d": 14, "1m": 30 };
+          const days = (periodMeta && PERIOD_DAYS[periodMeta]) || 30;
+          const endsAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
           await sb
             .from("sky_ads")

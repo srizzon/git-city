@@ -18,6 +18,8 @@ import {
   type DistrictZone,
   type DeveloperRecord,
 } from "@/lib/github";
+import { SPONSORS, gridToWorldPos } from "@/lib/sponsors/registry";
+import { getLandmarkAdId } from "@/lib/sponsors/landmarkAdIds";
 import Image from "next/image";
 import Link from "next/link";
 import ActivityTicker, { type FeedEvent } from "@/components/ActivityTicker";
@@ -26,13 +28,14 @@ import { useStreakCheckin } from "@/lib/useStreakCheckin";
 import { useLiveUsers } from "@/lib/useLiveUsers";
 import { useCodingPresence } from "@/lib/useCodingPresence";
 import { useRaidSequence } from "@/lib/useRaidSequence";
+import { isFridayThe13th } from "@/lib/raid";
 import { useDailies } from "@/lib/useDailies";
 import InviteCard, { type InvitePreview } from "@/components/InviteCard";
 import XpBar from "@/components/XpBar";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
-import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, isBuildingAd } from "@/lib/skyAds";
+import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
 import {
   identifyUser,
@@ -50,6 +53,8 @@ import {
   trackSignInPromptShown,
   trackSignInPromptClicked,
   trackDisabledButtonClicked,
+  trackEArcadeClicked,
+  trackLandmarkClicked,
 } from "@/lib/himetrica";
 
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
@@ -62,6 +67,8 @@ const RaidPreviewModal = dynamic(() => import("@/components/RaidPreviewModal"), 
 const RaidOverlay = dynamic(() => import("@/components/RaidOverlay"), { ssr: false });
 const PillModal = dynamic(() => import("@/components/PillModal"), { ssr: false });
 const FounderMessage = dynamic(() => import("@/components/FounderMessage"), { ssr: false });
+const EArcadeCard = dynamic(() => import("@/components/EArcadeCard"), { ssr: false });
+const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ssr: false });
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
 const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
 const LevelUpToast = dynamic(() => import("@/components/LevelUpToast"), { ssr: false });
@@ -430,11 +437,15 @@ function HomeContent() {
   const announceCooldownRef = useRef(0);
   const [flyPaused, setFlyPaused] = useState(false);
   const [flyPauseSignal, setFlyPauseSignal] = useState(0);
+  const [flyJoystickState, setFlyJoystickState] = useState<{ baseX: number; baseY: number; dx: number; dy: number } | null>(null);
+  const [flyBoostActive, setFlyBoostActive] = useState(false);
+  const [flyBrakeActive, setFlyBrakeActive] = useState(false);
   const [flyScore, setFlyScore] = useState({ score: 0, earned: 0, combo: 0, collected: 0, maxCombo: 1 });
   const [flyPersonalBest, setFlyPersonalBest] = useState(0);
   const flyStartTime = useRef(0);
   const flyPausedAt = useRef(0);
   const flyTotalPauseMs = useRef(0);
+  const exitFlyRef = useRef<(() => void) | null>(null);
   const [flyElapsedSec, setFlyElapsedSec] = useState(0);
   const [stats, setStats] = useState<CityStats>({ total_developers: 0, total_contributions: 0 });
   const [milestoneCelebrations, setMilestoneCelebrations] = useState<{ milestone: number; reached_at: string }[]>([]);
@@ -464,6 +475,19 @@ function HomeContent() {
   const [kudosSending, setKudosSending] = useState(false);
   const [kudosSent, setKudosSent] = useState(false);
   const [kudosError, setKudosError] = useState<string | null>(null);
+  const [dropPulling, setDropPulling] = useState(false);
+  const [myDropPulls, setMyDropPulls] = useState<Record<string, { points: number }>>({});
+  const myDropPullsLoaded = useRef(false);
+  const [dropHint, setDropHint] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [dropPlantOpen, setDropPlantOpen] = useState(false);
+  const [dropPlantRarity, setDropPlantRarity] = useState("common");
+  const [dropPlantDuration, setDropPlantDuration] = useState(24);
+  const [dropPlantMaxPulls, setDropPlantMaxPulls] = useState(50);
+  const [dropPlantItem, setDropPlantItem] = useState("");
+  const [dropPlantItems, setDropPlantItems] = useState<{ id: string; name: string; category: string }[]>([]);
+  const [dropPlanting, setDropPlanting] = useState(false);
+  const [dropPlantResult, setDropPlantResult] = useState<string | null>(null);
   const visitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [compareBuilding, setCompareBuilding] = useState<CityBuilding | null>(null);
   const [comparePair, setComparePair] = useState<[CityBuilding, CityBuilding] | null>(null);
@@ -479,6 +503,9 @@ function HomeContent() {
   const [discordMembers, setDiscordMembers] = useState<number | null>(null);
   const [pillModalOpen, setPillModalOpen] = useState(false);
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
+  const [eArcadeOpen, setEArcadeOpen] = useState(false);
+  const [arcadeOnline, setArcadeOnline] = useState<number>(0);
+  const [activeSponsor, setActiveSponsor] = useState<string | null>(null);
   const [districtChooserOpen, setDistrictChooserOpen] = useState(false);
   const [rabbitCinematic, setRabbitCinematic] = useState(false);
   const [rabbitCinematicPhase, setRabbitCinematicPhase] = useState(-1);
@@ -525,7 +552,7 @@ function HomeContent() {
   const prevRaidPhaseRef = useRef<string>("idle");
   const lastSuccessfulRaidRef = useRef<{ defenderLogin: string; attackerLogin: string; tagStyle: string } | null>(null);
 
-  // Fetch GitHub star count + Discord member count
+  // Fetch GitHub star count + Discord member count + Arcade player count
   useEffect(() => {
     fetch("https://api.github.com/repos/srizzon/git-city")
       .then((r) => r.ok ? r.json() : null)
@@ -535,6 +562,14 @@ function HomeContent() {
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.approximate_member_count != null) setDiscordMembers(d.approximate_member_count); })
       .catch(() => { });
+    const pkHost = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
+    if (pkHost) {
+      const base = pkHost.startsWith("http") ? pkHost : `${pkHost.includes("localhost") ? "http" : "https"}://${pkHost}`;
+      fetch(`${base}/parties/lobby/main`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((d: { count?: number } | null) => { if (d?.count) setArcadeOnline(d.count); })
+        .catch(() => { });
+    }
   }, []);
 
   // Track successful raid data before state resets
@@ -597,11 +632,12 @@ function HomeContent() {
       raidMode: raidState.phase !== "idle" && raidState.phase !== "preview",
       accent: theme.accent,
       shadow: theme.shadow,
+      hidden: flyMode && isMobile,
     };
     // Store for late-mounting components (e.g. portal)
     (window as unknown as Record<string, unknown>).__gcRadioMode = detail;
     window.dispatchEvent(new CustomEvent("gc:radio-mode", { detail }));
-  }, [flyMode, raidState.phase, theme.accent, theme.shadow]);
+  }, [flyMode, raidState.phase, theme.accent, theme.shadow, isMobile]);
 
   // Detect mobile/touch device
   useEffect(() => {
@@ -645,6 +681,72 @@ function HomeContent() {
       .then(d => { if (d.key) setVsCodeKey(d.key); })
       .catch(() => { });
   }, [session]);
+
+  // Fetch user's drop pulls from DB (source of truth, survives refresh/device changes)
+  useEffect(() => {
+    if (!session || buildings.length === 0 || myDropPullsLoaded.current) return;
+    const hasDrops = buildings.some((b) => b.active_drop);
+    if (!hasDrops) return;
+    myDropPullsLoaded.current = true;
+
+    let cancelled = false;
+    fetch("/api/drops/my-pulls")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.pulls) return;
+        const pullMap: Record<string, { points: number }> = {};
+        for (const [dropId, info] of Object.entries(data.pulls as Record<string, { points: number; pull_count: number }>)) {
+          pullMap[dropId] = { points: info.points };
+        }
+        if (Object.keys(pullMap).length > 0) {
+          setMyDropPulls(pullMap);
+        }
+        // Patch stale pull_count on buildings with fresh DB values
+        setBuildings((prev) =>
+          prev.map((b) => {
+            const fresh = b.active_drop && (data.pulls as Record<string, { pull_count: number }>)[b.active_drop.id];
+            if (!fresh) return b;
+            return { ...b, active_drop: { ...b.active_drop!, pull_count: fresh.pull_count } };
+          })
+        );
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [session, buildings]);
+
+  // Show drop hint once after city loads
+  const dropHintShown = useRef(false);
+  const [dropHintText, setDropHintText] = useState("");
+  useEffect(() => {
+    if (dropHintShown.current || loadStage !== "done" || buildings.length === 0) return;
+    const dropsBuildings = buildings.filter((b) => b.active_drop);
+    if (dropsBuildings.length === 0) return;
+    dropHintShown.current = true;
+    const districts = [...new Set(dropsBuildings.map((b) => b.district).filter(Boolean))];
+    const shown = districts.slice(0, 2).map((d) => DISTRICT_NAMES[d!] ?? d);
+    const extra = districts.length - shown.length;
+    let text = "Drops are hidden in the city";
+    if (shown.length > 0) {
+      text = `Drops hidden in ${shown.join(", ")}${extra > 0 ? ` +${extra} more` : ""}`;
+    }
+    setDropHintText(text);
+    const timer = setTimeout(() => {
+      setDropHint(true);
+      setTimeout(() => setDropHint(false), 5000);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [loadStage, buildings]);
+
+  // Admin check (client-side, for UI only - real auth is on the server endpoints)
+  useEffect(() => {
+    const adminLogins = (process.env.NEXT_PUBLIC_ADMIN_GITHUB_LOGINS ?? "")
+      .split(",").map(l => l.trim().toLowerCase()).filter(Boolean);
+    const admin = !!authLogin && adminLogins.includes(authLogin);
+    setIsAdmin(admin);
+    if (admin) {
+      fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => {});
+    }
+  }, [authLogin]);
 
   // Fly timer — ticks every second while flying and not paused
   useEffect(() => {
@@ -812,6 +914,71 @@ function HomeContent() {
     finally { setKudosSending(false); }
   }, [selectedBuilding, kudosSending, kudosSent, session, authLogin]);
 
+  // Drop pull handler
+  const handleDropPull = useCallback(async (dropId: string) => {
+    if (dropPulling || !session) return;
+    setDropPulling(true);
+    try {
+      const res = await fetch("/api/drops/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ drop_id: dropId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setMyDropPulls((prev) => ({ ...prev, [dropId]: { points: data.points_earned } }));
+        // Update pull_count locally (only if not already_pulled, to avoid double increment)
+        if (!data.already_pulled && selectedBuilding?.active_drop?.id === dropId) {
+          const updatedDrop = { ...selectedBuilding.active_drop, pull_count: selectedBuilding.active_drop.pull_count + 1 };
+          setSelectedBuilding({ ...selectedBuilding, active_drop: updatedDrop });
+          setBuildings((prev) =>
+            prev.map((b) =>
+              b.active_drop?.id === dropId ? { ...b, active_drop: updatedDrop } : b
+            )
+          );
+        }
+      }
+    } catch { /* ignore */ }
+    finally { setDropPulling(false); }
+  }, [dropPulling, session, selectedBuilding]);
+
+  // Admin: plant drop on selected building
+  const handlePlantDrop = useCallback(async () => {
+    if (!selectedBuilding || dropPlanting) return;
+    setDropPlanting(true);
+    setDropPlantResult(null);
+    try {
+      const res = await fetch("/api/admin/drops", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          building_login: selectedBuilding.login,
+          rarity: dropPlantRarity,
+          duration_hours: dropPlantDuration,
+          max_pulls: dropPlantMaxPulls,
+          item_reward: dropPlantRarity === "legendary" && dropPlantItem ? dropPlantItem : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDropPlantResult(data.error ?? "Failed");
+      } else {
+        // Update building locally with the new drop
+        const drop = data.drop;
+        const activeDrop = { id: drop.id, rarity: drop.rarity, points: drop.points, max_pulls: drop.max_pulls, pull_count: 0, expires_at: drop.expires_at };
+        setSelectedBuilding({ ...selectedBuilding, active_drop: activeDrop });
+        setBuildings((prev) => prev.map((b) => b.login === selectedBuilding.login ? { ...b, active_drop: activeDrop } : b));
+        setDropPlantOpen(false);
+        setDropPlantResult("Planted!");
+        setTimeout(() => setDropPlantResult(null), 2000);
+      }
+    } catch {
+      setDropPlantResult("Network error");
+    } finally {
+      setDropPlanting(false);
+    }
+  }, [selectedBuilding, dropPlanting, dropPlantRarity, dropPlantDuration, dropPlantMaxPulls, dropPlantItem]);
+
   // Gift: open modal with available items
   const handleOpenGift = useCallback(async () => {
     if (!selectedBuilding || !session) return;
@@ -864,13 +1031,15 @@ function HomeContent() {
   // During fly mode: only close overlays (profile card) — AirplaneFlight handles pause/exit
   // Outside fly mode: compare → share modal → profile card → focus → explore mode
   useEffect(() => {
-    if (flyMode && !selectedBuilding && !pillModalOpen && !founderMessageOpen) return;
-    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !rabbitCinematic && !invitePreview && raidState.phase === "idle") return;
+    if (flyMode && !selectedBuilding && !pillModalOpen && !founderMessageOpen && !eArcadeOpen && !activeSponsor) return;
+    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !eArcadeOpen && !activeSponsor && !rabbitCinematic && !invitePreview && raidState.phase === "idle") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
         // Founder modals take highest priority
         if (founderMessageOpen) { setFounderMessageOpen(false); return; }
         if (pillModalOpen) { setPillModalOpen(false); return; }
+        if (eArcadeOpen) { setEArcadeOpen(false); return; }
+        if (activeSponsor) { setActiveSponsor(null); return; }
         // Rabbit cinematic
         if (rabbitCinematic) { endRabbitCinematic(); return; }
         // Raid takes priority
@@ -914,7 +1083,7 @@ function HomeContent() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions, invitePreview]);
+  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, eArcadeOpen, activeSponsor, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions, invitePreview]);
 
   // Rabbit cinematic text phase timing (8s total flyover)
   useEffect(() => {
@@ -1030,6 +1199,8 @@ function HomeContent() {
     let allDevs: any[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let cityStats: any = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let dropsPayload: any[] = [];
 
     // Skip snapshot when busting cache — go straight to DB for fresh data
     if (!bustCache) {
@@ -1044,37 +1215,12 @@ function HomeContent() {
           const snapshot = await new Response(stream).json();
           allDevs = snapshot.developers;
           cityStats = snapshot.stats;
+          dropsPayload = snapshot._d ?? [];
         }
       } catch { /* fall through to chunked */ }
     }
 
-    // Fetch from API (primary when busting cache, fallback otherwise)
-    if (allDevs.length === 0) {
-      const cbParam = bustCache ? `&_t=${Date.now()}` : "";
-      const CHUNK = 1000;
-      const res = await fetch(`/api/city?from=0&to=${CHUNK}${cbParam}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      allDevs = data.developers ?? [];
-      cityStats = data.stats;
-
-      const total = cityStats?.total_developers ?? 0;
-      if (total > CHUNK && allDevs.length > 0) {
-        const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
-        for (let from = CHUNK; from < total; from += CHUNK) {
-          promises.push(
-            fetch(`/api/city?from=${from}&to=${from + CHUNK}${cbParam}`)
-              .then(r => r.ok ? r.json() : null)
-          );
-        }
-        const results = await Promise.all(promises);
-        for (const chunk of results) {
-          if (chunk?.developers?.length) {
-            allDevs = [...allDevs, ...chunk.developers];
-          }
-        }
-      }
-    }
+    // Snapshot is the only data source. No chunked API fallback.
 
     if (allDevs.length === 0) return null;
 
@@ -1097,6 +1243,19 @@ function HomeContent() {
     rawDevsRef.current = allDevs;
     setStats(cityStats);
     const layout = generateCityLayout(allDevs);
+
+    // Decode obfuscated drops (_d) and merge into buildings by rank
+    if (dropsPayload.length > 0) {
+      const dropByRank = new Map<number, typeof dropsPayload[0]>();
+      for (const d of dropsPayload) dropByRank.set(d.n, d);
+      for (const b of layout.buildings) {
+        const d = dropByRank.get(b.rank);
+        if (d) {
+          b.active_drop = { id: d.id, rarity: d.r, points: d.p, max_pulls: d.m, pull_count: d.c, expires_at: d.x };
+        }
+      }
+    }
+
     setBuildings(layout.buildings);
     setPlazas(layout.plazas);
     setDecorations(layout.decorations);
@@ -1167,6 +1326,8 @@ function HomeContent() {
         let allDevs: any[] = [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let cityStats: any = null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let dropsPayload: any[] = [];
 
         // Try pre-computed snapshot first (single file from Supabase CDN)
         try {
@@ -1180,35 +1341,9 @@ function HomeContent() {
             const snapshot = await new Response(stream).json();
             allDevs = snapshot.developers;
             cityStats = snapshot.stats;
+            dropsPayload = snapshot._d ?? [];
           }
-        } catch { /* fall through to chunked */ }
-
-        // Fallback to chunked API
-        if (allDevs.length === 0) {
-          const CHUNK = 1000;
-          const res = await fetch(`/api/city?from=0&to=${CHUNK}`);
-          if (!res.ok) throw new Error("Failed to fetch city data");
-          const data = await res.json();
-          allDevs = data.developers ?? [];
-          cityStats = data.stats;
-
-          const total = cityStats?.total_developers ?? 0;
-          if (total > CHUNK && allDevs.length > 0) {
-            const promises: Promise<{ developers: typeof data.developers } | null>[] = [];
-            for (let from = CHUNK; from < total; from += CHUNK) {
-              promises.push(
-                fetch(`/api/city?from=${from}&to=${from + CHUNK}`)
-                  .then((r) => (r.ok ? r.json() : null))
-              );
-            }
-            const results = await Promise.all(promises);
-            for (const chunk of results) {
-              if (chunk?.developers?.length) {
-                allDevs = [...allDevs, ...chunk.developers];
-              }
-            }
-          }
-        }
+        } catch { /* snapshot failed */ }
 
         setLoadProgress(30);
 
@@ -1242,6 +1377,19 @@ function HomeContent() {
         rawDevsRef.current = allDevs;
         setStats(cityStats);
         const finalLayout = generateCityLayout(allDevs);
+
+        // Decode obfuscated drops (_d) and merge into buildings by rank
+        if (dropsPayload.length > 0) {
+          const dropByRank = new Map<number, typeof dropsPayload[0]>();
+          for (const d of dropsPayload) dropByRank.set(d.n, d);
+          for (const b of finalLayout.buildings) {
+            const d = dropByRank.get(b.rank);
+            if (d) {
+              b.active_drop = { id: d.id, rarity: d.r, points: d.p, max_pulls: d.m, pull_count: d.c, expires_at: d.x };
+            }
+          }
+        }
+
         setBuildings(finalLayout.buildings);
         setPlazas(finalLayout.plazas);
         setDecorations(finalLayout.decorations);
@@ -1390,6 +1538,17 @@ function HomeContent() {
           setBridges(layout.bridges);
           setDistrictZones(layout.districtZones);
           setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+
+          // Focus immediately after injection instead of waiting for re-run
+          const injected = layout.buildings.find(
+            (b) => b.login.toLowerCase() === userParam.toLowerCase()
+          );
+          if (injected && !didFocusUserParam.current) {
+            didFocusUserParam.current = true;
+            setFocusedBuilding(userParam);
+            setSelectedBuilding(injected);
+            setExploreMode(true);
+          }
         } finally {
           fetchingUserParam.current = false;
         }
@@ -1403,6 +1562,28 @@ function HomeContent() {
       setFocusedBuilding(userParam);
       setSelectedBuilding(found);
       setExploreMode(true);
+
+      // Building from cache/snapshot may have stale claimed status — refresh from DB
+      if (!found.claimed) {
+        fetch(`/api/dev/${encodeURIComponent(userParam)}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(devData => {
+            if (!devData || devData.exists === false) return;
+            if (!devData.claimed) return;
+            // Update building in-place so canClaim recalculates
+            setBuildings(prev => prev.map(b =>
+              b.login.toLowerCase() === userParam.toLowerCase()
+                ? { ...b, claimed: true }
+                : b
+            ));
+            setSelectedBuilding(prev =>
+              prev && prev.login.toLowerCase() === userParam.toLowerCase()
+                ? { ...prev, claimed: true }
+                : prev
+            );
+          })
+          .catch(() => {});
+      }
     } else {
       // Buildings array was replaced (full layout loaded) — keep selectedBuilding in sync
       setSelectedBuilding(prev =>
@@ -1411,14 +1592,31 @@ function HomeContent() {
     }
   }, [userParam, giftedParam, buildings, stats]);
 
-  // ── Ensure logged-in user's building always appears ──────────
+  // ── Ensure logged-in user's building always appears + claimed status is fresh ──
   // Covers: page reload, new tab, cache expiry, auth callback failure
   const ensuringAuthBuilding = useRef<string | null>(null);
+  const refreshedClaimedStatus = useRef(false);
   useEffect(() => {
     if (!authLogin || buildings.length === 0) return;
 
-    // Building already in city
-    if (buildings.some(b => b.login.toLowerCase() === authLogin)) return;
+    // Building already in city — check if claimed status needs refresh
+    const existing = buildings.find(b => b.login.toLowerCase() === authLogin);
+    if (existing) {
+      // Refresh claimed status once per session (snapshot may be stale after login)
+      if (!existing.claimed && !refreshedClaimedStatus.current) {
+        refreshedClaimedStatus.current = true;
+        fetch(`/api/dev/${encodeURIComponent(authLogin)}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(devData => {
+            if (!devData || devData.exists === false || !devData.claimed) return;
+            setBuildings(prev => prev.map(b =>
+              b.login.toLowerCase() === authLogin ? { ...b, claimed: true } : b
+            ));
+          })
+          .catch(() => {});
+      }
+      return;
+    }
 
     // ?user= handler is already handling this
     if (userParam && userParam.toLowerCase() === authLogin) return;
@@ -1725,6 +1923,9 @@ function HomeContent() {
       if (res.ok) {
         trackBuildingClaimed(authLogin);
         await reloadCity();
+      } else if (res.status === 409) {
+        // Already claimed (e.g. by auth callback) — just refresh to sync UI
+        await reloadCity(true);
       }
     } finally {
       setClaiming(false);
@@ -1855,7 +2056,7 @@ function HomeContent() {
 
   // Feature 1: Daily Challenge Nudge — show after load if user has history but hasn't played today
   useEffect(() => {
-    if (loadStage !== "done" || isMobile || !session || flyMode || introMode) return;
+    if (loadStage !== "done" || !session || flyMode || introMode) return;
     dailyNudgeTimerRef.current = setTimeout(() => {
       try {
         const raw = localStorage.getItem("gitcity_fly_history");
@@ -1874,11 +2075,11 @@ function HomeContent() {
       } catch { }
     }, 2000);
     return () => clearTimeout(dailyNudgeTimerRef.current);
-  }, [loadStage, isMobile, session, flyMode, introMode]);
+  }, [loadStage, session, flyMode, introMode]);
 
   // Feature 2: First-Fly Tooltip — show if user has never flown
   useEffect(() => {
-    if (loadStage !== "done" || isMobile || flyMode || introMode) return;
+    if (loadStage !== "done" || flyMode || introMode) return;
     try {
       if (localStorage.getItem("gitcity_fly_history") || localStorage.getItem("gitcity_fly_hint_seen")) return;
     } catch { return; }
@@ -1892,7 +2093,7 @@ function HomeContent() {
       flyHintTimerRef.current = autoDismiss;
     }, 5000);
     return () => clearTimeout(flyHintTimerRef.current);
-  }, [loadStage, isMobile, flyMode, introMode]);
+  }, [loadStage, flyMode, introMode]);
 
   // Feature 3: First-Flight Controls Overlay — user-dismissed only (no auto-dismiss)
 
@@ -1907,7 +2108,7 @@ function HomeContent() {
         bridges={bridges}
         flyMode={flyMode}
         flyVehicle={flyVehicle}
-        onExitFly={() => {
+        onExitFly={exitFlyRef.current = () => {
           const wallMs = Date.now() - flyStartTime.current;
           // Exclude pause time from flight duration
           const currentPauseMs = flyPausedAt.current > 0 ? Date.now() - flyPausedAt.current : 0;
@@ -1960,7 +2161,7 @@ function HomeContent() {
             } catch { }
           }
           // Exit fly immediately (don't block on API)
-          setFlyMode(false); setFlyPaused(false); lastDistrictRef.current = null; setDistrictAnnouncement(null); clearTimeout(announceTimerRef.current);
+          setFlyMode(false); setFlyPaused(false); setFlyBoostActive(false); setFlyBrakeActive(false); lastDistrictRef.current = null; setDistrictAnnouncement(null); clearTimeout(announceTimerRef.current);
           // Feature 4: Show post-flight results (rank fills in async)
           if (finalScore > 0) {
             const captured = { score: finalScore, collected: flyScore.collected, maxCombo: flyScore.maxCombo, timeBonus, isNewPB };
@@ -2030,7 +2231,11 @@ function HomeContent() {
         accentColor={theme.accent}
         onClearFocus={() => setFocusedBuilding(null)}
         flyPauseSignal={flyPauseSignal}
-        flyHasOverlay={!!selectedBuilding || pillModalOpen || founderMessageOpen || rabbitCinematic}
+        isMobile={isMobile}
+        onJoystickState={flyMode ? setFlyJoystickState : undefined}
+        flyBoostActive={flyBoostActive}
+        flyBrakeActive={flyBrakeActive}
+        flyHasOverlay={!!selectedBuilding || pillModalOpen || founderMessageOpen || eArcadeOpen || !!activeSponsor || rabbitCinematic}
         flyStartPaused={showFlyControls}
         holdRise={loadStage !== "done"}
         celebrationActive={celebrationActive}
@@ -2042,19 +2247,20 @@ function HomeContent() {
           if (ad.link && isBuildingAd(ad.vehicle)) {
             const ctaHref = buildAdLink(ad) ?? ad.link;
             const isMailto = ad.link.startsWith("mailto:");
-            // Single beacon for both events (avoids rate limit dropping cta_click)
-            trackAdEvents(ad.id, ["click", "cta_click"], authLogin || undefined);
+            // Track click via beacon, cta_click via fetch to get click_id
+            trackAdEvent(ad.id, "click", authLogin || undefined);
             trackSkyAdCtaClick(ad.id, ad.vehicle);
             track("sky_ad_click", { ad_id: ad.id, vehicle: ad.vehicle, brand: ad.brand ?? "" });
-            if (isMailto) {
-              window.location.href = ctaHref;
-            } else {
-              const a = document.createElement("a");
-              a.href = ctaHref;
-              a.target = "_blank";
-              a.rel = "noopener noreferrer";
-              a.click();
-            }
+            // Async: get click_id then open link
+            (async () => {
+              const clickId = await trackAdEvent(ad.id, "cta_click", authLogin || undefined);
+              const finalUrl = clickId ? appendClickId(ctaHref, clickId) : ctaHref;
+              if (isMailto) {
+                window.location.href = finalUrl;
+              } else {
+                window.open(finalUrl, "_blank", "noopener,noreferrer");
+              }
+            })();
             try { setAdToast(ad.brand || new URL(ad.link).hostname.replace("www.", "")); } catch { setAdToast(ad.brand || "link"); }
             setTimeout(() => setAdToast(null), 2500);
           } else {
@@ -2090,6 +2296,24 @@ function HomeContent() {
         raidDefender={raidState.defenderBuilding}
         onRaidPhaseComplete={raidActions.onPhaseComplete}
         onLandmarkClick={() => { setPillModalOpen(true); setSelectedBuilding(null); }}
+        onEArcadeClick={() => { trackEArcadeClicked(); setEArcadeOpen(true); setSelectedBuilding(null); }}
+        onSponsorClick={(slug) => {
+          trackLandmarkClicked(slug);
+          const adId = getLandmarkAdId(slug);
+          if (adId) fetch("/api/sky-ads/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad_id: adId, event_type: "click" }) }).catch(() => {});
+          if (!exploreMode) setExploreMode(true);
+          setActiveSponsor(slug);
+          setSelectedBuilding(null);
+          setFocusedBuilding(null);
+        }}
+        sponsorFocusPos={(() => {
+          if (!activeSponsor) return null;
+          const sp = SPONSORS.find(s => s.slug === activeSponsor);
+          if (!sp) return null;
+          const pos = gridToWorldPos(sp.gridX, sp.gridZ);
+          return [pos[0], sp.hitboxHeight * 0.6, pos[2]] as [number, number, number];
+        })()}
+        activeSponsorSlug={activeSponsor}
         rabbitSighting={rabbitSighting}
         onRabbitCaught={onRabbitCaught}
         rabbitCinematic={rabbitCinematic}
@@ -2251,68 +2475,125 @@ function HomeContent() {
       {/* ─── Fly Mode HUD ─── */}
       {flyMode && (
         <div className="pointer-events-none fixed inset-0 z-30">
-          {/* Top bar */}
-          <div className="absolute top-4 left-1/2 -translate-x-1/2">
-            <div className="inline-flex items-center gap-3 border-[3px] border-border bg-bg/70 px-5 py-2.5 backdrop-blur-sm">
+
+          {/* ── Mobile: unified top bar ── */}
+          {isMobile ? (
+            <div className="pointer-events-auto absolute left-2 right-2 flex items-center gap-1.5 border-[3px] border-border bg-bg/80 px-2 py-1.5 backdrop-blur-sm" style={{ top: "max(8px, env(safe-area-inset-top, 8px))" }}>
+              {/* Exit */}
+              <button
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); exitFlyRef.current?.(); }}
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+                className="btn-press shrink-0 text-[10px] tracking-wider uppercase"
+                style={{ color: theme.accent }}
+              >
+                Exit
+              </button>
+              <span className="text-border">|</span>
+              {/* Pause/Resume */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); e.preventDefault();
+                  if (flyPaused) {
+                    window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true }));
+                  } else {
+                    setFlyPauseSignal(s => s + 1);
+                  }
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+                className="btn-press shrink-0 text-[10px] tracking-wider uppercase text-cream"
+              >
+                {flyPaused ? "Resume" : "Pause"}
+              </button>
+              {/* Spacer */}
+              <div className="flex-1" />
+              {/* Status dot + FLY + score */}
               <span
-                className={`h-2 w-2 shrink-0 ${flyPaused ? "" : "blink-dot"}`}
+                className={`h-1.5 w-1.5 shrink-0 ${flyPaused ? "" : "blink-dot"}`}
                 style={{ backgroundColor: flyPaused ? "#f85149" : theme.accent }}
               />
-              <span className="text-[10px] text-cream">
-                {flyPaused ? "Paused" : "Fly"}
-              </span>
-              <span className="mx-1 text-border">|</span>
-              <span className="text-[10px]" style={{ color: theme.accent }}>{flyScore.score}</span>
-              <span className="text-[10px] text-muted">PX</span>
+              <span className="text-[9px]" style={{ color: theme.accent }}>{flyScore.score}</span>
+              <span className="text-[9px] text-muted">PX</span>
               {flyScore.combo >= 2 && (
-                <span className="animate-pulse text-[10px] font-bold" style={{ color: "#ffd700" }}>
+                <span className="animate-pulse text-[9px] font-bold" style={{ color: "#ffd700" }}>
                   &times;{flyScore.combo >= 4 ? 3 : flyScore.combo >= 3 ? 2 : 1.5}
                 </span>
               )}
-            </div>
-          </div>
-
-          {/* Score HUD (top right) */}
-          <div className="absolute top-4 right-3 text-right text-[9px] text-muted sm:right-4 sm:text-[10px]">
-            <div>{flyScore.collected}/40 collected</div>
-            <div className="mt-1 flex h-1 w-24 items-center border border-border/40 bg-bg/50 ml-auto">
-              <div className="h-full transition-all duration-150" style={{ width: `${(flyScore.collected / 40) * 100}%`, backgroundColor: theme.accent }} />
-            </div>
-            <div className="mt-1.5 text-[8px]">
-              <span className="text-muted">TIME </span>
-              <span style={{ color: flyElapsedSec < 90 ? theme.accent : "#f85149" }}>
+              <span className="text-border">|</span>
+              <span className="text-[9px] text-muted">{flyScore.collected}<span style={{ color: theme.accent }}>/40</span></span>
+              <span className="text-[9px]" style={{ color: flyElapsedSec < 90 ? theme.accent : "#f85149" }}>
                 {Math.floor(flyElapsedSec / 60)}:{String(flyElapsedSec % 60).padStart(2, "0")}
               </span>
             </div>
-            {flyPersonalBest > 0 && (
-              <div className="mt-0.5 text-[8px] text-muted">BEST: <span style={{ color: theme.accent }}>{flyPersonalBest}</span></div>
-            )}
-          </div>
+          ) : (
+            <>
+              {/* ── Desktop: centered top bar ── */}
+              <div className="absolute top-4 left-1/2 -translate-x-1/2">
+                <div className="inline-flex items-center gap-3 border-[3px] border-border bg-bg/70 px-5 py-2.5 backdrop-blur-sm">
+                  <span
+                    className={`h-2 w-2 shrink-0 ${flyPaused ? "" : "blink-dot"}`}
+                    style={{ backgroundColor: flyPaused ? "#f85149" : theme.accent }}
+                  />
+                  <span className="text-[10px] text-cream">
+                    {flyPaused ? "Paused" : "Fly"}
+                  </span>
+                  <span className="mx-1 text-border">|</span>
+                  <span className="text-[10px]" style={{ color: theme.accent }}>{flyScore.score}</span>
+                  <span className="text-[10px] text-muted">PX</span>
+                  {flyScore.combo >= 2 && (
+                    <span className="animate-pulse text-[10px] font-bold" style={{ color: "#ffd700" }}>
+                      &times;{flyScore.combo >= 4 ? 3 : flyScore.combo >= 3 ? 2 : 1.5}
+                    </span>
+                  )}
+                </div>
+              </div>
 
-          {/* Flight data (above lo-fi radio) */}
-          <div className="absolute bottom-14 left-3 text-[9px] leading-loose text-muted sm:left-4 sm:text-[10px]">
-            <div className="flex items-center gap-2">
-              <span>SPD</span>
-              <span style={{ color: theme.accent }} className="w-6 text-right">
-                {Math.round(hud.speed)}
-              </span>
-              <div className="flex h-1.5 w-20 items-center border border-border/60 bg-bg/50">
-                <div
-                  className="h-full transition-all duration-150"
-                  style={{
-                    width: `${Math.round(((hud.speed - 20) / 140) * 100)}%`,
-                    backgroundColor: theme.accent,
-                  }}
-                />
+              {/* ── Desktop: score HUD (top right) ── */}
+              <div className="absolute top-4 right-4 text-right text-[10px] text-muted">
+                <div>{flyScore.collected}/40 collected</div>
+                <div className="mt-1 flex h-1 w-24 items-center border border-border/40 bg-bg/50 ml-auto">
+                  <div className="h-full transition-all duration-150" style={{ width: `${(flyScore.collected / 40) * 100}%`, backgroundColor: theme.accent }} />
+                </div>
+                <div className="mt-1.5 text-[8px]">
+                  <span className="text-muted">TIME </span>
+                  <span style={{ color: flyElapsedSec < 90 ? theme.accent : "#f85149" }}>
+                    {Math.floor(flyElapsedSec / 60)}:{String(flyElapsedSec % 60).padStart(2, "0")}
+                  </span>
+                </div>
+                {flyPersonalBest > 0 && (
+                  <div className="mt-0.5 text-[8px] text-muted">BEST: <span style={{ color: theme.accent }}>{flyPersonalBest}</span></div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Flight data (above lo-fi radio) — hidden on mobile */}
+          {!isMobile && (
+            <div className="absolute bottom-14 left-3 text-[9px] leading-loose text-muted sm:left-4 sm:text-[10px]">
+              <div className="flex items-center gap-2">
+                <span>SPD</span>
+                <span style={{ color: theme.accent }} className="w-6 text-right">
+                  {Math.round(hud.speed)}
+                </span>
+                <div className="flex h-1.5 w-20 items-center border border-border/60 bg-bg/50">
+                  <div
+                    className="h-full transition-all duration-150"
+                    style={{
+                      width: `${Math.round(((hud.speed - 20) / 140) * 100)}%`,
+                      backgroundColor: theme.accent,
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                ALT{" "}
+                <span style={{ color: theme.accent }}>
+                  {Math.round(hud.altitude)}
+                </span>
               </div>
             </div>
-            <div>
-              ALT{" "}
-              <span style={{ color: theme.accent }}>
-                {Math.round(hud.altitude)}
-              </span>
-            </div>
-          </div>
+          )}
 
           {/* District announcement */}
           {districtAnnouncement && (
@@ -2326,46 +2607,111 @@ function HomeContent() {
           )}
 
           {/* Controls hint */}
-          <div className="absolute bottom-35 right-3 text-right text-[8px] leading-loose text-muted sm:right-4 sm:text-[9px]">
-            {flyPaused ? (
-              <>
-                <div>
-                  <span className="text-cream">Drag</span> orbit
-                </div>
-                <div>
-                  <span className="text-cream">Scroll</span> zoom
-                </div>
-                <div>
-                  <span className="text-cream">WASD</span> resume
-                </div>
-                <div>
-                  <span style={{ color: theme.accent }}>ESC</span> exit
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <span className="text-cream">Mouse</span> steer
-                </div>
-                <div>
-                  <span className="text-cream">Shift</span> boost
-                </div>
-                <div>
-                  <span className="text-cream">Alt</span> slow
-                </div>
-                <div>
-                  <span className="text-cream">Scroll</span> base speed
-                </div>
-                <div>
-                  <span style={{ color: theme.accent }}>P</span> pause
-                </div>
-                <div>
-                  <span style={{ color: theme.accent }}>ESC</span> pause
-                </div>
-              </>
-            )}
-          </div>
+          {!isMobile && (
+            <div className="absolute bottom-35 right-3 text-right text-[8px] leading-loose text-muted sm:right-4 sm:text-[9px]">
+              {flyPaused ? (
+                <>
+                  <div>
+                    <span className="text-cream">Drag</span> orbit
+                  </div>
+                  <div>
+                    <span className="text-cream">Scroll</span> zoom
+                  </div>
+                  <div>
+                    <span className="text-cream">WASD</span> resume
+                  </div>
+                  <div>
+                    <span style={{ color: theme.accent }}>ESC</span> exit
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <span className="text-cream">Mouse</span> steer
+                  </div>
+                  <div>
+                    <span className="text-cream">Shift</span> boost
+                  </div>
+                  <div>
+                    <span className="text-cream">Alt</span> slow
+                  </div>
+                  <div>
+                    <span className="text-cream">Scroll</span> base speed
+                  </div>
+                  <div>
+                    <span style={{ color: theme.accent }}>P</span> pause
+                  </div>
+                  <div>
+                    <span style={{ color: theme.accent }}>ESC</span> pause
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* ─── Mobile Fly HUD (bottom controls only — top bar is unified above) ─── */}
+      {isMobile && flyMode && !showFlyControls && (
+        <>
+          {/* Boost + Slow — bottom left, retro style */}
+          {!flyPaused && (
+            <div className="fixed z-50 flex gap-1.5 select-none" style={{ bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: "16px", WebkitTouchCallout: "none" }}>
+              <button
+                onTouchStart={(e) => { e.stopPropagation(); setFlyBrakeActive(true); }}
+                onTouchEnd={(e) => { e.stopPropagation(); setFlyBrakeActive(false); }}
+                onTouchCancel={() => setFlyBrakeActive(false)}
+                className="btn-press border-[3px] bg-bg/80 px-3 py-2 text-[10px] tracking-widest uppercase backdrop-blur-sm transition-all"
+                style={{
+                  borderColor: flyBrakeActive ? theme.accent : "var(--color-border)",
+                  color: flyBrakeActive ? theme.accent : "var(--color-muted)",
+                }}
+              >
+                Slow
+              </button>
+              <button
+                onTouchStart={(e) => { e.stopPropagation(); setFlyBoostActive(true); }}
+                onTouchEnd={(e) => { e.stopPropagation(); setFlyBoostActive(false); }}
+                onTouchCancel={() => setFlyBoostActive(false)}
+                className="btn-press border-[3px] bg-bg/80 px-3 py-2 text-[10px] tracking-widest uppercase backdrop-blur-sm transition-all"
+                style={{
+                  borderColor: flyBoostActive ? "#ffb428" : "var(--color-border)",
+                  color: flyBoostActive ? "#ffb428" : "var(--color-cream)",
+                  boxShadow: flyBoostActive ? "0 0 12px rgba(255,180,40,0.25)" : "none",
+                }}
+              >
+                Boost
+              </button>
+            </div>
+          )}
+
+          {/* Joystick visual overlay */}
+          {flyJoystickState && (
+            <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 30 }}>
+              {/* Base ring */}
+              <div style={{
+                position: "absolute",
+                left: flyJoystickState.baseX - 60,
+                top: flyJoystickState.baseY - 60,
+                width: 120, height: 120,
+                borderRadius: "50%",
+                border: "1.5px solid rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.04)",
+              }} />
+              {/* Thumb */}
+              <div style={{
+                position: "absolute",
+                left: flyJoystickState.baseX + flyJoystickState.dx - 18,
+                top: flyJoystickState.baseY + flyJoystickState.dy - 18,
+                width: 36, height: 36,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.25)",
+                border: "1px solid rgba(255,255,255,0.35)",
+                willChange: "transform",
+              }} />
+            </div>
+          )}
+        </>
       )}
 
       {/* ─── Feature 3: First-Flight Controls Overlay ─── */}
@@ -2377,22 +2723,37 @@ function HomeContent() {
           >
             <p className="mb-4 text-xs tracking-widest text-muted">FLIGHT CONTROLS</p>
             <div className="flex flex-col gap-2.5 text-[11px]">
-              <div className="flex items-center justify-between gap-6">
-                <span className="text-cream">Mouse</span>
-                <span className="text-muted">Steer</span>
-              </div>
-              <div className="flex items-center justify-between gap-6">
-                <span className="text-cream">Scroll</span>
-                <span className="text-muted">Speed</span>
-              </div>
-              <div className="flex items-center justify-between gap-6">
-                <span className="text-cream">Shift / Alt</span>
-                <span className="text-muted">Boost / Slow</span>
-              </div>
-              <div className="flex items-center justify-between gap-6">
-                <span style={{ color: theme.accent }}>ESC</span>
-                <span className="text-muted">Pause &amp; Exit</span>
-              </div>
+              {isMobile ? (
+                <>
+                  <div className="flex items-center justify-between gap-6">
+                    <span className="text-cream">Touch &amp; Drag</span>
+                    <span className="text-muted">Steer</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-6">
+                    <span className="text-cream">Buttons</span>
+                    <span className="text-muted">Pause / Exit</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-6">
+                    <span className="text-cream">Mouse</span>
+                    <span className="text-muted">Steer</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-6">
+                    <span className="text-cream">Scroll</span>
+                    <span className="text-muted">Speed</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-6">
+                    <span className="text-cream">Shift / Alt</span>
+                    <span className="text-muted">Boost / Slow</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-6">
+                    <span style={{ color: theme.accent }}>ESC</span>
+                    <span className="text-muted">Pause &amp; Exit</span>
+                  </div>
+                </>
+              )}
             </div>
             <button
               onClick={() => {
@@ -2415,7 +2776,7 @@ function HomeContent() {
         buildings={buildings}
         playerX={playerPos.x}
         playerZ={playerPos.z}
-        visible={flyMode}
+        visible={flyMode && !isMobile}
         currentDistrict={lastDistrictRef.current}
       />
 
@@ -2855,6 +3216,29 @@ function HomeContent() {
                 <span className="text-sm text-cream">Shop</span>
                 <span className="text-xs text-muted" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (session) {
+                    window.location.href = "/arcade";
+                  } else {
+                    trackEArcadeClicked();
+                    setEArcadeOpen(true);
+                  }
+                }}
+                className="flex w-full items-center justify-between px-5 py-4 active:bg-white/5"
+              >
+                <span className="flex items-center gap-2 text-sm text-cream">
+                  Lobby
+                  {arcadeOnline > 0 && (
+                    <span className="flex items-center gap-1 text-[10px] text-muted">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#4ade80] animate-pulse" />
+                      {arcadeOnline} online
+                    </span>
+                  )}
+                </span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </button>
               <Link
                 href="/live"
                 onClick={() => setMobileMenuOpen(false)}
@@ -3162,6 +3546,20 @@ function HomeContent() {
             <SearchFeedback feedback={feedback} accentColor={theme.accent} onDismiss={() => setFeedback(null)} onRetry={searchUser} />
 
             {/* Loading indicator removed — LoadingScreen overlay handles this */}
+
+            {/* ─── Friday the 13th Event Banner (inline) ─── */}
+            {isFridayThe13th() && (
+              <div className="flex items-center gap-2 border-2 border-red-500/40 bg-red-950/30 px-3 py-1.5 sm:px-4 sm:py-2">
+                <span className="text-sm shrink-0">&#128128;</span>
+                <span className="font-silkscreen text-[9px] sm:text-[10px] uppercase tracking-wider text-red-400 whitespace-nowrap">
+                  Friday the 13th
+                </span>
+                <span className="text-[9px] text-red-400/40">|</span>
+                <span className="text-[9px] sm:text-[10px] text-orange-300/80 whitespace-nowrap">
+                  Unlimited battles, no cooldowns
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Center - Explore buttons + Shop + Auth */}
@@ -3194,8 +3592,29 @@ function HomeContent() {
                   }}
                 >
                   Explore City
+                  <span className="block text-[8px] opacity-60 normal-case">Browse Buildings</span>
                 </button>
-                {!isMobile && (
+                <button
+                  onClick={() => {
+                    if (session) {
+                      window.location.href = "/arcade";
+                    } else {
+                      trackEArcadeClicked();
+                      setEArcadeOpen(true);
+                    }
+                  }}
+                  className="btn-press px-7 py-3 text-xs sm:py-3.5 sm:text-sm text-bg"
+                  style={{
+                    backgroundColor: theme.accent,
+                    boxShadow: `4px 4px 0 0 ${theme.shadow}`,
+                  }}
+                >
+                  Lobby
+                  <span className="block text-[8px] opacity-60 normal-case">
+                    {arcadeOnline > 0 ? `${arcadeOnline} online` : "Meet other devs"}
+                  </span>
+                </button>
+                {(
                   <div className="relative">
                     <button
                       onClick={() => {
@@ -3218,15 +3637,7 @@ function HomeContent() {
                         boxShadow: `4px 4px 0 0 ${theme.shadow}`,
                       }}
                     >
-                      <span className="relative">
-                        &#9992; Fly
-                        <span
-                          className="absolute -top-3 -right-8 animate-pulse rounded-sm px-1 py-px text-[7px] font-bold leading-none text-bg"
-                          style={{ backgroundColor: theme.accent }}
-                        >
-                          NEW
-                        </span>
-                      </span>
+                      Fly
                       <span className="block text-[8px] opacity-60 normal-case">Collect PX</span>
                     </button>
                     {/* Feature 2: First-Fly Tooltip */}
@@ -3415,6 +3826,28 @@ function HomeContent() {
               NEW
             </span>
           </Link>
+          <button
+            onClick={() => {
+              if (session) {
+                window.location.href = "/arcade";
+              } else {
+                trackEArcadeClicked();
+                setEArcadeOpen(true);
+              }
+            }}
+            className="btn-press relative border-2 border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
+            style={{ color: theme.accent }}
+          >
+            Lobby
+            {arcadeOnline > 0 && (
+              <span
+                className="absolute -top-1.5 -right-1.5 rounded-full px-1 py-px text-[7px] font-bold leading-none text-bg"
+                style={{ backgroundColor: theme.accent }}
+              >
+                {arcadeOnline}
+              </span>
+            )}
+          </button>
           <Link
             href="/leaderboard"
             className="btn-press border-2 border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
@@ -3776,6 +4209,62 @@ function HomeContent() {
                 </div>
               )}
 
+              {/* Drop banner: show when building has an active drop */}
+              {selectedBuilding.active_drop && (() => {
+                const drop = selectedBuilding.active_drop;
+                const rarityColors: Record<string, string> = { common: "#00ff88", rare: "#0088ff", epic: "#aa00ff", legendary: "#ffaa00" };
+                const dropColor = rarityColors[drop.rarity] ?? rarityColors.common;
+                const myPull = myDropPulls[drop.id];
+                const exhausted = drop.pull_count >= drop.max_pulls;
+                return (
+                  <div
+                    className="mx-4 mb-3 border-2 p-3"
+                    style={{ borderColor: dropColor, backgroundColor: `${dropColor}10` }}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-bold" style={{ color: dropColor }}>
+                        DROP FOUND!
+                      </span>
+                      <span className="text-[9px] text-muted">
+                        {drop.pull_count}/{drop.max_pulls} pulled
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-cream mb-2">
+                      +{drop.points} pts <span className="text-muted capitalize">({drop.rarity})</span>
+                    </div>
+                    {myPull ? (
+                      <div className="text-[10px] text-center py-1.5" style={{ color: dropColor }}>
+                        Already pulled +{myPull.points} pts
+                      </div>
+                    ) : exhausted ? (
+                      <div className="text-[10px] text-center py-1.5 text-muted">
+                        Fully pulled ({drop.max_pulls}/{drop.max_pulls})
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDropPull(drop.id)}
+                          disabled={dropPulling}
+                          className="btn-press flex-1 py-1.5 text-[10px] text-bg"
+                          style={{ backgroundColor: dropColor, boxShadow: `2px 2px 0 0 ${dropColor}66` }}
+                        >
+                          {dropPulling ? "Pulling..." : "Pull"}
+                        </button>
+                        <a
+                          href={`https://x.com/intent/tweet?text=${encodeURIComponent(`just pulled a ${drop.rarity} drop in Git City 👀 how many are you walking past?`)}&url=${encodeURIComponent("https://thegitcity.com")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-press border-2 px-3 py-1.5 text-[10px] transition-colors hover:border-border-light"
+                          style={{ borderColor: `${dropColor}66`, color: dropColor }}
+                        >
+                          Share
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* A7: Show equipped items on other devs' buildings (mimetic desire) */}
               {selectedBuilding.login.toLowerCase() !== authLogin && (() => {
                 const equipped: string[] = [];
@@ -3950,6 +4439,84 @@ function HomeContent() {
                   >
                     Compare
                   </button>
+                </div>
+              )}
+
+              {/* Admin: Plant Drop */}
+              {isAdmin && !selectedBuilding.active_drop && (
+                <div className="mx-4 mb-3">
+                  {!dropPlantOpen ? (
+                    <button
+                      onClick={() => setDropPlantOpen(true)}
+                      className="btn-press w-full border-2 border-yellow-500/40 py-1.5 text-[9px] text-yellow-400 transition-colors hover:border-yellow-500/70 hover:bg-yellow-500/5"
+                    >
+                      Plant Drop
+                    </button>
+                  ) : (
+                    <div className="border-2 border-yellow-500/30 bg-yellow-500/5 p-3 space-y-2">
+                      <div className="flex gap-2">
+                        <select
+                          value={dropPlantRarity}
+                          onChange={(e) => setDropPlantRarity(e.target.value)}
+                          className="flex-1 border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
+                        >
+                          <option value="common">Common 10pts</option>
+                          <option value="rare">Rare 50pts</option>
+                          <option value="epic">Epic 200pts</option>
+                          <option value="legendary">Legendary 500pts</option>
+                        </select>
+                        <select
+                          value={dropPlantDuration}
+                          onChange={(e) => setDropPlantDuration(Number(e.target.value))}
+                          className="border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
+                        >
+                          <option value={24}>24h</option>
+                          <option value={48}>48h</option>
+                          <option value={72}>72h</option>
+                        </select>
+                      </div>
+                      <input
+                        type="number"
+                        value={dropPlantMaxPulls}
+                        onChange={(e) => setDropPlantMaxPulls(Number(e.target.value))}
+                        className="w-full border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
+                        placeholder="Max pulls"
+                        min={1}
+                        max={500}
+                      />
+                      {dropPlantRarity === "legendary" && (
+                        <select
+                          value={dropPlantItem}
+                          onChange={(e) => setDropPlantItem(e.target.value)}
+                          className="w-full border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
+                        >
+                          <option value="">Select item reward...</option>
+                          {dropPlantItems.map((item) => (
+                            <option key={item.id} value={item.id}>{item.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      {dropPlantResult && (
+                        <p className={`text-[9px] ${dropPlantResult === "Planted!" ? "text-lime" : "text-red-400"}`}>{dropPlantResult}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handlePlantDrop}
+                          disabled={dropPlanting || (dropPlantRarity === "legendary" && !dropPlantItem)}
+                          className="btn-press flex-1 py-1.5 text-[9px] text-bg disabled:opacity-50"
+                          style={{ backgroundColor: "#ffaa00" }}
+                        >
+                          {dropPlanting ? "..." : "Plant"}
+                        </button>
+                        <button
+                          onClick={() => { setDropPlantOpen(false); setDropPlantResult(null); }}
+                          className="border border-border px-3 py-1.5 text-[9px] text-muted hover:text-cream"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -4495,10 +5062,17 @@ function HomeContent() {
                         backgroundColor: theme.accent,
                         boxShadow: `4px 4px 0 0 ${theme.shadow}`,
                       }}
-                      onClick={() => {
+                      onClick={async (e) => {
+                        e.preventDefault();
                         track("sky_ad_click", { ad_id: clickedAd.id, vehicle: clickedAd.vehicle, brand: clickedAd.brand ?? "" });
-                        trackAdEvent(clickedAd.id, "cta_click", authLogin || undefined);
                         trackSkyAdCtaClick(clickedAd.id, clickedAd.vehicle);
+                        const clickId = await trackAdEvent(clickedAd.id, "cta_click", authLogin || undefined);
+                        const finalUrl = clickId ? appendClickId(ctaHref, clickId) : ctaHref;
+                        if (isMailto) {
+                          window.location.href = finalUrl;
+                        } else {
+                          window.open(finalUrl, "_blank", "noopener,noreferrer");
+                        }
                       }}
                     >
                       {isMailto
@@ -4547,6 +5121,19 @@ function HomeContent() {
           onClaim={claimDailies}
           onRefresh={refreshDailies}
         />
+      )}
+
+      {/* ─── Drop hint toast (only when city is fully visible) ─── */}
+      {dropHint && !introMode && loadStage === "done" && (
+        <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 sm:bottom-24">
+          <div
+            className="border-2 border-border bg-bg-raised/95 px-5 py-2.5 text-[11px] text-cream backdrop-blur-sm"
+            style={{ borderColor: "#ffaa0044", animation: "toastDrop 0.3s ease-out, toastOut 0.4s ease-in 4s forwards" }}
+          >
+            <span style={{ color: "#ffaa00" }}>&#9679;</span>{" "}
+            {dropHintText}
+          </div>
+        </div>
       )}
 
       {/* ─── Daily mission progress toasts (top-center, always visible) ─── */}
@@ -4764,7 +5351,7 @@ function HomeContent() {
                 Fly Again
               </button>
               <Link
-                href="/leaderboard?mode=game"
+                href="/leaderboard?mode=game&tab=flight"
                 onClick={() => { setShowFlyResults(null); clearTimeout(flyResultsTimerRef.current); }}
                 className="btn-press border-2 border-border px-5 py-2 text-[10px] transition-colors hover:border-border-light"
                 style={{ color: theme.accent }}
@@ -4952,6 +5539,24 @@ function HomeContent() {
           onSignIn={handleSignInWithRef}
         />
       )}
+
+      {/* E.Arcade card */}
+      {eArcadeOpen && (
+        <EArcadeCard
+          onClose={() => setEArcadeOpen(false)}
+          onEnter={() => {
+            window.location.href = "/arcade";
+          }}
+          session={session}
+          onSignIn={handleSignInWithRef}
+        />
+      )}
+
+      {/* Sponsored landmark card */}
+      {activeSponsor && (() => {
+        const cfg = SPONSORS.find((s) => s.slug === activeSponsor);
+        return cfg ? <SponsoredCard config={cfg} onClose={() => setActiveSponsor(null)} /> : null;
+      })()}
 
       {/* Rabbit Quest Cinematic Overlay */}
       {rabbitCinematic && (

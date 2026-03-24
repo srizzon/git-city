@@ -147,3 +147,35 @@ export function trackSignInPromptClicked() {
 export function trackDisabledButtonClicked(button_name: string) {
   hm()?.track("disabled_button_clicked", { button_name });
 }
+
+// ─── E.Arcade ───────────────────────────────────────────────
+
+export function trackEArcadeClicked() {
+  hm()?.track("earcade_clicked");
+}
+
+export function trackEArcadeSurveyStarted() {
+  hm()?.track("earcade_survey_started");
+}
+
+export function trackEArcadeSurveyCompleted() {
+  hm()?.track("earcade_survey_completed");
+}
+
+// ─── Sponsored Landmarks ────────────────────────────────────
+
+export function trackLandmarkImpression(slug: string) {
+  hm()?.track("landmark_impression", { slug });
+}
+
+export function trackLandmarkClicked(slug: string) {
+  hm()?.track("landmark_clicked", { slug });
+}
+
+export function trackLandmarkCardViewed(slug: string) {
+  hm()?.track("landmark_card_viewed", { slug });
+}
+
+export function trackLandmarkCtaClicked(slug: string, url: string) {
+  hm()?.track("landmark_cta_clicked", { slug, url });
+}

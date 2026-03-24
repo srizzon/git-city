@@ -37,6 +37,7 @@ export default function LofiRadio() {
   const [raidMode, setRaidMode] = useState(false);
   const [accent, setAccent] = useState(DEFAULT_ACCENT);
   const [shadow, setShadow] = useState(DEFAULT_SHADOW);
+  const [hidden, setHidden] = useState(false);
 
   const howlRef = useRef<Howl | null>(_howl);
   const fadingRef = useRef<Howl | null>(null);
@@ -80,6 +81,7 @@ export default function LofiRadio() {
       if (d.raidMode !== undefined) setRaidMode(d.raidMode as boolean);
       if (d.accent) setAccent(d.accent as string);
       if (d.shadow) setShadow(d.shadow as string);
+      if (d.hidden !== undefined) setHidden(d.hidden as boolean);
     };
 
     // Read stored state for late-mounting (e.g. portal)
@@ -94,6 +96,7 @@ export default function LofiRadio() {
       setRaidMode(false);
       setAccent(DEFAULT_ACCENT);
       setShadow(DEFAULT_SHADOW);
+      setHidden(false);
     };
   }, []);
 
@@ -227,6 +230,8 @@ export default function LofiRadio() {
   }, [raidMode, playing, volume, muted]);
 
   const currentTrack = TRACKS[trackIndex];
+
+  if (hidden) return null;
 
   return (
     <div className="relative">

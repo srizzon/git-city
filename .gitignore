@@ -58,6 +58,13 @@ docs/
 
 .vscode
 
+# partykit local state
+.partykit/
+
+# arcade dev/test scripts
+scripts/test-*.mjs
+scripts/recolor-*.mjs
+
 # vscode extension build artifacts
 packages/vscode-extension/dist/
 packages/vscode-extension/package-lock.json

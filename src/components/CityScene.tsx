@@ -8,6 +8,7 @@ import InstancedBuildings from "./InstancedBuildings";
 import InstancedLabels from "./InstancedLabels";
 import EffectsLayer from "./EffectsLayer";
 import LiveDots from "./LiveDots";
+import DropBeacon from "./DropBeacon";
 import type { LiveSession } from "@/lib/useCodingPresence";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
@@ -78,6 +79,7 @@ interface CitySceneProps {
   holdRise?: boolean;
   liveByLogin?: Map<string, LiveSession>;
   cityEnergy?: number;
+  dimAll?: boolean;
 }
 
 export default function CityScene({
@@ -95,6 +97,7 @@ export default function CityScene({
   holdRise,
   liveByLogin,
   cityEnergy,
+  dimAll,
 }: CitySceneProps) {
   // Single atlas texture for all building windows (created once per theme)
   const atlasTexture = useMemo(() => createWindowAtlas(colors), [colors]);
@@ -169,6 +172,7 @@ export default function CityScene({
         holdRise={holdRise}
         liveByLogin={liveByLogin}
         cityEnergy={cityEnergy}
+        dimAll={dimAll}
       />
 
       {/* Live presence dots above active buildings */}
@@ -221,6 +225,13 @@ export default function CityScene({
           />
         </group>
       )}
+
+      {/* Drop beacons: pillars of light on buildings with active drops */}
+      {!introMode && buildings.filter((b) => b.active_drop).map((b) => (
+        <group key={`drop-${b.login}`} position={[b.position[0], 0, b.position[2]]}>
+          <DropBeacon rarity={b.active_drop!.rarity} height={b.height} />
+        </group>
+      ))}
     </>
   );
 }

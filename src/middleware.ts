@@ -11,6 +11,9 @@ const ROUTE_LIMITS: [string, number, number][] = [
   ["/api/customizations", 10, 60_000],
   ["/api/sky-ads/track", 30, 60_000],
   ["/api/sky-ads", 30, 60_000],
+  ["/api/ads/auth", 5, 60_000],
+  ["/api/ads", 30, 60_000],
+  ["/api/v1/ads", 60, 60_000],
   ["/api/raid", 15, 60_000],
   ["/api/checkin", 10, 60_000],
   ["/api/heartbeats", 60, 60_000],
@@ -27,6 +30,21 @@ const ROUTE_LIMITS: [string, number, number][] = [
   ["/api/dev/", 60, 60_000],
   ["/api/items", 30, 60_000],
   ["/api/auth", 10, 60_000],
+];
+
+// Read-only routes that work without session refresh.
+// Skipping getUser() here avoids an external HTTP round-trip to Supabase
+// on every request, reducing latency by ~270ms on these high-traffic paths.
+const AUTH_SKIP_PREFIXES = [
+  "/api/online",
+  "/api/presence",
+  "/api/feed",
+  "/api/city",
+  "/api/sky-ads/track",
+  "/api/heartbeats",
+  "/dev/",
+  "/leaderboard",
+  "/live",
 ];
 
 const DEFAULT_API: [number, number] = [60, 60_000];
@@ -102,7 +120,8 @@ export async function middleware(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request });
 
-  if (hasSession) {
+  const skipAuth = AUTH_SKIP_PREFIXES.some((p) => pathname.startsWith(p));
+  if (hasSession && !skipAuth) {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

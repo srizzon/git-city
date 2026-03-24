@@ -37,8 +37,8 @@ export async function GET(request: Request) {
     );
   }
 
-  // Round 2: purchases + customizations + achievements + raid tags in parallel
-  const [purchasesResult, giftPurchasesResult, customizationsResult, achievementsResult, raidTagsResult] = await Promise.all([
+  // Round 2: purchases + customizations + achievements + raid tags + active drops in parallel
+  const [purchasesResult, giftPurchasesResult, customizationsResult, achievementsResult, raidTagsResult, activeDropsResult] = await Promise.all([
     sb
       .from("purchases")
       .select("developer_id, item_id")
@@ -64,6 +64,10 @@ export async function GET(request: Request) {
       .select("building_id, attacker_login, tag_style, expires_at")
       .in("building_id", devIds)
       .eq("active", true),
+    sb
+      .from("building_drops")
+      .select("id, building_id, rarity, points, max_pulls, pull_count, expires_at")
+      .gt("expires_at", new Date().toISOString()),
   ]);
 
   // Build owned items map (direct purchases + received gifts)
@@ -120,6 +124,20 @@ export async function GET(request: Request) {
     };
   }
 
+  // Build active drops as separate obfuscated array (keyed by dev rank)
+  const idToRank = new Map<number, number>();
+  for (const dev of devs) idToRank.set(dev.id, dev.rank);
+
+  const _d: { n: number; id: string; r: string; p: number; m: number; c: number; x: string }[] = [];
+  for (const row of activeDropsResult.data ?? []) {
+    if (row.pull_count < row.max_pulls) {
+      const rank = idToRank.get(row.building_id);
+      if (rank !== undefined) {
+        _d.push({ n: rank, id: row.id, r: row.rarity, p: row.points, m: row.max_pulls, c: row.pull_count, x: row.expires_at });
+      }
+    }
+  }
+
   // Merge everything
   const developersWithItems = devs.map((dev) => ({
     ...dev,
@@ -144,6 +162,7 @@ export async function GET(request: Request) {
   return NextResponse.json(
     {
       developers: developersWithItems,
+      _d,
       stats: statsResult.data ?? {
         total_developers: 0,
         total_contributions: 0,
