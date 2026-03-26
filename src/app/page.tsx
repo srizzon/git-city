@@ -2848,7 +2848,7 @@ function HomeContent() {
               <span className="text-cream">{theme.name}</span>
               <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
-            <div id="gc-radio-slot" />
+            <div id="gc-radio-slot" suppressHydrationWarning />
           </div>
 
           {/* Feed toggle (top-right, below GitHub badges on desktop) */}
