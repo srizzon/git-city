@@ -60,14 +60,24 @@ export async function POST(request: Request) {
     aura?: string | null;
   };
 
-  // Fetch owned items
-  const { data: purchases } = await admin
-    .from("purchases")
-    .select("item_id")
-    .eq("developer_id", dev.id)
-    .eq("status", "completed");
+  // Fetch owned items (bought directly + received as gifts)
+  const [{ data: bought }, { data: gifted }] = await Promise.all([
+    admin
+      .from("purchases")
+      .select("item_id")
+      .eq("developer_id", dev.id)
+      .is("gifted_to", null)
+      .eq("status", "completed"),
+    admin
+      .from("purchases")
+      .select("item_id")
+      .eq("gifted_to", dev.id)
+      .eq("status", "completed"),
+  ]);
 
-  const ownedSet = new Set((purchases ?? []).map((p) => p.item_id));
+  const ownedSet = new Set(
+    [...(bought ?? []), ...(gifted ?? [])].map((p) => p.item_id)
+  );
 
   // Validate each equipped item is owned and belongs to the correct zone
   const config: Record<string, string | null> = { crown: null, roof: null, aura: null };
