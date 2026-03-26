@@ -186,7 +186,7 @@ export default async function TrackingPage({ params }: Props) {
             Edit ad details &rarr;
           </Link>
           <Link
-            href="/ads/login"
+            href="/business/login?redirect=/ads/dashboard"
             className="text-[10px] normal-case transition-colors hover:text-cream"
             style={{ color: ACCENT }}
           >

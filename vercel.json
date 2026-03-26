@@ -9,6 +9,7 @@
     { "path": "/api/cron/city-snapshot",   "schedule": "*/10 * * * *" },
     { "path": "/api/cron/cleanup-sessions", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/refresh-ad-stats", "schedule": "0 * * * *" },
-    { "path": "/api/cron/ad-weekly-report", "schedule": "0 10 * * 1" }
+    { "path": "/api/cron/ad-weekly-report", "schedule": "0 10 * * 1" },
+    { "path": "/api/cron/jobs-expiry",      "schedule": "0 9 * * *" }
   ]
 }

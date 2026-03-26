@@ -5574,6 +5574,9 @@ function HomeContent() {
           onEnter={() => {
             window.location.href = "/arcade";
           }}
+          onViewJobs={() => {
+            window.location.href = "/jobs";
+          }}
           session={session}
           onSignIn={handleSignInWithRef}
         />

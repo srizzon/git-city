@@ -22,7 +22,7 @@ export function DashboardNav({ advertiser }: Props) {
 
   async function handleLogout() {
     await fetch("/api/ads/auth/logout", { method: "POST" });
-    router.push("/ads/login");
+    router.push("/business/login?redirect=/ads/dashboard");
   }
 
   return (

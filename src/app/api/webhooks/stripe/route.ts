@@ -151,6 +151,33 @@ export async function POST(request: Request) {
           break;
         }
 
+        // --- Job listing purchase ---
+        if (session.metadata?.type === "job_listing") {
+          const listingId = session.metadata.listing_id;
+          if (!listingId) {
+            console.error("Missing listing_id in session metadata:", session.id);
+            break;
+          }
+
+          const paymentIntentId =
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : session.payment_intent?.id;
+
+          await sb
+            .from("job_listings")
+            .update({
+              status: "pending_review",
+              tier: session.metadata.tier ?? "standard",
+              stripe_session_id: session.id,
+              stripe_payment_intent: paymentIntentId ?? null,
+            })
+            .eq("id", listingId);
+
+          console.log(`Job listing ${listingId} moved to pending_review after payment`);
+          break;
+        }
+
         // --- Pixel package purchase ---
         if (session.metadata?.type === "pixel_package") {
           const pxPackageId = session.metadata.package_id;

@@ -12,17 +12,21 @@ const survey = SURVEYS[SURVEY_ID];
 interface EArcadeCardProps {
   onClose: () => void;
   onEnter: () => void;
+  onViewJobs?: () => void;
   session: unknown;
   onSignIn?: () => void;
 }
 
-export default function EArcadeCard({ onClose, onEnter, session, onSignIn }: EArcadeCardProps) {
-  const [step, setStep] = useState(0); // 0 = intro, 1..N = questions, N+1 = thanks, -1 = error
+export default function EArcadeCard({ onClose, onEnter, onViewJobs, session, onSignIn }: EArcadeCardProps) {
+  const [view, setView] = useState<"hub" | "survey">("hub");
+  const [step, setStep] = useState(0); // 1..N = questions, N+1 = thanks, -1 = error
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [alreadyAnswered, setAlreadyAnswered] = useState<boolean | null>(null); // null = loading
+  const [alreadyAnswered, setAlreadyAnswered] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [xpEarned, setXpEarned] = useState(0);
   const [onlineCount, setOnlineCount] = useState<number | null>(null);
+  const [jobCount, setJobCount] = useState<number | null>(null);
+  const [notifyDone, setNotifyDone] = useState(false);
 
   // Fetch live player count from PartyKit
   useEffect(() => {
@@ -35,7 +39,15 @@ export default function EArcadeCard({ onClose, onEnter, session, onSignIn }: EAr
       .catch(() => {});
   }, []);
 
-  // Check if user already answered
+  // Fetch job count
+  useEffect(() => {
+    fetch("/api/jobs?count_only=true")
+      .then((r) => r.json())
+      .then((d: { total?: number }) => setJobCount(d.total ?? 0))
+      .catch(() => setJobCount(0));
+  }, []);
+
+  // Check if user already answered survey
   useEffect(() => {
     if (!session) { setAlreadyAnswered(false); return; }
     fetch(`/api/survey?id=${SURVEY_ID}`)
@@ -68,7 +80,7 @@ export default function EArcadeCard({ onClose, onEnter, session, onSignIn }: EAr
             setXpEarned(d.xp ?? 0);
             setStep(nextStep);
           })
-          .catch(() => setStep(-1)) // error state
+          .catch(() => setStep(-1))
           .finally(() => setSubmitting(false));
       } else {
         setStep(nextStep);
@@ -77,10 +89,16 @@ export default function EArcadeCard({ onClose, onEnter, session, onSignIn }: EAr
     [answers, step],
   );
 
+  const handleNotify = async () => {
+    const res = await fetch("/api/jobs/notify", { method: "POST" });
+    if (res.ok) setNotifyDone(true);
+  };
+
   const currentQuestion: SurveyQuestion | null =
     step >= 1 && step <= survey.questions.length ? survey.questions[step - 1] : null;
 
   const showThanks = step > survey.questions.length;
+  const hasJobs = jobCount !== null && jobCount > 0;
 
   return (
     <>
@@ -111,7 +129,7 @@ export default function EArcadeCard({ onClose, onEnter, session, onSignIn }: EAr
             <div className="h-1 w-10 rounded-full bg-border" />
           </div>
 
-          {/* Header (always visible) */}
+          {/* Header */}
           <div className="px-4 pb-3 sm:pt-4">
             <div className="flex items-center gap-3">
               <div
@@ -124,162 +142,242 @@ export default function EArcadeCard({ onClose, onEnter, session, onSignIn }: EAr
                 <p className="text-sm font-bold" style={{ color: ACCENT }}>
                   E.Arcade
                 </p>
-                <p className="text-[10px] text-muted">The city&apos;s office.</p>
+                <p className="text-[10px] text-muted">The heart of git city</p>
               </div>
+            </div>
+            {/* Live stats */}
+            <div className="mt-2 flex items-center gap-3 text-[9px] text-dim">
+              {onlineCount !== null && onlineCount > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#4ade80" }} />
+                  <span>{onlineCount} online</span>
+                </div>
+              )}
+              {jobCount !== null && (
+                <span>{jobCount} open job{jobCount !== 1 ? "s" : ""}</span>
+              )}
             </div>
           </div>
 
           <div className="mx-4 h-px bg-border" />
 
+          {/* ── HUB VIEW ── */}
+          {view === "hub" && alreadyAnswered !== null && (
+            <div className="px-4 py-3 space-y-2">
+              {/* Lobby section */}
+              <div
+                className="border-2 border-border p-3 space-y-2 transition-colors hover:border-border-light cursor-pointer"
+                onClick={() => {
+                  if (!session) { onSignIn?.(); return; }
+                  onEnter();
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm" style={{ color: ACCENT }}>{">"}_</span>
+                  <span className="text-[11px] text-cream font-bold">Lobby</span>
+                </div>
+                <p className="text-[9px] text-muted leading-relaxed">
+                  Chat with devs, sit at a terminal, discover what E. left behind.
+                </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: ACCENT }} />
+                    <span className="text-[9px] text-muted">
+                      {onlineCount !== null && onlineCount > 0 ? `${onlineCount} playing` : "Online now"}
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-bold" style={{ color: ACCENT }}>
+                    {session ? "Enter" : "Sign in to enter"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Jobs section */}
+              <div
+                className="border-2 border-border p-3 space-y-2 transition-colors hover:border-border-light cursor-pointer"
+                onClick={() => {
+                  if (!session) { onSignIn?.(); return; }
+                  if (hasJobs) { onViewJobs?.(); return; }
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm" style={{ color: ACCENT }}>$</span>
+                  <span className="text-[11px] text-cream font-bold">Jobs</span>
+                </div>
+                <p className="text-[9px] text-muted leading-relaxed">
+                  Real devs. Real jobs. No robots in between.
+                </p>
+
+                {hasJobs ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-muted">
+                      {jobCount} open position{jobCount !== 1 ? "s" : ""}
+                    </span>
+                    <span className="text-[9px] font-bold" style={{ color: ACCENT }}>
+                      View
+                    </span>
+                  </div>
+                ) : (
+                  /* Empty state — jobs launching soon */
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] text-dim">Launching soon</span>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!session) { onSignIn?.(); return; }
+                          window.location.href = "/jobs/career-profile";
+                        }}
+                        className="text-left text-[9px] transition-colors hover:text-cream"
+                        style={{ color: ACCENT }}
+                      >
+                        Create Career Profile — be ready
+                      </button>
+                      {!!session && !notifyDone && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleNotify(); }}
+                          className="text-left text-[9px] text-muted transition-colors hover:text-cream"
+                        >
+                          Notify me when jobs drop
+                        </button>
+                      )}
+                      {notifyDone && (
+                        <span className="text-[9px]" style={{ color: ACCENT }}>Subscribed</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Survey CTA (if not answered) */}
+              {!!session && !alreadyAnswered && (
+                <>
+                  <div className="mx-0 h-px bg-border" />
+                  <button
+                    onClick={() => { trackEArcadeSurveyStarted(); setView("survey"); setStep(1); }}
+                    className="w-full py-1.5 text-[9px] text-muted uppercase tracking-wider transition-all hover:text-cream"
+                  >
+                    Take survey (+{survey.xpReward} XP)
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* ── Loading state ── */}
-          {step === 0 && alreadyAnswered === null && (
+          {view === "hub" && alreadyAnswered === null && (
             <div className="px-4 py-4 text-center">
               <span className="text-[9px] text-muted">Loading...</span>
             </div>
           )}
 
-          {/* ── Ready to enter state ── */}
-          {step === 0 && alreadyAnswered !== null && (
-            <div className="px-4 py-3 space-y-3">
-              <p className="text-[10px] text-muted leading-relaxed">
-                The only building in Git City you can walk into. Chat with other devs, sit at a terminal, discover what E. left behind.
-              </p>
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="h-1.5 w-1.5 rounded-full animate-pulse"
-                  style={{ backgroundColor: ACCENT }}
-                />
-                <span className="text-[9px] text-muted">
-                  {onlineCount !== null && onlineCount > 0
-                    ? `${onlineCount} online now`
-                    : "Online now"}
-                </span>
-              </div>
-              <div className="mx-0 h-px bg-border" />
-              {session ? (
-                <div className="space-y-2">
+          {/* ── SURVEY VIEW ── */}
+          {view === "survey" && (
+            <>
+              {/* Back to hub */}
+              {!showThanks && step !== -1 && (
+                <div className="px-4 pt-2">
                   <button
-                    onClick={onEnter}
+                    onClick={() => { setView("hub"); setStep(0); setAnswers({}); }}
+                    className="text-[9px] text-muted transition-colors hover:text-cream"
+                  >
+                    &lt; Back
+                  </button>
+                </div>
+              )}
+
+              {/* Question state */}
+              {currentQuestion && (
+                <div className="px-4 py-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-muted">
+                      {step} / {survey.questions.length}
+                    </span>
+                    <div className="flex-1 h-0.5 bg-border overflow-hidden">
+                      <div
+                        className="h-full transition-all duration-300"
+                        style={{
+                          width: `${(step / survey.questions.length) * 100}%`,
+                          backgroundColor: ACCENT,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-cream font-bold">
+                    {currentQuestion.title}
+                  </p>
+
+                  <div className="space-y-1.5">
+                    {currentQuestion.options.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => selectAnswer(currentQuestion.key, opt.value)}
+                        disabled={submitting}
+                        className="w-full text-left px-3 py-2.5 text-[10px] border transition-all hover:brightness-125 disabled:opacity-50"
+                        style={{
+                          borderColor: ACCENT + "33",
+                          color: "#e8dcc8",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = ACCENT;
+                          e.currentTarget.style.backgroundColor = ACCENT + "11";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = ACCENT + "33";
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Error state */}
+              {step === -1 && (
+                <div className="px-4 py-4 space-y-3 text-center">
+                  <p className="text-[11px] text-red-400 font-bold">
+                    Something went wrong.
+                  </p>
+                  <p className="text-[9px] text-muted">
+                    Your answers were not saved.
+                  </p>
+                  <button
+                    onClick={() => setStep(survey.questions.length)}
                     className="w-full py-2 text-[10px] font-bold uppercase tracking-wider border-2 transition-all hover:brightness-125"
                     style={{ borderColor: ACCENT, color: ACCENT }}
                   >
-                    Enter
+                    Try again
                   </button>
-                  {!alreadyAnswered && (
-                    <button
-                      onClick={() => { trackEArcadeSurveyStarted(); setStep(1); }}
-                      className="w-full py-1.5 text-[9px] text-muted uppercase tracking-wider transition-all hover:text-cream"
-                    >
-                      Take survey (+{survey.xpReward} XP)
-                    </button>
+                </div>
+              )}
+
+              {/* Thanks state */}
+              {showThanks && (
+                <div className="px-4 py-4 space-y-3 text-center">
+                  <p className="text-[11px] text-cream font-bold">
+                    Thanks for your input!
+                  </p>
+                  {xpEarned > 0 && (
+                    <p className="text-[10px]" style={{ color: ACCENT }}>
+                      +{xpEarned} XP earned
+                    </p>
                   )}
-                </div>
-              ) : (
-                <button
-                  onClick={onSignIn}
-                  className="w-full py-2 text-[10px] font-bold uppercase tracking-wider border-2 transition-all hover:brightness-125"
-                  style={{ borderColor: ACCENT, color: ACCENT }}
-                >
-                  Sign in to enter
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* ── Question state ── */}
-          {currentQuestion && (
-            <div className="px-4 py-3 space-y-3">
-              {/* Progress */}
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] text-muted">
-                  {step} / {survey.questions.length}
-                </span>
-                <div className="flex-1 h-0.5 bg-border rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-300"
-                    style={{
-                      width: `${(step / survey.questions.length) * 100}%`,
-                      backgroundColor: ACCENT,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <p className="text-[11px] text-cream font-bold">
-                {currentQuestion.title}
-              </p>
-
-              <div className="space-y-1.5">
-                {currentQuestion.options.map((opt) => (
+                  <p className="text-[9px] text-muted">
+                    Your answers will shape what we build next.
+                  </p>
                   <button
-                    key={opt.value}
-                    onClick={() => selectAnswer(currentQuestion.key, opt.value)}
-                    disabled={submitting}
-                    className="w-full text-left px-3 py-2.5 text-[10px] border transition-all hover:brightness-125 disabled:opacity-50"
-                    style={{
-                      borderColor: ACCENT + "33",
-                      color: "#e8dcc8",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = ACCENT;
-                      e.currentTarget.style.backgroundColor = ACCENT + "11";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = ACCENT + "33";
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
+                    onClick={() => { setView("hub"); setAlreadyAnswered(true); }}
+                    className="w-full py-2 text-[10px] font-bold uppercase tracking-wider border-2 transition-all hover:brightness-125"
+                    style={{ borderColor: ACCENT + "66", color: ACCENT }}
                   >
-                    {opt.label}
+                    Back to hub
                   </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── Error state ── */}
-          {step === -1 && (
-            <div className="px-4 py-4 space-y-3 text-center">
-              <p className="text-[11px] text-red-400 font-bold">
-                Something went wrong.
-              </p>
-              <p className="text-[9px] text-muted">
-                Your answers were not saved.
-              </p>
-              <button
-                onClick={() => {
-                  // Retry: go back to last question
-                  setStep(survey.questions.length);
-                }}
-                className="w-full py-2 text-[10px] font-bold uppercase tracking-wider border-2 transition-all hover:brightness-125"
-                style={{ borderColor: ACCENT, color: ACCENT }}
-              >
-                Try again
-              </button>
-            </div>
-          )}
-
-          {/* ── Thanks state ── */}
-          {showThanks && (
-            <div className="px-4 py-4 space-y-3 text-center">
-              <p className="text-[11px] text-cream font-bold">
-                Thanks for your input!
-              </p>
-              {xpEarned > 0 && (
-                <p className="text-[10px]" style={{ color: ACCENT }}>
-                  +{xpEarned} XP earned
-                </p>
+                </div>
               )}
-              <p className="text-[9px] text-muted">
-                Your answers will shape what we build next.
-              </p>
-              <button
-                onClick={onClose}
-                className="w-full py-2 text-[10px] font-bold uppercase tracking-wider border-2 transition-all hover:brightness-125"
-                style={{ borderColor: ACCENT + "66", color: ACCENT }}
-              >
-                Close
-              </button>
-            </div>
+            </>
           )}
         </div>
       </div>

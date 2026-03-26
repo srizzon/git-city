@@ -62,7 +62,7 @@ export default function AdvertisePage() {
             &larr; Back to City
           </Link>
           <Link
-            href="/ads/login"
+            href="/business/login?redirect=/ads/dashboard"
             className="text-sm text-muted transition-colors hover:text-cream"
           >
             Log in

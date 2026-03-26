@@ -82,6 +82,50 @@ body {
 .scrollbar-thin::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 2px; }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #3a3a44; }
 
+/* ─── Rich text (Tiptap) content ─── */
+.tiptap h2 {
+  font-size: 14px;
+  color: #c8e64a;
+  margin-top: 20px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.tiptap h2:first-child { margin-top: 0; }
+.tiptap h3 {
+  font-size: 13px;
+  color: #e8dcc8;
+  margin-top: 16px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.tiptap p {
+  color: #c8b89c;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+.tiptap ul, .tiptap ol {
+  padding-left: 20px;
+  margin-bottom: 8px;
+}
+.tiptap li {
+  color: #c8b89c;
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+.tiptap li::marker { color: #c8e64a; }
+.tiptap a {
+  color: #c8e64a;
+  text-decoration: underline;
+}
+.tiptap strong { color: #e8dcc8; }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #5c5c6c;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
 /* ─── Free Gift CTA ─── */
 @keyframes gift-glow {
   0%, 100% { box-shadow: 0 0 8px 2px var(--gift-glow-color, #c8e64a66), 4px 4px 0 0 var(--gift-shadow-color, #5a7a00); }
