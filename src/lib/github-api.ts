@@ -342,3 +342,33 @@ export async function fetchGitHubDeveloperData(
     } : {}),
   };
 }
+
+/**
+ * Fetch a user's followers from GitHub.
+ * Returns up to 100 logins.
+ */
+export async function fetchFollowers(login: string): Promise<string[]> {
+  const headers = ghHeaders();
+  const res = await fetch(
+    `https://api.github.com/users/${encodeURIComponent(login)}/followers?per_page=100`,
+    { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data) ? data.map((u: any) => u.login.toLowerCase()) : [];
+}
+
+/**
+ * Fetch the users a user is following from GitHub.
+ * Returns up to 100 logins.
+ */
+export async function fetchFollowing(login: string): Promise<string[]> {
+  const headers = ghHeaders();
+  const res = await fetch(
+    `https://api.github.com/users/${encodeURIComponent(login)}/following?per_page=100`,
+    { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data) ? data.map((u: any) => u.login.toLowerCase()) : [];
+}

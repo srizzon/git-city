@@ -225,12 +225,12 @@ function calcHeightV2(
   const cnsScore = Math.pow(consistencyNorm, 0.6);
 
   const composite =
-    cScore  * 0.35 +
-    sScore  * 0.20 +
+    cScore * 0.35 +
+    sScore * 0.20 +
     prScore * 0.15 +
     extScore * 0.10 +
     cnsScore * 0.10 +
-    fScore  * 0.10;
+    fScore * 0.10;
 
   const height = Math.min(MAX_BUILDING_HEIGHT, MIN_BUILDING_HEIGHT + composite * HEIGHT_RANGE);
   return { height, composite };
@@ -380,7 +380,11 @@ function localBlockAxisPos(idx: number, footprint: number): number {
   return sign * (abs * footprint + abs * STREET_W);
 }
 
-export function generateCityLayout(devs: DeveloperRecord[]): {
+export function generateCityLayout(
+  devs: DeveloperRecord[],
+  neighbors: DeveloperRecord[] = [],
+  centerLogin?: string,
+): {
   buildings: CityBuilding[];
   plazas: CityPlaza[];
   decorations: CityDecoration[];
@@ -392,12 +396,26 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   const plazas: CityPlaza[] = [];
   const decorations: CityDecoration[] = [];
   const districtZones: DistrictZone[] = [];
-  const maxContrib = devs.reduce((max, d) => Math.max(max, d.contributions), 1);
-  const maxStars = devs.reduce((max, d) => Math.max(max, d.total_stars), 1);
-  const maxContribV2 = devs.reduce((max, d) => Math.max(max, d.contributions_total ?? 0), 1);
+  // ── 0. Pre-process for Neighborhood ──
+  const neighborSet = new Set(neighbors.map(n => n.github_login.toLowerCase()));
+  const neighborhoodSet = new Set(neighborSet);
+  if (centerLogin) neighborhoodSet.add(centerLogin.toLowerCase());
+
+  // Merge neighbors into the layout pool if they aren't already there
+  const allDevsForLayout = [...devs];
+  const existingLogins = new Set(devs.map(d => d.github_login.toLowerCase()));
+  for (const n of neighbors) {
+    if (!existingLogins.has(n.github_login.toLowerCase())) {
+      allDevsForLayout.push(n);
+    }
+  }
+
+  const maxContrib = allDevsForLayout.reduce((max, d) => Math.max(max, d.contributions), 1);
+  const maxStars = allDevsForLayout.reduce((max, d) => Math.max(max, d.total_stars), 1);
+  const maxContribV2 = allDevsForLayout.reduce((max, d) => Math.max(max, d.contributions_total ?? 0), 1);
 
   // ── 1. Group by district, sort within each, concat in priority order ──
-  const composites = precomputeComposites(devs, maxContrib, maxStars, maxContribV2);
+  const composites = precomputeComposites(allDevsForLayout, maxContrib, maxStars, maxContribV2);
 
   const DISTRICT_ORDER = [
     'backend', 'frontend', 'fullstack', 'data_ai', 'devops',
@@ -405,7 +423,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   ];
 
   const districtGroups: Record<string, DeveloperRecord[]> = {};
-  for (const dev of devs) {
+  for (const dev of allDevsForLayout) {
     const did = dev.district ?? inferDistrict(dev.primary_language);
     if (!districtGroups[did]) districtGroups[did] = [];
     districtGroups[did].push(dev);
@@ -424,34 +442,41 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   // ── Extract top 50 global devs as "downtown" (center, around the spire) ──
   const DOWNTOWN_COUNT = 50;
   const LOTS_PER_BLOCK = BLOCK_SIZE * BLOCK_SIZE; // 16
-  const allDevsSorted = [...devs].sort((a, b) =>
+  const allDevsSorted = [...allDevsForLayout].sort((a, b) =>
     (composites.get(b.github_login) ?? 0) - (composites.get(a.github_login) ?? 0)
   );
   const downtownDevs = allDevsSorted.slice(0, DOWNTOWN_COUNT);
-  const downtownSet = new Set(downtownDevs.map(d => d.github_login));
 
-  for (let i = 0; i < downtownDevs.length; i += LOTS_PER_BLOCK) {
-    const end = Math.min(i + LOTS_PER_BLOCK, downtownDevs.length);
-    const slice = downtownDevs.slice(i, end);
-    const shuffled = seededShuffle(slice, hashStr('downtown') + i);
-    for (let j = 0; j < shuffled.length; j++) downtownDevs[i + j] = shuffled[j];
+  // Neighborhood exclusion: remove neighborhood from standard pools
+  const filteredDowntownDevs = downtownDevs.filter(d => !neighborhoodSet.has(d.github_login.toLowerCase()));
+  const downtownSet = new Set(filteredDowntownDevs.map(d => d.github_login));
+
+  const downtownOverride = new Set(filteredDowntownDevs.map(d => d.github_login));
+
+  // neighborhoodDevs: specific users for (0,0) cluster
+  const centerDev = centerLogin ? allDevsForLayout.find(d => d.github_login.toLowerCase() === centerLogin.toLowerCase()) : null;
+  const neighborhoodDevs: DeveloperRecord[] = [];
+  if (centerDev) neighborhoodDevs.push(centerDev);
+  for (const n of neighbors) {
+    if (n.github_login.toLowerCase() !== centerLogin?.toLowerCase()) {
+      neighborhoodDevs.push(n);
+    }
   }
-
-  const downtownOverride = new Set(downtownDevs.map(d => d.github_login));
+  if (neighborhoodDevs.length > 0) neighborhoodDevs.forEach(d => downtownOverride.add(d.github_login));
 
   // ── Per-district dev arrays (sorted by composite, block-shuffled, minus downtown) ──
   const districtDevArrays: { did: string; devs: DeveloperRecord[] }[] = [];
   for (const did of DISTRICT_ORDER) {
     const group = districtGroups[did];
     if (!group || group.length === 0) continue;
-    const filtered = group.filter(d => !downtownSet.has(d.github_login));
+    const filtered = group.filter(d => !downtownSet.has(d.github_login) && !neighborhoodSet.has(d.github_login.toLowerCase()));
     if (filtered.length === 0) continue;
     // Full shuffle: organic mix of tall and short buildings
     districtDevArrays.push({ did, devs: seededShuffle(filtered, hashStr(did)) });
   }
   for (const [did, group] of Object.entries(districtGroups)) {
     if (!DISTRICT_ORDER.includes(did)) {
-      const filtered = group.filter(d => !downtownSet.has(d.github_login));
+      const filtered = group.filter(d => !downtownSet.has(d.github_login) && !neighborhoodSet.has(d.github_login.toLowerCase()));
       if (filtered.length === 0) continue;
       districtDevArrays.push({ did, devs: seededShuffle(filtered, hashStr(did)) });
     }
@@ -674,8 +699,12 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   // Sponsored landmarks (dynamic)
   for (const s of SPONSORS) occupiedCells.add(`${s.gridX},${s.gridZ}`);
 
-  // ── A) Downtown: spiral at grid (0, 0) ──
-  placeSpiralCluster(downtownDevs, 0, 0, true);
+  // ── A) Neighborhood + Downtown: spiral at grid (0, 0) ──
+  if (neighborhoodDevs.length > 0) {
+    placeSpiralCluster(neighborhoodDevs, 0, 0, true);
+  }
+  // Standard Downtown remaining devs
+  placeSpiralCluster(filteredDowntownDevs, 0, 0, neighborhoodDevs.length === 0);
 
   // ── B) Districts: spiral at offset grid positions ──
   for (let di = 0; di < districtDevArrays.length; di++) {
