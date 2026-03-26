@@ -446,6 +446,7 @@ function HomeContent() {
   const [stats, setStats] = useState<CityStats>({ total_developers: 0, total_contributions: 0 });
   const [milestoneCelebrations, setMilestoneCelebrations] = useState<{ milestone: number; reached_at: string }[]>([]);
   const [focusedBuilding, setFocusedBuilding] = useState<string | null>(null);
+  const [connections, setConnections] = useState<DeveloperRecord[]>([]);
   const [shareData, setShareData] = useState<{
     login: string;
     contributions: number;
@@ -716,7 +717,7 @@ function HomeContent() {
           })
         );
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, [session, buildings]);
 
@@ -750,7 +751,7 @@ function HomeContent() {
     const admin = !!authLogin && adminLogins.includes(authLogin);
     setIsAdmin(admin);
     if (admin) {
-      fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => {});
+      fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => { });
     }
   }, [authLogin]);
 
@@ -795,6 +796,20 @@ function HomeContent() {
           setThemeIndex(data.city_theme);
           localStorage.setItem("gitcity_theme", String(data.city_theme));
         }
+      })
+      .catch(() => { });
+  }, [sessionUserId]);
+
+  // Fetch user connections (followers/following)
+  useEffect(() => {
+    if (!sessionUserId) {
+      setConnections([]);
+      return;
+    }
+    fetch("/api/user/connections")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.connections) setConnections(data.connections);
       })
       .catch(() => { });
   }, [sessionUserId]);
@@ -1262,7 +1277,7 @@ function HomeContent() {
 
     rawDevsRef.current = allDevs;
     setStats(cityStats);
-    const layout = generateCityLayout(allDevs);
+    const layout = generateCityLayout(allDevs, connections, authLogin);
 
     // Decode obfuscated drops (_d) and merge into buildings by rank
     if (dropsPayload.length > 0) {
@@ -1284,7 +1299,14 @@ function HomeContent() {
     setDistrictZones(layout.districtZones);
     setCityCache({ ...layout, stats: cityStats, rawDevs: rawDevsRef.current });
     return layout.buildings;
-  }, []);
+  }, [connections, authLogin]);
+
+  // Regenerate city layout when connections or auth change (after initial load)
+  useEffect(() => {
+    if (loadStage === "done") {
+      reloadCity();
+    }
+  }, [connections, authLogin, reloadCity, loadStage]);
 
   // Handle loading fade complete: transition to "done" and trigger intro
   const handleLoadFadeComplete = useCallback(() => {
@@ -1396,7 +1418,7 @@ function HomeContent() {
 
         rawDevsRef.current = allDevs;
         setStats(cityStats);
-        const finalLayout = generateCityLayout(allDevs);
+        const finalLayout = generateCityLayout(allDevs, connections, authLogin);
 
         // Decode obfuscated drops (_d) and merge into buildings by rank
         if (dropsPayload.length > 0) {
@@ -1550,7 +1572,7 @@ function HomeContent() {
             xp_level: devData.xp_level ?? 1,
           };
           rawDevsRef.current = [...rawDevsRef.current, newDev];
-          const layout = generateCityLayout(rawDevsRef.current);
+          const layout = generateCityLayout(rawDevsRef.current, connections, authLogin);
           setBuildings(layout.buildings);
           setPlazas(layout.plazas);
           setDecorations(layout.decorations);
@@ -1602,7 +1624,7 @@ function HomeContent() {
                 : prev
             );
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     } else {
       // Buildings array was replaced (full layout loaded) — keep selectedBuilding in sync
@@ -1633,7 +1655,7 @@ function HomeContent() {
               b.login.toLowerCase() === authLogin ? { ...b, claimed: true } : b
             ));
           })
-          .catch(() => {});
+          .catch(() => { });
       }
       return;
     }
@@ -1672,7 +1694,7 @@ function HomeContent() {
           xp_level: devData.xp_level ?? 1,
         };
         rawDevsRef.current = [...rawDevsRef.current, newDev];
-        const layout = generateCityLayout(rawDevsRef.current);
+        const layout = generateCityLayout(rawDevsRef.current, connections, authLogin);
         setBuildings(layout.buildings);
         setPlazas(layout.plazas);
         setDecorations(layout.decorations);
@@ -1857,7 +1879,7 @@ function HomeContent() {
         )
         : [...rawDevsRef.current, syncedDev];
 
-      const layout = generateCityLayout(rawDevsRef.current);
+      const layout = generateCityLayout(rawDevsRef.current, connections, authLogin);
       setBuildings(layout.buildings);
       setPlazas(layout.plazas);
       setDecorations(layout.decorations);
@@ -2321,7 +2343,7 @@ function HomeContent() {
         onSponsorClick={(slug) => {
           trackLandmarkClicked(slug);
           const adId = getLandmarkAdId(slug);
-          if (adId) fetch("/api/sky-ads/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad_id: adId, event_type: "click" }) }).catch(() => {});
+          if (adId) fetch("/api/sky-ads/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad_id: adId, event_type: "click" }) }).catch(() => { });
           if (!exploreMode) setExploreMode(true);
           setActiveSponsor(slug);
           setSelectedBuilding(null);
