@@ -1,4 +1,6 @@
 import { getSupabaseAdmin } from "./supabase";
+import { sendAchievementNotification } from "./notification-senders/achievement";
+import { xpForAchievementTier } from "./xp";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -35,6 +37,14 @@ export const TIER_EMOJI: Record<string, string> = {
   diamond: "\u{1F48E}", // gem
 };
 
+/** Numeric order for sorting tiers lowest → highest. */
+export const TIER_ORDER: Record<string, number> = {
+  bronze: 0,
+  silver: 1,
+  gold: 2,
+  diamond: 3,
+};
+
 // ─── Core Logic ──────────────────────────────────────────────
 
 interface DevStats {
@@ -48,6 +58,9 @@ interface DevStats {
   app_streak?: number;
   kudos_streak?: number;
   raid_xp?: number;
+  /** Number of shop items purchased (paid or free). */
+  purchases?: number;
+  dailies_completed?: number;
 }
 
 /**
@@ -104,6 +117,10 @@ export async function checkAchievements(
         return (stats.kudos_streak ?? 0) >= a.threshold;
       case "raid":
         return (stats.raid_xp ?? 0) >= a.threshold;
+      case "purchases":
+        return (stats.purchases ?? 0) >= a.threshold;
+      case "dailies":
+        return (stats.dailies_completed ?? 0) >= a.threshold;
       default:
         return false;
     }
@@ -137,9 +154,21 @@ export async function checkAchievements(
       status: "completed",
     }));
 
-    // Insert one by one, skip if already owned (unique index handles dedup)
-    for (const row of purchaseRows) {
-      await sb.from("purchases").insert(row);
+    // Batch upsert — unique index on (developer_id, item_id) prevents duplicates
+    await sb
+      .from("purchases")
+      .upsert(purchaseRows, { onConflict: "developer_id,item_id" });
+  }
+
+  // Grant XP for each achievement unlock
+  for (const a of newUnlocks) {
+    const xpAmount = xpForAchievementTier(a.tier);
+    if (xpAmount > 0) {
+      sb.rpc("grant_xp", {
+        p_developer_id: developerId,
+        p_source: "achievement",
+        p_amount: xpAmount,
+      }).then();
     }
   }
 
@@ -173,11 +202,30 @@ export async function checkAchievements(
     });
   }
 
+  // Notify developer of gold/diamond achievements (fire-and-forget)
+  if (actorLogin) {
+    void (async () => {
+      try {
+        sendAchievementNotification(
+          developerId,
+          actorLogin,
+          newUnlocks.map((a) => ({ id: a.id, name: a.name, tier: a.tier })),
+        );
+      } catch (err: unknown) {
+        console.error("[achievements] notification failed", err);
+      }
+    })();
+  }
+
   return newUnlocks.map((a) => a.id);
 }
 
+/** Max IDs per Supabase `.in()` query to avoid URL length limits. */
+const CHUNK_SIZE = 500;
+
 /**
  * Batch fetch achievements for multiple developers (for city API).
+ * Automatically chunks large ID arrays to stay within Supabase query limits.
  */
 export async function getAchievementsForDevelopers(
   developerIds: number[]
@@ -185,13 +233,27 @@ export async function getAchievementsForDevelopers(
   if (developerIds.length === 0) return {};
 
   const sb = getSupabaseAdmin();
-  const { data } = await sb
-    .from("developer_achievements")
-    .select("developer_id, achievement_id")
-    .in("developer_id", developerIds);
+
+  // Split into chunks to avoid Supabase .in() URL length limits
+  const chunks: number[][] = [];
+  for (let i = 0; i < developerIds.length; i += CHUNK_SIZE) {
+    chunks.push(developerIds.slice(i, i + CHUNK_SIZE));
+  }
+
+  const rows = (
+    await Promise.all(
+      chunks.map((chunk) =>
+        sb
+          .from("developer_achievements")
+          .select("developer_id, achievement_id")
+          .in("developer_id", chunk)
+          .then(({ data }) => data ?? [])
+      )
+    )
+  ).flat();
 
   const result: Record<number, string[]> = {};
-  for (const row of data ?? []) {
+  for (const row of rows) {
     if (!result[row.developer_id]) result[row.developer_id] = [];
     result[row.developer_id].push(row.achievement_id);
   }

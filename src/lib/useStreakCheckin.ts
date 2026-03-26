@@ -15,6 +15,12 @@ export interface StreakReward {
   item_name: string;
 }
 
+export interface XpGrantResult {
+  granted: number;
+  new_total: number;
+  new_level: number;
+}
+
 export interface StreakData {
   checked_in: boolean;
   already_today: boolean;
@@ -26,6 +32,7 @@ export interface StreakData {
   kudos_since_last: number;
   raids_since_last?: RaidSinceLast[];
   streak_reward?: StreakReward | null;
+  xp?: XpGrantResult | null;
 }
 
 const CACHE_KEY = "gc_checkin";

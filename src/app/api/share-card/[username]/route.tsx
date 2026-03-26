@@ -479,6 +479,7 @@ function renderLandscape(
     {
       width: 1200,
       height: 675,
+      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
       fonts: [
         {
           name: "Silkscreen",
@@ -855,6 +856,7 @@ function renderStories(
     {
       width: 1080,
       height: 1920,
+      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
       fonts: [
         {
           name: "Silkscreen",

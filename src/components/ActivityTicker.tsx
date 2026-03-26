@@ -44,11 +44,13 @@ function formatEvent(e: FeedEvent): string {
     case "leaderboard_change":
       return `\u{1F451} ${meta.login ? `@${meta.login}` : actor} entered top ${meta.position ?? 3}!`;
     case "raid_success":
-      return `\u{1F4A5} ${meta.attacker_login ? `@${meta.attacker_login}` : actor} raided ${meta.defender_login ? `@${meta.defender_login}` : target}'s building`;
+      return `\u{1F4A5} ${meta.attacker_login ? `@${meta.attacker_login}` : actor} battled ${meta.defender_login ? `@${meta.defender_login}` : target}'s building`;
     case "raid_failed":
       return `\u{1F6E1} ${meta.defender_login ? `@${meta.defender_login}` : target} defended against ${meta.attacker_login ? `@${meta.attacker_login}` : actor}`;
     case "streak_checkin":
       return `\u{1F525} ${meta.login ? `@${meta.login}` : actor} checked in (${meta.streak}-day streak)`;
+    case "github_star_verified":
+      return `\u2B50 ${meta.login ? `@${meta.login}` : actor} unlocked the GitHub Star`;
     case "dev_highlight": {
       const login = meta.login ? `@${meta.login}` : actor;
       switch (meta.highlight) {
@@ -77,9 +79,10 @@ interface Props {
   events: FeedEvent[];
   onEventClick?: (event: FeedEvent) => void;
   onOpenPanel?: () => void;
+  hasBottomBar?: boolean;
 }
 
-export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Props) {
+export default function ActivityTicker({ events, onEventClick, onOpenPanel, hasBottomBar = false }: Props) {
   const tickerText = useMemo(() => {
     return events.map((e) => ({ id: e.id, text: formatEvent(e), event: e }));
   }, [events]);
@@ -88,26 +91,38 @@ export default function ActivityTicker({ events, onEventClick, onOpenPanel }: Pr
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-30 flex h-7 items-center overflow-hidden border-t border-border/30 bg-bg/90 backdrop-blur-sm cursor-pointer"
-      onClick={onOpenPanel}
+      className={`fixed ${hasBottomBar ? "bottom-11.5" : "bottom-0"} sm:bottom-0 left-0 right-0 z-30 flex h-7 items-center border-t border-border/30 bg-bg/90 backdrop-blur-sm`}
     >
       <div
-        className="ticker-scroll flex whitespace-nowrap"
-        style={{ "--ticker-duration": `${Math.max(30, tickerText.length * 2)}s` } as React.CSSProperties}
+        className="min-w-0 flex-1 overflow-hidden cursor-pointer"
+        onClick={onOpenPanel}
       >
-        {/* Duplicate for seamless loop */}
-        {[...tickerText, ...tickerText].map((item, i) => (
-          <span
-            key={`${item.id}-${i}`}
-            className="mx-6 text-[10px] text-muted hover:text-cream transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEventClick?.(item.event);
-            }}
-          >
-            {item.text}
-          </span>
-        ))}
+        <div
+          className="ticker-scroll flex whitespace-nowrap"
+          style={{ "--ticker-duration": `${Math.max(20, tickerText.length)}s` } as React.CSSProperties}
+        >
+          {[...tickerText, ...tickerText].map((item, i) => (
+            <span
+              key={`${item.id}-${i}`}
+              className="mx-6 text-[10px] text-muted hover:text-cream transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEventClick?.(item.event);
+              }}
+            >
+              {item.text}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer links */}
+      <div className="hidden sm:flex items-center gap-2 shrink-0 pr-3 pl-2 border-l border-border/30">
+        <a href="/terms" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">Terms</a>
+        <span className="text-[8px] text-cream/10">·</span>
+        <a href="/privacy" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">Privacy</a>
+        <span className="text-[8px] text-cream/10">·</span>
+        <a href="/support" className="text-[8px] text-cream/20 transition-colors hover:text-cream/50">Support</a>
       </div>
 
       <style jsx>{`

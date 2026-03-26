@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import type { AdStats, ConfirmState, ModalState } from "../_lib/types";
 import { useAdsUrlState } from "../_lib/use-ads-url-state";
 import { useAdsData } from "../_lib/use-ads-data";
@@ -14,8 +15,10 @@ import { BatchToolbar } from "./batch-toolbar";
 import { AdTable } from "./ad-table";
 
 export function AdsDashboard() {
+  const searchParams = useSearchParams();
   const { filters, setFilter, handleSort } = useAdsUrlState();
   const { toasts, addToast, dismissToast } = useToast();
+  const [reportMode, setReportMode] = useState(searchParams.get("report") === "true");
 
   const {
     ads,
@@ -130,77 +133,138 @@ export function AdsDashboard() {
     });
   }, [selectedIds, handleBatch]);
 
+  const toggleReportMode = useCallback(() => {
+    setReportMode((prev) => {
+      const next = !prev;
+      const url = new URL(window.location.href);
+      if (next) url.searchParams.set("report", "true");
+      else url.searchParams.delete("report");
+      window.history.replaceState({}, "", url.toString());
+      return next;
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-bg p-4 sm:p-6 lg:p-8">
+      {/* Global loading bar */}
+      {loading && !reportMode && (
+        <div className="fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden bg-border">
+          <div
+            className="h-full w-1/3 bg-lime"
+            style={{ animation: "loading-slide 1s ease-in-out infinite" }}
+          />
+          <style>{`@keyframes loading-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }`}</style>
+        </div>
+      )}
+
       <div className="mx-auto max-w-7xl">
-        {/* Toast */}
-        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        {!reportMode && (
+          <>
+            {/* Toast */}
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
-        {/* Confirm Dialog */}
-        <ConfirmDialog state={confirm} onClose={closeConfirm} />
+            {/* Confirm Dialog */}
+            <ConfirmDialog state={confirm} onClose={closeConfirm} />
 
-        {/* Ad Modal */}
-        <AdModal
-          open={modal.open}
-          mode={modal.mode}
-          ad={modal.ad}
-          saving={saving}
-          onClose={closeModal}
-          onCreate={handleCreate}
-          onEdit={handleEdit}
-        />
+            {/* Ad Modal */}
+            <AdModal
+              open={modal.open}
+              mode={modal.mode}
+              ad={modal.ad}
+              saving={saving}
+              onClose={closeModal}
+              onCreate={handleCreate}
+              onEdit={handleEdit}
+            />
+          </>
+        )}
 
         {/* Header */}
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl text-cream">ADS</h1>
-            <p className="mt-1 text-xs text-muted">
-              {ads.length} ads total / {activeCount} active / {paidCount} paid
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <a
-              href="/"
-              className="border border-border px-4 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
-            >
-              BACK
-            </a>
+        {reportMode ? (
+          <div className="mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-lime tracking-widest">GIT CITY</span>
+              <span className="text-xs text-dim">/</span>
+              {filteredAndSorted.length > 0 && (
+                <>
+                  <span className="text-xs text-cream">{filteredAndSorted[0].brand || filteredAndSorted[0].id}</span>
+                  <span className="text-xs text-dim">/</span>
+                </>
+              )}
+              <span className="text-xs text-muted">Ad Report</span>
+              <span className="text-xs text-dim">
+                {filters.period === "7d" ? "Last 7 days" : filters.period === "30d" ? "Last 30 days" : "All time"}
+              </span>
+            </div>
             <button
-              onClick={openCreateModal}
-              className="cursor-pointer border-2 border-lime px-4 py-2 text-xs text-lime transition-colors hover:bg-lime/10"
+              onClick={toggleReportMode}
+              className="cursor-pointer text-xs text-dim hover:text-muted transition-colors"
             >
-              + NEW AD
+              Exit report
             </button>
           </div>
-        </div>
+        ) : (
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-2xl text-cream">ADS</h1>
+              <p className="mt-1 text-xs text-muted">
+                {ads.length} ads total / {activeCount} active / {paidCount} paid
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={toggleReportMode}
+                className="cursor-pointer border border-border px-4 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
+              >
+                REPORT
+              </button>
+              <a
+                href="/"
+                className="border border-border px-4 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
+              >
+                BACK
+              </a>
+              <button
+                onClick={openCreateModal}
+                className="cursor-pointer border-2 border-lime px-4 py-2 text-xs text-lime transition-colors hover:bg-lime/10"
+              >
+                + NEW AD
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Summary Cards */}
-        <SummaryCards totals={totals} />
+        <SummaryCards totals={totals} periodDays={filters.period === "7d" ? 7 : filters.period === "30d" ? 30 : null} />
 
         {/* Filters */}
-        <AdFilters
-          filters={filters}
-          setFilter={setFilter}
-          onRefresh={fetchStats}
-          filteredCount={filteredAndSorted.length}
-          totalCount={ads.length}
-        />
+        {!reportMode && (
+          <AdFilters
+            filters={filters}
+            setFilter={setFilter}
+            onRefresh={fetchStats}
+            filteredCount={filteredAndSorted.length}
+            totalCount={ads.length}
+          />
+        )}
 
         {/* Error */}
-        {error && (
+        {error && !reportMode && (
           <div className="mb-4 border border-red-800 bg-red-900/20 p-4 text-xs text-red-400">
             {error}
           </div>
         )}
 
         {/* Batch Toolbar */}
-        <BatchToolbar
-          count={selectedIds.size}
-          onPause={batchPause}
-          onResume={batchResume}
-          onDelete={batchDelete}
-          onClear={() => setSelectedIds(new Set())}
-        />
+        {!reportMode && (
+          <BatchToolbar
+            count={selectedIds.size}
+            onPause={batchPause}
+            onResume={batchResume}
+            onDelete={batchDelete}
+            onClear={() => setSelectedIds(new Set())}
+          />
+        )}
 
         {/* Table */}
         <AdTable
@@ -211,6 +275,7 @@ export function AdsDashboard() {
           sortDir={filters.dir}
           expandedId={expandedId}
           selectedIds={selectedIds}
+          reportMode={reportMode}
           onSort={handleSort}
           onToggleExpand={(id) =>
             setExpandedId((prev) => (prev === id ? null : id))

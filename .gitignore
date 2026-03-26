@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -57,3 +57,15 @@ docs/
 *.mov
 
 .vscode
+
+# partykit local state
+.partykit/
+
+# arcade dev/test scripts
+scripts/test-*.mjs
+scripts/recolor-*.mjs
+
+# vscode extension build artifacts
+packages/vscode-extension/dist/
+packages/vscode-extension/package-lock.json
+packages/vscode-extension/*.vsix

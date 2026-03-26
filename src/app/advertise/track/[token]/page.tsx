@@ -5,6 +5,15 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 const ACCENT = "#c8e64a";
 
+// Historical baselines from Himetrica (tracking was lost in Supabase due to www origin bug).
+// Same map as in /api/sky-ads/analytics — keep in sync.
+const HISTORICAL_BASELINES: Record<string, { impressions: number; clicks: number; cta_clicks: number }> = {
+  "gitcity":   { impressions: 311161, clicks: 2527, cta_clicks: 1110 },
+  "samuel":    { impressions: 280045, clicks: 2274, cta_clicks: 999 },
+  "build":     { impressions: 248929, clicks: 2022, cta_clicks: 888 },
+  "advertise": { impressions: 31116,  clicks: 253,  cta_clicks: 110 },
+};
+
 export const metadata: Metadata = {
   title: "Ad Tracking - Git City Sky Ads",
   robots: { index: false, follow: false },
@@ -47,6 +56,12 @@ export default async function TrackingPage({ params }: Props) {
       .eq("ad_id", ad.id)
       .eq("event_type", "cta_click"),
   ]);
+
+  // Add historical baselines
+  const baseline = HISTORICAL_BASELINES[ad.id] ?? { impressions: 0, clicks: 0, cta_clicks: 0 };
+  const totalImpressions = (impressions.count ?? 0) + baseline.impressions;
+  const totalClicks = (clicks.count ?? 0) + baseline.clicks;
+  const totalCtaClicks = (ctaClicks.count ?? 0) + baseline.cta_clicks;
 
   const now = new Date();
   const endsAt = ad.ends_at ? new Date(ad.ends_at) : null;
@@ -122,9 +137,9 @@ export default async function TrackingPage({ params }: Props) {
         {/* Stats */}
         <div className="mt-6 grid grid-cols-3 gap-4">
           {[
-            { label: "Impressions", value: impressions.count ?? 0 },
-            { label: "Clicks", value: clicks.count ?? 0 },
-            { label: "CTA Clicks", value: ctaClicks.count ?? 0 },
+            { label: "Impressions", value: totalImpressions },
+            { label: "Clicks", value: totalClicks },
+            { label: "CTA Clicks", value: totalCtaClicks },
           ].map((stat) => (
             <div
               key={stat.label}
@@ -162,13 +177,20 @@ export default async function TrackingPage({ params }: Props) {
           </div>
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 flex items-center justify-center gap-6">
           <Link
             href={`/advertise/setup/${token}`}
             className="text-[10px] normal-case transition-colors hover:text-cream"
             style={{ color: ACCENT }}
           >
             Edit ad details &rarr;
+          </Link>
+          <Link
+            href="/ads/login"
+            className="text-[10px] normal-case transition-colors hover:text-cream"
+            style={{ color: ACCENT }}
+          >
+            Advertiser Dashboard &rarr;
           </Link>
         </div>
 

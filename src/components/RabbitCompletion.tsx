@@ -18,7 +18,6 @@ export default function RabbitCompletion({ onComplete }: RabbitCompletionProps) 
   const [line2, setLine2] = useState("");
   const [showCursor, setShowCursor] = useState(true);
   const charIdx = useRef(0);
-  const mountTime = useRef(Date.now());
 
   // Phase transitions
   useEffect(() => {
@@ -83,7 +82,7 @@ export default function RabbitCompletion({ onComplete }: RabbitCompletionProps) 
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[100] pointer-events-none" style={{ fontFamily: "'Silkscreen', monospace" }}>
+    <div className="fixed inset-0 z-100 pointer-events-none" style={{ fontFamily: "'Silkscreen', monospace" }}>
       {/* Glitch effect */}
       {phase === "glitch" && (
         <div

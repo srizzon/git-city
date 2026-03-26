@@ -6,7 +6,9 @@ import {
   calculateAttackScore,
   calculateDefenseScore,
   getStrengthEstimate,
-  MAX_RAIDS_PER_DAY,
+  getEffectiveMaxRaids,
+  isWeeklyCooldownActive,
+  isFridayThe13th,
 } from "@/lib/raid";
 import type { RaidBoostItem } from "@/lib/raid";
 
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  const maxRaids = getEffectiveMaxRaids();
   let raidsToday = 0;
   let targetRaidedThisWeek = false;
   try {
@@ -83,27 +86,29 @@ export async function POST(request: Request) {
       .gte("created_at", todayStart.toISOString());
     raidsToday = count ?? 0;
 
-    if (raidsToday >= MAX_RAIDS_PER_DAY) {
+    if (raidsToday >= maxRaids) {
       return NextResponse.json({ error: "Daily raid limit reached" }, { status: 429 });
     }
 
-    // Check weekly cooldown for this target
-    const now = new Date();
-    const isoWeekStart = new Date(now);
-    const dayOfWeek = now.getDay();
-    isoWeekStart.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
-    isoWeekStart.setHours(0, 0, 0, 0);
+    // Check weekly cooldown for this target (skipped during special events)
+    if (isWeeklyCooldownActive()) {
+      const now = new Date();
+      const isoWeekStart = new Date(now);
+      const dayOfWeek = now.getDay();
+      isoWeekStart.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
+      isoWeekStart.setHours(0, 0, 0, 0);
 
-    const { count: weeklyPairCount } = await admin
-      .from("raids")
-      .select("id", { count: "exact", head: true })
-      .eq("attacker_id", attacker.id)
-      .eq("defender_id", defender.id)
-      .gte("created_at", isoWeekStart.toISOString());
+      const { count: weeklyPairCount } = await admin
+        .from("raids")
+        .select("id", { count: "exact", head: true })
+        .eq("attacker_id", attacker.id)
+        .eq("defender_id", defender.id)
+        .gte("created_at", isoWeekStart.toISOString());
 
-    targetRaidedThisWeek = (weeklyPairCount ?? 0) > 0;
-    if (targetRaidedThisWeek) {
-      return NextResponse.json({ error: "Already raided this target this week" }, { status: 429 });
+      targetRaidedThisWeek = (weeklyPairCount ?? 0) > 0;
+      if (targetRaidedThisWeek) {
+        return NextResponse.json({ error: "Already raided this target this week" }, { status: 429 });
+      }
     }
   } catch {
     // raids table may not exist yet - allow raid
@@ -184,8 +189,9 @@ export async function POST(request: Request) {
   return NextResponse.json({
     can_raid: true,
     raids_today: raidsToday ?? 0,
-    raids_max: MAX_RAIDS_PER_DAY,
+    raids_max: maxRaids,
     target_raided_this_week: false,
+    special_event: isFridayThe13th() ? "friday13" : null,
     attack_estimate: getStrengthEstimate(attack.total),
     defense_estimate: getStrengthEstimate(defense.total),
     attack_score: attack.total,

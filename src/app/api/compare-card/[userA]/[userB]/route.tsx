@@ -272,7 +272,7 @@ function renderLandscape(
         </div>
       </div>
     ),
-    { width: 1200, height: 675, fonts: [{ name: "Silkscreen", data: fontData, style: "normal" as const, weight: 400 as const }] }
+    { width: 1200, height: 675, headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" }, fonts: [{ name: "Silkscreen", data: fontData, style: "normal" as const, weight: 400 as const }] }
   );
 }
 
@@ -355,6 +355,6 @@ function renderStories(
         </div>
       </div>
     ),
-    { width: 1080, height: 1920, fonts: [{ name: "Silkscreen", data: fontData, style: "normal" as const, weight: 400 as const }] }
+    { width: 1080, height: 1920, headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" }, fonts: [{ name: "Silkscreen", data: fontData, style: "normal" as const, weight: 400 as const }] }
   );
 }

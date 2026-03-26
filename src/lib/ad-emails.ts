@@ -14,14 +14,14 @@ export async function sendAdExpiringEmail(
     to: email,
     subject: `Your Git City ad expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`,
     html: `
-      <div style="font-family: monospace; max-width: 480px; margin: 0 auto; padding: 24px; background: #0a0f1e; color: #e0d8cc;">
+      <div style="font-family: 'Silkscreen', monospace; max-width: 480px; margin: 0 auto; padding: 24px; background: #0a0a0e; color: #f0f0f0;">
         <h2 style="color: #c8e64a; margin-top: 0;">Heads up!</h2>
         <p>Your ad <strong>"${escapeHtml(adBrand)}"</strong> expires in <strong>${daysLeft} day${daysLeft === 1 ? "" : "s"}</strong>.</p>
         <p>Check your stats before it ends:</p>
         <p><a href="${escapeHtml(trackingUrl)}" style="color: #c8e64a;">View Dashboard</a></p>
         <p>Want to keep running? <a href="https://thegitcity.com/advertise" style="color: #c8e64a;">Renew your ad</a></p>
-        <hr style="border-color: #222; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #666;">Git City - thegitcity.com</p>
+        <hr style="border-color: #1c1c20; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #3a3a44;">Git City - thegitcity.com</p>
       </div>
     `,
   });
@@ -39,23 +39,23 @@ export async function sendAdExpiredEmail(
     to: email,
     subject: `Your Git City ad "${escapeHtml(adBrand)}" has ended`,
     html: `
-      <div style="font-family: monospace; max-width: 480px; margin: 0 auto; padding: 24px; background: #0a0f1e; color: #e0d8cc;">
+      <div style="font-family: 'Silkscreen', monospace; max-width: 480px; margin: 0 auto; padding: 24px; background: #0a0a0e; color: #f0f0f0;">
         <h2 style="color: #c8e64a; margin-top: 0;">Campaign complete</h2>
         <p>Your ad <strong>"${escapeHtml(adBrand)}"</strong> has ended. Here are the results:</p>
         <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
           <tr>
-            <td style="padding: 8px; border: 1px solid #222; color: #c8e64a; font-size: 20px;">${stats.impressions.toLocaleString()}</td>
-            <td style="padding: 8px; border: 1px solid #222;">impressions</td>
+            <td style="padding: 8px; border: 1px solid #1c1c20; color: #c8e64a; font-size: 20px;">${stats.impressions.toLocaleString()}</td>
+            <td style="padding: 8px; border: 1px solid #1c1c20;">impressions</td>
           </tr>
           <tr>
-            <td style="padding: 8px; border: 1px solid #222; color: #c8e64a; font-size: 20px;">${stats.clicks.toLocaleString()}</td>
-            <td style="padding: 8px; border: 1px solid #222;">clicks</td>
+            <td style="padding: 8px; border: 1px solid #1c1c20; color: #c8e64a; font-size: 20px;">${stats.clicks.toLocaleString()}</td>
+            <td style="padding: 8px; border: 1px solid #1c1c20;">clicks</td>
           </tr>
         </table>
         <p>Ready for another run?</p>
         <p><a href="${escapeHtml(advertiseUrl)}" style="color: #c8e64a;">Buy a new ad</a></p>
-        <hr style="border-color: #222; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #666;">Git City - thegitcity.com</p>
+        <hr style="border-color: #1c1c20; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #3a3a44;">Git City - thegitcity.com</p>
       </div>
     `,
   });

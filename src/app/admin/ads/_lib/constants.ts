@@ -6,9 +6,10 @@ export const VEHICLE_LABELS: Record<string, string> = {
   billboard: "Billboard",
   rooftop_sign: "Rooftop Sign",
   led_wrap: "LED Wrap",
+  landmark: "Landmark",
 };
 
-export const VEHICLES = ["plane", "blimp", "billboard", "rooftop_sign", "led_wrap"] as const;
+export const VEHICLES = ["plane", "blimp", "billboard", "rooftop_sign", "led_wrap", "landmark"] as const;
 
 export const EMPTY_FORM: AdForm = {
   brand: "",
@@ -21,6 +22,7 @@ export const EMPTY_FORM: AdForm = {
   priority: 50,
   starts_at: "",
   ends_at: "",
+  purchaser_email: "",
 };
 
 export const STORAGE_KEY = "admin-ads-filters";

@@ -3,6 +3,8 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { checkAchievements } from "@/lib/achievements";
+import { touchLastActive } from "@/lib/notification-helpers";
+import { trackDailyMission } from "@/lib/dailies";
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabase();
@@ -86,9 +88,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to give kudos" }, { status: 500 });
   }
 
+  // Track activity
+  touchLastActive(giver.id);
+  trackDailyMission(giver.id, "give_kudos");
+  trackDailyMission(giver.id, "give_kudos_3");
+
   // Only increment + feed if the insert actually happened (no conflict)
   if (!insertError) {
     await admin.rpc("increment_kudos_count", { target_dev_id: receiver.id });
+
+    // Grant XP: giver gets 3, receiver gets 1
+    admin.rpc("grant_xp", { p_developer_id: giver.id, p_source: "kudos_given", p_amount: 3 }).then();
+    admin.rpc("grant_xp", { p_developer_id: receiver.id, p_source: "kudos_received", p_amount: 1 }).then();
 
     await admin.from("activity_feed").insert({
       event_type: "kudos_given",

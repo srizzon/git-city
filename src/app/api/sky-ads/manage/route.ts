@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-
-const OWNER_LOGIN = "srizzon";
+import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
 
 function generateToken(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -16,12 +15,8 @@ async function checkAdmin() {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const login = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-  return login === OWNER_LOGIN ? user : null;
+  const login = getGithubLoginFromUser(user);
+  return isAdminGithubLogin(login) ? user : null;
 }
 
 // Create a new ad
@@ -37,12 +32,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing required fields: id, brand, text" }, { status: 400 });
   }
 
-  const validVehicles = ["plane", "blimp", "billboard", "rooftop_sign", "led_wrap"];
+  const validVehicles = ["plane", "blimp", "billboard", "rooftop_sign", "led_wrap", "landmark"];
   const safeVehicle = validVehicles.includes(vehicle) ? vehicle : "plane";
 
   const trackingToken = generateToken();
-
   const admin = getSupabaseAdmin();
+
+  // For landmarks with an email, auto-create advertiser account and link it
+  let advertiserId: string | null = null;
+  if (safeVehicle === "landmark" && purchaser_email) {
+    const { data: existing } = await admin
+      .from("advertiser_accounts")
+      .select("id")
+      .eq("email", purchaser_email)
+      .single();
+
+    if (existing) {
+      advertiserId = existing.id;
+    } else {
+      const { data: created } = await admin
+        .from("advertiser_accounts")
+        .insert({ email: purchaser_email, name: brand })
+        .select("id")
+        .single();
+      if (created) advertiserId = created.id;
+    }
+  }
+
   const { data, error } = await admin.from("sky_ads").insert({
     id,
     brand,
@@ -58,6 +74,7 @@ export async function POST(request: Request) {
     tracking_token: trackingToken,
     purchaser_email: purchaser_email ?? null,
     plan_id: plan_id ?? null,
+    ...(advertiserId ? { advertiser_id: advertiserId } : {}),
   }).select().single();
 
   if (error) {

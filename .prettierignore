@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+
+# Generated files
+*.min.js
+*.min.css
+package-lock.json
+pnpm-lock.yaml
+
+# Supabase
+supabase/.temp/
+
+# Misc
+.vercel/
+.env*
+*.md

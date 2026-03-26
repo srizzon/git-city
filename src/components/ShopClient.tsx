@@ -91,6 +91,7 @@ interface Props {
   popularItems?: string[];
   purchaseCounts?: Record<string, number>;
   totalPurchaseCounts?: Record<string, number>;
+  pxBalance?: number;
 }
 
 interface PixModalData {
@@ -152,7 +153,9 @@ function dataUrlToFile(dataUrl: string, name: string, type: string): File {
 const PIX_EXPIRY_SECONDS = 900; // 15 minutes
 
 function formatPrice(item: ShopItem): string {
-  return `$${(item.price_usd_cents / 100).toFixed(2)}`;
+  if (item.price_pixels != null) return `${item.price_pixels} PX`;
+  if (item.price_usd_cents <= 0) return "Free";
+  return "—";
 }
 
 function formatCountdown(seconds: number): string {
@@ -239,7 +242,7 @@ function PixModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="relative mx-4 w-full max-w-sm border-[2px] border-border bg-bg p-6">
+      <div className="relative mx-4 w-full max-w-sm border-2 border-border bg-bg p-6">
         {/* Close */}
         <button
           onClick={onClose}
@@ -273,7 +276,7 @@ function PixModal({
               </a>
               <button
                 onClick={() => onCompleted(data.purchaseId)}
-                className="border-[2px] border-border px-4 py-2 text-[10px] text-cream hover:border-border-light"
+                className="border-2 border-border px-4 py-2 text-[10px] text-cream hover:border-border-light"
               >
                 Close
               </button>
@@ -287,7 +290,7 @@ function PixModal({
             </p>
             <button
               onClick={onClose}
-              className="mt-3 border-[2px] border-border px-4 py-2 text-[10px] text-cream hover:border-border-light"
+              className="mt-3 border-2 border-border px-4 py-2 text-[10px] text-cream hover:border-border-light"
             >
               Close
             </button>
@@ -304,7 +307,7 @@ function PixModal({
                   style={{ imageRendering: "pixelated" }}
                 />
               ) : (
-                <div className="flex h-48 w-48 items-center justify-center border-[2px] border-border text-[9px] text-muted">
+                <div className="flex h-48 w-48 items-center justify-center border-2 border-border text-[9px] text-muted">
                   QR code unavailable
                 </div>
               )}
@@ -314,14 +317,14 @@ function PixModal({
             <div className="mb-4">
               <p className="mb-1 text-[8px] text-muted">PIX code (copy &amp; paste):</p>
               <div className="flex items-stretch gap-1">
-                <div className="flex-1 overflow-hidden border-[2px] border-border bg-bg-card px-2 py-1.5">
+                <div className="flex-1 overflow-hidden border-2 border-border bg-bg-card px-2 py-1.5">
                   <p className="truncate text-[8px] text-cream normal-case">
                     {data.brCode}
                   </p>
                 </div>
                 <button
                   onClick={copyCode}
-                  className="shrink-0 border-[2px] px-3 text-[9px] transition-colors"
+                  className="shrink-0 border-2 px-3 text-[9px] transition-colors"
                   style={{
                     borderColor: copied ? ACCENT : "var(--color-border)",
                     color: copied ? ACCENT : "var(--color-cream)",
@@ -403,12 +406,12 @@ function ColorPickerPanel({
   };
 
   return (
-    <div className="mt-2 flex items-center gap-3 border-[2px] border-border/50 bg-bg/50 px-3 py-2">
+    <div className="mt-2 flex items-center gap-3 border-2 border-border/50 bg-bg/50 px-3 py-2">
       <input
         type="color"
         value={color}
         onChange={(e) => handleChange(e.target.value)}
-        className="h-8 w-10 cursor-pointer border-[2px] border-border bg-transparent"
+        className="h-8 w-10 cursor-pointer border-2 border-border bg-transparent"
       />
       <span className="text-[10px] text-muted normal-case">{color}</span>
       {isOwned ? (
@@ -417,7 +420,7 @@ function ColorPickerPanel({
             <button
               onClick={handleRemove}
               disabled={saving}
-              className="border-[2px] border-border px-2 py-1 text-[10px] text-muted hover:text-cream disabled:opacity-40"
+              className="border-2 border-border px-2 py-1 text-[10px] text-muted hover:text-cream disabled:opacity-40"
             >
               {feedback === "removed" ? "Removed!" : "Remove"}
             </button>
@@ -512,16 +515,16 @@ function BillboardUploadPanel({
   const displaySlots = isOwned ? Math.max(slotCount, 1) : 1;
 
   return (
-    <div className="mt-2 border-[2px] border-border/50 bg-bg/50 px-3 py-2">
+    <div className="mt-2 border-2 border-border/50 bg-bg/50 px-3 py-2">
       {isOwned ? (
         <>
           {autoUploading && (
-            <div className="mb-2 border-[2px] border-dashed px-3 py-2 text-[10px] normal-case animate-pulse" style={{ borderColor: ACCENT, color: ACCENT }}>
+            <div className="mb-2 border-2 border-dashed px-3 py-2 text-[10px] normal-case animate-pulse" style={{ borderColor: ACCENT, color: ACCENT }}>
               Uploading your billboard image...
             </div>
           )}
           {!autoUploading && images.filter(Boolean).length === 0 && (
-            <div className="mb-2 border-[2px] border-dashed px-3 py-2 text-[10px] normal-case" style={{ borderColor: ACCENT, color: ACCENT }}>
+            <div className="mb-2 border-2 border-dashed px-3 py-2 text-[10px] normal-case" style={{ borderColor: ACCENT, color: ACCENT }}>
               Upload an image to each slot below to display on your building!
             </div>
           )}
@@ -537,7 +540,7 @@ function BillboardUploadPanel({
               return (
                 <div
                   key={i}
-                  className="flex flex-col items-center gap-1 border-[2px] border-border/30 bg-bg-card p-2"
+                  className="flex flex-col items-center gap-1 border-2 border-border/30 bg-bg-card p-2"
                 >
                   <p className="text-[8px] text-dim">Slot {i + 1}</p>
                   {img ? (
@@ -546,10 +549,10 @@ function BillboardUploadPanel({
                       alt={`Billboard ${i + 1}`}
                       width={120}
                       height={40}
-                      className="h-10 w-full border-[1px] border-border object-cover"
+                      className="h-10 w-full border border-border object-cover"
                     />
                   ) : (
-                    <div className="flex h-10 w-full items-center justify-center border-[1px] border-border/30 bg-bg/50 text-[8px] text-dim">
+                    <div className="flex h-10 w-full items-center justify-center border border-border/30 bg-bg/50 text-[8px] text-dim">
                       Empty
                     </div>
                   )}
@@ -558,7 +561,7 @@ function BillboardUploadPanel({
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/gif"
                     onChange={() => handleFileChange(i)}
-                    className="w-full text-[8px] text-muted normal-case file:mr-1 file:border-[1px] file:border-border file:bg-bg file:px-1 file:py-0.5 file:text-[8px] file:text-cream"
+                    className="w-full text-[8px] text-muted normal-case file:mr-1 file:border file:border-border file:bg-bg file:px-1 file:py-0.5 file:text-[8px] file:text-cream"
                   />
                   <button
                     onClick={() => handleUpload(i)}
@@ -591,7 +594,7 @@ function BillboardUploadPanel({
                 alt="Billboard preview"
                 width={56}
                 height={40}
-                className="h-10 w-14 border-[2px] border-border object-cover"
+                className="h-10 w-14 border-2 border-border object-cover"
               />
             )}
             <input
@@ -599,7 +602,7 @@ function BillboardUploadPanel({
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
               onChange={() => handleFileChange(0)}
-              className="min-w-0 flex-1 text-[9px] text-muted normal-case file:mr-2 file:border-[2px] file:border-border file:bg-bg-card file:px-2 file:py-1 file:text-[9px] file:text-cream"
+              className="min-w-0 flex-1 text-[9px] text-muted normal-case file:mr-2 file:border-2 file:border-border file:bg-bg-card file:px-2 file:py-1 file:text-[9px] file:text-cream"
             />
           </div>
           <p className="mt-1 text-[8px] text-dim normal-case">
@@ -632,7 +635,11 @@ export default function ShopClient({
   popularItems = [],
   purchaseCounts = {},
   totalPurchaseCounts = {},
+  pxBalance: initialPxBalance = 0,
 }: Props) {
+  // Pixel balance
+  const [pxBalance, setPxBalance] = useState(initialPxBalance);
+
   // Loadout state
   const [loadout, setLoadout] = useState<Loadout>(
     initialLoadout ?? { crown: null, roof: null, aura: null }
@@ -654,10 +661,31 @@ export default function ShopClient({
   const [hasChanges, setHasChanges] = useState(false);
   const [highlightItem, setHighlightItem] = useState<string | null>(null);
   const [confirmBuyItem, setConfirmBuyItem] = useState<string | null>(null);
+  const [verifyingStar, setVerifyingStar] = useState(false);
+  const [starVerifyStep, setStarVerifyStep] = useState<"idle" | "opened" | "verifying">("idle");
   const [activeTab, setActiveTab] = useState<"building" | "raid">(() => {
     if (purchasedItem && [...RAID_VEHICLE_ITEMS, ...RAID_TAG_ITEMS, ...RAID_BOOST_ITEMS].includes(purchasedItem)) return "raid";
     return "building";
   });
+
+  const [isBrazil, setIsBrazil] = useState(false);
+  useEffect(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      // Brazilian IANA timezones all use Brazilian city names
+      const brTimezones = new Set([
+        "America/Sao_Paulo", "America/Bahia", "America/Belem",
+        "America/Fortaleza", "America/Recife", "America/Maceio",
+        "America/Araguaina", "America/Manaus", "America/Cuiaba",
+        "America/Porto_Velho", "America/Boa_Vista", "America/Campo_Grande",
+        "America/Eirunepe", "America/Rio_Branco", "America/Noronha",
+        "America/Santarem",
+      ]);
+      setIsBrazil(brTimezones.has(tz));
+    } catch {
+      setIsBrazil(false);
+    }
+  }, []);
 
   const [pixModal, setPixModal] = useState<PixModalData | null>(null);
   const [customColor, setCustomColor] = useState<string | null>(initialCustomColor);
@@ -674,6 +702,12 @@ export default function ShopClient({
   // Track shop page view on mount
   useEffect(() => {
     trackShopPageView();
+    // Fire-and-forget daily mission tracking
+    fetch("/api/dailies/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mission_id: "visit_shop" }),
+    }).catch(() => {});
   }, []);
 
   // Post-purchase: show toast + auto-equip if zone is empty + switch tab
@@ -681,7 +715,7 @@ export default function ShopClient({
   useEffect(() => {
     if (!purchasedItem) return;
     const shopItem = items.find((i) => i.id === purchasedItem);
-    trackPurchaseCompleted(purchasedItem, shopItem?.price_usd_cents ?? 0, "stripe");
+    trackPurchaseCompleted(purchasedItem, shopItem?.price_pixels ?? 0, "pixels");
     // Clear toast after 5s
     const timer = setTimeout(() => setPurchaseToast(null), 5000);
     // Switch to correct tab
@@ -715,7 +749,7 @@ export default function ShopClient({
   useEffect(() => {
     if (!giftedItem || !giftedTo) return;
     const shopItem = items.find((i) => i.id === giftedItem);
-    trackPurchaseCompleted(giftedItem, shopItem?.price_usd_cents ?? 0, "stripe");
+    trackPurchaseCompleted(giftedItem, shopItem?.price_pixels ?? 0, "pixels");
     const timer = setTimeout(() => setGiftToast(null), 5000);
     window.history.replaceState({}, "", window.location.pathname);
     return () => clearTimeout(timer);
@@ -803,15 +837,22 @@ export default function ShopClient({
     setSaved(false);
     setError(null);
     try {
+      const payload = loadoutRef.current;
       const res = await fetch("/api/loadout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(loadoutRef.current),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setSaved(true);
         setHasChanges(false);
         setTimeout(() => setSaved(false), 2000);
+        try {
+          localStorage.setItem(
+            "gitcity:loadout_override",
+            JSON.stringify({ developerId, loadout: payload, ts: Date.now() }),
+          );
+        } catch {}
       } else {
         setError("Failed to save. Try again.");
       }
@@ -853,6 +894,57 @@ export default function ShopClient({
     }
   }, [buyingItem]);
 
+  const verifyGitHubStar = useCallback(async () => {
+    if (verifyingStar) return;
+    setVerifyingStar(true);
+    setStarVerifyStep("verifying");
+    setError(null);
+
+    try {
+      const res = await fetch("/api/verify-github-star", { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Verification failed");
+        setStarVerifyStep("opened");
+        return;
+      }
+
+      if (data.verified) {
+        setOwned((prev) => prev.includes("github_star") ? prev : [...prev, "github_star"]);
+        // Auto-equip in crown if nothing equipped
+        if (!loadout.crown) {
+          setLoadout((prev) => ({ ...prev, crown: "github_star" }));
+          setHasChanges(true);
+        }
+        setStarVerifyStep("idle");
+      } else {
+        setError("Star not found — make sure you starred the repo first!");
+        setStarVerifyStep("opened");
+      }
+    } catch {
+      setError("Network error. Try again.");
+      setStarVerifyStep("opened");
+    } finally {
+      setVerifyingStar(false);
+    }
+  }, [loadout.crown, verifyingStar]);
+
+  // Auto-verify when user returns from GitHub tab
+  useEffect(() => {
+    if (starVerifyStep !== "opened") return;
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") verifyGitHubStar();
+    };
+    const onFocus = () => verifyGitHubStar();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [starVerifyStep, verifyGitHubStar]);
+
   const handleSetRaidVehicle = useCallback(async (vehicleId: string) => {
     const res = await fetch("/api/raid/loadout", {
       method: "POST",
@@ -864,10 +956,13 @@ export default function ShopClient({
     }
   }, [raidLoadout.tag]);
 
+  const [buyingProvider, setBuyingProvider] = useState<"stripe" | "nowpayments" | "abacatepay" | null>(null);
+
   const checkout = useCallback(
-    async (itemId: string, provider: "stripe" | "nowpayments" = "stripe") => {
+    async (itemId: string, provider: "stripe" | "nowpayments" | "abacatepay" = "stripe") => {
       if (buyingItem) return;
       setBuyingItem(itemId);
+      setBuyingProvider(provider);
       setError(null);
 
       const shopItem = items.find((i) => i.id === itemId);
@@ -915,9 +1010,67 @@ export default function ShopClient({
         setError("Network error. Try again.");
       } finally {
         setBuyingItem(null);
+        setBuyingProvider(null);
       }
     },
     [buyingItem, items, githubLogin]
+  );
+
+  const spendPixels = useCallback(
+    async (itemId: string) => {
+      if (buyingItem) return;
+      setBuyingItem(itemId);
+      setError(null);
+
+      try {
+        const res = await fetch("/api/pixels/spend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item_id: itemId }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          if (res.status === 409) {
+            setError("You already own this item");
+            setOwned((prev) => prev.includes(itemId) ? prev : [...prev, itemId]);
+          } else {
+            setError(data.error || "Purchase failed");
+          }
+          return;
+        }
+
+        // Success: update balance, mark as owned, show toast
+        setPxBalance(data.new_balance ?? 0);
+        setOwned((prev) => prev.includes(itemId) ? prev : [...prev, itemId]);
+        setPurchaseToast(itemId);
+        setTimeout(() => setPurchaseToast(null), 5000);
+
+        // Auto-equip if item belongs to a zone and that zone is empty
+        for (const [zone, zoneItems] of Object.entries(ZONE_ITEMS)) {
+          if (zoneItems.includes(itemId)) {
+            const zoneKey = zone as keyof Loadout;
+            setLoadout((prev) => {
+              if (prev[zoneKey]) return prev;
+              return { ...prev, [zoneKey]: itemId };
+            });
+            setHasChanges(true);
+            break;
+          }
+        }
+
+        // Streak freeze: increment local count
+        if (itemId === "streak_freeze") {
+          setFreezeCount((prev) => Math.min(prev + 1, 2));
+        }
+      } catch {
+        setError("Network error. Try again.");
+      } finally {
+        setBuyingItem(null);
+      }
+    },
+    [buyingItem]
   );
 
   const handlePixCompleted = useCallback(
@@ -1005,7 +1158,7 @@ export default function ShopClient({
         const toastMsg = isConsumable
           ? "Added to your inventory!"
           : isRaidItem
-            ? "Unlocked! Ready for your next raid."
+            ? "Unlocked! Ready for your next battle."
             : "Purchased! Equip it below.";
         const toastBg = isRaidItem ? "#ff5555" : ACCENT;
         const toastBorder = isRaidItem ? "#aa2222" : SHADOW;
@@ -1035,12 +1188,12 @@ export default function ShopClient({
         </div>
       )}
 
-      {/* Checkout loading overlay */}
-      {buyingItem && (
+      {/* Checkout loading overlay (only for legacy Stripe/PIX redirects, not PX spend) */}
+      {buyingItem && buyingProvider && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="border-[3px] border-border bg-bg p-6 text-center">
             <div className="mb-3 text-2xl animate-pulse">{ITEM_EMOJIS[buyingItem] ?? "🛒"}</div>
-            <p className="text-xs text-cream">Redirecting to checkout...</p>
+            <p className="text-xs text-cream">{buyingProvider === "abacatepay" ? "Generating PIX..." : "Redirecting to checkout..."}</p>
             <p className="mt-1 text-[9px] text-muted normal-case">Please wait</p>
           </div>
         </div>
@@ -1056,7 +1209,7 @@ export default function ShopClient({
       )}
 
       {error && (
-        <div className="mb-4 border-[2px] border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] text-red-400 normal-case">
+        <div className="mb-4 border-2 border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] text-red-400 normal-case">
           {error}
         </div>
       )}
@@ -1065,7 +1218,7 @@ export default function ShopClient({
       <div className="flex gap-2 mb-5">
         <button
           onClick={() => setActiveTab("building")}
-          className={`px-5 py-2 text-[11px] border-[2px] transition-colors ${
+          className={`px-5 py-2 text-[11px] border-2 transition-colors ${
             activeTab === "building"
               ? "bg-bg-card border-cream/20 text-cream"
               : "border-border text-muted hover:text-cream hover:border-border-light"
@@ -1075,14 +1228,14 @@ export default function ShopClient({
         </button>
         <button
           onClick={() => setActiveTab("raid")}
-          className={`px-5 py-2 text-[11px] border-[2px] transition-colors ${
+          className={`px-5 py-2 text-[11px] border-2 transition-colors ${
             activeTab === "raid"
               ? "bg-bg-card border-cream/20"
               : "border-border text-muted hover:text-cream hover:border-border-light"
           }`}
           style={{ color: activeTab === "raid" ? "#ff5555" : undefined }}
         >
-          RAID
+          BATTLE
         </button>
       </div>
 
@@ -1091,7 +1244,7 @@ export default function ShopClient({
         <>
           <div className="lg:flex lg:gap-6">
             {/* Left column: Preview (sticky on desktop) */}
-            <div className="lg:w-[360px] lg:shrink-0">
+            <div className="lg:w-90 lg:shrink-0">
               <div className="lg:sticky lg:top-6">
                 <ShopPreview
                   loadout={effectiveLoadout}
@@ -1140,6 +1293,8 @@ export default function ShopClient({
                     const hasAchievement = achUnlock && achievements.includes(achUnlock.achievement);
                     const isBuying = buyingItem === itemId;
 
+                    const isGitHubStar = itemId === "github_star";
+
                     // Badge text
                     let badge: string;
                     let badgeColor: string;
@@ -1149,10 +1304,13 @@ export default function ShopClient({
                     } else if (isOwned) {
                       badge = "\u2713";
                       badgeColor = ACCENT;
+                    } else if (isGitHubStar) {
+                      badge = "\u2B50 STAR TO UNLOCK";
+                      badgeColor = "#FFD700";
                     } else if (isFreeItem) {
                       badge = "FREE";
                       badgeColor = ACCENT;
-                    } else if (achUnlock && !shopItem?.price_usd_cents) {
+                    } else if (achUnlock && !shopItem?.price_pixels) {
                       badge = hasAchievement ? "Unlockable!" : achUnlock.label.split("(")[0].trim();
                       badgeColor = hasAchievement ? "#39d353" : "#a0a0b0";
                     } else if (shopItem) {
@@ -1172,10 +1330,17 @@ export default function ShopClient({
                         handleUnequip(zoneKey);
                       } else if (isOwned) {
                         handleEquip(zoneKey, itemId);
+                      } else if (isGitHubStar && !isOwned) {
+                        if (starVerifyStep === "idle") {
+                          window.open("https://github.com/srizzon/git-city", "_blank");
+                          setStarVerifyStep("opened");
+                        } else if (starVerifyStep === "opened") {
+                          verifyGitHubStar();
+                        }
                       } else if (isFreeItem) {
                         claimFreeItem();
-                      } else if (shopItem && shopItem.price_usd_cents > 0) {
-                        if (!isConfirming) trackShopItemViewed(itemId, zone, shopItem.price_usd_cents);
+                      } else if (shopItem && (shopItem.price_pixels ?? 0) > 0) {
+                        if (!isConfirming) trackShopItemViewed(itemId, zone, shopItem.price_pixels ?? 0);
                         setConfirmBuyItem(isConfirming ? null : itemId);
                       }
                     };
@@ -1219,8 +1384,8 @@ export default function ShopClient({
                           onMouseLeave={() => setHighlightItem(null)}
                           className={[
                             "flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                            isEquipped ? "border-[3px]" : "border-[2px]",
-                            isEquipped ? "border-[#39d353]" : isConfirming ? "border-[var(--color-border-light)]" : "border-border",
+                            isEquipped ? "border-[3px]" : "border-2",
+                            isEquipped ? "border-[#39d353]" : isConfirming ? "border-(--color-border-light)" : "border-border",
                             isEquipped ? "bg-[rgba(57,211,83,0.1)]" : "bg-bg-card",
                             !isOwned && !isEquipped ? "opacity-60" : "",
                             "hover:border-border-light",
@@ -1234,7 +1399,9 @@ export default function ShopClient({
                             className={`mt-0.5 ${badge.startsWith("$") ? "text-[10px] font-bold" : "text-[9px]"}`}
                             style={{ color: badgeColor }}
                           >
-                            {isBuying ? "..." : badge}
+                            {isBuying ? "..." : isGitHubStar && !isOwned && !isEquipped ? (
+                              verifyingStar ? "Verifying..." : starVerifyStep === "opened" ? "Verify \u2B50" : badge
+                            ) : badge}
                           </span>
                           {/* A13: Social proof - weekly purchase count */}
                           {(purchaseCounts[itemId] ?? 0) >= 3 && !isOwned && (
@@ -1246,7 +1413,7 @@ export default function ShopClient({
 
                         {/* Buy confirmation popover */}
                         {isConfirming && shopItem && (
-                          <div data-buy-popover className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                          <div data-buy-popover className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                             <p className="text-[9px] text-cream text-center mb-1.5">
                               {ITEM_NAMES[itemId]}
                             </p>
@@ -1257,27 +1424,25 @@ export default function ShopClient({
                               <div className="flex gap-1">
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }}
-                                  className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream"
+                                  className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream"
                                 >
                                   Cancel
                                 </button>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId); }}
-                                  disabled={isBuying}
+                                  onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); spendPixels(itemId); }}
+                                  disabled={isBuying || pxBalance < (shopItem.price_pixels ?? 0)}
                                   className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40"
                                   style={{ backgroundColor: ACCENT, boxShadow: `1px 1px 0 0 ${SHADOW}` }}
                                 >
                                   {isBuying ? "..." : "Buy"}
                                 </button>
                               </div>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId, "nowpayments"); }}
-                                disabled={isBuying}
-                                className="btn-press w-full py-1 text-[9px] text-bg disabled:opacity-40"
-                                style={{ backgroundColor: "#f7931a", boxShadow: "1px 1px 0 0 #b36a00" }}
-                              >
-                                {isBuying ? "..." : "Pay with Crypto"}
-                              </button>
+                              {pxBalance < (shopItem.price_pixels ?? 0) && (
+                                <p className="text-[8px] text-center text-red-400">
+                                  Not enough PX ({pxBalance} / {shopItem.price_pixels}).{" "}
+                                  <a href="/pixels" className="underline hover:text-red-300">Buy PX</a>
+                                </p>
+                              )}
                             </div>
                           </div>
                         )}
@@ -1318,7 +1483,7 @@ export default function ShopClient({
                 } else if (isBillboard && billboardSlots > 0) {
                   badge = `x${billboardSlots}`;
                   badgeColor = ACCENT;
-                } else if (achUnlock && !shopItem?.price_usd_cents) {
+                } else if (achUnlock && !shopItem?.price_pixels) {
                   badge = hasAchievement ? "Unlockable!" : achUnlock.label.split("(")[0].trim();
                   badgeColor = hasAchievement ? "#39d353" : "#a0a0b0";
                 } else if (shopItem) {
@@ -1335,11 +1500,10 @@ export default function ShopClient({
                 const handleClick = () => {
                   setHighlightItem(itemId);
                   if (isBillboard && isFacesOwned) {
-                    // Already owned, scroll to upload — no action needed on card
                     return;
                   }
-                  if (isOwned) return; // faces items don't equip/unequip
-                  if (shopItem && shopItem.price_usd_cents > 0) {
+                  if (isOwned) return;
+                  if (shopItem && (shopItem.price_pixels ?? 0) > 0) {
                     setConfirmBuyItem(isConfirming ? null : itemId);
                   }
                 };
@@ -1369,8 +1533,8 @@ export default function ShopClient({
                       onMouseLeave={() => setHighlightItem(null)}
                       className={[
                         "flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                        isFacesOwned ? "border-[3px] border-[#39d353] bg-[rgba(57,211,83,0.1)]" : "border-[2px] border-border bg-bg-card opacity-60",
-                        isConfirming ? "border-[var(--color-border-light)]" : "",
+                        isFacesOwned ? "border-[3px] border-[#39d353] bg-[rgba(57,211,83,0.1)]" : "border-2 border-border bg-bg-card opacity-60",
+                        isConfirming ? "border-(--color-border-light)" : "",
                         "hover:border-border-light",
                       ].join(" ")}
                     >
@@ -1394,7 +1558,7 @@ export default function ShopClient({
 
                     {/* Buy confirmation popover */}
                     {isConfirming && shopItem && (
-                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                         <p className="text-[9px] text-cream text-center mb-1.5">
                           {ITEM_NAMES[itemId]}
                         </p>
@@ -1405,27 +1569,24 @@ export default function ShopClient({
                           <div className="flex gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }}
-                              className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream"
+                              className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream"
                             >
                               Cancel
                             </button>
                             <button
-                              onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId); }}
-                              disabled={isBuying}
+                              onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); spendPixels(itemId); }}
+                              disabled={isBuying || pxBalance < (shopItem.price_pixels ?? 0)}
                               className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40"
                               style={{ backgroundColor: ACCENT, boxShadow: `1px 1px 0 0 ${SHADOW}` }}
                             >
                               {isBuying ? "..." : "Buy"}
                             </button>
                           </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId, "nowpayments"); }}
-                            disabled={isBuying}
-                            className="btn-press w-full py-1 text-[9px] text-bg disabled:opacity-40"
-                            style={{ backgroundColor: "#f7931a", boxShadow: "1px 1px 0 0 #b36a00" }}
-                          >
-                            {isBuying ? "..." : "Pay with Crypto"}
-                          </button>
+                          {pxBalance < (shopItem.price_pixels ?? 0) && (
+                            <p className="text-[8px] text-center text-red-400">
+                              Not enough PX ({pxBalance} / {shopItem.price_pixels})
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1508,14 +1669,14 @@ export default function ShopClient({
                     <button
                       onClick={() => {
                         if (atMax) return;
-                        if (!isConfirming) trackShopItemViewed("streak_freeze", "consumable", freezeItem.price_usd_cents);
+                        if (!isConfirming) trackShopItemViewed("streak_freeze", "consumable", freezeItem.price_pixels ?? 0);
                         setConfirmBuyItem(isConfirming ? null : "streak_freeze");
                       }}
                       disabled={isBuying || atMax}
                       className={[
                         "flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                        "border-[2px]",
-                        isConfirming ? "border-[var(--color-border-light)]" : "border-border",
+                        "border-2",
+                        isConfirming ? "border-(--color-border-light)" : "border-border",
                         "bg-bg-card",
                         atMax ? "opacity-40" : "",
                         "hover:border-border-light",
@@ -1531,7 +1692,7 @@ export default function ShopClient({
                     </button>
 
                     {isConfirming && (
-                      <div data-buy-popover className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                      <div data-buy-popover className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                         <p className="text-[9px] text-cream text-center mb-1.5">
                           {ITEM_NAMES.streak_freeze}
                         </p>
@@ -1545,27 +1706,25 @@ export default function ShopClient({
                           <div className="flex gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }}
-                              className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream"
+                              className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream"
                             >
                               Cancel
                             </button>
                             <button
-                              onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout("streak_freeze"); }}
-                              disabled={isBuying}
+                              onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); spendPixels("streak_freeze"); }}
+                              disabled={isBuying || pxBalance < (freezeItem?.price_pixels ?? 0)}
                               className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40"
                               style={{ backgroundColor: ACCENT, boxShadow: `1px 1px 0 0 ${SHADOW}` }}
                             >
                               {isBuying ? "..." : "Buy"}
                             </button>
                           </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout("streak_freeze", "nowpayments"); }}
-                            disabled={isBuying}
-                            className="btn-press w-full py-1 text-[9px] text-bg disabled:opacity-40"
-                            style={{ backgroundColor: "#f7931a", boxShadow: "1px 1px 0 0 #b36a00" }}
-                          >
-                            {isBuying ? "..." : "Pay with Crypto"}
-                          </button>
+                          {pxBalance < (freezeItem?.price_pixels ?? 0) && (
+                            <p className="text-[8px] text-center text-red-400">
+                              Not enough PX ({pxBalance} / {freezeItem?.price_pixels}).{" "}
+                              <a href="/pixels" className="underline hover:text-red-300">Buy PX</a>
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1574,11 +1733,6 @@ export default function ShopClient({
               </div>
             );
           })()}
-
-          {/* Payment note */}
-          <p className="text-center text-[10px] text-dim normal-case">
-            Payment via Stripe
-          </p>
             </div>
           </div>
 
@@ -1591,11 +1745,11 @@ export default function ShopClient({
 
       {/* ─── Raid Tab ─── */}
       {activeTab === "raid" && (
-        <div className="max-w-[640px] mx-auto space-y-5">
+        <div className="max-w-160 mx-auto space-y-5">
           <div className="border-[3px] border-border bg-bg-raised p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm" style={{ color: "#ff5555" }}>
-                Raid
+                Battle
               </h3>
               <span className="text-[9px] text-muted normal-case">
                 vehicles, tags & boosts
@@ -1609,7 +1763,7 @@ export default function ShopClient({
               <button
                 onClick={() => handleSetRaidVehicle("airplane")}
                 className={[
-                  "w-full overflow-hidden transition-colors border-[2px]",
+                  "w-full overflow-hidden transition-colors border-2",
                   raidLoadout.vehicle === "airplane"
                     ? "border-[#39d353] bg-[rgba(57,211,83,0.05)]"
                     : "border-[#39d353]/40 bg-[rgba(57,211,83,0.02)] hover:border-[#39d353]/70",
@@ -1650,7 +1804,7 @@ export default function ShopClient({
                       disabled={isBuying}
                       className={[
                         "w-full overflow-hidden transition-colors",
-                        "border-[2px]",
+                        "border-2",
                         isOwned
                           ? isActive
                             ? "border-[#39d353] bg-[rgba(57,211,83,0.05)]"
@@ -1681,15 +1835,15 @@ export default function ShopClient({
                       </div>
                     </button>
                     {isConfirming && shopItem && (
-                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                         <p className="text-[9px] text-cream text-center mb-1.5">{ITEM_NAMES[itemId]}</p>
                         <p className="text-[10px] text-center mb-2" style={{ color: "#ff5555" }}>{formatPrice(shopItem)}</p>
                         <div className="flex flex-col gap-1">
                           <div className="flex gap-1">
-                            <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
-                            <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId); }} disabled={isBuying} className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#ff5555", boxShadow: "1px 1px 0 0 #aa2222" }}>{isBuying ? "..." : "Buy"}</button>
+                            <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
+                            <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); spendPixels(itemId); }} disabled={isBuying || pxBalance < (shopItem.price_pixels ?? 0)} className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#ff5555", boxShadow: "1px 1px 0 0 #aa2222" }}>{isBuying ? "..." : "Buy"}</button>
                           </div>
-                          <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId, "nowpayments"); }} disabled={isBuying} className="btn-press w-full py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#f7931a", boxShadow: "1px 1px 0 0 #b36a00" }}>{isBuying ? "..." : "Pay with Crypto"}</button>
+                          {pxBalance < (shopItem.price_pixels ?? 0) && <p className="text-[8px] text-center text-red-400">Not enough PX ({pxBalance} / {shopItem.price_pixels}). <a href="/pixels" className="underline hover:text-red-300">Buy PX</a></p>}
                         </div>
                       </div>
                     )}
@@ -1729,7 +1883,7 @@ export default function ShopClient({
                           disabled={isBuying}
                           className={[
                             "relative flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                            "border-[2px]",
+                            "border-2",
                             isOwned
                               ? "border-[#39d353] bg-[rgba(57,211,83,0.05)]"
                               : isConfirming
@@ -1748,15 +1902,15 @@ export default function ShopClient({
                           )}
                         </button>
                         {isConfirming && shopItem && (
-                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                             <p className="text-[9px] text-cream text-center mb-1.5">{ITEM_NAMES[itemId]}</p>
                             <p className="text-[10px] text-center mb-2" style={{ color: "#ff5555" }}>{formatPrice(shopItem)}</p>
                             <div className="flex flex-col gap-1">
                               <div className="flex gap-1">
-                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
-                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId); }} disabled={isBuying} className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#ff5555", boxShadow: "1px 1px 0 0 #aa2222" }}>{isBuying ? "..." : "Buy"}</button>
+                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
+                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); spendPixels(itemId); }} disabled={isBuying || pxBalance < (shopItem.price_pixels ?? 0)} className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#ff5555", boxShadow: "1px 1px 0 0 #aa2222" }}>{isBuying ? "..." : "Buy"}</button>
                               </div>
-                              <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId, "nowpayments"); }} disabled={isBuying} className="btn-press w-full py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#f7931a", boxShadow: "1px 1px 0 0 #b36a00" }}>{isBuying ? "..." : "Pay with Crypto"}</button>
+                              {pxBalance < (shopItem.price_pixels ?? 0) && <p className="text-[8px] text-center text-red-400">Not enough PX ({pxBalance} / {shopItem.price_pixels}). <a href="/pixels" className="underline hover:text-red-300">Buy PX</a></p>}
                             </div>
                           </div>
                         )}
@@ -1796,7 +1950,7 @@ export default function ShopClient({
                           disabled={isBuying}
                           className={[
                             "relative flex flex-col items-center justify-center p-2 transition-all w-full aspect-square",
-                            "border-dashed border-[2px] border-orange-500/30",
+                            "border-dashed border-2 border-orange-500/30",
                             isConfirming ? "border-red-500/60 border-solid" : "",
                             "bg-bg-card hover:border-orange-500/50",
                           ].join(" ")}
@@ -1809,15 +1963,15 @@ export default function ShopClient({
                           <span className="mt-0.5 text-[8px] text-muted">{isBuying ? "..." : shopItem ? formatPrice(shopItem) : ""}</span>
                         </button>
                         {isConfirming && shopItem && (
-                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-[2px] border-border bg-bg p-2 shadow-lg">
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 w-36 border-2 border-border bg-bg p-2 shadow-lg">
                             <p className="text-[9px] text-cream text-center mb-1.5">{ITEM_NAMES[itemId]}</p>
                             <p className="text-[10px] text-center mb-2" style={{ color: "#ff5555" }}>{formatPrice(shopItem)}</p>
                             <div className="flex flex-col gap-1">
                               <div className="flex gap-1">
-                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-[2px] border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
-                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId); }} disabled={isBuying} className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#ff5555", boxShadow: "1px 1px 0 0 #aa2222" }}>{isBuying ? "..." : "Buy"}</button>
+                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); }} className="flex-1 border-2 border-border py-1 text-[9px] text-muted hover:text-cream">Cancel</button>
+                                <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); spendPixels(itemId); }} disabled={isBuying || pxBalance < (shopItem.price_pixels ?? 0)} className="btn-press flex-1 py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#ff5555", boxShadow: "1px 1px 0 0 #aa2222" }}>{isBuying ? "..." : "Buy"}</button>
                               </div>
-                              <button onClick={(e) => { e.stopPropagation(); setConfirmBuyItem(null); checkout(itemId, "nowpayments"); }} disabled={isBuying} className="btn-press w-full py-1 text-[9px] text-bg disabled:opacity-40" style={{ backgroundColor: "#f7931a", boxShadow: "1px 1px 0 0 #b36a00" }}>{isBuying ? "..." : "Pay with Crypto"}</button>
+                              {pxBalance < (shopItem.price_pixels ?? 0) && <p className="text-[8px] text-center text-red-400">Not enough PX ({pxBalance} / {shopItem.price_pixels}). <a href="/pixels" className="underline hover:text-red-300">Buy PX</a></p>}
                             </div>
                           </div>
                         )}
@@ -1829,9 +1983,10 @@ export default function ShopClient({
             })()}
           </div>
 
-          {/* Payment note */}
+          {/* PX note */}
           <p className="text-center text-[10px] text-dim normal-case">
-            Payment via Stripe
+            All items purchased with{" "}
+            <a href="/pixels" className="text-lime hover:underline">Pixels (PX)</a>
           </p>
         </div>
       )}

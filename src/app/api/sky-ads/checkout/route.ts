@@ -121,36 +121,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to create ad" }, { status: 500 });
   }
 
-  // Create Stripe checkout session
-  const stripe = getStripe();
   const baseUrl = getBaseUrl();
 
   try {
+    const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 60, // 30 min
+      mode: "subscription",
+      billing_address_collection: "required",
+      tax_id_collection: { enabled: true },
       line_items: [
         {
           price_data: {
             currency,
             product_data: {
               name: `Git City Ad: ${plan.label}`,
-              description: `${plan.label} ad for ${plan.duration_days} days on Git City`,
+              description: `${plan.label} monthly ad subscription on Git City`,
             },
             unit_amount: getPriceCents(plan_id, currency),
+            recurring: { interval: "month" },
           },
           quantity: 1,
         },
       ],
+      allow_promotion_codes: true,
       metadata: {
         sky_ad_id: adId,
         type: "sky_ad",
+      },
+      subscription_data: {
+        metadata: {
+          sky_ad_id: adId,
+          type: "sky_ad",
+        },
       },
       success_url: `${baseUrl}/advertise/setup/${trackingToken}`,
       cancel_url: `${baseUrl}/advertise`,
     });
 
-    // Store stripe session ID on the ad row
     await sb
       .from("sky_ads")
       .update({ stripe_session_id: session.id })
@@ -158,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    console.error("Stripe checkout creation failed:", err);
+    console.error("Sky ad checkout creation failed:", err);
     // Clean up the orphaned row
     await sb.from("sky_ads").delete().eq("id", adId);
     return NextResponse.json({ error: "Payment setup failed" }, { status: 500 });

@@ -7,6 +7,9 @@ import { createWindowAtlas, FocusBeacon } from "./Building3D";
 import InstancedBuildings from "./InstancedBuildings";
 import InstancedLabels from "./InstancedLabels";
 import EffectsLayer from "./EffectsLayer";
+import LiveDots from "./LiveDots";
+import DropBeacon from "./DropBeacon";
+import type { LiveSession } from "@/lib/useCodingPresence";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
 
@@ -74,6 +77,9 @@ interface CitySceneProps {
   flyMode?: boolean;
   ghostPreviewLogin?: string | null;
   holdRise?: boolean;
+  liveByLogin?: Map<string, LiveSession>;
+  cityEnergy?: number;
+  dimAll?: boolean;
 }
 
 export default function CityScene({
@@ -89,6 +95,9 @@ export default function CityScene({
   flyMode,
   ghostPreviewLogin,
   holdRise,
+  liveByLogin,
+  cityEnergy,
+  dimAll,
 }: CitySceneProps) {
   // Single atlas texture for all building windows (created once per theme)
   const atlasTexture = useMemo(() => createWindowAtlas(colors), [colors]);
@@ -161,7 +170,15 @@ export default function CityScene({
         introMode={introMode}
         onBuildingClick={onBuildingClick}
         holdRise={holdRise}
+        liveByLogin={liveByLogin}
+        cityEnergy={cityEnergy}
+        dimAll={dimAll}
       />
+
+      {/* Live presence dots above active buildings */}
+      {liveByLogin && liveByLogin.size > 0 && (
+        <LiveDots buildings={buildings} liveByLogin={liveByLogin} />
+      )}
 
       {/* All labels: single instanced draw call with billboard shader */}
       <InstancedLabels
@@ -208,6 +225,13 @@ export default function CityScene({
           />
         </group>
       )}
+
+      {/* Drop beacons: pillars of light on buildings with active drops */}
+      {!introMode && buildings.filter((b) => b.active_drop).map((b) => (
+        <group key={`drop-${b.login}`} position={[b.position[0], 0, b.position[2]]}>
+          <DropBeacon rarity={b.active_drop!.rarity} height={b.height} />
+        </group>
+      ))}
     </>
   );
 }

@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges" width="512" height="512">
+  <!-- CONCEPT 9: City From Above - aerial view -->
+  <!-- One building glows bright: citizen #1 -->
+
+  <!-- Background (dark void) -->
+  <rect width="64" height="64" fill="#0a0e12"/>
+
+  <!-- Wide glow from center building -->
+  <rect x="22" y="22" width="20" height="20" fill="#00ff41" opacity="0.03"/>
+  <rect x="27" y="27" width="10" height="10" fill="#00ff41" opacity="0.04"/>
+
+  <!-- ============================================ -->
+  <!-- BUILDING GRID: 8x8, each 6x6, 2px gap       -->
+  <!-- Position: (col*8+1, row*8+1)                 -->
+  <!-- ============================================ -->
+
+  <!-- ROW 0 -->
+  <rect x="9" y="1" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+  <rect x="17" y="1" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="33" y="1" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+  <rect x="41" y="1" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="49" y="1" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+
+  <!-- ROW 1 -->
+  <rect x="1" y="9" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+  <rect x="9" y="9" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="17" y="9" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="25" y="9" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="33" y="9" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="41" y="9" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="49" y="9" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="57" y="9" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+
+  <!-- ROW 2 -->
+  <rect x="9" y="17" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="17" y="17" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="25" y="17" width="6" height="6" fill="#00ff41" opacity="0.3"/>
+  <rect x="33" y="17" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="41" y="17" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="49" y="17" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+
+  <!-- ROW 3 -->
+  <rect x="1" y="25" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="9" y="25" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="17" y="25" width="6" height="6" fill="#00ff41" opacity="0.3"/>
+  <rect x="25" y="25" width="6" height="6" fill="#00ff41" opacity="0.45"/>
+  <rect x="33" y="25" width="6" height="6" fill="#00ff41" opacity="0.45"/>
+  <rect x="41" y="25" width="6" height="6" fill="#00ff41" opacity="0.3"/>
+  <rect x="49" y="25" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="57" y="25" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+
+  <!-- ROW 4 (CENTER ROW - has THE building) -->
+  <rect x="1" y="33" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+  <rect x="9" y="33" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="17" y="33" width="6" height="6" fill="#00ff41" opacity="0.3"/>
+  <rect x="25" y="33" width="6" height="6" fill="#00ff41" opacity="0.45"/>
+  <!-- THE BUILDING - citizen #1 -->
+  <rect x="32" y="32" width="8" height="8" fill="#00ff41" opacity="0.12"/><!-- glow -->
+  <rect x="33" y="33" width="6" height="6" fill="#00ff41"/><!-- FULL BRIGHT -->
+  <!-- Window cross inside the building -->
+  <rect x="35" y="33" width="1" height="6" fill="#080d08" opacity="0.3"/>
+  <rect x="33" y="35" width="6" height="1" fill="#080d08" opacity="0.3"/>
+  <!-- Warm window lights -->
+  <rect x="34" y="34" width="1" height="1" fill="#fef08a" opacity="0.8"/>
+  <rect x="37" y="34" width="1" height="1" fill="#fef08a" opacity="0.6"/>
+  <rect x="34" y="37" width="1" height="1" fill="#fef08a" opacity="0.5"/>
+  <rect x="37" y="37" width="1" height="1" fill="#fef08a" opacity="0.7"/>
+  <!-- end center building -->
+  <rect x="41" y="33" width="6" height="6" fill="#00ff41" opacity="0.45"/>
+  <rect x="49" y="33" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="57" y="33" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+
+  <!-- ROW 5 -->
+  <rect x="9" y="41" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="17" y="41" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="25" y="41" width="6" height="6" fill="#00ff41" opacity="0.3"/>
+  <rect x="33" y="41" width="6" height="6" fill="#00ff41" opacity="0.45"/>
+  <rect x="41" y="41" width="6" height="6" fill="#00ff41" opacity="0.3"/>
+  <rect x="49" y="41" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+
+  <!-- ROW 6 -->
+  <rect x="1" y="49" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+  <rect x="9" y="49" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="17" y="49" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="25" y="49" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="33" y="49" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="41" y="49" width="6" height="6" fill="#00ff41" opacity="0.18"/>
+  <rect x="49" y="49" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="57" y="49" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+
+  <!-- ROW 7 -->
+  <rect x="9" y="57" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+  <rect x="25" y="57" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+  <rect x="33" y="57" width="6" height="6" fill="#00ff41" opacity="0.1"/>
+  <rect x="41" y="57" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+  <rect x="49" y="57" width="6" height="6" fill="#00ff41" opacity="0.05"/>
+
+  <!-- Window lights on brighter buildings (level 4-5) -->
+  <!-- Row 3, col 3 -->
+  <rect x="27" y="27" width="1" height="1" fill="#fef08a" opacity="0.25"/>
+  <rect x="29" y="29" width="1" height="1" fill="#fef08a" opacity="0.2"/>
+  <!-- Row 3, col 4 -->
+  <rect x="35" y="27" width="1" height="1" fill="#fef08a" opacity="0.2"/>
+  <rect x="37" y="29" width="1" height="1" fill="#fef08a" opacity="0.15"/>
+  <!-- Row 4, col 3 -->
+  <rect x="27" y="35" width="1" height="1" fill="#fef08a" opacity="0.2"/>
+  <rect x="29" y="37" width="1" height="1" fill="#fef08a" opacity="0.15"/>
+  <!-- Row 4, col 5 -->
+  <rect x="43" y="35" width="1" height="1" fill="#fef08a" opacity="0.2"/>
+  <rect x="45" y="37" width="1" height="1" fill="#fef08a" opacity="0.15"/>
+  <!-- Row 5, col 4 -->
+  <rect x="35" y="43" width="1" height="1" fill="#fef08a" opacity="0.2"/>
+  <rect x="37" y="44" width="1" height="1" fill="#fef08a" opacity="0.15"/>
+</svg>

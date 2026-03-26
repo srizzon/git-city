@@ -3,11 +3,15 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { checkAchievements } from "@/lib/achievements";
+import { touchLastActive } from "@/lib/notification-helpers";
+import { sendRaidAlertNotification } from "@/lib/notification-senders/raid";
+import { trackDailyMission } from "@/lib/dailies";
 import {
   calculateAttackScore,
   calculateDefenseScore,
   getRaidTitle,
-  MAX_RAIDS_PER_DAY,
+  getEffectiveMaxRaids,
+  isWeeklyCooldownActive,
   RAID_TAG_DURATION_DAYS,
   XP_WIN_ATTACKER,
   XP_WIN_DEFENDER,
@@ -82,6 +86,7 @@ export async function POST(request: Request) {
   // Check daily raid count + weekly cooldown (raids table may not exist yet)
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
+  const maxRaids = getEffectiveMaxRaids();
 
   try {
     const { count: raidsToday } = await admin
@@ -90,26 +95,28 @@ export async function POST(request: Request) {
       .eq("attacker_id", attacker.id)
       .gte("created_at", todayStart.toISOString());
 
-    if ((raidsToday ?? 0) >= MAX_RAIDS_PER_DAY) {
+    if ((raidsToday ?? 0) >= maxRaids) {
       return NextResponse.json({ error: "Daily raid limit reached" }, { status: 429 });
     }
 
-    // Check weekly cooldown
-    const now = new Date();
-    const isoWeekStart = new Date(now);
-    const dayOfWeek = now.getDay();
-    isoWeekStart.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
-    isoWeekStart.setHours(0, 0, 0, 0);
+    // Check weekly cooldown (skipped during special events)
+    if (isWeeklyCooldownActive()) {
+      const now = new Date();
+      const isoWeekStart = new Date(now);
+      const dayOfWeek = now.getDay();
+      isoWeekStart.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
+      isoWeekStart.setHours(0, 0, 0, 0);
 
-    const { count: weeklyPairCount } = await admin
-      .from("raids")
-      .select("id", { count: "exact", head: true })
-      .eq("attacker_id", attacker.id)
-      .eq("defender_id", defender.id)
-      .gte("created_at", isoWeekStart.toISOString());
+      const { count: weeklyPairCount } = await admin
+        .from("raids")
+        .select("id", { count: "exact", head: true })
+        .eq("attacker_id", attacker.id)
+        .eq("defender_id", defender.id)
+        .gte("created_at", isoWeekStart.toISOString());
 
-    if ((weeklyPairCount ?? 0) > 0) {
-      return NextResponse.json({ error: "Already raided this target this week" }, { status: 429 });
+      if ((weeklyPairCount ?? 0) > 0) {
+        return NextResponse.json({ error: "Already raided this target this week" }, { status: 429 });
+      }
     }
   } catch {
     // raids table may not exist yet - allow raid
@@ -260,7 +267,7 @@ export async function POST(request: Request) {
         expires_at: new Date(Date.now() + RAID_TAG_DURATION_DAYS * 86400000).toISOString(),
       });
 
-      // Grant XP
+      // Grant raid_xp (existing system) + general XP
       await Promise.all([
         admin
           .from("developers")
@@ -271,13 +278,24 @@ export async function POST(request: Request) {
           .update({ raid_xp: (defender.raid_xp ?? 0) + XP_WIN_DEFENDER })
           .eq("id", defender.id),
       ]);
+      // General XP: attacker wins 50, defender gets 30 for being raided
+      admin.rpc("grant_xp", { p_developer_id: attacker.id, p_source: "raid_win", p_amount: 50 }).then();
+      admin.rpc("grant_xp", { p_developer_id: defender.id, p_source: "raid_defend", p_amount: 30 }).then();
     } else {
       // Defender gets XP for successful defense
       await admin
         .from("developers")
         .update({ raid_xp: (defender.raid_xp ?? 0) + XP_LOSE_DEFENDER })
         .eq("id", defender.id);
+      // General XP: attacker loses 15, defender defends 30
+      admin.rpc("grant_xp", { p_developer_id: attacker.id, p_source: "raid_loss", p_amount: 15 }).then();
+      admin.rpc("grant_xp", { p_developer_id: defender.id, p_source: "raid_defend", p_amount: 30 }).then();
     }
+
+    // Earn PX for raid participation
+    import("@/lib/pixels").then(({ earnPixels }) =>
+      earnPixels(attacker.id, "raid_attack", undefined, `raid:${raidId}:${attacker.id}`),
+    ).catch(() => {});
 
     // Activity feed
     await admin.from("activity_feed").insert({
@@ -291,6 +309,20 @@ export async function POST(request: Request) {
         defense_score: defense.total,
       },
     });
+
+    // Track activity + notify defender
+    touchLastActive(attacker.id);
+    trackDailyMission(attacker.id, "attempt_battle");
+    if (success) trackDailyMission(attacker.id, "win_battle");
+    sendRaidAlertNotification(
+      defender.id,
+      defender.github_login,
+      attacker.github_login,
+      raidId,
+      success,
+      attack.total,
+      defense.total,
+    );
 
     // Check achievements for both
     const newAttackerXp = (attacker.raid_xp ?? 0) + (success ? XP_WIN_ATTACKER : 0);
@@ -358,6 +390,20 @@ export async function POST(request: Request) {
     });
   }
 
-  // If RPC succeeded (future-proofing)
+  // If RPC succeeded — still need to run application-level side effects
+  // that aren't handled inside the database function.
+  touchLastActive(attacker.id);
+  trackDailyMission(attacker.id, "attempt_battle");
+  if (success) trackDailyMission(attacker.id, "win_battle");
+  sendRaidAlertNotification(
+    defender.id,
+    defender.github_login,
+    attacker.github_login,
+    raidRow?.raid_id ?? 0,
+    success,
+    attack.total,
+    defense.total,
+  );
+
   return NextResponse.json(raidRow);
 }

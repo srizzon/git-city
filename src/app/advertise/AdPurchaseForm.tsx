@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { SKY_AD_PLANS, getPriceCents, getFullPriceCents, formatPrice, PROMO_DISCOUNT, PROMO_LABEL, type SkyAdPlanId, type AdCurrency } from "@/lib/skyAdPlans";
+import { SKY_AD_PLANS, getPriceCents, formatPrice, PROMO_DISCOUNT, PROMO_LABEL, PERIOD_OPTIONS, type SkyAdPlanId, type AdCurrency, type AdPeriod } from "@/lib/skyAdPlans";
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
+import AdPixModal from "@/components/AdPixModal";
 
 const AdPreview = dynamic(() => import("@/components/AdPreview"), { ssr: false });
 
 const ACCENT = "#c8e64a";
 
 type Vehicle = "plane" | "blimp" | "billboard" | "rooftop_sign" | "led_wrap";
-type Duration = "weekly" | "monthly";
 
 const VEHICLES: { id: Vehicle; icon: string; name: string }[] = [
   { id: "plane", icon: "\u2708", name: "Plane" },
@@ -20,36 +20,49 @@ const VEHICLES: { id: Vehicle; icon: string; name: string }[] = [
   { id: "blimp", icon: "\u25C6", name: "Blimp" },
 ];
 
-function getPlanId(vehicle: Vehicle, duration: Duration): SkyAdPlanId {
-  return `${vehicle}_${duration}` as SkyAdPlanId;
+const VEHICLE_STATS: Record<Vehicle, { impressions: string; ctr: string; clicks: string }> = {
+  rooftop_sign: { impressions: "~63K", ctr: "1.5%", clicks: "~939" },
+  blimp:        { impressions: "~41K", ctr: "1.6%", clicks: "~651" },
+  plane:        { impressions: "~29K", ctr: "1.0%", clicks: "~299" },
+  led_wrap:     { impressions: "~28K", ctr: "0.4%", clicks: "~110" },
+  billboard:    { impressions: "~21K", ctr: "1.0%", clicks: "~217" },
+};
+
+function getPlanId(vehicle: Vehicle): SkyAdPlanId {
+  return `${vehicle}_monthly` as SkyAdPlanId;
 }
 
-function detectCurrency(): AdCurrency {
-  if (typeof navigator === "undefined") return "usd";
+function detectLocale(): { currency: AdCurrency } {
+  if (typeof navigator === "undefined") return { currency: "usd" };
   const lang = navigator.language || "";
-  return lang.startsWith("pt") ? "brl" : "usd";
+  return { currency: lang.startsWith("pt") ? "brl" : "usd" };
 }
+
+const PERIODS = Object.keys(PERIOD_OPTIONS) as AdPeriod[];
 
 export function AdPurchaseForm() {
   const [currency, setCurrency] = useState<AdCurrency>("usd");
   const [vehicle, setVehicle] = useState<Vehicle>("plane");
-  const [duration, setDuration] = useState<Duration>("weekly");
+  const [period, setPeriod] = useState<AdPeriod>("1m");
+  const [brand, setBrand] = useState("");
   const [text, setText] = useState("");
+  const [description, setDescription] = useState("");
   const [color, setColor] = useState("#f8d880");
   const [bgColor, setBgColor] = useState("#1a1018");
+  const [link, setLink] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pixLoading, setPixLoading] = useState(false);
+  const [pixModal, setPixModal] = useState<{ brCode: string; brCodeBase64: string; adId: string; successUrl: string } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setCurrency(detectCurrency());
+    const locale = detectLocale();
+    setCurrency(locale.currency);
   }, []);
 
-  const planId = getPlanId(vehicle, duration);
-  const plan = SKY_AD_PLANS[planId];
-  const priceCents = getPriceCents(planId, currency);
+  const planId = getPlanId(vehicle);
+  const priceCents = getPriceCents(planId, currency, period);
   const priceLabel = formatPrice(priceCents, currency);
-  const fullPriceCents = getFullPriceCents(planId, currency);
-  const hasDiscount = PROMO_DISCOUNT < 1;
 
   const textLength = text.length;
   const textOver = textLength > MAX_TEXT_LENGTH;
@@ -62,22 +75,27 @@ export function AdPurchaseForm() {
     !textOver &&
     colorValid &&
     bgColorValid &&
-    !loading;
+    !loading &&
+    !pixLoading;
 
   async function handleSubmit() {
     if (!canSubmit) return;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/sky-ads/checkout", {
+      const res = await fetch("/api/ads/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           plan_id: planId,
+          period,
+          brand: brand.trim() || undefined,
           text: text.trim(),
+          description: description.trim() || undefined,
           color,
           bgColor,
           currency,
+          link: link.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -86,11 +104,52 @@ export function AdPurchaseForm() {
         setLoading(false);
         return;
       }
-      if (data.url) window.location.href = data.url;
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch {
       setError("Network error. Please try again.");
       setLoading(false);
     }
+  }
+
+  const showPix = currency === "brl";
+  const brlPrice = formatPrice(getPriceCents(planId, "brl", period), "brl");
+  const isMonthly = period === "1m";
+
+  async function handlePix() {
+    if (!canSubmit) return;
+    setPixLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/ads/checkout/pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan_id: planId,
+          period,
+          brand: brand.trim() || undefined,
+          text: text.trim(),
+          description: description.trim() || undefined,
+          color,
+          bgColor,
+          link: link.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+        setPixLoading(false);
+        return;
+      }
+      const url = data.isLoggedIn
+        ? `/ads/dashboard/${data.adId}`
+        : `/advertise/setup/${data.trackingToken}`;
+      setPixModal({ brCode: data.brCode, brCodeBase64: data.brCodeBase64, adId: data.adId, successUrl: url });
+    } catch {
+      setError("Network error. Please try again.");
+    }
+    setPixLoading(false);
   }
 
   const isSky = vehicle === "plane" || vehicle === "blimp";
@@ -107,7 +166,7 @@ export function AdPurchaseForm() {
         </div>
       )}
 
-      {/* ── 3D Preview (hero) ── */}
+      {/* 3D Preview (hero) */}
       <AdPreview
         vehicle={vehicle}
         text={text}
@@ -115,7 +174,7 @@ export function AdPurchaseForm() {
         bgColor={bgColorValid ? bgColor : "#1a1018"}
       />
 
-      {/* ── Control Panel ── */}
+      {/* Control Panel */}
       <div className="mt-4 border-[3px] border-border p-4 sm:p-5">
 
         {/* Row 1: Format selector */}
@@ -148,30 +207,37 @@ export function AdPurchaseForm() {
               </button>
             ))}
           </div>
+          <p className="mt-2 text-[9px] text-dim normal-case">
+            {VEHICLE_STATS[vehicle].impressions} impressions/mo · {VEHICLE_STATS[vehicle].ctr} CTR · {VEHICLE_STATS[vehicle].clicks} clicks/mo
+          </p>
         </div>
 
-        {/* Row 2: Duration + Currency + Price */}
-        <div className="mt-4 flex items-center gap-3">
-          {/* Duration toggle */}
-          <div className="flex border-[2px] border-border text-[9px]">
-            {(["weekly", "monthly"] as const).map((d) => (
+        {/* Row 2: Duration */}
+        <div className="mt-4">
+          <p className="mb-2 text-[10px] text-muted normal-case">Duration</p>
+          <div className="flex flex-wrap gap-1.5">
+            {PERIODS.map((p) => (
               <button
-                key={d}
+                key={p}
                 type="button"
-                onClick={() => setDuration(d)}
-                className="px-3 py-1.5 transition-colors"
+                onClick={() => setPeriod(p)}
+                className="border-[2px] px-2.5 py-1.5 text-[9px] transition-colors"
                 style={{
-                  backgroundColor: duration === d ? ACCENT : "transparent",
-                  color: duration === d ? "#1a1018" : "var(--color-muted)",
+                  borderColor: period === p ? ACCENT : "var(--color-border)",
+                  color: period === p ? ACCENT : "var(--color-muted)",
+                  backgroundColor: period === p ? `${ACCENT}10` : "transparent",
                 }}
               >
-                {d === "weekly" ? `7 days` : `30 days`}
+                {PERIOD_OPTIONS[p].label}
               </button>
             ))}
           </div>
+        </div>
 
+        {/* Row 3: Currency + Price */}
+        <div className="mt-4 flex items-center gap-3">
           {/* Currency toggle */}
-          <div className="flex border-[2px] border-border text-[9px]">
+          <div className="flex border-2 border-border text-[9px]">
             {(["usd", "brl"] as const).map((c) => (
               <button
                 key={c}
@@ -193,22 +259,33 @@ export function AdPurchaseForm() {
             <span className="text-lg" style={{ color: ACCENT }}>
               {priceLabel}
             </span>
-            {hasDiscount && (
-              <span className="ml-2 text-[10px] text-muted line-through normal-case">
-                {formatPrice(fullPriceCents, currency)}
-              </span>
-            )}
             <span className="ml-1 text-[9px] text-muted normal-case">
-              / {plan.duration_days}d
+              {period === "1m" ? "/mo" : `for ${PERIOD_OPTIONS[period].label}`}
             </span>
           </div>
         </div>
 
         {/* Divider */}
-        <div className="my-4 border-t-[2px] border-border" />
+        <div className="my-4 border-t-2 border-border" />
 
-        {/* Row 3: Text input */}
+        {/* Brand */}
         <div>
+          <div className="flex items-baseline justify-between">
+            <label className="text-[10px] text-muted normal-case">Brand name</label>
+            <span className="text-[9px] text-muted normal-case">{brand.length}/40</span>
+          </div>
+          <input
+            type="text"
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+            maxLength={40}
+            placeholder="Your Brand"
+            className="mt-1.5 w-full border-[3px] border-border bg-transparent px-3 py-2 font-pixel text-xs text-cream outline-none transition-colors focus:border-lime"
+          />
+        </div>
+
+        {/* Banner text */}
+        <div className="mt-3">
           <div className="flex items-baseline justify-between">
             <label className="text-[10px] text-muted normal-case">
               Banner text
@@ -226,7 +303,37 @@ export function AdPurchaseForm() {
             maxLength={MAX_TEXT_LENGTH + 10}
             rows={2}
             placeholder="YOUR BRAND MESSAGE HERE"
-            className="mt-1.5 w-full border-[3px] border-border bg-transparent px-3 py-2 font-pixel text-xs text-cream uppercase outline-none transition-colors focus:border-[#c8e64a]"
+            className="mt-1.5 w-full border-[3px] border-border bg-transparent px-3 py-2 font-pixel text-xs text-cream uppercase outline-none transition-colors focus:border-lime"
+          />
+        </div>
+
+        {/* Description */}
+        <div className="mt-3">
+          <div className="flex items-baseline justify-between">
+            <label className="text-[10px] text-muted normal-case">Description (optional)</label>
+            <span className="text-[9px] text-muted normal-case">{description.length}/200</span>
+          </div>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={200}
+            rows={2}
+            placeholder="Short description shown on CTA popup"
+            className="mt-1.5 w-full border-[3px] border-border bg-transparent px-3 py-2 font-pixel text-[10px] text-cream outline-none transition-colors focus:border-lime normal-case"
+          />
+        </div>
+
+        {/* Link input */}
+        <div className="mt-3">
+          <label className="text-[10px] text-muted normal-case">
+            Link (optional)
+          </label>
+          <input
+            type="url"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="https://yoursite.com"
+            className="mt-1.5 w-full border-[3px] border-border bg-transparent px-3 py-2 font-pixel text-xs text-cream outline-none transition-colors focus:border-lime"
           />
         </div>
 
@@ -241,14 +348,14 @@ export function AdPurchaseForm() {
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="h-8 w-8 cursor-pointer border-[2px] border-border bg-transparent"
+                className="h-8 w-8 cursor-pointer border-2 border-border bg-transparent"
               />
               <input
                 type="text"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 maxLength={7}
-                className="w-full border-[2px] border-border bg-transparent px-2 py-1.5 font-pixel text-[10px] text-cream outline-none transition-colors focus:border-[#c8e64a]"
+                className="w-full border-2 border-border bg-transparent px-2 py-1.5 font-pixel text-[10px] text-cream outline-none transition-colors focus:border-lime"
               />
             </div>
           </div>
@@ -261,20 +368,20 @@ export function AdPurchaseForm() {
                 type="color"
                 value={bgColor}
                 onChange={(e) => setBgColor(e.target.value)}
-                className="h-8 w-8 cursor-pointer border-[2px] border-border bg-transparent"
+                className="h-8 w-8 cursor-pointer border-2 border-border bg-transparent"
               />
               <input
                 type="text"
                 value={bgColor}
                 onChange={(e) => setBgColor(e.target.value)}
                 maxLength={7}
-                className="w-full border-[2px] border-border bg-transparent px-2 py-1.5 font-pixel text-[10px] text-cream outline-none transition-colors focus:border-[#c8e64a]"
+                className="w-full border-2 border-border bg-transparent px-2 py-1.5 font-pixel text-[10px] text-cream outline-none transition-colors focus:border-lime"
               />
             </div>
           </div>
         </div>
 
-        {/* Row 5: Buy button */}
+        {/* Row 5: Subscribe button */}
         <div className="mt-5">
           {/* Error banner */}
           {error && (
@@ -285,23 +392,63 @@ export function AdPurchaseForm() {
               {error}
             </div>
           )}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="btn-press w-full py-3.5 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              backgroundColor: ACCENT,
-              boxShadow: "4px 4px 0 0 #5a7a00",
-            }}
-          >
-            {loading ? "Redirecting..." : `Buy for ${priceLabel}`}
-          </button>
-          <p className="mt-2.5 text-center text-[9px] text-muted normal-case">
-            Secure Stripe checkout. No account needed.
-          </p>
+
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => handleSubmit()}
+              disabled={!canSubmit}
+              className="btn-press w-full py-3.5 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                backgroundColor: ACCENT,
+                boxShadow: "4px 4px 0 0 #5a7a00",
+              }}
+            >
+              {loading
+                ? "Redirecting..."
+                : isMonthly
+                  ? `Subscribe ${priceLabel}/mo`
+                  : `Pay ${priceLabel}`}
+            </button>
+            {showPix && (
+              <button
+                type="button"
+                onClick={handlePix}
+                disabled={!canSubmit || pixLoading}
+                className="btn-press w-full py-3.5 text-sm transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                style={{
+                  backgroundColor: "transparent",
+                  border: `2px solid ${ACCENT}`,
+                  color: ACCENT,
+                  boxShadow: "4px 4px 0 0 #5a7a00",
+                }}
+              >
+                {pixLoading ? "Generating PIX..." : `Pay ${brlPrice} with PIX`}
+              </button>
+            )}
+            <p className="mt-1 text-center text-[9px] text-muted normal-case">
+              {showPix && isMonthly
+                ? "Card = monthly subscription (auto-renews). PIX = one-time payment for 30 days."
+                : showPix
+                  ? "Card or PIX. Secure checkout."
+                  : isMonthly
+                    ? "Monthly subscription, cancel anytime. Secure checkout via Stripe."
+                    : "Secure checkout via Stripe."}
+            </p>
+          </div>
         </div>
       </div>
+
+      {pixModal && (
+        <AdPixModal
+          brCode={pixModal.brCode}
+          brCodeBase64={pixModal.brCodeBase64}
+          adId={pixModal.adId}
+          planLabel={`Git City Ad: ${SKY_AD_PLANS[planId].label} (${period})`}
+          successUrl={pixModal.successUrl}
+          onClose={() => setPixModal(null)}
+        />
+      )}
     </div>
   );
 }

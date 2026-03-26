@@ -5,7 +5,8 @@ export async function GET(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
-  return NextResponse.redirect(
-    new URL(`/api/dev/${encodeURIComponent(username)}`, _request.url)
-  );
+  const url = new URL(`/api/dev/${encodeURIComponent(username)}`, _request.url);
+  const response = NextResponse.redirect(url);
+  response.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+  return response;
 }

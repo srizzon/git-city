@@ -4,6 +4,10 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { checkAchievements } from "@/lib/achievements";
 import { ITEM_NAMES } from "@/lib/zones";
+import { touchLastActive } from "@/lib/notification-helpers";
+import { sendStreakMilestoneNotification } from "@/lib/notification-senders/streak";
+import { sendStreakBrokenNotification } from "@/lib/notification-senders/streak-broken";
+import { trackDailyMission } from "@/lib/dailies";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // A12: Streak reward milestones — {milestone: days, pool: item_ids to pick from}
@@ -186,8 +190,31 @@ export async function POST() {
     return NextResponse.json({ error: checkinResult.error }, { status: 400 });
   }
 
+  // Track activity
+  touchLastActive(dev.id);
+  trackDailyMission(dev.id, "checkin");
+
+  // Detect streak broken: previous streak was >= 7, now reset to 1, and freeze didn't save them
+  const previousStreak = dev.app_streak ?? 0;
+  if (
+    checkinResult.checked_in &&
+    checkinResult.streak === 1 &&
+    previousStreak >= 7 &&
+    !checkinResult.was_frozen
+  ) {
+    const today = new Date().toISOString().split("T")[0];
+    sendStreakBrokenNotification(dev.id, githubLogin, previousStreak, today);
+  }
+
   let newAchievements: string[] = [];
   let streakReward: { milestone: number; item_id: string; item_name: string } | null = null;
+  let xpResult: { granted: number; new_total: number; new_level: number } | null = null;
+
+  // Grant XP for check-in
+  if (checkinResult.checked_in) {
+    const { data: xpData } = await sb.rpc("grant_xp", { p_developer_id: dev.id, p_source: "checkin", p_amount: 10 });
+    if (xpData) xpResult = xpData as { granted: number; new_total: number; new_level: number };
+  }
 
   if (checkinResult.checked_in) {
     // Check achievements with updated streak
@@ -221,6 +248,27 @@ export async function POST() {
 
     // A12: Streak rewards - grant free items at milestones
     streakReward = await grantStreakReward(sb, dev.id, checkinResult.streak);
+
+    // Streak milestone notifications (7, 30, 100, 365)
+    if ([7, 30, 100, 365].includes(checkinResult.streak)) {
+      sendStreakMilestoneNotification(
+        dev.id,
+        githubLogin,
+        checkinResult.streak,
+        checkinResult.longest,
+        streakReward?.item_name,
+      );
+    }
+
+    // Earn PX for streak milestones
+    const streakMilestones = [3, 7, 14, 30] as const;
+    for (const m of streakMilestones) {
+      if (checkinResult.streak === m) {
+        import("@/lib/pixels").then(({ earnPixels }) =>
+          earnPixels(dev.id, `streak_${m}`, undefined, `streak:${m}:${dev.id}:${new Date().toISOString().slice(0, 7)}`),
+        ).catch(() => {});
+      }
+    }
 
     // Insert feed event
     await sb.from("activity_feed").insert({
@@ -292,5 +340,6 @@ export async function POST() {
     kudos_since_last: recentKudos?.length ?? 0,
     raids_since_last: raidsSinceLast,
     streak_reward: streakReward,
+    xp: xpResult,
   });
 }

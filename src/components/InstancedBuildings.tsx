@@ -20,6 +20,7 @@ const vertexShader = /* glsl */ `
   attribute vec4 aUvSide;
   attribute float aRise;
   attribute vec4 aTint;
+  attribute float aLive;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -28,6 +29,7 @@ const vertexShader = /* glsl */ `
   varying vec3 vViewPos;
   varying float vInstanceId;
   varying vec4 vTint;
+  varying float vLive;
 
   void main() {
     vUv = uv;
@@ -35,6 +37,7 @@ const vertexShader = /* glsl */ `
     vUvFront = aUvFront;
     vUvSide = aUvSide;
     vTint = aTint;
+    vLive = aLive;
 
     // Rise animation: modulate Y position by aRise (0 = underground, 1 = full height)
     vec3 localPos = position;
@@ -59,6 +62,7 @@ const fragmentShader = /* glsl */ `
   uniform float uFocusedIdB;
   uniform float uDimOpacity;
   uniform float uDimEmissive;
+  uniform float uCityEnergy;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -67,6 +71,7 @@ const fragmentShader = /* glsl */ `
   varying vec3 vViewPos;
   varying float vInstanceId;
   varying vec4 vTint;
+  varying float vLive;
 
   void main() {
     // Early discard: skip fragments fully inside fog (invisible anyway)
@@ -95,12 +100,18 @@ const fragmentShader = /* glsl */ `
       wallColor = mix(wallColor, blendedTint, isFacePixel);
     }
 
-    // Emissive glow for lit windows
-    vec3 emissive = wallColor * 1.8;
-    vec3 wallFinal = wallColor * 0.3 + emissive;
+    // Emissive glow for lit windows, scaled by city energy
+    // Both ambient and emissive dim when city sleeps
+    float ambientBase = 0.08 + 0.22 * uCityEnergy;
+    vec3 emissive = wallColor * 1.8 * uCityEnergy;
+    vec3 wallFinal = wallColor * ambientBase + emissive;
 
-    // Roof: solid color with emissive
-    vec3 roofFinal = uRoofColor * 1.8;
+    // Live building boost: pushes windows past bloom threshold
+    vec3 liveBoost = vec3(1.4, 1.35, 1.2);
+    wallFinal = mix(wallFinal, wallFinal * liveBoost, vLive);
+
+    // Roof: solid color with emissive, also scaled by city energy
+    vec3 roofFinal = uRoofColor * (0.4 + 1.4 * uCityEnergy);
 
     vec3 color = mix(wallFinal, roofFinal, isRoof);
 
@@ -168,6 +179,9 @@ interface InstancedBuildingsProps {
   dimOpacity?: number;
   dimEmissive?: number;
   holdRise?: boolean;
+  liveByLogin?: Map<string, unknown>;
+  cityEnergy?: number;
+  dimAll?: boolean;
 }
 
 // Rise animation tracking
@@ -177,7 +191,11 @@ interface RiseState {
 }
 
 const RISE_DURATION = 0.85; // seconds
-const RISE_STAGGER_DELAY = 0.003; // stagger between buildings (~2.4s for 800 buildings)
+const MAX_RISE_TOTAL = 4; // cap total stagger to 4s regardless of building count
+
+// Module-level flag so the rise animation only plays once per session,
+// surviving component remounts caused by Next.js navigation.
+let hasPlayedRiseGlobal = false;
 
 export default memo(function InstancedBuildings({
   buildings,
@@ -190,6 +208,9 @@ export default memo(function InstancedBuildings({
   dimOpacity,
   dimEmissive,
   holdRise,
+  liveByLogin,
+  cityEnergy = 1.0,
+  dimAll,
 }: InstancedBuildingsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = buildings.length;
@@ -220,6 +241,7 @@ export default memo(function InstancedBuildings({
         uFocusedIdB: { value: -1.0 },
         uDimOpacity: { value: 0.6 },
         uDimEmissive: { value: 0.5 },
+        uCityEnergy: { value: 1.0 },
       },
       vertexShader,
       fragmentShader,
@@ -285,10 +307,14 @@ export default memo(function InstancedBuildings({
     return { uvFrontData: uvF, uvSideData: uvS, riseData: rise, tintData: tint };
   }, [buildings, count]);
 
+  // Live presence attribute (updated dynamically)
+  const liveData = useMemo(() => new Float32Array(count), [count]);
+
   // Rise animation state
   const risingRef = useRef<RiseState[]>([]);
   const riseInitialized = useRef(false);
-  const hasPlayedRise = useRef(false);
+  // hasPlayedRise uses the module-level flag (hasPlayedRiseGlobal) so the
+  // animation survives component remounts from Next.js navigation.
   const holdRiseRef = useRef(holdRise);
   holdRiseRef.current = holdRise;
 
@@ -328,32 +354,39 @@ export default memo(function InstancedBuildings({
     riseAttr.setUsage(THREE.DynamicDrawUsage);
     const tintAttr = new THREE.InstancedBufferAttribute(tintData, 4);
 
+    const liveAttr = new THREE.InstancedBufferAttribute(liveData, 1);
+    liveAttr.setUsage(THREE.DynamicDrawUsage);
+
     mesh.geometry.setAttribute("aUvFront", uvFrontAttr);
     mesh.geometry.setAttribute("aUvSide", uvSideAttr);
     mesh.geometry.setAttribute("aRise", riseAttr);
     mesh.geometry.setAttribute("aTint", tintAttr);
+    mesh.geometry.setAttribute("aLive", liveAttr);
 
-    if (hasPlayedRise.current) {
-      // Skip rise animation on subsequent updates (city reload, chunk loading)
+    if (hasPlayedRiseGlobal) {
+      // Skip rise animation on return visits / subsequent updates
       // Show all buildings at full height immediately
       for (let i = 0; i < count; i++) riseData[i] = 1;
       riseAttr.needsUpdate = true;
       riseInitialized.current = true;
       risingRef.current = [];
     } else {
-      // First mount: play the staggered rise animation
-      hasPlayedRise.current = true;
+      // First mount this session: play the staggered rise animation
+      hasPlayedRiseGlobal = true;
       riseInitialized.current = false;
       risingRef.current = [];
     }
 
     mesh.count = count;
-  }, [buildings, count, uvFrontData, uvSideData, riseData, tintData]);
+  }, [buildings, count, uvFrontData, uvSideData, riseData, tintData, liveData]);
 
   // Sync fog uniforms (only when values actually change, e.g. theme switch)
+  // Also smoothly lerp cityEnergy uniform toward target value
   const lastFogNear = useRef(0);
   const lastFogFar = useRef(0);
-  useFrame(({ scene }) => {
+  const cityEnergyRef = useRef(cityEnergy);
+  cityEnergyRef.current = cityEnergy;
+  useFrame(({ scene, clock }) => {
     if (!material.uniforms) return;
     const fog = scene.fog as THREE.Fog | null;
     if (!fog) return;
@@ -364,6 +397,13 @@ export default memo(function InstancedBuildings({
       lastFogNear.current = fog.near;
       lastFogFar.current = fog.far;
     }
+
+    // Smooth lerp city energy (transition over ~5 seconds)
+    const current = material.uniforms.uCityEnergy.value;
+    const target = cityEnergyRef.current;
+    if (Math.abs(current - target) > 0.001) {
+      material.uniforms.uCityEnergy.value += (target - current) * 0.02;
+    }
   });
 
   // Update focus uniforms
@@ -371,9 +411,26 @@ export default memo(function InstancedBuildings({
     if (!material.uniforms) return;
     const idA = focusedBuilding ? loginToIdx.get(focusedBuilding.toLowerCase()) : undefined;
     const idB = focusedBuildingB ? loginToIdx.get(focusedBuildingB.toLowerCase()) : undefined;
-    material.uniforms.uFocusedId.value = idA !== undefined ? idA : -1.0;
+    // dimAll: set focusedId to a value that matches no building, but hasFocus=true so all dim
+    material.uniforms.uFocusedId.value = dimAll ? 999999.0 : (idA !== undefined ? idA : -1.0);
     material.uniforms.uFocusedIdB.value = idB !== undefined ? idB : -1.0;
-  }, [focusedBuilding, focusedBuildingB, loginToIdx, material]);
+  }, [focusedBuilding, focusedBuildingB, dimAll, loginToIdx, material]);
+
+  // Update live presence glow
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const liveAttr = mesh.geometry.getAttribute("aLive") as THREE.InstancedBufferAttribute | undefined;
+    if (!liveAttr) return;
+    const arr = liveAttr.array as Float32Array;
+
+    for (let i = 0; i < count; i++) {
+      const login = buildings[i].login.toLowerCase();
+      // Creator gets an overdriven glow (1.5 overshoots the mix, extra bright)
+      arr[i] = liveByLogin?.has(login) ? (login === "srizzon" ? 1.5 : 1.0) : 0.0;
+    }
+    liveAttr.needsUpdate = true;
+  }, [liveByLogin, buildings, count]);
 
   // Rise animation + staggered init
   useFrame(({ clock }) => {
@@ -387,10 +444,11 @@ export default memo(function InstancedBuildings({
     const now = clock.elapsedTime;
     if (!riseInitialized.current) {
       riseInitialized.current = true;
+      const staggerDelay = Math.min(0.003, MAX_RISE_TOTAL / Math.max(1, count));
       const queue: RiseState[] = [];
       for (let i = 0; i < count; i++) {
         queue.push({
-          startTime: now + i * RISE_STAGGER_DELAY,
+          startTime: now + i * staggerDelay,
           idx: i,
         });
       }
@@ -480,7 +538,7 @@ export default memo(function InstancedBuildings({
     const onPointerDown = (e: PointerEvent) => {
       if (introRef.current) return;
       if (wasAdPointerConsumed()) return;
-      if ((window as any).__spireClicked) return;
+      if ((window as any).__spireClicked || (window as any).__arcadeClicked || (window as any).__sponsorClicked) return;
       const id = raycastInstance(e.clientX, e.clientY);
       if (id !== null && id < buildingsRef.current.length) {
         tapRef.current = { time: performance.now(), id, x: e.clientX, y: e.clientY };

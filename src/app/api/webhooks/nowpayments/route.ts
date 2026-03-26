@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyIpnSignature } from "@/lib/nowpayments";
 import { autoEquipIfSolo } from "@/lib/items";
+import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
+import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 
 export const dynamic = "force-dynamic";
 
@@ -99,12 +101,15 @@ export async function POST(request: Request) {
               item_id: purchase.item_id,
             },
           });
+          sendGiftSentNotification(purchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", purchase.id, purchase.item_id);
+          sendGiftReceivedNotification(purchase.gifted_to, dev?.github_login ?? "someone", receiver?.github_login ?? "unknown", purchase.id, purchase.item_id);
         } else {
           await sb.from("activity_feed").insert({
             event_type: "item_purchased",
             actor_id: purchase.developer_id,
             metadata: { login: dev?.github_login, item_id: purchase.item_id },
           });
+          sendPurchaseNotification(purchase.developer_id, dev?.github_login ?? "", purchase.id, purchase.item_id);
         }
         break;
       }

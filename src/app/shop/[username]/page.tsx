@@ -7,6 +7,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { getOwnedItems } from "@/lib/items";
 import type { ShopItem } from "@/lib/items";
 import { calcBuildingDims } from "@/lib/github";
+import { getBalance } from "@/lib/pixels";
 import ShopClient from "@/components/ShopClient";
 
 interface Props {
@@ -156,6 +157,9 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
   const achievements = (achievementsResult.data ?? []).map((a: { achievement_id: string }) => a.achievement_id);
 
+  // Fetch PX balance
+  const wallet = await getBalance(dev.id);
+
   // A10: Compute top 3 most purchased items (min 5 purchases)
   const purchaseCounts: Record<string, number> = {};
   const weeklyPurchaseCounts: Record<string, number> = {};
@@ -205,7 +209,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
-      <div className="mx-auto max-w-2xl px-3 py-6 sm:px-4 sm:py-10 lg:max-w-[960px]">
+      <div className="mx-auto max-w-2xl px-3 py-6 sm:px-4 sm:py-10 lg:max-w-240">
         {/* Header */}
         <Link
           href={`/dev/${dev.github_login}`}
@@ -223,7 +227,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
                 alt={dev.github_login}
                 width={56}
                 height={56}
-                className="border-[2px] border-border flex-shrink-0"
+                className="border-2 border-border shrink-0"
                 style={{ imageRendering: "pixelated" }}
               />
             )}
@@ -256,6 +260,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
           popularItems={popularItems}
           purchaseCounts={weeklyPurchaseCounts}
           totalPurchaseCounts={purchaseCounts}
+          pxBalance={wallet.balance}
         />
 
         {/* Back links */}

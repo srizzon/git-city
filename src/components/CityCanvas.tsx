@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useEffect, useState, useMemo } from "react";
+import { useRef, useEffect, useEffectEvent, useState, useMemo, useCallback } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/drei";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
+import type { LiveSession } from "@/lib/useCodingPresence";
 import type { CityBuilding, CityPlaza, CityDecoration, CityRiver, CityBridge } from "@/lib/github";
 import { seededRandom } from "@/lib/github";
 import SkyAds from "./SkyAds";
@@ -16,8 +17,17 @@ import RaidSequence3D, { VehicleMesh } from "./RaidSequence3D";
 import type { RaidPhase } from "@/lib/useRaidSequence";
 import type { RaidExecuteResponse } from "@/lib/raid";
 import FounderSpire from "./FounderSpire";
+import EArcadeLandmark from "./EArcadeLandmark";
+import { SPONSORS } from "@/lib/sponsors/registry";
+import SponsoredLandmark from "@/lib/sponsors/SponsoredLandmark";
 import WhiteRabbit from "./WhiteRabbit";
 import CelebrationEffect from "./CelebrationEffect";
+import ComparePath from "./ComparePath";
+import CompareCinematic from "./CompareCinematic";
+import CompareSplitScreen from "./CompareSplitScreen";
+import LocalizedFireworks from "./LocalizedFireworks";
+import WallpaperParallax from "./WallpaperParallax";
+import ThemeSkyFX from "./ThemeSkyFX";
 
 // ─── Theme Definitions ───────────────────────────────────────
 
@@ -70,7 +80,7 @@ const THEMES: CityTheme[] = [
       [0, "#000206"], [0.15, "#020814"], [0.30, "#061428"], [0.45, "#0c2040"],
       [0.55, "#102850"], [0.65, "#0c2040"], [0.80, "#061020"], [1, "#020608"],
     ],
-    fogColor: "#0a1428", fogNear: 500, fogFar: 3500,
+    fogColor: "#0a1428", fogNear: 400, fogFar: 3500,
     ambientColor: "#4060b0", ambientIntensity: 0.55,
     sunColor: "#7090d0", sunIntensity: 0.75, sunPos: [300, 120, -200],
     fillColor: "#304080", fillIntensity: 0.3, fillPos: [-200, 60, 200],
@@ -92,7 +102,7 @@ const THEMES: CityTheme[] = [
       [0.46, "#a05068"], [0.52, "#d07060"], [0.57, "#e89060"], [0.62, "#f0b070"],
       [0.68, "#f0c888"], [0.75, "#c08060"], [0.85, "#603030"], [1, "#180c10"],
     ],
-    fogColor: "#80405a", fogNear: 500, fogFar: 3500,
+    fogColor: "#80405a", fogNear: 400, fogFar: 3500,
     ambientColor: "#e0a080", ambientIntensity: 0.7,
     sunColor: "#f0b070", sunIntensity: 1.0, sunPos: [400, 120, -300],
     fillColor: "#6050a0", fillIntensity: 0.35, fillPos: [-200, 80, 200],
@@ -114,7 +124,7 @@ const THEMES: CityTheme[] = [
       [0.52, "#500860"], [0.60, "#380648"], [0.75, "#180230"], [0.90, "#0c0118"],
       [1, "#06000c"],
     ],
-    fogColor: "#1a0830", fogNear: 500, fogFar: 3500,
+    fogColor: "#1a0830", fogNear: 400, fogFar: 3500,
     ambientColor: "#8040c0", ambientIntensity: 0.6,
     sunColor: "#c050e0", sunIntensity: 0.85, sunPos: [300, 100, -200],
     fillColor: "#00c0d0", fillIntensity: 0.4, fillPos: [-250, 60, 200],
@@ -136,7 +146,7 @@ const THEMES: CityTheme[] = [
       [0.52, "#004828"], [0.60, "#003820"], [0.75, "#002014"], [0.90, "#001008"],
       [1, "#000604"],
     ],
-    fogColor: "#0a2014", fogNear: 500, fogFar: 3500,
+    fogColor: "#0a2014", fogNear: 400, fogFar: 3500,
     ambientColor: "#40a060", ambientIntensity: 0.55,
     sunColor: "#70d090", sunIntensity: 0.75, sunPos: [300, 100, -250],
     fillColor: "#20a080", fillIntensity: 0.35, fillPos: [-200, 60, 200],
@@ -171,13 +181,6 @@ function SkyDome({ stops }: { stops: [number, string][] }) {
     return new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false });
   }, [stops]);
 
-  // Keep sky dome centered on camera so it always surrounds the viewer
-  useFrame(({ camera }) => {
-    if (meshRef.current) {
-      meshRef.current.position.copy(camera.position);
-    }
-  });
-
   useEffect(() => {
     return () => {
       mat.map?.dispose();
@@ -185,8 +188,16 @@ function SkyDome({ stops }: { stops: [number, string][] }) {
     };
   }, [mat]);
 
+  // Center sky dome on whichever camera is currently rendering
+  // (works with split-screen virtual cameras, not just the default one)
+  const onBeforeRender = useCallback((_renderer: THREE.WebGLRenderer, _scene: THREE.Scene, camera: THREE.Camera) => {
+    if (meshRef.current) {
+      meshRef.current.position.copy(camera.position);
+    }
+  }, []);
+
   return (
-    <mesh ref={meshRef} material={mat} renderOrder={-1}>
+    <mesh ref={meshRef} material={mat} renderOrder={-1} onBeforeRender={onBeforeRender}>
       <sphereGeometry args={[3500, 32, 48]} />
     </mesh>
   );
@@ -210,37 +221,39 @@ useGLTF.preload("/models/paper-plane.glb");
 
 const INTRO_DURATION = 14; // seconds
 
-// Founder building sits at roughly (146, h, -66) in the first block.
-// Camera target: founder building top.
-const FOUNDER_X = 146;
-const FOUNDER_Z = -66;
-const TARGET_X = FOUNDER_X;
-const TARGET_Z = FOUNDER_Z;
-const TARGET_Y = 450;
+// E.Arcade landmark sits at (173, 0, -149), height ~540.
+// Camera target: E.Arcade mid-height.
+const EARCADE_X = 173;
+const EARCADE_Z = -149;
+const TARGET_X = EARCADE_X;
+const TARGET_Z = EARCADE_Z;
+const TARGET_Y = 270;
 
-// Arc sweep: camera arcs ~180° around the city
-// Far left in fog -> descends through buildings -> rises to wide panorama centered on founder
+// Mirror of original arc but from -Z side (front of city).
+// X is negated so screen-left→right matches the original.
+// Starts far-left (X+), sweeps right (X-), ends at orbit.
+const EARCADE_TOP_Y = 540;
 const INTRO_WAYPOINTS: [number, number, number][] = [
-  [-1600, 800, 1800],   // WP0: Far, high, left - city hidden in fog
-  [-1000, 700, 1300],   // WP1: Descending, silhouette appears
-  [-600,  600, 900],    // WP2: Ad plane level, buildings becoming clear
-  [-200,  550, 650],    // WP3: Skirting the city edge
-  [200,   600, 600],    // WP4: Crossing over
-  [500,   700, 700],    // WP5: Rising, pulling back
-  [700,   800, 900],    // WP6: Dramatic pullback
-  [800,   850, 1000],   // WP7: Final orbit position (wide panorama)
+  [1600, 650, -1800],   // WP0: Far, screen-left - in fog
+  [1000, 640, -1300],   // WP1: Silhouette appears
+  [600, 630, -900],    // WP2: Buildings becoming clear
+  [200, 620, -700],    // WP3: Skirting the city edge
+  [-200, 620, -720],   // WP4: Crossing over (level)
+  [-500, 650, -780],   // WP5: Gently rising
+  [-700, 730, -900],   // WP6: Rising further
+  [-800, 850, -1000],   // WP7: Final orbit position (wide panorama)
 ];
 
-// Look targets smoothly converge toward the founder building top
+// Look targets: gradual convergence toward E.Arcade rooftop (no sudden jumps)
 const INTRO_LOOK_TARGETS: [number, number, number][] = [
-  [100,      300,      -200],      // WP0: Toward distant city, already high
-  [TARGET_X, 380,      TARGET_Z],  // WP1: Rising toward founder top
-  [TARGET_X, TARGET_Y, TARGET_Z],  // WP2: Locking on
-  [TARGET_X, TARGET_Y, TARGET_Z],  // WP3: Holding
-  [TARGET_X, TARGET_Y, TARGET_Z],  // WP4: Holding
-  [TARGET_X, TARGET_Y, TARGET_Z],  // WP5: Holding
-  [TARGET_X, TARGET_Y, TARGET_Z],  // WP6: Holding
-  [TARGET_X, TARGET_Y, TARGET_Z],  // WP7: Final look target
+  [50, 350, -50],           // WP0: Toward city center
+  [EARCADE_X * 0.4, 380, EARCADE_Z * 0.2], // WP1: Easing toward E.Arcade
+  [EARCADE_X * 0.6, 410, EARCADE_Z * 0.4], // WP2: Converging
+  [EARCADE_X * 0.8, 450, EARCADE_Z * 0.7], // WP3: Getting closer
+  [EARCADE_X, 500, EARCADE_Z],       // WP4: Almost there
+  [EARCADE_X, EARCADE_TOP_Y, EARCADE_Z],  // WP5: Locking on rooftop
+  [EARCADE_X, EARCADE_TOP_Y, EARCADE_Z],  // WP6: Holding
+  [EARCADE_X, 450, EARCADE_Z],       // WP7: Gently easing down to orbit height
 ];
 
 // Smootherstep (Perlin): zero velocity AND zero acceleration at both ends
@@ -361,7 +374,7 @@ function RabbitFlyover({
   );
 
   useEffect(() => {
-    camera.position.set(800, 700, 1000);
+    camera.position.set(-800, 700, -1000);
     camera.lookAt(0, 200, 0);
   }, [camera]);
 
@@ -394,11 +407,13 @@ function CameraFocus({
   focusedBuilding,
   focusedBuildingB,
   controlsRef,
+  focusPosition,
 }: {
   buildings: CityBuilding[];
   focusedBuilding: string | null;
   focusedBuildingB?: string | null;
   controlsRef: React.RefObject<any>;
+  focusPosition?: [number, number, number] | null;
 }) {
   const { camera } = useThree();
   const startPos = useRef(new THREE.Vector3());
@@ -413,13 +428,14 @@ function CameraFocus({
   buildingsRef.current = buildings;
 
   useEffect(() => {
-    if (!focusedBuilding) {
+    if (!focusedBuilding && !focusPosition) {
       // Re-enable auto-rotate when focus is cleared
       if (controlsRef.current) {
         controlsRef.current.autoRotate = true;
       }
       return;
     }
+    if (!focusedBuilding) return; // focusPosition is handled by its own useEffect
 
     const bA = buildingsRef.current.find(
       (b) => b.login.toLowerCase() === focusedBuilding.toLowerCase()
@@ -474,17 +490,22 @@ function CameraFocus({
       // and pull camera further back to show more of the building
       const isMobile = window.innerWidth < 640;
       const mobileOffset = isMobile ? 60 : 0;
-      const dist = isMobile ? 250 : 80;
-      const camHeight = isMobile ? 160 : 60;
+      const dist = isMobile ? 300 : 180;
+      const camHeight = isMobile ? 200 : 120;
+
+      // Camera goes to the outside of the building (away from center) so it looks
+      // at the front face without other buildings blocking the view
+      const bx = bA.position[0], bz = bA.position[2];
+      const bLen = Math.sqrt(bx * bx + bz * bz) || 1;
       endPos.current.set(
-        bA.position[0] + dist,
+        bx + (bx / bLen) * dist,
         bA.height + camHeight,
-        bA.position[2] + dist
+        bz + (bz / bLen) * dist
       );
       endLook.current.set(
-        bA.position[0],
+        bx,
         Math.max(0, bA.height + 15 - mobileOffset),
-        bA.position[2]
+        bz
       );
     }
 
@@ -494,8 +515,38 @@ function CameraFocus({
     if (controlsRef.current) {
       controlsRef.current.autoRotate = false;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedBuilding, focusedBuildingB, camera, controlsRef]);
+
+  // Focus on a fixed position (sponsored landmarks)
+  useEffect(() => {
+    if (!focusPosition || focusedBuilding) return;
+
+    startPos.current.copy(camera.position);
+    if (controlsRef.current) {
+      startLook.current.copy(controlsRef.current.target);
+    }
+
+    const [px, py, pz] = focusPosition;
+    const isMobile = window.innerWidth < 640;
+    const dist = isMobile ? 400 : 280;
+    const camH = isMobile ? 300 : 220;
+    const mobileOffset = isMobile ? 60 : 0;
+
+    // Position camera OUTSIDE the building looking INWARD (toward center)
+    // so the front face (with text) is visible
+    const len = Math.sqrt(px * px + pz * pz) || 1;
+    endPos.current.set(px + (px / len) * dist, py + camH, pz + (pz / len) * dist);
+    endLook.current.set(px, Math.max(0, py - mobileOffset), pz);
+
+    progress.current = 0;
+    active.current = true;
+
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPosition, camera, controlsRef]);
 
   useFrame((_, delta) => {
     if (!active.current || progress.current >= 1) return;
@@ -551,15 +602,16 @@ const _idealLook = new THREE.Vector3();
 const _blendedPos = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 
-function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, vehicleType = "airplane" }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; vehicleType?: string }) {
+function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, startPaused = false, vehicleType = "airplane", posRef, cityRadius = 3500, isMobile = false, onJoystickState, boostActive = false, brakeActive = false }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; startPaused?: boolean; vehicleType?: string; posRef?: React.MutableRefObject<THREE.Vector3>; cityRadius?: number; isMobile?: boolean; onJoystickState?: (state: { baseX: number; baseY: number; dx: number; dy: number } | null) => void; boostActive?: boolean; brakeActive?: boolean }) {
   const { camera } = useThree();
   const ref = useRef<THREE.Group>(null);
   const orbitRef = useRef<any>(null);
 
   const mouse = useRef({ x: 0, y: 0 });
   const keys = useRef<Record<string, boolean>>({});
-  const [isPaused, setIsPaused] = useState(false);
-  const paused = useRef(false);
+  const [isPaused, setIsPaused] = useState(startPaused);
+  const paused = useRef(startPaused);
+  const isFirstResume = useRef(startPaused); // skip transition on first resume from startPaused
 
   // Flight state
   const yaw = useRef(0);
@@ -579,6 +631,13 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
   const transitionLookFrom = useRef(new THREE.Vector3());
   const transitionLookTo = useRef(new THREE.Vector3());
   const wasJustUnpaused = useRef(false);
+
+  // Contrail / speed trail
+  const TRAIL_POINTS = 48;
+  const trailPositions = useRef(new Float32Array(TRAIL_POINTS * 3));
+  const trailColors = useRef(new Float32Array(TRAIL_POINTS * 4));
+  const trailGeomRef = useRef<THREE.BufferGeometry>(null);
+  const trailInit = useRef(false);
 
   const hudTimer = useRef(0);
   const lastHudSpeed = useRef(-1);
@@ -610,9 +669,15 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
 
     camera.position.copy(camPos.current);
     camera.lookAt(camLook.current);
-  }, [camera]);
+    if (startPaused) onPause(true);
+  }, [camera]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Mouse tracking for flight steering
+  // Touch joystick refs
+  const joystickTouch = useRef<{ id: number; startX: number; startY: number } | null>(null);
+  const pendingTouch = useRef<{ dx: number; dy: number } | null>(null);
+  const JOYSTICK_MAX_RADIUS = 60;
+
+  // Mouse + touch tracking for flight steering
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!paused.current) {
@@ -625,13 +690,70 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
         flySpeed.current = Math.max(MIN_FLY_SPEED, Math.min(MAX_FLY_SPEED, flySpeed.current - e.deltaY * 0.05));
       }
     };
+
+    // Touch handlers for mobile joystick
+    const onTouchStart = (e: TouchEvent) => {
+      if (paused.current || joystickTouch.current) return;
+      const t = e.changedTouches[0];
+      joystickTouch.current = { id: t.identifier, startX: t.clientX, startY: t.clientY };
+      onJoystickState?.({ baseX: t.clientX, baseY: t.clientY, dx: 0, dy: 0 });
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!joystickTouch.current || paused.current) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier !== joystickTouch.current.id) continue;
+        const rawDx = t.clientX - joystickTouch.current.startX;
+        const rawDy = t.clientY - joystickTouch.current.startY;
+        // Follow behavior: recenter when finger exceeds radius
+        const dist = Math.sqrt(rawDx ** 2 + rawDy ** 2);
+        if (dist > JOYSTICK_MAX_RADIUS) {
+          const angle = Math.atan2(rawDy, rawDx);
+          joystickTouch.current.startX = t.clientX - Math.cos(angle) * JOYSTICK_MAX_RADIUS;
+          joystickTouch.current.startY = t.clientY - Math.sin(angle) * JOYSTICK_MAX_RADIUS;
+        }
+        const dx = t.clientX - joystickTouch.current.startX;
+        const dy = t.clientY - joystickTouch.current.startY;
+        pendingTouch.current = { dx, dy };
+        onJoystickState?.({ baseX: joystickTouch.current.startX, baseY: joystickTouch.current.startY, dx, dy });
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (joystickTouch.current?.id === e.changedTouches[i].identifier) {
+          joystickTouch.current = null;
+          pendingTouch.current = null;
+          mouse.current.x = 0;
+          mouse.current.y = 0;
+          onJoystickState?.(null);
+        }
+      }
+    };
+
     window.addEventListener("mousemove", onMove);
     window.addEventListener("wheel", onWheel, { passive: true });
+
+    // Touch: start on canvas element, move/end on window to catch finger leaving canvas
+    const canvas = document.querySelector("canvas");
+    if (isMobile && canvas) {
+      canvas.style.touchAction = "none";
+      canvas.addEventListener("touchstart", onTouchStart, { passive: true });
+      window.addEventListener("touchmove", onTouchMove, { passive: true });
+      window.addEventListener("touchend", onTouchEnd, { passive: true });
+      window.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    }
+
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("wheel", onWheel);
+      if (canvas) {
+        canvas.removeEventListener("touchstart", onTouchStart);
+      }
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, []);
+  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // External pause (triggered by parent, e.g. building click)
   const prevSignal = useRef(pauseSignal);
@@ -645,6 +767,30 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
       }
     }
   }, [pauseSignal, onPause]);
+
+  // Auto-pause when an overlay opens, auto-resume when it closes.
+  // useEffectEvent gives a stable identity that always reads the latest onPause
+  // without adding it to the effect's dependency array.
+  const notifyPause = useEffectEvent((p: boolean) => onPause(p));
+  useEffect(() => {
+    if (hasOverlay) {
+      if (!paused.current) {
+        paused.current = true;
+        setIsPaused(true);
+        notifyPause(true);
+      }
+    } else {
+      if (paused.current) {
+        paused.current = false;
+        setIsPaused(false);
+        wasJustUnpaused.current = true;
+        transitionProgress.current = 0;
+        transitionFrom.current.copy(camera.position);
+        transitionLookFrom.current.copy(camLook.current);
+        notifyPause(false);
+      }
+    }
+  }, [hasOverlay]);
 
   // Keyboard
   const hasOverlayRef = useRef(hasOverlay);
@@ -662,10 +808,17 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
       if (!paused.current) return;
       paused.current = false;
       setIsPaused(false);
-      wasJustUnpaused.current = true;
-      transitionProgress.current = 0;
-      transitionFrom.current.copy(camera.position);
-      transitionLookFrom.current.copy(camLook.current);
+      // Skip camera transition on first resume from startPaused — camera is already behind the plane
+      if (isFirstResume.current) {
+        isFirstResume.current = false;
+        transitionProgress.current = 1;
+        wasJustUnpaused.current = false;
+      } else {
+        wasJustUnpaused.current = true;
+        transitionProgress.current = 0;
+        transitionFrom.current.copy(camera.position);
+        transitionLookFrom.current.copy(camLook.current);
+      }
       onPause(false);
     };
 
@@ -688,6 +841,11 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
         e.preventDefault();
         if (paused.current) doResume();
         else doPause();
+      } else if (e.code === "KeyR") {
+        if (!paused.current) {
+          // Return to City
+          yaw.current = Math.atan2(pos.current.x, pos.current.z);
+        }
       } else if (paused.current && FLIGHT_KEYS.has(e.code)) {
         // Any flight key while paused → resume flying
         doResume();
@@ -737,6 +895,14 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     }
 
     // ── FLIGHT MODE ──
+    // Consume pending touch input (mobile joystick -> mouse)
+    if (pendingTouch.current) {
+      const { dx, dy } = pendingTouch.current;
+      mouse.current.x = Math.max(-1, Math.min(1, dx / JOYSTICK_MAX_RADIUS));
+      mouse.current.y = Math.max(-1, Math.min(1, -dy / JOYSTICK_MAX_RADIUS));
+      pendingTouch.current = null;
+    }
+
     const t = state.clock.elapsedTime;
     const mx = mouse.current.x;
     const my = mouse.current.y;
@@ -751,10 +917,10 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     if (k["KeyW"] || k["ArrowUp"]) altInput = 1;
     if (k["KeyS"] || k["ArrowDown"]) altInput = -1;
 
-    // Shift = boost 2x, Alt = slow 0.3x
+    // Shift = boost 2x, Alt = slow 0.3x, mobile boost/brake props
     let speedMult = 1;
-    if (k["ShiftLeft"] || k["ShiftRight"]) speedMult = 2;
-    if (k["AltLeft"] || k["AltRight"]) speedMult = 0.3;
+    if (k["ShiftLeft"] || k["ShiftRight"] || boostActive) speedMult = 2;
+    if (k["AltLeft"] || k["AltRight"] || brakeActive) speedMult = 0.3;
 
     const actualSpeed = flySpeed.current * speedMult;
 
@@ -766,6 +932,30 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
 
     _fwd.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     pos.current.addScaledVector(_fwd, actualSpeed * dt);
+
+    // Soft / Hard boundary for X/Z dynamically based on city size
+    const MAX_RADIUS = Math.max(3500, cityRadius * 1.3);
+    const SOFT_RADIUS = MAX_RADIUS * 0.85;
+    const distSq = pos.current.x * pos.current.x + pos.current.z * pos.current.z;
+    if (distSq > SOFT_RADIUS * SOFT_RADIUS) {
+      const dist = Math.sqrt(distSq);
+      if (dist > SOFT_RADIUS) {
+        const excess = dist - SOFT_RADIUS;
+        const pullFactor = Math.min(excess / (MAX_RADIUS - SOFT_RADIUS), 1.0);
+        const pullMag = actualSpeed * dt * pullFactor * 1.5;
+        pos.current.x -= (pos.current.x / dist) * pullMag;
+        pos.current.z -= (pos.current.z / dist) * pullMag;
+
+        const newDistSq = pos.current.x * pos.current.x + pos.current.z * pos.current.z;
+        if (newDistSq > MAX_RADIUS * MAX_RADIUS) {
+          const newDist = Math.sqrt(newDistSq);
+          pos.current.x = (pos.current.x / newDist) * MAX_RADIUS;
+          pos.current.z = (pos.current.z / newDist) * MAX_RADIUS;
+        }
+      }
+    }
+
+    if (posRef) posRef.current.copy(pos.current);
 
     const targetBank = -turnInput * MAX_BANK;
     bank.current += (targetBank - bank.current) * 5 * dt;
@@ -802,6 +992,38 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     }
     camera.lookAt(camLook.current);
 
+    // Update trail
+    if (!trailInit.current) {
+      for (let i = 0; i < TRAIL_POINTS; i++) {
+        trailPositions.current[i * 3] = pos.current.x;
+        trailPositions.current[i * 3 + 1] = pos.current.y;
+        trailPositions.current[i * 3 + 2] = pos.current.z;
+        trailColors.current[i * 4] = 1;
+        trailColors.current[i * 4 + 1] = 1;
+        trailColors.current[i * 4 + 2] = 1;
+        trailColors.current[i * 4 + 3] = 0;
+      }
+      trailInit.current = true;
+    } else {
+      trailPositions.current.copyWithin(3, 0, (TRAIL_POINTS - 1) * 3);
+      trailPositions.current[0] = pos.current.x - _fwd.x * 5; // trails slightly behind the nose
+      trailPositions.current[1] = pos.current.y;
+      trailPositions.current[2] = pos.current.z - _fwd.z * 5;
+    }
+
+    const speedRatio = actualSpeed / DEFAULT_FLY_SPEED;
+    for (let i = 0; i < TRAIL_POINTS; i++) {
+      const fade = 1 - (i / TRAIL_POINTS);
+      // Only show trail when boosting (speedRatio > 1) or fast
+      const intensity = Math.max(0, Math.min(1.0, (speedRatio - 0.7) * 1.5));
+      trailColors.current[i * 4 + 3] = fade * intensity * 0.5; // max 50% opacity
+    }
+
+    if (trailGeomRef.current) {
+      trailGeomRef.current.attributes.position.needsUpdate = true;
+      trailGeomRef.current.attributes.color.needsUpdate = true;
+    }
+
     hudTimer.current += dt;
     if (hudTimer.current > 0.25) {
       hudTimer.current = 0;
@@ -813,6 +1035,13 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
 
   return (
     <>
+      <line>
+        <bufferGeometry ref={trailGeomRef}>
+          <bufferAttribute attach="attributes-position" args={[trailPositions.current, 3]} count={TRAIL_POINTS} />
+          <bufferAttribute attach="attributes-color" args={[trailColors.current, 4]} count={TRAIL_POINTS} />
+        </bufferGeometry>
+        <lineBasicMaterial transparent vertexColors depthWrite={false} blending={THREE.AdditiveBlending} linewidth={2} />
+      </line>
       <group ref={ref}>
         <group scale={[4, 4, 4]}>
           <VehicleMesh type={vehicleType} />
@@ -835,12 +1064,239 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
   );
 }
 
+// ─── Sky Collectibles ────────────────────────────────────────
+
+const COLLECTIBLE_COUNT = 40;
+const COMBO_WINDOW = 3; // seconds
+// Hitbox radius per type — generous for good UX at flight speed
+const COLLECT_RADIUS: Record<string, number> = { common: 20, rare: 28, epic: 35 };
+
+interface CollectibleDef {
+  x: number; y: number; z: number;
+  type: "common" | "rare" | "epic";
+  points: number;
+  size: number;
+}
+
+const _cMatrix = new THREE.Matrix4();
+const _cScale = new THREE.Vector3();
+const _cPos = new THREE.Vector3();
+const _cQuat = new THREE.Quaternion();
+const _cEuler = new THREE.Euler();
+
+function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius }: {
+  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  accentColor: string;
+  onCollect: (score: number, earned: number, combo: number, collected: number, maxCombo: number) => void;
+  cityRadius: number;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const flashRef = useRef<THREE.PointLight>(null);
+
+  // Generate collectible positions using radial zone distribution across the city
+  const items = useMemo<CollectibleDef[]>(() => {
+    const spread = cityRadius * 0.6;
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 0);
+    const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
+    let seed = dayOfYear * 7919 + now.getFullYear();
+
+    const rng = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+    const MIN_SPACING = 80;
+    const result: CollectibleDef[] = [];
+
+    // Check minimum distance against all placed items
+    const tooClose = (x: number, y: number, z: number) =>
+      result.some(p => (p.x - x) ** 2 + (p.y - y) ** 2 + (p.z - z) ** 2 < MIN_SPACING ** 2);
+
+    // Place items in angular sectors within a radial zone
+    const placeInZone = (
+      count: number,
+      minR: number, maxR: number,
+      minAlt: number, maxAlt: number,
+      type: "common" | "rare" | "epic",
+      points: number, size: number,
+    ) => {
+      const angularOffset = rng() * Math.PI * 2; // random rotation per zone
+      for (let i = 0; i < count; i++) {
+        const baseAngle = angularOffset + (i / count) * Math.PI * 2;
+        let placed = false;
+        for (let attempt = 0; attempt < 10 && !placed; attempt++) {
+          const angle = baseAngle + (rng() - 0.5) * (Math.PI * 2 / count) * 0.7;
+          const dist = minR + rng() * (maxR - minR);
+          const x = Math.cos(angle) * dist;
+          const z = Math.sin(angle) * dist;
+          const y = minAlt + rng() * (maxAlt - minAlt);
+          if (!tooClose(x, y, z)) {
+            result.push({ x, y, z, type, points, size });
+            placed = true;
+          }
+        }
+        // Fallback: place anyway if all attempts collided
+        if (!placed) {
+          const angle = baseAngle + (rng() - 0.5) * 0.3;
+          const dist = minR + rng() * (maxR - minR);
+          result.push({
+            x: Math.cos(angle) * dist,
+            y: minAlt + rng() * (maxAlt - minAlt),
+            z: Math.sin(angle) * dist,
+            type, points, size,
+          });
+        }
+      }
+    };
+
+    // Altitudes are absolute — player flies between MIN_ALT(25) and MAX_ALT(900)
+    // Inner ring: 10 commons between buildings, low altitude
+    placeInZone(10, spread * 0.2, spread * 0.4, 80, 250, "common", 1, 6);
+    // Mid ring: 12 commons + 4 rares, medium altitude
+    placeInZone(12, spread * 0.4, spread * 0.7, 200, 500, "common", 1, 6);
+    placeInZone(4, spread * 0.4, spread * 0.7, 300, 600, "rare", 5, 9);
+    // Outer ring: 8 commons + 4 rares + 2 epics, high altitude
+    placeInZone(8, spread * 0.7, spread, 250, 550, "common", 1, 6);
+    placeInZone(4, spread * 0.7, spread, 400, 700, "rare", 5, 9);
+    placeInZone(2, spread * 0.7, spread, 650, 850, "epic", 25, 14);
+
+    return result;
+  }, [cityRadius]);
+
+  // Track collected state
+  const collected = useRef(new Uint8Array(COLLECTIBLE_COUNT));
+  const collectedCount = useRef(0);
+  const totalScore = useRef(0);
+  const lastCollectTime = useRef(0);
+  const comboCount = useRef(0);
+  const maxCombo = useRef(1);
+  const flashTimer = useRef(0);
+
+  // HDR colors — values > 1 glow naturally with toneMapped={false}
+  const colors = useMemo(() => ({
+    common: new THREE.Color(0, 2.5, 2.5),   // bright cyan
+    rare: new THREE.Color(2.5, 0.5, 3),     // vivid purple
+    epic: new THREE.Color(3, 2.2, 0),        // bright gold
+  }), []);
+
+  // Set instance colors
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    for (let i = 0; i < items.length; i++) {
+      mesh.setColorAt(i, colors[items[i].type]);
+    }
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [items, colors]);
+
+  const prevTime = useRef(0);
+
+  useFrame((state) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    const t = state.clock.elapsedTime;
+    const dt = prevTime.current > 0 ? Math.min(t - prevTime.current, 0.05) : 0.016;
+    prevTime.current = t;
+    const playerPos = playerPosRef.current;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      if (collected.current[i]) {
+        // Hide collected items
+        _cScale.set(0, 0, 0);
+        _cPos.set(item.x, item.y, item.z);
+        _cMatrix.compose(_cPos, _cQuat.identity(), _cScale);
+        mesh.setMatrixAt(i, _cMatrix);
+        continue;
+      }
+
+      // Check collection — hitbox scales with item type
+      const dx = playerPos.x - item.x;
+      const dy = playerPos.y - item.y;
+      const dz = playerPos.z - item.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      const radius = COLLECT_RADIUS[item.type];
+
+      if (distSq < radius * radius) {
+        collected.current[i] = 1;
+        collectedCount.current++;
+
+        // Combo logic
+        const now = t;
+        if (now - lastCollectTime.current < COMBO_WINDOW) {
+          comboCount.current++;
+        } else {
+          comboCount.current = 1;
+        }
+        lastCollectTime.current = now;
+
+        const multiplier = comboCount.current >= 4 ? 3 : comboCount.current >= 3 ? 2 : comboCount.current >= 2 ? 1.5 : 1;
+        const multiplierInt = multiplier >= 3 ? 3 : multiplier >= 2 ? 2 : 1;
+        if (multiplierInt > maxCombo.current) maxCombo.current = multiplierInt;
+
+        const earned = Math.round(item.points * multiplier);
+        totalScore.current += earned;
+
+        // Flash effect
+        if (flashRef.current) {
+          flashRef.current.position.set(item.x, item.y, item.z);
+          flashRef.current.intensity = 20;
+          flashTimer.current = 0.3;
+        }
+
+        onCollect(totalScore.current, earned, comboCount.current, collectedCount.current, maxCombo.current);
+
+        // Hide immediately
+        _cScale.set(0, 0, 0);
+        _cPos.set(item.x, item.y, item.z);
+        _cMatrix.compose(_cPos, _cQuat.identity(), _cScale);
+        mesh.setMatrixAt(i, _cMatrix);
+        continue;
+      }
+
+      // Animate: spin around Y + gentle pulse
+      const pulse = 1 + Math.sin(t * 2.5 + i) * 0.2;
+      const s = item.size * pulse;
+      _cEuler.set(0, t * 2.0 + i * 0.7, 0);
+      _cQuat.setFromEuler(_cEuler);
+      _cPos.set(item.x, item.y, item.z);
+      _cScale.set(s, s, s);
+      _cMatrix.compose(_cPos, _cQuat, _cScale);
+      mesh.setMatrixAt(i, _cMatrix);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+
+    // Fade flash
+    if (flashRef.current && flashTimer.current > 0) {
+      flashTimer.current -= dt;
+      flashRef.current.intensity = Math.max(0, (flashTimer.current / 0.3) * 20);
+    }
+  });
+
+  // Coin geometry: thin disc standing upright (like a Mario coin)
+  const coinGeo = useMemo(() => {
+    const geo = new THREE.CylinderGeometry(1, 1, 0.15, 16);
+    geo.rotateZ(Math.PI / 2); // stand upright — flat faces now face left/right
+    return geo;
+  }, []);
+
+  return (
+    <>
+      <instancedMesh ref={meshRef} args={[coinGeo, undefined, COLLECTIBLE_COUNT]}>
+        <meshBasicMaterial color="#ffffff" toneMapped={false} />
+      </instancedMesh>
+      <pointLight ref={flashRef} intensity={0} distance={120} color="#ffffff" />
+    </>
+  );
+}
+
 // ─── Camera Reset (after exiting fly mode) ──────────────────
 
 function CameraReset() {
   const { camera } = useThree();
   useEffect(() => {
-    camera.position.set(400, 450, 600);
+    camera.position.set(-400, 450, -600);
     camera.lookAt(0, 30, 0);
   }, [camera]);
   return null;
@@ -920,23 +1376,22 @@ function ParkedCar({ position, rotation, variant }: { position: [number, number,
 
 // ─── Park Bench ───────────────────────────────────────────────
 
+const _dBox = /* @__PURE__ */ new THREE.BoxGeometry(1, 1, 1);
+const _dPlane = /* @__PURE__ */ new THREE.PlaneGeometry(1, 1);
+
 function ParkBench({ position, rotation }: { position: [number, number, number]; rotation: number }) {
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      <mesh position={[0, 0.9, 0]}>
-        <boxGeometry args={[5, 0.3, 1.5]} />
+      <mesh position={[0, 0.9, 0]} geometry={_dBox} scale={[5, 0.3, 1.5]}>
         <meshStandardMaterial color="#6b4226" emissive="#6b4226" emissiveIntensity={0.3} />
       </mesh>
-      <mesh position={[0, 1.7, -0.65]} rotation={[0.15, 0, 0]}>
-        <boxGeometry args={[5, 1.3, 0.2]} />
+      <mesh position={[0, 1.7, -0.65]} rotation={[0.15, 0, 0]} geometry={_dBox} scale={[5, 1.3, 0.2]}>
         <meshStandardMaterial color="#6b4226" emissive="#6b4226" emissiveIntensity={0.3} />
       </mesh>
-      <mesh position={[-2, 0.45, 0]}>
-        <boxGeometry args={[0.3, 0.9, 1.2]} />
+      <mesh position={[-2, 0.45, 0]} geometry={_dBox} scale={[0.3, 0.9, 1.2]}>
         <meshStandardMaterial color="#3a3a3a" emissive="#3a3a3a" emissiveIntensity={0.3} />
       </mesh>
-      <mesh position={[2, 0.45, 0]}>
-        <boxGeometry args={[0.3, 0.9, 1.2]} />
+      <mesh position={[2, 0.45, 0]} geometry={_dBox} scale={[0.3, 0.9, 1.2]}>
         <meshStandardMaterial color="#3a3a3a" emissive="#3a3a3a" emissiveIntensity={0.3} />
       </mesh>
     </group>
@@ -973,8 +1428,7 @@ function Fountain({ position }: { position: [number, number, number] }) {
 function Sidewalk({ position, size, color }: { position: [number, number, number]; size: [number, number]; color?: string }) {
   const c = color ?? "#585860";
   return (
-    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={size} />
+    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]} geometry={_dPlane} scale={[size[0], size[1], 1]}>
       <meshStandardMaterial color={c} emissive={c} emissiveIntensity={0.2} roughness={0.85} />
     </mesh>
   );
@@ -1007,12 +1461,17 @@ const _dPos = new THREE.Vector3();
 const _dQuat = new THREE.Quaternion();
 const _dScale = new THREE.Vector3();
 const _dEuler = new THREE.Euler();
+const _dLocalPos = new THREE.Vector3();
+const _dPartQuat = new THREE.Quaternion();
 
 function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { items: CityDecoration[]; roadMarkingColor: string; sidewalkColor: string }) {
   const trees = useMemo(() => items.filter(d => d.type === 'tree'), [items]);
   const lamps = useMemo(() => items.filter(d => d.type === 'streetLamp'), [items]);
   const cars = useMemo(() => items.filter(d => d.type === 'car'), [items]);
   const roadMarkings = useMemo(() => items.filter(d => d.type === 'roadMarking'), [items]);
+  const benches = useMemo(() => items.filter(d => d.type === 'bench'), [items]);
+  const fountains = useMemo(() => items.filter(d => d.type === 'fountain'), [items]);
+  const sidewalks = useMemo(() => items.filter(d => d.type === 'sidewalk'), [items]);
 
   const treeTrunkRef = useRef<THREE.InstancedMesh>(null);
   const treeCanopyRef = useRef<THREE.InstancedMesh>(null);
@@ -1021,6 +1480,15 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
   const carBodyRef = useRef<THREE.InstancedMesh>(null);
   const carCabinRef = useRef<THREE.InstancedMesh>(null);
   const roadMarkingRef = useRef<THREE.InstancedMesh>(null);
+  const benchSeatRef = useRef<THREE.InstancedMesh>(null);
+  const benchBackRef = useRef<THREE.InstancedMesh>(null);
+  const benchLegLRef = useRef<THREE.InstancedMesh>(null);
+  const benchLegRRef = useRef<THREE.InstancedMesh>(null);
+  const fountainBasinRef = useRef<THREE.InstancedMesh>(null);
+  const fountainMidRef = useRef<THREE.InstancedMesh>(null);
+  const fountainUpperRef = useRef<THREE.InstancedMesh>(null);
+  const fountainWaterRef = useRef<THREE.InstancedMesh>(null);
+  const sidewalkRef = useRef<THREE.InstancedMesh>(null);
 
   // Shared geometries
   const geos = useMemo(() => ({
@@ -1031,6 +1499,10 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
     carBody: new THREE.BoxGeometry(8, 2.5, 3.5),
     carCabin: new THREE.BoxGeometry(5, 2, 3.2),
     roadMarking: new THREE.PlaneGeometry(1, 1),
+    fountainBasin: new THREE.CylinderGeometry(8, 8.5, 2.4, 16),
+    fountainMid: new THREE.CylinderGeometry(5, 5.5, 2, 12),
+    fountainUpper: new THREE.CylinderGeometry(2.5, 3.2, 2, 10),
+    fountainWater: new THREE.CylinderGeometry(1.8, 2, 1.2, 10),
   }), []);
 
   // Shared materials
@@ -1046,7 +1518,14 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
     roadMarking: new THREE.MeshStandardMaterial({
       color: roadMarkingColor, emissive: roadMarkingColor, emissiveIntensity: 0.8,
     }),
-  }), [roadMarkingColor]);
+    benchWood: new THREE.MeshStandardMaterial({ color: "#6b4226", emissive: "#6b4226", emissiveIntensity: 0.3 }),
+    benchMetal: new THREE.MeshStandardMaterial({ color: "#3a3a3a", emissive: "#3a3a3a", emissiveIntensity: 0.3 }),
+    fountainStone1: new THREE.MeshStandardMaterial({ color: "#707070", emissive: "#707070", emissiveIntensity: 0.25 }),
+    fountainStone2: new THREE.MeshStandardMaterial({ color: "#808080", emissive: "#808080", emissiveIntensity: 0.25 }),
+    fountainStone3: new THREE.MeshStandardMaterial({ color: "#909090", emissive: "#909090", emissiveIntensity: 0.25 }),
+    fountainWater: new THREE.MeshStandardMaterial({ color: "#4090d0", emissive: "#2060a0", emissiveIntensity: 2.0, toneMapped: false, transparent: true, opacity: 0.7 }),
+    sidewalk: new THREE.MeshStandardMaterial({ color: sidewalkColor, emissive: sidewalkColor, emissiveIntensity: 0.2, roughness: 0.85 }),
+  }), [roadMarkingColor, sidewalkColor]);
 
   // Set up tree instances
   useEffect(() => {
@@ -1149,6 +1628,111 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
     roadMarkingRef.current.instanceMatrix.needsUpdate = true;
   }, [roadMarkings]);
 
+  // Set up bench instances
+  useEffect(() => {
+    if (!benchSeatRef.current || !benchBackRef.current || !benchLegLRef.current || !benchLegRRef.current || benches.length === 0) return;
+
+    for (let i = 0; i < benches.length; i++) {
+      const d = benches[i];
+      _dEuler.set(0, d.rotation, 0);
+      _dQuat.setFromEuler(_dEuler);
+
+      // Seat: local [0, 0.9, 0], scale [5, 0.3, 1.5]
+      _dLocalPos.set(0, 0.9, 0).applyQuaternion(_dQuat);
+      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
+      _dScale.set(5, 0.3, 1.5);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      benchSeatRef.current.setMatrixAt(i, _dMatrix);
+
+      // Backrest: local [0, 1.7, -0.65], rot [0.15, 0, 0], scale [5, 1.3, 0.2]
+      _dLocalPos.set(0, 1.7, -0.65).applyQuaternion(_dQuat);
+      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
+      _dEuler.set(0.15, 0, 0);
+      _dPartQuat.setFromEuler(_dEuler);
+      _dPartQuat.premultiply(_dQuat);
+      _dScale.set(5, 1.3, 0.2);
+      _dMatrix.compose(_dPos, _dPartQuat, _dScale);
+      benchBackRef.current.setMatrixAt(i, _dMatrix);
+
+      // Leg L: local [-2, 0.45, 0], scale [0.3, 0.9, 1.2]
+      _dEuler.set(0, d.rotation, 0);
+      _dQuat.setFromEuler(_dEuler);
+      _dLocalPos.set(-2, 0.45, 0).applyQuaternion(_dQuat);
+      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
+      _dScale.set(0.3, 0.9, 1.2);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      benchLegLRef.current.setMatrixAt(i, _dMatrix);
+
+      // Leg R: local [2, 0.45, 0], scale [0.3, 0.9, 1.2]
+      _dLocalPos.set(2, 0.45, 0).applyQuaternion(_dQuat);
+      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
+      _dScale.set(0.3, 0.9, 1.2);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      benchLegRRef.current.setMatrixAt(i, _dMatrix);
+    }
+
+    benchSeatRef.current.instanceMatrix.needsUpdate = true;
+    benchBackRef.current.instanceMatrix.needsUpdate = true;
+    benchLegLRef.current.instanceMatrix.needsUpdate = true;
+    benchLegRRef.current.instanceMatrix.needsUpdate = true;
+  }, [benches]);
+
+  // Set up fountain instances
+  useEffect(() => {
+    if (!fountainBasinRef.current || !fountainMidRef.current || !fountainUpperRef.current || !fountainWaterRef.current || fountains.length === 0) return;
+    _dQuat.identity();
+    _dScale.set(1, 1, 1);
+
+    for (let i = 0; i < fountains.length; i++) {
+      const d = fountains[i];
+
+      // Basin: y+1.2
+      _dPos.set(d.position[0], d.position[1] + 1.2, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      fountainBasinRef.current.setMatrixAt(i, _dMatrix);
+
+      // Mid: y+3.4
+      _dPos.set(d.position[0], d.position[1] + 3.4, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      fountainMidRef.current.setMatrixAt(i, _dMatrix);
+
+      // Upper: y+5.6
+      _dPos.set(d.position[0], d.position[1] + 5.6, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      fountainUpperRef.current.setMatrixAt(i, _dMatrix);
+
+      // Water: y+7.2
+      _dPos.set(d.position[0], d.position[1] + 7.2, d.position[2]);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      fountainWaterRef.current.setMatrixAt(i, _dMatrix);
+    }
+
+    fountainBasinRef.current.instanceMatrix.needsUpdate = true;
+    fountainMidRef.current.instanceMatrix.needsUpdate = true;
+    fountainUpperRef.current.instanceMatrix.needsUpdate = true;
+    fountainWaterRef.current.instanceMatrix.needsUpdate = true;
+  }, [fountains]);
+
+  // Set up sidewalk instances
+  useEffect(() => {
+    if (!sidewalkRef.current || sidewalks.length === 0) return;
+
+    for (let i = 0; i < sidewalks.length; i++) {
+      const d = sidewalks[i];
+      const w = d.size?.[0] ?? 1;
+      const h = d.size?.[1] ?? 1;
+
+      _dEuler.set(-Math.PI / 2, 0, 0);
+      _dQuat.setFromEuler(_dEuler);
+      _dPos.set(d.position[0], d.position[1], d.position[2]);
+      _dScale.set(w, h, 1);
+      _dMatrix.compose(_dPos, _dQuat, _dScale);
+      sidewalkRef.current.setMatrixAt(i, _dMatrix);
+    }
+
+    sidewalkRef.current.instanceMatrix.needsUpdate = true;
+  }, [sidewalks]);
+
   // Dispose
   useEffect(() => {
     return () => {
@@ -1180,16 +1764,25 @@ function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { item
       {roadMarkings.length > 0 && (
         <instancedMesh ref={roadMarkingRef} args={[geos.roadMarking, mats.roadMarking, roadMarkings.length]} />
       )}
-      {/* Benches, fountains, sidewalks: keep as individual components (usually few) */}
-      {items.filter(d => d.type === 'bench').map((d, i) => (
-        <ParkBench key={`bench-${i}`} position={d.position} rotation={d.rotation} />
-      ))}
-      {items.filter(d => d.type === 'fountain').map((d, i) => (
-        <Fountain key={`fountain-${i}`} position={d.position} />
-      ))}
-      {items.filter(d => d.type === 'sidewalk').map((d, i) => (
-        <Sidewalk key={`walk-${i}`} position={d.position} size={d.size!} color={sidewalkColor} />
-      ))}
+      {benches.length > 0 && (
+        <>
+          <instancedMesh ref={benchSeatRef} args={[_dBox, mats.benchWood, benches.length]} />
+          <instancedMesh ref={benchBackRef} args={[_dBox, mats.benchWood, benches.length]} />
+          <instancedMesh ref={benchLegLRef} args={[_dBox, mats.benchMetal, benches.length]} />
+          <instancedMesh ref={benchLegRRef} args={[_dBox, mats.benchMetal, benches.length]} />
+        </>
+      )}
+      {fountains.length > 0 && (
+        <>
+          <instancedMesh ref={fountainBasinRef} args={[geos.fountainBasin, mats.fountainStone1, fountains.length]} />
+          <instancedMesh ref={fountainMidRef} args={[geos.fountainMid, mats.fountainStone2, fountains.length]} />
+          <instancedMesh ref={fountainUpperRef} args={[geos.fountainUpper, mats.fountainStone3, fountains.length]} />
+          <instancedMesh ref={fountainWaterRef} args={[geos.fountainWater, mats.fountainWater, fountains.length]} />
+        </>
+      )}
+      {sidewalks.length > 0 && (
+        <instancedMesh ref={sidewalkRef} args={[_dPlane, mats.sidewalk, sidewalks.length]} />
+      )}
     </>
   );
 }
@@ -1258,7 +1851,7 @@ function RiverText({ river }: { river: CityRiver }) {
 
     ctx.fillStyle = "rgba(255,255,255,0.4)";
     ctx.font = 'bold 100px "Silkscreen", monospace';
-    ctx.fillText("$GITC  -  CA: 0xd523f92f5f313288cf69ac9ca456b8a7d7a6dba3", 0, 0);
+    ctx.fillText("git.city", 0, 0);
 
     ctx.restore();
 
@@ -1305,17 +1898,14 @@ function Bridge({ bridge }: { bridge: CityBridge }) {
   return (
     <group position={[bx, 0, bz]} rotation={[0, bridge.rotation ?? 0, 0]}>
       {/* Deck */}
-      <mesh position={[0, deckY, 0]}>
-        <boxGeometry args={[deckLength, deckHeight, deckWidth]} />
+      <mesh position={[0, deckY, 0]} geometry={_dBox} scale={[deckLength, deckHeight, deckWidth]}>
         <meshStandardMaterial color="#505860" emissive="#404850" emissiveIntensity={0.4} />
       </mesh>
       {/* Guardrails */}
-      <mesh position={[0, deckY + 1, deckWidth / 2 - 0.2]}>
-        <boxGeometry args={[deckLength, 1.5, 0.4]} />
+      <mesh position={[0, deckY + 1, deckWidth / 2 - 0.2]} geometry={_dBox} scale={[deckLength, 1.5, 0.4]}>
         <meshStandardMaterial color="#606870" emissive="#505860" emissiveIntensity={0.3} />
       </mesh>
-      <mesh position={[0, deckY + 1, -(deckWidth / 2 - 0.2)]}>
-        <boxGeometry args={[deckLength, 1.5, 0.4]} />
+      <mesh position={[0, deckY + 1, -(deckWidth / 2 - 0.2)]} geometry={_dBox} scale={[deckLength, 1.5, 0.4]}>
         <meshStandardMaterial color="#606870" emissive="#505860" emissiveIntensity={0.3} />
       </mesh>
       {/* Pillars */}
@@ -1323,23 +1913,19 @@ function Bridge({ bridge }: { bridge: CityBridge }) {
         const px = -deckLength / 2 + pillarSpacing * (i + 1);
         return (
           <group key={i}>
-            <mesh position={[px, deckY / 2, 0]}>
-              <boxGeometry args={[2.5, deckY, 2.5]} />
+            <mesh position={[px, deckY / 2, 0]} geometry={_dBox} scale={[2.5, deckY, 2.5]}>
               <meshStandardMaterial color="#404848" emissive="#303838" emissiveIntensity={0.3} />
             </mesh>
             {/* Suspension cables (simple lines from pillar tops to deck edges) */}
-            <mesh position={[px, deckY + 8, 0]}>
-              <boxGeometry args={[2, 16, 2]} />
+            <mesh position={[px, deckY + 8, 0]} geometry={_dBox} scale={[2, 16, 2]}>
               <meshStandardMaterial color="#404848" emissive="#303838" emissiveIntensity={0.3} />
             </mesh>
             {/* Cable left */}
-            <mesh position={[px - deckLength * 0.12, deckY + 6, 0]} rotation={[0, 0, 0.35]}>
-              <boxGeometry args={[deckLength * 0.25, 0.3, 0.3]} />
+            <mesh position={[px - deckLength * 0.12, deckY + 6, 0]} rotation={[0, 0, 0.35]} geometry={_dBox} scale={[deckLength * 0.25, 0.3, 0.3]}>
               <meshStandardMaterial color="#606060" emissive="#505050" emissiveIntensity={0.3} />
             </mesh>
             {/* Cable right */}
-            <mesh position={[px + deckLength * 0.12, deckY + 6, 0]} rotation={[0, 0, -0.35]}>
-              <boxGeometry args={[deckLength * 0.25, 0.3, 0.3]} />
+            <mesh position={[px + deckLength * 0.12, deckY + 6, 0]} rotation={[0, 0, -0.35]} geometry={_dBox} scale={[deckLength * 0.25, 0.3, 0.3]}>
               <meshStandardMaterial color="#606060" emissive="#505050" emissiveIntensity={0.3} />
             </mesh>
           </group>
@@ -1421,14 +2007,14 @@ function Waterfront({ river, dockColor }: { river: CityRiver; dockColor: string 
 
 // ─── Orbit Scene (controls + focus) ──────────────────────────
 
-function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, onCameraMove }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; onCameraMove?: (x: number, z: number, tx: number, tz: number) => void }) {
+function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition, isCompareCinematicPlaying, onCameraMove }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null; isCompareCinematicPlaying?: boolean; onCameraMove?: (x: number, z: number, tx: number, tz: number) => void }) {
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
   const frameCount = useRef(0);
 
-  // Reset camera on mount — wide panorama centered on founder area
+  // Reset camera on mount — wide panorama from front, E.Arcade centered
   useEffect(() => {
-    camera.position.set(800, 700, 1000);
+    camera.position.set(-800, 700, -1000);
     camera.lookAt(TARGET_X, TARGET_Y, TARGET_Z);
   }, [camera]);
 
@@ -1442,7 +2028,9 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, onCameraMove
 
   return (
     <>
-      <CameraFocus buildings={buildings} focusedBuilding={focusedBuilding} focusedBuildingB={focusedBuildingB} controlsRef={controlsRef} />
+      {!isCompareCinematicPlaying && (
+        <CameraFocus buildings={buildings} focusedBuilding={focusedBuilding} focusedBuildingB={focusedBuildingB} controlsRef={controlsRef} focusPosition={focusPosition} />
+      )}
       <OrbitControls
         ref={controlsRef}
         enableDamping
@@ -1458,6 +2046,38 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, onCameraMove
   );
 }
 
+// ─── Wallpaper Orbit (no interaction, auto-rotate + parallax) ─
+
+function WallpaperOrbitScene({ speed }: { speed: number }) {
+  const controlsRef = useRef<any>(null);
+  const { camera } = useThree();
+
+  useEffect(() => {
+    camera.position.set(-800, 700, -1000);
+    camera.lookAt(TARGET_X, TARGET_Y, TARGET_Z);
+  }, [camera]);
+
+  return (
+    <>
+      <OrbitControls
+        ref={controlsRef}
+        enableDamping
+        dampingFactor={0.06}
+        minDistance={40}
+        maxDistance={2500}
+        maxPolarAngle={Math.PI / 2.1}
+        target={[TARGET_X, TARGET_Y, TARGET_Z]}
+        autoRotate
+        autoRotateSpeed={speed}
+        enablePan={false}
+        enableZoom={false}
+        enableRotate={false}
+      />
+      <WallpaperParallax controlsRef={controlsRef} baseTarget={[TARGET_X, TARGET_Y, TARGET_Z]} />
+    </>
+  );
+}
+
 // ─── Main Canvas ─────────────────────────────────────────────
 
 interface Props {
@@ -1469,6 +2089,7 @@ interface Props {
   flyMode: boolean;
   flyVehicle?: string;
   onExitFly: () => void;
+  onCollect?: (score: number, earned: number, combo: number, collected: number, maxCombo: number) => void;
   themeIndex: number;
   onHud?: (speed: number, altitude: number, x: number, z: number, yaw: number) => void;
   onPause?: (paused: boolean) => void;
@@ -1480,6 +2101,11 @@ interface Props {
   onFocusInfo?: (info: FocusInfo) => void;
   flyPauseSignal?: number;
   flyHasOverlay?: boolean;
+  flyStartPaused?: boolean;
+  isMobile?: boolean;
+  onJoystickState?: (state: { baseX: number; baseY: number; dx: number; dy: number } | null) => void;
+  flyBoostActive?: boolean;
+  flyBrakeActive?: boolean;
   skyAds?: SkyAd[];
   onAdClick?: (ad: SkyAd) => void;
   onAdViewed?: (adId: string) => void;
@@ -1491,6 +2117,10 @@ interface Props {
   raidDefender?: CityBuilding | null;
   onRaidPhaseComplete?: (phase: RaidPhase) => void;
   onLandmarkClick?: () => void;
+  onEArcadeClick?: () => void;
+  onSponsorClick?: (slug: string) => void;
+  sponsorFocusPos?: [number, number, number] | null;
+  activeSponsorSlug?: string | null;
   rabbitSighting?: number | null;
   onRabbitCaught?: () => void;
   rabbitCinematic?: boolean;
@@ -1500,15 +2130,63 @@ interface Props {
   holdRise?: boolean;
   celebrationActive?: boolean;
   onCameraMove?: (x: number, z: number, tx: number, tz: number) => void;
+  wallpaperMode?: boolean;
+  wallpaperSpeed?: number;
+  liveByLogin?: Map<string, LiveSession>;
+  cityEnergy?: number;
+  onCompareCinematicEnd?: () => void;
+}
+
+// Dynamically adjust scene exposure based on city energy (devs coding)
+function CityExposure({ cityEnergy }: { cityEnergy: number }) {
+  const gl = useThree((s) => s.gl);
+  const targetRef = useRef(1.3);
+  targetRef.current = 0.4 + 0.9 * Math.min(1, cityEnergy); // 0.4 at sleep, 1.3 at full
+
+  useFrame(() => {
+    const current = gl.toneMappingExposure;
+    const target = targetRef.current;
+    if (Math.abs(current - target) > 0.001) {
+      gl.toneMappingExposure += (target - current) * 0.02;
+    }
+  });
+
+  return null;
 }
 
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, onCameraMove }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onCameraMove }: Props) {
+  const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
+  const prevComparePairRef = useRef<string>("");
+
+  useEffect(() => {
+    // Determine if we just entered a new comparison
+    if (focusedBuilding && focusedBuildingB) {
+      const pairId = `${focusedBuilding}-${focusedBuildingB}`;
+      if (prevComparePairRef.current !== pairId) {
+        setIsCompareCinematicPlaying(true);
+        prevComparePairRef.current = pairId;
+      }
+    } else {
+      setIsCompareCinematicPlaying(false);
+      prevComparePairRef.current = "";
+    }
+  }, [focusedBuilding, focusedBuildingB]);
+
+  const compareWinner = useMemo(() => {
+    if (!focusedBuilding || !focusedBuildingB) return null;
+    const bA = buildings.find(b => b.login.toLowerCase() === focusedBuilding.toLowerCase());
+    const bB = buildings.find(b => b.login.toLowerCase() === focusedBuildingB.toLowerCase());
+    if (!bA || !bB) return null;
+    return bA.contributions >= bB.contributions ? bA : bB;
+  }, [buildings, focusedBuilding, focusedBuildingB]);
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
-  const [dpr, setDpr] = useState(1.5);
+  const [dpr, setDpr] = useState(1);
+  const [bloomEnabled, setBloomEnabled] = useState(false);
+  const flyPosRef = useRef(new THREE.Vector3());
 
   const cityRadius = useMemo(() => {
     let max = 200;
@@ -1521,13 +2199,17 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
   return (
     <Canvas
-      camera={{ position: [400, 450, 600], fov: 55, near: 0.5, far: 4000 }}
+      camera={{ position: [-400, 450, -600], fov: 55, near: 0.5, far: 15000 }}
       dpr={dpr}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
-      <PerformanceMonitor onIncline={() => setDpr(1.5)} onDecline={() => setDpr(1)} />
+      <CityExposure cityEnergy={cityEnergy ?? 1} />
+      <PerformanceMonitor
+        onIncline={() => { setDpr(1.25); setBloomEnabled(true); }}
+        onDecline={() => { setDpr(0.75); setBloomEnabled(false); }}
+      />
       <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
 
       <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
@@ -1536,40 +2218,106 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       <hemisphereLight args={[t.hemiSky, t.hemiGround, t.hemiIntensity * 3.5]} key={`hemi-${themeIndex}`} />
 
       <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
+      <ThemeSkyFX key={`sky-fx-${themeIndex}`} themeIndex={themeIndex as 0 | 1 | 2 | 3} theme={t} />
 
-      {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => {})} />}
+      {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => { })} />}
 
       {rabbitCinematic && rabbitCinematicTarget != null && (
         <RabbitFlyover
           targetPlazaIndex={RABBIT_PLAZA_INDICES[(rabbitCinematicTarget - 1)] ?? 1}
           plazas={plazas}
-          onEnd={onRabbitCinematicEnd ?? (() => {})}
+          onEnd={onRabbitCinematicEnd ?? (() => { })}
         />
       )}
 
-      {!introMode && !rabbitCinematic && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
-        <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} onCameraMove={onCameraMove} />
-      )}
+      {wallpaperMode ? (
+        <WallpaperOrbitScene speed={wallpaperSpeed ?? 0.08} />
+      ) : (
+        <>
+          {!introMode && !rabbitCinematic && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
+            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} isCompareCinematicPlaying={isCompareCinematicPlaying} onCameraMove={onCameraMove} />
+          )}
 
-      {raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && (
-        <RaidSequence3D
-          phase={raidPhase}
-          attacker={raidAttacker ?? null}
-          defender={raidDefender ?? null}
-          raidData={raidData ?? null}
-          onPhaseComplete={onRaidPhaseComplete ?? (() => {})}
-        />
-      )}
+          {isCompareCinematicPlaying && focusedBuilding && focusedBuildingB && (() => {
+            const bA = buildings.find((b) => b.login.toLowerCase() === focusedBuilding.toLowerCase());
+            const bB = buildings.find((b) => b.login.toLowerCase() === focusedBuildingB.toLowerCase());
+            if (bA && bB) {
+              return (
+                <CompareCinematic
+                  buildingA={bA}
+                  buildingB={bB}
+                  controlsRef={{ current: null }} // Let the cinematic own the camera completely while running
+                  onEnd={() => {
+                    setIsCompareCinematicPlaying(false);
+                    onCompareCinematicEnd?.();
+                  }}
+                />
+              );
+            }
+            return null;
+          })()}
 
-      {!introMode && flyMode && <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => {})} onPause={onPause ?? (() => {})} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} vehicleType={flyVehicle} />}
+          {!isCompareCinematicPlaying && compareWinner && focusedBuildingB && (() => {
+            const bA = buildings.find((b) => b.login.toLowerCase() === focusedBuilding?.toLowerCase());
+            const bB = buildings.find((b) => b.login.toLowerCase() === focusedBuildingB.toLowerCase());
+            if (bA && bB) {
+              return (
+                <>
+                  <LocalizedFireworks
+                    originX={compareWinner.position[0]}
+                    originY={compareWinner.height}
+                    originZ={compareWinner.position[2]}
+                  />
+                  <CompareSplitScreen buildingA={bA} buildingB={bB} />
+                </>
+              );
+            }
+            return null;
+          })()}
+
+          {raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && (
+            <RaidSequence3D
+              phase={raidPhase}
+              attacker={raidAttacker ?? null}
+              defender={raidDefender ?? null}
+              raidData={raidData ?? null}
+              onPhaseComplete={onRaidPhaseComplete ?? (() => { })}
+            />
+          )}
+
+          {!introMode && flyMode && (
+            <>
+              <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} cityRadius={cityRadius} isMobile={isMobile} onJoystickState={onJoystickState} boostActive={flyBoostActive} brakeActive={flyBrakeActive} />
+              <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={cityRadius} />
+            </>
+          )}
+        </>
+      )}
 
       <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />
 
-      <FounderSpire onClick={onLandmarkClick ?? (() => {})} />
+      <EArcadeLandmark
+        onClick={onEArcadeClick ?? (() => { })}
+        themeAccent={t.building.accent}
+        themeWindowLit={t.building.windowLit}
+        themeFace={t.building.face}
+      />
+      {SPONSORS.map((s) => (
+        <SponsoredLandmark
+          key={s.slug}
+          config={s}
+          onClick={() => onSponsorClick?.(s.slug)}
+          themeAccent={t.building.accent}
+          themeWindowLit={t.building.windowLit}
+          themeFace={t.building.face}
+          dimmed={!!activeSponsorSlug && activeSponsorSlug !== s.slug}
+        />
+      ))}
+      <FounderSpire onClick={onLandmarkClick ?? (() => { })} />
 
-      {celebrationActive && <CelebrationEffect cityRadius={cityRadius} />}
+      {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={cityRadius} />}
 
-      {rabbitSighting && rabbitSighting >= 1 && rabbitSighting <= 5 && (() => {
+      {!wallpaperMode && rabbitSighting && rabbitSighting >= 1 && rabbitSighting <= 5 && (() => {
         const plazaIdx = RABBIT_PLAZA_INDICES[rabbitSighting - 1];
         const plaza = plazas[plazaIdx];
         if (!plaza) return null;
@@ -1578,7 +2326,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           <WhiteRabbit
             position={pos}
             visible={true}
-            onCaught={onRabbitCaught ?? (() => {})}
+            onCaught={onRabbitCaught ?? (() => { })}
           />
         );
       })()}
@@ -1596,23 +2344,35 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       ))}
 
       <CityScene
-        buildings={buildings}
-        colors={t.building}
-        focusedBuilding={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidDefender?.login ?? focusedBuilding) : focusedBuilding}
-        focusedBuildingB={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : focusedBuildingB}
-        hideEffectsFor={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : null}
-        accentColor={t.building.accent}
-        onBuildingClick={onBuildingClick}
-        onFocusInfo={onFocusInfo}
-        introMode={introMode}
-        flyMode={flyMode}
-        ghostPreviewLogin={ghostPreviewLogin}
-        holdRise={holdRise}
-      />
+          buildings={buildings}
+          colors={t.building}
+          focusedBuilding={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidDefender?.login ?? focusedBuilding) : focusedBuilding}
+          focusedBuildingB={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : focusedBuildingB}
+          hideEffectsFor={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : null}
+          accentColor={t.building.accent}
+          onBuildingClick={onBuildingClick}
+          onFocusInfo={onFocusInfo}
+          introMode={introMode}
+          flyMode={flyMode}
+          ghostPreviewLogin={ghostPreviewLogin}
+          holdRise={holdRise}
+          liveByLogin={liveByLogin}
+          cityEnergy={cityEnergy}
+          dimAll={!!sponsorFocusPos}
+        />
+
+      {!isCompareCinematicPlaying && (!focusedBuilding || !focusedBuildingB) && (
+        <ComparePath
+          buildings={buildings}
+          focusedBuilding={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidDefender?.login ?? focusedBuilding ?? null) : (focusedBuilding ?? null)}
+          focusedBuildingB={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : (focusedBuildingB ?? null)}
+          accentColor={t.building.accent}
+        />
+      )}
 
       <InstancedDecorations items={decorations} roadMarkingColor={t.roadMarkingColor} sidewalkColor={t.sidewalkColor} />
 
-      {skyAds && skyAds.length > 0 && (
+      {!wallpaperMode && skyAds && skyAds.length > 0 && (
         <>
           <SkyAds ads={skyAds} cityRadius={cityRadius} flyMode={flyMode} onAdClick={onAdClick} onAdViewed={onAdViewed} />
           <BuildingAds
@@ -1626,14 +2386,16 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         </>
       )}
 
-      <EffectComposer multisampling={0}>
-        <Bloom
-          mipmapBlur
-          luminanceThreshold={1}
-          luminanceSmoothing={0.3}
-          intensity={1.2}
-        />
-      </EffectComposer>
+      {bloomEnabled && (
+        <EffectComposer multisampling={0}>
+          <Bloom
+            mipmapBlur
+            luminanceThreshold={1}
+            luminanceSmoothing={0.3}
+            intensity={1.2 * Math.max(0.1, cityEnergy ?? 1)}
+          />
+        </EffectComposer>
+      )}
     </Canvas>
   );
 }

@@ -10,11 +10,13 @@ export const contentType = "image/png";
 export default async function Image() {
   const [fontData, completerCount] = await Promise.all([
     readFile(join(process.cwd(), "public/fonts/Silkscreen-Regular.ttf")),
-    getSupabaseAdmin()
-      .from("developers")
-      .select("id", { count: "exact", head: true })
-      .eq("rabbit_completed", true)
-      .then(({ count }) => count ?? 0),
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? getSupabaseAdmin()
+          .from("developers")
+          .select("id", { count: "exact", head: true })
+          .eq("rabbit_completed", true)
+          .then(({ count }: { count: number | null }) => count ?? 0)
+      : Promise.resolve(0),
   ]);
 
   const green = "#00ff41";

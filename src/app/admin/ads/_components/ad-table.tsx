@@ -12,6 +12,7 @@ interface AdTableProps {
   sortDir: SortDir;
   expandedId: string | null;
   selectedIds: Set<string>;
+  reportMode?: boolean;
   onSort: (key: SortKey) => void;
   onToggleExpand: (id: string) => void;
   onToggleSelect: (id: string) => void;
@@ -56,6 +57,7 @@ export function AdTable({
   sortDir,
   expandedId,
   selectedIds,
+  reportMode,
   onSort,
   onToggleExpand,
   onToggleSelect,
@@ -71,24 +73,30 @@ export function AdTable({
   const allSelected =
     ads.length > 0 && ads.every((ad) => selectedIds.has(ad.id));
 
+  const gridCols = reportMode
+    ? "md:grid-cols-[minmax(0,2fr)_80px_80px_64px_88px_76px]"
+    : "md:grid-cols-[24px_minmax(0,2fr)_80px_80px_64px_88px_76px_130px]";
+
   return (
     <div className={loading ? "opacity-60 transition-opacity" : ""}>
       {/* Table header */}
       {ads.length > 0 && (
-        <div className="hidden border border-border bg-bg-raised px-3 py-2 md:grid md:grid-cols-[24px_minmax(0,2fr)_80px_80px_80px_60px_72px_120px] md:items-center md:gap-3">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={onSelectAll}
-            className="cursor-pointer accent-lime"
-          />
+        <div className={`hidden border border-border bg-bg-raised px-4 py-2.5 md:grid ${gridCols} md:items-center md:gap-3`}>
+          {!reportMode && (
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={onSelectAll}
+              className="cursor-pointer accent-lime"
+            />
+          )}
           <SortButton label="AD" sortKey="brand" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <SortButton label="IMP" sortKey="impressions" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <SortButton label="3D CLK" sortKey="clicks" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <SortButton label="CTA" sortKey="cta_clicks" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortButton label="VIEWS" sortKey="impressions" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortButton label="LINKS" sortKey="cta_clicks" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
           <SortButton label="CTR" sortKey="ctr" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
+          <span className="text-right text-xs text-muted">ENDS</span>
           <SortButton label="STATUS" sortKey="status" currentSort={sortKey} currentDir={sortDir} onSort={onSort} />
-          <span className="text-right text-[11px] text-muted">ACTIONS</span>
+          {!reportMode && <span className="text-right text-xs text-muted">ACTIONS</span>}
         </div>
       )}
 
@@ -98,8 +106,9 @@ export function AdTable({
           <AdRow
             key={ad.id}
             ad={ad}
-            isExpanded={expandedId === ad.id}
+            isExpanded={!reportMode && expandedId === ad.id}
             isSelected={selectedIds.has(ad.id)}
+            reportMode={reportMode}
             onToggleExpand={() => onToggleExpand(ad.id)}
             onToggleSelect={() => onToggleSelect(ad.id)}
             onEdit={() => onEdit(ad)}
@@ -109,7 +118,7 @@ export function AdTable({
         ))}
       </div>
 
-      {loading && (
+      {loading && !reportMode && (
         <div className="flex justify-center py-2">
           <div className="h-1 w-24 animate-pulse rounded bg-lime/30" />
         </div>

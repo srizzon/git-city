@@ -27,6 +27,7 @@ function adToForm(ad: AdStats): AdForm {
     priority: ad.priority,
     starts_at: ad.starts_at ? ad.starts_at.slice(0, 16) : "",
     ends_at: ad.ends_at ? ad.ends_at.slice(0, 16) : "",
+    purchaser_email: ad.purchaser_email ?? "",
   };
 }
 
@@ -74,35 +75,35 @@ export function AdModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-black/60 pt-[5vh]">
+    <div className="fixed inset-0 z-80 flex items-start justify-center overflow-y-auto bg-black/60 pt-[5vh]">
       <div className="mb-[5vh] w-full max-w-2xl border-2 border-border bg-bg-raised p-6">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-5 flex items-center justify-between">
           <p className="text-sm text-cream">
-            {mode === "create" ? "CREATE NEW AD" : `EDIT: ${ad?.brand}`}
+            {mode === "create"
+              ? form.vehicle === "landmark" ? "CREATE SPONSORED LANDMARK" : "CREATE NEW AD"
+              : `EDIT: ${ad?.brand}`}
           </p>
           <button
             onClick={onClose}
-            className="cursor-pointer text-muted transition-colors hover:text-cream"
+            className="cursor-pointer px-1 text-lg text-muted transition-colors hover:text-cream"
           >
-            x
+            &times;
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <AdFormFields form={form} onChange={setForm} />
 
-          <div className="mt-5 flex gap-3">
+          <div className="mt-6 flex gap-3">
             <button
               type="submit"
               disabled={saving}
               className="cursor-pointer border-2 border-lime bg-lime/10 px-6 py-2.5 text-xs text-lime transition-colors hover:bg-lime/20 disabled:opacity-50"
             >
               {saving
-                ? mode === "create"
-                  ? "CREATING..."
-                  : "SAVING..."
+                ? mode === "create" ? "CREATING..." : "SAVING..."
                 : mode === "create"
-                  ? "CREATE AD"
+                  ? form.vehicle === "landmark" ? "CREATE LANDMARK" : "CREATE AD"
                   : "SAVE"}
             </button>
             <button

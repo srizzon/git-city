@@ -32,7 +32,7 @@ export default function ClaimButton({ githubLogin, claimed }: Props) {
   if (isClaimed) {
     return (
       <div
-        className="inline-block border-[2px] px-3 py-1 text-[10px]"
+        className="inline-block border-2 px-3 py-1 text-[10px]"
         style={{ borderColor: accent, color: accent }}
       >
         CLAIMED

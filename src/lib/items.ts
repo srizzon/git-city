@@ -17,13 +17,16 @@ export interface ShopItem {
   available_until: string | null;
   max_quantity: number | null;
   is_exclusive: boolean;
+  // Pixels currency
+  price_pixels: number | null;
+  pixels_only: boolean;
 }
 
 export interface PurchaseRecord {
   id: string;
   developer_id: number;
   item_id: string;
-  provider: "stripe" | "abacatepay" | "free" | "achievement";
+  provider: "stripe" | "abacatepay" | "free" | "achievement" | "pixels";
   provider_tx_id: string | null;
   amount_cents: number;
   currency: "usd" | "brl";

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import crypto from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { autoEquipIfSolo } from "@/lib/items";
+import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
+import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
+import { SKY_AD_PLANS, isValidPlanId } from "@/lib/skyAdPlans";
 
 export const dynamic = "force-dynamic";
 
@@ -12,19 +14,6 @@ function extractPixId(data: any): string | undefined {
   return data?.pixQrCode?.id ?? data?.id;
 }
 
-function verifySignature(rawBody: string, signature: string): boolean {
-  const publicKey = process.env.ABACATEPAY_PUBLIC_KEY;
-  if (!publicKey) return false;
-
-  const expected = crypto
-    .createHmac("sha256", publicKey)
-    .update(Buffer.from(rawBody, "utf8"))
-    .digest("base64");
-
-  const a = Buffer.from(expected);
-  const b = Buffer.from(signature);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
 
 export async function POST(request: Request) {
   // Layer 1: Validate webhook secret via query string
@@ -39,13 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Layer 2: Verify HMAC-SHA256 signature
   const rawBody = await request.text();
-  const signature = request.headers.get("x-webhook-signature");
-  if (signature && !verifySignature(rawBody, signature)) {
-    console.error("AbacatePay webhook signature mismatch");
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let body: any;
@@ -64,7 +47,80 @@ export async function POST(request: Request) {
       case "pixQrCode.paid": {
         if (!pixId) break;
 
-        // Find purchase by pix ID
+        // --- Sky Ad purchase ---
+        const { data: ad } = await sb
+          .from("sky_ads")
+          .select("id, plan_id, active")
+          .eq("pix_id", pixId)
+          .maybeSingle();
+
+        if (ad && !ad.active) {
+          const now = new Date();
+          // Use period from metadata if available, default to 30 days
+          const periodMeta = body.data?.metadata?.period;
+          const PERIOD_DAYS: Record<string, number> = { "1w": 7, "7d": 7, "14d": 14, "1m": 30 };
+          const days = (periodMeta && PERIOD_DAYS[periodMeta]) || 30;
+          const endsAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+          await sb
+            .from("sky_ads")
+            .update({
+              active: true,
+              starts_at: now.toISOString(),
+              ends_at: endsAt.toISOString(),
+            })
+            .eq("id", ad.id);
+
+          const planId = ad.plan_id;
+          if (planId && isValidPlanId(planId)) {
+            const plan = SKY_AD_PLANS[planId];
+            if (plan.vehicle === "plane") {
+              await sb
+                .from("sky_ads")
+                .update({ active: false })
+                .eq("id", "advertise")
+                .eq("active", true);
+            }
+          }
+          break;
+        }
+
+        // --- Pixel package purchase ---
+        const { data: pixelPurchase } = await sb
+          .from("pixel_purchases")
+          .select("id, developer_id, package_id, status")
+          .eq("provider_tx_id", pixId)
+          .eq("status", "pending")
+          .maybeSingle();
+
+        if (pixelPurchase) {
+          const { data: pkg } = await sb
+            .from("pixel_packages")
+            .select("pixels, bonus_pixels")
+            .eq("id", pixelPurchase.package_id)
+            .single();
+
+          if (pkg) {
+            const totalPx = pkg.pixels + pkg.bonus_pixels;
+            await sb.rpc("credit_pixels", {
+              p_developer_id: pixelPurchase.developer_id,
+              p_amount: totalPx,
+              p_source: "purchase",
+              p_reference_id: pixelPurchase.id,
+              p_reference_type: "pixel_purchase",
+              p_description: `Purchased ${totalPx} PX (${pixelPurchase.package_id})`,
+              p_idempotency_key: `abacatepay:${pixId}`,
+            });
+
+            await sb
+              .from("pixel_purchases")
+              .update({ status: "completed", pixels_credited: totalPx })
+              .eq("id", pixelPurchase.id);
+          }
+          break;
+        }
+
+        // --- Shop item purchase ---
         const { data: purchase } = await sb
           .from("purchases")
           .select("id, status")
@@ -78,7 +134,6 @@ export async function POST(request: Request) {
             .update({ status: "completed" })
             .eq("id", purchase.id);
 
-          // Insert feed event
           const { data: fullPurchase } = await sb
             .from("purchases")
             .select("developer_id, item_id, gifted_to")
@@ -86,7 +141,6 @@ export async function POST(request: Request) {
             .single();
 
           if (fullPurchase) {
-            // Auto-equip if solo item in zone
             const itemOwner = fullPurchase.gifted_to ?? fullPurchase.developer_id;
             await autoEquipIfSolo(itemOwner, fullPurchase.item_id);
 
@@ -97,22 +151,29 @@ export async function POST(request: Request) {
               .single();
 
             if (fullPurchase.gifted_to) {
+              const { data: receiver } = await sb
+                .from("developers")
+                .select("github_login")
+                .eq("id", fullPurchase.gifted_to)
+                .single();
               await sb.from("activity_feed").insert({
                 event_type: "gift_sent",
                 actor_id: fullPurchase.developer_id,
                 target_id: fullPurchase.gifted_to,
-                metadata: { giver_login: dev?.github_login, item_id: fullPurchase.item_id },
+                metadata: { giver_login: dev?.github_login, receiver_login: receiver?.github_login, item_id: fullPurchase.item_id },
               });
+              sendGiftSentNotification(fullPurchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", purchase.id, fullPurchase.item_id);
+              sendGiftReceivedNotification(fullPurchase.gifted_to, dev?.github_login ?? "someone", receiver?.github_login ?? "unknown", purchase.id, fullPurchase.item_id);
             } else {
               await sb.from("activity_feed").insert({
                 event_type: "item_purchased",
                 actor_id: fullPurchase.developer_id,
                 metadata: { login: dev?.github_login, item_id: fullPurchase.item_id },
               });
+              sendPurchaseNotification(fullPurchase.developer_id, dev?.github_login ?? "", purchase.id, fullPurchase.item_id);
             }
           }
         }
-        // If already completed, ignore (duplicate webhook)
         break;
       }
 
@@ -120,12 +181,27 @@ export async function POST(request: Request) {
       case "pixQrCode.expired": {
         if (!pixId) break;
 
+        // Expire shop purchases
         await sb
           .from("purchases")
           .update({ status: "expired" })
           .eq("provider_tx_id", pixId)
           .eq("status", "pending")
           .eq("provider", "abacatepay");
+
+        // Expire pixel purchases
+        await sb
+          .from("pixel_purchases")
+          .update({ status: "expired" })
+          .eq("provider_tx_id", pixId)
+          .eq("status", "pending");
+
+        // Clean up expired sky ad rows
+        await sb
+          .from("sky_ads")
+          .delete()
+          .eq("pix_id", pixId)
+          .eq("active", false);
         break;
       }
     }

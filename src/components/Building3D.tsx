@@ -25,7 +25,12 @@ import {
   LightningAura,
   LEDBanner,
   StreakFlame,
+  GitHubStar,
+  TierNeonTrim,
+  TierBaseGlow,
+  TierSkyBeam,
 } from "./BuildingEffects";
+import { tierFromLevel } from "@/lib/xp";
 import { MiniWhiteRabbit } from "./WhiteRabbit";
 
 // Shared constants
@@ -235,8 +240,15 @@ function createFarLabel(building: CityBuilding): THREE.CanvasTexture {
   ctx.fill();
 
   if (building.claimed) {
-    ctx.fillStyle = "#e8dcc8";
-    ctx.shadowColor = "rgba(200, 230, 74, 0.5)";
+    const tier = tierFromLevel(building.xp_level ?? 1);
+    // Localhost tier (Lv 1-4) uses default cream; higher tiers get tier color
+    if (tier.id === "localhost") {
+      ctx.fillStyle = "#e8dcc8";
+      ctx.shadowColor = "rgba(200, 230, 74, 0.5)";
+    } else {
+      ctx.fillStyle = tier.color;
+      ctx.shadowColor = tier.color;
+    }
     ctx.shadowBlur = 8;
   } else {
     ctx.fillStyle = "rgba(140, 140, 160, 0.6)";
@@ -432,6 +444,9 @@ export const BuildingItemEffects = memo(function BuildingItemEffects({ building,
       )}
       {shouldRenderZone("crown_item") && (
         <CrownItem height={height} color={accentColor} focused={focused} />
+      )}
+      {shouldRenderZone("github_star") && (
+        <GitHubStar height={height} width={width} depth={depth} color={accentColor} />
       )}
       {/* White rabbit: always renders for completers, not tied to loadout */}
       {building.rabbit_completed && (
@@ -650,6 +665,49 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
       {!introMode && building.app_streak > 0 && (
         <StreakFlame height={building.height} width={building.width} depth={building.depth} streakDays={building.app_streak} color={accentColor ?? colors.accent ?? "#c8e64a"} />
       )}
+
+      {/* XP Tier visual effects */}
+      {!introMode && building.xp_level >= 5 && (() => {
+        const tier = tierFromLevel(building.xp_level);
+        return (
+          <>
+            {/* Staging (Lv 5-8): Blue neon trim */}
+            {tier.id === "staging" && (
+              <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
+            )}
+            {/* Production (Lv 9-13): Purple base glow + neon trim */}
+            {tier.id === "production" && (
+              <>
+                <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
+                <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
+              </>
+            )}
+            {/* Open Source (Lv 14-18): Golden base + golden neon trim */}
+            {tier.id === "open_source" && (
+              <>
+                <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
+                <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
+              </>
+            )}
+            {/* Unicorn (Lv 19-23): Cyan sky beam + base glow + neon trim */}
+            {tier.id === "unicorn" && (
+              <>
+                <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
+                <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
+                <TierSkyBeam height={building.height} color={tier.color} />
+              </>
+            )}
+            {/* Founder (Lv 24+): Prismatic sky beam + base glow + white neon trim */}
+            {tier.id === "founder" && (
+              <>
+                <TierBaseGlow width={building.width} depth={building.depth} color={tier.color} />
+                <TierNeonTrim width={building.width} height={building.height} depth={building.depth} color={tier.color} />
+                <TierSkyBeam height={building.height} color={tier.color} prismatic />
+              </>
+            )}
+          </>
+        );
+      })()}
     </group>
   );
 }

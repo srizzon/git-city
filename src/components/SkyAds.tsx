@@ -6,6 +6,11 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { getActiveAds, type SkyAd } from "@/lib/skyAds";
 
+// Shared geometries — prevents GPU leaks on mount/unmount
+const _box = /* @__PURE__ */ new THREE.BoxGeometry(1, 1, 1);
+const _plane = /* @__PURE__ */ new THREE.PlaneGeometry(1, 1);
+const _sphere = /* @__PURE__ */ new THREE.SphereGeometry(1, 10, 8);
+
 // ─── Pointer guard — prevents building click when ad is tapped ─
 //
 // Native capture-phase listener raycasts against all registered ad meshes.
@@ -191,11 +196,12 @@ function BannerPlane({
     };
   }, [tex, ledMat, ropeLine]);
 
-  // Flight
-  const rx = cityRadius * 0.55;
-  const rz = cityRadius * 0.4;
-  const altitude = 200 + index * 25;
-  const speed = 35;
+  // Flight — spread planes across multiple orbit radii so they cover the whole city
+  const radiusFraction = 0.25 + (index / Math.max(total - 1, 1)) * 0.5; // 25-75% of city radius
+  const rx = cityRadius * radiusFraction * (0.9 + (index % 3) * 0.1);
+  const rz = cityRadius * radiusFraction * (0.8 + ((index + 1) % 3) * 0.1);
+  const altitude = 180 + index * 20 + (index % 3) * 40;
+  const speed = 30 + (index % 4) * 5;
   const phaseOffset = (index * Math.PI * 2) / total;
   const angle = useRef(phaseOffset);
 
@@ -259,8 +265,9 @@ function BannerPlane({
         ref={hitboxRef}
         position={[0, bannerY / 2, (ROPE_GAP + BANNER_LENGTH) / 2]}
         onClick={handleClick}
+        geometry={_box}
+        scale={[12, Math.abs(bannerY) + BANNER_HEIGHT + 12, ROPE_GAP + BANNER_LENGTH + 12]}
       >
-        <boxGeometry args={[12, Math.abs(bannerY) + BANNER_HEIGHT + 12, ROPE_GAP + BANNER_LENGTH + 12]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
@@ -283,9 +290,9 @@ function BannerPlane({
         position={[0.15, bannerY, bannerZ]}
         rotation={[0, Math.PI / 2, 0]}
         onClick={handleClick}
-      >
-        <planeGeometry args={[BANNER_LENGTH, BANNER_HEIGHT]} />
-      </mesh>
+        geometry={_plane}
+        scale={[BANNER_LENGTH, BANNER_HEIGHT, 1]}
+      />
 
       {/* LED banner — side 2 (faces -X, same texture — UV is correct on both sides) */}
       <mesh
@@ -294,9 +301,9 @@ function BannerPlane({
         position={[-0.15, bannerY, bannerZ]}
         rotation={[0, -Math.PI / 2, 0]}
         onClick={handleClick}
-      >
-        <planeGeometry args={[BANNER_LENGTH, BANNER_HEIGHT]} />
-      </mesh>
+        geometry={_plane}
+        scale={[BANNER_LENGTH, BANNER_HEIGHT, 1]}
+      />
 
     </group>
   );
@@ -347,10 +354,12 @@ function Blimp({
     };
   }, [tex, ledMat]);
 
-  const r = cityRadius * 0.2;
-  const altitude = 280 + index * 30;
-  const speed = 6;
-  const phaseOffset = (index * Math.PI) / Math.max(total, 1);
+  // Spread blimps across the city instead of clustering near center
+  const radiusFraction = 0.15 + (index / Math.max(total - 1, 1)) * 0.45; // 15-60% of city radius
+  const r = cityRadius * radiusFraction;
+  const altitude = 260 + index * 25 + (index % 2) * 30;
+  const speed = 5 + (index % 3) * 2;
+  const phaseOffset = (index * Math.PI * 2) / Math.max(total, 1);
   const angle = useRef(phaseOffset);
 
   useFrame((state, delta) => {
@@ -407,14 +416,14 @@ function Blimp({
         ref={blimpHitboxRef}
         position={[0, -2, 0]}
         onClick={handleClick}
+        geometry={_box}
+        scale={[24, 24, 54]}
       >
-        <boxGeometry args={[24, 24, 54]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       {/* Body — elongated along local Z (forward), light hull */}
-      <mesh scale={[0.7, 0.5, 1.6]}>
-        <sphereGeometry args={[15, 10, 8]} />
+      <mesh geometry={_sphere} scale={[0.7 * 15, 0.5 * 15, 1.6 * 15]}>
         <meshStandardMaterial
           color="#c0c8d0"
           emissive="#606870"
@@ -425,8 +434,7 @@ function Blimp({
       </mesh>
 
       {/* Accent stripe — colored band around belly */}
-      <mesh scale={[0.72, 0.14, 1.62]} position={[0, -1, 0]}>
-        <sphereGeometry args={[15, 10, 6]} />
+      <mesh geometry={_sphere} scale={[0.72 * 15, 0.14 * 15, 1.62 * 15]} position={[0, -1, 0]}>
         <meshStandardMaterial
           color={ad.color}
           emissive={ad.color}
@@ -436,8 +444,7 @@ function Blimp({
       </mesh>
 
       {/* Accent stripe — thin upper trim */}
-      <mesh scale={[0.71, 0.07, 1.61]} position={[0, 3.5, 0]}>
-        <sphereGeometry args={[15, 10, 4]} />
+      <mesh geometry={_sphere} scale={[0.71 * 15, 0.07 * 15, 1.61 * 15]} position={[0, 3.5, 0]}>
         <meshStandardMaterial
           color={ad.color}
           emissive={ad.color}
@@ -447,13 +454,11 @@ function Blimp({
       </mesh>
 
       {/* Gondola */}
-      <mesh position={[0, -9, 0]}>
-        <boxGeometry args={[6, 3, 10]} />
+      <mesh position={[0, -9, 0]} geometry={_box} scale={[6, 3, 10]}>
         <meshStandardMaterial color="#8890a0" emissive="#404860" emissiveIntensity={0.3} />
       </mesh>
       {/* Gondola windows */}
-      <mesh position={[3.05, -8.5, 0]}>
-        <boxGeometry args={[0.1, 1.2, 6]} />
+      <mesh position={[3.05, -8.5, 0]} geometry={_box} scale={[0.1, 1.2, 6]}>
         <meshStandardMaterial
           color={ad.color}
           emissive={ad.color}
@@ -461,8 +466,7 @@ function Blimp({
           toneMapped={false}
         />
       </mesh>
-      <mesh position={[-3.05, -8.5, 0]}>
-        <boxGeometry args={[0.1, 1.2, 6]} />
+      <mesh position={[-3.05, -8.5, 0]} geometry={_box} scale={[0.1, 1.2, 6]}>
         <meshStandardMaterial
           color={ad.color}
           emissive={ad.color}
@@ -472,31 +476,25 @@ function Blimp({
       </mesh>
 
       {/* Struts — gondola to body */}
-      <mesh position={[2, -6.5, 3]} rotation={[0.15, 0, 0.2]}>
-        <boxGeometry args={[0.3, 4, 0.3]} />
+      <mesh position={[2, -6.5, 3]} rotation={[0.15, 0, 0.2]} geometry={_box} scale={[0.3, 4, 0.3]}>
         <meshStandardMaterial color="#9098a8" emissive="#404860" emissiveIntensity={0.2} />
       </mesh>
-      <mesh position={[-2, -6.5, 3]} rotation={[0.15, 0, -0.2]}>
-        <boxGeometry args={[0.3, 4, 0.3]} />
+      <mesh position={[-2, -6.5, 3]} rotation={[0.15, 0, -0.2]} geometry={_box} scale={[0.3, 4, 0.3]}>
         <meshStandardMaterial color="#9098a8" emissive="#404860" emissiveIntensity={0.2} />
       </mesh>
-      <mesh position={[2, -6.5, -3]} rotation={[-0.15, 0, 0.2]}>
-        <boxGeometry args={[0.3, 4, 0.3]} />
+      <mesh position={[2, -6.5, -3]} rotation={[-0.15, 0, 0.2]} geometry={_box} scale={[0.3, 4, 0.3]}>
         <meshStandardMaterial color="#9098a8" emissive="#404860" emissiveIntensity={0.2} />
       </mesh>
-      <mesh position={[-2, -6.5, -3]} rotation={[-0.15, 0, -0.2]}>
-        <boxGeometry args={[0.3, 4, 0.3]} />
+      <mesh position={[-2, -6.5, -3]} rotation={[-0.15, 0, -0.2]} geometry={_box} scale={[0.3, 4, 0.3]}>
         <meshStandardMaterial color="#9098a8" emissive="#404860" emissiveIntensity={0.2} />
       </mesh>
 
       {/* Tail fin — vertical */}
-      <mesh position={[0, 2, -22]} rotation={[0.1, 0, 0]}>
-        <boxGeometry args={[0.4, 7, 5]} />
+      <mesh position={[0, 2, -22]} rotation={[0.1, 0, 0]} geometry={_box} scale={[0.4, 7, 5]}>
         <meshStandardMaterial color="#9098a8" emissive={ad.color} emissiveIntensity={0.2} />
       </mesh>
       {/* Tail fin — vertical tip accent */}
-      <mesh position={[0, 5.5, -21]} rotation={[0.1, 0, 0]}>
-        <boxGeometry args={[0.5, 1, 3]} />
+      <mesh position={[0, 5.5, -21]} rotation={[0.1, 0, 0]} geometry={_box} scale={[0.5, 1, 3]}>
         <meshStandardMaterial
           color={ad.color}
           emissive={ad.color}
@@ -506,8 +504,7 @@ function Blimp({
       </mesh>
 
       {/* Tail fin — horizontal */}
-      <mesh position={[0, -1, -22]} rotation={[0.1, 0, 0]}>
-        <boxGeometry args={[6, 0.4, 5]} />
+      <mesh position={[0, -1, -22]} rotation={[0.1, 0, 0]} geometry={_box} scale={[6, 0.4, 5]}>
         <meshStandardMaterial color="#9098a8" emissive={ad.color} emissiveIntensity={0.2} />
       </mesh>
 
@@ -522,9 +519,9 @@ function Blimp({
         position={[10.8, -2, 0]}
         rotation={[0, Math.PI / 2, 0]}
         onClick={handleClick}
-      >
-        <planeGeometry args={[26, 9]} />
-      </mesh>
+        geometry={_plane}
+        scale={[26, 9, 1]}
+      />
 
       {/* LED Screen — right side (-X) */}
       <mesh
@@ -533,9 +530,9 @@ function Blimp({
         position={[-10.8, -2, 0]}
         rotation={[0, -Math.PI / 2, 0]}
         onClick={handleClick}
-      >
-        <planeGeometry args={[26, 9]} />
-      </mesh>
+        geometry={_plane}
+        scale={[26, 9, 1]}
+      />
 
     </group>
   );

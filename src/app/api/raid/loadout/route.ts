@@ -50,6 +50,8 @@ export async function GET(request: Request) {
   return NextResponse.json({
     vehicle: config.vehicle ?? "airplane",
     tag: config.tag ?? "default",
+  }, {
+    headers: { "Cache-Control": "private, max-age=30" },
   });
 }
 

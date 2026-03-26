@@ -65,11 +65,18 @@ body {
   box-shadow: none !important;
 }
 
+@keyframes pulse-node {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200, 230, 74, 0.3); }
+  50% { box-shadow: 0 0 12px 4px rgba(200, 230, 74, 0.15); }
+}
+
 ::selection {
   background: rgba(200, 230, 74, 0.3);
   color: #e8dcc8;
 }
 
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 2px; }
@@ -179,6 +186,11 @@ body {
 .live-dot { animation: live-pulse 2s ease-in-out infinite; }
 
 /* ─── District fly-by announcement ─── */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 @keyframes district-in {
   0%   { opacity: 0; transform: translateX(-20px); }
   10%  { opacity: 1; transform: translateX(0); }

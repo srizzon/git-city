@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     brand?: string;
     description?: string;
     link?: string;
+    email?: string;
   };
   try {
     body = await request.json();
@@ -104,6 +105,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "This link is not allowed" }, { status: 400 });
     }
     update.link = safeLink || null;
+  }
+
+  if (body.email !== undefined) {
+    const safeEmail = String(body.email).trim().toLowerCase();
+    if (safeEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(safeEmail)) {
+      update.purchaser_email = safeEmail;
+    }
   }
 
   if (Object.keys(update).length === 0) {

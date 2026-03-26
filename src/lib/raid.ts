@@ -84,6 +84,24 @@ export function calculateDefenseScore(inputs: DefenseInputs): {
 
 export const MAX_RAIDS_PER_DAY = 3;
 export const RAID_TAG_DURATION_DAYS = 3;
+
+// ─── Special Events ──────────────────────────────────────────
+
+/** Check if today is Friday the 13th (UTC) */
+export function isFridayThe13th(): boolean {
+  const now = new Date();
+  return now.getUTCDay() === 5 && now.getUTCDate() === 13;
+}
+
+/** Effective daily raid limit (unlimited on special event days) */
+export function getEffectiveMaxRaids(): number {
+  return isFridayThe13th() ? 999 : MAX_RAIDS_PER_DAY;
+}
+
+/** Whether the weekly per-target cooldown is active */
+export function isWeeklyCooldownActive(): boolean {
+  return !isFridayThe13th();
+}
 export const XP_WIN_ATTACKER = 50;
 export const XP_WIN_DEFENDER = 30;
 export const XP_LOSE_DEFENDER = 30;
@@ -101,6 +119,7 @@ export interface RaidPreviewResponse {
   raids_today: number;
   raids_max: number;
   target_raided_this_week: boolean;
+  special_event: "friday13" | null;
   attack_estimate: StrengthEstimate;
   defense_estimate: StrengthEstimate;
   attack_score: number;

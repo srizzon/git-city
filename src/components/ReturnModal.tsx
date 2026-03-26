@@ -51,10 +51,10 @@ export default function ReturnModal({ streakData, onClose }: Props) {
     parts.push(`${new_achievements.length} new badge${new_achievements.length > 1 ? "s" : ""}`);
   }
   if (successfulRaids.length > 0) {
-    parts.push(`Raided by ${successfulRaids.map((r) => r.attacker_login).join(", ")}`);
+    parts.push(`Attacked by ${successfulRaids.map((r) => r.attacker_login).join(", ")}`);
   }
   if (failedRaids.length > 0 && successfulRaids.length === 0) {
-    parts.push(`Defended ${failedRaids.length} raid${failedRaids.length > 1 ? "s" : ""}`);
+    parts.push(`Defended ${failedRaids.length} battle${failedRaids.length > 1 ? "s" : ""}`);
   }
   const subtitle = parts.length > 0 ? parts.join(" · ") : null;
 
@@ -69,7 +69,7 @@ export default function ReturnModal({ streakData, onClose }: Props) {
       }}
     >
       <div
-        className="flex items-center gap-3 border-[2px] bg-bg-raised/95 px-4 py-2.5 backdrop-blur-sm"
+        className="flex items-center gap-3 border-2 bg-bg-raised/95 px-4 py-2.5 backdrop-blur-sm"
         style={{ borderColor: color }}
       >
         <span className="text-lg font-bold" style={{ color }}>

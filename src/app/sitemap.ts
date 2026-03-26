@@ -8,12 +8,16 @@ const BASE_URL =
     : "http://localhost:3000");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const supabase = getSupabaseAdmin();
-
-  const { data: developers } = await supabase
-    .from("developers")
-    .select("github_login, updated_at")
-    .order("rank", { ascending: true, nullsFirst: false });
+  let developers: { github_login: string; updated_at: string | null }[] = [];
+  
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
+      .from("developers")
+      .select("github_login, updated_at")
+      .order("rank", { ascending: true, nullsFirst: false });
+    developers = data ?? [];
+  }
 
   const devEntries: MetadataRoute.Sitemap = (developers ?? []).map((dev) => ({
     url: `${BASE_URL}/dev/${dev.github_login}`,

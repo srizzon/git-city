@@ -4,50 +4,104 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Howl } from "howler";
 import { TRACKS, loadRadioState, saveRadioState } from "@/lib/radio";
 
-interface LofiRadioProps {
-  accent: string;
-  shadow: string;
-  flyMode: boolean;
-  raidMode?: boolean;
+/* ── Module-level persistent audio state (survives unmount & page navigation) ── */
+let _howl: Howl | null = null;
+let _playing = false;
+let _trackIndex = 0;
+let _volume = 0.15;
+let _muted = false;
+let _shuffle = false;
+let _initialized = false;
+// Mutable ref to latest advanceTrack — avoids stale closures in Howl callbacks
+let _advanceFn: ((currentIndex: number) => void) | null = null;
+
+const DEFAULT_ACCENT = "#6090e0";
+const DEFAULT_SHADOW = "#203870";
+
+function destroyHowl(howl: Howl | null) {
+  if (howl) {
+    try { howl.unload(); } catch {}
+  }
 }
 
-export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRadioProps) {
+export default function LofiRadio() {
   const [expanded, setExpanded] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [trackIndex, setTrackIndex] = useState(0);
-  const [shuffle, setShuffle] = useState(false);
-  const [volume, setVolume] = useState(0.5);
-  const [muted, setMuted] = useState(false);
+  const [playing, setPlaying] = useState(_playing);
+  const [trackIndex, setTrackIndex] = useState(_trackIndex);
+  const [shuffle, setShuffle] = useState(_shuffle);
+  const [volume, setVolume] = useState(_volume);
+  const [muted, setMuted] = useState(_muted);
 
-  const howlRef = useRef<Howl | null>(null);
+  // Mode state driven by events from main page
+  const [flyMode, setFlyMode] = useState(false);
+  const [raidMode, setRaidMode] = useState(false);
+  const [accent, setAccent] = useState(DEFAULT_ACCENT);
+  const [shadow, setShadow] = useState(DEFAULT_SHADOW);
+  const [hidden, setHidden] = useState(false);
+
+  const howlRef = useRef<Howl | null>(_howl);
   const fadingRef = useRef<Howl | null>(null);
-  const initRef = useRef(false);
 
-  // Load persisted state on mount
+  // ── Bootstrap: restore persistent Howl or load from localStorage ──
   useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-    const saved = loadRadioState();
-    setVolume(saved.volume);
-    setTrackIndex(saved.trackIndex);
-    setShuffle(saved.shuffle);
+    if (_howl) {
+      howlRef.current = _howl;
+      setPlaying(_playing);
+      setTrackIndex(_trackIndex);
+      setVolume(_volume);
+      setMuted(_muted);
+      setShuffle(_shuffle);
+    } else if (!_initialized) {
+      const saved = loadRadioState();
+      setVolume(saved.volume);
+      setTrackIndex(saved.trackIndex);
+      setShuffle(saved.shuffle);
+      _volume = saved.volume;
+      _trackIndex = saved.trackIndex;
+      _shuffle = saved.shuffle;
+    }
+    _initialized = true;
   }, []);
 
-
-  // Persist state changes
+  // ── Persist to localStorage ──
   useEffect(() => {
-    if (!initRef.current) return;
+    if (!_initialized) return;
     saveRadioState({ volume, trackIndex, shuffle });
   }, [volume, trackIndex, shuffle]);
 
-  const destroyHowl = useCallback((howl: Howl | null) => {
-    if (howl) {
-      try { howl.unload(); } catch {}
-    }
+  // ── Keep module-level state in sync ──
+  useEffect(() => { _volume = volume; }, [volume]);
+  useEffect(() => { _muted = muted; }, [muted]);
+  useEffect(() => { _shuffle = shuffle; }, [shuffle]);
+
+  // ── Listen for mode events from main page ──
+  useEffect(() => {
+    const apply = (d: Record<string, unknown>) => {
+      if (d.flyMode !== undefined) setFlyMode(d.flyMode as boolean);
+      if (d.raidMode !== undefined) setRaidMode(d.raidMode as boolean);
+      if (d.accent) setAccent(d.accent as string);
+      if (d.shadow) setShadow(d.shadow as string);
+      if (d.hidden !== undefined) setHidden(d.hidden as boolean);
+    };
+
+    // Read stored state for late-mounting (e.g. portal)
+    const stored = (window as unknown as Record<string, unknown>).__gcRadioMode;
+    if (stored) apply(stored as Record<string, unknown>);
+
+    const handler = (e: Event) => apply((e as CustomEvent).detail);
+    window.addEventListener("gc:radio-mode", handler);
+    return () => {
+      window.removeEventListener("gc:radio-mode", handler);
+      setFlyMode(false);
+      setRaidMode(false);
+      setAccent(DEFAULT_ACCENT);
+      setShadow(DEFAULT_SHADOW);
+      setHidden(false);
+    };
   }, []);
 
+  // ── Core playback ──
   const playTrack = useCallback((index: number, fadeIn = true) => {
-    // Fade out current track
     const old = howlRef.current;
     if (old) {
       fadingRef.current = old;
@@ -61,42 +115,39 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
     const track = TRACKS[index];
     if (!track) return;
 
+    const vol = _muted ? 0 : _volume;
     const howl = new Howl({
       src: [track.src],
       html5: true,
-      volume: fadeIn ? 0 : (muted ? 0 : volume),
-      onend: () => {
-        // Auto-advance
-        advanceTrack(index);
-      },
-      onloaderror: () => {
-        // Skip broken tracks
-        advanceTrack(index);
-      },
-      onplay: () => setPlaying(true),
+      volume: fadeIn ? 0 : vol,
+      onend: () => _advanceFn?.(index),
+      onloaderror: () => _advanceFn?.(index),
+      onplay: () => { setPlaying(true); _playing = true; },
     });
 
     howlRef.current = howl;
+    _howl = howl;
     howl.play();
-    if (fadeIn) {
-      howl.fade(0, muted ? 0 : volume, 400);
-    }
+    if (fadeIn) howl.fade(0, vol, 400);
     setTrackIndex(index);
+    _trackIndex = index;
     setPlaying(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [volume, muted, destroyHowl]);
+    _playing = true;
+  }, []);
 
   const advanceTrack = useCallback((currentIndex: number) => {
     let next: number;
-    if (shuffle) {
+    if (_shuffle) {
       do { next = Math.floor(Math.random() * TRACKS.length); }
       while (next === currentIndex && TRACKS.length > 1);
     } else {
       next = (currentIndex + 1) % TRACKS.length;
     }
     playTrack(next);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shuffle]);
+  }, [playTrack]);
+
+  // Keep module-level advance fn in sync
+  useEffect(() => { _advanceFn = advanceTrack; }, [advanceTrack]);
 
   const togglePlay = useCallback(() => {
     if (playing && howlRef.current) {
@@ -104,20 +155,19 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
       setTimeout(() => {
         howlRef.current?.pause();
         setPlaying(false);
+        _playing = false;
       }, 200);
     } else if (howlRef.current) {
       howlRef.current.play();
-      howlRef.current.fade(0, muted ? 0 : volume, 200);
+      howlRef.current.fade(0, _muted ? 0 : _volume, 200);
       setPlaying(true);
+      _playing = true;
     } else {
       playTrack(trackIndex);
     }
-  }, [playing, muted, volume, trackIndex, playTrack]);
+  }, [playing, trackIndex, playTrack]);
 
-  const skipNext = useCallback(() => {
-    advanceTrack(trackIndex);
-  }, [advanceTrack, trackIndex]);
-
+  const skipNext = useCallback(() => advanceTrack(trackIndex), [advanceTrack, trackIndex]);
   const skipPrev = useCallback(() => {
     const prev = trackIndex === 0 ? TRACKS.length - 1 : trackIndex - 1;
     playTrack(prev);
@@ -126,22 +176,21 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
   const toggleMute = useCallback(() => {
     setMuted((m) => {
       const next = !m;
-      if (howlRef.current) {
-        howlRef.current.volume(next ? 0 : volume);
-      }
+      _muted = next;
+      if (howlRef.current) howlRef.current.volume(next ? 0 : _volume);
       return next;
     });
-  }, [volume]);
+  }, []);
 
   const handleVolumeChange = useCallback((val: number) => {
     setVolume(val);
+    _volume = val;
     setMuted(false);
-    if (howlRef.current) {
-      howlRef.current.volume(val);
-    }
+    _muted = false;
+    if (howlRef.current) howlRef.current.volume(val);
   }, []);
 
-  // Keyboard shortcut: M to mute
+  // ── Keyboard shortcut: M to mute ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "m") return;
@@ -155,22 +204,22 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
     return () => window.removeEventListener("keydown", handler);
   }, [toggleMute]);
 
-  // Cleanup on unmount
+  // ── Cleanup: preserve Howl on unmount, only destroy fading ref ──
   useEffect(() => {
     return () => {
-      destroyHowl(howlRef.current);
       destroyHowl(fadingRef.current);
+      _howl = howlRef.current;
     };
-  }, [destroyHowl]);
+  }, []);
 
-  // Update volume on existing Howl when volume/muted changes
+  // ── Sync volume to active Howl ──
   useEffect(() => {
     if (howlRef.current && playing) {
       howlRef.current.volume(muted ? 0 : volume);
     }
   }, [volume, muted, playing]);
 
-  // Duck volume during raid mode
+  // ── Duck volume during raid mode ──
   useEffect(() => {
     if (!howlRef.current || !playing) return;
     if (raidMode) {
@@ -182,12 +231,16 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
 
   const currentTrack = TRACKS[trackIndex];
 
+  if (hidden) return null;
+
   return (
     <div className="relative">
-      {/* Expanded panel — pops up above the button */}
+      {/* Expanded panel — above button normally, to the right in fly mode */}
       {expanded && (
         <div
-          className="absolute bottom-full left-0 mb-2 z-[25] border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm"
+          className={`absolute z-25 border-[3px] border-border bg-bg-raised/95 backdrop-blur-sm ${
+            flyMode ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2'
+          }`}
           style={{ animation: "fade-in 0.15s ease-out", boxShadow: `3px 3px 0 0 ${shadow}`, width: 200 }}
         >
       {/* Track name + close */}
@@ -209,7 +262,7 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
         </button>
         <button
           onClick={togglePlay}
-          className="btn-press flex h-[32px] w-[32px] items-center justify-center border-[2px] border-border hover:border-cream/40"
+          className="btn-press flex h-8 w-8 items-center justify-center border-2 border-border hover:border-cream/40"
           style={{ color: playing ? accent : "var(--color-cream)" }}
           title={playing ? "Pause" : "Play"}
         >
@@ -236,7 +289,7 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
           style={{ "--radio-accent": accent } as React.CSSProperties}
         />
         <button
-          onClick={() => setShuffle((s) => !s)}
+          onClick={() => { setShuffle((s) => { _shuffle = !s; return !s; }); }}
           className="btn-press text-[9px] shrink-0"
           style={{ color: shuffle ? accent : "var(--color-muted)" }}
           title={shuffle ? "Shuffle: on" : "Shuffle: off"}
@@ -258,7 +311,7 @@ export default function LofiRadio({ accent, shadow, flyMode, raidMode }: LofiRad
         <span style={{ color: playing ? accent : "var(--color-muted)" }}>
           {playing ? "\u23F8" : "\u25B6"}
         </span>
-        <span className="text-cream max-w-[80px] truncate">
+        <span className="text-cream max-w-20 truncate">
           {playing ? currentTrack?.title : "Lo-fi"}
         </span>
         <span

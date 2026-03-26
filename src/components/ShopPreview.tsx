@@ -22,6 +22,7 @@ import {
   HologramRing,
   LightningAura,
   LEDBanner,
+  GitHubStar,
 } from "./BuildingEffects";
 import { ClaimedGlow } from "./Building3D";
 import type { BuildingDims } from "./ShopClient";
@@ -143,6 +144,8 @@ function EffectForItem({
       return <LightningAura {...dims} color={ACCENT} />;
     case "led_banner":
       return <LEDBanner {...dims} color={ACCENT} />;
+    case "github_star":
+      return <GitHubStar {...dims} />;
     default:
       return null;
   }
@@ -325,7 +328,7 @@ export default function ShopPreview({
 
   return (
     <div className="relative border-[3px] border-border" style={{ backgroundColor: THEME.fogColor }}>
-      <div className="h-[280px] sm:h-[360px] lg:h-[520px]">
+      <div className="h-70 sm:h-90 lg:h-130">
         <Canvas
           camera={{ position: [camDist * 0.5, camDist * 0.3, camDist * 0.7], fov: 45 }}
           gl={{ antialias: false }}

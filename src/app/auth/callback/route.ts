@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { checkAchievements } from "@/lib/achievements";
+import { cacheEmailFromAuth, touchLastActive, ensurePreferences } from "@/lib/notification-helpers";
+import { sendWelcomeNotification } from "@/lib/notification-senders/welcome";
+import { sendReferralJoinedNotification } from "@/lib/notification-senders/referral";
+import { fetchGitHubDeveloperData } from "@/lib/github-api";
+import { calculateGithubXp } from "@/lib/xp";
+
+// Extend timeout for GitHub API calls during login
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -27,26 +35,88 @@ export async function GET(request: Request) {
   const admin = getSupabaseAdmin();
 
   if (githubLogin) {
-    // Auto-claim: if building exists and not yet claimed, claim it
-    const { data: claimResult } = await admin
+    // Check if dev already exists in the database
+    const { data: existingDev } = await admin
       .from("developers")
-      .update({
-        claimed: true,
-        claimed_by: data.user.id,
-        claimed_at: new Date().toISOString(),
-        fetch_priority: 1,
-      })
+      .select("id, claimed")
       .eq("github_login", githubLogin)
-      .eq("claimed", false)
-      .select("id");
+      .maybeSingle();
 
-    // First-time claim → dev_joined feed event
-    if (claimResult && claimResult.length > 0) {
+    if (!existingDev) {
+      // ─── New dev: create building from GitHub data on login ───
+      try {
+        const ghData = await fetchGitHubDeveloperData(githubLogin, { allowEmpty: true });
+
+        const { data: created, error: createErr } = await admin
+          .from("developers")
+          .upsert({
+            ...ghData,
+            fetched_at: new Date().toISOString(),
+            claimed: true,
+            claimed_by: data.user.id,
+            claimed_at: new Date().toISOString(),
+            fetch_priority: 1,
+          }, { onConflict: "github_login" })
+          .select("id")
+          .single();
+
+        if (created && !createErr) {
+          // GitHub XP
+          const xp = calculateGithubXp({
+            contributions: ghData.contributions_total ?? ghData.contributions,
+            total_stars: ghData.total_stars,
+            public_repos: ghData.public_repos,
+            total_prs: ghData.total_prs ?? 0,
+          });
+          if (xp > 0) {
+            await admin.rpc("grant_xp", { p_developer_id: created.id, p_source: "github", p_amount: xp });
+            await admin.from("developers").update({ xp_github: xp }).eq("id", created.id);
+          }
+
+          // Rank
+          await admin.rpc("assign_new_dev_rank", { dev_id: created.id });
+          admin.rpc("recalculate_ranks").then(
+            () => console.log("Ranks recalculated for new dev:", githubLogin),
+            (err: unknown) => console.error("Rank recalculation failed:", err),
+          );
+
+          // Feed event
+          await admin.from("activity_feed").insert({
+            event_type: "dev_joined",
+            actor_id: created.id,
+            metadata: { login: githubLogin },
+          });
+
+          // Notifications
+          cacheEmailFromAuth(created.id, data.user.id).catch(() => {});
+          ensurePreferences(created.id).catch(() => {});
+          sendWelcomeNotification(created.id, githubLogin);
+        }
+      } catch (err) {
+        console.error("Failed to create dev on login:", err);
+      }
+    } else if (!existingDev.claimed) {
+      // ─── Legacy dev: claim existing unclaimed building ───
+      await admin
+        .from("developers")
+        .update({
+          claimed: true,
+          claimed_by: data.user.id,
+          claimed_at: new Date().toISOString(),
+          fetch_priority: 1,
+        })
+        .eq("id", existingDev.id)
+        .eq("claimed", false);
+
       await admin.from("activity_feed").insert({
         event_type: "dev_joined",
-        actor_id: claimResult[0].id,
+        actor_id: existingDev.id,
         metadata: { login: githubLogin },
       });
+
+      cacheEmailFromAuth(existingDev.id, data.user.id).catch(() => {});
+      ensurePreferences(existingDev.id).catch(() => {});
+      sendWelcomeNotification(existingDev.id, githubLogin);
     }
 
     // Fetch dev record for achievement check + referral processing
@@ -59,6 +129,10 @@ export async function GET(request: Request) {
         .single();
 
       if (dev) {
+        // Cache email + update last_active_at on every login
+        cacheEmailFromAuth(dev.id, data.user.id).catch(() => {});
+        touchLastActive(dev.id);
+
         // Process referral (from ?ref= param forwarded by client)
         const ref = searchParams.get("ref");
         if (ref && ref !== githubLogin && !dev.referred_by) {
@@ -82,6 +156,9 @@ export async function GET(request: Request) {
               target_id: dev.id,
               metadata: { referrer_login: referrer.github_login, referred_login: githubLogin },
             });
+
+            // Notify referrer that their referral joined
+            sendReferralJoinedNotification(referrer.id, referrer.github_login, githubLogin, dev.id);
 
             // Check referral achievements for the referrer
             const { data: referrerFull } = await admin

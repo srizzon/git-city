@@ -1,46 +1,79 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { createBrowserSupabase } from "@/lib/supabase";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 
-type Status = "connecting" | "connected" | "error";
+const HEARTBEAT_INTERVAL = 30_000; // 30s
+const COUNT_INTERVAL = 10_000; // 10s (CDN-cached)
 
 export function useLiveUsers() {
   const [count, setCount] = useState(1);
-  const [status, setStatus] = useState<Status>("connecting");
-  const channelRef = useRef<RealtimeChannel | null>(null);
+  const sessionId = useRef("");
 
   useEffect(() => {
-    const supabase = createBrowserSupabase();
-    const presenceKey = crypto.randomUUID();
+    if (!sessionId.current) {
+      sessionId.current = crypto.randomUUID();
+    }
 
-    const channel = supabase.channel("city-presence", {
-      config: { presence: { key: presenceKey } },
-    });
+    let cancelled = false;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+    let countTimer: ReturnType<typeof setInterval> | null = null;
 
-    channelRef.current = channel;
+    // Fire-and-forget heartbeat (keeps session alive)
+    async function heartbeat() {
+      try {
+        await fetch("/api/online", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: sessionId.current }),
+        });
+      } catch {
+        // ignore
+      }
+    }
 
-    channel
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        const total = Object.keys(state).length;
-        setCount(Math.max(1, total));
-        setStatus("connected");
-      })
-      .subscribe(async (status: string) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({ online_at: new Date().toISOString() });
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setStatus("error");
+    // Fetch cached count from CDN
+    async function fetchCount() {
+      try {
+        const res = await fetch("/api/online");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && typeof data.count === "number") {
+          setCount(Math.max(1, data.count));
         }
-      });
+      } catch {
+        // ignore
+      }
+    }
+
+    function start() {
+      heartbeat();
+      fetchCount();
+      heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL);
+      countTimer = setInterval(fetchCount, COUNT_INTERVAL);
+    }
+
+    function stop() {
+      if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+      if (countTimer) { clearInterval(countTimer); countTimer = null; }
+    }
+
+    function onVisibilityChange() {
+      if (document.hidden) {
+        stop();
+      } else {
+        start();
+      }
+    }
+
+    start();
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
-      channel.unsubscribe();
-      channelRef.current = null;
+      cancelled = true;
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
-  return { count, status };
+  return { count, status: "connected" as const };
 }

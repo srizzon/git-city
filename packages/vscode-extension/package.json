@@ -1,0 +1,92 @@
+{
+  "name": "gitcity",
+  "displayName": "Git City: Pulse",
+  "description": "Keep your city alive. When you code, your building glows and powers the signal. Privacy-first: you control what gets shared.",
+  "version": "0.3.0",
+  "publisher": "git-city",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/srizzon/git-city"
+  },
+  "homepage": "https://www.thegitcity.com",
+  "bugs": {
+    "url": "https://github.com/srizzon/git-city/issues"
+  },
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "icon": "icon.png",
+  "contributes": {
+    "commands": [
+      {
+        "command": "gitCity.login",
+        "title": "Pulse: Connect"
+      },
+      {
+        "command": "gitCity.logout",
+        "title": "Pulse: Disconnect"
+      },
+      {
+        "command": "gitCity.togglePause",
+        "title": "Pulse: Toggle"
+      },
+      {
+        "command": "gitCity.showDashboard",
+        "title": "Pulse: Open City"
+      }
+    ],
+    "configuration": {
+      "title": "Git City",
+      "properties": {
+        "gitCity.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable activity tracking"
+        },
+        "gitCity.apiUrl": {
+          "type": "string",
+          "default": "https://www.thegitcity.com",
+          "description": "Git City API URL (changing this sends your API key to a different server)",
+          "scope": "application"
+        },
+        "gitCity.privacy.shareLanguage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Share the programming language you're using (shown publicly on your building)"
+        },
+        "gitCity.privacy.shareProject": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send project name for your personal analytics (never shown publicly to other users)"
+        },
+        "gitCity.privacy.excludeProjects": {
+          "type": "array",
+          "default": [],
+          "items": { "type": "string" },
+          "description": "Project names to never track at all (e.g. secret-project, client-work)"
+        },
+        "gitCity.idleTimeout": {
+          "type": "number",
+          "default": 300,
+          "minimum": 60,
+          "maximum": 3600,
+          "description": "Seconds of inactivity before marking as idle"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.93.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  }
+}

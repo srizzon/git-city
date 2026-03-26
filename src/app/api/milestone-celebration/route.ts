@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { sendCommunityMilestoneNotifications } from "@/lib/notification-senders/community-milestone";
 
 // Milestones to celebrate (every 5k after 10k)
 const MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000, 100000];
@@ -28,6 +29,11 @@ export async function POST(req: Request) {
   if (error && !error.message.includes("duplicate")) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Send community milestone notifications (fire-and-forget, batch of 50)
+  sendCommunityMilestoneNotifications(milestone).catch((err) => {
+    console.error("[milestone] Notification send error:", err);
+  });
 
   return NextResponse.json({ celebrated: true, milestone, reached_at: data?.reached_at });
 }

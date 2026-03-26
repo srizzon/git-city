@@ -44,12 +44,10 @@ export async function POST() {
 
   const granted = await grantFreeClaimItem(dev.id);
 
-  if (!granted) {
-    return NextResponse.json(
-      { error: "Already claimed", item_id: FREE_CLAIM_ITEM },
-      { status: 409 }
-    );
-  }
+// grantFreeClaimItem is idempotent: returns false if already owned.
+    // Either way the user should see the success state — treat as 200 OK.
+    // (Returning 409 previously caused the frontend to silently reset
+    // the button without opening the gift modal — issue #11.)
 
   return NextResponse.json({
     claimed: true,

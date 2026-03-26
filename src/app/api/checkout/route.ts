@@ -140,6 +140,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Item not found or inactive" }, { status: 404 });
   }
 
+  // PX-only: items with pixel pricing must be purchased with Pixels, not direct payment
+  if (item.price_pixels != null) {
+    return NextResponse.json(
+      { error: "This item can only be purchased with Pixels. Visit /pixels to buy PX." },
+      { status: 400 },
+    );
+  }
+
   // A11: Check scarcity constraints (temporal + quantity)
   if (item.available_until && new Date(item.available_until).getTime() <= Date.now()) {
     return NextResponse.json({ error: "This item is no longer available" }, { status: 410 });
