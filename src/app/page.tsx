@@ -35,6 +35,7 @@ import XpBar from "@/components/XpBar";
 import PixelBalance from "@/components/PixelBalance";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
+import RadarMap from "@/components/RadarMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
@@ -73,7 +74,6 @@ const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ss
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
 const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
 const LevelUpToast = dynamic(() => import("@/components/LevelUpToast"), { ssr: false });
-const MiniMap = dynamic(() => import("@/components/MiniMap"), { ssr: false });
 
 // Feature flags — flip to switch milestone banner
 const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road to 1K, "devs" = total developers
@@ -443,6 +443,8 @@ function HomeContent() {
 
   const [hud, setHud] = useState({ speed: 0, altitude: 0 });
   const [playerPos, setPlayerPos] = useState<{ x: number; z: number }>({ x: 0, z: 0 });
+  const [playerYaw, setPlayerYaw] = useState(0);
+  const [cameraPos, setCameraPos] = useState<{ x: number; z: number; tx: number; tz: number }>({ x: 800, z: 1000, tx: 0, tz: 0 });
   const [districtAnnouncement, setDistrictAnnouncement] = useState<{ name: string; color: string; population: number } | null>(null);
   const lastDistrictRef = useRef<string | null>(null);
   const announceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -2209,6 +2211,7 @@ function HomeContent() {
         themeIndex={themeIndex}
         onHud={(s, a, x, z, yaw) => {
           setHud({ speed: s, altitude: a });
+          setPlayerYaw(yaw);
           // Look-ahead: ~40u ahead of airplane = center of screen
           const mapX = x - Math.sin(yaw) * 40;
           const mapZ = z - Math.cos(yaw) * 40;
@@ -2259,6 +2262,7 @@ function HomeContent() {
         flyStartPaused={showFlyControls}
         holdRise={loadStage !== "done"}
         celebrationActive={celebrationActive}
+        onCameraMove={(x, z, tx, tz) => setCameraPos({ x, z, tx, tz })}
         skyAds={skyAds}
         onAdClick={(ad) => {
           trackSkyAdClick(ad.id, ad.vehicle, ad.link);
@@ -2791,13 +2795,20 @@ function HomeContent() {
         </div>
       )}
 
-      {/* ─── Mini-map ─── */}
-      <MiniMap
+      {/* ─── Radar Map (always-visible bottom-left) ─── */}
+      <RadarMap
         buildings={buildings}
         playerX={playerPos.x}
         playerZ={playerPos.z}
-        visible={flyMode && !isMobile}
+        playerYaw={playerYaw}
+        cameraX={cameraPos.x}
+        cameraZ={cameraPos.z}
+        cameraTargetX={cameraPos.tx}
+        cameraTargetZ={cameraPos.tz}
+        visible={loadStage === "done" && !introMode && !rabbitCinematic && (exploreMode || flyMode)}
+        flyMode={flyMode}
         currentDistrict={lastDistrictRef.current}
+        districtZones={districtZones}
       />
 
       {/* ─── Explore Mode: minimal UI ─── */}
@@ -2836,7 +2847,7 @@ function HomeContent() {
               <span className="text-cream">{theme.name}</span>
               <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
-            <div id="gc-radio-slot" />
+            <div id="gc-radio-slot" suppressHydrationWarning />
           </div>
 
           {/* Feed toggle (top-right, below GitHub badges on desktop) */}
