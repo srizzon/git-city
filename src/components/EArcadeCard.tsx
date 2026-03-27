@@ -226,7 +226,7 @@ export default function EArcadeCard({ onClose, onEnter, onViewJobs, session, onS
                         onClick={(e) => {
                           e.stopPropagation();
                           if (!session) { onSignIn?.(); return; }
-                          window.location.href = "/jobs/career-profile";
+                          window.location.href = "/hire/edit";
                         }}
                         className="text-left text-[9px] transition-colors hover:text-cream"
                         style={{ color: ACCENT }}

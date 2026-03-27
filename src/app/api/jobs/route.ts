@@ -18,6 +18,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ total: count ?? 0 });
   }
 
+  // preview mode: no auth required — powers homepage jobs dropdown
+  const preview = url.searchParams.get("preview") === "true";
+  if (preview) {
+    const { data, count } = await admin
+      .from("job_listings")
+      .select("id, title, salary_min, salary_max, salary_currency, tier, seniority, role_type, company:job_company_profiles(name)", { count: "exact" })
+      .eq("status", "active")
+      .order("tier", { ascending: false })
+      .order("published_at", { ascending: false })
+      .limit(3);
+
+    return NextResponse.json({ listings: data ?? [], total: count ?? 0 });
+  }
+
   // Full listing mode: auth required (community-exclusive)
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();

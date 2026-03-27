@@ -48,6 +48,7 @@ const AUTH_SKIP_PREFIXES = [
   "/api/sky-ads/track",
   "/api/heartbeats",
   "/dev/",
+  "/hire/",
   "/leaderboard",
   "/live",
 ];

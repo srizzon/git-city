@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import type { JobSeniority, JobWeb, JobContract } from "@/lib/jobs/types";
@@ -15,12 +16,12 @@ async function getAuthenticatedDeveloper() {
   const admin = getSupabaseAdmin();
   const { data: dev } = await admin
     .from("developers")
-    .select("id")
+    .select("id, github_login")
     .eq("claimed_by", user.id)
     .maybeSingle();
 
   if (!dev) return null;
-  return { userId: user.id, developerId: dev.id as number };
+  return { userId: user.id, developerId: dev.id as number, githubLogin: dev.github_login as string };
 }
 
 export async function GET() {
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest) {
     link_portfolio: body.link_portfolio ?? null,
     link_linkedin: body.link_linkedin ?? null,
     link_website: body.link_website ?? null,
+    extra_links: Array.isArray(body.extra_links) ? body.extra_links.slice(0, 6) : [],
     open_to_work: body.open_to_work ?? false,
   };
 
@@ -144,6 +146,9 @@ export async function POST(req: NextRequest) {
     ]);
   }
 
+  // Bust cache on portfolio page
+  revalidatePath(`/hire/${auth.githubLogin}`);
+
   return NextResponse.json({ profile, isFirstCreation });
 }
 
@@ -158,6 +163,8 @@ export async function DELETE() {
     .from("career_profiles")
     .delete()
     .eq("id", auth.developerId);
+
+  revalidatePath(`/hire/${auth.githubLogin}`);
 
   return NextResponse.json({ deleted: true });
 }

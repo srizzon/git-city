@@ -105,7 +105,7 @@ export default function JobBoardClient() {
           </div>
           <div className="flex gap-2">
             <Link
-              href="/jobs/career-profile"
+              href="/hire/edit"
               className="btn-press border-[3px] border-border px-4 py-2 text-xs text-cream transition-colors hover:border-border-light"
             >
               Career Profile
@@ -233,7 +233,7 @@ export default function JobBoardClient() {
               )}
               <div>
                 <Link
-                  href="/jobs/career-profile"
+                  href="/hire/edit"
                   className="btn-press inline-block bg-lime px-6 py-3 text-xs text-bg"
                   style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}
                 >

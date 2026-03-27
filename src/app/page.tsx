@@ -523,6 +523,9 @@ function HomeContent() {
   const [skyAds, setSkyAds] = useState<import("@/lib/skyAds").SkyAd[]>(DEFAULT_SKY_ADS);
   const [starCount, setStarCount] = useState<number | null>(null);
   const [discordMembers, setDiscordMembers] = useState<number | null>(null);
+  const [jobCount, setJobCount] = useState<number | null>(null);
+  const [jobPanelOpen, setJobPanelOpen] = useState(false);
+  const [jobPreview, setJobPreview] = useState<Array<{ id: string; title: string; salary_min: number; salary_max: number; salary_currency: string; tier: string; seniority: string; role_type: string; company: { name: string } | null }>>([]);
   const [pillModalOpen, setPillModalOpen] = useState(false);
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
   const [eArcadeOpen, setEArcadeOpen] = useState(false);
@@ -583,6 +586,13 @@ function HomeContent() {
     fetch("https://discord.com/api/v9/invites/2bTjFAkny7?with_counts=true")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.approximate_member_count != null) setDiscordMembers(d.approximate_member_count); })
+      .catch(() => { });
+    fetch("/api/jobs?preview=true")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (d?.total != null) setJobCount(d.total);
+        if (Array.isArray(d?.listings)) setJobPreview(d.listings);
+      })
       .catch(() => { });
     const pkHost = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
     if (pkHost) {
@@ -2869,23 +2879,38 @@ function HomeContent() {
 
       {/* Shop & Auth moved to center buttons area */}
 
-      {/* ─── GitHub Badge (mobile: top-center, desktop: top-right) ─── */}
+      {/* ─── GitHub + Discord (top-left) ─── */}
       {!flyMode && !introMode && !rabbitCinematic && (
-        <div className={`pointer-events-auto fixed top-3 left-3 z-30 items-center gap-1.5 sm:gap-2 sm:left-auto sm:right-4 sm:top-4 ${exploreMode ? "hidden lg:flex" : "flex"}`}>
-          {/* GitHub stars — only when loaded */}
+        <div className={`pointer-events-auto fixed top-3 left-3 z-30 items-center gap-1.5 sm:gap-2 sm:top-4 sm:left-4 ${exploreMode ? "hidden lg:flex" : "flex"}`}>
+          {/* Mobile: Live + Jobs */}
+          <div className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm sm:hidden">
+            <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#ef4444]" />
+            <span className="text-cream">{liveUsers.toLocaleString()}</span>
+            <span className="text-muted">live</span>
+          </div>
+          {jobCount != null && jobCount > 0 && (
+            <Link
+              href="/jobs"
+              className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light sm:hidden"
+            >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#fbbf24]" />
+              <span className="text-cream">{jobCount}</span>
+              <span className="text-muted">{jobCount === 1 ? "job" : "jobs"}</span>
+            </Link>
+          )}
+          {/* Desktop: GitHub + Discord */}
           {starCount != null && (
             <a
               href="https://github.com/srizzon/git-city"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+              className="hidden sm:flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
               <span style={{ color: theme.accent }}>&#9733;</span>
               <span className="text-cream">{starCount.toLocaleString()}</span>
             </a>
           )}
-          {/* Discord — desktop only, goes in mobile menu */}
           <a
             href="https://discord.gg/2bTjFAkny7"
             target="_blank"
@@ -2896,23 +2921,19 @@ function HomeContent() {
             <span className="hidden sm:inline text-cream">Discord</span>
             {discordMembers != null && <span className="text-cream">{discordMembers.toLocaleString()}</span>}
           </a>
-          {/* Live users — desktop only */}
-          <div className="hidden sm:flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm">
-            <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#4ade80]" />
+        </div>
+      )}
+
+      {/* ─── Live + Coding + Jobs (top-right) ─── */}
+      {!flyMode && !introMode && !rabbitCinematic && (
+        <div className={`pointer-events-auto fixed top-3 right-3 z-30 items-center gap-1.5 sm:gap-2 sm:top-4 sm:right-4 ${exploreMode ? "hidden lg:flex" : "hidden sm:flex"}`}>
+          {/* Live users */}
+          <div className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm">
+            <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#ef4444]" />
             <span className="text-cream">{liveUsers.toLocaleString()}</span>
             <span className="text-muted">live</span>
           </div>
-          {/* Coding now — mobile: compact pulse badge; desktop: dropdown button */}
-          {codingCount > 0 && (
-            <button
-              onClick={() => setCodingInfoOpen(true)}
-              className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm sm:hidden"
-            >
-              <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#4ade80]" />
-              <span className="text-cream">{codingCount}</span>
-              <span className="text-muted">coding</span>
-            </button>
-          )}
+          {/* Coding now — desktop dropdown */}
           {(() => {
             const energyLabel = codingCount === 0 ? "City sleeping" : codingCount <= 2 ? "City waking up" : codingCount <= 9 ? "City alive" : "City buzzing";
             const energyDotColor = codingCount === 0 ? "bg-muted/50" : codingCount <= 2 ? "bg-[#fbbf24]" : "bg-[#4ade80]";
@@ -2920,14 +2941,14 @@ function HomeContent() {
             return (
               <div className="relative hidden sm:block">
                 <button
-                  onClick={() => setCodingPanelOpen((v) => !v)}
+                  onClick={() => { setCodingPanelOpen((v) => !v); setJobPanelOpen(false); }}
                   className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
                 >
                   <span className={`${energyDotAnim} h-1.5 w-1.5 flex-shrink-0 rounded-full ${energyDotColor}`} />
                   {codingCount > 0 ? (
                     <>
                       <span className="text-cream">{codingCount}</span>
-                      <span className="text-muted">coding now</span>
+                      <span className="text-muted">coding</span>
                     </>
                   ) : (
                     <span className="text-muted">{energyLabel}</span>
@@ -3102,6 +3123,96 @@ function HomeContent() {
               </div>
             );
           })()}
+          {/* Jobs — dropdown preview */}
+          {jobCount != null && jobCount > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => { setJobPanelOpen((v) => !v); setCodingPanelOpen(false); }}
+                className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+              >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#fbbf24]" />
+                <span className="text-cream">{jobCount}</span>
+                <span className="text-muted">{jobCount === 1 ? "job" : "jobs"}</span>
+              </button>
+              {jobPanelOpen && (
+                <div className="absolute right-0 top-full mt-1 w-80 border-[3px] border-border bg-bg/95 backdrop-blur-sm">
+                  <div className="border-b border-border px-5 py-3">
+                    <p className="text-xs text-cream">Jobs in the city</p>
+                    <p className="mt-0.5 text-[10px] normal-case text-muted">
+                      Real jobs from verified companies, exclusive to Git City developers.
+                    </p>
+                  </div>
+                  <div>
+                    {jobPreview.map((job) => (
+                      <Link
+                        key={job.id}
+                        href={`/jobs/${job.id}`}
+                        onClick={() => setJobPanelOpen(false)}
+                        className="flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            {job.tier === "premium" && (
+                              <span className="shrink-0 text-[8px] text-[#fbbf24]">★</span>
+                            )}
+                            {job.tier === "featured" && (
+                              <span className="shrink-0 text-[8px] text-[#c8e64a]">★</span>
+                            )}
+                            <span className="truncate text-[11px] text-cream">{job.title}</span>
+                          </div>
+                          <p className="truncate text-[10px] normal-case text-muted">
+                            {job.company?.name ?? "Company"} · {job.seniority} · {job.role_type}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-[10px] text-[#c8e64a]">
+                          {job.salary_currency} {job.salary_min.toLocaleString()}–{job.salary_max.toLocaleString()}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="border-t border-border">
+                    <Link
+                      href="/jobs"
+                      onClick={() => setJobPanelOpen(false)}
+                      className="block px-4 py-2.5 text-center text-[11px] text-muted transition-colors hover:text-cream"
+                    >
+                      {jobCount > 3 ? `View all ${jobCount} jobs` : "Browse all jobs"} &rarr;
+                    </Link>
+                  </div>
+                  {session ? (
+                    <div className="flex border-t border-border">
+                      <Link
+                        href={authLogin ? `/hire/${authLogin}` : "/hire/edit"}
+                        onClick={() => setJobPanelOpen(false)}
+                        className="flex-1 px-4 py-2.5 text-center text-[11px] text-[#c8e64a] transition-colors hover:bg-white/5"
+                      >
+                        My profile
+                      </Link>
+                      <div className="w-px bg-border" />
+                      <Link
+                        href="/jobs/my-applications"
+                        onClick={() => setJobPanelOpen(false)}
+                        className="flex-1 px-4 py-2.5 text-center text-[11px] text-muted transition-colors hover:text-cream hover:bg-white/5"
+                      >
+                        My applications
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="border-t border-border px-5 py-3.5 text-center">
+                      <Link
+                        href="/auth"
+                        onClick={() => setJobPanelOpen(false)}
+                        className="btn-press inline-block w-full py-2 text-center text-xs text-bg"
+                        style={{ backgroundColor: "#fbbf24", boxShadow: "2px 2px 0 0 #b45309" }}
+                      >
+                        Sign in to apply
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -3223,14 +3334,34 @@ function HomeContent() {
 
           {/* ── Nav ── */}
           <div className="flex-1 overflow-y-auto">
+            {/* ── City ── */}
+            <div className="px-5 pt-4 pb-1">
+              <p className="text-[9px] text-muted/50 uppercase tracking-[0.2em]">City</p>
+            </div>
             <div className="divide-y divide-border/40">
               <Link
-                href={shopHref}
+                href="/live"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
               >
-                <span className="text-sm text-cream">Shop</span>
-                <span className="text-xs text-muted" style={{ color: theme.accent }}>&#8594;</span>
+                <span className="flex items-center gap-2 text-sm text-cream">
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#ef4444] ${liveUsers > 0 ? "live-dot" : ""}`} />
+                  Live
+                  <span className="text-[10px] text-muted">{liveUsers.toLocaleString()} online</span>
+                </span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </Link>
+              <Link
+                href="/live"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
+              >
+                <span className="flex items-center gap-2 text-sm text-cream">
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#4ade80] ${codingCount > 0 ? "live-dot" : ""}`} />
+                  Coding
+                  {codingCount > 0 && <span className="text-[10px] text-muted">{codingCount} active</span>}
+                </span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
               <button
                 onClick={() => {
@@ -3242,58 +3373,86 @@ function HomeContent() {
                     setEArcadeOpen(true);
                   }
                 }}
-                className="flex w-full items-center justify-between px-5 py-4 active:bg-white/5"
+                className="flex w-full items-center justify-between px-5 py-3.5 active:bg-white/5"
               >
                 <span className="flex items-center gap-2 text-sm text-cream">
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#a78bfa] ${arcadeOnline > 0 ? "animate-pulse" : ""}`} />
                   Lobby
-                  {arcadeOnline > 0 && (
-                    <span className="flex items-center gap-1 text-[10px] text-muted">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#4ade80] animate-pulse" />
-                      {arcadeOnline} online
-                    </span>
-                  )}
+                  <span className="text-[10px] text-muted">{arcadeOnline} playing</span>
                 </span>
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </button>
+            </div>
+
+            {/* ── Explore ── */}
+            <div className="px-5 pt-5 pb-1">
+              <p className="text-[9px] text-muted/50 uppercase tracking-[0.2em]">Explore</p>
+            </div>
+            <div className="divide-y divide-border/40">
               <Link
-                href="/live"
+                href={shopHref}
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
               >
-                <span className="flex items-center gap-2 text-sm text-cream">
-                  {codingCount > 0 && <span className="live-dot h-2 w-2 rounded-full bg-[#4ade80]" />}
-                  Live
-                  {codingCount > 0 && (
-                    <span className="text-[10px] text-muted">{codingCount} coding now</span>
-                  )}
-                </span>
+                <span className="text-sm text-cream">Shop</span>
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
               <Link
                 href="/leaderboard"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
               >
-                <span className="text-sm text-cream">&#9819; Leaderboard</span>
+                <span className="text-sm text-cream">Leaderboard</span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </Link>
+            </div>
+
+            {/* ── Opportunities ── */}
+            <div className="px-5 pt-5 pb-1">
+              <p className="text-[9px] text-muted/50 uppercase tracking-[0.2em]">Opportunities</p>
+            </div>
+            <div className="divide-y divide-border/40">
+              <Link
+                href="/jobs"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
+              >
+                <span className="flex items-center gap-2 text-sm text-cream">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#fbbf24]" />
+                  Jobs
+                  {jobCount != null && jobCount > 0 && <span className="text-[10px] text-muted">{jobCount} open</span>}
+                </span>
+                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
+              </Link>
+              <Link
+                href="/jobs/refer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
+              >
+                <span className="text-sm text-cream">Hire developers</span>
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
               <Link
                 href="/advertise"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
               >
-                <span className="flex items-center gap-2 text-sm" style={{ color: theme.accent }}>
-                  Place your Ad
-                  <span className="px-1 py-px text-[8px] font-bold text-bg leading-none" style={{ backgroundColor: theme.accent }}>NEW</span>
-                </span>
+                <span className="text-sm text-cream">Place your Ad</span>
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
+            </div>
+
+            {/* ── Community ── */}
+            <div className="px-5 pt-5 pb-1">
+              <p className="text-[9px] text-muted/50 uppercase tracking-[0.2em]">Community</p>
+            </div>
+            <div className="divide-y divide-border/40">
               <a
                 href="https://discord.gg/2bTjFAkny7"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
               >
                 <span className="flex items-center gap-2 text-sm text-cream">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2] shrink-0"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z" /></svg>
@@ -3307,7 +3466,7 @@ function HomeContent() {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-between px-5 py-4 active:bg-white/5"
+                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
               >
                 <span className="flex items-center gap-2 text-sm text-cream">
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="text-cream shrink-0"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
@@ -3339,18 +3498,11 @@ function HomeContent() {
               </div>
             </div>
 
-            {/* ── Stats footer ── */}
-            <div className="border-t border-border px-5 py-4 flex items-center gap-4">
-              <div className="flex items-center gap-1.5 text-[10px] text-muted">
-                <span style={{ color: theme.accent }}>&#9733;</span>
-                <span className="text-cream">{starCount?.toLocaleString() ?? "..."}</span>
-                <span>stars</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted">
-                <span className="live-dot h-1.5 w-1.5 rounded-full bg-[#4ade80]" />
-                <span className="text-cream">{liveUsers.toLocaleString()}</span>
-                <span>online now</span>
-              </div>
+            {/* ── Footer ── */}
+            <div className="border-t border-border px-5 py-4">
+              <p className="text-[10px] text-muted/40 normal-case">
+                A city of {buildings.length.toLocaleString()} developers.
+              </p>
             </div>
           </div>
         </div>
