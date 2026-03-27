@@ -62,7 +62,7 @@ export default function JobDetailClient({ listingId }: { listingId: string }) {
 
   const handleCopyProfile = async () => {
     if (!data?.hasCareerProfile) {
-      window.location.href = `/jobs/career-profile?returnTo=/jobs/${listingId}`;
+      window.location.href = `/hire/edit?returnTo=/jobs/${listingId}`;
       return;
     }
     try {

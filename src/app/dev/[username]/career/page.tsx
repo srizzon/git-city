@@ -64,11 +64,34 @@ function daysAgo(dateStr: string): number {
 export default async function CareerPage({ params, searchParams }: Props) {
   const { username } = await params;
   const { saved, first } = await searchParams;
+
+  // Redirect to the new portfolio page
+  if (!saved && !first) {
+    const { redirect } = await import("next/navigation");
+    redirect(`/hire/${username}`);
+  }
+
   const dev = await getDeveloper(username);
   if (!dev) notFound();
 
+  // Check if the viewer is the profile owner
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  const viewerLogin = (
+    user?.user_metadata?.user_name ??
+    user?.user_metadata?.preferred_username ??
+    ""
+  ).toLowerCase();
+  const isOwner = viewerLogin === dev.github_login.toLowerCase();
+
   const profile = await getCareerProfile(dev.id);
-  if (!profile) notFound();
+  if (!profile) {
+    if (isOwner) {
+      const { redirect } = await import("next/navigation");
+      redirect("/hire/edit");
+    }
+    notFound();
+  }
 
   const achievements = await getAchievements(dev.id);
   const contribs = (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : (dev.contributions ?? 0);
@@ -99,7 +122,7 @@ export default async function CareerPage({ params, searchParams }: Props) {
               <Link href="/jobs" className="text-xs text-lime transition-colors hover:text-cream">
                 Browse Jobs
               </Link>
-              <Link href="/jobs/career-profile" className="text-xs text-muted transition-colors hover:text-cream">
+              <Link href="/hire/edit" className="text-xs text-muted transition-colors hover:text-cream">
                 Edit Profile
               </Link>
             </div>
@@ -116,6 +139,14 @@ export default async function CareerPage({ params, searchParams }: Props) {
             <p className="mt-3 border-[3px] border-yellow-500/40 bg-yellow-500/5 px-4 py-2 text-xs text-yellow-500 inline-block">
               Last updated {staleDays} days ago
             </p>
+          )}
+          {isOwner && (
+            <Link
+              href="/hire/edit"
+              className="mt-4 inline-block border-[3px] border-border px-4 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
+            >
+              Edit profile
+            </Link>
           )}
         </div>
 
