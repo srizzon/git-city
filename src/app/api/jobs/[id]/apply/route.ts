@@ -106,13 +106,13 @@ export async function POST(
     }
   }
 
-  // Build apply URL with UTMs (safe against invalid URLs)
+  // Build apply URL with UTMs — preserve existing params, don't overwrite
   let applyUrlStr = listing.apply_url;
   try {
     const applyUrl = new URL(listing.apply_url);
-    applyUrl.searchParams.set("utm_source", "gitcity");
-    applyUrl.searchParams.set("utm_medium", "jobs");
-    applyUrl.searchParams.set("ref", "gitcity");
+    if (!applyUrl.searchParams.has("utm_source")) applyUrl.searchParams.set("utm_source", "gitcity");
+    if (!applyUrl.searchParams.has("utm_medium")) applyUrl.searchParams.set("utm_medium", "jobs");
+    if (!applyUrl.searchParams.has("ref")) applyUrl.searchParams.set("ref", "gitcity");
     applyUrlStr = applyUrl.toString();
   } catch {
     // If URL parsing fails, use the raw URL

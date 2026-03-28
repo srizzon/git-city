@@ -121,7 +121,7 @@ interface FormData {
   benefits: string[];
   badgeResponse: boolean;
   badgeNoAi: boolean;
-  contractTypes: JobContract[];
+  contractType: JobContract;
   salaryCurrency: string;
   salaryPeriod: JobSalaryPeriod;
   salaryMin: string;
@@ -143,7 +143,7 @@ const DEFAULT_FORM: FormData = {
   benefits: [],
   badgeResponse: false,
   badgeNoAi: false,
-  contractTypes: ["fulltime"],
+  contractType: "fulltime",
   salaryCurrency: "USD",
   salaryPeriod: "annual",
   salaryMin: "",
@@ -193,13 +193,8 @@ export default function PostJobForm() {
     if (e.key === "Backspace" && !techInput && form.techTags.length > 0) removeTech(form.techTags[form.techTags.length - 1]);
   };
 
-  // Contract multi-select
-  const toggleContract = (c: JobContract) => {
-    const set = new Set(form.contractTypes);
-    if (set.has(c)) { set.delete(c); } else { set.add(c); }
-    if (set.size === 0) return; // at least one
-    update({ contractTypes: [...set] });
-  };
+  // Contract select
+  const selectContract = (c: JobContract) => update({ contractType: c });
 
   // Benefits toggle
   const toggleBenefit = (id: string) => {
@@ -267,7 +262,7 @@ export default function PostJobForm() {
           role_type: form.roleType,
           tech_stack: form.techTags,
           seniority: form.seniority,
-          contract_type: form.contractTypes[0],
+          contract_type: form.contractType,
           web_type: "both",
           apply_url: form.applyUrl,
           location_type: form.locationType,
@@ -545,9 +540,9 @@ export default function PostJobForm() {
         {/* ═══ STEP 4: COMPENSATION ═══ */}
         {step === 4 && (
           <div className="mt-8 border-[3px] border-border bg-bg-raised p-6 sm:p-8 space-y-8">
-            <Field label="Contract type" required hint="Select all that apply">
+            <Field label="Contract type" required>
               <div className="mt-3 flex flex-wrap gap-2">
-                {CONTRACT_OPTIONS.map((c) => <Chip key={c} active={form.contractTypes.includes(c)} onClick={() => toggleContract(c)}>{CONTRACT_LABELS[c]}</Chip>)}
+                {CONTRACT_OPTIONS.map((c) => <Chip key={c} active={form.contractType === c} onClick={() => selectContract(c)}>{CONTRACT_LABELS[c]}</Chip>)}
               </div>
             </Field>
 
@@ -599,7 +594,7 @@ export default function PostJobForm() {
                 <span className="text-xs text-dim ml-1">{SALARY_PERIOD_LABELS[form.salaryPeriod]}</span>
               </p>
               <p className="text-xs text-muted">
-                {form.contractTypes.map((c) => CONTRACT_LABELS[c]).join(", ")}
+                {CONTRACT_LABELS[form.contractType]}
               </p>
               <div className="flex flex-wrap gap-2">
                 {form.techTags.map((t) => (

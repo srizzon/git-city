@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { JobListing } from "@/lib/jobs/types";
+import DOMPurify from "isomorphic-dompurify";
 import {
   SENIORITY_LABELS,
   ROLE_TYPE_LABELS,
@@ -13,6 +14,11 @@ import {
   SALARY_PERIOD_LABELS,
   BENEFITS_LIST,
 } from "@/lib/jobs/constants";
+
+const SAFE_HTML = {
+  ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "h1", "h2", "h3", "blockquote", "code", "pre"],
+  ALLOWED_ATTR: ["href", "target", "rel"],
+};
 
 interface JobDetailData {
   listing: JobListing;
@@ -77,11 +83,14 @@ export default function JobDetailClient({ listingId }: { listingId: string }) {
 
   const handleReport = async () => {
     if (!reportReason) return;
-    await fetch(`/api/jobs/${listingId}/report`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: reportReason }),
-    });
+    try {
+      const res = await fetch(`/api/jobs/${listingId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reportReason }),
+      });
+      if (!res.ok) return;
+    } catch { return; }
     setReported(true);
     setShowReport(false);
   };
@@ -324,7 +333,7 @@ export default function JobDetailClient({ listingId }: { listingId: string }) {
             {/* Description */}
             <div className="border-[3px] border-border bg-bg-raised p-6 sm:p-8">
               <h2 className="text-xs text-muted/50 tracking-[0.15em] mb-5">About this role</h2>
-              <div className="tiptap text-sm text-cream-dark normal-case leading-relaxed" dangerouslySetInnerHTML={{ __html: job.description }} />
+              <div className="tiptap text-sm text-cream-dark normal-case leading-relaxed" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(job.description, SAFE_HTML) }} />
             </div>
 
             {/* Benefits */}
@@ -349,7 +358,7 @@ export default function JobDetailClient({ listingId }: { listingId: string }) {
             {job.how_to_apply && (
               <div className="border-[3px] border-border bg-bg-raised p-6 sm:p-8">
                 <h2 className="text-xs text-muted/50 tracking-[0.15em] mb-5">How to apply</h2>
-                <div className="tiptap text-sm text-cream-dark normal-case leading-relaxed" dangerouslySetInnerHTML={{ __html: job.how_to_apply }} />
+                <div className="tiptap text-sm text-cream-dark normal-case leading-relaxed" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(job.how_to_apply, SAFE_HTML) }} />
               </div>
             )}
 

@@ -54,13 +54,24 @@ export interface JobListing {
 
 export interface JobCompanyProfile {
   id: string;
-  advertiser_id: string;
+  advertiser_id: string | null;
   name: string;
   slug: string;
   logo_url: string | null;
   website: string;
   description: string | null;
   github_org: string | null;
+}
+
+export interface JobCompanyProfileAdmin extends JobCompanyProfile {
+  created_by: string | null;
+  hired_count: number;
+  last_dashboard_visit: string | null;
+  created_at: string;
+  updated_at: string;
+  advertiser_email?: string | null;
+  listings_count?: number;
+  active_count?: number;
 }
 
 export interface CareerProfile {

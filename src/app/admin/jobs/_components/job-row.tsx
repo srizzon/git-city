@@ -19,6 +19,9 @@ interface JobRowProps {
   onPause: () => void;
   onResume: () => void;
   onDelete: () => void;
+  onEdit: () => void;
+  onChangeTier: (tier: string) => void;
+  onExtend: () => void;
 }
 
 function fmtDate(d: string | null): string {
@@ -66,6 +69,9 @@ export function JobRow({
   onPause,
   onResume,
   onDelete,
+  onEdit,
+  onChangeTier,
+  onExtend,
 }: JobRowProps) {
   const status = job.status as JobStatus;
   const isPending = status === "pending_review";
@@ -212,6 +218,20 @@ export function JobRow({
                 {isActive && <button onClick={onPause} className="cursor-pointer border border-border px-4 py-2 text-xs text-muted transition-colors hover:text-cream">PAUSE</button>}
                 {isPaused && <button onClick={onResume} className="cursor-pointer border border-border px-4 py-2 text-xs text-muted transition-colors hover:text-lime">RESUME</button>}
                 {canDelete && <button onClick={onDelete} className="cursor-pointer border border-red-800/50 px-4 py-2 text-xs text-red-400 transition-colors hover:bg-red-900/20">DELETE</button>}
+                <button onClick={onEdit} className="cursor-pointer border border-lime/40 px-4 py-2 text-xs text-lime transition-colors hover:bg-lime/10">EDIT</button>
+                <select
+                  value={job.tier}
+                  onChange={(e) => onChangeTier(e.target.value)}
+                  className="cursor-pointer border border-border bg-bg px-3 py-2 text-xs text-muted outline-none hover:border-border-light hover:text-cream"
+                >
+                  <option value="free">FREE</option>
+                  <option value="standard">STANDARD</option>
+                  <option value="featured">FEATURED</option>
+                  <option value="premium">PREMIUM</option>
+                </select>
+                {(isActive || isPaused || status === "expired") && (
+                  <button onClick={onExtend} className="cursor-pointer border border-border px-4 py-2 text-xs text-muted transition-colors hover:border-lime hover:text-lime">+30D</button>
+                )}
                 <a href={`/jobs/${job.id}`} target="_blank" rel="noopener" className="border border-border px-4 py-2 text-xs text-muted transition-colors hover:text-cream">VIEW LISTING</a>
               </div>
 
