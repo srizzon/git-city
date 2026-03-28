@@ -17,6 +17,9 @@ interface JobTableProps {
   onPause: (id: string) => void;
   onResume: (id: string) => void;
   onDelete: (job: JobListingAdmin) => void;
+  onEdit: (job: JobListingAdmin) => void;
+  onChangeTier: (id: string, tier: string) => void;
+  onExtend: (id: string) => void;
 }
 
 function SkeletonRows() {
@@ -62,6 +65,9 @@ export function JobTable({
   onPause,
   onResume,
   onDelete,
+  onEdit,
+  onChangeTier,
+  onExtend,
 }: JobTableProps) {
   if (isFirstLoad && loading) {
     return <SkeletonRows />;
@@ -99,6 +105,9 @@ export function JobTable({
             onPause={() => onPause(job.id)}
             onResume={() => onResume(job.id)}
             onDelete={() => onDelete(job)}
+            onEdit={() => onEdit(job)}
+            onChangeTier={(tier) => onChangeTier(job.id, tier)}
+            onExtend={() => onExtend(job.id)}
           />
         ))}
       </div>

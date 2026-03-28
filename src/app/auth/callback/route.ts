@@ -202,20 +202,28 @@ export async function GET(request: Request) {
     }
   }
 
-  // Support ?next= param for post-login redirect (e.g. /shop)
+  // Support ?next= param for post-login redirect
   const next = searchParams.get("next");
-  if (next === "/shop" && githubLogin) {
-    const { data: dev } = await admin
-      .from("developers")
-      .select("github_login")
-      .eq("github_login", githubLogin)
-      .single();
+  if (next && githubLogin) {
+    // Special case: /shop redirects to /shop/{username}
+    if (next === "/shop") {
+      const { data: dev } = await admin
+        .from("developers")
+        .select("github_login")
+        .eq("github_login", githubLogin)
+        .single();
 
-    if (!dev) {
-      return NextResponse.redirect(`${origin}/?user=${githubLogin}`);
+      if (!dev) {
+        return NextResponse.redirect(`${origin}/?user=${githubLogin}`);
+      }
+
+      return NextResponse.redirect(`${origin}/shop/${githubLogin}`);
     }
 
-    return NextResponse.redirect(`${origin}/shop/${githubLogin}`);
+    // General redirect: only allow relative paths
+    if (next.startsWith("/")) {
+      return NextResponse.redirect(`${origin}${next}`);
+    }
   }
 
   return NextResponse.redirect(`${origin}/?user=${githubLogin}`);

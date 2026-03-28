@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import type { JobStatus } from "@/lib/jobs/types";
+import type { JobStatus, JobCompanyProfileAdmin } from "@/lib/jobs/types";
 import { JOB_TIERS } from "@/lib/jobs/constants";
 import type { JobListingAdmin } from "./job-row";
 import type { Toast } from "./toast";
@@ -12,6 +12,8 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { SummaryCards } from "./summary-cards";
 import { JobFilters as JobFiltersComponent } from "./job-filters";
 import { JobTable } from "./job-table";
+import { CompanyDashboard } from "./company-dashboard";
+import { JobForm } from "./job-form";
 
 // ─── Toast hook ─────────────────────────────────────────────
 function useToast() {
@@ -33,12 +35,18 @@ function useToast() {
   return { toasts, addToast, dismissToast };
 }
 
+type Tab = "listings" | "companies";
+
 // ─── Dashboard ──────────────────────────────────────────────
 export function JobsDashboard() {
   const { toasts, addToast, dismissToast } = useToast();
 
+  // Tab
+  const [tab, setTab] = useState<Tab>("listings");
+
   // Data
   const [jobs, setJobs] = useState<JobListingAdmin[]>([]);
+  const [companies, setCompanies] = useState<JobCompanyProfileAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +80,10 @@ export function JobsDashboard() {
     onConfirm: () => {},
   });
 
+  // Job form state
+  const [showJobForm, setShowJobForm] = useState(false);
+  const [editingJob, setEditingJob] = useState<JobListingAdmin | null>(null);
+
   // ─── Fetch ──────────────────────────────────────────────
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -87,9 +99,21 @@ export function JobsDashboard() {
     setLoading(false);
   }, []);
 
+  const fetchCompanies = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/companies");
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      setCompanies(data.companies ?? []);
+    } catch {
+      /* silent - companies loaded on demand */
+    }
+  }, []);
+
   useEffect(() => {
     fetchJobs();
-  }, [fetchJobs]);
+    fetchCompanies();
+  }, [fetchJobs, fetchCompanies]);
 
   // ─── Computed ───────────────────────────────────────────
   const pendingCount = useMemo(
@@ -115,12 +139,10 @@ export function JobsDashboard() {
   const filteredAndSorted = useMemo(() => {
     let result = [...jobs];
 
-    // Status filter
     if (filters.status !== "all") {
       result = result.filter((j) => j.status === filters.status);
     }
 
-    // Search
     if (filters.q.trim()) {
       const q = filters.q.toLowerCase();
       result = result.filter(
@@ -130,16 +152,11 @@ export function JobsDashboard() {
       );
     }
 
-    // Sort
     result.sort((a, b) => {
       const dir = filters.dir === "asc" ? 1 : -1;
       switch (filters.sort) {
         case "date":
-          return (
-            dir *
-            (new Date(a.created_at).getTime() -
-              new Date(b.created_at).getTime())
-          );
+          return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         case "salary":
           return dir * (a.salary_max - b.salary_max);
         case "views":
@@ -167,9 +184,7 @@ export function JobsDashboard() {
                   ...j,
                   status: "active" as JobStatus,
                   published_at: new Date().toISOString(),
-                  expires_at: new Date(
-                    Date.now() + 30 * 86400000,
-                  ).toISOString(),
+                  expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
                 }
               : j,
           ),
@@ -193,13 +208,7 @@ export function JobsDashboard() {
         if (!res.ok) throw new Error();
         setJobs((prev) =>
           prev.map((j) =>
-            j.id === id
-              ? {
-                  ...j,
-                  status: "rejected" as JobStatus,
-                  rejection_reason: reason,
-                }
-              : j,
+            j.id === id ? { ...j, status: "rejected" as JobStatus, rejection_reason: reason } : j,
           ),
         );
         addToast("success", "Listing rejected");
@@ -219,11 +228,7 @@ export function JobsDashboard() {
           body: JSON.stringify({ action: "pause" }),
         });
         if (!res.ok) throw new Error();
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === id ? { ...j, status: "paused" as JobStatus } : j,
-          ),
-        );
+        setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, status: "paused" as JobStatus } : j)));
         addToast("success", "Listing paused");
       } catch {
         addToast("error", "Failed to pause");
@@ -241,11 +246,7 @@ export function JobsDashboard() {
           body: JSON.stringify({ action: "resume" }),
         });
         if (!res.ok) throw new Error();
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === id ? { ...j, status: "active" as JobStatus } : j,
-          ),
-        );
+        setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, status: "active" as JobStatus } : j)));
         addToast("success", "Listing resumed");
       } catch {
         addToast("error", "Failed to resume");
@@ -272,6 +273,49 @@ export function JobsDashboard() {
     [addToast],
   );
 
+  const handleChangeTier = useCallback(
+    async (id: string, tier: string) => {
+      try {
+        const res = await fetch(`/api/admin/jobs/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "change_tier", tier }),
+        });
+        if (!res.ok) throw new Error();
+        setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, tier: tier as JobListingAdmin["tier"] } : j)));
+        addToast("success", `Tier changed to ${tier}`);
+      } catch {
+        addToast("error", "Failed to change tier");
+      }
+    },
+    [addToast],
+  );
+
+  const handleExtend = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/admin/jobs/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "extend", days: 30 }),
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === id
+              ? { ...j, expires_at: data.expires_at, status: "active" as JobStatus }
+              : j,
+          ),
+        );
+        addToast("success", "Extended by 30 days");
+      } catch {
+        addToast("error", "Failed to extend");
+      }
+    },
+    [addToast],
+  );
+
   // ─── Batch ──────────────────────────────────────────────
   const batchApprove = useCallback(async () => {
     const ids = Array.from(selectedIds);
@@ -280,9 +324,7 @@ export function JobsDashboard() {
       try {
         const res = await fetch(`/api/jobs/${id}/approve`, { method: "POST" });
         if (res.ok) ok++;
-      } catch {
-        /* skip */
-      }
+      } catch { /* skip */ }
     }
     if (ok > 0) {
       setJobs((prev) =>
@@ -292,9 +334,7 @@ export function JobsDashboard() {
                 ...j,
                 status: "active" as JobStatus,
                 published_at: new Date().toISOString(),
-                expires_at: new Date(
-                  Date.now() + 30 * 86400000,
-                ).toISOString(),
+                expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
               }
             : j,
         ),
@@ -309,9 +349,9 @@ export function JobsDashboard() {
     setConfirm({
       open: true,
       title: `Reject ${count} listings?`,
-      message:
-        "All selected pending listings will be rejected. This cannot be undone.",
+      message: "All selected pending listings will be rejected. This cannot be undone.",
       withReason: true,
+      destructive: true,
       onConfirm: async () => {
         const ids = Array.from(selectedIds);
         let ok = 0;
@@ -323,9 +363,7 @@ export function JobsDashboard() {
               body: JSON.stringify({ reason: "Batch rejection" }),
             });
             if (res.ok) ok++;
-          } catch {
-            /* skip */
-          }
+          } catch { /* skip */ }
         }
         if (ok > 0) {
           setJobs((prev) =>
@@ -347,8 +385,8 @@ export function JobsDashboard() {
     setConfirm({
       open: true,
       title: `Delete ${count} listings?`,
-      message:
-        "This permanently removes the selected listings. This action cannot be undone.",
+      message: "This permanently removes the selected listings. This action cannot be undone.",
+      destructive: true,
       onConfirm: async () => {
         const ids = Array.from(selectedIds);
         let ok = 0;
@@ -360,9 +398,7 @@ export function JobsDashboard() {
               body: JSON.stringify({ action: "delete" }),
             });
             if (res.ok) ok++;
-          } catch {
-            /* skip */
-          }
+          } catch { /* skip */ }
         }
         if (ok > 0) {
           setJobs((prev) => prev.filter((j) => !selectedIds.has(j.id)));
@@ -397,8 +433,7 @@ export function JobsDashboard() {
       setConfirm({
         open: true,
         title: "Approve this listing?",
-        message:
-          "The listing will go live immediately and expire in 30 days.",
+        message: "The listing will go live immediately and expire in 30 days.",
         onConfirm: () => handleApprove(id),
       });
     },
@@ -416,16 +451,12 @@ export function JobsDashboard() {
   );
 
   const requestPause = useCallback(
-    (id: string) => {
-      handlePause(id);
-    },
+    (id: string) => { handlePause(id); },
     [handlePause],
   );
 
   const requestResume = useCallback(
-    (id: string) => {
-      handleResume(id);
-    },
+    (id: string) => { handleResume(id); },
     [handleResume],
   );
 
@@ -434,17 +465,39 @@ export function JobsDashboard() {
       setConfirm({
         open: true,
         title: `Delete "${job.title}"?`,
-        message:
-          "This permanently removes the listing. This action cannot be undone.",
+        message: "This permanently removes the listing. This action cannot be undone.",
+        destructive: true,
         onConfirm: () => handleDelete(job.id),
       });
     },
     [handleDelete],
   );
 
+  const requestEdit = useCallback((job: JobListingAdmin) => {
+    setEditingJob(job);
+  }, []);
+
+  const requestExtend = useCallback(
+    (id: string) => {
+      setConfirm({
+        open: true,
+        title: "Extend by 30 days?",
+        message: "This will add 30 days to the expiry date. Expired/paused listings will be reactivated.",
+        onConfirm: () => handleExtend(id),
+      });
+    },
+    [handleExtend],
+  );
+
   const closeConfirm = useCallback(() => {
     setConfirm({ open: false, title: "", message: "", onConfirm: () => {} });
   }, []);
+
+  const handleJobFormSave = useCallback(() => {
+    setShowJobForm(false);
+    setEditingJob(null);
+    fetchJobs();
+  }, [fetchJobs]);
 
   return (
     <div className="min-h-screen bg-bg p-4 sm:p-6 lg:p-8">
@@ -453,9 +506,7 @@ export function JobsDashboard() {
         <div className="fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden bg-border">
           <div
             className="h-full w-1/3 bg-lime"
-            style={{
-              animation: "loading-slide 1s ease-in-out infinite",
-            }}
+            style={{ animation: "loading-slide 1s ease-in-out infinite" }}
           />
           <style>{`@keyframes loading-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }`}</style>
         </div>
@@ -469,15 +520,13 @@ export function JobsDashboard() {
         <ConfirmDialog state={confirm} onClose={closeConfirm} />
 
         {/* Header */}
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl text-cream">JOBS</h1>
             <p className="mt-1 text-xs text-muted">
               {jobs.length} listings total / {activeCount} active
               {pendingCount > 0 && (
-                <span className="ml-1 text-yellow-400">
-                  / {pendingCount} pending
-                </span>
+                <span className="ml-1 text-yellow-400">/ {pendingCount} pending</span>
               )}
             </p>
           </div>
@@ -498,83 +547,124 @@ export function JobsDashboard() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <SummaryCards
-          total={jobs.length}
-          pending={pendingCount}
-          active={activeCount}
-          revenue={revenue}
-        />
+        {/* Tabs */}
+        <div className="mb-6 flex items-center gap-0 border-b border-border">
+          <button
+            onClick={() => setTab("listings")}
+            className={`cursor-pointer border-b-2 px-4 py-2.5 text-xs transition-colors ${
+              tab === "listings"
+                ? "border-lime text-lime"
+                : "border-transparent text-muted hover:text-cream"
+            }`}
+          >
+            LISTINGS
+          </button>
+          <button
+            onClick={() => setTab("companies")}
+            className={`cursor-pointer border-b-2 px-4 py-2.5 text-xs transition-colors ${
+              tab === "companies"
+                ? "border-lime text-lime"
+                : "border-transparent text-muted hover:text-cream"
+            }`}
+          >
+            COMPANIES
+          </button>
+          {tab === "listings" && (
+            <button
+              onClick={() => setShowJobForm(true)}
+              className="ml-auto cursor-pointer border-2 border-lime px-4 py-1.5 text-xs text-lime transition-colors hover:bg-lime/10"
+            >
+              CREATE LISTING
+            </button>
+          )}
+        </div>
 
-        {/* Filters */}
-        <JobFiltersComponent
-          filters={filters}
-          setFilter={setFilter}
-          onRefresh={fetchJobs}
-          filteredCount={filteredAndSorted.length}
-          totalCount={jobs.length}
-        />
+        {/* Tab content */}
+        {tab === "listings" && (
+          <>
+            {/* Summary Cards */}
+            <SummaryCards
+              total={jobs.length}
+              pending={pendingCount}
+              active={activeCount}
+              revenue={revenue}
+            />
 
-        {/* Error */}
-        {error && (
-          <div className="mb-4 border border-red-800 bg-red-900/20 p-4 text-xs text-red-400">
-            {error}
-          </div>
+            {/* Filters */}
+            <JobFiltersComponent
+              filters={filters}
+              setFilter={setFilter}
+              onRefresh={fetchJobs}
+              filteredCount={filteredAndSorted.length}
+              totalCount={jobs.length}
+            />
+
+            {/* Error */}
+            {error && (
+              <div className="mb-4 border border-red-800 bg-red-900/20 p-4 text-xs text-red-400">
+                {error}
+              </div>
+            )}
+
+            {/* Batch Toolbar */}
+            {selectedIds.size > 0 && (
+              <div className="mb-4 flex items-center gap-3 border border-lime/30 bg-lime/5 px-4 py-3">
+                <span className="text-xs text-lime">{selectedIds.size} selected</span>
+                <div className="ml-auto flex gap-2">
+                  <button onClick={batchApprove} className="cursor-pointer border-2 border-lime px-3 py-1.5 text-[11px] text-lime transition-colors hover:bg-lime/10">APPROVE ALL</button>
+                  <button onClick={batchReject} className="cursor-pointer border border-red-800/50 px-3 py-1.5 text-[11px] text-red-400 transition-colors hover:bg-red-900/20">REJECT ALL</button>
+                  <button onClick={batchDelete} className="cursor-pointer border border-red-800/50 px-3 py-1.5 text-[11px] text-red-400 transition-colors hover:bg-red-900/20">DELETE ALL</button>
+                  <button onClick={() => setSelectedIds(new Set())} className="cursor-pointer px-3 py-1.5 text-[11px] text-dim transition-colors hover:text-cream">CLEAR</button>
+                </div>
+              </div>
+            )}
+
+            {/* Table */}
+            <JobTable
+              jobs={filteredAndSorted}
+              loading={loading}
+              isFirstLoad={isFirstLoad}
+              expandedId={expandedId}
+              selectedIds={selectedIds}
+              onToggleExpand={(id) => setExpandedId((prev) => (prev === id ? null : id))}
+              onToggleSelect={toggleSelect}
+              onSelectAll={selectAll}
+              onApprove={requestApprove}
+              onReject={requestRejectWithReason}
+              onPause={requestPause}
+              onResume={requestResume}
+              onDelete={requestDelete}
+              onEdit={requestEdit}
+              onChangeTier={handleChangeTier}
+              onExtend={requestExtend}
+            />
+          </>
         )}
 
-        {/* Batch Toolbar */}
-        {selectedIds.size > 0 && (
-          <div className="mb-4 flex items-center gap-3 border border-lime/30 bg-lime/5 px-4 py-3">
-            <span className="text-xs text-lime">
-              {selectedIds.size} selected
-            </span>
-            <div className="ml-auto flex gap-2">
-              <button
-                onClick={batchApprove}
-                className="cursor-pointer border-2 border-lime px-3 py-1.5 text-[11px] text-lime transition-colors hover:bg-lime/10"
-              >
-                APPROVE ALL
-              </button>
-              <button
-                onClick={batchReject}
-                className="cursor-pointer border border-red-800/50 px-3 py-1.5 text-[11px] text-red-400 transition-colors hover:bg-red-900/20"
-              >
-                REJECT ALL
-              </button>
-              <button
-                onClick={batchDelete}
-                className="cursor-pointer border border-red-800/50 px-3 py-1.5 text-[11px] text-red-400 transition-colors hover:bg-red-900/20"
-              >
-                DELETE ALL
-              </button>
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="cursor-pointer px-3 py-1.5 text-[11px] text-dim transition-colors hover:text-cream"
-              >
-                CLEAR
-              </button>
-            </div>
-          </div>
+        {tab === "companies" && (
+          <CompanyDashboard addToast={addToast} />
         )}
 
-        {/* Table */}
-        <JobTable
-          jobs={filteredAndSorted}
-          loading={loading}
-          isFirstLoad={isFirstLoad}
-          expandedId={expandedId}
-          selectedIds={selectedIds}
-          onToggleExpand={(id) =>
-            setExpandedId((prev) => (prev === id ? null : id))
-          }
-          onToggleSelect={toggleSelect}
-          onSelectAll={selectAll}
-          onApprove={requestApprove}
-          onReject={requestRejectWithReason}
-          onPause={requestPause}
-          onResume={requestResume}
-          onDelete={requestDelete}
-        />
+        {/* Job Form Modals */}
+        {showJobForm && (
+          <JobForm
+            mode="create"
+            companies={companies}
+            onSave={handleJobFormSave}
+            onClose={() => setShowJobForm(false)}
+            addToast={addToast}
+          />
+        )}
+        {editingJob && (
+          <JobForm
+            mode="edit"
+            listing={editingJob}
+            companies={companies}
+            onSave={handleJobFormSave}
+            onClose={() => setEditingJob(null)}
+            addToast={addToast}
+          />
+        )}
       </div>
     </div>
   );

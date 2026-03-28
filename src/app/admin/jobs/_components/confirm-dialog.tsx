@@ -7,6 +7,8 @@ export interface ConfirmState {
   onConfirm: () => void;
   /** Optional: show a text input for reason */
   withReason?: boolean;
+  /** Optional: use destructive (red) style. Default: positive (lime) */
+  destructive?: boolean;
 }
 
 interface ConfirmDialogProps {
@@ -54,7 +56,11 @@ export function ConfirmDialog({ state, onClose }: ConfirmDialogProps) {
           <button
             onClick={handleConfirm}
             disabled={state.withReason && !reason.trim()}
-            className="cursor-pointer border-2 border-red-800 bg-red-900/20 px-4 py-2 text-xs text-red-400 transition-colors hover:bg-red-900/40 disabled:opacity-30"
+            className={`cursor-pointer border-2 px-4 py-2 text-xs transition-colors disabled:opacity-30 ${
+              state.destructive
+                ? "border-red-800 bg-red-900/20 text-red-400 hover:bg-red-900/40"
+                : "border-lime text-lime hover:bg-lime/10"
+            }`}
           >
             CONFIRM
           </button>

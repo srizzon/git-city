@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import SignInButton from "./sign-in-button";
 
 export const metadata: Metadata = {
   title: "Shop - Git City",
@@ -93,7 +92,16 @@ export default async function ShopLanding() {
 
           {/* Sign in */}
           <div className="mt-8 flex flex-col items-center gap-3">
-            <SignInButton accent={ACCENT} />
+            <Link
+              href="/api/auth/github?redirect=/shop"
+              className="btn-press flex items-center gap-2 px-8 py-3.5 text-sm text-bg"
+              style={{
+                backgroundColor: ACCENT,
+                boxShadow: "4px 4px 0 0 #5a7a00",
+              }}
+            >
+              Sign in with GitHub
+            </Link>
             <p className="text-[8px] text-dim normal-case">
               We only read your public profile info
             </p>
