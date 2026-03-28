@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdvertiserFromCookies } from "@/lib/advertiser-auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import DOMPurify from "isomorphic-dompurify";
+
+const ALLOWED_HTML = {
+  ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "h1", "h2", "h3", "blockquote", "code", "pre"],
+  ALLOWED_ATTR: ["href", "target", "rel"],
+};
 
 export async function PATCH(
   req: NextRequest,
@@ -73,7 +79,9 @@ export async function PATCH(
     }
     case "edit": {
       const updates: Record<string, unknown> = {};
-      if (body.description) updates.description = body.description;
+      if (body.description && typeof body.description === "string") {
+        updates.description = DOMPurify.sanitize(body.description, ALLOWED_HTML);
+      }
       if (body.salary_min) updates.salary_min = body.salary_min;
       if (body.salary_max) updates.salary_max = body.salary_max;
       if (body.tech_stack) updates.tech_stack = body.tech_stack;

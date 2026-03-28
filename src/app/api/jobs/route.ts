@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
   const salaryMin = url.searchParams.get("salary_min");
   const seniority = url.searchParams.get("seniority");
   const contract = url.searchParams.get("contract");
+  const location = url.searchParams.get("location");
   const sort = url.searchParams.get("sort") ?? "recent";
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1"));
   const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get("limit") ?? "20")));
@@ -65,8 +66,20 @@ export async function GET(req: NextRequest) {
   if (web) {
     query = query.eq("web_type", web);
   }
+  if (location) {
+    const VALID_LOCATIONS = ["remote", "hybrid", "onsite"];
+    if (VALID_LOCATIONS.includes(location)) {
+      query = query.eq("location_type", location);
+    }
+  }
   if (role) {
-    query = query.eq("role_type", role);
+    const VALID_ROLES = ["frontend", "backend", "fullstack", "devops", "mobile", "data", "design", "cloud", "security", "qa", "ai_ml", "blockchain", "embedded", "sre", "gamedev", "engineering_manager", "other"];
+    const roles = role.split(",").filter((r) => VALID_ROLES.includes(r));
+    if (roles.length === 1) {
+      query = query.eq("role_type", roles[0]);
+    } else if (roles.length > 1) {
+      query = query.in("role_type", roles);
+    }
   }
   if (stack) {
     const tags = stack.split(",").map((s) => s.trim().toLowerCase());
@@ -76,10 +89,22 @@ export async function GET(req: NextRequest) {
     query = query.gte("salary_max", parseInt(salaryMin));
   }
   if (seniority) {
-    query = query.eq("seniority", seniority);
+    const VALID_SENIORITY = ["intern", "junior", "mid", "senior", "staff", "lead", "principal", "director"];
+    const levels = seniority.split(",").filter((s) => VALID_SENIORITY.includes(s));
+    if (levels.length === 1) {
+      query = query.eq("seniority", levels[0]);
+    } else if (levels.length > 1) {
+      query = query.in("seniority", levels);
+    }
   }
   if (contract) {
-    query = query.eq("contract_type", contract);
+    const VALID_CONTRACT = ["clt", "pj", "contract", "fulltime", "parttime", "freelance", "internship"];
+    const types = contract.split(",").filter((c) => VALID_CONTRACT.includes(c));
+    if (types.length === 1) {
+      query = query.eq("contract_type", types[0]);
+    } else if (types.length > 1) {
+      query = query.in("contract_type", types);
+    }
   }
 
   // Featured/premium listings pinned to top, then sort by user preference

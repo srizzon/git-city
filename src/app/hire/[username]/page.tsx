@@ -14,14 +14,11 @@ import {
   CONTRACT_LABELS,
   WEB_TYPE_LABELS,
 } from "@/lib/jobs/constants";
-import { RELATIONSHIP_LABELS } from "@/lib/portfolio/constants";
 import PortfolioProjects from "./PortfolioProjects";
 import PortfolioExperiences from "./PortfolioExperiences";
-import EndorseButton from "./EndorseButton";
 import type {
   PortfolioProject,
   PortfolioExperience,
-  EndorsementAggregate,
 } from "@/lib/portfolio/types";
 
 export const revalidate = 0;
@@ -45,37 +42,13 @@ const getPortfolio = cache(async (username: string) => {
 
   if (!dev) return null;
 
-  const [profileRes, projectsRes, experiencesRes, endorsementsRes, achievementsRes] =
+  const [profileRes, projectsRes, experiencesRes, achievementsRes] =
     await Promise.all([
       admin.from("career_profiles").select("*").eq("id", dev.id).maybeSingle(),
       admin.from("portfolio_projects").select("*").eq("developer_id", dev.id).order("sort_order").limit(6),
       admin.from("portfolio_experiences").select("*").eq("developer_id", dev.id).order("sort_order").limit(5),
-      admin
-        .from("portfolio_endorsements")
-        .select("skill_name, context_text, relationship, weight, created_at, endorser:developers!portfolio_endorsements_endorser_id_fkey(github_login, avatar_url, xp_level)")
-        .eq("developer_id", dev.id)
-        .eq("status", "approved")
-        .order("created_at", { ascending: false }),
       admin.from("developer_achievements").select("achievement_id, name:achievements(name), tier:achievements(tier)").eq("developer_id", dev.id),
     ]);
-
-  // Aggregate endorsements
-  const skillMap = new Map<string, { count: number; top: EndorsementAggregate["top"] }>();
-  for (const e of endorsementsRes.data ?? []) {
-    const existing = skillMap.get(e.skill_name) ?? { count: 0, top: [] };
-    existing.count++;
-    const endorser = Array.isArray(e.endorser) ? e.endorser[0] : e.endorser;
-    if (endorser && existing.top.length < 3) {
-      existing.top.push({
-        github_login: (endorser as { github_login: string }).github_login,
-        avatar_url: (endorser as { avatar_url: string | null }).avatar_url,
-        context_text: e.context_text,
-        relationship: e.relationship as EndorsementAggregate["top"][0]["relationship"],
-        xp_level: (endorser as { xp_level: number }).xp_level,
-      });
-    }
-    skillMap.set(e.skill_name, existing);
-  }
 
   const contribs = (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : (dev.contributions ?? 0);
 
@@ -84,10 +57,6 @@ const getPortfolio = cache(async (username: string) => {
     profile: profileRes.data,
     projects: (projectsRes.data ?? []) as PortfolioProject[],
     experiences: (experiencesRes.data ?? []) as PortfolioExperience[],
-    endorsements: Array.from(skillMap.entries())
-      .map(([skill, d]) => ({ skill, ...d }))
-      .sort((a, b) => b.count - a.count) as EndorsementAggregate[],
-    endorsement_count: endorsementsRes.data?.length ?? 0,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     achievements: (achievementsRes.data ?? []).map((a: any) => ({
       achievement_id: a.achievement_id as string,
@@ -123,7 +92,7 @@ export default async function PortfolioPage({ params }: Props) {
   const data = await getPortfolio(username);
   if (!data) notFound();
 
-  const { dev, profile, projects, experiences, endorsements, endorsement_count, achievements } = data;
+  const { dev, profile, projects, experiences, achievements } = data;
 
   // Owner detection
   const supabase = await createServerSupabase();
@@ -290,16 +259,6 @@ export default async function PortfolioPage({ params }: Props) {
 
             {/* Projects */}
             <PortfolioProjects projects={projects} isOwner={isOwner} />
-
-            {/* Endorsements */}
-            <EndorseButton
-              targetUsername={dev.github_login}
-              skills={profile?.skills ?? []}
-              endorsements={endorsements}
-              endorsementCount={endorsement_count}
-              isLoggedIn={!!user}
-              isOwner={isOwner}
-            />
 
             {/* Experience */}
             <PortfolioExperiences experiences={experiences} isOwner={isOwner} />

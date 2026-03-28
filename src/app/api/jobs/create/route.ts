@@ -3,10 +3,15 @@ import { getAdvertiserFromCookies } from "@/lib/advertiser-auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import DOMPurify from "isomorphic-dompurify";
 
-const VALID_ROLE_TYPES = ["frontend", "backend", "fullstack", "devops", "mobile", "data", "design", "other"];
-const VALID_SENIORITIES = ["junior", "mid", "senior", "staff", "lead"];
-const VALID_CONTRACTS = ["clt", "pj", "contract"];
+const VALID_ROLE_TYPES = ["frontend", "backend", "fullstack", "devops", "mobile", "data", "design", "cloud", "security", "qa", "ai_ml", "blockchain", "embedded", "sre", "gamedev", "engineering_manager", "other"];
+const VALID_SENIORITIES = ["intern", "junior", "mid", "senior", "staff", "lead", "principal", "director"];
+const VALID_CONTRACTS = ["clt", "pj", "contract", "fulltime", "parttime", "freelance", "internship"];
 const VALID_WEB = ["web2", "web3", "both"];
+const VALID_LOCATION_TYPES = ["remote", "hybrid", "onsite"];
+const VALID_LOCATION_RESTRICTIONS = ["worldwide", "americas", "europe", "asia", "africa", "oceania", "latam", "specific"];
+const VALID_SALARY_PERIODS = ["monthly", "annual"];
+const MAX_BENEFITS = 15;
+const MAX_HOW_TO_APPLY = 3000;
 const MAX_TITLE_LENGTH = 100;
 const MAX_TECH_TAGS = 15;
 const MAX_DESCRIPTION_LENGTH = 10000;
@@ -45,7 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { title, description, salary_min, salary_max, role_type, tech_stack, seniority, contract_type, web_type, apply_url } = body as Record<string, string | number | string[]>;
+  const { title, description, salary_min, salary_max, role_type, tech_stack, seniority, contract_type, web_type, apply_url, location_type, location_restriction, location_countries, location_city, location_timezone, benefits, how_to_apply, salary_period } = body as Record<string, string | number | string[] | boolean>;
 
   // ── Validation ──
   if (!title || typeof title !== "string" || title.length < 5) {
@@ -88,6 +93,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Apply URL must be a valid http/https URL" }, { status: 400 });
   }
 
+  // Location
+  const locType = (location_type as string) || "remote";
+  if (!VALID_LOCATION_TYPES.includes(locType)) return NextResponse.json({ error: "Invalid location type" }, { status: 400 });
+  const locRestriction = (location_restriction as string) || "worldwide";
+  if (!VALID_LOCATION_RESTRICTIONS.includes(locRestriction)) return NextResponse.json({ error: "Invalid location restriction" }, { status: 400 });
+  const locCountries = Array.isArray(location_countries) ? location_countries.slice(0, 20) : [];
+  const locCity = typeof location_city === "string" ? location_city.slice(0, 100) : null;
+  const locTimezone = typeof location_timezone === "string" ? location_timezone.slice(0, 50) : null;
+
+  // Benefits
+  const jobBenefits = Array.isArray(benefits) ? benefits.slice(0, MAX_BENEFITS) : [];
+
+  // How to apply
+  let cleanHowToApply: string | null = null;
+  if (how_to_apply && typeof how_to_apply === "string" && how_to_apply.trim().length > 0) {
+    if (how_to_apply.length > MAX_HOW_TO_APPLY) return NextResponse.json({ error: "How to apply is too long" }, { status: 400 });
+    cleanHowToApply = DOMPurify.sanitize(how_to_apply, {
+      ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "a", "ul", "ol", "li"],
+      ALLOWED_ATTR: ["href", "target", "rel"],
+    });
+  }
+
+  // Salary period
+  const salaryPeriod = VALID_SALARY_PERIODS.includes(salary_period as string) ? salary_period : "monthly";
+
   // ── Check for existing draft (prevent duplicates on retry) ──
   const { data: existingDraft } = await admin
     .from("job_listings")
@@ -106,12 +136,20 @@ export async function POST(req: NextRequest) {
         salary_min: minSalary,
         salary_max: maxSalary,
         salary_currency: (body.salary_currency as string) ?? "USD",
+        salary_period: salaryPeriod,
         role_type,
         tech_stack: (tech_stack as string[]).map((t) => t.toLowerCase().trim()),
         seniority,
         contract_type,
         web_type,
         apply_url,
+        location_type: locType,
+        location_restriction: locRestriction,
+        location_countries: locCountries,
+        location_city: locCity,
+        location_timezone: locTimezone,
+        benefits: jobBenefits,
+        how_to_apply: cleanHowToApply,
         language: (body.language as string) ?? "en",
         language_pt_br: (body.language_pt_br as string) ?? null,
         badge_response_guaranteed: (body.badge_response_guaranteed as boolean) ?? false,
@@ -138,12 +176,20 @@ export async function POST(req: NextRequest) {
       salary_min: minSalary,
       salary_max: maxSalary,
       salary_currency: (body.salary_currency as string) ?? "USD",
+      salary_period: salaryPeriod,
       role_type,
       tech_stack: (tech_stack as string[]).map((t) => t.toLowerCase().trim()),
       seniority,
       contract_type,
       web_type,
       apply_url,
+      location_type: locType,
+      location_restriction: locRestriction,
+      location_countries: locCountries,
+      location_city: locCity,
+      location_timezone: locTimezone,
+      benefits: jobBenefits,
+      how_to_apply: cleanHowToApply,
       language: (body.language as string) ?? "en",
       language_pt_br: (body.language_pt_br as string) ?? null,
       badge_response_guaranteed: (body.badge_response_guaranteed as boolean) ?? false,

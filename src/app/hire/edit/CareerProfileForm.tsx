@@ -298,8 +298,31 @@ export default function CareerProfileForm() {
   if (loading) {
     return (
       <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
-        <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-          <p className="text-muted">Loading...</p>
+        <div className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+          <div className="h-3 w-20 animate-pulse bg-border" />
+          <div className="mt-6 h-7 w-48 animate-pulse bg-border" />
+          <div className="mt-8 border-[3px] border-border bg-bg-raised p-6 sm:p-8 space-y-6">
+            <div className="space-y-2">
+              <div className="h-3 w-16 animate-pulse bg-border" />
+              <div className="h-10 w-full animate-pulse bg-border" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-3 w-20 animate-pulse bg-border" />
+              <div className="h-24 w-full animate-pulse bg-border" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-3 w-12 animate-pulse bg-border" />
+              <div className="flex gap-2">
+                <div className="h-9 w-20 animate-pulse bg-border" />
+                <div className="h-9 w-16 animate-pulse bg-border" />
+                <div className="h-9 w-18 animate-pulse bg-border" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2"><div className="h-3 w-16 animate-pulse bg-border" /><div className="h-10 w-full animate-pulse bg-border" /></div>
+              <div className="space-y-2"><div className="h-3 w-20 animate-pulse bg-border" /><div className="h-10 w-full animate-pulse bg-border" /></div>
+            </div>
+          </div>
         </div>
       </main>
     );
@@ -558,7 +581,7 @@ export default function CareerProfileForm() {
             <div className="mt-8 border-[3px] border-red-400/10 p-5">
               <h2 className="text-xs text-red-400/40 tracking-[0.15em] mb-3">Danger zone</h2>
               <p className="text-xs text-muted/40 normal-case mb-4">
-                Permanently delete your career profile. Your projects, experiences, and endorsements will also be removed. This cannot be undone.
+                Permanently delete your career profile. Your projects and experiences will also be removed. This cannot be undone.
               </p>
               <button
                 onClick={deleteProfile}

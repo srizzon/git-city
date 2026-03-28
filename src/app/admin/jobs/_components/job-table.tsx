@@ -74,20 +74,12 @@ export function JobTable({
     <div className={loading ? "opacity-60 transition-opacity" : ""}>
       {/* Table header */}
       {jobs.length > 0 && (
-        <div className="hidden border border-border bg-bg-raised px-4 py-2.5 md:grid md:grid-cols-[24px_minmax(0,2fr)_72px_80px_72px_80px_60px_60px_130px] md:items-center md:gap-3">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={onSelectAll}
-            className="cursor-pointer accent-lime"
-          />
+        <div className="hidden border border-border bg-bg-raised px-4 py-2.5 md:grid md:grid-cols-[minmax(0,2fr)_80px_90px_80px_80px_180px] md:items-center md:gap-3">
           <span className="text-xs text-muted">TITLE / COMPANY</span>
           <span className="text-right text-xs text-muted">STATUS</span>
           <span className="text-right text-xs text-muted">SALARY</span>
-          <span className="text-right text-xs text-muted">LEVEL</span>
           <span className="text-right text-xs text-muted">POSTED</span>
-          <span className="text-right text-xs text-muted">VIEWS</span>
-          <span className="text-right text-xs text-muted">APPLIES</span>
+          <span className="text-right text-xs text-muted">METRICS</span>
           <span className="text-right text-xs text-muted">ACTIONS</span>
         </div>
       )}

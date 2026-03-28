@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { JobListing } from "@/lib/jobs/types";
 import {
@@ -8,7 +9,12 @@ import {
   ROLE_TYPE_LABELS,
   CONTRACT_LABELS,
   WEB_TYPE_LABELS,
+  LOCATION_TYPE_LABELS,
+  LOCATION_RESTRICTION_LABELS,
+  SALARY_PERIOD_LABELS,
 } from "@/lib/jobs/constants";
+
+/* ─── Types ─── */
 
 interface JobsResponse {
   listings: JobListing[];
@@ -16,336 +22,504 @@ interface JobsResponse {
   page: number;
 }
 
-const ROLE_OPTIONS = ["frontend", "backend", "fullstack", "devops", "mobile", "data", "design", "other"] as const;
-const SENIORITY_OPTIONS = ["junior", "mid", "senior", "staff", "lead"] as const;
-const CONTRACT_OPTIONS = ["clt", "pj", "contract"] as const;
-const WEB_OPTIONS = ["web2", "web3", "both"] as const;
+/* ─── Filter options ─── */
 
-export default function JobBoardClient() {
+const ROLE_OPTIONS = [
+  "frontend", "backend", "fullstack", "mobile", "devops", "cloud", "sre",
+  "data", "ai_ml", "security", "qa", "blockchain", "embedded", "gamedev",
+  "design", "engineering_manager", "other",
+] as const;
+
+const SENIORITY_OPTIONS = ["intern", "junior", "mid", "senior", "staff", "lead", "principal", "director"] as const;
+
+const CONTRACT_OPTIONS = ["fulltime", "parttime", "clt", "pj", "contract", "freelance", "internship"] as const;
+
+const SALARY_BRACKETS = [
+  { label: "5k+", value: "5000" },
+  { label: "10k+", value: "10000" },
+  { label: "15k+", value: "15000" },
+  { label: "20k+", value: "20000" },
+  { label: "30k+", value: "30000" },
+] as const;
+
+/* ─── Helpers ─── */
+
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+function companyGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const h1 = Math.abs(hash % 360);
+  const h2 = (h1 + 40 + Math.abs((hash >> 8) % 60)) % 360;
+  return `linear-gradient(135deg, hsl(${h1}, 60%, 45%), hsl(${h2}, 50%, 35%))`;
+}
+
+function fmtSalary(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
+  return String(n);
+}
+
+/** Toggle a value in a Set-like comma string. Returns new string. */
+function toggleSet(current: string, value: string): string {
+  const set = new Set(current.split(",").filter(Boolean));
+  if (set.has(value)) set.delete(value);
+  else set.add(value);
+  return [...set].join(",");
+}
+
+function setHas(csv: string, value: string): boolean {
+  return csv.split(",").includes(value);
+}
+
+/* ─── URL Sync Hook ─── */
+
+function useUrlFilters() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const getParam = (key: string) => searchParams.get(key) ?? "";
+
+  const [q, setQ] = useState(getParam("q"));
+  const [roles, setRoles] = useState(getParam("role"));
+  const [seniorities, setSeniorities] = useState(getParam("seniority"));
+  const [contracts, setContracts] = useState(getParam("contract"));
+  const [location, setLocation] = useState(getParam("location"));
+  const [salaryMin, setSalaryMin] = useState(getParam("salary_min"));
+  const [sort, setSort] = useState(getParam("sort") || "recent");
+  const [page, setPage] = useState(parseInt(getParam("page") || "1"));
+
+  const syncUrl = useCallback(() => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (roles) p.set("role", roles);
+    if (seniorities) p.set("seniority", seniorities);
+    if (contracts) p.set("contract", contracts);
+    if (location) p.set("location", location);
+    if (salaryMin) p.set("salary_min", salaryMin);
+    if (sort && sort !== "recent") p.set("sort", sort);
+    if (page > 1) p.set("page", String(page));
+    const qs = p.toString();
+    router.replace(`/jobs${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [q, roles, seniorities, contracts, location, salaryMin, sort, page, router]);
+
+  useEffect(() => { syncUrl(); }, [syncUrl]);
+
+  const hasFilters = !!(roles || seniorities || contracts || location || salaryMin || q);
+  const filterCount = [roles, seniorities, contracts, location, salaryMin, q].filter(Boolean).length;
+
+  const clearAll = () => {
+    setQ(""); setRoles(""); setSeniorities(""); setContracts(""); setLocation("");
+    setSalaryMin(""); setSort("recent"); setPage(1);
+  };
+
+  return {
+    q, setQ,
+    roles, setRoles,
+    seniorities, setSeniorities,
+    contracts, setContracts,
+    location, setLocation,
+    salaryMin, setSalaryMin,
+    sort, setSort,
+    page, setPage,
+    hasFilters, filterCount, clearAll,
+  };
+}
+
+/* ─── Main ─── */
+
+export default function JobBoardClient({ username }: { username: string }) {
+  const filters = useUrlFilters();
   const [listings, setListings] = useState<JobListing[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  // Filters
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [role, setRole] = useState("");
-  const [seniority, setSeniority] = useState("");
-  const [contract, setContract] = useState("");
-  const [salaryMin, setSalaryMin] = useState("");
-  const [web, setWeb] = useState("");
-  const [sort, setSort] = useState("recent");
+  const [debouncedQ, setDebouncedQ] = useState(filters.q);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // Debounce search
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+    const t = setTimeout(() => setDebouncedQ(filters.q), 300);
+    return () => clearTimeout(t);
+  }, [filters.q]);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
     setError(false);
-    const params = new URLSearchParams();
-    if (debouncedSearch) params.set("q", debouncedSearch);
-    if (role) params.set("role", role);
-    if (seniority) params.set("seniority", seniority);
-    if (contract) params.set("contract", contract);
-    if (web) params.set("web", web);
-    if (salaryMin) params.set("salary_min", salaryMin);
-    if (sort !== "recent") params.set("sort", sort);
-    params.set("page", String(page));
-
+    const p = new URLSearchParams();
+    if (debouncedQ) p.set("q", debouncedQ);
+    if (filters.roles) p.set("role", filters.roles);
+    if (filters.seniorities) p.set("seniority", filters.seniorities);
+    if (filters.contracts) p.set("contract", filters.contracts);
+    if (filters.location) p.set("location", filters.location);
+    if (filters.salaryMin) p.set("salary_min", filters.salaryMin);
+    if (filters.sort !== "recent") p.set("sort", filters.sort);
+    p.set("page", String(filters.page));
     try {
-      const res = await fetch(`/api/jobs?${params}`);
+      const res = await fetch(`/api/jobs?${p}`);
       if (!res.ok) throw new Error();
       const data: JobsResponse = await res.json();
       setListings(data.listings);
       setTotal(data.total);
-    } catch {
-      setError(true);
-    }
+    } catch { setError(true); }
     setLoading(false);
-  }, [debouncedSearch, role, seniority, contract, web, salaryMin, sort, page]);
+  }, [debouncedQ, filters.roles, filters.seniorities, filters.contracts, filters.location, filters.salaryMin, filters.sort, filters.page]);
 
-  useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+  useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
-  // Reset page when filters change
+  // Reset page on filter change
   useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, role, seniority, contract, web, salaryMin, sort]);
+    filters.setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQ, filters.roles, filters.seniorities, filters.contracts, filters.location, filters.salaryMin, filters.sort]);
 
   const totalPages = Math.ceil(total / 20);
-  const hasFilters = !!(role || seniority || contract || web || salaryMin || debouncedSearch);
 
-  const clearFilters = () => {
-    setSearch(""); setRole(""); setSeniority(""); setContract("");
-    setWeb(""); setSalaryMin(""); setSort("recent");
-  };
+  // Build active pills
+  const activePills: Array<{ label: string; onClear: () => void }> = [];
+  for (const r of filters.roles.split(",").filter(Boolean)) {
+    activePills.push({ label: ROLE_TYPE_LABELS[r] ?? r, onClear: () => filters.setRoles(toggleSet(filters.roles, r)) });
+  }
+  for (const s of filters.seniorities.split(",").filter(Boolean)) {
+    activePills.push({ label: SENIORITY_LABELS[s] ?? s, onClear: () => filters.setSeniorities(toggleSet(filters.seniorities, s)) });
+  }
+  for (const c of filters.contracts.split(",").filter(Boolean)) {
+    activePills.push({ label: CONTRACT_LABELS[c] ?? c, onClear: () => filters.setContracts(toggleSet(filters.contracts, c)) });
+  }
+  if (filters.location) {
+    activePills.push({ label: LOCATION_TYPE_LABELS[filters.location] ?? filters.location, onClear: () => filters.setLocation("") });
+  }
+  if (filters.salaryMin) {
+    activePills.push({ label: `${(parseInt(filters.salaryMin) / 1000).toFixed(0)}k+`, onClear: () => filters.setSalaryMin("") });
+  }
 
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+
+        {/* ─── Header ─── */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Link href="/" className="text-xs text-muted transition-colors hover:text-cream">
-              &lt; Back to city
-            </Link>
-            <h1 className="mt-3 text-2xl text-lime sm:text-3xl">
-              Git City Jobs
-            </h1>
-            <p className="mt-1 text-sm text-muted">
-              {total} open position{total !== 1 ? "s" : ""} · real devs. real jobs.
-            </p>
+            <Link href="/" className="text-[10px] text-dim transition-colors hover:text-muted">&larr; Back to City</Link>
+            <h1 className="mt-3 text-3xl text-lime sm:text-4xl">Jobs</h1>
+            <p className="mt-1 text-xs text-muted normal-case">Real devs. Real jobs. No robots in between.</p>
           </div>
           <div className="flex gap-2">
-            <Link
-              href="/hire/edit"
-              className="btn-press border-[3px] border-border px-4 py-2 text-xs text-cream transition-colors hover:border-border-light"
-            >
-              Career Profile
-            </Link>
-            <Link
-              href="/jobs/my-applications"
-              className="btn-press border-[3px] border-border px-4 py-2 text-xs text-cream transition-colors hover:border-border-light"
-            >
-              My Applications
+            <Link href={username ? `/hire/${username}` : "/hire/edit"} className="border-[3px] border-border px-3 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream">
+              My Profile
             </Link>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="mt-6">
+        {/* ─── Search + Filter toggle ─── */}
+        <div className="mt-8 flex gap-2">
           <input
             type="text"
-            placeholder="Search jobs..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search jobs, companies, tech..."
+            value={filters.q}
+            onChange={(e) => filters.setQ(e.target.value)}
             aria-label="Search jobs"
-            className="w-full border-[3px] border-border bg-bg-raised px-5 py-3 text-sm text-cream normal-case outline-none placeholder:text-dim focus-visible:border-lime"
+            className="flex-1 border-[3px] border-border bg-bg-raised px-4 py-3.5 text-xs text-cream normal-case outline-none placeholder:text-dim focus-visible:border-lime transition-colors"
           />
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className="cursor-pointer border-[3px] px-5 py-3.5 text-xs transition-colors"
+            style={{
+              borderColor: filtersOpen || filters.hasFilters ? "#c8e64a" : "var(--color-border)",
+              color: filtersOpen || filters.hasFilters ? "#c8e64a" : "var(--color-muted)",
+              backgroundColor: filtersOpen || filters.hasFilters ? "rgba(200,230,74,0.05)" : "var(--color-bg-raised)",
+            }}
+          >
+            Filter{filters.filterCount > 0 ? ` (${filters.filterCount})` : ""}
+          </button>
         </div>
 
-        {/* Filters — all chips, no native selects */}
-        <div className="mt-4 space-y-3">
-          {/* Row 1: Role chips */}
-          <div className="flex flex-wrap gap-1.5">
-            {ROLE_OPTIONS.map((r) => (
-              <FilterChip key={r} active={role === r} onClick={() => setRole(role === r ? "" : r)}>
-                {ROLE_TYPE_LABELS[r]}
-              </FilterChip>
-            ))}
-          </div>
-
-          {/* Row 2: Seniority + Contract + Sort */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {SENIORITY_OPTIONS.map((s) => (
-              <FilterChip key={s} active={seniority === s} onClick={() => setSeniority(seniority === s ? "" : s)}>
-                {SENIORITY_LABELS[s]}
-              </FilterChip>
-            ))}
-
-            <span className="mx-1 h-4 w-px bg-border/50" />
-
-            {CONTRACT_OPTIONS.map((c) => (
-              <FilterChip key={c} active={contract === c} onClick={() => setContract(contract === c ? "" : c)}>
-                {CONTRACT_LABELS[c]}
-              </FilterChip>
-            ))}
-
-            <span className="mx-1 h-4 w-px bg-border/50" />
-
-            {WEB_OPTIONS.map((w) => (
-              <FilterChip key={w} active={web === w} onClick={() => setWeb(web === w ? "" : w)}>
-                {WEB_TYPE_LABELS[w]}
-              </FilterChip>
-            ))}
-
-            <span className="mx-1 h-4 w-px bg-border/50" />
-
-            <FilterChip active={sort === "salary"} onClick={() => setSort(sort === "salary" ? "recent" : "salary")}>
-              Highest Salary
-            </FilterChip>
-          </div>
-
-          {/* Row 3: Salary min + Clear */}
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              placeholder="Min salary..."
-              value={salaryMin}
-              onChange={(e) => setSalaryMin(e.target.value)}
-              aria-label="Minimum salary filter"
-              className="w-32 border-[3px] border-border bg-bg-raised px-3 py-2 text-xs text-cream normal-case outline-none placeholder:text-dim focus-visible:border-lime"
-            />
-            {hasFilters && (
-              <button
-                onClick={clearFilters}
-                className="text-xs text-muted transition-colors hover:text-cream"
-              >
-                Clear filters
-              </button>
+        {/* ─── Filters panel ─── */}
+        {filtersOpen && (
+          <div className="mt-3 border-[3px] border-border bg-bg-raised p-5 space-y-5" style={{ animation: "fade-in 0.15s ease-out" }}>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <FilterGroup label="Role">
+                {ROLE_OPTIONS.map((r) => (
+                  <Chip key={r} active={setHas(filters.roles, r)} onClick={() => filters.setRoles(toggleSet(filters.roles, r))}>
+                    {ROLE_TYPE_LABELS[r]}
+                  </Chip>
+                ))}
+              </FilterGroup>
+              <FilterGroup label="Seniority">
+                {SENIORITY_OPTIONS.map((s) => (
+                  <Chip key={s} active={setHas(filters.seniorities, s)} onClick={() => filters.setSeniorities(toggleSet(filters.seniorities, s))}>
+                    {SENIORITY_LABELS[s]}
+                  </Chip>
+                ))}
+              </FilterGroup>
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              <FilterGroup label="Contract">
+                {CONTRACT_OPTIONS.map((c) => (
+                  <Chip key={c} active={setHas(filters.contracts, c)} onClick={() => filters.setContracts(toggleSet(filters.contracts, c))}>
+                    {CONTRACT_LABELS[c]}
+                  </Chip>
+                ))}
+              </FilterGroup>
+              <FilterGroup label="Location">
+                {(["remote", "hybrid", "onsite"] as const).map((l) => (
+                  <Chip key={l} active={filters.location === l} onClick={() => filters.setLocation(filters.location === l ? "" : l)}>
+                    {LOCATION_TYPE_LABELS[l]}
+                  </Chip>
+                ))}
+              </FilterGroup>
+              <FilterGroup label="Min Salary">
+                {SALARY_BRACKETS.map((b) => (
+                  <Chip key={b.value} active={filters.salaryMin === b.value} onClick={() => filters.setSalaryMin(filters.salaryMin === b.value ? "" : b.value)}>
+                    {b.label}
+                  </Chip>
+                ))}
+              </FilterGroup>
+            </div>
+            {filters.hasFilters && (
+              <div className="border-t border-border/30 pt-4 text-right">
+                <button onClick={filters.clearAll} className="text-[10px] text-dim transition-colors hover:text-muted">Clear all filters</button>
+              </div>
             )}
           </div>
+        )}
+
+        {/* ─── Active pills (when panel closed) ─── */}
+        {!filtersOpen && activePills.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {activePills.map((p) => (
+              <ActivePill key={p.label} label={p.label} onClear={p.onClear} />
+            ))}
+            <button onClick={filters.clearAll} className="text-[10px] text-dim transition-colors hover:text-muted">Clear</button>
+          </div>
+        )}
+
+        {/* ─── Results header + Sort ─── */}
+        <div className="mt-6 flex items-center justify-between">
+          <p className="text-[10px] text-dim">
+            {loading ? "Loading..." : `Showing ${listings.length} of ${total}`}
+          </p>
+          <div className="flex gap-1">
+            <SortChip active={filters.sort === "recent"} onClick={() => filters.setSort("recent")}>Newest</SortChip>
+            <SortChip active={filters.sort === "salary"} onClick={() => filters.setSort("salary")}>Top Salary</SortChip>
+          </div>
         </div>
 
-        {/* Results */}
-        <div ref={resultsRef} className="mt-6" aria-live="polite">
+        {/* ─── Job grid ─── */}
+        <div ref={resultsRef} className="mt-4" aria-live="polite">
           {loading ? (
-            /* Skeleton loading */
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="border-[3px] border-border bg-bg-raised p-5">
-                  <div className="h-4 w-2/3 animate-pulse bg-border" />
-                  <div className="mt-2 h-3 w-1/3 animate-pulse bg-border" />
-                  <div className="mt-2 flex gap-1">
-                    <div className="h-5 w-16 animate-pulse bg-border" />
-                    <div className="h-5 w-12 animate-pulse bg-border" />
-                  </div>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
             </div>
           ) : error ? (
-            <div className="border-[3px] border-red-500/30 bg-red-500/5 p-8 text-center space-y-4">
-              <p className="text-sm text-red-400 normal-case">Failed to load jobs</p>
-              <button
-                onClick={fetchJobs}
-                className="btn-press border-[3px] border-border px-5 py-2 text-xs text-cream"
-              >
-                Try Again
-              </button>
+            <div className="border-[3px] border-red-500/30 bg-red-500/5 p-12 text-center space-y-3">
+              <p className="text-xs text-red-400 normal-case">Failed to load jobs</p>
+              <button onClick={fetchJobs} className="btn-press border-[3px] border-border px-5 py-2.5 text-xs text-cream">Try Again</button>
             </div>
           ) : listings.length === 0 ? (
-            <div className="border-[3px] border-border bg-bg-raised p-10 text-center space-y-4">
+            <div className="border-[3px] border-border bg-bg-raised p-14 text-center space-y-5">
               <p className="text-sm text-muted">No jobs match your filters.</p>
-              {hasFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="btn-press border-[3px] border-border px-5 py-2 text-xs text-cream"
-                >
-                  Clear Filters
-                </button>
+              {filters.hasFilters && (
+                <button onClick={filters.clearAll} className="btn-press border-[3px] border-border px-5 py-2.5 text-xs text-cream">Clear Filters</button>
               )}
-              <div>
-                <Link
-                  href="/hire/edit"
-                  className="btn-press inline-block bg-lime px-6 py-3 text-xs text-bg"
-                  style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}
-                >
+              <div className="pt-2">
+                <Link href="/hire/edit" className="btn-press inline-block bg-lime px-6 py-3 text-xs text-bg" style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}>
                   Create Career Profile
                 </Link>
                 <p className="mt-2 text-[10px] text-dim normal-case">Be ready when jobs drop</p>
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {listings.map((job) => (
-                <Link
-                  key={job.id}
-                  href={`/jobs/${job.id}`}
-                  aria-label={`${job.title} at ${job.company?.name ?? "Company"} — ${job.salary_currency} ${job.salary_min.toLocaleString()}–${job.salary_max.toLocaleString()}`}
-                  className="block border-[3px] border-border bg-bg-raised p-5 transition-colors hover:border-border-light"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        {(job.tier === "featured" || job.tier === "premium") && (
-                          <span
-                            className="shrink-0 border-2 px-1.5 py-0.5 text-[10px]"
-                            style={{
-                              borderColor: job.tier === "premium" ? "#fbbf24" : "#c8e64a",
-                              color: job.tier === "premium" ? "#fbbf24" : "#c8e64a",
-                            }}
-                          >
-                            {job.tier === "premium" ? "Premium" : "Featured"}
-                          </span>
-                        )}
-                        <h3 className="truncate text-sm text-cream">{job.title}</h3>
-                      </div>
-                      <p className="text-xs text-muted">
-                        {job.company?.name ?? "Company"} · {SENIORITY_LABELS[job.seniority]} · {WEB_TYPE_LABELS[job.web_type]}
-                      </p>
-                      <div className="flex flex-wrap gap-1 pt-0.5">
-                        {job.tech_stack.slice(0, 6).map((tag) => (
-                          <span
-                            key={tag}
-                            className="border-2 px-1.5 py-0.5 text-[10px]"
-                            style={{ borderColor: "rgba(200,230,74,0.2)", color: "#c8e64a" }}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {job.tech_stack.length > 6 && (
-                          <span className="px-1.5 py-0.5 text-[10px] text-dim">
-                            +{job.tech_stack.length - 6}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-sm text-lime">
-                        {job.salary_currency} {job.salary_min.toLocaleString()}–{job.salary_max.toLocaleString()}
-                        <span className="text-[10px] text-dim ml-1">/mo</span>
-                      </p>
-                      <div className="mt-1.5 flex justify-end gap-2 text-[10px] text-dim">
-                        {job.badge_response_guaranteed && <span>Response OK</span>}
-                        {job.badge_no_ai_screening && <span>No AI</span>}
-                        <span>Verified</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                <JobCard key={job.id} job={job} />
               ))}
             </div>
           )}
         </div>
 
-        {/* Pagination */}
+        {/* ─── Pagination ─── */}
         {totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-center gap-3">
+          <div className="mt-10 flex items-center justify-center gap-4">
             <button
-              onClick={() => { setPage(Math.max(1, page - 1)); resultsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-              disabled={page === 1}
-              className="btn-press border-[3px] border-border px-4 py-2 text-xs text-cream disabled:opacity-30"
+              onClick={() => { filters.setPage(Math.max(1, filters.page - 1)); resultsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+              disabled={filters.page === 1}
+              className="btn-press border-[3px] border-border px-5 py-2.5 text-xs text-cream disabled:opacity-30"
             >
               Prev
             </button>
-            <span className="px-3 py-2 text-xs text-muted">
-              {page} / {totalPages}
-            </span>
+            <span className="text-xs text-muted">{filters.page} / {totalPages}</span>
             <button
-              onClick={() => { setPage(Math.min(totalPages, page + 1)); resultsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-              disabled={page === totalPages}
-              className="btn-press border-[3px] border-border px-4 py-2 text-xs text-cream disabled:opacity-30"
+              onClick={() => { filters.setPage(Math.min(totalPages, filters.page + 1)); resultsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+              disabled={filters.page === totalPages}
+              className="btn-press border-[3px] border-border px-5 py-2.5 text-xs text-cream disabled:opacity-30"
             >
               Next
             </button>
           </div>
         )}
+
+        <div className="h-12" />
       </div>
+
     </main>
   );
 }
 
-/* ── Filter chip ── */
-function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+/* ─── Job Card ─── */
+
+function JobCard({ job }: { job: JobListing }) {
+  const companyName = job.company?.name ?? "Company";
+  const isPremium = job.tier === "premium";
+  const isFeatured = job.tier === "featured";
+  const accent = isPremium ? "#fbbf24" : "#c8e64a";
+
+  let wrapClass = "border-[3px] border-border bg-bg-raised";
+  let wrapStyle: React.CSSProperties = {};
+
+  if (isPremium) {
+    wrapClass = "border-[3px] border-[#fbbf24]/30";
+    wrapStyle = {
+      background: "linear-gradient(180deg, rgba(251,191,36,0.05) 0%, rgba(251,191,36,0.01) 100%)",
+      boxShadow: "0 0 0 1px rgba(251,191,36,0.08), 0 0 24px rgba(251,191,36,0.04)",
+    };
+  } else if (isFeatured) {
+    wrapClass = "border-[3px] border-lime/20";
+    wrapStyle = {
+      background: "rgba(200,230,74,0.02)",
+      boxShadow: "0 0 0 1px rgba(200,230,74,0.06)",
+    };
+  }
+
   return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className="border-[3px] px-3 py-1.5 text-xs transition-colors"
-      style={{
-        borderColor: active ? "#c8e64a" : "var(--color-border)",
-        color: active ? "#c8e64a" : "var(--color-muted)",
-        backgroundColor: active ? "rgba(200,230,74,0.08)" : "transparent",
-      }}
-    >
+    <div className={`${wrapClass} p-6`} style={wrapStyle}>
+      {/* Company + badge */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <CompanyAvatar name={companyName} logoUrl={job.company?.logo_url} website={job.company?.website} />
+          <div className="min-w-0">
+            <p className="text-xs text-cream truncate">{companyName}</p>
+            <p className="text-[10px] text-dim">{timeAgo(job.published_at)}</p>
+          </div>
+        </div>
+        {(isPremium || isFeatured) && (
+          <span className="shrink-0 border-[2px] px-2 py-0.5 text-[8px]" style={{ borderColor: `${accent}50`, color: accent }}>
+            {isPremium ? "Premium" : "Featured"}
+          </span>
+        )}
+      </div>
+
+      {/* Title */}
+      <h3 className="mt-4 text-sm text-cream leading-snug sm:text-base">{job.title}</h3>
+
+      {/* Tags */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <TagPill>{LOCATION_TYPE_LABELS[job.location_type] ?? "Remote"}{job.location_type === "remote" && job.location_restriction && job.location_restriction !== "worldwide" ? ` (${LOCATION_RESTRICTION_LABELS[job.location_restriction]})` : ""}</TagPill>
+        <TagPill>{SENIORITY_LABELS[job.seniority]}</TagPill>
+        <TagPill>{CONTRACT_LABELS[job.contract_type]}</TagPill>
+      </div>
+
+      {/* Tech */}
+      {job.tech_stack.length > 0 && (
+        <p className="mt-2.5 text-[9px] text-dim normal-case truncate">
+          {job.tech_stack.slice(0, 5).join(" · ")}
+          {job.tech_stack.length > 5 && ` +${job.tech_stack.length - 5}`}
+        </p>
+      )}
+
+      {/* Bottom: Salary + View */}
+      <div className="mt-5 flex items-end justify-between border-t border-border/30 pt-4">
+        <div>
+          <p className="text-sm" style={{ color: accent }}>
+            {job.salary_currency} {fmtSalary(job.salary_min)}-{fmtSalary(job.salary_max)}
+            <span className="text-[10px] text-dim ml-1">{SALARY_PERIOD_LABELS[job.salary_period] ?? "/mo"}</span>
+          </p>
+          {(job.badge_response_guaranteed || job.badge_no_ai_screening || job.apply_count > 0) && (
+            <div className="mt-1 flex items-center gap-2 text-[9px] text-dim">
+              {job.badge_response_guaranteed && <span>Response OK</span>}
+              {job.badge_no_ai_screening && <span>No AI</span>}
+              {job.apply_count > 0 && <span>{job.apply_count} applied</span>}
+            </div>
+          )}
+        </div>
+        <Link
+          href={`/jobs/${job.id}`}
+          className="btn-press border-[3px] border-border px-4 py-2 text-[10px] text-cream transition-colors hover:border-border-light"
+        >
+          View
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Shared ─── */
+
+function CompanyAvatar({ name, logoUrl, website }: { name: string; logoUrl?: string | null; website?: string | null }) {
+  const src = (() => {
+    if (logoUrl) return logoUrl;
+    if (!website) return null;
+    try { return `https://www.google.com/s2/favicons?domain=${new URL(website).hostname}&sz=128`; }
+    catch { return null; }
+  })();
+  if (src) {
+    return <img src={src} alt={`${name} logo`} className="h-10 w-10 shrink-0 border-[2px] border-border/40 object-cover bg-white/5" />;
+  }
+  return (
+    <div className="h-10 w-10 shrink-0 flex items-center justify-center text-sm font-bold border-[2px] border-border/40 text-white/80" style={{ background: companyGradient(name) }}>
+      {name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
+function TagPill({ children }: { children: React.ReactNode }) {
+  return <span className="border-[2px] border-border px-2.5 py-1 text-[10px] text-muted">{children}</span>;
+}
+
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} aria-pressed={active} className="cursor-pointer border-[2px] px-2.5 py-1 text-[10px] transition-colors"
+      style={{ borderColor: active ? "#c8e64a" : "var(--color-border)", color: active ? "#c8e64a" : "var(--color-muted)", backgroundColor: active ? "rgba(200,230,74,0.08)" : "transparent" }}>
       {children}
     </button>
+  );
+}
+
+function SortChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button onClick={onClick} className="cursor-pointer px-2 py-0.5 text-[10px] transition-colors" style={{ color: active ? "#c8e64a" : "var(--color-dim)" }}>{children}</button>;
+}
+
+function ActivePill({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <button onClick={onClear} className="flex items-center gap-1 border-[2px] border-lime/20 bg-lime/[0.06] px-2.5 py-1 text-[10px] text-lime transition-colors hover:border-lime/40">
+      {label} <span className="text-lime/40">&times;</span>
+    </button>
+  );
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div><p className="text-[10px] text-dim tracking-widest mb-2">{label}</p><div className="flex flex-wrap gap-1.5">{children}</div></div>;
+}
+
+function SkeletonCard() {
+  return (
+    <div className="border-[3px] border-border bg-bg-raised p-6 space-y-4">
+      <div className="flex items-center gap-3"><div className="h-10 w-10 animate-pulse bg-border" /><div className="space-y-1.5 flex-1"><div className="h-3 w-24 animate-pulse bg-border" /><div className="h-2.5 w-16 animate-pulse bg-border" /></div></div>
+      <div className="h-5 w-4/5 animate-pulse bg-border" />
+      <div className="flex gap-1.5"><div className="h-5 w-16 animate-pulse bg-border" /><div className="h-5 w-14 animate-pulse bg-border" /><div className="h-5 w-12 animate-pulse bg-border" /></div>
+      <div className="flex items-center justify-between border-t border-border/30 pt-4"><div className="h-4 w-24 animate-pulse bg-border" /><div className="h-8 w-16 animate-pulse bg-border" /></div>
+    </div>
   );
 }

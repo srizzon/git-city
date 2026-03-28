@@ -1,11 +1,14 @@
 // src/lib/jobs/types.ts
 
 export type JobStatus = "draft" | "pending_review" | "active" | "paused" | "filled" | "expired" | "rejected";
-export type JobTier = "standard" | "featured" | "premium";
-export type JobSeniority = "junior" | "mid" | "senior" | "staff" | "lead";
-export type JobContract = "clt" | "pj" | "contract";
+export type JobTier = "free" | "standard" | "featured" | "premium";
+export type JobSeniority = "intern" | "junior" | "mid" | "senior" | "staff" | "lead" | "principal" | "director";
+export type JobContract = "clt" | "pj" | "contract" | "fulltime" | "parttime" | "freelance" | "internship";
 export type JobWeb = "web2" | "web3" | "both";
-export type JobRoleType = "frontend" | "backend" | "fullstack" | "devops" | "mobile" | "data" | "design" | "other";
+export type JobRoleType = "frontend" | "backend" | "fullstack" | "devops" | "mobile" | "data" | "design" | "cloud" | "security" | "qa" | "ai_ml" | "blockchain" | "embedded" | "sre" | "gamedev" | "engineering_manager" | "other";
+export type JobLocationType = "remote" | "hybrid" | "onsite";
+export type JobLocationRestriction = "worldwide" | "americas" | "europe" | "asia" | "africa" | "oceania" | "latam" | "specific";
+export type JobSalaryPeriod = "monthly" | "annual";
 
 export interface JobListing {
   id: string;
@@ -15,11 +18,19 @@ export interface JobListing {
   salary_min: number;
   salary_max: number;
   salary_currency: string;
+  salary_period: JobSalaryPeriod;
   role_type: JobRoleType;
   tech_stack: string[];
   seniority: JobSeniority;
   contract_type: JobContract;
   web_type: JobWeb;
+  location_type: JobLocationType;
+  location_restriction: JobLocationRestriction;
+  location_countries: string[];
+  location_city: string | null;
+  location_timezone: string | null;
+  benefits: string[];
+  how_to_apply: string | null;
   apply_url: string;
   language: string;
   language_pt_br: string | null;

@@ -85,19 +85,9 @@ export function JobRow({
     <div className="border border-t-0 border-border first:border-t bg-bg-raised transition-colors hover:bg-bg-card">
       {/* Main row */}
       <div
-        className="cursor-pointer px-4 py-2.5 md:grid md:grid-cols-[24px_minmax(0,2fr)_72px_80px_72px_80px_60px_60px_130px] md:items-center md:gap-3"
+        className="cursor-pointer px-4 py-2.5 md:grid md:grid-cols-[minmax(0,2fr)_80px_90px_80px_80px_180px] md:items-center md:gap-3"
         onClick={onToggleExpand}
       >
-        {/* Checkbox */}
-        <div className="hidden md:block" onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={onToggleSelect}
-            className="cursor-pointer accent-lime"
-          />
-        </div>
-
         {/* Title + Company */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -109,7 +99,7 @@ export function JobRow({
             </span>
           </div>
           <p className="mt-0.5 truncate text-[11px] text-muted">
-            {job.company?.name}
+            {job.company?.name} · {SENIORITY_LABELS[job.seniority] ?? job.seniority}
           </p>
         </div>
 
@@ -123,24 +113,14 @@ export function JobRow({
           {fmtSalary(job.salary_min, job.salary_max, job.salary_currency)}
         </p>
 
-        {/* Tier (text) */}
-        <p className="hidden text-right text-xs text-muted md:block">
-          {SENIORITY_LABELS[job.seniority] ?? job.seniority}
-        </p>
-
         {/* Posted */}
         <p className="hidden text-right text-xs tabular-nums text-dim md:block">
           {fmtDateShort(job.published_at || job.created_at)}
         </p>
 
-        {/* Views */}
+        {/* Metrics */}
         <p className="hidden text-right text-xs tabular-nums text-cream md:block">
-          {job.view_count.toLocaleString()}
-        </p>
-
-        {/* Applies */}
-        <p className="hidden text-right text-xs tabular-nums text-cream md:block">
-          {job.apply_count.toLocaleString()}
+          {job.view_count}v / {job.apply_count}a
         </p>
 
         {/* Actions */}
@@ -200,201 +180,119 @@ export function JobRow({
         </div>
       </div>
 
-      {/* Expanded details */}
+      {/* Modal */}
       {isExpanded && (
-        <div className="border-t border-border/50 px-4 py-5">
-          {/* Description */}
-          <div className="mb-5 border border-border bg-bg p-4">
-            <p className="mb-2 text-[10px] text-dim">DESCRIPTION</p>
-            <div
-              className="tiptap text-xs text-cream-dark normal-case leading-relaxed max-h-64 overflow-y-auto"
-              dangerouslySetInnerHTML={{ __html: job.description }}
-            />
-          </div>
-
-          {/* Info grid */}
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
-            <div>
-              <span className="text-xs text-dim">Role type</span>
-              <p className="mt-1 text-sm text-cream">
-                {ROLE_TYPE_LABELS[job.role_type] ?? job.role_type}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">Seniority</span>
-              <p className="mt-1 text-sm text-cream">
-                {SENIORITY_LABELS[job.seniority] ?? job.seniority}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">Contract</span>
-              <p className="mt-1 text-sm text-cream">
-                {CONTRACT_LABELS[job.contract_type] ?? job.contract_type}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">Web type</span>
-              <p className="mt-1 text-sm text-cream">
-                {WEB_TYPE_LABELS[job.web_type] ?? job.web_type}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">Salary</span>
-              <p className="mt-1 text-sm text-lime">
-                {job.salary_currency} {job.salary_min.toLocaleString()} - {job.salary_max.toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">Published</span>
-              <p className="mt-1 text-sm text-cream">{fmtDate(job.published_at)}</p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">Expires</span>
-              <p className={`mt-1 text-sm ${expiryColor}`}>
-                {fmtDate(job.expires_at)}
-                {job.expires_at && (
-                  <span className="ml-1 text-[11px]">({expiryLabel})</span>
-                )}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">Stats</span>
-              <p className="mt-1 text-sm text-cream">
-                {job.view_count} views / {job.apply_count} applies / {job.profile_count} profiles
-              </p>
-            </div>
-          </div>
-
-          {/* Tech stack */}
-          {job.tech_stack.length > 0 && (
-            <div className="mt-4">
-              <span className="text-xs text-dim">TECH STACK</span>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {job.tech_stack.map((tag) => (
-                  <span
-                    key={tag}
-                    className="border border-lime/20 px-2 py-0.5 text-xs text-lime"
-                  >
-                    {tag}
-                  </span>
-                ))}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onToggleExpand}>
+          <div className="absolute inset-0 bg-black/70" />
+          <div
+            className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto bg-bg border-[3px] border-border no-scrollbar"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg px-5 py-3">
+              <div className="min-w-0">
+                <h2 className="text-sm text-cream truncate">{job.title}</h2>
+                <p className="text-xs text-muted">{job.company?.name} · {job.tier.toUpperCase()}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                <StatusBadge status={status} />
+                <button onClick={onToggleExpand} className="text-xs text-dim hover:text-cream cursor-pointer ml-2">ESC</button>
               </div>
             </div>
-          )}
 
-          {/* Trust badges */}
-          {(job.badge_response_guaranteed || job.badge_no_ai_screening) && (
-            <div className="mt-4 flex gap-2">
-              {job.badge_response_guaranteed && (
-                <span className="border border-lime/30 px-2 py-0.5 text-xs text-lime">
-                  Response Guaranteed
-                </span>
-              )}
-              {job.badge_no_ai_screening && (
-                <span className="border border-lime/30 px-2 py-0.5 text-xs text-lime">
-                  No AI Screening
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Links + Rejection */}
-          <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-3 border-t border-border/50 pt-4 sm:grid-cols-4">
-            <div>
-              <span className="text-xs text-dim">Apply URL</span>
-              <p className="mt-1 truncate text-sm">
-                <a
-                  href={job.apply_url}
-                  target="_blank"
-                  rel="noopener"
-                  className="text-lime hover:underline"
-                >
-                  {job.apply_url.replace(/^https?:\/\/(www\.)?/, "")}
-                </a>
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">Company website</span>
-              <p className="mt-1 truncate text-sm">
-                {job.company?.website ? (
-                  <a
-                    href={job.company.website}
-                    target="_blank"
-                    rel="noopener"
-                    className="text-lime hover:underline"
-                  >
-                    {job.company.website.replace(/^https?:\/\/(www\.)?/, "")}
-                  </a>
-                ) : (
-                  <span className="text-muted">-</span>
+            <div className="p-5 space-y-5">
+              {/* Actions bar */}
+              <div className="flex flex-wrap gap-2">
+                {isPending && (
+                  <>
+                    <button onClick={onApprove} className="cursor-pointer border-2 border-lime px-4 py-2 text-xs text-lime transition-colors hover:bg-lime/10">APPROVE</button>
+                    <button onClick={onReject} className="cursor-pointer border border-red-800/50 px-4 py-2 text-xs text-red-400 transition-colors hover:bg-red-900/20">REJECT</button>
+                  </>
                 )}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">Stripe Session</span>
-              <p className="mt-1 truncate text-xs text-muted font-mono">
-                {job.stripe_session_id || "-"}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-dim">ID</span>
-              <p className="mt-1 truncate text-xs text-muted font-mono">{job.id}</p>
-            </div>
-          </div>
+                {isActive && <button onClick={onPause} className="cursor-pointer border border-border px-4 py-2 text-xs text-muted transition-colors hover:text-cream">PAUSE</button>}
+                {isPaused && <button onClick={onResume} className="cursor-pointer border border-border px-4 py-2 text-xs text-muted transition-colors hover:text-lime">RESUME</button>}
+                {canDelete && <button onClick={onDelete} className="cursor-pointer border border-red-800/50 px-4 py-2 text-xs text-red-400 transition-colors hover:bg-red-900/20">DELETE</button>}
+                <a href={`/jobs/${job.id}`} target="_blank" rel="noopener" className="border border-border px-4 py-2 text-xs text-muted transition-colors hover:text-cream">VIEW LISTING</a>
+              </div>
 
-          {/* Rejection reason */}
-          {job.rejection_reason && (
-            <div className="mt-3 border border-red-800/30 bg-red-900/10 p-3">
-              <span className="text-[10px] text-red-400">REJECTION REASON</span>
-              <p className="mt-1 text-xs text-red-300 normal-case">{job.rejection_reason}</p>
-            </div>
-          )}
+              {/* Info grid */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <InfoCell label="Role">{ROLE_TYPE_LABELS[job.role_type] ?? job.role_type}</InfoCell>
+                <InfoCell label="Seniority">{SENIORITY_LABELS[job.seniority] ?? job.seniority}</InfoCell>
+                <InfoCell label="Contract">{CONTRACT_LABELS[job.contract_type] ?? job.contract_type}</InfoCell>
+                <InfoCell label="Web">{WEB_TYPE_LABELS[job.web_type] ?? job.web_type}</InfoCell>
+                <InfoCell label="Salary" accent>{job.salary_currency} {job.salary_min.toLocaleString()} - {job.salary_max.toLocaleString()}</InfoCell>
+                <InfoCell label="Published">{fmtDate(job.published_at)}</InfoCell>
+                <InfoCell label="Expires"><span className={expiryColor}>{fmtDate(job.expires_at)} {job.expires_at && `(${expiryLabel})`}</span></InfoCell>
+                <InfoCell label="Stats">{job.view_count}v / {job.apply_count}a / {job.profile_count}p</InfoCell>
+              </div>
 
-          {/* Mobile actions */}
-          <div className="mt-4 flex flex-wrap gap-2 md:hidden">
-            {isPending && (
-              <>
-                <button
-                  onClick={onApprove}
-                  className="cursor-pointer border-2 border-lime px-4 py-1.5 text-xs text-lime transition-colors hover:bg-lime/10"
-                >
-                  APPROVE
-                </button>
-                <button
-                  onClick={onReject}
-                  className="cursor-pointer border border-red-800/50 px-4 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-900/20"
-                >
-                  REJECT
-                </button>
-              </>
-            )}
-            {isActive && (
-              <button
-                onClick={onPause}
-                className="cursor-pointer border border-border px-4 py-1.5 text-xs text-muted transition-colors hover:text-cream"
-              >
-                PAUSE
-              </button>
-            )}
-            {isPaused && (
-              <button
-                onClick={onResume}
-                className="cursor-pointer border border-border px-4 py-1.5 text-xs text-muted transition-colors hover:text-lime"
-              >
-                RESUME
-              </button>
-            )}
-            {canDelete && (
-              <button
-                onClick={onDelete}
-                className="cursor-pointer border border-red-800/50 px-4 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-900/20"
-              >
-                DELETE
-              </button>
-            )}
+              {/* Tech stack */}
+              {job.tech_stack.length > 0 && (
+                <div>
+                  <p className="text-xs text-dim mb-2">TECH STACK</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {job.tech_stack.map((tag) => <span key={tag} className="border border-lime/20 px-2 py-0.5 text-xs text-lime">{tag}</span>)}
+                  </div>
+                </div>
+              )}
+
+              {/* Badges */}
+              {(job.badge_response_guaranteed || job.badge_no_ai_screening) && (
+                <div className="flex gap-2">
+                  {job.badge_response_guaranteed && <span className="border border-lime/30 px-2 py-0.5 text-xs text-lime">Response Guaranteed</span>}
+                  {job.badge_no_ai_screening && <span className="border border-lime/30 px-2 py-0.5 text-xs text-lime">No AI Screening</span>}
+                </div>
+              )}
+
+              {/* Description */}
+              <div className="border border-border bg-bg-raised p-4">
+                <p className="text-xs text-dim mb-2">DESCRIPTION</p>
+                <div className="tiptap text-xs text-cream-dark normal-case leading-relaxed max-h-80 overflow-y-auto scrollbar-thin" dangerouslySetInnerHTML={{ __html: job.description }} />
+              </div>
+
+              {/* Links */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-border/50 pt-4">
+                <div>
+                  <p className="text-xs text-dim">Apply URL</p>
+                  <a href={job.apply_url} target="_blank" rel="noopener" className="mt-1 block text-xs text-lime hover:underline truncate">{job.apply_url.replace(/^https?:\/\/(www\.)?/, "")}</a>
+                </div>
+                <div>
+                  <p className="text-xs text-dim">Company</p>
+                  {job.company?.website ? (
+                    <a href={job.company.website} target="_blank" rel="noopener" className="mt-1 block text-xs text-lime hover:underline truncate">{job.company.website.replace(/^https?:\/\/(www\.)?/, "")}</a>
+                  ) : <p className="mt-1 text-xs text-muted">-</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-dim">Stripe</p>
+                  <p className="mt-1 text-xs text-muted font-mono truncate">{job.stripe_session_id || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-dim">ID</p>
+                  <p className="mt-1 text-xs text-muted font-mono truncate">{job.id}</p>
+                </div>
+              </div>
+
+              {/* Rejection */}
+              {job.rejection_reason && (
+                <div className="border border-red-800/30 bg-red-900/10 p-3">
+                  <p className="text-[10px] text-red-400">REJECTION REASON</p>
+                  <p className="mt-1 text-xs text-red-300 normal-case">{job.rejection_reason}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function InfoCell({ label, accent, children }: { label: string; accent?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="border border-border bg-bg-raised p-2.5">
+      <p className="text-[10px] text-dim">{label}</p>
+      <p className={`mt-0.5 text-xs ${accent ? "text-lime" : "text-cream"}`}>{children}</p>
     </div>
   );
 }

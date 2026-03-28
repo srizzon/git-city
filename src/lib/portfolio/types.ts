@@ -30,39 +30,3 @@ export interface PortfolioExperience {
   created_at: string;
 }
 
-export type EndorsementStatus = "pending" | "approved" | "hidden";
-export type EndorsementRelationship =
-  | "worked_together"
-  | "managed_by"
-  | "mentored"
-  | "open_source"
-  | "other";
-
-export interface PortfolioEndorsement {
-  id: string;
-  developer_id: number;
-  endorser_id: number;
-  skill_name: string;
-  context_text: string;
-  relationship: EndorsementRelationship;
-  status: EndorsementStatus;
-  weight: number;
-  created_at: string;
-  endorser?: {
-    github_login: string;
-    avatar_url: string | null;
-    xp_level: number;
-  };
-}
-
-export interface EndorsementAggregate {
-  skill: string;
-  count: number;
-  top: Array<{
-    github_login: string;
-    avatar_url: string | null;
-    context_text: string;
-    relationship: EndorsementRelationship;
-    xp_level: number;
-  }>;
-}

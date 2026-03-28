@@ -8,63 +8,149 @@ import {
   SENIORITY_LABELS,
   ROLE_TYPE_LABELS,
   CONTRACT_LABELS,
+  LOCATION_TYPE_LABELS,
+  LOCATION_RESTRICTION_LABELS,
+  SALARY_PERIOD_LABELS,
+  BENEFITS_LIST,
   JOB_TIERS,
 } from "@/lib/jobs/constants";
-import type { JobTier, JobSeniority, JobContract, JobRoleType } from "@/lib/jobs/types";
+import type { JobTier, JobSeniority, JobContract, JobRoleType, JobLocationType, JobLocationRestriction, JobSalaryPeriod } from "@/lib/jobs/types";
 
-const SENIORITY_OPTIONS: JobSeniority[] = ["junior", "mid", "senior", "staff", "lead"];
-const ROLE_OPTIONS: JobRoleType[] = ["frontend", "backend", "fullstack", "devops", "mobile", "data", "design", "other"];
-const CONTRACT_OPTIONS: JobContract[] = ["clt", "pj", "contract"];
-const TIER_OPTIONS: JobTier[] = ["standard", "featured", "premium"];
+/* ─── Options ─── */
 
-const TIER_DESCRIPTIONS: Record<JobTier, string> = {
-  standard: "Listed on the job board for 30 days",
-  featured: "Pinned to the top for 7 days + highlighted",
-  premium: "Pinned + highlighted + weekly digest + Discord announcement",
-};
+const ROLE_OPTIONS: JobRoleType[] = [
+  "frontend", "backend", "fullstack", "mobile", "devops", "cloud", "sre",
+  "data", "ai_ml", "security", "qa", "blockchain", "embedded", "gamedev",
+  "design", "engineering_manager", "other",
+];
+const SENIORITY_OPTIONS: JobSeniority[] = ["intern", "junior", "mid", "senior", "staff", "lead", "principal", "director"];
+const CONTRACT_OPTIONS: JobContract[] = ["fulltime", "parttime", "clt", "pj", "contract", "freelance", "internship"];
+const LOCATION_OPTIONS: JobLocationType[] = ["remote", "hybrid", "onsite"];
+const RESTRICTION_OPTIONS: JobLocationRestriction[] = ["worldwide", "americas", "europe", "asia", "latam", "africa", "oceania", "specific"];
+const CURRENCY_OPTIONS = ["USD", "BRL", "EUR", "GBP"] as const;
+const SALARY_PERIOD_OPTIONS: JobSalaryPeriod[] = ["monthly", "annual"];
+const LANGUAGE_OPTIONS = [
+  { id: "en", label: "English" },
+  { id: "pt", label: "Portuguese" },
+  { id: "es", label: "Spanish" },
+] as const;
 
 const STEPS = [
-  { id: 1, label: "The Basics" },
-  { id: 2, label: "Details" },
-  { id: 3, label: "The Offer" },
-  { id: 4, label: "Review" },
+  { id: 1, label: "The Job" },
+  { id: 2, label: "Description" },
+  { id: 3, label: "Tech & Perks" },
+  { id: 4, label: "Compensation" },
+  { id: 5, label: "Review" },
 ] as const;
 
 const LS_KEY = "gc_post_job_draft";
+
+/* ─── Suggested tech stacks per role ─── */
+
+const SUGGESTED_TECH: Partial<Record<JobRoleType, string[]>> = {
+  frontend: ["react", "typescript", "javascript", "next.js", "css", "tailwind", "html", "vue", "angular"],
+  backend: ["node.js", "python", "java", "go", "postgresql", "mongodb", "redis", "docker", "aws"],
+  fullstack: ["react", "node.js", "typescript", "postgresql", "docker", "next.js", "tailwind", "aws"],
+  mobile: ["react native", "swift", "kotlin", "flutter", "ios", "android", "typescript"],
+  devops: ["docker", "kubernetes", "terraform", "aws", "ci/cd", "linux", "ansible", "github actions"],
+  cloud: ["aws", "gcp", "azure", "terraform", "kubernetes", "docker", "serverless", "lambda"],
+  sre: ["kubernetes", "prometheus", "grafana", "terraform", "linux", "python", "docker", "aws"],
+  data: ["python", "sql", "spark", "airflow", "dbt", "snowflake", "pandas", "tableau"],
+  ai_ml: ["python", "pytorch", "tensorflow", "pandas", "scikit-learn", "llm", "hugging face", "aws"],
+  security: ["python", "linux", "aws", "docker", "owasp", "penetration testing", "siem"],
+  qa: ["selenium", "cypress", "jest", "python", "postman", "jira", "ci/cd"],
+  blockchain: ["solidity", "ethereum", "web3.js", "hardhat", "rust", "solana", "typescript"],
+  embedded: ["c", "c++", "rtos", "linux", "arm", "python", "mqtt", "firmware"],
+  gamedev: ["unity", "c#", "unreal", "c++", "godot", "blender", "3d", "pixel art"],
+  design: ["figma", "sketch", "adobe xd", "css", "html", "tailwind", "framer"],
+  engineering_manager: ["agile", "scrum", "jira", "okrs", "system design", "architecture"],
+};
+
+/* ─── Description templates per role ─── */
+
+function getDescriptionTemplate(role: JobRoleType, seniority: JobSeniority): string {
+  const senLabel = SENIORITY_LABELS[seniority] ?? "Mid-Level";
+  const roleLabel = ROLE_TYPE_LABELS[role] ?? "Developer";
+
+  return `<h2>About the role</h2>
+<p>We're looking for a ${senLabel} ${roleLabel} to join our team. You'll work on [describe the product/project] and help us [describe the impact].</p>
+
+<h2>What you'll do</h2>
+<ul>
+<li>[Key responsibility 1]</li>
+<li>[Key responsibility 2]</li>
+<li>[Key responsibility 3]</li>
+<li>[Key responsibility 4]</li>
+</ul>
+
+<h2>What we're looking for</h2>
+<ul>
+<li>[Required skill or experience 1]</li>
+<li>[Required skill or experience 2]</li>
+<li>[Required skill or experience 3]</li>
+</ul>
+
+<h2>Nice to have</h2>
+<ul>
+<li>[Optional skill 1]</li>
+<li>[Optional skill 2]</li>
+</ul>
+
+<h2>What we offer</h2>
+<ul>
+<li>[Benefit 1]</li>
+<li>[Benefit 2]</li>
+<li>[Benefit 3]</li>
+</ul>`;
+}
+
+/* ─── Form State ─── */
 
 interface FormData {
   title: string;
   roleType: JobRoleType;
   seniority: JobSeniority;
+  locationType: JobLocationType;
+  locationRestriction: JobLocationRestriction;
+  locationCity: string;
+  locationTimezone: string;
+  language: string;
   description: string;
   techTags: string[];
   applyUrl: string;
-  contractType: JobContract;
-  salaryCurrency: string;
-  salaryMin: string;
-  salaryMax: string;
+  benefits: string[];
   badgeResponse: boolean;
   badgeNoAi: boolean;
-  languagePtBr: string;
-  tier: JobTier;
+  contractTypes: JobContract[];
+  salaryCurrency: string;
+  salaryPeriod: JobSalaryPeriod;
+  salaryMin: string;
+  salaryMax: string;
 }
 
 const DEFAULT_FORM: FormData = {
   title: "",
   roleType: "fullstack",
   seniority: "mid",
+  locationType: "remote",
+  locationRestriction: "worldwide",
+  locationCity: "",
+  locationTimezone: "",
+  language: "en",
   description: "",
   techTags: [],
   applyUrl: "",
-  contractType: "pj",
-  salaryCurrency: "USD",
-  salaryMin: "",
-  salaryMax: "",
+  benefits: [],
   badgeResponse: false,
   badgeNoAi: false,
-  languagePtBr: "",
-  tier: "standard",
+  contractTypes: ["fulltime"],
+  salaryCurrency: "USD",
+  salaryPeriod: "annual",
+  salaryMin: "",
+  salaryMax: "",
 };
+
+/* ─── Main ─── */
 
 export default function PostJobForm() {
   const [step, setStep] = useState(1);
@@ -77,37 +163,24 @@ export default function PostJobForm() {
   const [loaded, setLoaded] = useState(false);
   const techInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Load: localStorage first, then check for existing DB draft ──
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LS_KEY);
-      if (saved) {
-        setForm(JSON.parse(saved));
-        setHasDraft(true);
-      }
-    } catch { /* ignore */ }
+      if (saved) { setForm({ ...DEFAULT_FORM, ...JSON.parse(saved) }); setHasDraft(true); }
+    } catch { /* */ }
     setLoaded(true);
   }, []);
 
-  // ── LocalStorage: save on change (only after initial load) ──
   useEffect(() => {
     if (loaded) {
-      try { localStorage.setItem(LS_KEY, JSON.stringify(form)); } catch { /* ignore */ }
+      try { localStorage.setItem(LS_KEY, JSON.stringify(form)); } catch { /* */ }
     }
   }, [form, loaded]);
 
-  const clearDraft = () => {
-    setForm(DEFAULT_FORM);
-    setStep(1);
-    setHasDraft(false);
-    setError("");
-    setFieldErrors({});
-    localStorage.removeItem(LS_KEY);
-  };
-
+  const clearDraft = () => { setForm(DEFAULT_FORM); setStep(1); setHasDraft(false); setError(""); setFieldErrors({}); localStorage.removeItem(LS_KEY); };
   const update = (partial: Partial<FormData>) => setForm((prev) => ({ ...prev, ...partial }));
 
-  // ── Tech tags ──
+  // Tech tags
   const addTech = (raw: string) => {
     const tag = raw.toLowerCase().trim();
     if (!tag || form.techTags.includes(tag) || form.techTags.length >= 15) return;
@@ -120,7 +193,22 @@ export default function PostJobForm() {
     if (e.key === "Backspace" && !techInput && form.techTags.length > 0) removeTech(form.techTags[form.techTags.length - 1]);
   };
 
-  // ── Validation per step ──
+  // Contract multi-select
+  const toggleContract = (c: JobContract) => {
+    const set = new Set(form.contractTypes);
+    if (set.has(c)) { set.delete(c); } else { set.add(c); }
+    if (set.size === 0) return; // at least one
+    update({ contractTypes: [...set] });
+  };
+
+  // Benefits toggle
+  const toggleBenefit = (id: string) => {
+    const set = new Set(form.benefits);
+    if (set.has(id)) set.delete(id); else set.add(id);
+    update({ benefits: [...set] });
+  };
+
+  // Validation
   function validateStep(s: number): Record<string, string> {
     const errs: Record<string, string> = {};
     if (s === 1) {
@@ -130,52 +218,38 @@ export default function PostJobForm() {
     if (s === 2) {
       const textLength = form.description.replace(/<[^>]*>/g, "").trim().length;
       if (!form.description || textLength < 50) errs.description = `Description needs ${Math.max(0, 50 - textLength)} more characters`;
+    }
+    if (s === 3) {
       if (form.techTags.length === 0) errs.techTags = "Add at least 1 tech tag";
       if (form.applyUrl && !isValidUrl(form.applyUrl)) errs.applyUrl = "Must be a valid http/https URL";
       if (!form.applyUrl) errs.applyUrl = "Apply URL is required";
     }
-    if (s === 3) {
+    if (s === 4) {
       const min = Number(form.salaryMin);
       const max = Number(form.salaryMax);
       if (!min || min <= 0) errs.salaryMin = "Required";
       if (!max || max <= 0) errs.salaryMax = "Required";
-      if (min > 0 && max > 0 && max < min) errs.salaryMax = "Must be ≥ min";
+      if (min > 0 && max > 0 && max < min) errs.salaryMax = "Must be >= min";
     }
     return errs;
   }
 
-  function canProceed(s: number): boolean {
-    return Object.keys(validateStep(s)).length === 0;
-  }
+  function canProceed(s: number): boolean { return Object.keys(validateStep(s)).length === 0; }
 
   function goNext() {
     const errs = validateStep(step);
-    if (Object.keys(errs).length > 0) {
-      setFieldErrors(errs);
-      return;
-    }
+    if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
     setFieldErrors({});
-    setStep((s) => Math.min(4, s + 1));
+    setStep((s) => Math.min(5, s + 1));
     window.scrollTo({ top: 0 });
   }
 
-  function goBack() {
-    setFieldErrors({});
-    setStep((s) => Math.max(1, s - 1));
-    window.scrollTo({ top: 0 });
-  }
+  function goBack() { setFieldErrors({}); setStep((s) => Math.max(1, s - 1)); window.scrollTo({ top: 0 }); }
+  function goToStep(s: number) { if (s > step) return; setFieldErrors({}); setStep(s); window.scrollTo({ top: 0 }); }
 
-  function goToStep(s: number) {
-    // Only allow going to completed steps or current
-    if (s > step) return;
-    setFieldErrors({});
-    setStep(s);
-    window.scrollTo({ top: 0 });
-  }
-
-  // ── Submit ──
+  // Submit
   async function handleSubmit() {
-    if (submitting) return; // prevent double-click
+    if (submitting) return;
     setError("");
     setSubmitting(true);
 
@@ -189,13 +263,21 @@ export default function PostJobForm() {
           salary_min: parseInt(form.salaryMin),
           salary_max: parseInt(form.salaryMax),
           salary_currency: form.salaryCurrency,
+          salary_period: form.salaryPeriod,
           role_type: form.roleType,
           tech_stack: form.techTags,
           seniority: form.seniority,
-          contract_type: form.contractType,
+          contract_type: form.contractTypes[0],
           web_type: "both",
           apply_url: form.applyUrl,
-          language_pt_br: form.languagePtBr || null,
+          location_type: form.locationType,
+          location_restriction: form.locationRestriction,
+          location_city: form.locationCity || null,
+          location_timezone: form.locationTimezone || null,
+          location_countries: [],
+          benefits: form.benefits,
+          language: form.language,
+          language_pt_br: null,
           badge_response_guaranteed: form.badgeResponse,
           badge_no_ai_screening: form.badgeNoAi,
         }),
@@ -210,24 +292,31 @@ export default function PostJobForm() {
 
       const { listing } = await createRes.json();
 
+      // Auto-free for founding companies
       const checkoutRes = await fetch("/api/jobs/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listing_id: listing.id, tier: form.tier }),
+        body: JSON.stringify({ listing_id: listing.id, tier: "free" }),
       });
 
       if (!checkoutRes.ok) {
-        setError("Failed to create checkout session. Your listing was saved as draft.");
+        const d = await checkoutRes.json();
+        if (d.error?.includes("limit")) {
+          // Free limit reached, redirect to tier selection
+          setError("Free listing already used. Choose a paid tier.");
+          setSubmitting(false);
+          return;
+        }
+        setError("Failed to submit. Your listing was saved as draft.");
         setSubmitting(false);
         return;
       }
 
-      // DON'T clear localStorage here — user might click Back from Stripe.
-      // localStorage is cleared on the dashboard when ?posted= param is detected.
+      localStorage.removeItem(LS_KEY);
       const { url } = await checkoutRes.json();
       window.location.href = url;
     } catch {
-      setError("Network error. Please check your connection and try again.");
+      setError("Network error. Please try again.");
       setSubmitting(false);
     }
   }
@@ -236,25 +325,23 @@ export default function PostJobForm() {
 
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
-      <div className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+
         {/* Nav */}
-        <Link href="/jobs/dashboard" className="text-sm text-muted transition-colors hover:text-cream">
-          &lt; Back to dashboard
+        <Link href="/jobs/dashboard" className="text-xs text-dim transition-colors hover:text-muted">
+          &larr; Back to dashboard
         </Link>
 
         <div className="mt-6 flex items-center justify-between">
           <h1 className="text-2xl text-lime sm:text-3xl">Post a Job</h1>
           {hasDraft && (
-            <button
-              onClick={clearDraft}
-              className="text-xs text-dim transition-colors hover:text-muted normal-case"
-            >
+            <button onClick={clearDraft} className="text-xs text-dim transition-colors hover:text-muted normal-case cursor-pointer">
               Start fresh
             </button>
           )}
         </div>
 
-        {/* ── Progress indicator ── */}
+        {/* ── Progress ── */}
         <nav className="mt-8" aria-label="Form progress">
           <ol className="flex items-center gap-0">
             {STEPS.map((s, i) => {
@@ -263,12 +350,11 @@ export default function PostJobForm() {
               const isFuture = step < s.id;
               return (
                 <li key={s.id} className="flex items-center" style={{ flex: i < STEPS.length - 1 ? 1 : "none" }}>
-                  {/* Dot + label */}
                   <button
                     onClick={() => goToStep(s.id)}
                     disabled={isFuture}
                     aria-current={isCurrent ? "step" : undefined}
-                    className="flex flex-col items-center gap-1.5 disabled:cursor-default"
+                    className="flex flex-col items-center gap-1.5 disabled:cursor-default cursor-pointer"
                   >
                     <div
                       className="flex h-8 w-8 items-center justify-center border-[3px] text-xs transition-colors"
@@ -280,370 +366,276 @@ export default function PostJobForm() {
                     >
                       {isCompleted ? "✓" : s.id}
                     </div>
-                    <span
-                      className="hidden text-[10px] sm:block"
-                      style={{ color: isCurrent ? "#c8e64a" : isCompleted ? "var(--color-cream)" : "var(--color-dim)" }}
-                    >
+                    <span className="hidden text-xs sm:block" style={{ color: isCurrent ? "#c8e64a" : isCompleted ? "var(--color-cream)" : "var(--color-dim)" }}>
                       {s.label}
                     </span>
                   </button>
-                  {/* Connector line */}
                   {i < STEPS.length - 1 && (
-                    <div
-                      className="mx-1 h-[3px] flex-1"
-                      style={{ backgroundColor: isCompleted ? "#c8e64a" : "var(--color-border)" }}
-                    />
+                    <div className="mx-1 h-[3px] flex-1" style={{ backgroundColor: isCompleted ? "#c8e64a" : "var(--color-border)" }} />
                   )}
                 </li>
               );
             })}
           </ol>
-          {/* Mobile: show current step text */}
-          <p className="mt-3 text-xs text-muted sm:hidden">
-            Step {step} of {STEPS.length} — {STEPS[step - 1].label}
-          </p>
+          <p className="mt-3 text-xs text-muted sm:hidden">Step {step} of {STEPS.length} — {STEPS[step - 1].label}</p>
         </nav>
 
-        {/* ═══════ STEP 1: THE BASICS ═══════ */}
+        {/* ═══ STEP 1: THE JOB ═══ */}
         {step === 1 && (
           <div className="mt-8 border-[3px] border-border bg-bg-raised p-6 sm:p-8 space-y-8">
-            <div>
-              <label htmlFor="pj-title" className="text-sm text-cream">
-                Job title <span className="text-lime">*</span>
-              </label>
-              <p className="mt-1 text-xs text-muted normal-case">
-                Keep it clear — no "REMOTE" or salary in the title
-              </p>
-              <input
-                id="pj-title"
-                value={form.title}
-                onChange={(e) => update({ title: e.target.value })}
-                placeholder="Senior React Developer"
-                maxLength={100}
-                autoFocus
-                className={`${inputClass} mt-2`}
-                style={{ fontFamily: "inherit" }}
-              />
-              {fieldErrors.title && <p className="mt-1 text-xs text-red-400 normal-case">{fieldErrors.title}</p>}
+            <Field label="Job title" required hint="e.g. Senior React Developer, Backend Engineer, Product Designer">
+              <input value={form.title} onChange={(e) => update({ title: e.target.value })} placeholder="Senior React Developer" maxLength={100} autoFocus className={`${inputClass} mt-2`} />
+              {fieldErrors.title && <Err>{fieldErrors.title}</Err>}
+            </Field>
+
+            <Sep />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <Field label="Role" required>
+                <select value={form.roleType} onChange={(e) => update({ roleType: e.target.value as JobRoleType })} className={`${inputClass} mt-2 cursor-pointer`}>
+                  {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{ROLE_TYPE_LABELS[r]}</option>)}
+                </select>
+              </Field>
+              <Field label="Seniority" required>
+                <select value={form.seniority} onChange={(e) => update({ seniority: e.target.value as JobSeniority })} className={`${inputClass} mt-2 cursor-pointer`}>
+                  {SENIORITY_OPTIONS.map((s) => <option key={s} value={s}>{SENIORITY_LABELS[s]}</option>)}
+                </select>
+              </Field>
             </div>
 
-            <div className="h-px bg-border/50" />
+            <Sep />
 
-            <div>
-              <span className="text-sm text-cream">Role <span className="text-lime">*</span></span>
-              <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Role type">
-                {ROLE_OPTIONS.map((r) => (
-                  <Chip key={r} active={form.roleType === r} onClick={() => update({ roleType: r })}>
-                    {ROLE_TYPE_LABELS[r]}
-                  </Chip>
-                ))}
+            <Field label="Location" required>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {LOCATION_OPTIONS.map((l) => <Chip key={l} active={form.locationType === l} onClick={() => update({ locationType: l })}>{LOCATION_TYPE_LABELS[l]}</Chip>)}
               </div>
-            </div>
+              {form.locationType === "remote" && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted mb-2 normal-case">Where can candidates be located?</p>
+                  <div className="flex flex-wrap gap-2">
+                    {RESTRICTION_OPTIONS.map((r) => <Chip key={r} active={form.locationRestriction === r} onClick={() => update({ locationRestriction: r })}>{LOCATION_RESTRICTION_LABELS[r]}</Chip>)}
+                  </div>
+                </div>
+              )}
+              {(form.locationType === "hybrid" || form.locationType === "onsite") && (
+                <input value={form.locationCity} onChange={(e) => update({ locationCity: e.target.value })} placeholder="City, Country" className={`${inputClass} mt-3`} />
+              )}
+              <input value={form.locationTimezone} onChange={(e) => update({ locationTimezone: e.target.value })} placeholder="Timezone preference (e.g. UTC-3 to UTC+1) - optional" className={`${inputClass} mt-2`} />
+            </Field>
 
-            <div className="h-px bg-border/50" />
+            <Sep />
 
-            <div>
-              <span className="text-sm text-cream">Seniority <span className="text-lime">*</span></span>
-              <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Seniority">
-                {SENIORITY_OPTIONS.map((s) => (
-                  <Chip key={s} active={form.seniority === s} onClick={() => update({ seniority: s })}>
-                    {SENIORITY_LABELS[s]}
-                  </Chip>
-                ))}
+            <Field label="Listing language" hint="The language your job description is written in">
+              <div className="mt-3 flex flex-wrap gap-2">
+                {LANGUAGE_OPTIONS.map((l) => <Chip key={l.id} active={form.language === l.id} onClick={() => update({ language: l.id })}>{l.label}</Chip>)}
               </div>
-            </div>
+            </Field>
           </div>
         )}
 
-        {/* ═══════ STEP 2: DETAILS ═══════ */}
+        {/* ═══ STEP 2: DESCRIPTION ═══ */}
         {step === 2 && (
-          <div className="mt-8 border-[3px] border-border bg-bg-raised p-6 sm:p-8 space-y-8">
-            <div>
-              <span className="text-sm text-cream">
-                Description <span className="text-lime">*</span>
-              </span>
-              <p className="mt-1 text-xs text-muted normal-case">
-                Good descriptions get 3x more applies. Paste from anywhere or use the template.
-              </p>
+          <div className="mt-8 border-[3px] border-border bg-bg-raised p-6 sm:p-8">
+            <Field label="Job description" required hint="Paste from Google Docs, Notion, or anywhere. Or use our template to get started.">
+              {form.description.replace(/<[^>]*>/g, "").trim().length < 10 && (
+                <button
+                  onClick={() => update({ description: getDescriptionTemplate(form.roleType, form.seniority) })}
+                  className="mt-3 mb-2 border-[3px] border-lime/20 px-4 py-2.5 text-xs text-lime transition-colors hover:border-lime/40 hover:bg-lime/5 cursor-pointer normal-case"
+                >
+                  Start with a template for {ROLE_TYPE_LABELS[form.roleType]}
+                </button>
+              )}
               <div className="mt-3">
-                <Suspense fallback={
-                  <div className="border-[3px] border-border bg-bg px-4 py-8 text-center text-xs text-dim">
-                    Loading editor...
-                  </div>
-                }>
+                <Suspense fallback={<div className="border-[3px] border-border bg-bg px-4 py-12 text-center text-xs text-dim">Loading editor...</div>}>
                   <RichTextEditor
                     content={form.description}
                     onChange={(html) => update({ description: html })}
-                    placeholder="Describe the role — responsibilities, requirements, benefits. Or click 'Use template' above."
+                    placeholder="Paste your job description here, or use the template above..."
                   />
                 </Suspense>
               </div>
-              {fieldErrors.description && (
-                <p className="mt-1 text-xs text-red-400 normal-case">{fieldErrors.description}</p>
-              )}
-            </div>
-
-            <div className="h-px bg-border/50" />
-
-            <div>
-              <label htmlFor="pj-tech" className="text-sm text-cream">
-                Tech Stack <span className="text-lime">*</span>
-              </label>
-              <p className="mt-1 text-xs text-muted normal-case">
-                Press Enter or comma to add. Matched against developer skills.
-              </p>
-              <div className="mt-2 flex gap-2">
-                <input
-                  id="pj-tech"
-                  ref={techInputRef}
-                  value={techInput}
-                  onChange={(e) => setTechInput(e.target.value)}
-                  onKeyDown={handleTechKeyDown}
-                  autoFocus={form.description.length >= 50}
-                  placeholder={form.techTags.length === 0 ? "react" : "add another..."}
-                  className={`${inputClass} flex-1`}
-                  style={{ fontFamily: "inherit" }}
-                  disabled={form.techTags.length >= 15}
-                />
-                <button
-                  onClick={() => { addTech(techInput); techInputRef.current?.focus(); }}
-                  disabled={!techInput.trim() || form.techTags.length >= 15}
-                  className="btn-press shrink-0 border-[3px] border-border px-5 text-sm text-cream disabled:opacity-30"
-                >
-                  Add
-                </button>
-              </div>
-              {form.techTags.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {form.techTags.map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => removeTech(tag)}
-                      className="group flex items-center gap-2 border-[3px] px-4 py-2 text-sm transition-colors hover:border-red-500/40"
-                      style={{ borderColor: "rgba(200,230,74,0.3)", color: "#c8e64a" }}
-                      aria-label={`Remove ${tag}`}
-                    >
-                      {tag}
-                      <span className="text-dim group-hover:text-red-400">x</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {fieldErrors.techTags && <p className="mt-1 text-xs text-red-400 normal-case">{fieldErrors.techTags}</p>}
-              <p className="mt-1 text-xs text-dim">{form.techTags.length}/15</p>
-            </div>
-
-            <div className="h-px bg-border/50" />
-
-            <div>
-              <label htmlFor="pj-apply" className="text-sm text-cream">
-                Apply URL <span className="text-lime">*</span>
-              </label>
-              <p className="mt-1 text-xs text-muted normal-case">
-                Where candidates will be redirected when they click Apply
-              </p>
-              <input
-                id="pj-apply"
-                value={form.applyUrl}
-                onChange={(e) => update({ applyUrl: e.target.value })}
-                placeholder="https://company.com/careers/senior-react"
-                className={`${inputClass} mt-2`}
-                style={{ fontFamily: "inherit" }}
-              />
-              {fieldErrors.applyUrl && <p className="mt-1 text-xs text-red-400 normal-case">{fieldErrors.applyUrl}</p>}
-            </div>
+              {fieldErrors.description && <Err>{fieldErrors.description}</Err>}
+            </Field>
           </div>
         )}
 
-        {/* ═══════ STEP 3: THE OFFER ═══════ */}
+        {/* ═══ STEP 3: TECH & PERKS ═══ */}
         {step === 3 && (
           <div className="mt-8 border-[3px] border-border bg-bg-raised p-6 sm:p-8 space-y-8">
-            <div>
-              <span className="text-sm text-cream">Contract <span className="text-lime">*</span></span>
-              <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Contract type">
-                {CONTRACT_OPTIONS.map((c) => (
-                  <Chip key={c} active={form.contractType === c} onClick={() => update({ contractType: c })}>
-                    {CONTRACT_LABELS[c]}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-
-            <div className="h-px bg-border/50" />
-
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-cream">Salary <span className="text-lime">*</span></span>
-                <div className="flex gap-1">
-                  {(["USD", "BRL", "EUR"] as const).map((cur) => (
-                    <button
-                      key={cur}
-                      onClick={() => update({ salaryCurrency: cur })}
-                      className="border-2 px-2.5 py-0.5 text-[10px] transition-colors"
-                      style={{
-                        borderColor: form.salaryCurrency === cur ? "#c8e64a" : "var(--color-border)",
-                        color: form.salaryCurrency === cur ? "#c8e64a" : "var(--color-dim)",
-                      }}
-                    >
-                      {cur}
+            {/* Tech stack */}
+            <Field label="Tech stack" required hint="Click suggestions or type your own">
+              {(() => {
+                const suggestions = (SUGGESTED_TECH[form.roleType] ?? []).filter((t) => !form.techTags.includes(t));
+                if (suggestions.length === 0) return null;
+                return (
+                  <div className="mt-2 mb-3">
+                    <p className="text-xs text-dim mb-1.5 normal-case">Popular for {ROLE_TYPE_LABELS[form.roleType]}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {suggestions.map((tag) => (
+                        <button key={tag} onClick={() => addTech(tag)} disabled={form.techTags.length >= 15} className="border-[2px] border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-lime/30 hover:text-lime cursor-pointer disabled:opacity-30">
+                          + {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+              {form.techTags.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {form.techTags.map((tag) => (
+                    <button key={tag} onClick={() => removeTech(tag)} className="group flex items-center gap-2 border-[3px] px-3 py-1.5 text-xs transition-colors hover:border-red-500/40 cursor-pointer" style={{ borderColor: "rgba(200,230,74,0.3)", color: "#c8e64a" }}>
+                      {tag} <span className="text-dim group-hover:text-red-400">x</span>
                     </button>
                   ))}
                 </div>
+              )}
+              <div className="flex gap-2">
+                <input ref={techInputRef} value={techInput} onChange={(e) => setTechInput(e.target.value)} onKeyDown={handleTechKeyDown} placeholder="Type to add custom tech..." className={`${inputClass} flex-1`} disabled={form.techTags.length >= 15} />
+                <button onClick={() => { addTech(techInput); techInputRef.current?.focus(); }} disabled={!techInput.trim() || form.techTags.length >= 15} className="btn-press shrink-0 border-[3px] border-border px-5 text-xs text-cream disabled:opacity-30 cursor-pointer">Add</button>
               </div>
-              <p className="mt-1 text-xs text-muted normal-case">
-                All listings require visible salary — no &quot;competitive compensation&quot;
-              </p>
-              <div className="mt-3 flex items-center gap-3">
-                <input
-                  type="number"
-                  value={form.salaryMin}
-                  onChange={(e) => update({ salaryMin: e.target.value })}
-                  placeholder="Min"
-                  aria-label="Minimum salary"
-                  className={`${inputClass} flex-1 min-w-0`}
-                  style={{ fontFamily: "inherit" }}
-                />
-                <span className="text-base text-dim shrink-0">—</span>
-                <input
-                  type="number"
-                  value={form.salaryMax}
-                  onChange={(e) => update({ salaryMax: e.target.value })}
-                  placeholder="Max"
-                  aria-label="Maximum salary"
-                  className={`${inputClass} flex-1 min-w-0`}
-                  style={{ fontFamily: "inherit" }}
-                />
-              </div>
-              <div className="mt-1 flex gap-4">
-                {fieldErrors.salaryMin && <span className="text-xs text-red-400 normal-case">{fieldErrors.salaryMin}</span>}
-                {fieldErrors.salaryMax && <span className="text-xs text-red-400 normal-case">{fieldErrors.salaryMax}</span>}
-              </div>
-            </div>
+              {fieldErrors.techTags && <Err>{fieldErrors.techTags}</Err>}
+            </Field>
 
-            <div className="h-px bg-border/50" />
+            <Sep />
+
+            {/* Apply URL */}
+            <Field label="Apply URL" required hint="Where candidates go when they click Apply">
+              <input value={form.applyUrl} onChange={(e) => update({ applyUrl: e.target.value })} placeholder="https://company.com/careers/role" className={`${inputClass} mt-2`} />
+              {fieldErrors.applyUrl && <Err>{fieldErrors.applyUrl}</Err>}
+            </Field>
+
+            <Sep />
+
+            {/* Benefits */}
+            <Field label="Benefits" hint="Select what you offer. Helps candidates decide.">
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {BENEFITS_LIST.map((b) => (
+                  <label key={b.id} className="flex items-center gap-3 cursor-pointer px-3 py-2 transition-colors hover:bg-bg/50">
+                    <input type="checkbox" checked={form.benefits.includes(b.id)} onChange={() => toggleBenefit(b.id)} className="accent-lime h-4 w-4 shrink-0" />
+                    <span className="text-xs text-cream normal-case">{b.label}</span>
+                  </label>
+                ))}
+              </div>
+            </Field>
+
+            <Sep />
 
             {/* Trust badges */}
-            <div className="space-y-4">
-              <span className="text-sm text-cream">Trust Badges</span>
-              <p className="text-xs text-muted normal-case">
-                Optional — these appear on your listing and build candidate trust
-              </p>
-              <label htmlFor="pj-badge-response" className="flex items-center gap-3 cursor-pointer">
-                <input
-                  id="pj-badge-response"
-                  type="checkbox"
-                  checked={form.badgeResponse}
-                  onChange={(e) => update({ badgeResponse: e.target.checked })}
-                  className="accent-lime h-5 w-5 shrink-0"
-                />
-                <div>
-                  <span className="text-sm text-cream">Response Guaranteed</span>
-                  <p className="mt-0.5 text-xs text-muted normal-case">You reply to every applicant</p>
-                </div>
-              </label>
-              <label htmlFor="pj-badge-noai" className="flex items-center gap-3 cursor-pointer">
-                <input
-                  id="pj-badge-noai"
-                  type="checkbox"
-                  checked={form.badgeNoAi}
-                  onChange={(e) => update({ badgeNoAi: e.target.checked })}
-                  className="accent-lime h-5 w-5 shrink-0"
-                />
-                <div>
-                  <span className="text-sm text-cream">No AI Screening</span>
-                  <p className="mt-0.5 text-xs text-muted normal-case">Humans review every application</p>
-                </div>
-              </label>
-            </div>
-
-            <div className="h-px bg-border/50" />
-
-            {/* PT-BR (collapsed optional) */}
-            <div>
-              <label htmlFor="pj-ptbr" className="text-xs text-muted">
-                PT-BR Description
-              </label>
-              <p className="mt-1 text-xs text-dim normal-case">Optional — 20% of our devs are Brazilian</p>
-              <textarea
-                id="pj-ptbr"
-                value={form.languagePtBr}
-                onChange={(e) => update({ languagePtBr: e.target.value })}
-                rows={4}
-                placeholder="Descrição em português..."
-                className={`${inputClass} mt-2 resize-none`}
-                style={{ fontFamily: "inherit" }}
-              />
-            </div>
+            <Field label="Trust badges" hint="Stand out from other listings">
+              <div className="mt-3 space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.badgeResponse} onChange={(e) => update({ badgeResponse: e.target.checked })} className="accent-lime h-4 w-4 shrink-0" />
+                  <div>
+                    <span className="text-xs text-cream">Response Guaranteed</span>
+                    <p className="text-xs text-dim normal-case">You reply to every applicant</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.badgeNoAi} onChange={(e) => update({ badgeNoAi: e.target.checked })} className="accent-lime h-4 w-4 shrink-0" />
+                  <div>
+                    <span className="text-xs text-cream">No AI Screening</span>
+                    <p className="text-xs text-dim normal-case">Humans review every application</p>
+                  </div>
+                </label>
+              </div>
+            </Field>
           </div>
         )}
 
-        {/* ═══════ STEP 4: REVIEW & PAY ═══════ */}
+        {/* ═══ STEP 4: COMPENSATION ═══ */}
         {step === 4 && (
+          <div className="mt-8 border-[3px] border-border bg-bg-raised p-6 sm:p-8 space-y-8">
+            <Field label="Contract type" required hint="Select all that apply">
+              <div className="mt-3 flex flex-wrap gap-2">
+                {CONTRACT_OPTIONS.map((c) => <Chip key={c} active={form.contractTypes.includes(c)} onClick={() => toggleContract(c)}>{CONTRACT_LABELS[c]}</Chip>)}
+              </div>
+            </Field>
+
+            <Sep />
+
+            <Field label="Salary" required hint="All listings require visible salary. Developers skip jobs without it.">
+              <div className="mt-3 flex flex-wrap gap-6">
+                <div>
+                  <p className="text-xs text-dim mb-1.5 normal-case">Currency</p>
+                  <div className="flex gap-1.5">
+                    {CURRENCY_OPTIONS.map((cur) => <Chip key={cur} active={form.salaryCurrency === cur} onClick={() => update({ salaryCurrency: cur })}>{cur}</Chip>)}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-dim mb-1.5 normal-case">Period</p>
+                  <div className="flex gap-1.5">
+                    {SALARY_PERIOD_OPTIONS.map((p) => <Chip key={p} active={form.salaryPeriod === p} onClick={() => update({ salaryPeriod: p })}>{p === "monthly" ? "Monthly" : "Annual"}</Chip>)}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <input type="number" value={form.salaryMin} onChange={(e) => update({ salaryMin: e.target.value })} placeholder="Min" className={`${inputClass} flex-1 min-w-0`} />
+                <span className="text-sm text-dim shrink-0">to</span>
+                <input type="number" value={form.salaryMax} onChange={(e) => update({ salaryMax: e.target.value })} placeholder="Max" className={`${inputClass} flex-1 min-w-0`} />
+                <span className="text-xs text-dim shrink-0">{SALARY_PERIOD_LABELS[form.salaryPeriod]}</span>
+              </div>
+              <div className="mt-1 flex gap-4">
+                {fieldErrors.salaryMin && <Err>{fieldErrors.salaryMin}</Err>}
+                {fieldErrors.salaryMax && <Err>{fieldErrors.salaryMax}</Err>}
+              </div>
+            </Field>
+          </div>
+        )}
+
+        {/* ═══ STEP 5: REVIEW ═══ */}
+        {step === 5 && (
           <div className="mt-8 space-y-6">
             {/* Preview */}
-            <div className="border-[3px] border-lime/30 bg-bg-raised p-6 sm:p-8 space-y-4">
-              <p className="text-xs text-lime">Preview — this is how devs will see your listing</p>
+            <div className="border-[3px] border-lime/20 bg-bg-raised p-6 sm:p-8 space-y-4">
+              <p className="text-xs text-lime">Preview</p>
               <h2 className="text-xl text-cream sm:text-2xl">{form.title}</h2>
-              <p className="text-sm text-muted">
-                {SENIORITY_LABELS[form.seniority]} · {ROLE_TYPE_LABELS[form.roleType]} · {CONTRACT_LABELS[form.contractType]}
+              <p className="text-xs text-muted">
+                {SENIORITY_LABELS[form.seniority]} · {ROLE_TYPE_LABELS[form.roleType]} · {LOCATION_TYPE_LABELS[form.locationType]}
+                {form.locationType === "remote" && form.locationRestriction !== "worldwide" && ` (${LOCATION_RESTRICTION_LABELS[form.locationRestriction]})`}
+                {form.locationCity && ` · ${form.locationCity}`}
               </p>
-              <p className="text-base text-lime">
-                {form.salaryCurrency} {parseInt(form.salaryMin).toLocaleString()}–{parseInt(form.salaryMax).toLocaleString()}
+              <p className="text-sm text-lime">
+                {form.salaryCurrency} {parseInt(form.salaryMin || "0").toLocaleString()}-{parseInt(form.salaryMax || "0").toLocaleString()}
+                <span className="text-xs text-dim ml-1">{SALARY_PERIOD_LABELS[form.salaryPeriod]}</span>
+              </p>
+              <p className="text-xs text-muted">
+                {form.contractTypes.map((c) => CONTRACT_LABELS[c]).join(", ")}
               </p>
               <div className="flex flex-wrap gap-2">
                 {form.techTags.map((t) => (
-                  <span key={t} className="border-[3px] px-3 py-1 text-xs" style={{ borderColor: "rgba(200,230,74,0.3)", color: "#c8e64a" }}>
-                    {t}
-                  </span>
+                  <span key={t} className="border-[2px] px-2 py-0.5 text-xs" style={{ borderColor: "rgba(200,230,74,0.3)", color: "#c8e64a" }}>{t}</span>
                 ))}
               </div>
+              {form.benefits.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {form.benefits.map((b) => {
+                    const benefit = BENEFITS_LIST.find((bl) => bl.id === b);
+                    return <span key={b} className="text-xs text-muted normal-case">&#10003; {benefit?.label ?? b}</span>;
+                  })}
+                </div>
+              )}
               <div className="border-t border-border/50 pt-4">
                 <div className="tiptap text-sm text-cream-dark normal-case leading-relaxed" dangerouslySetInnerHTML={{ __html: form.description }} />
               </div>
               {(form.badgeResponse || form.badgeNoAi) && (
-                <div className="flex gap-3">
-                  {form.badgeResponse && <span className="border-[3px] border-lime/30 px-3 py-1 text-xs text-lime">Response Guaranteed</span>}
-                  {form.badgeNoAi && <span className="border-[3px] border-lime/30 px-3 py-1 text-xs text-lime">No AI Screening</span>}
+                <div className="flex gap-2">
+                  {form.badgeResponse && <span className="border-[2px] border-lime/30 px-2 py-0.5 text-xs text-lime">Response Guaranteed</span>}
+                  {form.badgeNoAi && <span className="border-[2px] border-lime/30 px-2 py-0.5 text-xs text-lime">No AI Screening</span>}
                 </div>
               )}
             </div>
 
-            {/* Tier selection */}
-            <div className="border-[3px] border-border bg-bg-raised p-6 sm:p-8">
-              <span className="text-sm text-cream">Choose a tier</span>
-              <div className="mt-4 space-y-3">
-                {TIER_OPTIONS.map((t) => {
-                  const cfg = JOB_TIERS[t];
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => update({ tier: t })}
-                      aria-pressed={form.tier === t}
-                      className="flex w-full items-center justify-between border-[3px] p-5 text-left transition-colors"
-                      style={{
-                        borderColor: form.tier === t ? "#c8e64a" : "var(--color-border)",
-                        backgroundColor: form.tier === t ? "rgba(200,230,74,0.05)" : "transparent",
-                      }}
-                    >
-                      <div>
-                        <span className="text-sm" style={{ color: form.tier === t ? "#c8e64a" : "var(--color-cream)" }}>
-                          {cfg.label}
-                        </span>
-                        <p className="mt-1 text-xs text-muted normal-case">{TIER_DESCRIPTIONS[t]}</p>
-                      </div>
-                      <span className="text-base text-cream shrink-0 ml-4">
-                        ${(cfg.price_usd_cents / 100).toFixed(0)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Founding company note */}
+            <div className="border-[3px] border-[#fbbf24]/20 bg-[#fbbf24]/[0.03] p-5">
+              <p className="text-xs text-[#fbbf24]">Founding Company</p>
+              <p className="mt-1 text-xs text-muted normal-case">
+                Your first listing is free for 30 days. It will be reviewed and published within 24 hours.
+              </p>
             </div>
 
-            {/* Error */}
             {error && (
               <div className="border-[3px] border-red-500/30 bg-red-500/5 px-5 py-4">
-                <p className="text-sm text-red-400 normal-case">{error}</p>
+                <p className="text-xs text-red-400 normal-case">{error}</p>
               </div>
             )}
           </div>
@@ -652,18 +644,15 @@ export default function PostJobForm() {
         {/* ── Navigation ── */}
         <div className="mt-8 flex gap-3">
           {step > 1 && (
-            <button
-              onClick={goBack}
-              className="btn-press border-[3px] border-border px-6 py-4 text-sm text-cream"
-            >
+            <button onClick={goBack} className="btn-press border-[3px] border-border px-6 py-4 text-sm text-cream cursor-pointer">
               Back
             </button>
           )}
-          {step < 4 ? (
+          {step < 5 ? (
             <button
               onClick={goNext}
               disabled={!canProceed(step)}
-              className="btn-press flex-1 bg-lime py-4 text-sm text-bg disabled:opacity-40"
+              className="btn-press flex-1 bg-lime py-4 text-sm text-bg disabled:opacity-40 cursor-pointer"
               style={{ boxShadow: "4px 4px 0 0 #5a7a00" }}
             >
               Continue
@@ -672,21 +661,13 @@ export default function PostJobForm() {
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="btn-press flex-1 bg-lime py-4 text-sm text-bg disabled:opacity-50"
+              className="btn-press flex-1 bg-lime py-4 text-sm text-bg disabled:opacity-50 cursor-pointer"
               style={{ boxShadow: "4px 4px 0 0 #5a7a00" }}
             >
-              {submitting ? "Processing..." : `Pay $${(JOB_TIERS[form.tier].price_usd_cents / 100).toFixed(0)} & Submit`}
+              {submitting ? "Submitting..." : "Submit for Review (Free)"}
             </button>
           )}
         </div>
-
-        {/* Paying state overlay */}
-        {submitting && (
-          <div className="mt-4 text-center">
-            <div className="mx-auto h-4 w-4 animate-pulse bg-lime" />
-            <p className="mt-2 text-xs text-muted">Redirecting to payment...</p>
-          </div>
-        )}
 
         <div className="h-12" />
       </div>
@@ -694,21 +675,27 @@ export default function PostJobForm() {
   );
 }
 
-function isValidUrl(str: string): boolean {
-  try {
-    const url = new URL(str);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
+/* ─── Shared ─── */
+
+function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <span className="text-sm text-cream">{label} {required && <span className="text-lime">*</span>}</span>
+      {hint && <p className="mt-1 text-xs text-muted normal-case">{hint}</p>}
+      {children}
+    </div>
+  );
 }
+
+function Sep() { return <div className="h-px bg-border/50" />; }
+function Err({ children }: { children: React.ReactNode }) { return <p className="mt-1 text-xs text-red-400 normal-case">{children}</p>; }
 
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
       aria-pressed={active}
-      className="border-[3px] px-5 py-2.5 text-sm transition-colors"
+      className="border-[3px] px-4 py-2 text-xs transition-colors cursor-pointer"
       style={{
         borderColor: active ? "#c8e64a" : "var(--color-border)",
         color: active ? "#c8e64a" : "var(--color-muted)",
@@ -718,4 +705,9 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       {children}
     </button>
   );
+}
+
+function isValidUrl(str: string): boolean {
+  try { const url = new URL(str); return url.protocol === "https:" || url.protocol === "http:"; }
+  catch { return false; }
 }

@@ -3190,14 +3190,6 @@ function HomeContent() {
                       >
                         My profile
                       </Link>
-                      <div className="w-px bg-border" />
-                      <Link
-                        href="/jobs/my-applications"
-                        onClick={() => setJobPanelOpen(false)}
-                        className="flex-1 px-4 py-2.5 text-center text-[11px] text-muted transition-colors hover:text-cream hover:bg-white/5"
-                      >
-                        My applications
-                      </Link>
                     </div>
                   ) : (
                     <div className="border-t border-border px-5 py-3.5 text-center">
@@ -3427,7 +3419,7 @@ function HomeContent() {
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
               <Link
-                href="/jobs/refer"
+                href="/for-companies"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
               >

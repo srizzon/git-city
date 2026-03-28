@@ -45,13 +45,14 @@ export async function POST(
       { onConflict: "listing_id,developer_id" },
     );
 
-  // Check if >= 3 reports → auto-pause
+  // Flag for admin review at 10+ reports (no auto-pause to prevent abuse)
   const { count } = await admin
     .from("job_reports")
     .select("*", { count: "exact", head: true })
     .eq("listing_id", id);
 
-  if (count && count >= 3) {
+  if (count && count >= 10) {
+    // Mark as flagged for admin review instead of auto-pausing
     await admin
       .from("job_listings")
       .update({ status: "paused", paused_at: new Date().toISOString() })
