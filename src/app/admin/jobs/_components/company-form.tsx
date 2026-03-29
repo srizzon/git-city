@@ -80,7 +80,7 @@ export function CompanyForm({ mode, company, onSave, onClose }: CompanyFormProps
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg px-5 py-3">
           <h2 className="text-sm text-cream">{mode === "create" ? "CREATE COMPANY" : "EDIT COMPANY"}</h2>
-          <button onClick={onClose} className="text-xs text-dim hover:text-cream cursor-pointer">ESC</button>
+          <button onClick={onClose} className="text-xs text-dim hover:text-cream cursor-pointer">CLOSE</button>
         </div>
 
         <div className="p-5 space-y-4">

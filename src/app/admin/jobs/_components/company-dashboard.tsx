@@ -216,7 +216,7 @@ export function CompanyDashboard({ addToast }: CompanyDashboardProps) {
                   onClick={() => handleDelete(company)}
                   className="cursor-pointer border border-red-800/50 px-2 py-1 text-[10px] text-red-400 transition-colors hover:border-red-800 hover:bg-red-900/20"
                 >
-                  DEL
+                  DELETE
                 </button>
               </div>
 

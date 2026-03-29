@@ -255,7 +255,7 @@ export default function JobDetailClient({ listingId }: { listingId: string }) {
                       </div>
                       <button
                         onClick={handleApply}
-                        className="btn-press w-full border-[3px] border-border py-2.5 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
+                        className="btn-press w-full cursor-pointer border-[3px] border-border py-2.5 text-xs text-muted transition-colors hover:border-border-light hover:text-cream"
                       >
                         Open application page again
                       </button>

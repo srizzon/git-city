@@ -85,7 +85,7 @@ export function JobTable({
           <span className="text-right text-xs text-muted">STATUS</span>
           <span className="text-right text-xs text-muted">SALARY</span>
           <span className="text-right text-xs text-muted">POSTED</span>
-          <span className="text-right text-xs text-muted">METRICS</span>
+          <span className="text-right text-xs text-muted">VIEWS / APPLIES</span>
           <span className="text-right text-xs text-muted">ACTIONS</span>
         </div>
       )}

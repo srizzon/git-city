@@ -126,7 +126,7 @@ export function JobRow({
 
         {/* Metrics */}
         <p className="hidden text-right text-xs tabular-nums text-cream md:block">
-          {job.view_count}v / {job.apply_count}a
+          {job.view_count} views / {job.apply_count} applies
         </p>
 
         {/* Actions */}
@@ -171,7 +171,7 @@ export function JobRow({
               onClick={onDelete}
               className="cursor-pointer border border-red-800/50 px-2 py-1 text-[10px] text-red-400 transition-colors hover:border-red-800 hover:bg-red-900/20"
             >
-              DEL
+              DELETE
             </button>
           )}
         </div>
@@ -202,7 +202,7 @@ export function JobRow({
               </div>
               <div className="flex items-center gap-2 shrink-0 ml-4">
                 <StatusBadge status={status} />
-                <button onClick={onToggleExpand} className="text-xs text-dim hover:text-cream cursor-pointer ml-2">ESC</button>
+                <button onClick={onToggleExpand} className="text-xs text-dim hover:text-cream cursor-pointer ml-2">CLOSE</button>
               </div>
             </div>
 
@@ -230,7 +230,7 @@ export function JobRow({
                   <option value="premium">PREMIUM</option>
                 </select>
                 {(isActive || isPaused || status === "expired") && (
-                  <button onClick={onExtend} className="cursor-pointer border border-border px-4 py-2 text-xs text-muted transition-colors hover:border-lime hover:text-lime">+30D</button>
+                  <button onClick={onExtend} className="cursor-pointer border border-border px-4 py-2 text-xs text-muted transition-colors hover:border-lime hover:text-lime">EXTEND 30 DAYS</button>
                 )}
                 <a href={`/jobs/${job.id}`} target="_blank" rel="noopener" className="border border-border px-4 py-2 text-xs text-muted transition-colors hover:text-cream">VIEW LISTING</a>
               </div>
@@ -244,7 +244,9 @@ export function JobRow({
                 <InfoCell label="Salary" accent>{job.salary_currency} {job.salary_min.toLocaleString()} - {job.salary_max.toLocaleString()}</InfoCell>
                 <InfoCell label="Published">{fmtDate(job.published_at)}</InfoCell>
                 <InfoCell label="Expires"><span className={expiryColor}>{fmtDate(job.expires_at)} {job.expires_at && `(${expiryLabel})`}</span></InfoCell>
-                <InfoCell label="Stats">{job.view_count}v / {job.apply_count}a / {job.profile_count}p</InfoCell>
+                <InfoCell label="Views">{job.view_count.toLocaleString()}</InfoCell>
+                <InfoCell label="Applies">{job.apply_count.toLocaleString()}</InfoCell>
+                <InfoCell label="Profile views">{job.profile_count.toLocaleString()}</InfoCell>
               </div>
 
               {/* Tech stack */}

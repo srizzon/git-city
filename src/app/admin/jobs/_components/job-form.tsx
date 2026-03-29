@@ -183,7 +183,7 @@ export function JobForm({ mode, listing, companies, onSave, onClose, addToast }:
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg px-5 py-3">
           <h2 className="text-sm text-cream">{mode === "create" ? "CREATE LISTING" : "EDIT LISTING"}</h2>
-          <button onClick={onClose} className="text-xs text-dim hover:text-cream cursor-pointer">ESC</button>
+          <button onClick={onClose} className="text-xs text-dim hover:text-cream cursor-pointer">CLOSE</button>
         </div>
 
         <div className="p-5 space-y-5">
@@ -264,7 +264,7 @@ export function JobForm({ mode, listing, companies, onSave, onClose, addToast }:
                   maxLength={5}
                 />
               </Field>
-              <Field label="Period">
+              <Field label="Pay Period">
                 <Select value={salaryPeriod} onChange={setSalaryPeriod} options={SALARY_PERIOD_LABELS} />
               </Field>
             </div>
@@ -273,10 +273,10 @@ export function JobForm({ mode, listing, companies, onSave, onClose, addToast }:
           {/* Location */}
           <Section title="LOCATION">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Type">
+              <Field label="Work Model">
                 <Select value={locationType} onChange={setLocationType} options={LOCATION_TYPE_LABELS} />
               </Field>
-              <Field label="Restriction">
+              <Field label="Region">
                 <Select value={locationRestriction} onChange={setLocationRestriction} options={LOCATION_RESTRICTION_LABELS} />
               </Field>
               <Field label="City">
