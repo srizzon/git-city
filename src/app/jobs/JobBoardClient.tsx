@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { JobListing } from "@/lib/jobs/types";
 import {
@@ -83,11 +83,12 @@ function setHas(csv: string, value: string): boolean {
 
 /* ─── URL Sync Hook ─── */
 
-function useUrlFilters() {
+function useUrlFilters(initialFilters?: Record<string, string>) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
 
-  const getParam = (key: string) => searchParams.get(key) ?? "";
+  const getParam = (key: string) => searchParams.get(key) ?? initialFilters?.[key] ?? "";
 
   const [q, setQ] = useState(getParam("q"));
   const [roles, setRoles] = useState(getParam("role"));
@@ -97,20 +98,34 @@ function useUrlFilters() {
   const [salaryMin, setSalaryMin] = useState(getParam("salary_min"));
   const [sort, setSort] = useState(getParam("sort") || "recent");
   const [page, setPage] = useState(parseInt(getParam("page") || "1"));
+  const [stack] = useState(initialFilters?.stack ?? "");
+
+  // On programmatic pages (/jobs/t/react), don't sync filters that come from the route
+  const isTagPage = pathname.startsWith("/jobs/t/");
 
   const syncUrl = useCallback(() => {
-    const p = new URLSearchParams();
-    if (q) p.set("q", q);
-    if (roles) p.set("role", roles);
-    if (seniorities) p.set("seniority", seniorities);
-    if (contracts) p.set("contract", contracts);
-    if (location) p.set("location", location);
-    if (salaryMin) p.set("salary_min", salaryMin);
-    if (sort && sort !== "recent") p.set("sort", sort);
-    if (page > 1) p.set("page", String(page));
-    const qs = p.toString();
-    router.replace(`/jobs${qs ? `?${qs}` : ""}`, { scroll: false });
-  }, [q, roles, seniorities, contracts, location, salaryMin, sort, page, router]);
+    if (isTagPage) {
+      // Only sync user-changed params (page, sort, extra filters) as query string
+      const p = new URLSearchParams();
+      if (q) p.set("q", q);
+      if (sort && sort !== "recent") p.set("sort", sort);
+      if (page > 1) p.set("page", String(page));
+      const qs = p.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    } else {
+      const p = new URLSearchParams();
+      if (q) p.set("q", q);
+      if (roles) p.set("role", roles);
+      if (seniorities) p.set("seniority", seniorities);
+      if (contracts) p.set("contract", contracts);
+      if (location) p.set("location", location);
+      if (salaryMin) p.set("salary_min", salaryMin);
+      if (sort && sort !== "recent") p.set("sort", sort);
+      if (page > 1) p.set("page", String(page));
+      const qs = p.toString();
+      router.replace(`/jobs${qs ? `?${qs}` : ""}`, { scroll: false });
+    }
+  }, [q, roles, seniorities, contracts, location, salaryMin, sort, page, router, pathname, isTagPage]);
 
   useEffect(() => { syncUrl(); }, [syncUrl]);
 
@@ -129,6 +144,7 @@ function useUrlFilters() {
     contracts, setContracts,
     location, setLocation,
     salaryMin, setSalaryMin,
+    stack,
     sort, setSort,
     page, setPage,
     hasFilters, filterCount, clearAll,
@@ -137,8 +153,15 @@ function useUrlFilters() {
 
 /* ─── Main ─── */
 
-export default function JobBoardClient({ username }: { username: string }) {
-  const filters = useUrlFilters();
+interface JobBoardProps {
+  username: string | null;
+  pageTitle?: string;
+  pageDescription?: string;
+  initialFilters?: Record<string, string>;
+}
+
+export default function JobBoardClient({ username, pageTitle, pageDescription, initialFilters }: JobBoardProps) {
+  const filters = useUrlFilters(initialFilters);
   const [listings, setListings] = useState<JobListing[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -165,6 +188,7 @@ export default function JobBoardClient({ username }: { username: string }) {
     if (filters.contracts) p.set("contract", filters.contracts);
     if (filters.location) p.set("location", filters.location);
     if (filters.salaryMin) p.set("salary_min", filters.salaryMin);
+    if (filters.stack) p.set("stack", filters.stack);
     if (filters.sort !== "recent") p.set("sort", filters.sort);
     p.set("page", String(filters.page));
     try {
@@ -175,7 +199,7 @@ export default function JobBoardClient({ username }: { username: string }) {
       setTotal(data.total);
     } catch { setError(true); }
     setLoading(false);
-  }, [debouncedQ, filters.roles, filters.seniorities, filters.contracts, filters.location, filters.salaryMin, filters.sort, filters.page]);
+  }, [debouncedQ, filters.roles, filters.seniorities, filters.contracts, filters.location, filters.salaryMin, filters.stack, filters.sort, filters.page]);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
@@ -212,17 +236,31 @@ export default function JobBoardClient({ username }: { username: string }) {
         {/* ─── Header ─── */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Link href="/" className="text-[10px] text-dim transition-colors hover:text-muted">&larr; Back to City</Link>
-            <h1 className="mt-3 text-3xl text-lime sm:text-4xl">Jobs</h1>
-            <p className="mt-1 text-xs text-muted normal-case">Real devs. Real jobs. No robots in between.</p>
+            <Link href={pageTitle ? "/jobs" : "/"} className="text-[10px] text-dim transition-colors hover:text-muted">
+              &larr; {pageTitle ? "All Jobs" : "Back to City"}
+            </Link>
+            <h1 className="mt-3 text-3xl text-lime sm:text-4xl">{pageTitle ?? "Jobs"}</h1>
+            <p className="mt-1 text-xs text-muted normal-case">{pageDescription ?? "Real devs. Real jobs. No robots in between."}</p>
           </div>
           <div className="flex gap-2">
-            <Link href="/jobs/my-applications" className="border-[3px] border-border px-3 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream">
-              My Applications
-            </Link>
-            <Link href={username ? `/hire/${username}` : "/hire/edit"} className="border-[3px] border-border px-3 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream">
-              My Profile
-            </Link>
+            {username ? (
+              <>
+                <Link href="/jobs/my-applications" className="border-[3px] border-border px-3 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream">
+                  My Applications
+                </Link>
+                <Link href={`/hire/${username}`} className="border-[3px] border-border px-3 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream">
+                  My Profile
+                </Link>
+              </>
+            ) : (
+              <Link
+                href="/api/auth/github?redirect=/jobs"
+                className="btn-press bg-lime px-4 py-2 text-xs text-bg"
+                style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}
+              >
+                Sign in with GitHub
+              </Link>
+            )}
           </div>
         </div>
 
@@ -374,6 +412,9 @@ export default function JobBoardClient({ username }: { username: string }) {
           </div>
         )}
 
+        {/* ─── Job alert signup ─── */}
+        <JobAlertSignup />
+
         <div className="h-12" />
       </div>
 
@@ -514,6 +555,74 @@ function ActivePill({ label, onClear }: { label: string; onClear: () => void }) 
 
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><p className="text-[10px] text-dim tracking-widest mb-2">{label}</p><div className="flex flex-wrap gap-1.5">{children}</div></div>;
+}
+
+function JobAlertSignup() {
+  const [email, setEmail] = useState("");
+  const [stack, setAlertStack] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/jobs/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          tech_stack: stack.split(",").map((s) => s.trim()).filter(Boolean),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setStatus("done");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  if (status === "done") {
+    return (
+      <div className="mt-12 border-[3px] border-lime/20 bg-lime/[0.03] p-8 text-center">
+        <p className="text-sm text-lime">You&apos;re subscribed!</p>
+        <p className="mt-1 text-xs text-muted normal-case">We&apos;ll send you matching jobs every week.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-12 border-[3px] border-border bg-bg-raised p-6 sm:p-8">
+      <p className="text-xs text-lime tracking-widest">Get job alerts</p>
+      <p className="mt-1 text-[10px] text-muted normal-case">New matching jobs delivered weekly. No account needed.</p>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <input
+          type="email"
+          required
+          placeholder="your@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="flex-1 border-[3px] border-border bg-bg px-4 py-3 text-xs text-cream normal-case outline-none placeholder:text-dim focus-visible:border-lime transition-colors"
+        />
+        <input
+          type="text"
+          placeholder="react, typescript, node (optional)"
+          value={stack}
+          onChange={(e) => setAlertStack(e.target.value)}
+          className="flex-1 border-[3px] border-border bg-bg px-4 py-3 text-xs text-cream normal-case outline-none placeholder:text-dim focus-visible:border-lime transition-colors"
+        />
+        <button
+          type="submit"
+          disabled={status === "loading"}
+          className="btn-press bg-lime px-6 py-3 text-xs text-bg disabled:opacity-50"
+          style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}
+        >
+          {status === "loading" ? "..." : "Subscribe"}
+        </button>
+      </div>
+      {status === "error" && <p className="mt-2 text-xs text-red-400 normal-case">Failed to subscribe. Try again.</p>}
+    </form>
+  );
 }
 
 function SkeletonCard() {
