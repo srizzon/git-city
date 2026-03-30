@@ -162,6 +162,7 @@ interface JobBoardProps {
 
 export default function JobBoardClient({ username, pageTitle, pageDescription, initialFilters }: JobBoardProps) {
   const filters = useUrlFilters(initialFilters);
+  const rawSearchParams = useSearchParams();
   const [listings, setListings] = useState<JobListing[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -263,6 +264,13 @@ export default function JobBoardClient({ username, pageTitle, pageDescription, i
             )}
           </div>
         </div>
+
+        {/* ─── Unsubscribe confirmation ─── */}
+        {rawSearchParams.get("unsubscribed") === "true" && (
+          <div className="mt-6 border-[3px] border-lime/20 bg-lime/[0.03] px-5 py-3">
+            <p className="text-xs text-lime normal-case">You have been unsubscribed from job alerts.</p>
+          </div>
+        )}
 
         {/* ─── Search + Filter toggle ─── */}
         <div className="mt-8 flex gap-2">
@@ -448,11 +456,10 @@ function JobCard({ job }: { job: JobListing }) {
   }
 
   return (
-    <div className={`${wrapClass} p-6`} style={wrapStyle}>
+    <Link href={`/jobs/${job.id}`} className={`${wrapClass} p-6 block sm:pointer-events-none`} style={wrapStyle}>
       {/* Company + badge */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <CompanyAvatar name={companyName} logoUrl={job.company?.logo_url} website={job.company?.website} />
           <div className="min-w-0">
             <p className="text-xs text-cream truncate">{companyName}</p>
             <p className="text-[10px] text-dim">{timeAgo(job.published_at)}</p>
@@ -500,12 +507,12 @@ function JobCard({ job }: { job: JobListing }) {
         </div>
         <Link
           href={`/jobs/${job.id}`}
-          className="btn-press border-[3px] border-border px-4 py-2 text-[10px] text-cream transition-colors hover:border-border-light"
+          className="btn-press hidden sm:block sm:pointer-events-auto border-[3px] border-border px-4 py-2 text-[10px] text-cream transition-colors hover:border-border-light"
         >
           View
         </Link>
       </div>
-    </div>
+    </Link>
   );
 }
 

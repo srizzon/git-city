@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { createServerSupabase } from "@/lib/supabase-server";
+import { cache } from "react";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import JobDetailClient from "./JobDetailClient";
 import {
   SENIORITY_LABELS,
   ROLE_TYPE_LABELS,
-  CONTRACT_LABELS,
   LOCATION_TYPE_LABELS,
   SALARY_PERIOD_LABELS,
   BENEFITS_LIST,
@@ -15,16 +14,21 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params;
+// Shared query — React `cache` deduplicates within the same request
+const getActiveListing = cache(async (id: string) => {
   const admin = getSupabaseAdmin();
-
-  const { data: listing } = await admin
+  const { data } = await admin
     .from("job_listings")
-    .select("title, seniority, role_type, salary_min, salary_max, salary_currency, salary_period, location_type, tech_stack, company:job_company_profiles(name)")
+    .select("title, description, seniority, role_type, contract_type, salary_min, salary_max, salary_currency, salary_period, location_type, location_restriction, tech_stack, benefits, published_at, expires_at, company:job_company_profiles(name)")
     .eq("id", id)
     .eq("status", "active")
     .single();
+  return data;
+});
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const listing = await getActiveListing(id);
 
   if (!listing) {
     return { title: "Job - Git City" };
@@ -58,6 +62,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function safeJsonLd(json: string): string {
+  return json.replace(/<\//g, "<\\/");
+}
+
 function buildJobPostingSchema(listing: Record<string, unknown>) {
   const company = listing.company as { name: string } | null;
   const techStack = (listing.tech_stack as string[]) ?? [];
@@ -80,7 +92,7 @@ function buildJobPostingSchema(listing: Record<string, unknown>) {
     "@context": "https://schema.org/",
     "@type": "JobPosting",
     title: listing.title,
-    description: listing.description,
+    description: stripHtml((listing.description as string) ?? ""),
     datePosted: listing.published_at,
     validThrough: listing.expires_at,
     employmentType: contractMap[listing.contract_type as string] ?? "FULL_TIME",
@@ -109,25 +121,17 @@ function buildJobPostingSchema(listing: Record<string, unknown>) {
     };
   }
 
-  // Remove undefined values
-  return JSON.stringify(
+  const json = JSON.stringify(
     Object.fromEntries(Object.entries(schema).filter(([, v]) => v !== undefined)),
   );
+  return safeJsonLd(json);
 }
 
 export default async function JobDetailPage({ params }: Props) {
   const { id } = await params;
-  const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
 
-  // Fetch listing for schema markup (server-side)
-  const admin = getSupabaseAdmin();
-  const { data: listing } = await admin
-    .from("job_listings")
-    .select("title, description, seniority, role_type, contract_type, salary_min, salary_max, salary_currency, salary_period, location_type, location_restriction, tech_stack, benefits, published_at, expires_at, company:job_company_profiles(name)")
-    .eq("id", id)
-    .eq("status", "active")
-    .single();
+  // Reuses the cached query from generateMetadata (same request = 1 DB call)
+  const listing = await getActiveListing(id);
 
   return (
     <>
@@ -137,7 +141,7 @@ export default async function JobDetailPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: buildJobPostingSchema(listing) }}
         />
       )}
-      <JobDetailClient listingId={id} isAuthenticated={!!user} />
+      <JobDetailClient listingId={id} />
     </>
   );
 }

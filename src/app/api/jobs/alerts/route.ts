@@ -5,7 +5,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 /**
  * POST /api/jobs/alerts — Subscribe to recurring job alerts.
  * Works for both authenticated and unauthenticated users.
- * Authenticated users are auto-verified; anonymous users need email verification.
+ * Authenticated users are auto-verified; anonymous users auto-verified during launch.
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -28,7 +28,6 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   let developerId: number | null = null;
-  let autoVerified = false;
 
   if (user) {
     const { data: dev } = await admin
@@ -37,38 +36,26 @@ export async function POST(req: NextRequest) {
       .eq("claimed_by", user.id)
       .maybeSingle();
     developerId = dev?.id ?? null;
-    autoVerified = true;
   }
 
-  const verifyToken = autoVerified ? null : crypto.randomUUID();
-
-  const { error } = await admin
+  // Try insert first; if email already exists, update tech_stack instead
+  const { error: insertError } = await admin
     .from("job_alert_subscriptions")
-    .upsert(
-      {
-        email,
+    .insert({
+      email,
+      tech_stack: cleanStack,
+      verified: true,
+      developer_id: developerId,
+    });
+
+  if (insertError) {
+    // Email already exists (unique index on lower(email)) — update preferences
+    await admin
+      .from("job_alert_subscriptions")
+      .update({
         tech_stack: cleanStack,
-        verified: autoVerified,
-        verify_token: verifyToken,
-        developer_id: developerId,
-      },
-      { onConflict: "idx_job_alert_subscriptions_email" },
-    );
-
-  if (error) {
-    // On conflict (email exists), just update the stack
-    await admin
-      .from("job_alert_subscriptions")
-      .update({ tech_stack: cleanStack })
-      .eq("email", email);
-  }
-
-  // TODO: Send verification email for non-authenticated users
-  // For now, auto-verify everyone during launch to reduce friction
-  if (!autoVerified) {
-    await admin
-      .from("job_alert_subscriptions")
-      .update({ verified: true })
+        ...(developerId ? { developer_id: developerId } : {}),
+      })
       .eq("email", email);
   }
 

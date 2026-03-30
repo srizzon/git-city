@@ -144,18 +144,32 @@ export async function GET(req: NextRequest) {
         break;
       }
 
-      // Get claimed devs WITH email, WITHOUT career profile, with a primary language
+      // Get devs who interacted with jobs (applied or signed up for notifications)
+      // but DON'T have a career profile (those were handled in pass 1).
+      // This ensures we only email devs who showed interest in the job board.
+      const { data: jobDevIds } = await admin
+        .from("job_applications")
+        .select("developer_id")
+        .range(passiveOffset, passiveOffset + BATCH_SIZE - 1);
+
+      if (!jobDevIds || jobDevIds.length === 0) { passiveHasMore = false; break; }
+
+      const uniqueDevIds = [...new Set(jobDevIds.map((r) => r.developer_id))];
+
       const { data: devs } = await admin
         .from("developers")
         .select("id, github_login, email, primary_language")
-        .eq("claimed", true)
+        .in("id", uniqueDevIds)
         .not("email", "is", null)
-        .not("primary_language", "is", null)
-        .range(passiveOffset, passiveOffset + BATCH_SIZE - 1);
+        .not("primary_language", "is", null);
 
-      if (!devs || devs.length === 0) { passiveHasMore = false; break; }
+      if (!devs || devs.length === 0) {
+        passiveHasMore = jobDevIds.length === BATCH_SIZE;
+        passiveOffset += BATCH_SIZE;
+        continue;
+      }
 
-      // Filter out devs who already have career profiles (they were handled in pass 1)
+      // Filter out devs who already have career profiles (handled in pass 1)
       const devIds = devs.map((d) => d.id);
       const { data: profileIds } = await admin
         .from("career_profiles")

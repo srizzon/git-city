@@ -75,10 +75,6 @@ const ALL_TAGS: Record<string, TagDef> = {
   ...LOCATION_TAGS,
 };
 
-export function generateStaticParams() {
-  return Object.keys(ALL_TAGS).map((slug) => ({ slug }));
-}
-
 interface Props {
   params: Promise<{ slug: string }>;
 }

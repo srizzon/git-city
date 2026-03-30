@@ -48,7 +48,7 @@ function companyGradient(name: string): string {
   return `linear-gradient(135deg, hsl(${h1}, 60%, 45%), hsl(${h2}, 50%, 35%))`;
 }
 
-export default function JobDetailClient({ listingId, isAuthenticated: serverAuth }: { listingId: string; isAuthenticated: boolean }) {
+export default function JobDetailClient({ listingId }: { listingId: string }) {
   const [data, setData] = useState<JobDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -315,12 +315,12 @@ export default function JobDetailClient({ listingId, isAuthenticated: serverAuth
                 {job.company.description && (
                   <p className="mt-1.5 text-[10px] text-cream-dark normal-case leading-relaxed text-center line-clamp-3">{job.company.description}</p>
                 )}
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 grid grid-cols-2 gap-2">
                   <a
                     href={job.company.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 block border-[3px] border-lime/20 px-3 py-2.5 text-[10px] text-center text-lime transition-colors hover:border-lime/40 hover:bg-lime/5"
+                    className="block border-[3px] border-lime/20 px-3 py-2.5 text-[10px] text-center text-lime transition-colors hover:border-lime/40 hover:bg-lime/5"
                   >
                     Website &#8599;
                   </a>
@@ -329,14 +329,14 @@ export default function JobDetailClient({ listingId, isAuthenticated: serverAuth
                       href={`https://github.com/${job.company.github_org}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 block border-[3px] border-lime/20 px-3 py-2.5 text-[10px] text-center text-lime transition-colors hover:border-lime/40 hover:bg-lime/5"
+                      className="block border-[3px] border-lime/20 px-3 py-2.5 text-[10px] text-center text-lime transition-colors hover:border-lime/40 hover:bg-lime/5"
                     >
                       GitHub &#8599;
                     </a>
                   )}
                   <Link
                     href={`/jobs/company/${job.company.slug}`}
-                    className="flex-1 block border-[3px] border-border px-3 py-2.5 text-[10px] text-center text-muted transition-colors hover:border-border-light hover:text-cream"
+                    className={`block border-[3px] border-border px-3 py-2.5 text-[10px] text-center text-muted transition-colors hover:border-border-light hover:text-cream ${!job.company.github_org ? "" : "col-span-2"}`}
                   >
                     All Listings
                   </Link>

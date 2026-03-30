@@ -81,6 +81,11 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 }
 
+/** Escape content for safe CDATA embedding (prevent ]]> breakout) */
+function safeCdata(str: string): string {
+  return str.replace(/]]>/g, "]]]]><![CDATA[>");
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function formatJobXml(l: any): string {
   const company = l.company as { name: string; website: string } | null;
@@ -102,18 +107,18 @@ function formatJobXml(l: any): string {
   if (l.location_city) locationStr = `${l.location_city} (${locationStr})`;
 
   return `    <job>
-      <title><![CDATA[${l.title}]]></title>
+      <title><![CDATA[${safeCdata(l.title)}]]></title>
       <date>${l.published_at}</date>
       <referencenumber>${l.id}</referencenumber>
       <url>${BASE_URL}/jobs/${l.id}</url>
-      <company><![CDATA[${companyName}]]></company>
+      <company><![CDATA[${safeCdata(companyName)}]]></company>
       <city>${escapeXml(l.location_city ?? "")}</city>
       <country>${escapeXml(((l.location_countries as string[]) ?? [])[0] ?? "Remote")}</country>
       <jobtype>${contractMap[l.contract_type] ?? "full-time"}</jobtype>
       <salary>${l.salary_currency} ${l.salary_min}-${l.salary_max} ${l.salary_period ?? "monthly"}</salary>
       <category>${escapeXml(ROLE_TYPE_LABELS[l.role_type] ?? l.role_type)}</category>
       <experience>${escapeXml(SENIORITY_LABELS[l.seniority] ?? l.seniority)}</experience>
-      <description><![CDATA[${description}]]></description>
+      <description><![CDATA[${safeCdata(description)}]]></description>
       <skills>${escapeXml(techStack)}</skills>
       <benefits>${escapeXml(benefitLabels)}</benefits>
       <remotetype>${l.location_type}</remotetype>
