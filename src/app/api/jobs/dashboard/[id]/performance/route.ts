@@ -18,7 +18,7 @@ export async function GET(
   // Verify ownership
   const { data: listing } = await admin
     .from("job_listings")
-    .select("id, view_count, apply_count, profile_count, company:job_company_profiles!inner(advertiser_id)")
+    .select("id, view_count, apply_count, profile_count, published_at, company:job_company_profiles!inner(advertiser_id)")
     .eq("id", id)
     .single();
 
@@ -61,7 +61,7 @@ export async function GET(
   // Applicant breakdown
   const { data: applications } = await admin
     .from("job_applications")
-    .select("developer_id, has_profile")
+    .select("developer_id, has_profile, status, created_at")
     .eq("listing_id", id);
 
   const profileIds = (applications ?? []).filter((a) => a.has_profile).map((a) => a.developer_id);
@@ -89,10 +89,14 @@ export async function GET(
     .slice(0, 10)
     .map(([skill, count]) => ({ skill, count }));
 
+  const hiredCount = (applications ?? []).filter((a) => a.status === "hired").length;
+
   return NextResponse.json({
-    funnel,
+    funnel: { ...funnel, hired: hiredCount },
     daily,
     topSkills,
     seniorityBreakdown,
+    totalApplicants: (applications ?? []).length,
+    applicantsWithProfile: profileIds.length,
   });
 }

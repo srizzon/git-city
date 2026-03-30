@@ -376,7 +376,7 @@ function ListingCard({ listing, onAction }: { listing: JobListing; onAction: (id
       <div className="mt-4 flex flex-wrap gap-2 border-t border-border/30 pt-4">
         {listing.status === "active" && (
           <>
-            <ActionBtn accent onClick={() => window.open(`/jobs/dashboard/${listing.id}/candidates`, "_self")}>Candidates</ActionBtn>
+            <ActionBtn accent onClick={() => window.open(`/jobs/dashboard/${listing.id}/candidates`, "_self")}>Performance & Candidates</ActionBtn>
             <ActionBtn onClick={() => window.open(`/jobs/${listing.id}`, "_blank")}>View</ActionBtn>
             <ActionBtn onClick={() => onAction(listing.id, "pause")}>Pause</ActionBtn>
             <ActionBtn onClick={() => onAction(listing.id, "fill")}>Mark Filled</ActionBtn>
@@ -394,6 +394,7 @@ function ListingCard({ listing, onAction }: { listing: JobListing; onAction: (id
         {listing.status === "paused" && (
           <>
             <ActionBtn accent onClick={() => onAction(listing.id, "resume")}>Resume</ActionBtn>
+            <ActionBtn onClick={() => window.open(`/jobs/dashboard/${listing.id}/candidates`, "_self")}>Performance & Candidates</ActionBtn>
             <ActionBtn onClick={() => window.open(`/jobs/${listing.id}`, "_blank")}>View</ActionBtn>
             <ActionBtn onClick={() => onAction(listing.id, "fill")}>Mark Filled</ActionBtn>
           </>
@@ -401,6 +402,13 @@ function ListingCard({ listing, onAction }: { listing: JobListing; onAction: (id
         {listing.status === "expired" && (
           <>
             <ActionBtn accent onClick={() => onAction(listing.id, "checkout")}>Repost</ActionBtn>
+            <ActionBtn onClick={() => window.open(`/jobs/dashboard/${listing.id}/candidates`, "_self")}>Performance & Candidates</ActionBtn>
+            <ActionBtn onClick={() => window.open(`/jobs/${listing.id}`, "_blank")}>View</ActionBtn>
+          </>
+        )}
+        {listing.status === "filled" && (
+          <>
+            <ActionBtn onClick={() => window.open(`/jobs/dashboard/${listing.id}/candidates`, "_self")}>Performance & Candidates</ActionBtn>
             <ActionBtn onClick={() => window.open(`/jobs/${listing.id}`, "_blank")}>View</ActionBtn>
           </>
         )}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import ROICalculator from "@/components/jobs/ROICalculator";
 
 export const revalidate = 300;
 
@@ -94,15 +95,6 @@ const FAQ = [
   },
 ];
 
-const COMPARE_ROWS = [
-  { feature: "Developer profiles", others: "Self-reported resumes", gitcity: "GitHub-verified data" },
-  { feature: "Skills verification", others: "Trust the resume", gitcity: "Real contributions & repos" },
-  { feature: "Salary on listing", others: "Optional or hidden", gitcity: "Required on every job" },
-  { feature: "Candidate quality", others: "Mass applications", gitcity: "Developers self-select" },
-  { feature: "Activity proof", others: "None", gitcity: "Streaks, XP, commit history" },
-  { feature: "Community", others: "Resume database", gitcity: "Active developer platform" },
-];
-
 export default async function ForCompaniesPage() {
   const stats = await getStats();
 
@@ -163,27 +155,10 @@ export default async function ForCompaniesPage() {
           </div>
         </div>
 
-        {/* ─── Comparison table ─── */}
+        {/* ─── ROI Calculator + Comparison ─── */}
         <div className="mt-14">
-          <h2 className="text-sm text-muted/50 tracking-[0.15em] text-center mb-6">Git City vs other job boards</h2>
-          <div className="border-[3px] border-border">
-            <div className="grid grid-cols-3 border-b-[3px] border-border bg-bg-raised">
-              <div className="p-4" />
-              <div className="p-4 text-center border-l-[3px] border-border">
-                <p className="text-xs text-muted">Others</p>
-              </div>
-              <div className="p-4 text-center border-l-[3px] border-border bg-lime/[0.03]">
-                <p className="text-xs text-lime">Git City</p>
-              </div>
-            </div>
-            {COMPARE_ROWS.map((row, i) => (
-              <div key={row.feature} className={`grid grid-cols-3 ${i < COMPARE_ROWS.length - 1 ? "border-b-[3px] border-border" : ""}`}>
-                <div className="p-4"><p className="text-xs text-cream">{row.feature}</p></div>
-                <div className="p-4 border-l-[3px] border-border"><p className="text-xs text-red-400/50 normal-case">{row.others}</p></div>
-                <div className="p-4 border-l-[3px] border-border bg-lime/[0.02]"><p className="text-xs text-lime/80 normal-case">{row.gitcity}</p></div>
-              </div>
-            ))}
-          </div>
+          <h2 className="text-sm text-muted/50 tracking-[0.15em] text-center mb-6">Why Git City</h2>
+          <ROICalculator />
         </div>
 
         {/* ─── See a real profile ─── */}

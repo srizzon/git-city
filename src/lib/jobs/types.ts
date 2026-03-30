@@ -96,12 +96,53 @@ export interface CareerProfile {
   updated_at: string;
 }
 
+export type ApplicationStatus = "applied" | "hired";
+
 export interface JobApplication {
   id: string;
   listing_id: string;
   developer_id: number;
   has_profile: boolean;
+  status: ApplicationStatus;
+  status_changed_at: string | null;
   created_at: string;
   // Joined
   listing?: JobListing;
+}
+
+export type CandidateBadge =
+  | "top_contributor"
+  | "active_streak"
+  | "full_portfolio"
+  | "open_source"
+  | "verified_profile";
+
+export interface CandidateBadgeInfo {
+  id: CandidateBadge;
+  label: string;
+  color: string;
+}
+
+export interface CandidateWithScore {
+  developer_id: number;
+  github_login: string;
+  contributions: number;
+  stars: number;
+  repos: number;
+  streak: number;
+  level: number;
+  has_profile: boolean;
+  status: ApplicationStatus;
+  applied_at: string | undefined;
+  profile: {
+    seniority: string;
+    years_experience: number | null;
+    web_type: string;
+    skills: string[];
+    bio: string;
+  } | null;
+  skill_match: number;
+  skill_total: number;
+  quality_score: number;
+  badges: CandidateBadge[];
 }

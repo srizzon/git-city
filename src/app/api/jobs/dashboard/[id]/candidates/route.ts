@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdvertiserFromCookies } from "@/lib/advertiser-auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { calculateQualityScore, calculateBadges } from "@/lib/jobs/quality-score";
 
 export async function GET(
   req: NextRequest,
@@ -32,7 +33,7 @@ export async function GET(
   // Get all applications for this listing
   const { data: applications } = await admin
     .from("job_applications")
-    .select("developer_id, has_profile, created_at")
+    .select("developer_id, has_profile, status, created_at")
     .eq("listing_id", id)
     .order("created_at", { ascending: false });
 
@@ -55,6 +56,19 @@ export async function GET(
     .select("*")
     .in("id", withProfileIds);
 
+  // Check portfolio data for quality scoring
+  const { data: projectRows } = await admin
+    .from("portfolio_projects")
+    .select("developer_id")
+    .in("developer_id", devIds);
+  const { data: experienceRows } = await admin
+    .from("portfolio_experiences")
+    .select("developer_id")
+    .in("developer_id", devIds);
+
+  const devsWithProjects = new Set((projectRows ?? []).map((r) => r.developer_id));
+  const devsWithExperiences = new Set((experienceRows ?? []).map((r) => r.developer_id));
+
   // Build candidates
   const candidates = (devs ?? []).map((dev) => {
     const profile = profiles?.find((p) => p.id === dev.id);
@@ -65,6 +79,17 @@ export async function GET(
     const devSkills = profile?.skills ?? [];
     const matchedSkills = techStack.filter((t: string) => devSkills.includes(t));
 
+    // Quality score + badges
+    const scoreInput = {
+      contributions: dev.contributions_total ?? 0,
+      stars: dev.total_stars ?? 0,
+      streak: dev.current_streak ?? 0,
+      level: dev.level ?? 1,
+      has_profile: !!profile,
+      has_projects: devsWithProjects.has(dev.id),
+      has_experiences: devsWithExperiences.has(dev.id),
+    };
+
     return {
       developer_id: dev.id,
       github_login: dev.github_login,
@@ -74,6 +99,7 @@ export async function GET(
       streak: dev.current_streak ?? 0,
       level: dev.level ?? 1,
       has_profile: !!profile,
+      status: app?.status ?? "applied",
       applied_at: app?.created_at,
       profile: profile ? {
         seniority: profile.seniority,
@@ -84,6 +110,8 @@ export async function GET(
       } : null,
       skill_match: matchedSkills.length,
       skill_total: techStack.length,
+      quality_score: calculateQualityScore(scoreInput),
+      badges: calculateBadges(scoreInput),
     };
   });
 
@@ -93,6 +121,7 @@ export async function GET(
 
   candidates.sort((a, b) => {
     switch (sort) {
+      case "best_match": return b.quality_score - a.quality_score;
       case "stars": return b.stars - a.stars;
       case "streak": return b.streak - a.streak;
       case "skill_match": return b.skill_match - a.skill_match;
@@ -100,9 +129,12 @@ export async function GET(
     }
   });
 
+  const hiredCount = candidates.filter((c) => c.status === "hired").length;
+
   return NextResponse.json({
     candidates,
     withProfile: withProfileIds.length,
     withoutProfile,
+    hiredCount,
   });
 }
