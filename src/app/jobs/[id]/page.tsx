@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import JobDetailClient from "./JobDetailClient";
+import {
+  SENIORITY_LABELS,
+  ROLE_TYPE_LABELS,
+  CONTRACT_LABELS,
+  LOCATION_TYPE_LABELS,
+  SALARY_PERIOD_LABELS,
+  BENEFITS_LIST,
+} from "@/lib/jobs/constants";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -14,7 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const { data: listing } = await admin
     .from("job_listings")
-    .select("title, seniority, role_type, salary_min, salary_max, salary_currency, salary_period, location_type, company:job_company_profiles(name)")
+    .select("title, seniority, role_type, salary_min, salary_max, salary_currency, salary_period, location_type, tech_stack, company:job_company_profiles(name)")
     .eq("id", id)
     .eq("status", "active")
     .single();
@@ -26,9 +33,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const company = (listing.company as unknown as { name: string })?.name ?? "Unknown";
   const title = `${listing.title} at ${company} - Git City Jobs`;
 
-  const seniority = listing.seniority.charAt(0).toUpperCase() + listing.seniority.slice(1);
-  const roleType = listing.role_type.charAt(0).toUpperCase() + listing.role_type.slice(1);
-  const locationType = listing.location_type.charAt(0).toUpperCase() + listing.location_type.slice(1);
+  const seniority = SENIORITY_LABELS[listing.seniority] ?? listing.seniority;
+  const roleType = ROLE_TYPE_LABELS[listing.role_type] ?? listing.role_type;
+  const locationType = LOCATION_TYPE_LABELS[listing.location_type] ?? listing.location_type;
 
   let salaryPart = "";
   if (listing.salary_min && listing.salary_max) {
@@ -37,11 +44,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     salaryPart = ` ${currency} ${listing.salary_min.toLocaleString()}-${listing.salary_max.toLocaleString()}/${period}.`;
   }
 
-  const description = `${seniority} ${roleType} at ${company}.${salaryPart} ${locationType}.`;
+  const description = `${seniority} ${roleType} at ${company}.${salaryPart} ${locationType}. Apply on Git City.`;
+  const techStack = (listing.tech_stack as string[]) ?? [];
 
   return {
     title,
     description,
+    keywords: [company, roleType, seniority, ...techStack.slice(0, 5)],
     openGraph: {
       title,
       description,
@@ -49,14 +58,86 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+function buildJobPostingSchema(listing: Record<string, unknown>) {
+  const company = listing.company as { name: string } | null;
+  const techStack = (listing.tech_stack as string[]) ?? [];
+  const benefits = (listing.benefits as string[]) ?? [];
+  const benefitLabels = benefits
+    .map((b) => BENEFITS_LIST.find((bl) => bl.id === b)?.label)
+    .filter(Boolean);
+
+  const contractMap: Record<string, string> = {
+    fulltime: "FULL_TIME",
+    parttime: "PART_TIME",
+    contract: "CONTRACTOR",
+    freelance: "CONTRACTOR",
+    internship: "INTERN",
+    clt: "FULL_TIME",
+    pj: "CONTRACTOR",
+  };
+
+  const schema: Record<string, unknown> = {
+    "@context": "https://schema.org/",
+    "@type": "JobPosting",
+    title: listing.title,
+    description: listing.description,
+    datePosted: listing.published_at,
+    validThrough: listing.expires_at,
+    employmentType: contractMap[listing.contract_type as string] ?? "FULL_TIME",
+    hiringOrganization: {
+      "@type": "Organization",
+      name: company?.name ?? "Unknown",
+    },
+    jobLocationType: listing.location_type === "remote" ? "TELECOMMUTE" : undefined,
+    applicantLocationRequirements: listing.location_type === "remote"
+      ? { "@type": "Country", name: "Worldwide" }
+      : undefined,
+    skills: techStack.join(", "),
+    jobBenefits: benefitLabels.length > 0 ? benefitLabels.join(", ") : undefined,
+  };
+
+  if (listing.salary_min && listing.salary_max) {
+    schema.baseSalary = {
+      "@type": "MonetaryAmount",
+      currency: listing.salary_currency ?? "USD",
+      value: {
+        "@type": "QuantitativeValue",
+        minValue: listing.salary_min,
+        maxValue: listing.salary_max,
+        unitText: listing.salary_period === "annual" ? "YEAR" : "MONTH",
+      },
+    };
+  }
+
+  // Remove undefined values
+  return JSON.stringify(
+    Object.fromEntries(Object.entries(schema).filter(([, v]) => v !== undefined)),
+  );
+}
+
 export default async function JobDetailPage({ params }: Props) {
   const { id } = await params;
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect(`/api/auth/github?redirect=/jobs/${id}`);
-  }
+  // Fetch listing for schema markup (server-side)
+  const admin = getSupabaseAdmin();
+  const { data: listing } = await admin
+    .from("job_listings")
+    .select("title, description, seniority, role_type, contract_type, salary_min, salary_max, salary_currency, salary_period, location_type, location_restriction, tech_stack, benefits, published_at, expires_at, company:job_company_profiles(name)")
+    .eq("id", id)
+    .eq("status", "active")
+    .single();
 
-  return <JobDetailClient listingId={id} />;
+  return (
+    <>
+      {listing && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: buildJobPostingSchema(listing) }}
+        />
+      )}
+      <JobDetailClient listingId={id} isAuthenticated={!!user} />
+    </>
+  );
 }

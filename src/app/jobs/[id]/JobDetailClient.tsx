@@ -24,6 +24,7 @@ interface JobDetailData {
   listing: JobListing;
   hasApplied: boolean;
   hasCareerProfile: boolean;
+  isAuthenticated: boolean;
   isPreview?: boolean;
 }
 
@@ -47,7 +48,7 @@ function companyGradient(name: string): string {
   return `linear-gradient(135deg, hsl(${h1}, 60%, 45%), hsl(${h2}, 50%, 35%))`;
 }
 
-export default function JobDetailClient({ listingId }: { listingId: string }) {
+export default function JobDetailClient({ listingId, isAuthenticated: serverAuth }: { listingId: string; isAuthenticated: boolean }) {
   const [data, setData] = useState<JobDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -248,7 +249,18 @@ export default function JobDetailClient({ listingId }: { listingId: string }) {
               {/* Apply actions */}
               {!data.isPreview && (
                 <div className="mt-5 space-y-2">
-                  {applied ? (
+                  {!data.isAuthenticated ? (
+                    <>
+                      <a
+                        href={`/api/auth/github?redirect=/jobs/${job.id}`}
+                        className="btn-press block w-full py-3.5 text-xs text-bg text-center"
+                        style={{ backgroundColor: accent, boxShadow: `3px 3px 0 0 ${shadow}` }}
+                      >
+                        Sign in to Apply
+                      </a>
+                      <p className="text-[10px] text-dim normal-case text-center">Sign in with GitHub to apply and track your applications</p>
+                    </>
+                  ) : applied ? (
                     <>
                       <div className="w-full border-[3px] py-3.5 text-xs text-center" style={{ borderColor: `${accent}40`, color: accent }}>
                         You applied to this job
@@ -276,12 +288,12 @@ export default function JobDetailClient({ listingId }: { listingId: string }) {
                       {applying ? "Applying..." : "Apply Now"}
                     </button>
                   )}
-                  {!applied && !data.hasCareerProfile && (
+                  {data.isAuthenticated && !applied && !data.hasCareerProfile && (
                     <Link
                       href={`/hire/edit?returnTo=/jobs/${job.id}`}
-                      className="block w-full border-[3px] border-border py-2.5 text-xs text-center text-muted transition-colors hover:border-border-light hover:text-cream"
+                      className="block w-full border-[3px] border-border py-2.5 text-xs text-center text-muted transition-colors hover:border-border-light hover:text-cream normal-case"
                     >
-                      Create Career Profile first
+                      Complete your career profile to stand out
                     </Link>
                   )}
                 </div>

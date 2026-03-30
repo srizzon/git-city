@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
@@ -38,13 +37,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Full listing mode: auth required (community-exclusive)
-  const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
+  // Full listing mode: public (SEO-friendly, no auth required)
   // Parse filters
   const q = url.searchParams.get("q") ?? "";
   const web = url.searchParams.get("web");

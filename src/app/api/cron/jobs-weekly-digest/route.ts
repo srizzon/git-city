@@ -42,13 +42,11 @@ export async function GET(req: NextRequest) {
     companyName: (job.company as unknown as { name: string }).name,
   }));
 
-  // Single optimized query: join career_profiles + developers + preferences
-  // Process in batches with cursor-based pagination
+  // ─── Pass 1: Developers with career profiles (existing behavior) ───
   let offset = 0;
   let hasMore = true;
 
   while (hasMore) {
-    // Timeout guard
     if (Date.now() - startTime > MAX_DURATION_MS) {
       results.timedOut = true;
       results.lastOffset = offset;
@@ -70,7 +68,6 @@ export async function GET(req: NextRequest) {
       break;
     }
 
-    // Batch-check preferences for all devs in this batch
     const devIds = rows.map((r) => (r.developer as unknown as { id: number }).id);
     const { data: allPrefs } = await admin
       .from("notification_preferences")
@@ -83,37 +80,21 @@ export async function GET(req: NextRequest) {
 
     for (const row of rows) {
       const dev = row.developer as unknown as { id: number; github_login: string; email: string };
-      if (!dev.email || !dev.github_login) {
-        results.skipped++;
-        continue;
-      }
+      if (!dev.email || !dev.github_login) { results.skipped++; continue; }
 
-      // Check preferences
       const prefs = prefsMap.get(dev.id);
-      if (prefs && (prefs.email_enabled === false || prefs.jobs_digest === false)) {
-        results.skipped++;
-        continue;
-      }
+      if (prefs && (prefs.email_enabled === false || prefs.jobs_digest === false)) { results.skipped++; continue; }
 
       const devSkills = ((row.skills ?? []) as string[]).map((s) => s.toLowerCase());
-      if (devSkills.length === 0) {
-        results.skipped++;
-        continue;
-      }
+      if (devSkills.length === 0) { results.skipped++; continue; }
 
-      // Match jobs (in-memory, fast since jobData is pre-built)
       const matchingJobs = jobData
         .map((job) => {
           const matchedSkills = devSkills.filter((s) => job.techStack.includes(s));
           return {
-            id: job.id,
-            title: job.title,
-            companyName: job.companyName,
-            seniority: job.seniority,
-            locationType: job.locationType,
-            salaryMin: job.salaryMin,
-            salaryMax: job.salaryMax,
-            currency: job.currency,
+            id: job.id, title: job.title, companyName: job.companyName,
+            seniority: job.seniority, locationType: job.locationType,
+            salaryMin: job.salaryMin, salaryMax: job.salaryMax, currency: job.currency,
             matchedSkills: matchedSkills.map((s) => s.charAt(0).toUpperCase() + s.slice(1)),
             matchScore: matchedSkills.length + (job.seniority === row.seniority ? 2 : 0),
           };
@@ -122,19 +103,105 @@ export async function GET(req: NextRequest) {
         .sort((a, b) => b.matchScore - a.matchScore)
         .slice(0, 10);
 
-      if (matchingJobs.length === 0) {
-        results.skipped++;
-        continue;
-      }
-
+      if (matchingJobs.length === 0) { results.skipped++; continue; }
       sendJobDigestNotification(dev.id, dev.github_login, matchingJobs);
       results.sent++;
     }
 
-    if (rows.length < BATCH_SIZE) {
-      hasMore = false;
-    } else {
-      offset += BATCH_SIZE;
+    hasMore = rows.length === BATCH_SIZE;
+    offset += BATCH_SIZE;
+  }
+
+  // ─── Pass 2: GitHub-powered passive matching ───
+  // For claimed devs WITHOUT career profile: match by primary_language
+  const LANG_TO_STACK: Record<string, string[]> = {
+    "TypeScript": ["typescript", "react", "nextjs", "node", "angular", "vue"],
+    "JavaScript": ["javascript", "react", "node", "vue", "express"],
+    "Python": ["python", "django", "flask", "fastapi"],
+    "Rust": ["rust"],
+    "Go": ["go", "golang"],
+    "Java": ["java", "spring", "kotlin"],
+    "Ruby": ["ruby", "rails"],
+    "Swift": ["swift", "ios"],
+    "Kotlin": ["kotlin", "android"],
+    "Dart": ["dart", "flutter"],
+    "C#": ["csharp", "dotnet", ".net"],
+    "PHP": ["php", "laravel"],
+    "Elixir": ["elixir", "phoenix"],
+    "Solidity": ["solidity", "ethereum", "web3"],
+    "C++": ["cpp", "c++"],
+    "Lua": ["lua", "gamedev"],
+    "GDScript": ["godot", "gamedev"],
+  };
+
+  if (!results.timedOut) {
+    let passiveOffset = 0;
+    let passiveHasMore = true;
+
+    while (passiveHasMore) {
+      if (Date.now() - startTime > MAX_DURATION_MS) {
+        results.timedOut = true;
+        break;
+      }
+
+      // Get claimed devs WITH email, WITHOUT career profile, with a primary language
+      const { data: devs } = await admin
+        .from("developers")
+        .select("id, github_login, email, primary_language")
+        .eq("claimed", true)
+        .not("email", "is", null)
+        .not("primary_language", "is", null)
+        .range(passiveOffset, passiveOffset + BATCH_SIZE - 1);
+
+      if (!devs || devs.length === 0) { passiveHasMore = false; break; }
+
+      // Filter out devs who already have career profiles (they were handled in pass 1)
+      const devIds = devs.map((d) => d.id);
+      const { data: profileIds } = await admin
+        .from("career_profiles")
+        .select("id")
+        .in("id", devIds);
+      const hasProfileSet = new Set((profileIds ?? []).map((p) => p.id));
+
+      // Check notification preferences
+      const { data: allPrefs } = await admin
+        .from("notification_preferences")
+        .select("developer_id, email_enabled, jobs_digest")
+        .in("developer_id", devIds);
+      const prefsMap = new Map((allPrefs ?? []).map((p) => [p.developer_id, p]));
+
+      for (const dev of devs) {
+        if (hasProfileSet.has(dev.id)) { results.skipped++; continue; }
+        if (!dev.email || !dev.primary_language) { results.skipped++; continue; }
+
+        const prefs = prefsMap.get(dev.id);
+        if (prefs && (prefs.email_enabled === false || prefs.jobs_digest === false)) { results.skipped++; continue; }
+
+        const inferredSkills = LANG_TO_STACK[dev.primary_language] ?? [];
+        if (inferredSkills.length === 0) { results.skipped++; continue; }
+
+        const matchingJobs = jobData
+          .map((job) => {
+            const matchedSkills = inferredSkills.filter((s) => job.techStack.includes(s));
+            return {
+              id: job.id, title: job.title, companyName: job.companyName,
+              seniority: job.seniority, locationType: job.locationType,
+              salaryMin: job.salaryMin, salaryMax: job.salaryMax, currency: job.currency,
+              matchedSkills: matchedSkills.map((s) => s.charAt(0).toUpperCase() + s.slice(1)),
+              matchScore: matchedSkills.length,
+            };
+          })
+          .filter((j) => j.matchScore >= 1)
+          .sort((a, b) => b.matchScore - a.matchScore)
+          .slice(0, 10);
+
+        if (matchingJobs.length === 0) { results.skipped++; continue; }
+        sendJobDigestNotification(dev.id, dev.github_login, matchingJobs);
+        results.sent++;
+      }
+
+      passiveHasMore = devs.length === BATCH_SIZE;
+      passiveOffset += BATCH_SIZE;
     }
   }
 

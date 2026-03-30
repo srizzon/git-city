@@ -10,20 +10,22 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
   const admin = getSupabaseAdmin();
 
-  // Get developer ID for checking application status
-  const { data: dev } = await admin
-    .from("developers")
-    .select("id")
-    .eq("claimed_by", user.id)
-    .maybeSingle();
+  // Auth is optional — unauthenticated users can view active listings
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Get developer ID if authenticated
+  let dev: { id: number } | null = null;
+  if (user) {
+    const { data } = await admin
+      .from("developers")
+      .select("id")
+      .eq("claimed_by", user.id)
+      .maybeSingle();
+    dev = data;
+  }
 
   // First try active listing (normal case)
   let { data: listing } = await admin
@@ -35,7 +37,7 @@ export async function GET(
 
   let closedReason: "filled" | "expired" | "paused" | null = null;
 
-  // If not active, check if the user has other access
+  // If not active, check if the user has other access (must be authenticated)
   if (!listing) {
     const { data: anyListing } = await admin
       .from("job_listings")
@@ -44,6 +46,11 @@ export async function GET(
       .single();
 
     if (!anyListing) {
+      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    }
+
+    // Non-active listings require authentication + special access
+    if (!user) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
@@ -104,13 +111,13 @@ export async function GET(
     hasCareerProfile = !!profileResult.data;
   }
 
-  // Only track views for active listings
-  if (listing.status === "active") {
+  // Only track views for active listings from authenticated users
+  if (listing.status === "active" && dev) {
     await Promise.all([
       admin.from("job_listing_events").insert({
         listing_id: id,
         event_type: "view",
-        developer_id: dev?.id ?? null,
+        developer_id: dev.id,
       }),
       admin.rpc("increment_job_counter", {
         p_listing_id: id,
@@ -123,6 +130,7 @@ export async function GET(
     listing,
     hasApplied,
     hasCareerProfile,
+    isAuthenticated: !!user,
     isPreview: listing.status !== "active",
     ...(closedReason && { closedReason }),
   });
