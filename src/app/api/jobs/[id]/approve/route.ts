@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
 import { LISTING_DURATION_DAYS } from "@/lib/jobs/constants";
+import { sendJobApprovedEmail } from "@/lib/notification-senders/job-approved";
 
 export async function POST(
   _req: NextRequest,
@@ -32,6 +33,33 @@ export async function POST(
 
   if (error) {
     return NextResponse.json({ error: "Failed to approve" }, { status: 500 });
+  }
+
+  // Send approval email to company
+  const { data: listing } = await admin
+    .from("job_listings")
+    .select("title, company:job_company_profiles!inner(advertiser_id)")
+    .eq("id", id)
+    .single();
+
+  if (listing) {
+    const comp = listing.company as unknown as { advertiser_id: string | null };
+    if (comp.advertiser_id) {
+      const { data: advertiser } = await admin
+        .from("advertiser_accounts")
+        .select("email")
+        .eq("id", comp.advertiser_id)
+        .single();
+
+      if (advertiser?.email) {
+        sendJobApprovedEmail(
+          advertiser.email,
+          listing.title,
+          id,
+          expires.toISOString(),
+        ).catch((err) => console.error("[job-notify] Failed to send approved email:", err));
+      }
+    }
   }
 
   return NextResponse.json({ approved: true });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdvertiserFromCookies } from "@/lib/advertiser-auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import DOMPurify from "isomorphic-dompurify";
+import { sendJobFilledNotification } from "@/lib/notification-senders/job-filled";
 
 const ALLOWED_HTML = {
   ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "h1", "h2", "h3", "blockquote", "code", "pre"],
@@ -63,11 +64,42 @@ export async function PATCH(
       await admin.from("job_listings").update({ status: "active" }).eq("id", id).eq("status", "paused");
       break;
     }
-    case "fill":
+    case "fill": {
       await admin.from("job_listings").update({ status: "filled", filled_at: new Date().toISOString() }).eq("id", id);
-      // Atomic increment hired_count
       await admin.rpc("increment_hired_count", { p_company_id: comp.id });
+
+      // Notify all applicants that the position was filled (except hired ones)
+      const { data: filledListing } = await admin
+        .from("job_listings")
+        .select("title, company:job_company_profiles!inner(name)")
+        .eq("id", id)
+        .single();
+
+      if (filledListing) {
+        const companyName = (filledListing.company as unknown as { name: string }).name;
+        const { data: applicants } = await admin
+          .from("job_applications")
+          .select("developer_id, status")
+          .eq("listing_id", id)
+          .neq("status", "hired");
+
+        if (applicants) {
+          // Process in chunks of 25 to avoid overwhelming the event loop
+          const CHUNK = 25;
+          for (let i = 0; i < applicants.length; i += CHUNK) {
+            const chunk = applicants.slice(i, i + CHUNK);
+            for (const app of chunk) {
+              sendJobFilledNotification(app.developer_id, filledListing.title, companyName);
+            }
+            // Yield between chunks so the response isn't blocked
+            if (i + CHUNK < applicants.length) {
+              await new Promise((r) => setTimeout(r, 100));
+            }
+          }
+        }
+      }
       break;
+    }
     case "delete": {
       // Only allow deleting drafts and rejected listings
       const deletableStatuses = ["draft", "rejected"];

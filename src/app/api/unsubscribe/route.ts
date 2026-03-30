@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyHmacToken, type NotificationCategory } from "@/lib/notifications";
 
-const VALID_CATEGORIES = ["transactional", "social", "digest", "marketing", "streak_reminders", "all"];
+const VALID_CATEGORIES = [
+  "transactional", "social", "digest", "marketing", "streak_reminders",
+  "jobs_applications", "jobs_performance", "jobs_digest", "jobs_updates",
+  "all",
+];
 
 /**
  * POST /api/unsubscribe?dev={id}&cat={category}&token={hmac}

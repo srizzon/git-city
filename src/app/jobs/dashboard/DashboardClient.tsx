@@ -34,6 +34,7 @@ export default function DashboardClient({ advertiserEmail }: { advertiserEmail: 
   const [error, setError] = useState(false);
   const [setupMode, setSetupMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [showSettings, setShowSettings] = useState(false);
 
   // Setup form
   const [name, setName] = useState("");
@@ -313,6 +314,69 @@ export default function DashboardClient({ advertiserEmail }: { advertiserEmail: 
               )}
             </div>
           </>
+        )}
+
+        {/* ─── Email notification settings ─── */}
+        {company && !setupMode && (
+          <div className="mt-8">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="flex items-center gap-2 text-xs text-muted transition-colors hover:text-cream cursor-pointer"
+            >
+              <span>{showSettings ? "▾" : "▸"}</span>
+              Email notification settings
+            </button>
+
+            {showSettings && (
+              <div className="mt-3 border-[3px] border-border bg-bg-raised p-5 sm:p-6 space-y-4">
+                <p className="text-xs text-muted/40 normal-case">
+                  These emails are sent to <strong className="text-cream">{advertiserEmail}</strong>
+                </p>
+
+                <div className="space-y-1 text-xs normal-case">
+                  <div className="flex items-center gap-3 py-2 border-b border-border/20">
+                    <span className="text-[#c8e64a]">&#10003;</span>
+                    <div>
+                      <span className="text-cream">Listing approved / rejected</span>
+                      <span className="text-muted/40 ml-2">Always on</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 py-2 border-b border-border/20">
+                    <span className="text-[#c8e64a]">&#10003;</span>
+                    <div>
+                      <span className="text-cream">Expiration warnings</span>
+                      <span className="text-muted/40 ml-2">Always on</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 py-2 border-b border-border/20">
+                    <span className="text-[#c8e64a]">&#10003;</span>
+                    <div>
+                      <span className="text-cream">New candidates</span>
+                      <span className="text-muted/40 ml-2">When someone applies</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 py-2 border-b border-border/20">
+                    <span className="text-[#c8e64a]">&#10003;</span>
+                    <div>
+                      <span className="text-cream">Weekly performance report</span>
+                      <span className="text-muted/40 ml-2">Every Monday</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 py-2">
+                    <span className="text-[#c8e64a]">&#10003;</span>
+                    <div>
+                      <span className="text-cream">Moderation alerts</span>
+                      <span className="text-muted/40 ml-2">If listing is flagged</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted/30 normal-case pt-2">
+                  All emails are sent to your login email. To change it, log in with a different corporate email.
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="h-12" />

@@ -3492,6 +3492,15 @@ function HomeContent() {
               </div>
             </div>
 
+            {/* ── Settings ── */}
+            {session && (
+              <div className="border-t border-border px-5 py-4">
+                <a href="/settings" className="text-[11px] text-muted transition-colors hover:text-cream normal-case">
+                  Notification settings
+                </a>
+              </div>
+            )}
+
             {/* ── Footer ── */}
             <div className="border-t border-border px-5 py-4">
               <p className="text-[10px] text-muted/40 normal-case">
@@ -3946,6 +3955,12 @@ function HomeContent() {
                         <PixelBalance />
                       </>
                     )}
+                    <a
+                      href="/settings"
+                      className="border-2 border-border bg-bg/80 px-2 py-1 text-[9px] text-muted backdrop-blur-sm transition-colors hover:text-cream hover:border-border-light"
+                    >
+                      Settings
+                    </a>
                     <button
                       onClick={handleSignOut}
                       className="border-2 border-border bg-bg/80 px-2 py-1 text-[9px] text-muted backdrop-blur-sm transition-colors hover:text-cream hover:border-border-light"

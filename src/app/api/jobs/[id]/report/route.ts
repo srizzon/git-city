@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { sendJobReportedEmail, sendJobReportedAdminEmail } from "@/lib/notification-senders/job-reported";
 
 export async function POST(
   req: NextRequest,
@@ -53,11 +54,38 @@ export async function POST(
 
   if (count && count >= 10) {
     // Mark as flagged for admin review instead of auto-pausing
-    await admin
+    const { data: updated } = await admin
       .from("job_listings")
       .update({ status: "paused", paused_at: new Date().toISOString() })
       .eq("id", id)
-      .eq("status", "active");
+      .eq("status", "active")
+      .select("title, company:job_company_profiles!inner(name, advertiser_id)")
+      .single();
+
+    if (updated) {
+      const comp = updated.company as unknown as { name: string; advertiser_id: string | null };
+
+      // Notify admin
+      sendJobReportedAdminEmail(updated.title, comp.name, count, id).catch((err) =>
+        console.error("[job-notify] Failed to send report admin email:", err),
+      );
+
+      // Notify company
+      if (comp.advertiser_id) {
+        admin
+          .from("advertiser_accounts")
+          .select("email")
+          .eq("id", comp.advertiser_id)
+          .single()
+          .then(({ data: advertiser }) => {
+            if (advertiser?.email) {
+              sendJobReportedEmail(advertiser.email, updated.title).catch((err) =>
+                console.error("[job-notify] Failed to send report company email:", err),
+              );
+            }
+          });
+      }
+    }
   }
 
   return NextResponse.json({ reported: true });

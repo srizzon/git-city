@@ -576,6 +576,11 @@ export default function CareerProfileForm() {
             {saved ? "Saved!" : saving ? "Saving..." : "Save profile"}
           </button>
 
+          {/* ─── Notification Settings ─── */}
+          <a href="/settings" className="block text-center text-xs text-muted/40 normal-case transition-colors hover:text-cream mt-4">
+            Manage job notification preferences &rarr;
+          </a>
+
           {/* ─── Danger Zone ─── */}
           {hasExisting && (
             <div className="mt-8 border-[3px] border-red-400/10 p-5">

@@ -26,10 +26,10 @@ export async function POST(
     return NextResponse.json({ error: "No developer profile" }, { status: 400 });
   }
 
-  // Get the listing
+  // Get the listing with company info for notification
   const { data: listing } = await admin
     .from("job_listings")
-    .select("id, apply_url")
+    .select("id, apply_url, title, company_id, company:job_company_profiles!inner(advertiser_id)")
     .eq("id", id)
     .eq("status", "active")
     .single();
@@ -72,11 +72,24 @@ export async function POST(
     }),
   ]);
 
-  // Check if first-ever application for XP + achievement
-  // Only run on fresh inserts (created just now, within last 5 seconds)
+  // Queue email notification for company (batched by cron every 15 min)
   const isNewApplication = appResult?.created_at &&
     Date.now() - new Date(appResult.created_at).getTime() < 5000;
 
+  if (isNewApplication) {
+    admin
+      .from("job_application_email_queue")
+      .insert({
+        listing_id: id,
+        developer_login: dev.github_login,
+        has_profile: !!profile,
+      })
+      .then(({ error: qErr }) => {
+        if (qErr) console.error("[job-notify] Failed to queue application email:", qErr);
+      });
+  }
+
+  // Check if first-ever application for XP + achievement
   if (isNewApplication) {
     const { count } = await admin
       .from("job_applications")

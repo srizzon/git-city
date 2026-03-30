@@ -10,6 +10,10 @@
     { "path": "/api/cron/cleanup-sessions", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/refresh-ad-stats", "schedule": "0 * * * *" },
     { "path": "/api/cron/ad-weekly-report", "schedule": "0 10 * * 1" },
-    { "path": "/api/cron/jobs-expiry",      "schedule": "0 9 * * *" }
+    { "path": "/api/cron/jobs-expiry",          "schedule": "0 9 * * *" },
+    { "path": "/api/cron/jobs-weekly-report",   "schedule": "0 10 * * 1" },
+    { "path": "/api/cron/jobs-weekly-digest",   "schedule": "0 11 * * 1" },
+    { "path": "/api/cron/jobs-notify-signups",  "schedule": "0 12 * * *" },
+    { "path": "/api/cron/jobs-flush-application-emails", "schedule": "*/15 * * * *" }
   ]
 }

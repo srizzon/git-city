@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { createJobCheckoutSession } from "@/lib/jobs/stripe";
 import { FREE_LISTING_LIMIT, LISTING_DURATION_DAYS } from "@/lib/jobs/constants";
 import type { JobTier } from "@/lib/jobs/types";
+import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pending-review";
 
 const VALID_TIERS: JobTier[] = ["free", "standard", "featured", "premium"];
 
@@ -69,6 +70,20 @@ export async function POST(req: NextRequest) {
         expires_at: expiresAt,
       })
       .eq("id", listing_id);
+
+    // Notify admin that a new listing needs review
+    const { data: pendingListing } = await admin
+      .from("job_listings")
+      .select("title, company:job_company_profiles!inner(name)")
+      .eq("id", listing_id)
+      .single();
+
+    if (pendingListing) {
+      const compName = (pendingListing.company as unknown as { name: string }).name;
+      sendJobPendingReviewEmail(pendingListing.title, compName, "free", listing_id).catch((err) =>
+        console.error("[job-notify] Failed to send pending review email:", err),
+      );
+    }
 
     return NextResponse.json({ url: `/jobs/dashboard?published=free` });
   }

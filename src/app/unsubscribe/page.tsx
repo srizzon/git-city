@@ -15,6 +15,10 @@ export default async function UnsubscribePage({
     marketing: "marketing emails",
     streak_reminders: "streak reminders",
     transactional: "transactional emails",
+    jobs_applications: "job application notifications",
+    jobs_performance: "job performance reports",
+    jobs_digest: "weekly job digest",
+    jobs_updates: "job status updates",
   };
 
   return (
@@ -93,12 +97,20 @@ export default async function UnsubscribePage({
           }}
         />
 
-        <a
-          href="https://thegitcity.com"
-          style={{ color: "#c8e64a", fontSize: 14, textDecoration: "underline" }}
-        >
-          Back to Git City
-        </a>
+        <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>
+          <a
+            href="/settings"
+            style={{ color: "#c8e64a", fontSize: 14, textDecoration: "underline" }}
+          >
+            Notification settings
+          </a>
+          <a
+            href="https://thegitcity.com"
+            style={{ color: "#666", fontSize: 14, textDecoration: "underline" }}
+          >
+            Back to Git City
+          </a>
+        </div>
       </div>
     </div>
   );

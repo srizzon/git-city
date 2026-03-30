@@ -6,6 +6,7 @@ import { SKY_AD_PLANS, isValidPlanId } from "@/lib/skyAdPlans";
 import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import type Stripe from "stripe";
+import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pending-review";
 
 // Disable body parsing — Stripe needs raw body for signature verification
 export const dynamic = "force-dynamic";
@@ -173,6 +174,23 @@ export async function POST(request: Request) {
               stripe_payment_intent: paymentIntentId ?? null,
             })
             .eq("id", listingId);
+
+          // Notify admin about new listing for review
+          const { data: paidListing } = await sb
+            .from("job_listings")
+            .select("title, company:job_company_profiles!inner(name)")
+            .eq("id", listingId)
+            .single();
+
+          if (paidListing) {
+            const compName = (paidListing.company as unknown as { name: string }).name;
+            sendJobPendingReviewEmail(
+              paidListing.title,
+              compName,
+              session.metadata.tier ?? "standard",
+              listingId,
+            ).catch((err) => console.error("[job-notify] Failed to send pending review email:", err));
+          }
 
           console.log(`Job listing ${listingId} moved to pending_review after payment`);
           break;
