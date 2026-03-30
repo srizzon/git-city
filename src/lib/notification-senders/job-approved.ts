@@ -1,8 +1,7 @@
-import { getResend } from "@/lib/resend";
-import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
+import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
+import { buildButton, escapeHtml } from "@/lib/email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
-const FROM = "Git City Jobs <noreply@thegitcity.com>";
 
 /**
  * Email sent to the company when their job listing is approved by admin.
@@ -42,11 +41,10 @@ export async function sendJobApprovedEmail(
     </p>
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await sendCompanyEmail({
     to: email,
     subject: `Your listing is live: ${listingTitle}`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `Your listing is live: ${listingTitle}\n\nYour job listing has been approved and is now visible to developers on Git City.\n\nIt will remain active until ${expiresDate}. You'll receive a reminder before it expires.\n\nWhat happens next:\n- You'll be notified when developers apply\n- Review candidates and their profiles in your dashboard\n- Mark candidates as hired to track your results\n\nView Dashboard: ${BASE_URL}/jobs/dashboard\nView your listing: ${BASE_URL}/jobs/${listingId}`,
   });
 }

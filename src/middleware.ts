@@ -89,10 +89,38 @@ function getClientIp(request: NextRequest): string {
 }
 
 // ---------------------------------------------------------------------------
+// Known bot User-Agent patterns (case-insensitive substrings)
+// ---------------------------------------------------------------------------
+const BOT_PATTERNS = [
+  "bot", "crawler", "spider", "slurp", "mediapartners",
+  "facebookexternalhit", "linkedinbot", "twitterbot",
+  "whatsapp", "telegrambot", "discordbot", "bingpreview",
+  "semrush", "ahrefsbot", "mj12bot", "dotbot", "petalbot",
+  "yandexbot", "baiduspider", "sogou", "bytespider",
+  "gptbot", "ccbot", "anthropic-ai", "google-extended",
+  "applebot", "duckduckbot",
+];
+
+function isBot(ua: string): boolean {
+  const lower = ua.toLowerCase();
+  return BOT_PATTERNS.some((p) => lower.includes(p));
+}
+
+// ---------------------------------------------------------------------------
 // Middleware
 // ---------------------------------------------------------------------------
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ── 0. Block bots from API routes ─────────────────────────────────
+  // Bots don't need API access; blocking them here avoids function
+  // invocations and saves cost.  Pages/OG images are still served.
+  if (pathname.startsWith("/api/")) {
+    const ua = request.headers.get("user-agent") ?? "";
+    if (isBot(ua)) {
+      return new NextResponse(null, { status: 403 });
+    }
+  }
 
   // ── 1. Rate Limit ────────────────────────────────────────────────────
   const ip = getClientIp(request);

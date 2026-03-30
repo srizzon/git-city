@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { sendJobCompanyWelcomeEmail } from "@/lib/notification-senders/job-company-welcome";
 
 async function requireAdmin() {
   const supabase = await createServerSupabase();
@@ -87,6 +88,10 @@ export async function POST(
     console.error("Failed to link company:", error);
     return NextResponse.json({ error: "Failed to link company" }, { status: 500 });
   }
+
+  sendJobCompanyWelcomeEmail(normalizedEmail, company.name as string).catch((err) =>
+    console.error("Failed to send company welcome email:", err),
+  );
 
   return NextResponse.json({ company, advertiser_email: normalizedEmail });
 }

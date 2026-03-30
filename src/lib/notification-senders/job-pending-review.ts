@@ -1,8 +1,7 @@
-import { getResend } from "@/lib/resend";
-import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
+import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
+import { buildButton, escapeHtml } from "@/lib/email-template";
 import { getAdminNotificationEmail } from "@/lib/jobs/admin-email";
 
-const FROM = "Git City Jobs <noreply@thegitcity.com>";
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
 /**
@@ -27,11 +26,10 @@ export async function sendJobPendingReviewEmail(
     ${buildButton("Review in Admin", `${BASE_URL}/admin/jobs`)}
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await sendCompanyEmail({
     to: adminEmail,
     subject: `[Review] New job listing: ${listingTitle} (${companyName})`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `[Review] New job listing: ${listingTitle} (${companyName})\n\n${companyName} submitted a new ${tier} job listing.\n\nReview in Admin: ${BASE_URL}/admin/jobs`,
   });
 }

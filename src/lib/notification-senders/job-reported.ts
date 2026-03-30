@@ -1,8 +1,7 @@
-import { getResend } from "@/lib/resend";
-import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
+import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
+import { buildButton, escapeHtml } from "@/lib/email-template";
 import { getAdminNotificationEmail } from "@/lib/jobs/admin-email";
 
-const FROM = "Git City Jobs <noreply@thegitcity.com>";
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
 /**
@@ -28,13 +27,12 @@ export async function sendJobReportedEmail(
     </p>
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await sendCompanyEmail({
     to: companyEmail,
-    replyTo: "support@thegitcity.com",
     subject: `Your listing was paused for review: ${listingTitle}`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `Your listing was paused for review: ${listingTitle}\n\nYour listing has been temporarily paused after receiving multiple reports from the community.\n\nOur team will review it shortly. If everything checks out, it will be reactivated automatically. If changes are needed, we'll reach out with details.\n\nView Dashboard: ${BASE_URL}/jobs/dashboard\n\nIf you think this was a mistake, reply to this email.`,
+    replyTo: "support@thegitcity.com",
   });
 }
 
@@ -59,11 +57,10 @@ export async function sendJobReportedAdminEmail(
     ${buildButton("Review in Admin", `${BASE_URL}/admin/jobs`)}
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await sendCompanyEmail({
     to: adminEmail,
     subject: `[Moderation] Job auto-paused: ${listingTitle} (${reportCount} reports)`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `[Moderation] Job auto-paused: ${listingTitle} (${reportCount} reports)\n\nListing by ${companyName} was auto-paused after ${reportCount} reports.\n\nReview in Admin: ${BASE_URL}/admin/jobs`,
   });
 }

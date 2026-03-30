@@ -3,6 +3,7 @@ import { getAdvertiserFromCookies } from "@/lib/advertiser-auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import DOMPurify from "isomorphic-dompurify";
 import { sendJobFilledNotification } from "@/lib/notification-senders/job-filled";
+import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pending-review";
 
 const ALLOWED_HTML = {
   ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "h1", "h2", "h3", "blockquote", "code", "pre"],
@@ -119,6 +120,34 @@ export async function PATCH(
       if (body.tech_stack) updates.tech_stack = body.tech_stack;
       if (Object.keys(updates).length > 0) {
         await admin.from("job_listings").update(updates).eq("id", id);
+      }
+      break;
+    }
+    case "resubmit": {
+      if (listing.status !== "rejected") {
+        return NextResponse.json({ error: "Only rejected listings can be resubmitted" }, { status: 400 });
+      }
+
+      await admin
+        .from("job_listings")
+        .update({ status: "pending_review", rejection_reason: null })
+        .eq("id", id);
+
+      // Fetch listing details for the admin notification
+      const { data: resubmittedListing } = await admin
+        .from("job_listings")
+        .select("title, tier, company:job_company_profiles!inner(name)")
+        .eq("id", id)
+        .single();
+
+      if (resubmittedListing) {
+        const resubCompanyName = (resubmittedListing.company as unknown as { name: string }).name;
+        sendJobPendingReviewEmail(
+          resubmittedListing.title,
+          resubCompanyName,
+          resubmittedListing.tier,
+          id,
+        ).catch((err) => console.error("Failed to send resubmit review email:", err));
       }
       break;
     }

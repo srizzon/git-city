@@ -46,5 +46,7 @@ export async function GET() {
     .select("milestone, reached_at")
     .order("milestone", { ascending: false });
 
-  return NextResponse.json(data ?? []);
+  return NextResponse.json(data ?? [], {
+    headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+  });
 }

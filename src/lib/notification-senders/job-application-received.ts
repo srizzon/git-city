@@ -1,8 +1,7 @@
-import { getResend } from "@/lib/resend";
-import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
+import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
+import { buildButton, escapeHtml } from "@/lib/email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
-const FROM = "Git City Jobs <noreply@thegitcity.com>";
 
 interface ApplicationInfo {
   developerLogin: string;
@@ -51,12 +50,15 @@ export async function sendJobApplicationReceivedEmail(
     </p>
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  const scoreText = application.qualityScore != null ? `Quality score: ${application.qualityScore}/100\n` : "";
+  const badgesText = application.badges && application.badges.length > 0 ? `${application.badges.join(", ")}\n` : "";
+  const profileText = application.hasProfile ? "Has profile" : "No profile";
+
+  await sendCompanyEmail({
     to: email,
     subject: `New candidate for ${listingTitle}: @${application.developerLogin}`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `New candidate for ${listingTitle}: @${application.developerLogin}\n\n@${application.developerLogin} applied to ${listingTitle}\n\n${scoreText}${badgesText}${profileText}\n\nView Candidates: ${BASE_URL}/jobs/dashboard`,
   });
 }
 
@@ -99,11 +101,16 @@ export async function sendJobApplicationsBatchEmail(
     ${buildButton("Review Candidates", `${BASE_URL}/jobs/dashboard`)}
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  const listText = applications
+    .slice(0, 10)
+    .map((a) => `- @${a.login}${a.hasProfile ? " (has profile)" : ""}`)
+    .join("\n");
+  const moreLineText = total > 10 ? `\n...and ${total - 10} more` : "";
+
+  await sendCompanyEmail({
     to: email,
     subject: `${total} new candidate${total > 1 ? "s" : ""} for ${listingTitle}`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `${total} new application${total > 1 ? "s" : ""} for ${listingTitle}\n\n${withProfile} of ${total} have a complete career profile.\n\n${listText}${moreLineText}\n\nReview Candidates: ${BASE_URL}/jobs/dashboard`,
   });
 }

@@ -259,6 +259,12 @@ export default function JobDetailClient({ listingId }: { listingId: string }) {
                       >
                         Open application page again
                       </button>
+                      <a
+                        href="/jobs/my-applications"
+                        className="block w-full py-2 text-center text-xs text-muted/40 transition-colors hover:text-muted normal-case"
+                      >
+                        View all my applications
+                      </a>
                     </>
                   ) : (
                     <button

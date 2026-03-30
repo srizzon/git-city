@@ -58,14 +58,23 @@ export interface SendResult {
 // ── Config ──
 
 const FROM = "Git City <noreply@thegitcity.com>";
-const HMAC_SECRET = process.env.UNSUBSCRIBE_HMAC_SECRET || process.env.CRON_SECRET || "fallback-secret";
+const HMAC_SECRET = (() => {
+  const secret = process.env.UNSUBSCRIBE_HMAC_SECRET;
+  if (!secret) {
+    console.error("[notifications] UNSUBSCRIBE_HMAC_SECRET is not set. Unsubscribe links will not work securely.");
+  }
+  return secret || "MISSING_HMAC_SECRET_SET_ENV_VAR";
+})();
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
 const RATE_LIMITS: Record<Channel, { perHour: number; perDay: number }> = {
-  email: { perHour: 5, perDay: 10 },
-  push: { perHour: 10, perDay: 30 },
-  in_app: { perHour: 100, perDay: 500 },
+  email: { perHour: 20, perDay: 50 },
+  push: { perHour: 20, perDay: 50 },
+  in_app: { perHour: 200, perDay: 1000 },
 };
+
+// Categories exempt from rate limiting (always send)
+const RATE_LIMIT_EXEMPT: NotificationCategory[] = ["transactional"];
 
 // ── Public API ──
 
@@ -208,8 +217,9 @@ async function processChannel(
     }
   }
 
-  // 4. Rate limit check (if rate limited and batch eligible, route to batch)
-  const rateLimited = await checkRateLimit(sb, payload.developerId, channel);
+  // 4. Rate limit check (exempt transactional, if rate limited and batch eligible, route to batch)
+  const isExempt = RATE_LIMIT_EXEMPT.includes(payload.category) || payload.forceSend;
+  const rateLimited = isExempt ? null : await checkRateLimit(sb, payload.developerId, channel);
   if (rateLimited) {
     if (payload.batchKey && payload.priority !== "high") {
       return await addToBatch(sb, channel, payload);
@@ -413,6 +423,7 @@ async function dispatchEmail(
     to: email,
     subject: payload.title,
     html: fullHtml,
+    text: payload.body,
     headers: {
       "List-Unsubscribe": `<${unsubUrl}>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",

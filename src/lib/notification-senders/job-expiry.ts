@@ -1,8 +1,7 @@
-import { getResend } from "@/lib/resend";
-import { wrapInBaseTemplate, buildButton, buildStatsTable, escapeHtml } from "@/lib/email-template";
+import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
+import { buildButton, buildStatsTable, escapeHtml } from "@/lib/email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
-const FROM = "Git City Jobs <noreply@thegitcity.com>";
 
 /**
  * Email sent when a job listing is about to expire (5 days warning).
@@ -31,12 +30,11 @@ export async function sendJobExpiringEmail(
     ${buildButton("View Dashboard", `${BASE_URL}/jobs/dashboard`)}
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await sendCompanyEmail({
     to: email,
     subject: `Your listing expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}: ${listingTitle}`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `Your listing expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}: ${listingTitle}\n\nHere's how it performed so far:\n- Views: ${stats.views.toLocaleString()}\n- Applications: ${stats.applies.toLocaleString()}\n\nAfter expiration, your listing will no longer appear in search results. You can repost it anytime from your dashboard.\n\nView Dashboard: ${BASE_URL}/jobs/dashboard`,
   });
 }
 
@@ -65,11 +63,10 @@ export async function sendJobExpiredEmail(
     ${buildButton("Repost Listing", `${BASE_URL}/jobs/dashboard`)}
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await sendCompanyEmail({
     to: email,
     subject: `Final results for: ${listingTitle}`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `Final results for: ${listingTitle}\n\nYour listing has expired. Here are the final numbers:\n- Views: ${stats.views.toLocaleString()}\n- Applications: ${stats.applies.toLocaleString()}\n- Hires: ${stats.hires.toLocaleString()}\n\nStill hiring? Repost your listing to reach more developers.\n\nRepost Listing: ${BASE_URL}/jobs/dashboard`,
   });
 }

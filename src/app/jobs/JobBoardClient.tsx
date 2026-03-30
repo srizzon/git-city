@@ -217,6 +217,9 @@ export default function JobBoardClient({ username }: { username: string }) {
             <p className="mt-1 text-xs text-muted normal-case">Real devs. Real jobs. No robots in between.</p>
           </div>
           <div className="flex gap-2">
+            <Link href="/jobs/my-applications" className="border-[3px] border-border px-3 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream">
+              My Applications
+            </Link>
             <Link href={username ? `/hire/${username}` : "/hire/edit"} className="border-[3px] border-border px-3 py-2 text-xs text-muted transition-colors hover:border-border-light hover:text-cream">
               My Profile
             </Link>

@@ -1,8 +1,7 @@
-import { getResend } from "@/lib/resend";
-import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
+import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
+import { buildButton, escapeHtml } from "@/lib/email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
-const FROM = "Git City Jobs <noreply@thegitcity.com>";
 
 /**
  * Email sent to the company when their job listing is rejected by admin.
@@ -32,12 +31,11 @@ export async function sendJobRejectedEmail(
     </p>
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await sendCompanyEmail({
     to: email,
-    replyTo: "support@thegitcity.com",
     subject: `Listing not approved: ${listingTitle}`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `Listing not approved: ${listingTitle}\n\nYour job listing was not approved after review.\n\nReason: ${reason}\n\nYou can edit your listing and resubmit it for review from your dashboard.\n\nEdit Listing: ${BASE_URL}/jobs/dashboard\n\nIf you think this was a mistake, reply to this email and we'll take another look.`,
+    replyTo: "support@thegitcity.com",
   });
 }

@@ -1,8 +1,7 @@
-import { getResend } from "@/lib/resend";
-import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
+import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
+import { buildButton, escapeHtml } from "@/lib/email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
-const FROM = "Git City Jobs <noreply@thegitcity.com>";
 
 interface ListingStats {
   title: string;
@@ -93,11 +92,15 @@ export async function sendJobWeeklyPerformanceReport(report: WeeklyReport) {
     </p>
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  const listingLines = report.listings
+    .sort((a, b) => b.views - a.views)
+    .map((l) => `- ${l.title}: ${fmtNum(l.views)} views, ${fmtNum(l.applies)} applies, ${fmtNum(l.profileViews)} profile views`)
+    .join("\n");
+
+  await sendCompanyEmail({
     to: report.companyEmail,
     subject: `Your Git City jobs: ${fmtNum(report.totals.views)} views this week`,
-    html: wrapInBaseTemplate(bodyHtml),
+    html: bodyHtml,
+    text: `Weekly Jobs Report\n\nHere's how your listings performed this week, ${report.companyName}.\n\nViews: ${fmtNum(report.totals.views)} (${viewsChange})\nApplications: ${fmtNum(report.totals.applies)} (${appliesChange})\nProfile Views: ${fmtNum(report.totals.profileViews)} (${profileChange})\n\n${listingLines}\n\nView Full Dashboard: ${BASE_URL}/jobs/dashboard`,
   });
 }

@@ -1,30 +1,42 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { Webhook } from "svix";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Resend webhook handler for email delivery events.
- * Handles bounces, complaints, delivery confirmations, and opens/clicks.
- * Updates notification_log delivery lifecycle and notification_suppressions.
+ * Verifies Svix signature, then handles bounces, complaints, delivery, opens, clicks.
  */
 export async function POST(request: Request) {
-  // Verify webhook secret (set in Resend dashboard)
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
-  if (webhookSecret) {
-    const sig = request.headers.get("svix-signature");
-    if (!sig) {
-      return NextResponse.json({ error: "Missing signature" }, { status: 401 });
-    }
-    // For production, use Resend's webhook verification SDK.
-    // For now, we rely on the webhook URL being secret.
+  if (!webhookSecret) {
+    console.error("[webhook:resend] RESEND_WEBHOOK_SECRET not set, rejecting all webhooks");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
   }
+
+  // Verify Svix signature
+  const svixId = request.headers.get("svix-id");
+  const svixTimestamp = request.headers.get("svix-timestamp");
+  const svixSignature = request.headers.get("svix-signature");
+
+  if (!svixId || !svixTimestamp || !svixSignature) {
+    return NextResponse.json({ error: "Missing signature headers" }, { status: 401 });
+  }
+
+  const rawBody = await request.text();
 
   let body: { type: string; data: Record<string, unknown> };
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    const wh = new Webhook(webhookSecret);
+    body = wh.verify(rawBody, {
+      "svix-id": svixId,
+      "svix-timestamp": svixTimestamp,
+      "svix-signature": svixSignature,
+    }) as typeof body;
+  } catch (err) {
+    console.error("[webhook:resend] Signature verification failed:", err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   const sb = getSupabaseAdmin();
@@ -37,7 +49,6 @@ export async function POST(request: Request) {
         const emailId = body.data.email_id as string;
 
         if (email) {
-          // Add to suppressions
           await sb
             .from("notification_suppressions")
             .upsert(
@@ -95,7 +106,7 @@ export async function POST(request: Request) {
             .from("notification_log")
             .update({ opened_at: now })
             .eq("provider_id", emailId)
-            .is("opened_at", null); // Only update first open
+            .is("opened_at", null);
         }
         break;
       }
@@ -107,7 +118,7 @@ export async function POST(request: Request) {
             .from("notification_log")
             .update({ clicked_at: now })
             .eq("provider_id", emailId)
-            .is("clicked_at", null); // Only update first click
+            .is("clicked_at", null);
         }
         break;
       }

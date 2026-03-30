@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
       .select("*", { count: "exact", head: true })
       .eq("status", "active");
 
-    return NextResponse.json({ total: count ?? 0 });
+    return NextResponse.json(
+      { total: count ?? 0 },
+      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } },
+    );
   }
 
   // preview mode: no auth required — powers homepage jobs dropdown
@@ -29,7 +32,10 @@ export async function GET(req: NextRequest) {
       .order("published_at", { ascending: false })
       .limit(3);
 
-    return NextResponse.json({ listings: data ?? [], total: count ?? 0 });
+    return NextResponse.json(
+      { listings: data ?? [], total: count ?? 0 },
+      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } },
+    );
   }
 
   // Full listing mode: auth required (community-exclusive)

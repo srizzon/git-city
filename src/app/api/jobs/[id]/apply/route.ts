@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { sendJobApplicationConfirmedNotification } from "@/lib/notification-senders/job-application-confirmed";
+import { sendJobProfileNudgeNotification } from "@/lib/notification-senders/job-profile-nudge";
 
 export async function POST(
   _req: NextRequest,
@@ -29,7 +31,7 @@ export async function POST(
   // Get the listing with company info for notification
   const { data: listing } = await admin
     .from("job_listings")
-    .select("id, apply_url, title, company_id, company:job_company_profiles!inner(advertiser_id)")
+    .select("id, apply_url, title, company_id, company:job_company_profiles!inner(name, advertiser_id)")
     .eq("id", id)
     .eq("status", "active")
     .single();
@@ -77,6 +79,7 @@ export async function POST(
     Date.now() - new Date(appResult.created_at).getTime() < 5000;
 
   if (isNewApplication) {
+    // Queue company notification
     admin
       .from("job_application_email_queue")
       .insert({
@@ -87,6 +90,17 @@ export async function POST(
       .then(({ error: qErr }) => {
         if (qErr) console.error("[job-notify] Failed to queue application email:", qErr);
       });
+
+    // Confirm to the developer
+    const compName = (listing.company as unknown as { name: string }).name;
+    sendJobApplicationConfirmedNotification(
+      dev.id,
+      dev.github_login,
+      listing.title,
+      compName,
+      id,
+      !!profile,
+    );
   }
 
   // Check if first-ever application for XP + achievement
@@ -96,8 +110,13 @@ export async function POST(
       .select("*", { count: "exact", head: true })
       .eq("developer_id", dev.id);
 
+    // Nudge to complete profile after 3rd application without profile
+    if (!profile && count === 3) {
+      sendJobProfileNudgeNotification(dev.id, dev.github_login, count);
+    }
+
     if (count === 1) {
-      // First application — award XP + achievement
+      // First application - award XP + achievement
       await Promise.all([
         admin.rpc("grant_xp", {
           p_developer_id: dev.id,

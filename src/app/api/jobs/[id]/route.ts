@@ -18,6 +18,13 @@ export async function GET(
 
   const admin = getSupabaseAdmin();
 
+  // Get developer ID for checking application status
+  const { data: dev } = await admin
+    .from("developers")
+    .select("id")
+    .eq("claimed_by", user.id)
+    .maybeSingle();
+
   // First try active listing (normal case)
   let { data: listing } = await admin
     .from("job_listings")
@@ -26,7 +33,9 @@ export async function GET(
     .eq("status", "active")
     .single();
 
-  // If not active, allow preview for admins and listing owners
+  let closedReason: "filled" | "expired" | "paused" | null = null;
+
+  // If not active, check if the user has other access
   if (!listing) {
     const { data: anyListing } = await admin
       .from("job_listings")
@@ -49,19 +58,29 @@ export async function GET(
       isOwner = comp?.advertiser_id === advertiser.id;
     }
 
-    if (!isAdmin && !isOwner) {
+    // Check if developer applied to this listing (filled/expired/paused only)
+    let isApplicant = false;
+    const closedStatuses = ["filled", "expired", "paused"];
+    if (dev && closedStatuses.includes(anyListing.status)) {
+      const { data: application } = await admin
+        .from("job_applications")
+        .select("id")
+        .eq("listing_id", id)
+        .eq("developer_id", dev.id)
+        .maybeSingle();
+      isApplicant = !!application;
+    }
+
+    if (!isAdmin && !isOwner && !isApplicant) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    }
+
+    if (isApplicant && closedStatuses.includes(anyListing.status)) {
+      closedReason = anyListing.status as "filled" | "expired" | "paused";
     }
 
     listing = anyListing;
   }
-
-  // Get developer ID for checking application status
-  const { data: dev } = await admin
-    .from("developers")
-    .select("id")
-    .eq("claimed_by", user.id)
-    .maybeSingle();
 
   let hasApplied = false;
   let hasCareerProfile = false;
@@ -105,5 +124,6 @@ export async function GET(
     hasApplied,
     hasCareerProfile,
     isPreview: listing.status !== "active",
+    ...(closedReason && { closedReason }),
   });
 }

@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
 import { LISTING_DURATION_DAYS } from "@/lib/jobs/constants";
 import { sendJobApprovedEmail } from "@/lib/notification-senders/job-approved";
+import { sendJobReferralConvertedNotification } from "@/lib/notification-senders/job-referral-converted";
 
 export async function POST(
   _req: NextRequest,
@@ -58,6 +59,58 @@ export async function POST(
           id,
           expires.toISOString(),
         ).catch((err) => console.error("[job-notify] Failed to send approved email:", err));
+      }
+    }
+  }
+
+  // Check if this company was referred (first approved listing triggers referral reward)
+  if (listing) {
+    const comp = listing.company as unknown as { advertiser_id: string | null };
+    if (comp.advertiser_id) {
+      const { data: referral } = await admin
+        .from("job_referrals")
+        .select("referrer_dev_id, converted")
+        .eq("advertiser_id", comp.advertiser_id)
+        .eq("converted", false)
+        .maybeSingle();
+
+      if (referral) {
+        // Mark referral as converted
+        await admin
+          .from("job_referrals")
+          .update({ converted: true, converted_at: new Date().toISOString() })
+          .eq("referrer_dev_id", referral.referrer_dev_id)
+          .eq("advertiser_id", comp.advertiser_id);
+
+        // Get referrer info and notify
+        const { data: referrer } = await admin
+          .from("developers")
+          .select("id, github_login")
+          .eq("id", referral.referrer_dev_id)
+          .single();
+
+        if (referrer) {
+          // Award XP + achievement
+          await Promise.all([
+            admin.rpc("grant_xp", { p_developer_id: referrer.id, p_source: "referral_converted", p_amount: 1000 }),
+            admin.from("developer_achievements").upsert(
+              { developer_id: referrer.id, achievement_id: "city_recruiter", name: "City Recruiter", tier: "silver" },
+              { onConflict: "developer_id,achievement_id" },
+            ),
+          ]);
+
+          const { data: companyInfo } = await admin
+            .from("job_company_profiles")
+            .select("name")
+            .eq("advertiser_id", comp.advertiser_id)
+            .single();
+
+          sendJobReferralConvertedNotification(
+            referrer.id,
+            referrer.github_login,
+            companyInfo?.name ?? "A company",
+          );
+        }
       }
     }
   }
