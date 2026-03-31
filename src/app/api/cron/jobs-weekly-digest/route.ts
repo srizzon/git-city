@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   // Get active job listings published this week (one query, reused for all devs)
   const { data: recentJobs } = await admin
     .from("job_listings")
-    .select("id, title, seniority, tech_stack, location_type, salary_min, salary_max, currency, company:job_company_profiles!inner(name)")
+    .select("id, title, seniority, tech_stack, location_type, salary_min, salary_max, salary_currency, company:job_company_profiles!inner(name)")
     .eq("status", "active")
     .gte("published_at", oneWeekAgo)
     .order("published_at", { ascending: false });
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     locationType: job.location_type,
     salaryMin: job.salary_min,
     salaryMax: job.salary_max,
-    currency: job.currency,
+    currency: job.salary_currency,
     companyName: (job.company as unknown as { name: string }).name,
   }));
 
@@ -59,7 +59,6 @@ export async function GET(req: NextRequest) {
         id, skills, seniority,
         developer:developers!inner(id, github_login, email)
       `)
-      .eq("open_to_work", true)
       .not("developer.email", "is", null)
       .range(offset, offset + BATCH_SIZE - 1);
 
