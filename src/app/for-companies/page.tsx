@@ -107,7 +107,7 @@ export default async function ForCompaniesPage() {
         {/* Nav */}
         <div className="flex items-center justify-between">
           <Link href="/" className="text-xs text-dim transition-colors hover:text-muted">&larr; Back to City</Link>
-          <Link href="/business/login" className="text-xs text-muted transition-colors hover:text-cream">Log in</Link>
+          <Link href="/business/login?redirect=/jobs/dashboard" className="text-xs text-muted transition-colors hover:text-cream">Log in</Link>
         </div>
 
         {/* ─── Launch banner ─── */}
