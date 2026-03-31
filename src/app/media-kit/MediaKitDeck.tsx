@@ -5,9 +5,9 @@ import Link from "next/link";
 
 const ACCENT = "#c8e64a";
 const CREAM = "#e8dcc8";
-const TOTAL_SLIDES = 5;
+const TOTAL_SLIDES = 6;
 
-const SLIDE_LABELS = ["Cover", "Audience", "Formats", "Results", "Contact"];
+const SLIDE_LABELS = ["Cover", "Numbers", "Audience", "Formats", "Results", "Contact"];
 
 /* ─────────────── main component ─────────────── */
 export default function MediaKitDeck() {
@@ -76,6 +76,7 @@ export default function MediaKitDeck() {
 
   const slides = [
     <SlideCover key="cover" />,
+    <SlideNumbers key="numbers" />,
     <SlideAudience key="audience" />,
     <SlideFormats key="formats" />,
     <SlideResults key="results" />,
@@ -206,12 +207,6 @@ function SlideCover() {
         Put your brand in front of 156,000+ developers inside a 3D city built
         from real GitHub data
       </p>
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
-        <Pill>156K+ visitors</Pill>
-        <Pill>512K+ page views</Pill>
-        <Pill>71K+ devs</Pill>
-        <Pill>34K+ logged in</Pill>
-      </div>
       <p className="mt-4 text-xs text-dim normal-case sm:text-sm">
         Press &rarr; or swipe to navigate
       </p>
@@ -219,72 +214,142 @@ function SlideCover() {
   );
 }
 
-const NOTABLE_DEVS = [
-  { login: "torvalds", name: "Linus Torvalds", followers: "293K" },
-  { login: "karpathy", name: "Andrej Karpathy", followers: "154K" },
-  { login: "yyx990803", name: "Evan You", followers: "107K" },
-  { login: "gustavoguanabara", name: "Gustavo Guanabara", followers: "111K" },
-  { login: "rafaballerini", name: "Rafaella Ballerini", followers: "59K" },
-  { login: "theprimeagen", name: "ThePrimeagen", followers: "48K" },
-];
-
-function SlideAudience() {
+function SlideNumbers() {
   return (
-    <div className="flex w-full max-w-4xl flex-col gap-8">
-      <SlideHeader n="02" title="Audience" />
+    <div className="flex w-full max-w-4xl flex-col justify-between gap-10 sm:gap-12">
+      <SlideHeader n="02" title="Traction" />
 
-      {/* Notable devs — bigger, with followers */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
-        {NOTABLE_DEVS.map((dev) => (
-          <div key={dev.login} className="border-[3px] border-border bg-bg-raised p-3 text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`https://github.com/${dev.login}.png?size=80`}
-              alt={dev.name}
-              width={64}
-              height={64}
-              className="mx-auto rounded-sm border-2 border-border"
-              loading="lazy"
-            />
-            <p className="mt-2 text-[10px] text-cream normal-case leading-tight">
-              {dev.name}
+      {/* Hero numbers — 2x2 grid, big */}
+      <div className="grid grid-cols-2 gap-4 sm:gap-6">
+        {[
+          { n: "156K+", l: "Unique visitors", accent: true },
+          { n: "3.3M+", l: "Ad impressions", accent: true },
+          { n: "512K+", l: "Page views", accent: false },
+          { n: "71K+", l: "Devs in the city", accent: false },
+        ].map((m) => (
+          <div
+            key={m.l}
+            className="border-[3px] bg-bg-raised p-5 sm:p-8"
+            style={{ borderColor: m.accent ? ACCENT : undefined }}
+          >
+            <p
+              className="text-3xl sm:text-5xl"
+              style={{ color: m.accent ? ACCENT : CREAM }}
+            >
+              {m.n}
             </p>
-            <p className="mt-0.5 text-[10px] normal-case" style={{ color: ACCENT }}>
-              {dev.followers} followers
-            </p>
+            <p className="mt-2 text-[10px] text-dim sm:text-xs">{m.l}</p>
           </div>
         ))}
       </div>
 
-      {/* Key facts — grid of 4 */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="border-[3px] border-border bg-bg-raised p-4 text-center">
-          <p className="text-xl sm:text-2xl" style={{ color: ACCENT }}>15.7M+</p>
-          <p className="mt-1 text-[10px] text-dim">Combined GitHub Stars</p>
+      {/* Bottom row: supporting stats + context */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Pill>34K+ logged in</Pill>
+        <Pill>14K+ link clicks</Pill>
+        <Pill>$0 marketing</Pill>
+        <Pill>100% organic</Pill>
+        <Pill>40 days old</Pill>
+      </div>
+    </div>
+  );
+}
+
+const NOTABLE_DEVS_ROW1 = [
+  { login: "torvalds", name: "Linus Torvalds", desc: "Creator of Linux" },
+  { login: "bcherny", name: "Boris Cherny", desc: "Creator of Claude Code" },
+  { login: "steipete", name: "Peter Steinberger", desc: "Creator of OpenClaw" },
+];
+
+const NOTABLE_DEVS_ROW2 = [
+  { login: "gustavoguanabara", name: "Gustavo Guanabara", desc: "Curso em Video" },
+  { login: "filipedeschamps", name: "Filipe Deschamps", desc: "TabNews, YouTuber" },
+];
+
+function SlideAudience() {
+  const allDevs = [...NOTABLE_DEVS_ROW1, ...NOTABLE_DEVS_ROW2];
+
+  return (
+    <div className="flex w-full max-w-4xl flex-col gap-8">
+      <SlideHeader n="03" title="Audience" />
+
+      {/* Primary: real audience data */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
+        <div className="border-[3px] border-border bg-bg-raised p-3 text-center sm:p-4">
+          <p className="text-lg sm:text-2xl" style={{ color: ACCENT }}>BR 18%</p>
+          <p className="mt-1 text-[9px] text-dim sm:text-[10px]">US 17% · FR 12%</p>
         </div>
-        <div className="border-[3px] border-border bg-bg-raised p-4 text-center">
-          <p className="text-xl sm:text-2xl" style={{ color: ACCENT }}>5.2M+</p>
-          <p className="mt-1 text-[10px] text-dim">Combined Followers</p>
+        <div className="border-[3px] border-border bg-bg-raised p-3 text-center sm:p-4">
+          <p className="text-lg sm:text-2xl" style={{ color: ACCENT }}>69%</p>
+          <p className="mt-1 text-[9px] text-dim sm:text-[10px]">Desktop</p>
         </div>
-        <div className="border-[3px] border-border bg-bg-raised p-4 text-center">
-          <p className="text-xl sm:text-2xl" style={{ color: CREAM }}>69%</p>
-          <p className="mt-1 text-[10px] text-dim">Desktop</p>
+        <div className="border-[3px] border-border bg-bg-raised p-3 text-center sm:p-4">
+          <p className="text-lg sm:text-2xl" style={{ color: CREAM }}>15.7M+</p>
+          <p className="mt-1 text-[9px] text-dim sm:text-[10px]">GitHub Stars</p>
         </div>
-        <div className="border-[3px] border-border bg-bg-raised p-4 text-center">
-          <p className="text-xl sm:text-2xl" style={{ color: CREAM }}>BR 18%</p>
-          <p className="mt-1 text-[10px] text-dim">US 17% · FR 12%</p>
+        <div className="border-[3px] border-border bg-bg-raised p-3 text-center sm:p-4">
+          <p className="text-lg sm:text-2xl" style={{ color: CREAM }}>5.2M+</p>
+          <p className="mt-1 text-[9px] text-dim sm:text-[10px]">Followers</p>
         </div>
       </div>
 
-      {/* Traffic sources */}
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <Pill>GitHub 41K</Pill>
-        <Pill>Google 40K</Pill>
-        <Pill>X/Twitter 12K</Pill>
-        <Pill>LinkedIn 3.3K</Pill>
-        <Pill>JS 14K devs</Pill>
-        <Pill>Python 9K devs</Pill>
-        <Pill>TypeScript 8.7K devs</Pill>
+      {/* Traffic + Languages */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="border-[3px] border-border bg-bg-raised p-5">
+          <p className="mb-3 text-xs text-dim">Where they come from</p>
+          <div className="space-y-2">
+            {[
+              { source: "GitHub", value: "41K" },
+              { source: "Google", value: "40K" },
+              { source: "X / Twitter", value: "12K" },
+              { source: "LinkedIn", value: "3.3K" },
+            ].map((s) => (
+              <div key={s.source} className="flex items-center justify-between text-sm">
+                <span className="text-muted">{s.source}</span>
+                <span className="text-cream">{s.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="border-[3px] border-border bg-bg-raised p-5">
+          <p className="mb-3 text-xs text-dim">What they code</p>
+          <div className="space-y-2">
+            {[
+              { lang: "JavaScript", count: "14.2K" },
+              { lang: "Python", count: "9.0K" },
+              { lang: "TypeScript", count: "8.7K" },
+              { lang: "Java", count: "2.8K" },
+            ].map((l) => (
+              <div key={l.lang} className="flex items-center justify-between text-sm">
+                <span className="text-muted">{l.lang}</span>
+                <span className="text-cream">{l.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Devs in the city — compact, secondary */}
+      <div>
+        <p className="mb-3 text-xs text-dim normal-case">
+          71,000+ developers represented in the city, including:
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          {allDevs.map((dev) => (
+            <div key={dev.login} className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://github.com/${dev.login}.png?size=48`}
+                alt={dev.name}
+                width={24}
+                height={24}
+                className="rounded-sm border border-border"
+                loading="lazy"
+              />
+              <span className="text-xs text-muted normal-case">{dev.name}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -292,91 +357,131 @@ function SlideAudience() {
 
 function SlideFormats() {
   return (
-    <div className="flex w-full max-w-4xl flex-col gap-8">
-      <SlideHeader n="03" title="Formats" />
-      <div className="grid gap-5 sm:grid-cols-3">
-        <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
-          <p className="mb-3 text-base text-cream sm:text-lg">Landmark</p>
-          <p className="mb-4 text-sm leading-relaxed text-muted normal-case">
-            An exclusive 3D building with your brand identity. Custom model,
-            your colors, permanent position in the city.
+    <div className="flex w-full max-w-4xl flex-col gap-6">
+      <SlideHeader n="04" title="Formats" />
+
+      {/* Landmark — featured, full width */}
+      <div className="border-[3px] p-5 sm:p-8" style={{ borderColor: ACCENT }}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="max-w-lg">
+            <div className="flex items-center gap-3">
+              <p className="text-lg text-cream sm:text-2xl">Landmark</p>
+              <span className="border px-2 py-0.5 text-[10px]" style={{ borderColor: ACCENT, color: ACCENT }}>
+                PREMIUM
+              </span>
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-muted normal-case">
+              Your company becomes a building in the city. Custom 3D model with
+              your brand colors, logo, and a permanent position on the map.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Pill>AbacatePay</Pill>
+              <Pill>Viral Day</Pill>
+              <Pill>Acelera Dev</Pill>
+            </div>
+          </div>
+          <div className="shrink-0 text-center sm:text-right">
+            <p className="text-3xl sm:text-5xl" style={{ color: ACCENT }}>
+              1.72%
+            </p>
+            <p className="mt-1 text-xs text-dim">CTR (top performer)</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Rooftop + Blimp side by side */}
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2">
+        <div className="border-[3px] border-border bg-bg-raised p-4 sm:p-6">
+          <p className="text-base text-cream sm:text-lg">Rooftop Sign</p>
+          <p className="mt-3 text-sm leading-relaxed text-muted normal-case">
+            Illuminated sign that spins 360° on top of the tallest buildings.
+            Click goes straight to your link — no extra steps.
           </p>
-          <div className="h-0.5 bg-border" />
-          <p className="mt-4 text-3xl sm:text-4xl" style={{ color: ACCENT }}>
-            1.35%
-          </p>
-          <p className="mt-1 text-xs text-dim">CTR</p>
+          <div className="mt-5 h-0.5 bg-border" />
+          <div className="mt-4 flex items-baseline gap-6">
+            <div>
+              <p className="text-2xl sm:text-3xl" style={{ color: ACCENT }}>0.93%</p>
+              <p className="mt-1 text-[10px] text-dim">CTR (top performer)</p>
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl" style={{ color: CREAM }}>96%</p>
+              <p className="mt-1 text-[10px] text-dim">click&rarr;visit</p>
+            </div>
+          </div>
         </div>
 
-        <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
-          <p className="mb-3 text-base text-cream sm:text-lg">Rooftop Sign</p>
-          <p className="mb-4 text-sm leading-relaxed text-muted normal-case">
-            Illuminated rotating sign on top of the tallest buildings. Spins
-            360°, visible from all angles. Direct click to your link.
+        <div className="border-[3px] border-border bg-bg-raised p-4 sm:p-6">
+          <p className="text-base text-cream sm:text-lg">Blimp</p>
+          <p className="mt-3 text-sm leading-relaxed text-muted normal-case">
+            Airship with LED screens on both sides.
+            Flies slowly across the skyline — imposing, cinematic, impossible to miss.
           </p>
-          <div className="h-0.5 bg-border" />
-          <p className="mt-4 text-3xl sm:text-4xl" style={{ color: ACCENT }}>
-            0.71%
-          </p>
-          <p className="mt-1 text-xs text-dim">
-            CTR · 96% click&rarr;visit
-          </p>
-        </div>
-
-        <div className="border-[3px] border-border bg-bg-raised p-5 sm:p-6">
-          <p className="mb-3 text-base text-cream sm:text-lg">Blimp</p>
-          <p className="mb-4 text-sm leading-relaxed text-muted normal-case">
-            Airship with LED screens on both sides. Flies slowly across the
-            skyline — imposing and impossible to ignore.
-          </p>
-          <div className="h-0.5 bg-border" />
-          <p className="mt-4 text-3xl sm:text-4xl" style={{ color: ACCENT }}>
-            1.40%
-          </p>
-          <p className="mt-1 text-xs text-dim">Engagement rate</p>
+          <div className="mt-5 h-0.5 bg-border" />
+          <div className="mt-4">
+            <p className="text-2xl sm:text-3xl" style={{ color: ACCENT }}>0.35%</p>
+            <p className="mt-1 text-[10px] text-dim">CTR (top performer)</p>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-const RESULTS = [
-  { advertiser: "Puentes", format: "Rooftop Sign", impressions: "88K", ctr: "0.93%" },
-  { advertiser: "Git Trophy", format: "Billboard", impressions: "23K", ctr: "1.15%" },
-  { advertiser: "Surf Data", format: "Rooftop Sign", impressions: "87K", ctr: "0.52%" },
-];
-
 function SlideResults() {
   return (
     <div className="flex w-full max-w-4xl flex-col gap-8">
-      <SlideHeader n="04" title="Real Results" />
-      <div className="grid gap-5 sm:grid-cols-3">
-        {RESULTS.map((row) => (
+      <SlideHeader n="05" title="Real Results" />
+
+      {/* Big context numbers */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        <div className="border-[3px] border-border bg-bg-raised p-3 text-center sm:p-5">
+          <p className="text-xl sm:text-4xl" style={{ color: ACCENT }}>3.3M+</p>
+          <p className="mt-1 text-[9px] text-dim sm:text-[10px]">Impressions</p>
+        </div>
+        <div className="border-[3px] border-border bg-bg-raised p-3 text-center sm:p-5">
+          <p className="text-xl sm:text-4xl" style={{ color: ACCENT }}>14K+</p>
+          <p className="mt-1 text-[9px] text-dim sm:text-[10px]">Link clicks</p>
+        </div>
+        <div className="border-[3px] border-border bg-bg-raised p-3 text-center sm:p-5">
+          <p className="text-xl sm:text-4xl" style={{ color: ACCENT }}>64</p>
+          <p className="mt-1 text-[9px] text-dim sm:text-[10px]">Ads sold</p>
+        </div>
+      </div>
+
+      {/* Cases as rows */}
+      <div>
+        <p className="mb-3 text-xs text-dim">Top performing ads</p>
+        {[
+          { advertiser: "Viral Day", format: "Landmark", impressions: "31.8K", links: "550", ctr: "1.72%" },
+          { advertiser: "AbacatePay", format: "Landmark", impressions: "32K", links: "481", ctr: "1.50%" },
+          { advertiser: "Leah", format: "Rooftop Sign", impressions: "44.7K", links: "616", ctr: "1.38%" },
+          { advertiser: "Git Trophy", format: "Billboard", impressions: "23.4K", links: "270", ctr: "1.15%" },
+          { advertiser: "WikiCity", format: "Rooftop Sign", impressions: "44.7K", links: "491", ctr: "1.10%" },
+        ].map((row, i, arr) => (
           <div
-            key={row.advertiser}
-            className="border-[3px] border-border bg-bg-raised p-5 sm:p-6"
+            key={row.advertiser + row.format}
+            className={`flex items-center justify-between py-3.5 ${i < arr.length - 1 ? "border-b border-border/40" : ""}`}
           >
-            <p className="text-base text-cream sm:text-lg">{row.advertiser}</p>
-            <p className="mt-1 text-xs text-dim">{row.format}</p>
-            <div className="mt-4 h-0.5 bg-border" />
-            <p
-              className="mt-4 text-3xl sm:text-4xl"
-              style={{ color: ACCENT }}
-            >
+            <div>
+              <p className="text-sm text-cream sm:text-base">{row.advertiser}</p>
+              <p className="mt-0.5 text-[10px] text-dim">
+                {row.format} · {row.impressions} views · {row.links} clicks
+              </p>
+            </div>
+            <p className="text-xl sm:text-2xl" style={{ color: ACCENT }}>
               {row.ctr}
-            </p>
-            <p className="mt-1 text-xs text-dim">
-              CTR · {row.impressions} impressions
             </p>
           </div>
         ))}
       </div>
+
+      {/* Benchmark */}
       <div
         className="border-l-[3px] py-2 pl-5"
         style={{ borderColor: ACCENT }}
       >
         <p className="text-sm text-muted normal-case">
-          Average display ad CTR in tech industry:{" "}
+          Industry avg display ad CTR (Tech/SaaS):{" "}
           <span className="text-cream">0.34%</span>
         </p>
       </div>
@@ -387,7 +492,7 @@ function SlideResults() {
 function SlideContact() {
   return (
     <div className="flex w-full max-w-4xl flex-col items-center justify-center gap-10 text-center">
-      <SlideHeader n="05" title="Let's Talk" />
+      <SlideHeader n="06" title="Let's Talk" />
       <p className="max-w-xl text-base leading-relaxed text-muted normal-case sm:text-lg">
         Want your brand in the city? Let&apos;s find the best format for your
         goal.

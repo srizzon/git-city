@@ -20,5 +20,21 @@ export default async function JobsPage() {
     ? (user.user_metadata?.user_name ?? user.user_metadata?.preferred_username ?? "") as string
     : null;
 
-  return <Suspense><JobBoardClient username={username} /></Suspense>;
+  let hasProfile = false;
+  if (user) {
+    const { data: dev } = await supabase
+      .from("developers")
+      .select("id")
+      .eq("claimed_by", user.id)
+      .maybeSingle();
+    if (dev) {
+      const { count } = await supabase
+        .from("career_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("id", dev.id);
+      hasProfile = (count ?? 0) > 0;
+    }
+  }
+
+  return <Suspense><JobBoardClient username={username} hasProfile={hasProfile} /></Suspense>;
 }

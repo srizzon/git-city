@@ -155,12 +155,13 @@ function useUrlFilters(initialFilters?: Record<string, string>) {
 
 interface JobBoardProps {
   username: string | null;
+  hasProfile?: boolean;
   pageTitle?: string;
   pageDescription?: string;
   initialFilters?: Record<string, string>;
 }
 
-export default function JobBoardClient({ username, pageTitle, pageDescription, initialFilters }: JobBoardProps) {
+export default function JobBoardClient({ username, hasProfile, pageTitle, pageDescription, initialFilters }: JobBoardProps) {
   const filters = useUrlFilters(initialFilters);
   const rawSearchParams = useSearchParams();
   const [listings, setListings] = useState<JobListing[]>([]);
@@ -379,16 +380,28 @@ export default function JobBoardClient({ username, pageTitle, pageDescription, i
             </div>
           ) : listings.length === 0 ? (
             <div className="border-[3px] border-border bg-bg-raised p-14 text-center space-y-5">
-              <p className="text-sm text-muted">No jobs match your filters.</p>
-              {filters.hasFilters && (
-                <button onClick={filters.clearAll} className="btn-press border-[3px] border-border px-5 py-2.5 text-xs text-cream">Clear Filters</button>
+              {filters.hasFilters ? (
+                <>
+                  <p className="text-sm text-muted">No jobs match your filters.</p>
+                  <button onClick={filters.clearAll} className="btn-press border-[3px] border-border px-5 py-2.5 text-xs text-cream">Clear Filters</button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-lime">First jobs dropping soon.</p>
+                  <div className="pt-2">
+                    {hasProfile ? (
+                      <InlineAlertSignup />
+                    ) : (
+                      <>
+                        <p className="text-xs text-muted normal-case mb-4">Set up your profile to apply instantly.</p>
+                        <Link href="/hire/edit" className="btn-press inline-block bg-lime px-6 py-3 text-xs text-bg" style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}>
+                          Create Career Profile
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </>
               )}
-              <div className="pt-2">
-                <Link href="/hire/edit" className="btn-press inline-block bg-lime px-6 py-3 text-xs text-bg" style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}>
-                  Create Career Profile
-                </Link>
-                <p className="mt-2 text-[10px] text-dim normal-case">Be ready when jobs drop</p>
-              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -420,8 +433,8 @@ export default function JobBoardClient({ username, pageTitle, pageDescription, i
           </div>
         )}
 
-        {/* ─── Job alert signup ─── */}
-        <JobAlertSignup />
+        {/* ─── Job alert signup (hide when empty state already shows inline form) ─── */}
+        {listings.length > 0 && <JobAlertSignup />}
 
         <div className="h-12" />
       </div>
@@ -564,6 +577,61 @@ function FilterGroup({ label, children }: { label: string; children: React.React
   return <div><p className="text-[10px] text-dim tracking-widest mb-2">{label}</p><div className="flex flex-wrap gap-1.5">{children}</div></div>;
 }
 
+function InlineAlertSignup() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/jobs/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, tech_stack: [] }),
+      });
+      if (!res.ok) throw new Error();
+      setStatus("done");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  if (status === "done") {
+    return (
+      <div className="pt-2">
+        <p className="text-xs text-lime normal-case">You&apos;re in! We&apos;ll ping you when jobs drop.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="pt-4">
+      <p className="text-xs text-muted normal-case mb-3">Get pinged when they land.</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+        <input
+          type="email"
+          required
+          placeholder="your@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="border-[3px] border-border bg-bg px-4 py-3 text-xs text-cream normal-case outline-none placeholder:text-dim focus-visible:border-lime transition-colors sm:w-64"
+        />
+        <button
+          type="submit"
+          disabled={status === "loading"}
+          className="btn-press bg-lime px-6 py-3 text-xs text-bg disabled:opacity-50 cursor-pointer"
+          style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}
+        >
+          {status === "loading" ? "..." : "Get Job Alerts"}
+        </button>
+      </div>
+      {status === "error" && <p className="mt-2 text-xs text-red-400 normal-case">Something went wrong. Try again.</p>}
+    </form>
+  );
+}
+
 function JobAlertSignup() {
   const [email, setEmail] = useState("");
   const [stack, setAlertStack] = useState("");
@@ -599,7 +667,7 @@ function JobAlertSignup() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-12 border-[3px] border-border bg-bg-raised p-6 sm:p-8">
+    <form id="job-alerts" onSubmit={handleSubmit} className="mt-12 border-[3px] border-border bg-bg-raised p-6 sm:p-8">
       <p className="text-xs text-lime tracking-widest">Get job alerts</p>
       <p className="mt-1 text-[10px] text-muted normal-case">New matching jobs delivered weekly. No account needed.</p>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
