@@ -61,9 +61,9 @@ const FROM = "Git City <noreply@thegitcity.com>";
 const HMAC_SECRET = (() => {
   const secret = process.env.UNSUBSCRIBE_HMAC_SECRET;
   if (!secret) {
-    console.error("[notifications] UNSUBSCRIBE_HMAC_SECRET is not set. Unsubscribe links will not work securely.");
+    throw new Error("[notifications] UNSUBSCRIBE_HMAC_SECRET is required but not set.");
   }
-  return secret || "MISSING_HMAC_SECRET_SET_ENV_VAR";
+  return secret;
 })();
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
