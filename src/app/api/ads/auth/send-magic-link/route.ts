@@ -76,7 +76,9 @@ export async function POST(request: NextRequest) {
   // Build verify URL with redirect passthrough
   const verifyUrl = new URL(`${getBaseUrl()}/api/ads/auth/verify`);
   verifyUrl.searchParams.set("token", token);
-  if (body.redirect) verifyUrl.searchParams.set("redirect", body.redirect);
+  if (body.redirect && body.redirect.startsWith("/") && !body.redirect.startsWith("//")) {
+    verifyUrl.searchParams.set("redirect", body.redirect);
+  }
 
   const resend = getResend();
   await resend.emails.send({

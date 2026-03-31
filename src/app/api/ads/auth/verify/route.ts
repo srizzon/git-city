@@ -21,8 +21,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const destination = redirect || "/ads/dashboard";
-  const response = NextResponse.redirect(new URL(destination, request.url));
+  // Prevent open redirect: only allow relative paths
+  const safeRedirect =
+    redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+      ? redirect
+      : "/ads/dashboard";
+  const response = NextResponse.redirect(new URL(safeRedirect, request.url));
 
   const cookieOptions = getSessionCookieOptions();
   response.cookies.set(cookieOptions.name, sessionToken, cookieOptions);
