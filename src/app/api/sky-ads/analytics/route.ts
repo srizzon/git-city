@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   }
 
   // Get all ads with full details
-  const { data: allAds } = await admin.from("sky_ads").select("id, brand, text, description, color, bg_color, link, active, vehicle, priority, plan_id, starts_at, ends_at, purchaser_email, tracking_token, created_at");
+  const { data: allAds } = await admin.from("sky_ads").select("id, brand, text, description, color, bg_color, link, active, vehicle, priority, plan_id, starts_at, ends_at, purchaser_email, tracking_token, created_at, amount_paid_cents, currency");
   const adMap = new Map((allAds ?? []).map((a) => [a.id, a]));
 
   // Build aggregated map from RPC results + historical baselines
@@ -103,9 +103,18 @@ export async function GET(request: Request) {
 
   function buildAdEntry(id: string, s: { impressions: number; clicks: number; cta_clicks: number }) {
     const ad = adMap.get(id);
-    const totalClicks = s.clicks + s.cta_clicks;
     const dayMap = dailyByAd.get(id);
     const daily = last7Days.map((d) => dayMap?.get(d) ?? 0);
+    const amountCents = ad?.amount_paid_cents ?? null;
+    const cur = ad?.currency ?? null;
+
+    // CPC = amount paid / link clicks
+    let cpc: string | null = null;
+    if (amountCents && s.cta_clicks > 0) {
+      const cpcValue = amountCents / 100 / s.cta_clicks;
+      const symbol = cur === "brl" ? "R$" : "$";
+      cpc = `${symbol}${cpcValue.toFixed(2)}`;
+    }
 
     return {
       id,
@@ -124,10 +133,13 @@ export async function GET(request: Request) {
       purchaser_email: ad?.purchaser_email ?? null,
       tracking_token: ad?.tracking_token ?? null,
       created_at: ad?.created_at ?? null,
+      amount_paid_cents: amountCents,
+      currency: cur,
       impressions: s.impressions,
       clicks: s.clicks,
       cta_clicks: s.cta_clicks,
-      ctr: s.impressions > 0 ? ((totalClicks / s.impressions) * 100).toFixed(2) + "%" : "0%",
+      ctr: s.impressions > 0 ? ((s.cta_clicks / s.impressions) * 100).toFixed(2) + "%" : "0%",
+      cpc,
       daily,
     };
   }

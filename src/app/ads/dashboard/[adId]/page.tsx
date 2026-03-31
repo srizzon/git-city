@@ -38,6 +38,7 @@ interface AdDetail {
   conversions: number;
   revenue_cents: number;
   ctr: string;
+  cpc: string | null;
 }
 
 interface AudienceData {
@@ -177,11 +178,12 @@ function AdDetailContent({ adId }: { adId: string }) {
         {ad.text}
       </div>
 
-      <div className={`mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 transition-opacity ${loading ? "opacity-50" : ""}`}>
+      <div className={`mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7 transition-opacity ${loading ? "opacity-50" : ""}`}>
         <StatsCard label="Impressions" value={ad.impressions} />
         <StatsCard label="Clicks" value={ad.clicks} />
         <StatsCard label="CTA Clicks" value={ad.cta_clicks} />
         <StatsCard label="CTR" value={ad.ctr} />
+        <StatsCard label="CPC" value={ad.cpc ?? "-"} />
         <StatsCard label="Conversions" value={ad.conversions} />
         <StatsCard
           label="Conv. Rate"

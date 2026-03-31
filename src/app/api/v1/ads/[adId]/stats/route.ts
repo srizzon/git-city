@@ -34,7 +34,7 @@ export async function GET(
   // Verify ownership
   const { data: ad } = await sb
     .from("sky_ads")
-    .select("id")
+    .select("id, amount_paid_cents, currency")
     .eq("id", adId)
     .eq("advertiser_id", advertiserId)
     .maybeSingle();
@@ -71,9 +71,15 @@ export async function GET(
     daily.push({ day: row.day, impressions: imp, clicks: clk, cta_clicks: cta, conversions: conv, revenue_cents: rev });
   }
 
-  const totalClicks = clicks + cta_clicks;
-  const ctr = impressions > 0 ? ((totalClicks / impressions) * 100).toFixed(2) + "%" : "0.00%";
+  const ctr = impressions > 0 ? ((cta_clicks / impressions) * 100).toFixed(2) + "%" : "0.00%";
   const conv_rate = cta_clicks > 0 ? ((conversions / cta_clicks) * 100).toFixed(2) + "%" : "0.00%";
+
+  let cpc: string | null = null;
+  if (ad.amount_paid_cents && cta_clicks > 0) {
+    const cpcValue = ad.amount_paid_cents / 100 / cta_clicks;
+    const symbol = ad.currency === "brl" ? "R$" : "$";
+    cpc = `${symbol}${cpcValue.toFixed(2)}`;
+  }
 
   return NextResponse.json({
     ad_id: adId,
@@ -84,6 +90,7 @@ export async function GET(
     conversions,
     revenue_cents,
     ctr,
+    cpc,
     conv_rate,
     daily,
   }, {

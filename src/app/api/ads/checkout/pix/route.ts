@@ -108,6 +108,8 @@ export async function POST(request: NextRequest) {
     plan_id,
     tracking_token: trackingToken,
     advertiser_id: advertiser?.id ?? null,
+    amount_paid_cents: priceCents,
+    currency: "brl",
   });
 
   if (insertError) {

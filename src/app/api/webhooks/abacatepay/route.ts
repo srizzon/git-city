@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { autoEquipIfSolo } from "@/lib/items";
 import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
-import { SKY_AD_PLANS, isValidPlanId } from "@/lib/skyAdPlans";
+import { SKY_AD_PLANS, isValidPlanId, getPriceCents, type AdPeriod } from "@/lib/skyAdPlans";
 
 export const dynamic = "force-dynamic";
 
@@ -62,12 +62,20 @@ export async function POST(request: Request) {
           const days = (periodMeta && PERIOD_DAYS[periodMeta]) || 30;
           const endsAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
+          // Derive amount from plan + period (PIX is always BRL)
+          const pixPlanId = ad.plan_id;
+          const pixAmountCents = pixPlanId && isValidPlanId(pixPlanId)
+            ? getPriceCents(pixPlanId, "brl", (periodMeta === "1w" ? "1w" : "1m") as AdPeriod)
+            : undefined;
+
           await sb
             .from("sky_ads")
             .update({
               active: true,
               starts_at: now.toISOString(),
               ends_at: endsAt.toISOString(),
+              amount_paid_cents: pixAmountCents,
+              currency: "brl",
             })
             .eq("id", ad.id);
 

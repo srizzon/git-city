@@ -82,18 +82,15 @@ export async function GET(request: NextRequest) {
         prevConv += Number(row.conversions ?? 0);
       }
 
-      const totalClicks = totalEng + totalLinks;
-
       const adReports = ads.map((ad) => {
         const t = adTotals.get(ad.id) ?? { impressions: 0, engagements: 0, linkClicks: 0, conversions: 0, revenue_cents: 0 };
-        const adTotalClicks = t.engagements + t.linkClicks;
         return {
           brand: ad.brand || ad.text.slice(0, 30),
           impressions: t.impressions,
           engagements: t.engagements,
           linkClicks: t.linkClicks,
           conversions: t.conversions,
-          ctr: t.impressions > 0 ? ((adTotalClicks / t.impressions) * 100).toFixed(2) + "%" : "0%",
+          ctr: t.impressions > 0 ? ((t.linkClicks / t.impressions) * 100).toFixed(2) + "%" : "0%",
           convRate: t.linkClicks > 0 ? ((t.conversions / t.linkClicks) * 100).toFixed(2) + "%" : "0%",
         };
       });
@@ -109,7 +106,7 @@ export async function GET(request: NextRequest) {
           engagements: totalEng,
           linkClicks: totalLinks,
           conversions: totalConv,
-          ctr: totalImp > 0 ? ((totalClicks / totalImp) * 100).toFixed(2) + "%" : "0%",
+          ctr: totalImp > 0 ? ((totalLinks / totalImp) * 100).toFixed(2) + "%" : "0%",
           convRate,
         },
         prevTotals: { impressions: prevImp, engagements: prevEng, linkClicks: prevLinks, conversions: prevConv },

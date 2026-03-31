@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   // Get advertiser's ads
   const { data: ads } = await sb
     .from("sky_ads")
-    .select("id, brand, text, description, color, bg_color, vehicle, active, priority, plan_id, starts_at, ends_at, created_at, link")
+    .select("id, brand, text, description, color, bg_color, vehicle, active, priority, plan_id, starts_at, ends_at, created_at, link, amount_paid_cents, currency")
     .eq("advertiser_id", advertiserId);
 
   if (!ads || ads.length === 0) {
@@ -110,7 +110,14 @@ export async function GET(request: NextRequest) {
     totals.conversions += s.conversions;
     totals.revenue_cents += s.revenue_cents;
 
-    const totalClicks = s.clicks + s.cta_clicks;
+    // CPC = amount paid / link clicks
+    let cpc: string | null = null;
+    if (ad.amount_paid_cents && s.cta_clicks > 0) {
+      const cpcValue = ad.amount_paid_cents / 100 / s.cta_clicks;
+      const symbol = ad.currency === "brl" ? "R$" : "$";
+      cpc = `${symbol}${cpcValue.toFixed(2)}`;
+    }
+
     return {
       ...ad,
       impressions: s.impressions,
@@ -118,12 +125,12 @@ export async function GET(request: NextRequest) {
       cta_clicks: s.cta_clicks,
       conversions: s.conversions,
       revenue_cents: s.revenue_cents,
-      ctr: s.impressions > 0 ? ((totalClicks / s.impressions) * 100).toFixed(2) + "%" : "0.00%",
+      ctr: s.impressions > 0 ? ((s.cta_clicks / s.impressions) * 100).toFixed(2) + "%" : "0.00%",
+      cpc,
     };
   });
 
-  const totalAllClicks = totals.clicks + totals.cta_clicks;
-  const ctr = totals.impressions > 0 ? ((totalAllClicks / totals.impressions) * 100).toFixed(2) + "%" : "0.00%";
+  const ctr = totals.impressions > 0 ? ((totals.cta_clicks / totals.impressions) * 100).toFixed(2) + "%" : "0.00%";
 
   // Percentage changes
   function pctChange(current: number, prev: number): number {

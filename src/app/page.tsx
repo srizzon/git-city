@@ -2853,7 +2853,7 @@ function HomeContent() {
 
           {/* Feed toggle (top-right, below GitHub badges on desktop) */}
           {feedEvents.length >= 1 && (
-            <div className="pointer-events-auto absolute top-3 right-3 sm:top-14 sm:right-4">
+            <div className="pointer-events-auto absolute top-3 right-3 sm:top-4 sm:right-4">
               <button
                 onClick={() => setFeedPanelOpen(true)}
                 className="flex items-center gap-2 border-[3px] border-border bg-bg/70 px-3 py-1.5 text-[10px] backdrop-blur-sm transition-colors"
@@ -2883,7 +2883,7 @@ function HomeContent() {
 
       {/* ─── GitHub + Discord (top-left) ─── */}
       {!flyMode && !introMode && !rabbitCinematic && (
-        <div className={`pointer-events-auto fixed top-3 left-3 z-30 items-center gap-1.5 sm:gap-2 sm:top-4 sm:left-4 ${exploreMode ? "hidden lg:flex" : "flex"}`}>
+        <div className={`pointer-events-auto fixed top-3 left-3 z-30 items-center gap-1.5 sm:gap-2 sm:top-4 sm:left-4 ${exploreMode ? "hidden" : "flex"}`}>
           {/* Mobile: Live + Jobs */}
           <div className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm sm:hidden">
             <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#ef4444]" />
@@ -2928,7 +2928,7 @@ function HomeContent() {
 
       {/* ─── Live + Coding + Jobs (top-right) ─── */}
       {!flyMode && !introMode && !rabbitCinematic && (
-        <div className={`pointer-events-auto fixed top-3 right-3 z-30 items-center gap-1.5 sm:gap-2 sm:top-4 sm:right-4 ${exploreMode ? "hidden lg:flex" : "hidden sm:flex"}`}>
+        <div className={`pointer-events-auto fixed top-3 right-3 z-30 items-center gap-1.5 sm:gap-2 sm:top-4 sm:right-4 ${exploreMode ? "hidden" : "hidden sm:flex"}`}>
           {/* Live users */}
           <div className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm">
             <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#ef4444]" />

@@ -113,7 +113,7 @@ export function useAdsData({ filters, onToast }: UseAdsDataOptions) {
     );
     const totalCtr =
       t.impressions > 0
-        ? (((t.clicks + t.cta_clicks) / t.impressions) * 100).toFixed(2) + "%"
+        ? ((t.cta_clicks / t.impressions) * 100).toFixed(2) + "%"
         : "0%";
     return { ...t, ctr: totalCtr };
   }, [filteredAndSorted]);

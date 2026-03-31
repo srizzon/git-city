@@ -293,6 +293,18 @@ export function AdRow({
                 <p className="mt-0.5 text-xs text-cream">{ad.clicks.toLocaleString()}</p>
               </div>
               <div>
+                <span className="text-xs text-dim">CPC</span>
+                <p className="mt-0.5 text-xs text-cream">{ad.cpc || "-"}</p>
+              </div>
+              <div>
+                <span className="text-xs text-dim">Paid</span>
+                <p className="mt-0.5 text-xs text-cream">
+                  {ad.amount_paid_cents
+                    ? `${ad.currency === "brl" ? "R$" : "$"}${(ad.amount_paid_cents / 100).toFixed(2)}`
+                    : "-"}
+                </p>
+              </div>
+              <div>
                 <span className="text-xs text-dim">Token</span>
                 <p className="mt-0.5 truncate text-xs text-muted font-mono">{ad.tracking_token || "-"}</p>
               </div>

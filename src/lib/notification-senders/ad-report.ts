@@ -58,12 +58,11 @@ export async function sendWeeklyAdReport(report: AdReport) {
   const convColor = changeColor(report.totals.conversions, report.prevTotals.conversions);
 
   // CTR comparison
-  const prevTotalClicks = report.prevTotals.engagements + report.prevTotals.linkClicks;
   const prevCtr = report.prevTotals.impressions > 0
-    ? (prevTotalClicks / report.prevTotals.impressions) * 100
+    ? (report.prevTotals.linkClicks / report.prevTotals.impressions) * 100
     : 0;
   const currCtr = report.totals.impressions > 0
-    ? ((report.totals.engagements + report.totals.linkClicks) / report.totals.impressions) * 100
+    ? (report.totals.linkClicks / report.totals.impressions) * 100
     : 0;
   const ctrChange = pctLabel(Math.round(currCtr * 100), Math.round(prevCtr * 100));
   const ctrColor = changeColor(Math.round(currCtr * 100), Math.round(prevCtr * 100));

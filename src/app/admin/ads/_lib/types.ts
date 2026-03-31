@@ -19,6 +19,9 @@ export interface AdStats {
   clicks: number;
   cta_clicks: number;
   ctr: string;
+  cpc: string | null;
+  amount_paid_cents: number | null;
+  currency: string | null;
   daily?: number[];
 }
 

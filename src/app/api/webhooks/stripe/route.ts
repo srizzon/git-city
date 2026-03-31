@@ -119,6 +119,9 @@ export async function POST(request: Request) {
                 typeof session.customer === "string"
                   ? session.customer
                   : session.customer?.id ?? null,
+              // Store actual amount paid (after coupons/discounts)
+              amount_paid_cents: session.amount_total ?? undefined,
+              currency: session.currency ?? undefined,
             })
             .eq("id", ad.id);
 

@@ -36,8 +36,7 @@ export function AdCard({ ad }: Props) {
       : "expired";
 
   const statusColors = { pending: "#f8d880", active: ACCENT, expired: "#888" };
-  const totalClicks = ad.clicks + ad.cta_clicks;
-  const ctr = ad.impressions > 0 ? ((totalClicks / ad.impressions) * 100).toFixed(2) : "0.00";
+  const ctr = ad.impressions > 0 ? ((ad.cta_clicks / ad.impressions) * 100).toFixed(2) : "0.00";
 
   return (
     <Link
@@ -65,7 +64,7 @@ export function AdCard({ ad }: Props) {
           <p className="text-[10px] text-muted normal-case">impressions</p>
         </div>
         <div>
-          <p className="text-base text-cream">{totalClicks.toLocaleString()}</p>
+          <p className="text-base text-cream">{ad.cta_clicks.toLocaleString()}</p>
           <p className="text-[10px] text-muted normal-case">clicks</p>
         </div>
         <div>
