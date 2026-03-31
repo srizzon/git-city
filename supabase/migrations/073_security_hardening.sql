@@ -134,26 +134,28 @@ ALTER FUNCTION update_job_updated_at() SET search_path = 'public';
 -- find_auth_user_by_github_login (which accesses auth.users!), etc.
 -- ============================================================================
 
-REVOKE EXECUTE ON FUNCTION assign_new_dev_rank(bigint) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION credit_pixels(bigint, bigint, text, text, text, text, text, inet, text) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION deactivate_expired_ads() FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION debit_pixels(bigint, bigint, text, text, text, text) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION earn_pixels(bigint, text, text, text, text) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION find_auth_user_by_github_login(text) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION get_ad_daily_stats(date, date, text[]) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION get_ad_stats(date, date, text[]) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION get_auth_users_without_developer() FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION get_endorsements_given_this_month(bigint) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION heartbeat_visitor(text) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION increment_hired_count(uuid) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION increment_job_counter(uuid, text) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION increment_kudos_count(bigint) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION increment_referral_count(bigint) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION increment_visit_count(bigint) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION recalculate_ranks() FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION refresh_sky_ad_stats() FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION spend_pixels(bigint, text, text, bigint, boolean, inet, text) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION upsert_arcade_visit(uuid, uuid) FROM anon, authenticated;
+-- Must revoke from PUBLIC (not just anon/authenticated) because PostgreSQL
+-- grants EXECUTE to PUBLIC by default on all functions, and named roles inherit it.
+REVOKE EXECUTE ON FUNCTION assign_new_dev_rank(bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION credit_pixels(bigint, bigint, text, text, text, text, text, inet, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION deactivate_expired_ads() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION debit_pixels(bigint, bigint, text, text, text, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION earn_pixels(bigint, text, text, text, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION find_auth_user_by_github_login(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION get_ad_daily_stats(date, date, text[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION get_ad_stats(date, date, text[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION get_auth_users_without_developer() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION get_endorsements_given_this_month(bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION heartbeat_visitor(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION increment_hired_count(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION increment_job_counter(uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION increment_kudos_count(bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION increment_referral_count(bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION increment_visit_count(bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION recalculate_ranks() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION refresh_sky_ad_stats() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION spend_pixels(bigint, text, text, bigint, boolean, inet, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION upsert_arcade_visit(uuid, uuid) FROM PUBLIC;
 
 
 -- ============================================================================
