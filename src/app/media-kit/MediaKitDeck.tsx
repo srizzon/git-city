@@ -276,8 +276,8 @@ function SlideAudience() {
       {/* Primary: real audience data */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
         <div className="border-[3px] border-border bg-bg-raised p-3 text-center sm:p-4">
-          <p className="text-lg sm:text-2xl" style={{ color: ACCENT }}>BR 18%</p>
-          <p className="mt-1 text-[9px] text-dim sm:text-[10px]">US 17% · FR 12%</p>
+          <p className="text-lg sm:text-2xl" style={{ color: ACCENT }}>Global</p>
+          <p className="mt-1 text-[9px] text-dim sm:text-[10px]">IN 36% · BR 15% · US 8%</p>
         </div>
         <div className="border-[3px] border-border bg-bg-raised p-3 text-center sm:p-4">
           <p className="text-lg sm:text-2xl" style={{ color: ACCENT }}>69%</p>
