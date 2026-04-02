@@ -742,7 +742,7 @@ function HomeContent() {
           })
         );
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, [session, buildings]);
 
@@ -776,7 +776,7 @@ function HomeContent() {
     const admin = !!authLogin && adminLogins.includes(authLogin);
     setIsAdmin(admin);
     if (admin) {
-      fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => {});
+      fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => { });
     }
   }, [authLogin]);
 
@@ -1609,7 +1609,7 @@ function HomeContent() {
                 : prev
             );
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     } else {
       // Buildings array was replaced (full layout loaded) — keep selectedBuilding in sync
@@ -1640,7 +1640,7 @@ function HomeContent() {
               b.login.toLowerCase() === authLogin ? { ...b, claimed: true } : b
             ));
           })
-          .catch(() => {});
+          .catch(() => { });
       }
       return;
     }
@@ -2330,7 +2330,7 @@ function HomeContent() {
         onSponsorClick={(slug) => {
           trackLandmarkClicked(slug);
           const adId = getLandmarkAdId(slug);
-          if (adId) fetch("/api/sky-ads/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad_id: adId, event_type: "click" }) }).catch(() => {});
+          if (adId) fetch("/api/sky-ads/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad_id: adId, event_type: "click" }) }).catch(() => { });
           if (!exploreMode) setExploreMode(true);
           setActiveSponsor(slug);
           setSelectedBuilding(null);
@@ -2669,6 +2669,9 @@ function HomeContent() {
                     <span className="text-cream">Scroll</span> base speed
                   </div>
                   <div>
+                    <span style={{ color: theme.accent }}>R</span> return to city
+                  </div>
+                  <div>
                     <span style={{ color: theme.accent }}>P</span> pause
                   </div>
                   <div>
@@ -2777,6 +2780,10 @@ function HomeContent() {
                   <div className="flex items-center justify-between gap-6">
                     <span className="text-cream">Shift / Alt</span>
                     <span className="text-muted">Boost / Slow</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-6">
+                    <span style={{ color: theme.accent }}>R</span>
+                    <span className="text-muted">Return to City</span>
                   </div>
                   <div className="flex items-center justify-between gap-6">
                     <span style={{ color: theme.accent }}>ESC</span>
