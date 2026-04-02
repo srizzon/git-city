@@ -25,7 +25,7 @@ const MAX_STRING = 64;
 const MAX_PROJECT = 128;
 const MAX_SESSION_ID = 128;
 const MAX_ACTIVE_SECONDS = 3600;
-const ALLOWED_EDITORS = new Set(["vscode", "cursor", "vscodium", "windsurf", "positron"]);
+const ALLOWED_EDITORS = new Set(["vscode", "cursor", "vscodium", "windsurf", "positron", "neovim"]);
 const ALLOWED_OS = new Set(["darwin", "linux", "win32", "freebsd", "openbsd"]);
 const ALLOWED_STATUS = new Set(["active", "offline"]);
 
