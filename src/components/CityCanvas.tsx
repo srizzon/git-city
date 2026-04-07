@@ -28,6 +28,8 @@ import CompareSplitScreen from "./CompareSplitScreen";
 import LocalizedFireworks from "./LocalizedFireworks";
 import WallpaperParallax from "./WallpaperParallax";
 import ThemeSkyFX from "./ThemeSkyFX";
+import RemotePilots from "./RemotePilots";
+import type { RemotePilot } from "@/lib/useFlyPresence";
 
 // ─── Theme Definitions ───────────────────────────────────────
 
@@ -602,7 +604,7 @@ const _idealLook = new THREE.Vector3();
 const _blendedPos = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 
-function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, startPaused = false, vehicleType = "airplane", posRef, cityRadius = 3500, isMobile = false, onJoystickState, boostActive = false, brakeActive = false }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; startPaused?: boolean; vehicleType?: string; posRef?: React.MutableRefObject<THREE.Vector3>; cityRadius?: number; isMobile?: boolean; onJoystickState?: (state: { baseX: number; baseY: number; dx: number; dy: number } | null) => void; boostActive?: boolean; brakeActive?: boolean }) {
+function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, startPaused = false, vehicleType = "airplane", posRef, cityRadius = 3500, isMobile = false, onJoystickState, boostActive = false, brakeActive = false, onFlyMove }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; startPaused?: boolean; vehicleType?: string; posRef?: React.MutableRefObject<THREE.Vector3>; cityRadius?: number; isMobile?: boolean; onJoystickState?: (state: { baseX: number; baseY: number; dx: number; dy: number } | null) => void; boostActive?: boolean; brakeActive?: boolean; onFlyMove?: (x: number, y: number, z: number, yaw: number, bank: number) => void }) {
   const { camera } = useThree();
   const ref = useRef<THREE.Group>(null);
   const orbitRef = useRef<any>(null);
@@ -956,6 +958,9 @@ function AirplaneFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = 
     }
 
     if (posRef) posRef.current.copy(pos.current);
+
+    // Broadcast position to multiplayer presence (throttled internally)
+    onFlyMove?.(pos.current.x, pos.current.y, pos.current.z, yaw.current, bank.current);
 
     const targetBank = -turnInput * MAX_BANK;
     bank.current += (targetBank - bank.current) * 5 * dt;
@@ -2125,6 +2130,8 @@ interface Props {
   liveByLogin?: Map<string, LiveSession>;
   cityEnergy?: number;
   onCompareCinematicEnd?: () => void;
+  onFlyMove?: (x: number, y: number, z: number, yaw: number, bank: number) => void;
+  flyPilotsRef?: React.MutableRefObject<Map<string, RemotePilot>>;
 }
 
 // Dynamically adjust scene exposure based on city energy (devs coding)
@@ -2147,7 +2154,7 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef }: Props) {
   const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
   const prevComparePairRef = useRef<string>("");
 
@@ -2277,8 +2284,9 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
           {!introMode && flyMode && (
             <>
-              <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} cityRadius={cityRadius} isMobile={isMobile} onJoystickState={onJoystickState} boostActive={flyBoostActive} brakeActive={flyBrakeActive} />
+              <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} cityRadius={cityRadius} isMobile={isMobile} onJoystickState={onJoystickState} boostActive={flyBoostActive} brakeActive={flyBrakeActive} onFlyMove={onFlyMove} />
               <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={cityRadius} />
+              {flyPilotsRef && <RemotePilots pilotsRef={flyPilotsRef} />}
             </>
           )}
         </>

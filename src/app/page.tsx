@@ -27,6 +27,7 @@ import { ITEM_NAMES, ITEM_EMOJIS } from "@/lib/zones";
 import { useStreakCheckin } from "@/lib/useStreakCheckin";
 import { useLiveUsers } from "@/lib/useLiveUsers";
 import { useCodingPresence } from "@/lib/useCodingPresence";
+import { useFlyPresence } from "@/lib/useFlyPresence";
 import { useRaidSequence } from "@/lib/useRaidSequence";
 import { isFridayThe13th } from "@/lib/raid";
 import { useDailies } from "@/lib/useDailies";
@@ -704,6 +705,14 @@ function HomeContent() {
     session?.user?.user_metadata?.preferred_username ??
     ""
   ).toLowerCase();
+
+  const authAvatar = (session?.user?.user_metadata?.avatar_url ?? "") as string;
+  const { pilotsRef: flyPilotsRef, sendMove: flySendMove } = useFlyPresence(
+    flyMode,
+    authLogin,
+    authAvatar,
+    flyVehicle,
+  );
 
   // Fetch existing VS Code API key
   useEffect(() => {
@@ -2391,6 +2400,8 @@ function HomeContent() {
             setExploreMode(true);
           }
         }}
+        onFlyMove={flySendMove}
+        flyPilotsRef={flyPilotsRef}
       />
 
       {/* Loading screen overlay */}
