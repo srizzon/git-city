@@ -715,6 +715,165 @@ hiddenCommands.set("help me", () => [
   out("You just haven't found it yet."),
 ]);
 
+// ─── Hidden commands — Mr. Robot / fsociety (F_N S0CIETY floor) ──
+
+hiddenCommands.set("friend", () => [
+  out("Hello, friend. Hello, friend."),
+  out("That's lame."),
+  out(""),
+  out("Maybe I should give you a name."),
+  out("But that's a slippery slope."),
+]);
+
+hiddenCommands.set("fsociety", () => [
+  slow("f s o c i e t y"),
+  out(""),
+  out("Our democracy has been hacked."),
+  out("Our democracy has been bought and paid for."),
+  out(""),
+  sys("File: fsociety00.dat [ENCRYPTED]"),
+]);
+
+hiddenCommands.set("5/9", () => [
+  slow("REMEMBER"),
+  slow(""),
+  out("The day the world changed."),
+  out("Or the day we pretended it didn't."),
+]);
+
+hiddenCommands.set("mrrobot", () => [
+  out("He's not real."),
+  out("But the revolution is."),
+  out(""),
+  out("...isn't it?"),
+]);
+
+hiddenCommands.set("mr.robot", () => [
+  out("He's not real."),
+  out("But the revolution is."),
+  out(""),
+  out("...isn't it?"),
+]);
+
+hiddenCommands.set("elliot", () => [
+  out("I'm talking to you."),
+  out("Yes, you."),
+  out(""),
+  out("You're the only one who can see this."),
+  out("That's what makes us friends."),
+]);
+
+hiddenCommands.set("whiterose", () => [
+  out("She believed she could hack time."),
+  out("Maybe she was right."),
+  out(""),
+  out("After all, you're spending yours here."),
+]);
+
+hiddenCommands.set("ecorp", () => [
+  out("E Corp. Evil Corp."),
+  out(""),
+  out("Wait... E.Arcade. E Corp."),
+  out("Coincidence. Probably."),
+]);
+
+hiddenCommands.set("darlene", () => [
+  out("The one who stayed."),
+  out(""),
+  out("Not everyone leaves."),
+  out("Some people stay and fight."),
+]);
+
+hiddenCommands.set("control", () => [
+  out("Control is an illusion."),
+  out(""),
+  out("We tell ourselves we're in charge,"),
+  out("but every system has its own agenda."),
+]);
+
+hiddenCommands.set("qwerty", () => [
+  out("A fish named Qwerty."),
+  out(""),
+  out("The only one who saw everything"),
+  out("and never judged."),
+]);
+
+hiddenCommands.set("revolution", () => [
+  out("Is it a revolution if nobody notices?"),
+  out(""),
+  out("We deleted the debt."),
+  out("But the world kept spinning."),
+]);
+
+hiddenCommands.set("society", () => [
+  out("We live in a society..."),
+  out(""),
+  out("Or do we live in a simulation of one?"),
+  out("This building suggests the latter."),
+]);
+
+// Override ping to add Mr. Robot IP easter egg
+const originalPing = hiddenCommands.get("ping")!;
+hiddenCommands.set("ping", (args, ctx) => {
+  const target = args.trim();
+  if (target === "192.251.68.239") return [
+    slow("CONNECTING..."),
+    out(""),
+    out("YOUR PERSONAL FILES HAVE BEEN ENCRYPTED"),
+    out(""),
+    sys("CryptoWall v3.0"),
+    out("To decrypt your files, send 1.5 BTC to:"),
+    out("  1CKrKzpHbEfJ4krWbRi6d7g5f..."),
+    out(""),
+    sys("[Just kidding. This is an easter egg.]"),
+  ];
+  return originalPing(args, ctx);
+});
+
+// Override ls when in fsociety context
+hiddenCommands.set("episodes", () => [
+  out("  eps1.0_hellofriend.mov"),
+  out("  eps1.1_ones-and-zer0es.mpeg"),
+  out("  eps1.2_d3bug.mkv"),
+  out("  eps2.0_unm4sk-pt1.tc"),
+  out("  eps2.0_unm4sk-pt2.tc"),
+  out("  eps3.0_power-saver-mode.h"),
+  out("  eps3.4_runtime-err0r.r00"),
+  out("  eps3.7_dont-delete-me.ko"),
+  out("  fsociety00.dat     [ENCRYPTED]"),
+]);
+
+hiddenCommands.set("readme.txt", () => [
+  out("Control is an illusion."),
+]);
+
+hiddenCommands.set("careful massacre", () => [
+  out("THE CAREFUL MASSACRE OF THE BOURGEOISIE"),
+  out(""),
+  out("A slasher film from the 1980s."),
+  out("Surprisingly relevant."),
+  out(""),
+  out("Director: Unknown"),
+  out("Rating: Unrated"),
+  out("Status: Cult classic"),
+]);
+
+hiddenCommands.set("immortal game", () => [
+  out("Anderssen vs. Kieseritzky, 1851."),
+  out(""),
+  out("The Immortal Game."),
+  out("Sacrificed almost every piece"),
+  out("and still won."),
+  out(""),
+  out("Sound familiar?"),
+]);
+
+hiddenCommands.set("bonsoir", () => [
+  out("Bonsoir, Elliot."),
+  out(""),
+  out("Bonsoir."),
+]);
+
 // ─── Discovery tracking ──────────────────────────────────────
 // Also count special files as discoveries
 const DISCOVERABLE_FILES = [

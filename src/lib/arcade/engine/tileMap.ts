@@ -12,6 +12,7 @@ export interface FurnitureObject {
   height: number;
   collides: boolean;
   sortY?: number;  // Z-sort key (bottom of footprint). If missing, uses y + height.
+  sittable?: boolean; // Gather-style: player walks through and auto-sits when idle
 }
 
 export interface MapObject {
@@ -47,14 +48,30 @@ export function findNearbyObject(
   return null;
 }
 
-/** Find a seat (or PC workstation) at or near the player */
+/** Find a seat (or PC workstation / arcade machine) at or near the player */
 export function findNearbySeat(
   playerX: number,
   playerY: number,
 ): MapObject | null {
-  // Both "seat" and "pc" are sittable
-  return findNearbyObject(playerX, playerY, "seat")
-    ?? findNearbyObject(playerX, playerY, "pc");
+  // "seat", "pc", and "arcade_machine" are all sittable
+  const seat = findNearbyObject(playerX, playerY, "seat")
+    ?? findNearbyObject(playerX, playerY, "pc")
+    ?? findNearbyObject(playerX, playerY, "arcade_machine");
+
+  // Debug: log seat finding
+  if (seat) {
+    console.log(`[seat] Player(${playerX},${playerY}) → found ${seat.type} at (${seat.x},${seat.y}) dir=${seat.dir}`);
+  }
+  return seat;
+}
+
+/** Per-tile-ID properties — defined once on the tileset, inherited by all instances */
+export interface TileProperties {
+  /** Map of ground tile ID → properties */
+  [tileId: number]: {
+    walkable: boolean;
+    type: "wall" | "floor" | "door";
+  };
 }
 
 export interface GameMap {
@@ -64,6 +81,10 @@ export interface GameMap {
   tileSize: number;
   tileset: string;
   tilesetColumns: number;
+  /** Tile size in the tileset image (px). If absent, uses tileSize. */
+  tilesetTileSize?: number;
+  /** Per-tile-ID properties. If absent, falls back to collision layer. */
+  tileProperties?: TileProperties;
   layers: {
     ground: number[];
     collision: number[];
@@ -84,12 +105,83 @@ export async function loadMap(url: string): Promise<GameMap> {
 }
 
 export function loadMapFromData(map: GameMap): GameMap {
+  // If tileProperties exist, rebuild collision from structural tiles + furniture
+  if (map.tileProperties) {
+    rebuildCollision(map);
+  }
   currentMap = map;
   return map;
 }
 
 export function getMap(): GameMap | null {
   return currentMap;
+}
+
+/**
+ * Check if a tile is structurally walkable (ignoring furniture).
+ * Uses tileProperties if available, otherwise falls back to collision layer.
+ */
+export function isStructurallyWalkable(map: GameMap, x: number, y: number): boolean {
+  if (x < 0 || x >= map.width || y < 0 || y >= map.height) return false;
+  if (map.tileProperties) {
+    const gid = map.layers.ground[y * map.width + x];
+    const props = map.tileProperties[gid];
+    return props ? props.walkable : true; // unknown tiles default to walkable
+  }
+  // Fallback: use collision layer
+  return map.layers.collision[y * map.width + x] === 0;
+}
+
+/**
+ * Get the structural type of a tile ("wall", "floor", "door").
+ * Returns "floor" if tileProperties is not defined.
+ */
+export function getTileType(map: GameMap, x: number, y: number): "wall" | "floor" | "door" {
+  if (x < 0 || x >= map.width || y < 0 || y >= map.height) return "wall";
+  if (map.tileProperties) {
+    const gid = map.layers.ground[y * map.width + x];
+    const props = map.tileProperties[gid];
+    return props?.type ?? "floor";
+  }
+  // Fallback: collision=1 means wall
+  return map.layers.collision[y * map.width + x] !== 0 ? "wall" : "floor";
+}
+
+/**
+ * Rebuild the collision layer from tileProperties + furniture footprints.
+ * Call this after furniture changes to keep collision in sync.
+ */
+export function rebuildCollision(map: GameMap): void {
+  const { width, height, tileSize } = map;
+  const coll = new Array(width * height).fill(0);
+
+  // 1. Static collision from tile properties
+  for (let i = 0; i < coll.length; i++) {
+    if (map.tileProperties) {
+      const gid = map.layers.ground[i];
+      const props = map.tileProperties[gid];
+      if (props && !props.walkable) coll[i] = 1;
+    }
+  }
+
+  // 2. Dynamic collision from furniture
+  for (const f of map.furniture) {
+    if (!f.collides) continue;
+    // Sittable furniture is walk-through (Gather-style)
+    if (f.sittable || f.sprite.includes("sofa_") || f.sprite.includes("chair_") || f.sprite.includes("puff_")) continue;
+    const ftx = Math.floor(f.x / tileSize);
+    const fty = Math.floor(f.y / tileSize);
+    const ftw = Math.floor(f.width / tileSize);
+    const fth = Math.floor(f.height / tileSize);
+    for (let dy = 0; dy < fth; dy++) {
+      for (let dx = 0; dx < ftw; dx++) {
+        const idx = (fty + dy) * width + (ftx + dx);
+        if (idx >= 0 && idx < coll.length) coll[idx] = 1;
+      }
+    }
+  }
+
+  map.layers.collision = coll;
 }
 
 export function isWalkable(x: number, y: number): boolean {

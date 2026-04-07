@@ -71,3 +71,5 @@ packages/vscode-extension/package-lock.json
 packages/vscode-extension/*.vsix
 
 scripts/
+
+public/cozy/

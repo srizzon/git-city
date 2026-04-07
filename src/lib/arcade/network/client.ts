@@ -1,5 +1,5 @@
 import PartySocket from "partysocket";
-import type { ClientMsg, ServerMsg, PlayerState, ChatLogEntry } from "../types";
+import type { ClientMsg, ServerMsg, PlayerState, ChatLogEntry, GameResult } from "../types";
 
 export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "error";
 
@@ -14,6 +14,8 @@ export interface ArcadeCallbacks {
   onStand: (id: string, x: number, y: number) => void;
   onAvatar: (id: string, spriteId: number) => void;
   onMapReload: (map: Record<string, unknown>) => void;
+  onGameAck: (game: string) => void;
+  onGameResult: (game: string, result: GameResult) => void;
   onStatusChange: (status: ConnectionStatus) => void;
 }
 
@@ -95,6 +97,12 @@ export function connect(token: string, callbacks: ArcadeCallbacks, spriteId?: nu
       case "map_reload":
         callbacks.onMapReload(msg.map);
         break;
+      case "game_ack":
+        callbacks.onGameAck(msg.game);
+        break;
+      case "game_result":
+        callbacks.onGameResult(msg.game, msg.result);
+        break;
     }
   });
 
@@ -144,6 +152,16 @@ export function sendStand() {
 
 export function sendAvatar(spriteId: number) {
   const msg: ClientMsg = { type: "avatar", sprite_id: spriteId };
+  socket?.send(JSON.stringify(msg));
+}
+
+export function sendGameStart(game: string) {
+  const msg: ClientMsg = { type: "game_start", game };
+  socket?.send(JSON.stringify(msg));
+}
+
+export function sendGameStop(game: string) {
+  const msg: ClientMsg = { type: "game_stop", game };
   socket?.send(JSON.stringify(msg));
 }
 

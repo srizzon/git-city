@@ -1,6 +1,7 @@
 import type { PlayerState, ChatBubble } from "../types";
 import type { GameMap, FurnitureObject } from "./tileMap";
-import { drawCharacter, isSpriteLoaded } from "./sprites";
+import { drawCharacter, isSpriteLoaded, isCozyLoaded, COZY_SPRITE_SIZE, isPetLoaded, drawPet, updatePetAnimation, PET_SIZE } from "./sprites";
+import type { Direction } from "../types";
 
 export interface RenderPlayer extends PlayerState {
   renderX: number;
@@ -28,42 +29,58 @@ const furnitureImages = new Map<string, HTMLImageElement>();
 export function loadFurnitureSprites(basePath: string, spriteKeys: string[]): Promise<void> {
   const unique = [...new Set(spriteKeys)];
   const promises = unique.map((key) => {
-    // Map sprite keys to file paths
+    if (furnitureImages.has(key)) return Promise.resolve(); // already loaded
     const path = getSpriteFile(basePath, key);
     return new Promise<void>((resolve) => {
       const img = new Image();
       img.onload = () => { furnitureImages.set(key, img); resolve(); };
-      img.onerror = () => { console.warn(`[arcade] Failed to load furniture sprite: ${path}`); resolve(); };
+      img.onerror = () => {
+        // If png failed, try gif (for animated arcade machines)
+        if (path.endsWith(".png") && basePath.includes("/cozy/")) {
+          const gifPath = path.replace(/\.png$/, ".gif");
+          const gifImg = new Image();
+          gifImg.onload = () => { furnitureImages.set(key, gifImg); resolve(); };
+          gifImg.onerror = () => { console.warn(`[arcade] Failed to load furniture sprite: ${path}`); resolve(); };
+          gifImg.src = gifPath;
+        } else {
+          console.warn(`[arcade] Failed to load furniture sprite: ${path}`);
+          resolve();
+        }
+      };
       img.src = path;
     });
   });
   return Promise.all(promises).then(() => {});
 }
 
-function getSpriteFile(basePath: string, key: string): string {
-  // Map keys like "DESK_FRONT" -> "/sprites/arcade/furniture-lumon/DESK/DESK_FRONT.png"
-  const parts = key.split("_");
-  const nameMap: Record<string, string> = {
-    DESK_FRONT: "DESK/DESK_FRONT",
-    DESK_SIDE: "DESK/DESK_SIDE",
-    PC_FRONT: "PC/PC_FRONT_ON_1",
-    CHAIR_FRONT: "CUSHIONED_CHAIR/CUSHIONED_CHAIR_FRONT",
-    CHAIR_BACK: "CUSHIONED_CHAIR/CUSHIONED_CHAIR_BACK",
-    PLANT: "PLANT/PLANT",
-    CACTUS: "CACTUS/CACTUS",
-    BOOKSHELF: "BOOKSHELF/BOOKSHELF",
-    WHITEBOARD: "WHITEBOARD/WHITEBOARD",
-    SOFA_FRONT: "SOFA/SOFA_FRONT",
-    SMALL_TABLE: "SMALL_TABLE/SMALL_TABLE_FRONT",
-    CLOCK: "CLOCK/CLOCK",
-    BIN: "BIN/BIN",
-    COFFEE: "COFFEE/COFFEE",
-    LARGE_PAINTING: "LARGE_PAINTING/LARGE_PAINTING",
-    SMALL_PAINTING: "SMALL_PAINTING/SMALL_PAINTING",
-  };
-  const mapped = nameMap[key];
-  if (mapped) return `${basePath}/furniture-lumon/${mapped}.png`;
-  return `${basePath}/furniture-lumon/${parts[0]}/${key}.png`;
+// Lumon sprite key → file path mapping
+const LUMON_SPRITE_MAP: Record<string, string> = {
+  DESK_FRONT: "DESK/DESK_FRONT",
+  DESK_SIDE: "DESK/DESK_SIDE",
+  PC_FRONT: "PC/PC_FRONT_ON_1",
+  CHAIR_FRONT: "CUSHIONED_CHAIR/CUSHIONED_CHAIR_FRONT",
+  CHAIR_BACK: "CUSHIONED_CHAIR/CUSHIONED_CHAIR_BACK",
+  PLANT: "PLANT/PLANT",
+  CACTUS: "CACTUS/CACTUS",
+  BOOKSHELF: "BOOKSHELF/BOOKSHELF",
+  WHITEBOARD: "WHITEBOARD/WHITEBOARD",
+  SOFA_FRONT: "SOFA/SOFA_FRONT",
+  SMALL_TABLE: "SMALL_TABLE/SMALL_TABLE_FRONT",
+  CLOCK: "CLOCK/CLOCK",
+  BIN: "BIN/BIN",
+  COFFEE: "COFFEE/COFFEE",
+  LARGE_PAINTING: "LARGE_PAINTING/LARGE_PAINTING",
+  SMALL_PAINTING: "SMALL_PAINTING/SMALL_PAINTING",
+  ELEVATOR: "ELEVATOR/ELEVATOR",
+};
+
+function getSpriteFile(_basePath: string, key: string): string {
+  // Check if it's a known Lumon sprite
+  const mapped = LUMON_SPRITE_MAP[key];
+  if (mapped) return `/sprites/arcade/furniture-lumon/${mapped}.png`;
+
+  // Otherwise it's a Cozy sprite — load from /cozy/furniture/
+  return `/cozy/furniture/${key}.png`;
 }
 
 // ─── Pre-rendered ground cache ────────────────────────────────
@@ -128,8 +145,58 @@ export function resetRenderer(): void {
   furnitureImages.clear();
 }
 
+// ─── Pet follow state ────────────────────────────────────────
+let petX = 0;
+let petY = 0;
+let petDir: Direction = "down";
+let petWalking = false;
+let petInitialized = false;
+const PET_FOLLOW_DIST = 20; // pixels — how close before pet stops
+const PET_SPEED = 55; // pixels/sec — slightly slower than player
+
+export function updatePet(dt: number, targetX: number, targetY: number): void {
+  if (!isPetLoaded()) return;
+
+  if (!petInitialized) {
+    petX = targetX - 16;
+    petY = targetY + 12;
+    petInitialized = true;
+  }
+
+  const dx = targetX - petX;
+  const dy = targetY - petY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  if (dist > PET_FOLLOW_DIST) {
+    petWalking = true;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    petX += nx * PET_SPEED * dt;
+    petY += ny * PET_SPEED * dt;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      petDir = dx > 0 ? "right" : "left";
+    } else {
+      petDir = dy > 0 ? "down" : "up";
+    }
+  } else {
+    petWalking = false;
+  }
+
+  updatePetAnimation(dt, petWalking);
+}
+
+export function resetPetState(): void {
+  petX = 0;
+  petY = 0;
+  petDir = "down";
+  petWalking = false;
+  petInitialized = false;
+}
+
 export function buildLayerCaches(map: GameMap): void {
-  const ts = map.tileSize;
+  const ts = map.tileSize;         // tile size on canvas (32px)
+  const sts = map.tilesetTileSize ?? ts; // tile size in tileset image (16px for Cozy, 32px for Lumon)
   const canvas = document.createElement("canvas");
   canvas.width = map.width * ts;
   canvas.height = map.height * ts;
@@ -143,12 +210,14 @@ export function buildLayerCaches(map: GameMap): void {
     const gid = map.layers.ground[i];
     if (gid === 0) continue;
 
-    const sx = (gid % tilesetCols) * ts;
-    const sy = Math.floor(gid / tilesetCols) * ts;
+    // Source: position in tileset image (using tileset tile size)
+    const sx = (gid % tilesetCols) * sts;
+    const sy = Math.floor(gid / tilesetCols) * sts;
+    // Dest: position on canvas (using map tile size, scales up if sts < ts)
     const dx = (i % map.width) * ts;
     const dy = Math.floor(i / map.width) * ts;
 
-    ctx.drawImage(tilesetImg, sx, sy, ts, ts, dx, dy, ts, ts);
+    ctx.drawImage(tilesetImg, sx, sy, sts, sts, dx, dy, ts, ts);
   }
 
   groundCache = canvas;
@@ -226,10 +295,58 @@ export function render(
     });
   }
 
+  // Build a set of sittable tiles for auto-sit detection
+  const sittableTiles = new Map<string, FurnitureObject>();
+  for (const f of map.furniture) {
+    // Check sittable flag, or infer from sprite name (sofa, chair, puff)
+    const sittable = f.sittable
+      || f.sprite.includes("sofa_")
+      || f.sprite.includes("chair_")
+      || f.sprite.includes("puff_");
+    if (!sittable) continue;
+    const ftx = Math.floor(f.x / ts);
+    const fty = Math.floor(f.y / ts);
+    const ftw = Math.floor(f.width / ts);
+    const fth = Math.floor(f.height / ts);
+    for (let dy = 0; dy < fth; dy++) {
+      for (let dx = 0; dx < ftw; dx++) {
+        sittableTiles.set(`${ftx + dx},${fty + dy}`, f);
+      }
+    }
+  }
+
   for (const p of players) {
+    // Auto-sit: check if player is standing on a sittable tile and not walking
+    const ptx = Math.round(p.renderX / ts);
+    const pty = Math.round(p.renderY / ts);
+    const tileKey = `${ptx},${pty}`;
+    const onSittable = sittableTiles.get(tileKey);
+    const isSitting = !!onSittable && !p.walking;
+    if (onSittable && !p.walking) {
+      // Log once per sit (avoid spamming)
+      if (!(p as unknown as Record<string, unknown>).__lastSitLog || (p as unknown as Record<string, unknown>).__lastSitLog !== tileKey) {
+        console.log(`[auto-sit] ${p.github_login} sitting on ${onSittable.sprite} at tile(${ptx},${pty})`);
+        (p as unknown as Record<string, unknown>).__lastSitLog = tileKey;
+      }
+    } else {
+      (p as unknown as Record<string, unknown>).__lastSitLog = null;
+    }
+
     renderables.push({
       sortY: p.renderY + ts,
-      draw: () => renderPlayer(ctx, p, ts, localPlayerId),
+      draw: () => renderPlayer(ctx, p, ts, localPlayerId, isSitting),
+    });
+  }
+
+  // Pet (follows local player)
+  if (isPetLoaded()) {
+    renderables.push({
+      sortY: petY + PET_SIZE,
+      draw: () => {
+        const petScale = 2;
+        const petDrawSize = PET_SIZE * petScale;
+        drawPet(ctx, petDir, petWalking, petX - petDrawSize / 2, petY - petDrawSize / 2, petScale);
+      },
     });
   }
 
@@ -301,24 +418,39 @@ function renderPlayer(
   p: RenderPlayer,
   ts: number,
   localPlayerId: string,
+  sitting = false,
 ): void {
   const px = p.renderX;
   const py = p.renderY;
+  // When sitting, shift the sprite down by half a tile (Habbo-style offset)
+  const sitOffset = sitting ? 12 : 0;
 
   if (isSpriteLoaded()) {
-    const spriteScale = 2;
-    const spriteW = 16 * spriteScale;
-    const spriteH = 32 * spriteScale;
-    drawCharacter(
-      ctx, p.sprite_id, p.dir, p.walking,
-      px + (ts - spriteW) / 2,
-      py - spriteH + ts,
-      spriteScale,
-    );
+    if (isCozyLoaded()) {
+      const spriteScale = 2;
+      const spriteW = COZY_SPRITE_SIZE * spriteScale;
+      const spriteH = COZY_SPRITE_SIZE * spriteScale;
+      drawCharacter(
+        ctx, p.id, p.sprite_id, p.dir, sitting ? false : p.walking,
+        px + (ts - spriteW) / 2,
+        py - spriteH + ts + sitOffset,
+        spriteScale,
+      );
+    } else {
+      const spriteScale = 2;
+      const spriteW = 16 * spriteScale;
+      const spriteH = 32 * spriteScale;
+      drawCharacter(
+        ctx, p.id, p.sprite_id, p.dir, sitting ? false : p.walking,
+        px + (ts - spriteW) / 2,
+        py - spriteH + ts + sitOffset,
+        spriteScale,
+      );
+    }
   } else {
     const isLocal = p.id === localPlayerId;
     ctx.fillStyle = isLocal ? "#c8e64a" : "#4a9eff";
-    ctx.fillRect(px + 8, py + 4, 16, 24);
+    ctx.fillRect(px + 8, py + 4 + sitOffset, 16, 24);
   }
 
   ctx.fillStyle = "#ffffff";
