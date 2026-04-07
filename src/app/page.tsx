@@ -36,7 +36,6 @@ import XpBar from "@/components/XpBar";
 import PixelBalance from "@/components/PixelBalance";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
-import MiniMap from "@/components/MiniMap";
 import RadarMap from "@/components/RadarMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
@@ -76,7 +75,6 @@ const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ss
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
 const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
 const LevelUpToast = dynamic(() => import("@/components/LevelUpToast"), { ssr: false });
-const MiniMap = dynamic(() => import("@/components/MiniMap"), { ssr: false });
 
 // Feature flags — flip to switch milestone banner
 const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road to 1K, "devs" = total developers
@@ -2644,7 +2642,7 @@ function HomeContent() {
 
           {/* District announcement */}
           {districtAnnouncement && (
-            <div key={districtAnnouncement.name} className="absolute bottom-32 left-3 animate-district-in sm:left-4">
+            <div key={districtAnnouncement.name} className="absolute bottom-6 left-1/2 -translate-x-1/2 animate-district-in">
               <div className="border-l-4 bg-bg/80 px-4 py-2 backdrop-blur-sm" style={{ borderColor: districtAnnouncement.color }}>
                 <div className="text-[8px] uppercase tracking-widest text-muted">District</div>
                 <div className="font-pixel text-sm text-cream">{districtAnnouncement.name}</div>
@@ -2655,7 +2653,7 @@ function HomeContent() {
 
           {/* Controls hint */}
           {!isMobile && (
-            <div className="absolute bottom-35 right-3 text-right text-[8px] leading-loose text-muted sm:right-4 sm:text-[9px]">
+            <div className="absolute bottom-28 left-3 text-[8px] leading-loose text-muted sm:left-4 sm:text-[9px]">
               {flyPaused ? (
                 <>
                   <div>
@@ -2818,16 +2816,7 @@ function HomeContent() {
         </div>
       )}
 
-      {/* ─── Mini-map (legacy fly-only) ─── */}
-      <MiniMap
-        buildings={buildings}
-        playerX={playerPos.x}
-        playerZ={playerPos.z}
-        visible={flyMode && !isMobile}
-        currentDistrict={lastDistrictRef.current}
-      />
-
-      {/* ─── Radar Map (always-visible bottom-left) ─── */}
+      {/* ─── Radar Map ─── */}
       <RadarMap
         buildings={buildings}
         playerX={playerPos.x}
@@ -2841,6 +2830,7 @@ function HomeContent() {
         flyMode={flyMode}
         currentDistrict={lastDistrictRef.current}
         districtZones={districtZones}
+        remotePilotsRef={flyPilotsRef}
       />
 
       {/* ─── Explore Mode: minimal UI ─── */}
@@ -2899,7 +2889,7 @@ function HomeContent() {
 
           {/* Navigation hints (bottom-right) — hidden when building card is open */}
           {!selectedBuilding && (
-            <div className="absolute bottom-3 right-3 text-right text-[8px] leading-loose text-muted sm:bottom-4 sm:right-4 sm:text-[9px]">
+            <div className="absolute bottom-20 left-3 text-[8px] leading-loose text-muted sm:left-4 sm:text-[9px]">
               <div><span className="text-cream">Drag</span> orbit</div>
               <div><span className="text-cream">Scroll</span> zoom</div>
               <div><span className="text-cream">Right-drag</span> pan</div>

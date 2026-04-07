@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useMemo, useCallback, useState } from "react";
 import type { CityBuilding, DistrictZone } from "@/lib/github";
+import type { RemotePilot } from "@/lib/useFlyPresence";
 
 interface RadarMapProps {
   buildings: CityBuilding[];
@@ -16,6 +17,7 @@ interface RadarMapProps {
   flyMode: boolean;
   currentDistrict?: string | null;
   districtZones?: DistrictZone[];
+  remotePilotsRef?: React.MutableRefObject<Map<string, RemotePilot>>;
 }
 
 const RES     = 100;
@@ -65,9 +67,11 @@ export default function RadarMap({
   flyMode,
   currentDistrict,
   districtZones = [],
+  remotePilotsRef,
 }: RadarMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [pulse, setPulse] = useState(false);
+  const [remotePilotBlips, setRemotePilotBlips] = useState<{ id: string; x: number; z: number; yaw: number; login: string }[]>([]);
 
   // ── Heading-up rotation (shortest-arc accumulator) ───────────
   // Avoids the 360° wrap-around flip that CSS transitions can't handle.
@@ -209,6 +213,24 @@ export default function RadarMap({
     return () => clearInterval(id);
   }, [visible]);
 
+  // ── Sync remote pilots into state (~5fps) ────────────────────
+  useEffect(() => {
+    if (!visible || !remotePilotsRef) return;
+    const id = setInterval(() => {
+      const pilots = remotePilotsRef.current;
+      if (pilots.size === 0) {
+        setRemotePilotBlips(prev => prev.length === 0 ? prev : []);
+        return;
+      }
+      const blips: typeof remotePilotBlips = [];
+      for (const [pid, p] of pilots) {
+        blips.push({ id: pid, x: p.x, z: p.z, yaw: p.yaw, login: p.login });
+      }
+      setRemotePilotBlips(blips);
+    }, 200);
+    return () => clearInterval(id);
+  }, [visible, remotePilotsRef]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── SVG indicator geometry ───────────────────────────────────
   const [camSx, camSy] = w2s(cameraX, cameraZ);
   const [tgtSx, tgtSy] = w2s(cameraTargetX, cameraTargetZ);
@@ -231,7 +253,7 @@ export default function RadarMap({
 
   return (
     <div
-      className="pointer-events-none fixed bottom-20 left-3 z-30 sm:bottom-20 sm:left-4"
+      className="pointer-events-none fixed bottom-3 right-3 z-30 sm:bottom-4 sm:right-4"
       style={{ width: OUTER, height: OUTER }}
     >
       {/* ── Rotating inner area: canvas + SVG indicators + compass labels ── */}
@@ -298,6 +320,27 @@ export default function RadarMap({
               <circle cx={plySx} cy={plySy} r={3} fill="white" />
             </g>
           )}
+
+          {/* Remote pilots */}
+          {remotePilotBlips.map((p) => {
+            const [px, py] = w2s(p.x, p.z);
+            return (
+              <g key={p.id}>
+                <circle cx={px} cy={py} r={2.5} fill="#c8e64a" opacity={0.9} />
+                <circle cx={px} cy={py} r={5} fill="none" stroke="#c8e64a" strokeWidth="0.6" opacity={0.4} />
+                <text
+                  x={px} y={py + 8}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fontSize="4.5" fill="#c8e64a" opacity={0.7}
+                  fontFamily="monospace"
+                  transform={`rotate(${-mapRotDeg}, ${px}, ${py + 8})`}
+                  style={{ userSelect: "none" }}
+                >
+                  {p.login.slice(0, 10)}
+                </text>
+              </g>
+            );
+          })}
 
           {/* District labels — counter-rotated so text stays upright */}
           {dzData.map((z) => (
