@@ -2286,9 +2286,11 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
             <>
               <AirplaneFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} cityRadius={cityRadius} isMobile={isMobile} onJoystickState={onJoystickState} boostActive={flyBoostActive} brakeActive={flyBrakeActive} onFlyMove={onFlyMove} />
               <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={cityRadius} />
-              {flyPilotsRef && <RemotePilots pilotsRef={flyPilotsRef} />}
             </>
           )}
+
+          {/* Remote pilots visible in both explore and fly mode */}
+          {flyPilotsRef && <RemotePilots pilotsRef={flyPilotsRef} />}
         </>
       )}
 
