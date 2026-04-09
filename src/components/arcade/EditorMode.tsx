@@ -477,7 +477,9 @@ export default function EditorMode({ map, canvas, slug, onSave, onExit }: Editor
           ctx.fillStyle = "#f0c040";
           ctx.font = "bold 7px monospace";
           ctx.textAlign = "center";
-          ctx.fillText("click=move · Del=remove", f.x + f.width / 2, f.y - 3);
+          const isSittable1x1 = (f.sittable || f.sprite.includes("puff_") || f.sprite.includes("1seat_")) && f.width <= ts && f.height <= ts;
+          const dirLabel = isSittable1x1 ? ` · R=face:${(f as PlacedFurniture).sitDir ?? "down"}` : "";
+          ctx.fillText(`move · Del${dirLabel}`, f.x + f.width / 2, f.y - 3);
 
           // Ghost preview at cursor position (for moving)
           if (ed.ghostTileX >= 0 && !ed.selectedItem) {
@@ -630,6 +632,24 @@ export default function EditorMode({ map, canvas, slug, onSave, onExit }: Editor
           onExit();
         }
       }
+      // R = cycle sit direction on 1×1 sittable items (puffs, armchairs)
+      if (e.key === "r" && !e.metaKey && !e.ctrlKey && !(e.target instanceof HTMLInputElement) && ed.selectedFurniture) {
+        const f = furnitureRef.current.find((f) => f.id === ed.selectedFurniture);
+        if (f) {
+          const isSittable = f.sittable || f.sprite.includes("puff_") || f.sprite.includes("1seat_");
+          const is1x1 = f.width <= ts && f.height <= ts;
+          if (isSittable && is1x1) {
+            const dirs: Array<"up" | "down" | "left" | "right"> = ["down", "up", "left", "right"];
+            const cur = f.sitDir ?? "down";
+            const next = dirs[(dirs.indexOf(cur) + 1) % dirs.length];
+            setUndoStack((prev) => [...prev, furnitureRef.current]);
+            setFurniture((prev) => prev.map((item) =>
+              item.id === f.id ? { ...item, sitDir: next } : item
+            ));
+          }
+        }
+      }
+
       if (e.key === "g" && !e.metaKey && !e.ctrlKey && !(e.target instanceof HTMLInputElement)) {
         setShowGrid((prev) => !prev);
       }

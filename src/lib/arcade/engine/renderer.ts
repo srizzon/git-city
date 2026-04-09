@@ -296,9 +296,9 @@ export function render(
   }
 
   // Build a set of sittable tiles for auto-sit detection
+  // Only the SEAT tiles (bottom row for front/back, right col for left, left col for right)
   const sittableTiles = new Map<string, FurnitureObject>();
   for (const f of map.furniture) {
-    // Check sittable flag, or infer from sprite name (sofa, chair, puff)
     const sittable = f.sittable
       || f.sprite.includes("sofa_")
       || f.sprite.includes("chair_")
@@ -308,9 +308,20 @@ export function render(
     const fty = Math.floor(f.y / ts);
     const ftw = Math.floor(f.width / ts);
     const fth = Math.floor(f.height / ts);
-    for (let dy = 0; dy < fth; dy++) {
+
+    if (ftw <= 1 && fth <= 1) {
+      // 1×1 (puff, single armchair): entire tile is sittable
+      sittableTiles.set(`${ftx},${fty}`, f);
+    } else if (f.sprite.includes("_left") || f.sprite.includes("_right")) {
+      // Side sofas: only top tiles (exclude bottom to avoid z-order issues)
+      for (let dy = 0; dy < Math.max(1, fth - 1); dy++) {
+        sittableTiles.set(`${ftx},${fty + dy}`, f);
+      }
+    } else {
+      // Front/back sofas: only bottom row (the cushion/seat area)
+      const seatY = fty + fth - 1;
       for (let dx = 0; dx < ftw; dx++) {
-        sittableTiles.set(`${ftx + dx},${fty + dy}`, f);
+        sittableTiles.set(`${ftx + dx},${seatY}`, f);
       }
     }
   }
@@ -322,19 +333,25 @@ export function render(
     const tileKey = `${ptx},${pty}`;
     const onSittable = sittableTiles.get(tileKey);
     const isSitting = !!onSittable && !p.walking;
-    if (onSittable && !p.walking) {
-      // Log once per sit (avoid spamming)
-      if (!(p as unknown as Record<string, unknown>).__lastSitLog || (p as unknown as Record<string, unknown>).__lastSitLog !== tileKey) {
-        console.log(`[auto-sit] ${p.github_login} sitting on ${onSittable.sprite} at tile(${ptx},${pty})`);
-        (p as unknown as Record<string, unknown>).__lastSitLog = tileKey;
+
+    // Determine sit direction from the furniture
+    let sitDir: Direction | null = null;
+    if (isSitting && onSittable) {
+      // First check if the furniture has an explicit sitDir (puffs, 1×1 items)
+      if (onSittable.sitDir) {
+        sitDir = onSittable.sitDir;
+      } else {
+        // Derive from sprite name
+        const s = onSittable.sprite;
+        if (s.includes("_left")) sitDir = "right";
+        else if (s.includes("_right")) sitDir = "left";
+        else sitDir = "down"; // front/back → face camera
       }
-    } else {
-      (p as unknown as Record<string, unknown>).__lastSitLog = null;
     }
 
     renderables.push({
       sortY: p.renderY + ts,
-      draw: () => renderPlayer(ctx, p, ts, localPlayerId, isSitting),
+      draw: () => renderPlayer(ctx, p, ts, localPlayerId, isSitting, sitDir),
     });
   }
 
@@ -419,11 +436,12 @@ function renderPlayer(
   ts: number,
   localPlayerId: string,
   sitting = false,
+  sitDir: Direction | null = null,
 ): void {
   const px = p.renderX;
   const py = p.renderY;
-  // When sitting, shift the sprite down by half a tile (Habbo-style offset)
   const sitOffset = sitting ? 12 : 0;
+  const dir = sitting && sitDir ? sitDir : p.dir;
 
   if (isSpriteLoaded()) {
     if (isCozyLoaded()) {
@@ -431,7 +449,7 @@ function renderPlayer(
       const spriteW = COZY_SPRITE_SIZE * spriteScale;
       const spriteH = COZY_SPRITE_SIZE * spriteScale;
       drawCharacter(
-        ctx, p.id, p.sprite_id, p.dir, sitting ? false : p.walking,
+        ctx, p.id, p.sprite_id, dir, sitting ? false : p.walking,
         px + (ts - spriteW) / 2,
         py - spriteH + ts + sitOffset,
         spriteScale,
@@ -441,7 +459,7 @@ function renderPlayer(
       const spriteW = 16 * spriteScale;
       const spriteH = 32 * spriteScale;
       drawCharacter(
-        ctx, p.id, p.sprite_id, p.dir, sitting ? false : p.walking,
+        ctx, p.id, p.sprite_id, dir, sitting ? false : p.walking,
         px + (ts - spriteW) / 2,
         py - spriteH + ts + sitOffset,
         spriteScale,

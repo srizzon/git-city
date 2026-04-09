@@ -13,6 +13,7 @@ export interface FurnitureObject {
   collides: boolean;
   sortY?: number;  // Z-sort key (bottom of footprint). If missing, uses y + height.
   sittable?: boolean; // Gather-style: player walks through and auto-sits when idle
+  sitDir?: "up" | "down" | "left" | "right"; // Direction player faces when sitting (for items without directional sprite names)
 }
 
 export interface MapObject {
