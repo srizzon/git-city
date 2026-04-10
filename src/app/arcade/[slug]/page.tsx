@@ -20,6 +20,7 @@ import {
   resetRenderer,
   updatePet,
   resetPetState,
+  setPetEnabled,
   type RenderPlayer,
   type InteractionPrompt,
 } from "@/lib/arcade/engine/renderer";
@@ -610,6 +611,7 @@ export default function ArcadeRoomPage({
       // 7. Set local player avatar and connect
       loadoutRef.current = loadout;
       setPlayerAvatar(session.user.id, loadout);
+      setPetEnabled(!!loadout.pet_id);
       if (loadout.pet_id) setActivePet(loadout.pet_id);
       spriteIdRef.current = 0;
       connect(token, connectCallbacks(), 0, slug!);
@@ -625,6 +627,7 @@ export default function ArcadeRoomPage({
       disconnect();
       resetRenderer();
       resetPetState();
+      setPetEnabled(false);
       resetSprites();
       resetPet();
       resetMap();
@@ -679,6 +682,7 @@ export default function ArcadeRoomPage({
     loadoutRef.current = newLoadout;
     setPlayerAvatar(localIdRef.current, newLoadout);
     preloadLoadout(newLoadout).catch(() => {});
+    setPetEnabled(!!newLoadout.pet_id);
     if (newLoadout.pet_id) setActivePet(newLoadout.pet_id);
     setShowAvatarModal(false);
   };

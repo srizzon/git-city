@@ -154,8 +154,14 @@ let petInitialized = false;
 const PET_FOLLOW_DIST = 20; // pixels — how close before pet stops
 const PET_SPEED = 55; // pixels/sec — slightly slower than player
 
+let petEnabled = false;
+
+export function setPetEnabled(enabled: boolean): void {
+  petEnabled = enabled;
+}
+
 export function updatePet(dt: number, targetX: number, targetY: number): void {
-  if (!isPetLoaded()) return;
+  if (!petEnabled || !isPetLoaded()) return;
 
   if (!petInitialized) {
     petX = targetX - 16;
@@ -355,8 +361,8 @@ export function render(
     });
   }
 
-  // Pet (follows local player)
-  if (isPetLoaded()) {
+  // Pet (follows local player, only if enabled)
+  if (petEnabled && isPetLoaded()) {
     renderables.push({
       sortY: petY + PET_SIZE,
       draw: () => {
