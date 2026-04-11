@@ -45,7 +45,7 @@
     "howler": "^2.2.4",
     "isomorphic-dompurify": "^3.7.1",
     "lucide-react": "^0.577.0",
-    "next": "16.2.0",
+    "next": "16.2.3",
     "partykit": "^0.0.115",
     "partysocket": "^1.1.16",
     "postprocessing": "^6.38.3",
