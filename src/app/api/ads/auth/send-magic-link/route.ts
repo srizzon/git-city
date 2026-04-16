@@ -4,7 +4,6 @@ import { getResend } from "@/lib/resend";
 import { createMagicLinkSession } from "@/lib/advertiser-auth";
 import { wrapInBaseTemplate, buildButton } from "@/lib/email-template";
 import { rateLimit } from "@/lib/rate-limit";
-import { FREE_EMAIL_DOMAINS } from "@/lib/jobs/constants";
 
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
@@ -33,13 +32,6 @@ export async function POST(request: NextRequest) {
   const email = body.email?.trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
-  }
-
-  // Validate corporate email (skip in development)
-  const isDev = process.env.NODE_ENV === "development";
-  const domain = email.split("@")[1];
-  if (!isDev && FREE_EMAIL_DOMAINS.includes(domain)) {
-    return NextResponse.json({ error: "Please use a company email address" }, { status: 400 });
   }
 
   const sb = getSupabaseAdmin();

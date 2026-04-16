@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
-import AceleraDevBuilding from "./buildings/AceleraDevBuilding";
 import ArkiBuilding from "./buildings/ArkiBuilding";
 import GuaraCloudBuilding from "./buildings/GuaraCloudBuilding";
+import SolanaHackathonBuilding from "./buildings/SolanaHackathonBuilding";
 
 // ─── Grid constants (must match github.ts) ──────────────────
 const BLOCK_FOOTPRINT_X = 161; // 4*38 + 3*3
@@ -50,26 +50,6 @@ export interface SponsorConfig {
 
 export const SPONSORS: SponsorConfig[] = [
   {
-    slug: "aceleradev",
-    name: "Acelera Dev",
-    tagline: "Conquiste sua vaga em tech",
-    description:
-      "Método que já levou devs comuns a oportunidades extraordinárias. Currículo, LinkedIn, entrevistas e posicionamento estratégico para conquistar sua primeira (ou melhor) vaga em tech.",
-    url: "https://aceleradev.com.br/",
-    accent: "#38bdf8",
-    gridX: -1,
-    gridZ: 1,
-    features: ["Currículo otimizado", "LinkedIn estratégico", "Preparação para entrevistas"],
-    Building: AceleraDevBuilding,
-    hitboxRadius: 70,
-    hitboxHeight: 500,
-    logoSvg: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M13 2L4.5 13H11L10 22L19.5 11H13L13 2Z" fill="currentColor" />
-      </svg>
-    ),
-  },
-  {
     slug: "arki",
     name: "Arki",
     tagline: "Lance seu SaaS essa semana",
@@ -78,7 +58,7 @@ export const SPONSORS: SponsorConfig[] = [
     url: "https://www.usearki.dev/",
     accent: "#f97316",
     gridX: -1,
-    gridZ: -1,
+    gridZ: 1,
     features: ["Auth completa", "Stripe + PIX integrados", "Multi-tenancy"],
     Building: ArkiBuilding,
     hitboxRadius: 80,
@@ -109,6 +89,28 @@ export const SPONSORS: SponsorConfig[] = [
     logoSvg: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <path d="M6 16a4 4 0 0 1-.5-7.97A6 6 0 0 1 17.5 8.5a4.5 4.5 0 0 1 .5 8.97H6Z" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    slug: "solana-hackathon",
+    name: "Colosseum Hackathon",
+    tagline: "Superteam Brasil x Solana",
+    description:
+      "Colosseum Global Hackathon 2026. Build on Solana, compete globally, win R$5M+ in prizes and seed capital. Brazilian teams already won $300K last edition.",
+    url: "https://colosseum.com/frontier?ref=brasil",
+    accent: "#9945FF",
+    gridX: -1,
+    gridZ: -1,
+    features: ["R$5M+ in prizes", "$300K seed per team", "80K+ global builders"],
+    Building: SolanaHackathonBuilding,
+    hitboxRadius: 80,
+    hitboxHeight: 500,
+    logoSvg: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M4 7h16l-2 2H6L4 7Z" fill="currentColor" />
+        <path d="M4 17h16l-2-2H6l-2 2Z" fill="currentColor" />
+        <path d="M20 12H4l2-2h12l2 2Z" fill="currentColor" />
       </svg>
     ),
   },
