@@ -1,6 +1,7 @@
 import type { PlayerState, ChatBubble } from "../types";
 import type { GameMap, FurnitureObject } from "./tileMap";
 import { drawCharacter, isSpriteLoaded, isCozyLoaded, COZY_SPRITE_SIZE, isPetLoaded, drawPet, updatePetAnimation, PET_SIZE } from "./sprites";
+import { cozyUrl, COZY_BASE } from "../assetBase";
 import type { Direction } from "../types";
 
 export interface RenderPlayer extends PlayerState {
@@ -36,7 +37,7 @@ export function loadFurnitureSprites(basePath: string, spriteKeys: string[]): Pr
       img.onload = () => { furnitureImages.set(key, img); resolve(); };
       img.onerror = () => {
         // If png failed, try gif (for animated arcade machines)
-        if (path.endsWith(".png") && basePath.includes("/cozy/")) {
+        if (path.endsWith(".png") && path.includes(`${COZY_BASE}/furniture/`)) {
           const gifPath = path.replace(/\.png$/, ".gif");
           const gifImg = new Image();
           gifImg.onload = () => { furnitureImages.set(key, gifImg); resolve(); };
@@ -79,8 +80,8 @@ function getSpriteFile(_basePath: string, key: string): string {
   const mapped = LUMON_SPRITE_MAP[key];
   if (mapped) return `/sprites/arcade/furniture-lumon/${mapped}.png`;
 
-  // Otherwise it's a Cozy sprite — load from /cozy/furniture/
-  return `/cozy/furniture/${key}.png`;
+  // Otherwise it's a Cozy sprite — load from the arcade assets bucket/folder.
+  return cozyUrl(`furniture/${key}.png`);
 }
 
 // ─── Pre-rendered ground cache ────────────────────────────────

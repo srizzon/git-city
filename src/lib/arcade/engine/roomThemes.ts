@@ -1,7 +1,9 @@
 // ─── Room Themes ─────────────────────────────────────────────
-// Uses /cozy/tileset-interior.png (wallpapers.png from Cozy Interior)
+// Uses tileset-interior.png (wallpapers.png from Cozy Interior)
 // Tileset: 40 columns × 51 rows, 16×16 tiles
 // GID formula: row * 40 + col
+
+import { cozyUrl } from "../assetBase";
 
 const COLS = 40; // tileset columns
 
@@ -330,7 +332,7 @@ export function generateRoom(
     width,
     height,
     tileSize: 32,
-    tileset: "/cozy/tileset-interior.png",
+    tileset: cozyUrl("tileset-interior.png"),
     tilesetColumns: COLS,
     tilesetTileSize: 16,
     tileProperties,

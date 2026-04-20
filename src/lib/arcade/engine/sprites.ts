@@ -228,18 +228,18 @@ export function isSpriteLoaded(): boolean {
 }
 
 // ─── Walk animation ────────────────────────────────────────
+// Frame 0 is the idle pose; frames 1-7 are the walk cycle.
+// We cycle walkFrame through 0..WALK_CYCLE_LEN-1 and map to frames 1..WALK_CYCLE_LEN when drawing.
+const WALK_CYCLE_LEN = COZY_COLS - 1;
 let walkFrame = 0;
 let walkTimer = 0;
-// info.txt says 100ms per frame. CozyFarm uses 200ms at 100px/s.
-// Our tile move = 150ms. At 100ms/frame we get ~1.5 frames per tile step,
-// which gives visible animation without being too fast.
 const WALK_FRAME_DURATION = 0.1;
 
 export function updateSpriteAnimation(dt: number): void {
   walkTimer += dt;
   if (walkTimer >= WALK_FRAME_DURATION) {
     walkTimer -= WALK_FRAME_DURATION;
-    walkFrame = (walkFrame + 1) % COZY_COLS;
+    walkFrame = (walkFrame + 1) % WALK_CYCLE_LEN;
   }
 }
 
@@ -266,7 +266,7 @@ export function drawCozyCharacter(
   scale: number = 2,
 ): void {
   const row = COZY_DIR_ROW[dir];
-  const frame = walking ? walkFrame : 0;
+  const frame = walking ? walkFrame + 1 : 0;
   const dw = COZY_CELL * scale;
   const dh = COZY_CELL * scale;
   const sx = frame * COZY_CELL;

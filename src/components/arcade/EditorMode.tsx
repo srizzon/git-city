@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import type { GameMap, FurnitureObject } from "@/lib/arcade/engine/tileMap";
 import { getTileType, rebuildCollision } from "@/lib/arcade/engine/tileMap";
 import { getCameraState, loadFurnitureSprites } from "@/lib/arcade/engine/renderer";
+import { cozyUrl } from "@/lib/arcade/assetBase";
 
 // ─── Sprite catalog ──────────────────────────────────────────
 export type PlacementType = "floor" | "wall" | "rug";
@@ -48,7 +49,7 @@ function rugItem(id: string, label: string, category: string, file: string, pw: 
   return { id, label, category, file, pw, ph, tw, th, collides: false, placement: "rug" };
 }
 
-const COZY_BASE = "/cozy/furniture";
+const FURNITURE_BASE = cozyUrl("furniture");
 
 const CATALOG: CatalogItem[] = [
   // ─── Arcade Machines ────────────────────────────────────────
@@ -219,7 +220,7 @@ function SpritePreview({ file, animated, pw, ph, maxH = 48 }: { file: string; an
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`${COZY_BASE}/${ext}`}
+      src={`${FURNITURE_BASE}/${ext}`}
       alt=""
       width={w}
       height={h}
@@ -326,7 +327,7 @@ export default function EditorMode({ map, canvas, slug, onSave, onExit }: Editor
   const getGhostImg = useCallback((file: string): HTMLImageElement | null => {
     if (ghostImgCache.current.has(file)) return ghostImgCache.current.get(file)!;
     const img = new Image();
-    img.src = `${COZY_BASE}/${file}`;
+    img.src = `${FURNITURE_BASE}/${file}`;
     img.onload = () => ghostImgCache.current.set(file, img);
     return null;
   }, []);
@@ -556,7 +557,7 @@ export default function EditorMode({ map, canvas, slug, onSave, onExit }: Editor
         };
         setUndoStack((prev) => [...prev, furnitureRef.current]);
         setFurniture((prev) => [...prev, newF]);
-        loadFurnitureSprites(COZY_BASE, [sprite]);
+        loadFurnitureSprites(FURNITURE_BASE, [sprite]);
 
         // Interactive objects (seats, arcade machines) are rebuilt on save
         // by rebuildObjects() — no need to push here

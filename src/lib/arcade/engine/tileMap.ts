@@ -26,6 +26,16 @@ export interface MapObject {
   dir?: "up" | "down" | "left" | "right"; // facing direction when sitting
 }
 
+export interface RoomPortal {
+  type: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  label?: string;
+  destination: string; // target room slug
+}
+
 /** Find an interactive object at or near the player */
 export function findNearbyObject(
   playerX: number,
@@ -55,15 +65,9 @@ export function findNearbySeat(
   playerY: number,
 ): MapObject | null {
   // "seat", "pc", and "arcade_machine" are all sittable
-  const seat = findNearbyObject(playerX, playerY, "seat")
+  return findNearbyObject(playerX, playerY, "seat")
     ?? findNearbyObject(playerX, playerY, "pc")
     ?? findNearbyObject(playerX, playerY, "arcade_machine");
-
-  // Debug: log seat finding
-  if (seat) {
-    console.log(`[seat] Player(${playerX},${playerY}) → found ${seat.type} at (${seat.x},${seat.y}) dir=${seat.dir}`);
-  }
-  return seat;
 }
 
 /** Per-tile-ID properties — defined once on the tileset, inherited by all instances */

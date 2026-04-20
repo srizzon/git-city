@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { AvatarLoadout } from "@/lib/arcade/types";
+import { cozyUrl } from "@/lib/arcade/assetBase";
 
 // ─── Types ──────────────────────────────────────────────────
 interface ShopItem {
@@ -90,10 +91,10 @@ function loadAtlas(): Promise<void> {
       const img = new Image();
       img.onload = () => { atlasImg = img; res(); };
       img.onerror = () => res();
-      img.src = "/cozy/walk/atlas.png";
+      img.src = cozyUrl("walk/atlas.png");
     }),
     // Load atlas map
-    fetch("/cozy/walk/atlas.json").then((r) => r.json()).then((map) => { atlasMap = map; }).catch(() => {}),
+    fetch(cozyUrl("walk/atlas.json")).then((r) => r.json()).then((map) => { atlasMap = map; }).catch(() => {}),
   ]).then(() => { atlasReady = true; });
 
   return atlasPromise;
@@ -105,7 +106,7 @@ function loadPetImg(file: string): Promise<HTMLImageElement> {
     const img = new Image();
     img.onload = () => { petImgCache.set(file, img); res(img); };
     img.onerror = rej;
-    img.src = `/cozy/${file}`;
+    img.src = cozyUrl(file);
   });
 }
 

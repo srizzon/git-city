@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { createBrowserSupabase } from "@/lib/supabase";
 import type { PlayerState, ChatBubble, ChatLogEntry, Direction, AvatarConfig } from "@/lib/arcade/types";
 import { startGameLoop } from "@/lib/arcade/engine/gameLoop";
-import { loadSpritesheet, loadCozySprites, updateSpriteAnimation, resetSprites, loadPetSprites, resetPet, setActivePet, getActivePet, getPetDefs, registerShopItems, setPlayerAvatar, preloadLoadout, getDefaultLoadout, loadoutToAvatar, type CozyLayer } from "@/lib/arcade/engine/sprites";
+import { loadSpritesheet, loadCozySprites, updateSpriteAnimation, resetSprites, loadPetSprites, resetPet, setActivePet, registerShopItems, setPlayerAvatar, preloadLoadout, getDefaultLoadout, loadoutToAvatar, type CozyLayer } from "@/lib/arcade/engine/sprites";
 import type { AvatarLoadout } from "@/lib/arcade/types";
-import { loadMapFromData, resetMap, type GameMap } from "@/lib/arcade/engine/tileMap";
+import { loadMapFromData, resetMap, type GameMap, type RoomPortal } from "@/lib/arcade/engine/tileMap";
+import { cozyUrl, COZY_BASE } from "@/lib/arcade/assetBase";
 import {
   render,
   resizeCanvas,
@@ -88,7 +89,7 @@ function SpritePreview({ charIndex, scale = 3 }: { charIndex: number; scale?: nu
 
     // Try cozy avatar first
     const avatar = loadoutToAvatar(getDefaultLoadout());
-    const basePath = "/cozy/walk";
+    const basePath = cozyUrl("walk");
     const promises = avatar.layers.map((layer: CozyLayer) => {
       return new Promise<{ layer: CozyLayer; img: HTMLImageElement } | null>((resolve) => {
         const img = new Image();
@@ -170,6 +171,7 @@ export default function ArcadeRoomPage({
   const [nearInteractable, setNearInteractable] = useState<string | null>(null);
   const [showMessage, setShowMessage] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState<{ title: string; body: string } | null>(null);
+  const [elevatorPicker, setElevatorPicker] = useState<RoomPortal[] | null>(null);
   const [playerCount, setPlayerCount] = useState(0);
   const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
   const [chatLogOpen, setChatLogOpen] = useState(false);
@@ -215,6 +217,7 @@ export default function ArcadeRoomPage({
   const nearInteractableRef = useRef<string | null>(null);
   const localIdRef = useRef<string>("");
   const mapRef = useRef<GameMap | null>(null);
+  const portalsRef = useRef<RoomPortal[]>([]);
   const tokenRef = useRef<string>("");
   const spriteIdRef = useRef<number | undefined>(undefined);
   const loadoutRef = useRef<AvatarLoadout | null>(null);
@@ -259,12 +262,23 @@ export default function ArcadeRoomPage({
     }
     const obj = findNearbyObject(localP.x, localP.y);
     if (obj?.type === "elevator") {
+      const destinations = portalsRef.current.filter(
+        (p) => p.type === "elevator" && p.destination !== slug,
+      );
+      if (destinations.length === 1) {
+        router.push(`/arcade/${destinations[0].destination}`);
+        return;
+      }
+      if (destinations.length > 1) {
+        setElevatorPicker(destinations);
+        return;
+      }
       setShowDialog(ELEVATOR_NOTICES[Math.floor(Math.random() * ELEVATOR_NOTICES.length)]);
     }
     if (obj?.type === "quote") {
       setShowDialog(FOUNDER_QUOTES[Math.floor(Math.random() * FOUNDER_QUOTES.length)]);
     }
-  }, []);
+  }, [router, slug]);
 
   const connectCallbacks = useCallback((): Parameters<typeof connect>[1] => ({
     onSync(players) {
@@ -349,7 +363,6 @@ export default function ArcadeRoomPage({
     onSit(id, x, y, dir) {
       const p = playersRef.current.get(id);
       if (!p) return;
-      console.log(`[sit] Player ${p.github_login} sits at tile(${x},${y}) dir=${dir}, was at tile(${p.x},${p.y})`);
       p.x = x;
       p.y = y;
       p.prevX = x;
@@ -440,15 +453,16 @@ export default function ArcadeRoomPage({
 
       // 1. Load map, avatar, and shop catalog in parallel
       const [mapRes, avatarRes, shopRes] = await Promise.all([
-        fetch(`/api/arcade/rooms/${slug}`).then((r) => {
+        fetch(`/api/arcade/rooms/${slug}`, { cache: "no-store" }).then((r) => {
           if (!r.ok) throw new Error("Room not found");
           return r.json();
-        }) as Promise<{ room: { map_json: GameMap } }>,
+        }) as Promise<{ room: { map_json: GameMap; portals: RoomPortal[] | null } }>,
         fetch("/api/arcade/avatar").then((r) => r.json()) as Promise<{ loadout: AvatarLoadout | null }>,
         fetch("/api/arcade/shop").then((r) => r.json()).catch(() => ({ items: [] })) as Promise<{ items: Array<{ id: string; file: string | null; no_tint: boolean; default_color: string | null }> }>,
       ]);
       const map = loadMapFromData(mapRes.room.map_json);
       mapRef.current = map;
+      portalsRef.current = mapRes.room.portals ?? [];
 
       // Register shop item files so loadoutToAvatar can resolve file paths
       if (shopRes.items?.length) {
@@ -459,9 +473,9 @@ export default function ArcadeRoomPage({
       const spriteKeys = map.furniture?.map((f) => f.sprite) ?? [];
       await Promise.all([
         Promise.all([
-          loadCozySprites("/cozy/walk").catch(() => {}),
+          loadCozySprites(cozyUrl("walk")).catch(() => {}),
           loadSpritesheet("/sprites/arcade").catch(() => {}),
-          loadPetSprites("/cozy").catch(() => {}),
+          loadPetSprites(COZY_BASE).catch(() => {}),
         ]),
         loadTileset(map.tileset, map.tilesetColumns),
         loadFurnitureSprites("/sprites/arcade", spriteKeys),
@@ -817,6 +831,10 @@ export default function ArcadeRoomPage({
         }
         return;
       }
+      if (elevatorPicker) {
+        if (e.key === "Escape") setElevatorPicker(null);
+        return;
+      }
       if (e.key === "Escape" && chatOpen) {
         setChatOpen(false);
         chatInputRef.current?.blur();
@@ -833,7 +851,7 @@ export default function ArcadeRoomPage({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [router, chatOpen, showAvatarModal, showDialog, showTerminal, showArcadeGame, handleInteract]);
+  }, [router, chatOpen, showAvatarModal, showDialog, showTerminal, showArcadeGame, elevatorPicker, handleInteract]);
 
   return (
     <div
@@ -942,6 +960,52 @@ export default function ArcadeRoomPage({
                 }}
               >
                 Acknowledged
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Elevator floor picker */}
+      {elevatorPicker && (
+        <div className="absolute inset-0 z-[58] flex items-center justify-center bg-[#0a0a1a]/40">
+          <div
+            className="w-[320px] rounded-[8px] overflow-hidden"
+            style={{
+              background: "linear-gradient(180deg, #e8e4df 0%, #d8d4cf 100%)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5)",
+            }}
+          >
+            <div className="px-4 py-2 border-b border-[#c0bbb5]">
+              <p className="text-[10px] font-bold tracking-[0.2em] text-[#706860] uppercase">
+                Select Floor
+              </p>
+            </div>
+            <div className="p-3 flex flex-col gap-2">
+              {elevatorPicker.map((p) => (
+                <button
+                  key={p.destination}
+                  onClick={() => {
+                    setElevatorPicker(null);
+                    router.push(`/arcade/${p.destination}`);
+                  }}
+                  className="cursor-pointer w-full rounded-[3px] px-4 py-2 text-left text-[11px] font-bold tracking-wider uppercase transition-all hover:brightness-95"
+                  style={{
+                    background: "linear-gradient(180deg, #c0b8ac, #b0a89c)",
+                    color: "#5a5248",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 3px rgba(0,0,0,0.15)",
+                  }}
+                >
+                  {p.label ?? p.destination}
+                </button>
+              ))}
+            </div>
+            <div className="px-4 pb-3 flex justify-end">
+              <button
+                onClick={() => setElevatorPicker(null)}
+                className="cursor-pointer text-[10px] text-[#8a8278] hover:text-[#5a5248] tracking-wider uppercase font-medium"
+              >
+                Cancel
               </button>
             </div>
           </div>
@@ -1225,22 +1289,6 @@ export default function ArcadeRoomPage({
                         </button>
                       </>
                     )}
-                    <span className="text-[#c0bbb5]">|</span>
-                    <button
-                      onClick={() => {
-                        const defs = getPetDefs();
-                        const cur = getActivePet();
-                        const idx = defs.findIndex((d) => d.id === cur);
-                        const next = defs[(idx + 1) % defs.length];
-                        setActivePet(next.id);
-                        setShowMessage(`Pet: ${next.name}`);
-                        setTimeout(() => setShowMessage(null), 2000);
-                      }}
-                      className="cursor-pointer text-[11px] text-[#706860] hover:text-[#3a3430] transition-colors font-medium"
-                      title="Switch pet"
-                    >
-                      Pet
-                    </button>
                   </div>
 
                   <div className="flex items-center gap-3 text-[10px] text-[#8a8278]">
