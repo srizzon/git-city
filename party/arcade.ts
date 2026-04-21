@@ -339,18 +339,11 @@ export default class ArcadeServer implements Party.Server {
     // Rebuild seat set from config
     this.seatSet = new Set(this.mapConfig.seats.map((s) => `${s.x},${s.y}`));
 
-    // Restore players from storage
-    const stored = await this.room.storage.list<PlayerState>({ prefix: "player:" });
-    for (const [key, player] of stored) {
-      const userId = key.slice("player:".length);
-      this.players.set(userId, player);
-
-      // Rebuild occupied seats from player positions
-      const sk = seatKey(player.x, player.y);
-      if (this.seatSet.has(sk)) {
-        this.occupiedSeats.add(sk);
-        this.seatedAt.set(userId, sk);
-      }
+    // Purge any stale player entries from previous deploys.
+    // Players are ephemeral — they only exist while a WebSocket connection is live.
+    const stale = await this.room.storage.list<PlayerState>({ prefix: "player:" });
+    for (const key of stale.keys()) {
+      await this.room.storage.delete(key);
     }
 
     // Restore chat log
@@ -549,7 +542,6 @@ export default class ArcadeServer implements Party.Server {
 
     conn.setState({ userId });
     this.players.set(userId, player);
-    this.room.storage.put(`player:${userId}`, player);
 
     // Send full state to new player
     const syncMsg: ServerMsg = { type: "sync", players: [...this.players.values()] };
@@ -616,7 +608,6 @@ export default class ArcadeServer implements Party.Server {
 
       if (!this.isWalkable(nx, ny)) {
         player.dir = dir;
-        this.room.storage.put(`player:${userId}`, player);
         const moveMsg: ServerMsg = { type: "move", id: userId, x: player.x, y: player.y, dir };
         this.room.broadcast(JSON.stringify(moveMsg));
         return;
@@ -625,7 +616,6 @@ export default class ArcadeServer implements Party.Server {
       player.x = nx;
       player.y = ny;
       player.dir = dir;
-      this.room.storage.put(`player:${userId}`, player);
       const moveMsg: ServerMsg = { type: "move", id: userId, x: nx, y: ny, dir };
       this.room.broadcast(JSON.stringify(moveMsg));
     }
@@ -657,7 +647,6 @@ export default class ArcadeServer implements Party.Server {
       player.x = x;
       player.y = y;
       player.dir = dir;
-      this.room.storage.put(`player:${userId}`, player);
       const sitMsg: ServerMsg = { type: "sit", id: userId, x, y, dir };
       this.room.broadcast(JSON.stringify(sitMsg));
     }
@@ -685,7 +674,6 @@ export default class ArcadeServer implements Party.Server {
       const spriteId = msg.sprite_id;
       if (typeof spriteId !== "number" || !Number.isInteger(spriteId) || spriteId < 0 || spriteId > MAX_SPRITE_ID) return;
       player.sprite_id = spriteId;
-      this.room.storage.put(`player:${userId}`, player);
       const avatarMsg: ServerMsg = { type: "avatar", id: userId, sprite_id: spriteId };
       this.room.broadcast(JSON.stringify(avatarMsg));
     }
@@ -980,8 +968,15 @@ export default class ArcadeServer implements Party.Server {
   onClose(conn: Connection) {
     const state = conn.state as { userId?: string } | null;
     const userId = state?.userId ?? conn.id;
+
+    // If the user already reconnected on a different connection (tab refocus,
+    // network blip), a new conn has taken over — don't wipe their player.
+    const takenOver = [...this.room.getConnections()].some(
+      (c) => c !== conn && (c.state as { userId?: string } | null)?.userId === userId,
+    );
+    if (takenOver) return;
+
     this.players.delete(userId);
-    this.room.storage.delete(`player:${userId}`);
     this.lastMove.delete(userId);
     this.lastChat.delete(userId);
     this.lastSit.delete(userId);
@@ -1047,7 +1042,6 @@ export default class ArcadeServer implements Party.Server {
               const spawn = this.randomSpawn();
               player.x = spawn.x;
               player.y = spawn.y;
-              this.room.storage.put(`player:${userId}`, player);
               const prevSeat = this.seatedAt.get(userId);
               if (prevSeat) {
                 this.occupiedSeats.delete(prevSeat);

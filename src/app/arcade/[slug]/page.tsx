@@ -8,7 +8,7 @@ import { startGameLoop } from "@/lib/arcade/engine/gameLoop";
 import { loadSpritesheet, loadCozySprites, updateSpriteAnimation, resetSprites, loadPetSprites, resetPet, setActivePet, registerShopItems, setPlayerAvatar, preloadLoadout, getDefaultLoadout, loadoutToAvatar, type CozyLayer } from "@/lib/arcade/engine/sprites";
 import type { AvatarLoadout } from "@/lib/arcade/types";
 import { loadMapFromData, resetMap, type GameMap, type RoomPortal } from "@/lib/arcade/engine/tileMap";
-import { cozyUrl, COZY_BASE } from "@/lib/arcade/assetBase";
+import { cozyUrl, COZY_BASE, resolveTilesetUrl } from "@/lib/arcade/assetBase";
 import {
   render,
   resizeCanvas,
@@ -484,7 +484,7 @@ export default function ArcadeRoomPage({
           loadSpritesheet("/sprites/arcade").catch(() => {}),
           loadPetSprites(COZY_BASE).catch(() => {}),
         ]),
-        loadTileset(map.tileset, map.tilesetColumns),
+        loadTileset(resolveTilesetUrl(map.tileset), map.tilesetColumns),
         loadFurnitureSprites("/sprites/arcade", spriteKeys),
       ]);
 

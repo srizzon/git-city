@@ -9,3 +9,15 @@ export function cozyUrl(path: string): string {
   const p = path.startsWith("/") ? path.slice(1) : path;
   return `${COZY_BASE}/${p}`;
 }
+
+/**
+ * Resolve a tileset reference stored in a map.
+ * Absolute URLs (http[s]:// or /-rooted paths) are returned as-is; bare
+ * filenames like "tileset-interior.png" are resolved through cozyUrl so the
+ * runtime base (Supabase Storage in prod, /cozy in dev) is applied at render
+ * time instead of being baked into the DB at room-creation time.
+ */
+export function resolveTilesetUrl(tileset: string): string {
+  if (/^https?:\/\//i.test(tileset) || tileset.startsWith("/")) return tileset;
+  return cozyUrl(tileset);
+}

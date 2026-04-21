@@ -3,8 +3,6 @@
 // Tileset: 40 columns × 51 rows, 16×16 tiles
 // GID formula: row * 40 + col
 
-import { cozyUrl } from "../assetBase";
-
 const COLS = 40; // tileset columns
 
 function gid(row: number, col: number): number {
@@ -332,7 +330,7 @@ export function generateRoom(
     width,
     height,
     tileSize: 32,
-    tileset: cozyUrl("tileset-interior.png"),
+    tileset: "tileset-interior.png",
     tilesetColumns: COLS,
     tilesetTileSize: 16,
     tileProperties,
