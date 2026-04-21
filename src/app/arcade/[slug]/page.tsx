@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { createBrowserSupabase } from "@/lib/supabase";
 import type { PlayerState, ChatBubble, ChatLogEntry, Direction, AvatarConfig } from "@/lib/arcade/types";
 import { startGameLoop } from "@/lib/arcade/engine/gameLoop";
-import { loadSpritesheet, updateSpriteAnimation, resetSprites } from "@/lib/arcade/engine/sprites";
-import { loadMapFromData, resetMap, type GameMap } from "@/lib/arcade/engine/tileMap";
+import { loadSpritesheet, loadCozySprites, updateSpriteAnimation, resetSprites, loadPetSprites, resetPet, setActivePet, registerShopItems, setPlayerAvatar, preloadLoadout, getDefaultLoadout, loadoutToAvatar, type CozyLayer } from "@/lib/arcade/engine/sprites";
+import type { AvatarLoadout } from "@/lib/arcade/types";
+import { loadMapFromData, resetMap, type GameMap, type RoomPortal } from "@/lib/arcade/engine/tileMap";
+import { cozyUrl, COZY_BASE } from "@/lib/arcade/assetBase";
 import {
   render,
   resizeCanvas,
@@ -17,6 +19,9 @@ import {
   snapCamera,
   getCameraState,
   resetRenderer,
+  updatePet,
+  resetPetState,
+  setPetEnabled,
   type RenderPlayer,
   type InteractionPrompt,
 } from "@/lib/arcade/engine/renderer";
@@ -34,16 +39,21 @@ import {
   sendSit,
   sendStand,
   sendAvatar,
+  sendLoadout,
   disconnect,
 } from "@/lib/arcade/network/client";
 import { findNearbySeat, findNearbyObject } from "@/lib/arcade/engine/tileMap";
 import { executeCommand, getBootSequence, TOTAL_DISCOVERIES, type TerminalLine } from "@/lib/arcade/terminal";
 import type { ConnectionStatus } from "@/lib/arcade/network/client";
+import type { GameResult } from "@/lib/arcade/types";
+import ArcadeGameOverlay from "@/components/arcade/ArcadeGameOverlay";
+import AvatarEditor from "@/components/arcade/AvatarEditor";
+import EditorMode from "@/components/arcade/EditorMode";
 
 const LERP_DURATION = 0.12;
 const BUBBLE_DURATION = 5;
 const CHAT_LOG_MAX = 30;
-const SPRITE_NAMES = ["Marcus", "Ginger", "Zuri", "Frost", "Kai", "Guard"];
+const SPRITE_NAMES = ["Alex", "Ruby", "Nova", "Atlas", "Lime", "Rose"];
 
 const ELEVATOR_NOTICES = [
   { title: "NOTICE", body: "Elevator access requires Level 2 clearance. Your current clearance level is: Pending. Please contact your department supervisor for authorization." },
@@ -75,21 +85,55 @@ function SpritePreview({ charIndex, scale = 3 }: { charIndex: number; scale?: nu
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const img = new Image();
-    img.onload = () => {
-      ctx.imageSmoothingEnabled = false;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // idle frame: col=1, row=0, each cell is 16x32
-      ctx.drawImage(img, 16, 0, 16, 32, 0, 0, 16 * scale, 32 * scale);
-    };
-    img.src = `/sprites/arcade/char_${charIndex}.png`;
+    // Try cozy avatar first
+    const avatar = loadoutToAvatar(getDefaultLoadout());
+    const basePath = cozyUrl("walk");
+    const promises = avatar.layers.map((layer: CozyLayer) => {
+      return new Promise<{ layer: CozyLayer; img: HTMLImageElement } | null>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ layer, img });
+        img.onerror = () => resolve(null);
+        img.src = `${basePath}/${layer.file}`;
+      });
+    });
+
+    Promise.all(promises).then((results) => {
+      const loaded = results.filter(Boolean) as { layer: CozyLayer; img: HTMLImageElement }[];
+      if (loaded.length === 0) {
+        // Fallback to legacy
+        const img = new Image();
+        img.onload = () => {
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(img, 16, 0, 16, 32, 0, 0, 16 * scale, 32 * scale);
+        };
+        img.src = `/sprites/arcade/char_${charIndex}.png`;
+        return;
+      }
+
+      // Draw each layer with tinting using an offscreen canvas
+      for (const { layer, img } of loaded) {
+        const oc = new OffscreenCanvas(img.width, img.height);
+        const octx = oc.getContext("2d")!;
+        octx.drawImage(img, 0, 0);
+        octx.globalCompositeOperation = "multiply";
+        octx.fillStyle = layer.color;
+        octx.fillRect(0, 0, img.width, img.height);
+        octx.globalCompositeOperation = "destination-in";
+        octx.drawImage(img, 0, 0);
+
+        // Draw idle frame (frame 0, row 0 = down) from the tinted sheet
+        ctx.drawImage(oc, 0, 0, 32, 32, 0, 0, 32 * scale, 32 * scale);
+      }
+    });
   }, [charIndex, scale]);
 
   return (
     <canvas
       ref={ref}
-      width={16 * scale}
+      width={32 * scale}
       height={32 * scale}
       style={{ imageRendering: "pixelated" }}
     />
@@ -101,6 +145,7 @@ interface InterpolatedPlayer extends PlayerState {
   prevY: number;
   lerpTimer: number;
   walking: boolean;
+  idleGrace: number;
 }
 
 export default function ArcadeRoomPage({
@@ -127,6 +172,7 @@ export default function ArcadeRoomPage({
   const [nearInteractable, setNearInteractable] = useState<string | null>(null);
   const [showMessage, setShowMessage] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState<{ title: string; body: string } | null>(null);
+  const [elevatorPicker, setElevatorPicker] = useState<RoomPortal[] | null>(null);
   const [playerCount, setPlayerCount] = useState(0);
   const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
   const [chatLogOpen, setChatLogOpen] = useState(false);
@@ -152,6 +198,15 @@ export default function ArcadeRoomPage({
   const terminalHistoryIdxRef = useRef(-1);
   const discoveriesRef = useRef<string[]>([]);
 
+  // Arcade game state
+  const [showArcadeGame, setShowArcadeGame] = useState(false);
+  const arcadeGameOpenRef = useRef(false);
+
+  // Editor state
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [editorMode, setEditorMode] = useState(false);
+  const editorModeRef = useRef(false);
+
   const playersRef = useRef<Map<string, InterpolatedPlayer>>(new Map());
   const bubblesRef = useRef<ChatBubble[]>([]);
   const chatLogRef = useRef<ChatLogEntry[]>([]);
@@ -163,8 +218,10 @@ export default function ArcadeRoomPage({
   const nearInteractableRef = useRef<string | null>(null);
   const localIdRef = useRef<string>("");
   const mapRef = useRef<GameMap | null>(null);
+  const portalsRef = useRef<RoomPortal[]>([]);
   const tokenRef = useRef<string>("");
   const spriteIdRef = useRef<number | undefined>(undefined);
+  const loadoutRef = useRef<AvatarLoadout | null>(null);
   const readyRef = useRef(false);
 
   const isTyping = useCallback(() => {
@@ -180,10 +237,13 @@ export default function ArcadeRoomPage({
   }, []);
 
   const handleInteract = useCallback(() => {
+    if (editorModeRef.current) return; // Disable interaction in editor
     if (terminalOpenRef.current) return;
+    if (arcadeGameOpenRef.current) return;
     if (sittingRef.current) {
-      // Standing up also closes terminal
+      // Standing up also closes terminal/game
       if (terminalOpenRef.current) { setShowTerminal(false); terminalOpenRef.current = false; }
+      if (arcadeGameOpenRef.current) { setShowArcadeGame(false); arcadeGameOpenRef.current = false; }
       sendStand();
       return;
     }
@@ -195,29 +255,49 @@ export default function ArcadeRoomPage({
       if (seat.type === "pc") {
         setShowTerminal(true);
         terminalOpenRef.current = true;
+      } else if (seat.type === "arcade_machine") {
+        setShowArcadeGame(true);
+        arcadeGameOpenRef.current = true;
       }
       return;
     }
     const obj = findNearbyObject(localP.x, localP.y);
     if (obj?.type === "elevator") {
+      const destinations = portalsRef.current.filter(
+        (p) => p.type === "elevator" && p.destination !== slug,
+      );
+      if (destinations.length === 1) {
+        router.push(`/arcade/${destinations[0].destination}`);
+        return;
+      }
+      if (destinations.length > 1) {
+        setElevatorPicker(destinations);
+        return;
+      }
       setShowDialog(ELEVATOR_NOTICES[Math.floor(Math.random() * ELEVATOR_NOTICES.length)]);
     }
     if (obj?.type === "quote") {
       setShowDialog(FOUNDER_QUOTES[Math.floor(Math.random() * FOUNDER_QUOTES.length)]);
     }
-  }, []);
+  }, [router, slug]);
 
   const connectCallbacks = useCallback((): Parameters<typeof connect>[1] => ({
     onSync(players) {
       const pmap = playersRef.current;
       pmap.clear();
       for (const p of players) {
+        // Set avatar for each player (loadout from PartyKit or default)
+        if (p.loadout) {
+          setPlayerAvatar(p.id, p.loadout);
+          preloadLoadout(p.loadout).catch(() => {});
+        }
         pmap.set(p.id, {
           ...p,
           prevX: p.x,
           prevY: p.y,
           lerpTimer: LERP_DURATION,
           walking: false,
+          idleGrace: 0,
         });
       }
       setPlayerCount(pmap.size);
@@ -228,12 +308,17 @@ export default function ArcadeRoomPage({
       }
     },
     onJoin(player) {
+      if (player.loadout) {
+        setPlayerAvatar(player.id, player.loadout);
+        preloadLoadout(player.loadout).catch(() => {});
+      }
       playersRef.current.set(player.id, {
         ...player,
         prevX: player.x,
         prevY: player.y,
         lerpTimer: LERP_DURATION,
         walking: false,
+        idleGrace: 0,
       });
       setPlayerCount(playersRef.current.size);
     },
@@ -245,6 +330,8 @@ export default function ArcadeRoomPage({
     onMove(id, x, y, dir) {
       const p = playersRef.current.get(id);
       if (!p) return;
+      // Only animate walk if position actually changed (avoid animating against walls)
+      const moved = p.x !== x || p.y !== y;
       const t = Math.min(p.lerpTimer / LERP_DURATION, 1);
       p.prevX = p.prevX + (p.x - p.prevX) * t;
       p.prevY = p.prevY + (p.y - p.prevY) * t;
@@ -252,7 +339,7 @@ export default function ArcadeRoomPage({
       p.y = y;
       p.dir = dir;
       p.lerpTimer = 0;
-      p.walking = true;
+      p.walking = moved;
     },
     onChat(id, text) {
       const playerBubbles = bubblesRef.current.filter((b) => b.id === id);
@@ -297,11 +384,18 @@ export default function ArcadeRoomPage({
       if (id === localIdRef.current) {
         setSitting(false); sittingRef.current = false;
         setShowTerminal(false); terminalOpenRef.current = false;
+        setShowArcadeGame(false); arcadeGameOpenRef.current = false;
       }
     },
     onAvatar(id, spriteId) {
       const p = playersRef.current.get(id);
       if (p) p.sprite_id = spriteId;
+    },
+    onLoadout(id, loadout) {
+      const p = playersRef.current.get(id);
+      if (p) p.loadout = loadout;
+      setPlayerAvatar(id, loadout);
+      preloadLoadout(loadout).catch(() => {});
     },
     onMapReload(mapData) {
       const map = mapData as unknown as GameMap;
@@ -310,6 +404,15 @@ export default function ArcadeRoomPage({
       buildLayerCaches(map);
       const spriteKeys = map.furniture.map((f: { sprite: string }) => f.sprite);
       loadFurnitureSprites("/sprites/arcade", spriteKeys);
+    },
+    onGameAck(game: string) {
+      // Forward to overlay via window global
+      const handler = (window as unknown as Record<string, unknown>).__arcadeGameAck as ((g: string) => void) | undefined;
+      handler?.(game);
+    },
+    onGameResult(game: string, result: GameResult) {
+      const handler = (window as unknown as Record<string, unknown>).__arcadeGameResult as ((g: string, r: GameResult) => void) | undefined;
+      handler?.(game, result);
     },
     onStatusChange(s) {
       setStatus(s);
@@ -341,23 +444,58 @@ export default function ArcadeRoomPage({
       tokenRef.current = token;
       localIdRef.current = session.user.id;
 
-      // 1. Load map from API + fetch avatar in parallel
-      const [mapRes, avatarRes] = await Promise.all([
-        fetch(`/api/arcade/rooms/${slug}`).then((r) => {
+      // Check if user is admin
+      const ghLogin = (
+        session.user.user_metadata?.user_name ??
+        session.user.user_metadata?.preferred_username ??
+        ""
+      ).toLowerCase();
+      const adminLogins = (process.env.NEXT_PUBLIC_ADMIN_GITHUB_LOGINS ?? "")
+        .split(",")
+        .map((l: string) => l.trim().toLowerCase())
+        .filter(Boolean);
+      if (adminLogins.includes(ghLogin)) {
+        setIsAdmin(true);
+      }
+
+      // 1. Load map, avatar, and shop catalog in parallel
+      const [mapRes, avatarRes, shopRes] = await Promise.all([
+        fetch(`/api/arcade/rooms/${slug}`, { cache: "no-store" }).then((r) => {
           if (!r.ok) throw new Error("Room not found");
           return r.json();
-        }) as Promise<{ room: { map_json: GameMap } }>,
-        fetch("/api/arcade/avatar").then((r) => r.json()) as Promise<{ config: AvatarConfig | null }>,
+        }) as Promise<{ room: { map_json: GameMap; portals: RoomPortal[] | null } }>,
+        fetch("/api/arcade/avatar").then((r) => r.json()) as Promise<{ loadout: AvatarLoadout | null }>,
+        fetch("/api/arcade/shop").then((r) => r.json()).catch(() => ({ items: [] })) as Promise<{ items: Array<{ id: string; file: string | null; no_tint: boolean; default_color: string | null }> }>,
       ]);
       const map = loadMapFromData(mapRes.room.map_json);
       mapRef.current = map;
+      portalsRef.current = mapRes.room.portals ?? [];
+
+      // Register shop item files so loadoutToAvatar can resolve file paths
+      if (shopRes.items?.length) {
+        registerShopItems(shopRes.items);
+      }
 
       // 2. Load assets in parallel
       const spriteKeys = map.furniture?.map((f) => f.sprite) ?? [];
       await Promise.all([
-        loadSpritesheet("/sprites/arcade").catch(() => {}),
+        Promise.all([
+          loadCozySprites(cozyUrl("walk")).catch(() => {}),
+          loadSpritesheet("/sprites/arcade").catch(() => {}),
+          loadPetSprites(COZY_BASE).catch(() => {}),
+        ]),
         loadTileset(map.tileset, map.tilesetColumns),
         loadFurnitureSprites("/sprites/arcade", spriteKeys),
+      ]);
+
+      // 3. Preload the local player's loadout + the default loadout.
+      // The default is used to render remote players whose loadout wasn't synced
+      // through PartyKit — without preloading, their hair/clothes sprites are
+      // missing and they appear naked.
+      const loadout = avatarRes.loadout ?? getDefaultLoadout();
+      await Promise.all([
+        preloadLoadout(loadout),
+        preloadLoadout(getDefaultLoadout()),
       ]);
 
       // 3. Pre-render static tile layers to offscreen canvases
@@ -371,6 +509,7 @@ export default function ArcadeRoomPage({
 
       // 5. Input handler
       const onMoveDir = (dir: Direction) => {
+        if (editorModeRef.current) return; // Disable movement in editor
         if (terminalOpenRef.current) return;
         if (sittingRef.current) { sendStand(); return; }
         sendMove({ type: "move", dir });
@@ -394,14 +533,36 @@ export default function ArcadeRoomPage({
         update(dt) {
           updateMovement(dt);
           if (isMobileRef.current) updateTouchMovement(dt);
-          updateSpriteAnimation(dt);
 
           for (const p of playersRef.current.values()) {
             p.lerpTimer = Math.min(p.lerpTimer + dt, LERP_DURATION);
             if (p.lerpTimer >= LERP_DURATION) {
-              p.walking = false;
+              // Grace period: don't instantly set walking=false.
+              // If a new move arrives within ~50ms, we avoid the idle flicker.
+              if (p.walking) {
+                p.idleGrace = (p.idleGrace ?? 0) + dt;
+                if (p.idleGrace >= 0.05) {
+                  p.walking = false;
+                  p.idleGrace = 0;
+                }
+              }
+            } else {
+              p.idleGrace = 0;
             }
           }
+          updateSpriteAnimation(dt);
+
+          // Update pet to follow local player
+          {
+            const lp = playersRef.current.get(localIdRef.current);
+            if (lp) {
+              const t = Math.min(lp.lerpTimer / LERP_DURATION, 1);
+              const lpx = (lp.prevX + (lp.x - lp.prevX) * t) * tileSize + tileSize / 2;
+              const lpy = (lp.prevY + (lp.y - lp.prevY) * t) * tileSize + tileSize / 2;
+              updatePet(dt, lpx, lpy);
+            }
+          }
+
           bubblesRef.current = bubblesRef.current.filter((b) => {
             b.timer -= dt;
             return b.timer > 0;
@@ -415,7 +576,7 @@ export default function ArcadeRoomPage({
             if (hasSeat !== nearSeatRef.current) { nearSeatRef.current = hasSeat; setNearSeat(hasSeat); }
 
             if (seat) {
-              const seatLabel = seat.type === "pc" ? "Terminal" : "Sit";
+              const seatLabel = seat.type === "pc" ? "Terminal" : seat.type === "arcade_machine" ? "Play" : "Sit";
               promptRef.current = { x: seat.x, y: seat.y, text: seatLabel };
               if (nearInteractableRef.current !== null) { nearInteractableRef.current = null; setNearInteractable(null); }
               setActionLabel(seatLabel);
@@ -474,14 +635,13 @@ export default function ArcadeRoomPage({
       readyRef.current = true;
       setLoading(false);
 
-      // 7. Check avatar — if no saved config, show modal; otherwise connect
-      if (avatarRes.config?.sprite_id !== undefined) {
-        spriteIdRef.current = avatarRes.config.sprite_id;
-        setSelectedSprite(avatarRes.config.sprite_id);
-        connect(token, connectCallbacks(), avatarRes.config.sprite_id, slug!);
-      } else {
-        setShowAvatarModal(true);
-      }
+      // 7. Set local player avatar and connect
+      loadoutRef.current = loadout;
+      setPlayerAvatar(session.user.id, loadout);
+      setPetEnabled(!!loadout.pet_id);
+      if (loadout.pet_id) setActivePet(loadout.pet_id);
+      spriteIdRef.current = 0;
+      connect(token, connectCallbacks(), 0, slug!);
     }
 
     if (slug) init();
@@ -493,7 +653,10 @@ export default function ArcadeRoomPage({
       cleanupResize?.();
       disconnect();
       resetRenderer();
+      resetPetState();
+      setPetEnabled(false);
       resetSprites();
+      resetPet();
       resetMap();
     };
   }, [slug, router, isTyping, connectCallbacks]);
@@ -535,11 +698,20 @@ export default function ArcadeRoomPage({
   };
 
   const handleEditAvatar = () => {
-    setSelectedSprite(spriteIdRef.current ?? 0);
     setShowAvatarModal(true);
   };
 
   const handleAvatarCancel = () => {
+    setShowAvatarModal(false);
+  };
+
+  const handleAvatarSave = (newLoadout: AvatarLoadout) => {
+    loadoutRef.current = newLoadout;
+    setPlayerAvatar(localIdRef.current, newLoadout);
+    preloadLoadout(newLoadout).catch(() => {});
+    setPetEnabled(!!newLoadout.pet_id);
+    if (newLoadout.pet_id) setActivePet(newLoadout.pet_id);
+    sendLoadout(newLoadout);
     setShowAvatarModal(false);
   };
 
@@ -663,10 +835,18 @@ export default function ArcadeRoomPage({
         }
         return; // terminal input handles everything else
       }
+      if (showArcadeGame) {
+        // Arcade game overlay handles its own keyboard events
+        return;
+      }
       if (showDialog) {
         if (e.key === "Escape" || e.key === "e" || e.key === "E" || e.key === "Enter") {
           setShowDialog(null);
         }
+        return;
+      }
+      if (elevatorPicker) {
+        if (e.key === "Escape") setElevatorPicker(null);
         return;
       }
       if (e.key === "Escape" && chatOpen) {
@@ -685,7 +865,7 @@ export default function ArcadeRoomPage({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [router, chatOpen, showAvatarModal, showDialog, showTerminal, handleInteract]);
+  }, [router, chatOpen, showAvatarModal, showDialog, showTerminal, showArcadeGame, elevatorPicker, handleInteract]);
 
   return (
     <div
@@ -749,78 +929,13 @@ export default function ArcadeRoomPage({
       )}
 
       {/* Avatar selection modal */}
-      {showAvatarModal && !loading && (
-        <div className="absolute inset-0 z-[58] flex items-center justify-center bg-[#0a0a1a]/60">
-          <div
-            className="rounded-[8px] p-5 w-[280px]"
-            style={{
-              background: "linear-gradient(180deg, #d8d0c4 0%, #c8c0b4 100%)",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3)",
-            }}
-          >
-            <p className="text-center text-[11px] font-bold tracking-widest text-[#5a5248] uppercase mb-4">
-              Choose your character
-            </p>
-
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {SPRITE_NAMES.map((name, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSelectedSprite(i)}
-                  className="flex flex-col items-center gap-1 rounded-[4px] py-2 px-1 transition-all"
-                  style={{
-                    background: selectedSprite === i
-                      ? "linear-gradient(180deg, #a09080 0%, #908070 100%)"
-                      : "transparent",
-                    boxShadow: selectedSprite === i
-                      ? "inset 0 1px 2px rgba(0,0,0,0.2), 0 1px 0 rgba(255,255,255,0.2)"
-                      : "none",
-                  }}
-                >
-                  <SpritePreview charIndex={i} />
-                  <span
-                    className="text-[9px] font-medium"
-                    style={{ color: selectedSprite === i ? "#e8e0d4" : "#706860" }}
-                  >
-                    {name}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              {spriteIdRef.current !== undefined && (
-                <button
-                  onClick={handleAvatarCancel}
-                  className="flex-1 cursor-pointer rounded-[4px] py-2 text-[11px] font-bold tracking-widest uppercase transition-all"
-                  style={{
-                    background: "linear-gradient(180deg, #c0b8ac, #b0a89c)",
-                    color: "#5a5248",
-                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 3px rgba(0,0,0,0.15)",
-                  }}
-                >
-                  Cancel
-                </button>
-              )}
-              <button
-                onClick={handleAvatarConfirm}
-                disabled={savingAvatar}
-                className="flex-1 cursor-pointer rounded-[4px] py-2 text-[11px] font-bold tracking-widest uppercase transition-all"
-                style={{
-                  background: savingAvatar
-                    ? "#a09888"
-                    : "linear-gradient(180deg, #5a8a5a 0%, #4a7a4a 100%)",
-                  color: "#e8e4df",
-                  boxShadow: savingAvatar
-                    ? "none"
-                    : "0 2px 8px rgba(74,122,74,0.3), inset 0 1px 0 rgba(255,255,255,0.2)",
-                }}
-              >
-                {savingAvatar ? "Saving..." : spriteIdRef.current !== undefined ? "Save" : "Enter"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {showAvatarModal && !loading && loadoutRef.current && (
+        <AvatarEditor
+          initialLoadout={loadoutRef.current}
+          playerName={playersRef.current.get(localIdRef.current)?.github_login ?? "Player"}
+          onClose={handleAvatarCancel}
+          onSave={handleAvatarSave}
+        />
       )}
 
       {/* Game dialog (Lumon-style corporate notice) */}
@@ -863,6 +978,64 @@ export default function ArcadeRoomPage({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Elevator floor picker */}
+      {elevatorPicker && (
+        <div className="absolute inset-0 z-[58] flex items-center justify-center bg-[#0a0a1a]/40">
+          <div
+            className="w-[320px] rounded-[8px] overflow-hidden"
+            style={{
+              background: "linear-gradient(180deg, #e8e4df 0%, #d8d4cf 100%)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5)",
+            }}
+          >
+            <div className="px-4 py-2 border-b border-[#c0bbb5]">
+              <p className="text-[10px] font-bold tracking-[0.2em] text-[#706860] uppercase">
+                Select Floor
+              </p>
+            </div>
+            <div className="p-3 flex flex-col gap-2">
+              {elevatorPicker.map((p) => (
+                <button
+                  key={p.destination}
+                  onClick={() => {
+                    setElevatorPicker(null);
+                    router.push(`/arcade/${p.destination}`);
+                  }}
+                  className="cursor-pointer w-full rounded-[3px] px-4 py-2 text-left text-[11px] font-bold tracking-wider uppercase transition-all hover:brightness-95"
+                  style={{
+                    background: "linear-gradient(180deg, #c0b8ac, #b0a89c)",
+                    color: "#5a5248",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 3px rgba(0,0,0,0.15)",
+                  }}
+                >
+                  {p.label ?? p.destination}
+                </button>
+              ))}
+            </div>
+            <div className="px-4 pb-3 flex justify-end">
+              <button
+                onClick={() => setElevatorPicker(null)}
+                className="cursor-pointer text-[10px] text-[#8a8278] hover:text-[#5a5248] tracking-wider uppercase font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Arcade game overlay (10s Challenge) */}
+      {showArcadeGame && (
+        <ArcadeGameOverlay
+          isMobile={isMobile}
+          onClose={() => {
+            setShowArcadeGame(false);
+            arcadeGameOpenRef.current = false;
+            sendStand();
+          }}
+        />
       )}
 
       {/* Terminal overlay */}
@@ -1005,6 +1178,22 @@ export default function ArcadeRoomPage({
                   />
                 )}
 
+                {/* Editor mode overlay */}
+                {editorMode && mapRef.current && canvasRef.current && slug && (
+                  <EditorMode
+                    map={mapRef.current}
+                    canvas={canvasRef.current}
+                    slug={slug}
+                    onSave={(updatedMap) => {
+                      mapRef.current = updatedMap;
+                      buildLayerCaches(updatedMap);
+                      setShowMessage("Map saved!");
+                      setTimeout(() => setShowMessage(null), 2000);
+                    }}
+                    onExit={() => { setEditorMode(false); editorModeRef.current = false; }}
+                  />
+                )}
+
                 {/* Chat log overlay */}
                 {!loading && chatLog.length > 0 && !(isMobile && chatOpen) && (
                   <div
@@ -1102,6 +1291,18 @@ export default function ArcadeRoomPage({
                     >
                       Avatar
                     </button>
+                    {isAdmin && (
+                      <>
+                        <span className="text-[#c0bbb5]">|</span>
+                        <button
+                          onClick={() => { setEditorMode(true); editorModeRef.current = true; }}
+                          className="cursor-pointer text-[11px] text-[#c08040] hover:text-[#e0a060] transition-colors font-medium"
+                          title="Edit room layout"
+                        >
+                          Edit
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-3 text-[10px] text-[#8a8278]">
@@ -1118,6 +1319,10 @@ export default function ArcadeRoomPage({
                     ) : nearInteractable === "elevator" ? (
                       <span className="text-[#5a8a5a] font-medium">
                         <kbd className="bg-[#b8b0a4] px-1 rounded text-[9px] border border-[#a8a094]">E</kbd> elevator
+                      </span>
+                    ) : nearInteractable === "arcade_machine" ? (
+                      <span className="text-[#5a8a5a] font-medium">
+                        <kbd className="bg-[#b8b0a4] px-1 rounded text-[9px] border border-[#a8a094]">E</kbd> play
                       </span>
                     ) : null}
                     <span><kbd className="bg-[#b8b0a4] px-1 rounded text-[9px] border border-[#a8a094]">WASD</kbd> move</span>

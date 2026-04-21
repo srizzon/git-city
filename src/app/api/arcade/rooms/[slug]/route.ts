@@ -35,6 +35,63 @@ export async function GET(
   });
 }
 
+// PUT /api/arcade/rooms/[slug] — update map_json (admin only)
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> },
+) {
+  const { slug } = await params;
+
+  // Auth check — must be logged in
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Admin check
+  const login = (
+    user.user_metadata?.user_name ??
+    user.user_metadata?.preferred_username ??
+    ""
+  ).toLowerCase();
+  const admins = (process.env.ADMIN_GITHUB_LOGINS ?? "")
+    .split(",")
+    .map((l: string) => l.trim().toLowerCase())
+    .filter(Boolean);
+  if (!admins.includes(login)) {
+    return NextResponse.json({ error: "Admin only" }, { status: 403 });
+  }
+
+  const body = await req.json();
+  if (!body.map_json) {
+    return NextResponse.json({ error: "map_json required" }, { status: 400 });
+  }
+
+  const sb = getSupabaseAdmin();
+  const { error } = await sb
+    .from("arcade_rooms")
+    .update({ map_json: body.map_json, updated_at: new Date().toISOString() })
+    .eq("slug", slug);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Invalidate PartyKit cache
+  const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
+  if (host) {
+    const base = host.startsWith("http") ? host : `https://${host}`;
+    try {
+      await fetch(`${base}/parties/main/${slug}/invalidate`, { method: "POST" });
+    } catch {
+      // Best-effort
+    }
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
 // POST /api/arcade/rooms/[slug] — invalidate PartyKit cache (admin only)
 export async function POST(
   req: NextRequest,

@@ -45,6 +45,17 @@ supabase/
 - Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`
 - Never skip hooks or force push to main
 
+## Third-party Assets (IMPORTANT)
+
+- **Arcade character sprites (char_0-5)** and Lumon furniture: from [pixel-agents](https://github.com/pablodelucca/pixel-agents) by Pablo De Lucca (MIT) / [MetroCity](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack) (CC0). These ARE in the repo under `public/sprites/arcade/`.
+- **Cozy People Asset Pack** by shubibubi: purchased under commercial license ($3.99+). Used for the layered avatar (body, hair, clothing, accessories) and pet sprites.
+- **Cozy Interior Asset Pack** by shubibubi: purchased under commercial license. Used for arcade room furniture and tilesets.
+- **License terms**: "Can be used in any commercial or non commercial project, may modify. Can't be resold or redistributed even if modified."
+- **NEVER commit Cozy assets to the repo** — they are NOT covered by AGPL. They live in Supabase Storage and are loaded at runtime via `NEXT_PUBLIC_COZY_BASE_URL`.
+- **NEVER include Cozy PNGs in git add** — the `public/cozy/` folder is gitignored.
+- Forkers must buy their own license from shubibubi on itch.io, place files in `public/cozy/`, then run `node --env-file=.env.local scripts/upload-arcade-assets.mjs` to seed the `arcade-assets` Supabase bucket.
+- Original purchase links: https://shubibubi.itch.io/cozy-people and https://shubibubi.itch.io/cozy-interior
+
 ## Key files
 
 | File | What it does |

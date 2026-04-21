@@ -1,5 +1,5 @@
 import PartySocket from "partysocket";
-import type { ClientMsg, ServerMsg, PlayerState, ChatLogEntry } from "../types";
+import type { ClientMsg, ServerMsg, PlayerState, ChatLogEntry, GameResult, AvatarLoadout } from "../types";
 
 export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "error";
 
@@ -13,7 +13,10 @@ export interface ArcadeCallbacks {
   onSit: (id: string, x: number, y: number, dir: PlayerState["dir"]) => void;
   onStand: (id: string, x: number, y: number) => void;
   onAvatar: (id: string, spriteId: number) => void;
+  onLoadout: (id: string, loadout: AvatarLoadout) => void;
   onMapReload: (map: Record<string, unknown>) => void;
+  onGameAck: (game: string) => void;
+  onGameResult: (game: string, result: GameResult) => void;
   onStatusChange: (status: ConnectionStatus) => void;
 }
 
@@ -92,8 +95,17 @@ export function connect(token: string, callbacks: ArcadeCallbacks, spriteId?: nu
       case "avatar":
         callbacks.onAvatar(msg.id, msg.sprite_id);
         break;
+      case "loadout":
+        callbacks.onLoadout(msg.id, msg.loadout);
+        break;
       case "map_reload":
         callbacks.onMapReload(msg.map);
+        break;
+      case "game_ack":
+        callbacks.onGameAck(msg.game);
+        break;
+      case "game_result":
+        callbacks.onGameResult(msg.game, msg.result);
         break;
     }
   });
@@ -144,6 +156,21 @@ export function sendStand() {
 
 export function sendAvatar(spriteId: number) {
   const msg: ClientMsg = { type: "avatar", sprite_id: spriteId };
+  socket?.send(JSON.stringify(msg));
+}
+
+export function sendLoadout(loadout: AvatarLoadout) {
+  const msg: ClientMsg = { type: "loadout", loadout };
+  socket?.send(JSON.stringify(msg));
+}
+
+export function sendGameStart(game: string) {
+  const msg: ClientMsg = { type: "game_start", game };
+  socket?.send(JSON.stringify(msg));
+}
+
+export function sendGameStop(game: string) {
+  const msg: ClientMsg = { type: "game_stop", game };
   socket?.send(JSON.stringify(msg));
 }
 

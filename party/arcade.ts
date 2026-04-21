@@ -1,14 +1,44 @@
-import type { Party, Connection, ConnectionContext } from "partykit/server";
+import type * as Party from "partykit/server";
+import type { Connection, ConnectionContext } from "partykit/server";
 import { checkProfanity } from "glin-profanity";
 
 // ─── Types (inline — party/ can't use @/ alias) ─────────────
 type Direction = "up" | "down" | "left" | "right";
+
+interface AvatarLoadout {
+  skin_color: string;
+  hair_id: string | null;
+  hair_color: string | null;
+  clothes_top_id: string | null;
+  clothes_top_color: string | null;
+  clothes_bottom_id: string | null;
+  clothes_bottom_color: string | null;
+  clothes_full_id: string | null;
+  clothes_full_color: string | null;
+  shoes_id: string | null;
+  shoes_color: string | null;
+  acc_hat_id: string | null;
+  acc_hat_color: string | null;
+  acc_face_id: string | null;
+  acc_face_color: string | null;
+  acc_facial_id: string | null;
+  acc_facial_color: string | null;
+  acc_jewelry_id: string | null;
+  acc_jewelry_color: string | null;
+  eyes_color: string | null;
+  blush_id: string | null;
+  blush_color: string | null;
+  lipstick_id: string | null;
+  lipstick_color: string | null;
+  pet_id: string | null;
+}
 
 interface PlayerState {
   id: string;
   github_login: string;
   avatar_url: string;
   sprite_id: number;
+  loadout?: AvatarLoadout;
   x: number;
   y: number;
   dir: Direction;
@@ -19,12 +49,25 @@ type ClientMsg =
   | { type: "chat"; text: string }
   | { type: "sit"; x: number; y: number; dir: Direction }
   | { type: "stand" }
-  | { type: "avatar"; sprite_id: number };
+  | { type: "avatar"; sprite_id: number }
+  | { type: "loadout"; loadout: AvatarLoadout }
+  | { type: "game_start"; game: string }
+  | { type: "game_stop"; game: string };
 
 interface ChatLogEntry {
   username: string;
   text: string;
   ts: number;
+}
+
+interface GameResult {
+  diff_ms: number;
+  best_ms: number;
+  attempts: number;
+  is_new_record: boolean;
+  rank: number | null;
+  milestones_earned: string[];
+  px_earned: number;
 }
 
 type ServerMsg =
@@ -37,7 +80,48 @@ type ServerMsg =
   | { type: "sit"; id: string; x: number; y: number; dir: Direction }
   | { type: "stand"; id: string; x: number; y: number }
   | { type: "avatar"; id: string; sprite_id: number }
-  | { type: "map_reload"; map: Record<string, unknown> };
+  | { type: "loadout"; id: string; loadout: AvatarLoadout }
+  | { type: "map_reload"; map: Record<string, unknown> }
+  | { type: "game_ack"; game: string }
+  | { type: "game_result"; game: string; result: GameResult };
+
+// Fields we accept when a client sends a loadout update. Keeps the server
+// defensive against malformed payloads.
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const LOADOUT_STRING_FIELDS = new Set([
+  "hair_id", "clothes_top_id", "clothes_bottom_id", "clothes_full_id",
+  "shoes_id", "acc_hat_id", "acc_face_id", "acc_facial_id", "acc_jewelry_id",
+  "blush_id", "lipstick_id", "pet_id",
+]);
+const LOADOUT_COLOR_FIELDS = new Set([
+  "skin_color", "hair_color", "clothes_top_color", "clothes_bottom_color",
+  "clothes_full_color", "shoes_color", "acc_hat_color", "acc_face_color",
+  "acc_facial_color", "acc_jewelry_color", "eyes_color", "blush_color",
+  "lipstick_color",
+]);
+
+function sanitizeLoadout(raw: unknown): AvatarLoadout | null {
+  if (!raw || typeof raw !== "object") return null;
+  const out: Record<string, string | null> = {};
+  const src = raw as Record<string, unknown>;
+  for (const key of LOADOUT_STRING_FIELDS) {
+    const v = src[key];
+    if (v === null || typeof v === "undefined") { out[key] = null; continue; }
+    if (typeof v !== "string" || v.length > 50) return null;
+    out[key] = v;
+  }
+  for (const key of LOADOUT_COLOR_FIELDS) {
+    const v = src[key];
+    if (v === null || typeof v === "undefined") {
+      out[key] = key === "skin_color" || key === "eyes_color" ? "#888888" : null;
+      continue;
+    }
+    if (typeof v !== "string" || !HEX_RE.test(v)) return null;
+    out[key] = v;
+  }
+  if (!out.skin_color) out.skin_color = "#e8c4a0";
+  return out as unknown as AvatarLoadout;
+}
 
 // ─── Map config (loaded dynamically from Supabase) ───────────
 interface MapConfig {
@@ -134,6 +218,28 @@ const MUTE_STRIKES_WINDOW_MS = 60_000;
 const MUTE_DURATIONS_MS = [30_000, 120_000, 300_000];
 const CHAT_LOG_MAX = 30;
 
+// ─── Game constants ─────────────────────────────────────────
+const GAME_TARGET_MS = 10_000;
+const GAME_TIMEOUT_MS = 60_000;
+const GAME_RATE_LIMIT_MS = 3_000;
+const VALID_GAMES = ["10s_classic"];
+
+// ─── PX Milestones ──────────────────────────────────────────
+interface MilestoneDef {
+  id: string;
+  max_diff_ms: number;
+  px: number;
+}
+
+const MILESTONES: MilestoneDef[] = [
+  { id: "first_try", max_diff_ms: Infinity, px: 5 },
+  { id: "close_enough", max_diff_ms: 500, px: 10 },
+  { id: "sharp", max_diff_ms: 100, px: 25 },
+  { id: "sniper", max_diff_ms: 50, px: 50 },
+  { id: "inhuman", max_diff_ms: 10, px: 100 },
+  { id: "perfection", max_diff_ms: 5, px: 250 },
+];
+
 // ─── Chat filter ─────────────────────────────────────────────
 const PROFANITY_CONFIG = {
   allLanguages: true,
@@ -204,6 +310,10 @@ export default class ArcadeServer implements Party.Server {
   readonly seatedAt = new Map<string, string>();
   readonly chatLog: ChatLogEntry[] = [];
 
+  // ── Game state (10s challenge) ──────────────────────────────
+  readonly gameStartedAt = new Map<string, number>();   // userId -> timestamp
+  readonly lastGameStop = new Map<string, number>();    // userId -> timestamp (rate limit)
+
   constructor(readonly room: Party.Room) {}
 
   // ── Load config + restore state ────────────────────────────
@@ -251,6 +361,35 @@ export default class ArcadeServer implements Party.Server {
 
     // Ping lobby party with current count
     this.pingLobby();
+  }
+
+  private async fetchLoadoutFromSupabase(userId: string): Promise<AvatarLoadout | null> {
+    const supabaseUrl = this.room.env.NEXT_PUBLIC_SUPABASE_URL as string;
+    const supabaseKey = this.room.env.SUPABASE_SERVICE_ROLE_KEY as string;
+    if (!supabaseUrl || !supabaseKey) return null;
+
+    try {
+      // Join developers → arcade_avatar_loadouts via embedded select
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/developers?claimed_by=eq.${encodeURIComponent(userId)}&select=id,arcade_avatar_loadouts(*)&limit=1`,
+        {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+        },
+      );
+      if (!res.ok) return null;
+      const rows = (await res.json()) as Array<{
+        id: number;
+        arcade_avatar_loadouts: AvatarLoadout | AvatarLoadout[] | null;
+      }>;
+      const raw = rows[0]?.arcade_avatar_loadouts;
+      const loadout = Array.isArray(raw) ? raw[0] : raw;
+      return sanitizeLoadout(loadout);
+    } catch {
+      return null;
+    }
   }
 
   private async fetchMapFromSupabase(): Promise<MapConfig | null> {
@@ -426,6 +565,20 @@ export default class ArcadeServer implements Party.Server {
     const joinMsg: ServerMsg = { type: "join", player };
     this.room.broadcast(JSON.stringify(joinMsg), [conn.id]);
 
+    // Async: fetch this player's loadout from Supabase, then broadcast it so
+    // remote clients render the right avatar. Keeps onConnect sync path fast.
+    this.fetchLoadoutFromSupabase(userId).then((loadout) => {
+      if (!loadout) return;
+      const stored = this.players.get(userId);
+      if (!stored) return;
+      stored.loadout = loadout;
+      this.room.storage.put(`player:${userId}`, stored);
+      const loadoutMsg: ServerMsg = { type: "loadout", id: userId, loadout };
+      this.room.broadcast(JSON.stringify(loadoutMsg));
+    }).catch(() => {
+      // best-effort
+    });
+
     // Update lobby
     this.pingLobby();
   }
@@ -537,6 +690,19 @@ export default class ArcadeServer implements Party.Server {
       this.room.broadcast(JSON.stringify(avatarMsg));
     }
 
+    if (msg.type === "loadout") {
+      const lastAvatarTime = this.lastAvatar.get(userId) ?? 0;
+      if (now - lastAvatarTime < AVATAR_INTERVAL_MS) return;
+      this.lastAvatar.set(userId, now);
+
+      const clean = sanitizeLoadout(msg.loadout);
+      if (!clean) return;
+      player.loadout = clean;
+      this.room.storage.put(`player:${userId}`, player);
+      const loadoutMsg: ServerMsg = { type: "loadout", id: userId, loadout: clean };
+      this.room.broadcast(JSON.stringify(loadoutMsg));
+    }
+
     if (msg.type === "chat") {
       const lastChatTime = this.lastChat.get(userId) ?? 0;
       if (now - lastChatTime < CHAT_INTERVAL_MS) return;
@@ -576,6 +742,223 @@ export default class ArcadeServer implements Party.Server {
       if (this.chatLog.length > CHAT_LOG_MAX) this.chatLog.shift();
       this.room.storage.put("chatLog", this.chatLog);
     }
+
+    // ── Game: Start ───────────────────────────────────────────
+    if (msg.type === "game_start") {
+      if (!VALID_GAMES.includes(msg.game)) return;
+
+      // Rate limit: must wait between attempts
+      const lastStop = this.lastGameStop.get(userId) ?? 0;
+      if (now - lastStop < GAME_RATE_LIMIT_MS) return;
+
+      // Clear any existing game (restart)
+      this.gameStartedAt.set(userId, now);
+
+      const ackMsg: ServerMsg = { type: "game_ack", game: msg.game };
+      sender.send(JSON.stringify(ackMsg));
+    }
+
+    // ── Game: Stop ────────────────────────────────────────────
+    if (msg.type === "game_stop") {
+      if (!VALID_GAMES.includes(msg.game)) return;
+
+      const startedAt = this.gameStartedAt.get(userId);
+      if (!startedAt) return; // no active game
+
+      this.gameStartedAt.delete(userId);
+      this.lastGameStop.set(userId, now);
+
+      const elapsed = now - startedAt;
+      const diff_ms = Math.abs(elapsed - GAME_TARGET_MS);
+
+      // Timeout: reject if way too far from target
+      if (diff_ms > GAME_TIMEOUT_MS) return;
+
+      // Call score API to persist + get result
+      this.submitScore(userId, player.github_login, msg.game, diff_ms, sender);
+    }
+  }
+
+  // ── Score submission (async, always sends result) ─────────
+  private async submitScore(
+    userId: string,
+    login: string,
+    game: string,
+    diff_ms: number,
+    sender: Connection,
+  ) {
+    // Default result — sent even if persistence fails
+    let best_ms = diff_ms;
+    let attempts = 1;
+    let is_new_record = true;
+    let rank: number | null = null;
+    const milestones_earned: string[] = [];
+    let px_earned = 0;
+
+    try {
+      const supabaseUrl = this.room.env.NEXT_PUBLIC_SUPABASE_URL as string;
+      const supabaseKey = this.room.env.SUPABASE_SERVICE_ROLE_KEY as string;
+      if (!supabaseUrl || !supabaseKey) throw new Error("Missing Supabase env vars");
+
+      const headers = {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      };
+
+      // 1. Get current best score + attempt count
+      const currentRes = await fetch(
+        `${supabaseUrl}/rest/v1/arcade_scores?user_id=eq.${userId}&game=eq.${encodeURIComponent(game)}&select=best_ms,attempts`,
+        { headers },
+      );
+      if (!currentRes.ok) throw new Error(`scores fetch: ${currentRes.status}`);
+      const currentRows = (await currentRes.json()) as Array<{ best_ms: number; attempts: number }>;
+      const current = currentRows[0] ?? null;
+
+      const prevBest = current?.best_ms ?? Infinity;
+      attempts = (current?.attempts ?? 0) + 1;
+      is_new_record = diff_ms < prevBest;
+      best_ms = Math.min(diff_ms, prevBest);
+
+      // 2. Upsert score
+      if (current) {
+        const updateBody: Record<string, unknown> = { attempts, updated_at: new Date().toISOString() };
+        if (is_new_record) updateBody.best_ms = diff_ms;
+        await fetch(
+          `${supabaseUrl}/rest/v1/arcade_scores?user_id=eq.${userId}&game=eq.${encodeURIComponent(game)}`,
+          { method: "PATCH", headers: { ...headers, Prefer: "return=minimal" }, body: JSON.stringify(updateBody) },
+        );
+      } else {
+        await fetch(
+          `${supabaseUrl}/rest/v1/arcade_scores`,
+          { method: "POST", headers, body: JSON.stringify({ user_id: userId, game, best_ms: diff_ms, attempts: 1 }) },
+        );
+      }
+
+      // 3. Get rank (only if new record)
+      if (is_new_record) {
+        const rankRes = await fetch(
+          `${supabaseUrl}/rest/v1/arcade_scores?game=eq.${encodeURIComponent(game)}&best_ms=lt.${best_ms}&select=user_id`,
+          { headers: { ...headers, Prefer: "count=exact" }, method: "HEAD" },
+        );
+        const countHeader = rankRes.headers.get("content-range");
+        const match = countHeader?.match(/\/(\d+)/);
+        rank = match ? parseInt(match[1], 10) + 1 : null;
+      }
+
+      // 4. Check milestones (best-effort)
+      try {
+        const existingRes = await fetch(
+          `${supabaseUrl}/rest/v1/arcade_milestones?user_id=eq.${userId}&game=eq.${encodeURIComponent(game)}&select=milestone`,
+          { headers },
+        );
+        const existingSet = new Set(
+          ((await existingRes.json()) as Array<{ milestone: string }>).map((m) => m.milestone),
+        );
+
+        const newMilestones: MilestoneDef[] = [];
+        for (const m of MILESTONES) {
+          if (existingSet.has(m.id)) continue;
+          if (m.id === "first_try" || diff_ms <= m.max_diff_ms) {
+            newMilestones.push(m);
+          }
+        }
+
+        if (newMilestones.length > 0) {
+          await fetch(`${supabaseUrl}/rest/v1/arcade_milestones`, {
+            method: "POST", headers,
+            body: JSON.stringify(newMilestones.map((m) => ({ user_id: userId, game, milestone: m.id }))),
+          });
+          px_earned = newMilestones.reduce((sum, m) => sum + m.px, 0);
+          milestones_earned.push(...newMilestones.map((m) => m.id));
+
+          // Credit PX (best-effort — look up developer_id first)
+          if (px_earned > 0) {
+            const devRes = await fetch(`${supabaseUrl}/rest/v1/developers?user_id=eq.${userId}&select=id`, { headers });
+            const devRows = (await devRes.json()) as Array<{ id: number }>;
+            if (devRows[0]?.id) {
+              await fetch(`${supabaseUrl}/rest/v1/rpc/credit_pixels`, {
+                method: "POST", headers,
+                body: JSON.stringify({
+                  p_developer_id: devRows[0].id,
+                  p_amount: px_earned,
+                  p_source: "arcade_milestone",
+                  p_reference_id: game,
+                  p_reference_type: "arcade",
+                  p_description: `Arcade milestones: ${milestones_earned.join(", ")}`,
+                  p_idempotency_key: `arcade_${userId}_${game}_${milestones_earned.join("_")}`,
+                }),
+              });
+            }
+          }
+        }
+      } catch (milestoneErr) {
+        console.error(`[arcade:${this.room.id}] milestone error:`, milestoneErr);
+      }
+
+      // 5. Check achievements (best-effort)
+      try {
+        const achievementRes = await fetch(
+          `${supabaseUrl}/rest/v1/achievements?category=eq.arcade&select=id,threshold`,
+          { headers },
+        );
+        const allAchievements = (await achievementRes.json()) as Array<{ id: string; threshold: number }>;
+        if (allAchievements.length > 0) {
+          const devRes = await fetch(`${supabaseUrl}/rest/v1/developers?user_id=eq.${userId}&select=id`, { headers });
+          const devRows = (await devRes.json()) as Array<{ id: number }>;
+          const developerId = devRows[0]?.id;
+
+          if (developerId) {
+            const unlockedRes = await fetch(
+              `${supabaseUrl}/rest/v1/developer_achievements?developer_id=eq.${developerId}&select=achievement_id`,
+              { headers },
+            );
+            const unlocked = new Set(
+              ((await unlockedRes.json()) as Array<{ achievement_id: string }>).map((a) => a.achievement_id),
+            );
+
+            const newAchievements = allAchievements.filter((a) => {
+              if (unlocked.has(a.id)) return false;
+              if (a.id === "arcade_hello_friend") return true;
+              return diff_ms <= a.threshold;
+            });
+
+            if (newAchievements.length > 0) {
+              await fetch(`${supabaseUrl}/rest/v1/developer_achievements`, {
+                method: "POST", headers,
+                body: JSON.stringify(newAchievements.map((a) => ({ developer_id: developerId, achievement_id: a.id }))),
+              });
+            }
+          }
+        }
+      } catch (achievementErr) {
+        console.error(`[arcade:${this.room.id}] achievement error:`, achievementErr);
+      }
+
+      // 6. Broadcast chat if top 10
+      if (is_new_record && rank !== null && rank <= 10) {
+        const chatText = `${login} scored ${diff_ms}ms off on 10s Challenge! (#${rank})`;
+        const chatMsg: ServerMsg = { type: "chat", id: "__system__", text: chatText };
+        this.room.broadcast(JSON.stringify(chatMsg));
+        this.chatLog.push({ username: "ARCADE", text: chatText, ts: Date.now() });
+        if (this.chatLog.length > CHAT_LOG_MAX) this.chatLog.shift();
+        this.room.storage.put("chatLog", this.chatLog);
+      }
+    } catch (err) {
+      console.error(`[arcade:${this.room.id}] submitScore error:`, err);
+    }
+
+    // ALWAYS send result, even if persistence failed
+    try {
+      const resultMsg: ServerMsg = {
+        type: "game_result",
+        game,
+        result: { diff_ms, best_ms, attempts, is_new_record, rank, milestones_earned, px_earned },
+      };
+      sender.send(JSON.stringify(resultMsg));
+    } catch {
+      // Connection might be closed — nothing we can do
+    }
   }
 
   private addStrike(userId: string, now: number) {
@@ -604,6 +987,8 @@ export default class ArcadeServer implements Party.Server {
     this.lastSit.delete(userId);
     this.lastAvatar.delete(userId);
     this.chatHistory.delete(userId);
+    this.gameStartedAt.delete(userId);
+    this.lastGameStop.delete(userId);
 
     const prevSeat = this.seatedAt.get(userId);
     if (prevSeat) {
