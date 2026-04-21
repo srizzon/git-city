@@ -430,12 +430,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   const downtownDevs = allDevsSorted.slice(0, DOWNTOWN_COUNT);
   const downtownSet = new Set(downtownDevs.map(d => d.github_login));
 
-  for (let i = 0; i < downtownDevs.length; i += LOTS_PER_BLOCK) {
-    const end = Math.min(i + LOTS_PER_BLOCK, downtownDevs.length);
-    const slice = downtownDevs.slice(i, end);
-    const shuffled = seededShuffle(slice, hashStr('downtown') + i);
-    for (let j = 0; j < shuffled.length; j++) downtownDevs[i + j] = shuffled[j];
-  }
+  // Downtown devs stay sorted by composite (biggest first = center of spiral)
 
   const downtownOverride = new Set(downtownDevs.map(d => d.github_login));
 
@@ -669,13 +664,15 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   }
 
   // ── Reserve grid cells for landmarks ──
-  // E.Arcade: grid(1, -1) → world [173, 0, -149]
+  // E.Arcade: grid(1, -1)
   occupiedCells.add("1,-1");
+  // FounderSpire: grid(3, 0)
+  occupiedCells.add("3,0");
   // Sponsored landmarks (dynamic)
   for (const s of SPONSORS) occupiedCells.add(`${s.gridX},${s.gridZ}`);
 
-  // ── A) Downtown: spiral at grid (0, 0) ──
-  placeSpiralCluster(downtownDevs, 0, 0, true);
+  // ── A) Downtown: spiral at grid (0, 0) — no plaza, fill center with buildings ──
+  placeSpiralCluster(downtownDevs, 0, 0, false);
 
   // ── B) Districts: spiral at offset grid positions ──
   for (let di = 0; di < districtDevArrays.length; di++) {

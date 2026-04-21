@@ -36,6 +36,7 @@ import XpBar from "@/components/XpBar";
 import PixelBalance from "@/components/PixelBalance";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
+import RadarMap from "@/components/RadarMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
@@ -74,7 +75,6 @@ const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ss
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
 const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
 const LevelUpToast = dynamic(() => import("@/components/LevelUpToast"), { ssr: false });
-const MiniMap = dynamic(() => import("@/components/MiniMap"), { ssr: false });
 
 // Feature flags — flip to switch milestone banner
 const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road to 1K, "devs" = total developers
@@ -444,6 +444,8 @@ function HomeContent() {
 
   const [hud, setHud] = useState({ speed: 0, altitude: 0 });
   const [playerPos, setPlayerPos] = useState<{ x: number; z: number }>({ x: 0, z: 0 });
+  const [playerYaw, setPlayerYaw] = useState(0);
+  const [cameraPos, setCameraPos] = useState<{ x: number; z: number; tx: number; tz: number }>({ x: 800, z: 1000, tx: 0, tz: 0 });
   const [districtAnnouncement, setDistrictAnnouncement] = useState<{ name: string; color: string; population: number } | null>(null);
   const lastDistrictRef = useRef<string | null>(null);
   const announceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -751,7 +753,7 @@ function HomeContent() {
           })
         );
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, [session, buildings]);
 
@@ -785,7 +787,7 @@ function HomeContent() {
     const admin = !!authLogin && adminLogins.includes(authLogin);
     setIsAdmin(admin);
     if (admin) {
-      fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => {});
+      fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => { });
     }
   }, [authLogin]);
 
@@ -1618,7 +1620,7 @@ function HomeContent() {
                 : prev
             );
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     } else {
       // Buildings array was replaced (full layout loaded) — keep selectedBuilding in sync
@@ -1649,7 +1651,7 @@ function HomeContent() {
               b.login.toLowerCase() === authLogin ? { ...b, claimed: true } : b
             ));
           })
-          .catch(() => {});
+          .catch(() => { });
       }
       return;
     }
@@ -2228,6 +2230,7 @@ function HomeContent() {
         themeIndex={themeIndex}
         onHud={(s, a, x, z, yaw) => {
           setHud({ speed: s, altitude: a });
+          setPlayerYaw(yaw);
           // Look-ahead: ~40u ahead of airplane = center of screen
           const mapX = x - Math.sin(yaw) * 40;
           const mapZ = z - Math.cos(yaw) * 40;
@@ -2278,6 +2281,7 @@ function HomeContent() {
         flyStartPaused={showFlyControls}
         holdRise={loadStage !== "done"}
         celebrationActive={celebrationActive}
+        onCameraMove={(x, z, tx, tz) => setCameraPos({ x, z, tx, tz })}
         skyAds={skyAds}
         onAdClick={(ad) => {
           trackSkyAdClick(ad.id, ad.vehicle, ad.link);
@@ -2339,7 +2343,7 @@ function HomeContent() {
         onSponsorClick={(slug) => {
           trackLandmarkClicked(slug);
           const adId = getLandmarkAdId(slug);
-          if (adId) fetch("/api/sky-ads/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad_id: adId, event_type: "click" }) }).catch(() => {});
+          if (adId) fetch("/api/sky-ads/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad_id: adId, event_type: "click" }) }).catch(() => { });
           if (!exploreMode) setExploreMode(true);
           setActiveSponsor(slug);
           setSelectedBuilding(null);
@@ -2638,7 +2642,7 @@ function HomeContent() {
 
           {/* District announcement */}
           {districtAnnouncement && (
-            <div key={districtAnnouncement.name} className="absolute bottom-32 left-3 animate-district-in sm:left-4">
+            <div key={districtAnnouncement.name} className="absolute bottom-6 left-1/2 -translate-x-1/2 animate-district-in">
               <div className="border-l-4 bg-bg/80 px-4 py-2 backdrop-blur-sm" style={{ borderColor: districtAnnouncement.color }}>
                 <div className="text-[8px] uppercase tracking-widest text-muted">District</div>
                 <div className="font-pixel text-sm text-cream">{districtAnnouncement.name}</div>
@@ -2649,7 +2653,7 @@ function HomeContent() {
 
           {/* Controls hint */}
           {!isMobile && (
-            <div className="absolute bottom-35 right-3 text-right text-[8px] leading-loose text-muted sm:right-4 sm:text-[9px]">
+            <div className="absolute bottom-28 left-3 text-[8px] leading-loose text-muted sm:left-4 sm:text-[9px]">
               {flyPaused ? (
                 <>
                   <div>
@@ -2678,6 +2682,9 @@ function HomeContent() {
                   </div>
                   <div>
                     <span className="text-cream">Scroll</span> base speed
+                  </div>
+                  <div>
+                    <span style={{ color: theme.accent }}>R</span> return to city
                   </div>
                   <div>
                     <span style={{ color: theme.accent }}>P</span> pause
@@ -2790,6 +2797,10 @@ function HomeContent() {
                     <span className="text-muted">Boost / Slow</span>
                   </div>
                   <div className="flex items-center justify-between gap-6">
+                    <span style={{ color: theme.accent }}>R</span>
+                    <span className="text-muted">Return to City</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-6">
                     <span style={{ color: theme.accent }}>ESC</span>
                     <span className="text-muted">Pause &amp; Exit</span>
                   </div>
@@ -2812,13 +2823,21 @@ function HomeContent() {
         </div>
       )}
 
-      {/* ─── Mini-map ─── */}
-      <MiniMap
+      {/* ─── Radar Map ─── */}
+      <RadarMap
         buildings={buildings}
         playerX={playerPos.x}
         playerZ={playerPos.z}
-        visible={flyMode && !isMobile}
+        playerYaw={playerYaw}
+        cameraX={cameraPos.x}
+        cameraZ={cameraPos.z}
+        cameraTargetX={cameraPos.tx}
+        cameraTargetZ={cameraPos.tz}
+        visible={loadStage === "done" && !introMode && !rabbitCinematic && (exploreMode || flyMode)}
+        flyMode={flyMode}
         currentDistrict={lastDistrictRef.current}
+        districtZones={districtZones}
+        remotePilotsRef={flyPilotsRef}
       />
 
       {/* ─── Explore Mode: minimal UI ─── */}
@@ -2877,7 +2896,7 @@ function HomeContent() {
 
           {/* Navigation hints (bottom-right) — hidden when building card is open */}
           {!selectedBuilding && (
-            <div className="absolute bottom-3 right-3 text-right text-[8px] leading-loose text-muted sm:bottom-4 sm:right-4 sm:text-[9px]">
+            <div className="absolute bottom-20 left-3 text-[8px] leading-loose text-muted sm:left-4 sm:text-[9px]">
               <div><span className="text-cream">Drag</span> orbit</div>
               <div><span className="text-cream">Scroll</span> zoom</div>
               <div><span className="text-cream">Right-drag</span> pan</div>

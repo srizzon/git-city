@@ -141,7 +141,7 @@ export default function FounderSpire({ onClick }: FounderSpireProps) {
   });
 
   return (
-    <group ref={groupRef} position={[0, 0, 0]} userData={{ isLandmark: true }}>
+    <group ref={groupRef} position={[519, 0, 0]} userData={{ isLandmark: true }}>
       {/* Invisible hitbox for easier clicking */}
       <mesh position={[0, SPIRE_HEIGHT / 2, 0]} visible={false}>
         <cylinderGeometry args={[35, 35, SPIRE_HEIGHT, 8]} />

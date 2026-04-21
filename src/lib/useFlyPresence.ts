@@ -34,7 +34,7 @@ const SEND_INTERVAL_MS = 100;
 // ─── Hook ───────────────────────────────────────────────────
 
 export function useFlyPresence(
-  active: boolean,
+  flying: boolean,
   login: string,
   avatar: string,
   vehicle: string,
@@ -45,16 +45,11 @@ export function useFlyPresence(
   const pilotsRef = useRef<Map<string, RemotePilot>>(new Map());
   const socketRef = useRef<PartySocket | null>(null);
   const lastSendRef = useRef(0);
+  const flyingRef = useRef(flying);
+  flyingRef.current = flying;
 
+  // Connect always (even without login) to see other pilots in explore mode
   useEffect(() => {
-    if (!active || !login) {
-      if (socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
-      pilotsRef.current.clear();
-      return;
-    }
 
     const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
 
@@ -66,7 +61,9 @@ export function useFlyPresence(
     socketRef.current = ws;
 
     ws.addEventListener("open", () => {
-      ws.send(JSON.stringify({ type: "join", login, avatar, vehicle }));
+      if (flyingRef.current) {
+        ws.send(JSON.stringify({ type: "join", login: login || "anonymous", avatar, vehicle }));
+      }
     });
 
     ws.addEventListener("message", (evt) => {
@@ -125,9 +122,20 @@ export function useFlyPresence(
       socketRef.current = null;
       pilotsRef.current.clear();
     };
-  }, [active, login, avatar, vehicle]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Send join when flying state changes while connected
+  useEffect(() => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (flying) {
+      ws.send(JSON.stringify({ type: "join", login: login || "anonymous", avatar, vehicle }));
+    }
+  }, [flying, login, avatar, vehicle]);
 
   const sendMove = useCallback((x: number, y: number, z: number, yaw: number, bank: number) => {
+    if (!flyingRef.current || !socketRef.current) return;
     const now = Date.now();
     if (now - lastSendRef.current < SEND_INTERVAL_MS) return;
     lastSendRef.current = now;

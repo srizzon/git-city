@@ -354,10 +354,9 @@ function Blimp({
     };
   }, [tex, ledMat]);
 
-  // Spread blimps across the city instead of clustering near center
-  const radiusFraction = 0.15 + (index / Math.max(total - 1, 1)) * 0.45; // 15-60% of city radius
-  const r = cityRadius * radiusFraction;
-  const altitude = 260 + index * 25 + (index % 2) * 30;
+  // Orbit blimps around the landmarks area (center of city)
+  const r = 350 + index * 60;
+  const altitude = 400 + index * 25 + (index % 2) * 30;
   const speed = 5 + (index % 3) * 2;
   const phaseOffset = (index * Math.PI * 2) / Math.max(total, 1);
   const angle = useRef(phaseOffset);

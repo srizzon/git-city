@@ -3,10 +3,12 @@ import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { autoEquipIfSolo } from "@/lib/items";
 import { SKY_AD_PLANS, isValidPlanId } from "@/lib/skyAdPlans";
+import { AD_PACKAGES, isValidPackageId } from "@/lib/adPackages";
 import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import type Stripe from "stripe";
 import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pending-review";
+import { getResend } from "@/lib/resend";
 
 // Disable body parsing — Stripe needs raw body for signature verification
 export const dynamic = "force-dynamic";
@@ -152,6 +154,139 @@ export async function POST(request: Request) {
               .eq("active", true);
           }
 
+          break;
+        }
+
+        // --- Sky Ad Package purchase (Foundation, Skyline, Landmark) ---
+        if (session.metadata?.type === "sky_ad_package") {
+          const packageId = session.metadata.package_id;
+          const adIdsCsv = session.metadata.sky_ad_ids;
+
+          if (!packageId || !adIdsCsv) {
+            console.error("Missing package metadata in session:", session.id);
+            break;
+          }
+
+          const adIds = adIdsCsv.split(",").filter(Boolean);
+
+          // Get subscription details for period end
+          const subscriptionId =
+            typeof session.subscription === "string"
+              ? session.subscription
+              : session.subscription?.id;
+
+          const now = new Date();
+          let endsAt: Date;
+
+          if (subscriptionId) {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+              expand: ["items.data"],
+            });
+            const firstItem = subscription.items?.data?.[0];
+            const periodEnd = firstItem?.current_period_end;
+            endsAt = periodEnd
+              ? new Date(periodEnd * 1000)
+              : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          } else {
+            endsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          }
+
+          const purchaserEmail = session.customer_details?.email ?? null;
+          const amountPerAd = session.amount_total
+            ? Math.round(session.amount_total / adIds.length)
+            : 0;
+
+          // Activate all ads in the package
+          for (const adId of adIds) {
+            const { data: ad } = await sb
+              .from("sky_ads")
+              .select("id, active")
+              .eq("id", adId)
+              .maybeSingle();
+
+            if (!ad || ad.active) continue;
+
+            await sb
+              .from("sky_ads")
+              .update({
+                active: true,
+                starts_at: now.toISOString(),
+                ends_at: endsAt.toISOString(),
+                purchaser_email: purchaserEmail,
+                stripe_subscription_id: subscriptionId ?? null,
+                stripe_customer_id:
+                  typeof session.customer === "string"
+                    ? session.customer
+                    : session.customer?.id ?? null,
+                amount_paid_cents: amountPerAd,
+                currency: session.currency ?? undefined,
+              })
+              .eq("id", adId);
+
+            // Link to advertiser account if exists
+            if (purchaserEmail) {
+              const { data: advertiser } = await sb
+                .from("advertiser_accounts")
+                .select("id")
+                .eq("email", purchaserEmail)
+                .maybeSingle();
+
+              if (advertiser) {
+                await sb
+                  .from("sky_ads")
+                  .update({ advertiser_id: advertiser.id })
+                  .eq("id", adId)
+                  .is("advertiser_id", null);
+              }
+            }
+          }
+
+          // Auto-deactivate plane placeholder if package includes a plane
+          const pkg = isValidPackageId(packageId) ? AD_PACKAGES[packageId] : null;
+          if (pkg?.vehicles.includes("plane")) {
+            await sb
+              .from("sky_ads")
+              .update({ active: false })
+              .eq("id", "advertise")
+              .eq("active", true);
+          }
+
+          // Send admin notification email
+          const totalFormatted = session.currency === "brl"
+            ? `R$${((session.amount_total ?? 0) / 100).toFixed(2)}`
+            : `$${((session.amount_total ?? 0) / 100).toFixed(2)}`;
+
+          const isLandmark = pkg?.landmark === true;
+
+          try {
+            const resend = getResend();
+            await resend.emails.send({
+              from: "Git City Ads <ads@thegitcity.com>",
+              to: "samuelrizzondev@gmail.com",
+              subject: isLandmark
+                ? `[ACTION REQUIRED] New Landmark sale — ${totalFormatted}/mo`
+                : `New ${pkg?.label ?? packageId} sale — ${totalFormatted}/mo`,
+              html: `
+                <h2>${isLandmark ? "🏗️ New Landmark Package — Custom building needed" : `New ${pkg?.label ?? packageId} Package Sale`}</h2>
+                <table style="border-collapse:collapse;font-family:monospace;">
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Package</td><td><strong>${pkg?.label ?? packageId}</strong></td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Amount</td><td><strong>${totalFormatted}/mo</strong></td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Currency</td><td>${(session.currency ?? "usd").toUpperCase()}</td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Customer</td><td>${purchaserEmail ?? "unknown"}</td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Vehicles</td><td>${adIds.length} ads (${pkg?.vehicles.join(", ") ?? "?"})</td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Ad IDs</td><td>${adIds.join(", ")}</td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Subscription</td><td>${subscriptionId ?? "none"}</td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Starts</td><td>${now.toISOString()}</td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Ends</td><td>${endsAt.toISOString()}</td></tr>
+                </table>
+                ${isLandmark ? "<p style='margin-top:16px;color:#c8e64a;'><strong>⚠️ This is a Landmark package. You need to create a custom 3D building and post on Instagram/X.</strong></p>" : ""}
+              `,
+            });
+          } catch (emailErr) {
+            console.error("Failed to send admin ad sale email:", emailErr);
+          }
+
+          console.log(`Package ${packageId} activated: ${adIds.length} ads for ${purchaserEmail}`);
           break;
         }
 
@@ -384,14 +519,13 @@ export async function POST(request: Request) {
 
         if (!subscriptionId) break;
 
-        // Only handle sky ad subscriptions
-        const { data: ad } = await sb
+        // Handle sky ad subscriptions (single ads and packages)
+        const { data: ads } = await sb
           .from("sky_ads")
-          .select("id, active")
-          .eq("stripe_subscription_id", subscriptionId)
-          .maybeSingle();
+          .select("id")
+          .eq("stripe_subscription_id", subscriptionId);
 
-        if (!ad) break;
+        if (!ads || ads.length === 0) break;
 
         // Get updated period end from subscription items
         const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
@@ -403,41 +537,35 @@ export async function POST(request: Request) {
           ? new Date(periodEnd * 1000)
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
+        // Update all ads with this subscription (supports packages)
         await sb
           .from("sky_ads")
           .update({
             active: true,
             ends_at: endsAt.toISOString(),
           })
-          .eq("id", ad.id);
+          .eq("stripe_subscription_id", subscriptionId);
 
         break;
       }
 
       // --- Subscription canceled: deactivate ad ---
       case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription;
+        const canceledSub = event.data.object as Stripe.Subscription;
 
-        const { data: ad } = await sb
+        // Deactivate all ads with this subscription (supports packages)
+        await sb
           .from("sky_ads")
-          .select("id")
-          .eq("stripe_subscription_id", subscription.id)
-          .maybeSingle();
-
-        if (ad) {
-          await sb
-            .from("sky_ads")
-            .update({ active: false })
-            .eq("id", ad.id);
-        }
+          .update({ active: false })
+          .eq("stripe_subscription_id", canceledSub.id);
 
         break;
       }
 
       case "checkout.session.expired": {
         const expiredSession = event.data.object as Stripe.Checkout.Session;
-        if (expiredSession.metadata?.type === "sky_ad") {
-          // Clean up orphaned inactive ad row from abandoned checkout
+        if (expiredSession.metadata?.type === "sky_ad" || expiredSession.metadata?.type === "sky_ad_package") {
+          // Clean up orphaned inactive ad rows from abandoned checkout
           await sb
             .from("sky_ads")
             .delete()
