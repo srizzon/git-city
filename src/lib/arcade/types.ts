@@ -68,6 +68,7 @@ export type ClientMsg =
   | { type: "sit"; x: number; y: number; dir: Direction }
   | { type: "stand" }
   | { type: "avatar"; sprite_id: number }
+  | { type: "loadout"; loadout: AvatarLoadout }
   | { type: "game_start"; game: string }
   | { type: "game_stop"; game: string };
 
@@ -102,6 +103,7 @@ export type ServerMsg =
   | { type: "sit"; id: string; x: number; y: number; dir: Direction }
   | { type: "stand"; id: string; x: number; y: number }
   | { type: "avatar"; id: string; sprite_id: number }
+  | { type: "loadout"; id: string; loadout: AvatarLoadout }
   | { type: "map_reload"; map: Record<string, unknown> }
   | { type: "game_ack"; game: string }
   | { type: "game_result"; game: string; result: GameResult };

@@ -1,14 +1,44 @@
-import type { Party, Connection, ConnectionContext } from "partykit/server";
+import type * as Party from "partykit/server";
+import type { Connection, ConnectionContext } from "partykit/server";
 import { checkProfanity } from "glin-profanity";
 
 // ─── Types (inline — party/ can't use @/ alias) ─────────────
 type Direction = "up" | "down" | "left" | "right";
+
+interface AvatarLoadout {
+  skin_color: string;
+  hair_id: string | null;
+  hair_color: string | null;
+  clothes_top_id: string | null;
+  clothes_top_color: string | null;
+  clothes_bottom_id: string | null;
+  clothes_bottom_color: string | null;
+  clothes_full_id: string | null;
+  clothes_full_color: string | null;
+  shoes_id: string | null;
+  shoes_color: string | null;
+  acc_hat_id: string | null;
+  acc_hat_color: string | null;
+  acc_face_id: string | null;
+  acc_face_color: string | null;
+  acc_facial_id: string | null;
+  acc_facial_color: string | null;
+  acc_jewelry_id: string | null;
+  acc_jewelry_color: string | null;
+  eyes_color: string | null;
+  blush_id: string | null;
+  blush_color: string | null;
+  lipstick_id: string | null;
+  lipstick_color: string | null;
+  pet_id: string | null;
+}
 
 interface PlayerState {
   id: string;
   github_login: string;
   avatar_url: string;
   sprite_id: number;
+  loadout?: AvatarLoadout;
   x: number;
   y: number;
   dir: Direction;
@@ -20,6 +50,7 @@ type ClientMsg =
   | { type: "sit"; x: number; y: number; dir: Direction }
   | { type: "stand" }
   | { type: "avatar"; sprite_id: number }
+  | { type: "loadout"; loadout: AvatarLoadout }
   | { type: "game_start"; game: string }
   | { type: "game_stop"; game: string };
 
@@ -49,9 +80,48 @@ type ServerMsg =
   | { type: "sit"; id: string; x: number; y: number; dir: Direction }
   | { type: "stand"; id: string; x: number; y: number }
   | { type: "avatar"; id: string; sprite_id: number }
+  | { type: "loadout"; id: string; loadout: AvatarLoadout }
   | { type: "map_reload"; map: Record<string, unknown> }
   | { type: "game_ack"; game: string }
   | { type: "game_result"; game: string; result: GameResult };
+
+// Fields we accept when a client sends a loadout update. Keeps the server
+// defensive against malformed payloads.
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const LOADOUT_STRING_FIELDS = new Set([
+  "hair_id", "clothes_top_id", "clothes_bottom_id", "clothes_full_id",
+  "shoes_id", "acc_hat_id", "acc_face_id", "acc_facial_id", "acc_jewelry_id",
+  "blush_id", "lipstick_id", "pet_id",
+]);
+const LOADOUT_COLOR_FIELDS = new Set([
+  "skin_color", "hair_color", "clothes_top_color", "clothes_bottom_color",
+  "clothes_full_color", "shoes_color", "acc_hat_color", "acc_face_color",
+  "acc_facial_color", "acc_jewelry_color", "eyes_color", "blush_color",
+  "lipstick_color",
+]);
+
+function sanitizeLoadout(raw: unknown): AvatarLoadout | null {
+  if (!raw || typeof raw !== "object") return null;
+  const out: Record<string, string | null> = {};
+  const src = raw as Record<string, unknown>;
+  for (const key of LOADOUT_STRING_FIELDS) {
+    const v = src[key];
+    if (v === null || typeof v === "undefined") { out[key] = null; continue; }
+    if (typeof v !== "string" || v.length > 50) return null;
+    out[key] = v;
+  }
+  for (const key of LOADOUT_COLOR_FIELDS) {
+    const v = src[key];
+    if (v === null || typeof v === "undefined") {
+      out[key] = key === "skin_color" || key === "eyes_color" ? "#888888" : null;
+      continue;
+    }
+    if (typeof v !== "string" || !HEX_RE.test(v)) return null;
+    out[key] = v;
+  }
+  if (!out.skin_color) out.skin_color = "#e8c4a0";
+  return out as unknown as AvatarLoadout;
+}
 
 // ─── Map config (loaded dynamically from Supabase) ───────────
 interface MapConfig {
@@ -293,6 +363,35 @@ export default class ArcadeServer implements Party.Server {
     this.pingLobby();
   }
 
+  private async fetchLoadoutFromSupabase(userId: string): Promise<AvatarLoadout | null> {
+    const supabaseUrl = this.room.env.NEXT_PUBLIC_SUPABASE_URL as string;
+    const supabaseKey = this.room.env.SUPABASE_SERVICE_ROLE_KEY as string;
+    if (!supabaseUrl || !supabaseKey) return null;
+
+    try {
+      // Join developers → arcade_avatar_loadouts via embedded select
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/developers?claimed_by=eq.${encodeURIComponent(userId)}&select=id,arcade_avatar_loadouts(*)&limit=1`,
+        {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+        },
+      );
+      if (!res.ok) return null;
+      const rows = (await res.json()) as Array<{
+        id: number;
+        arcade_avatar_loadouts: AvatarLoadout | AvatarLoadout[] | null;
+      }>;
+      const raw = rows[0]?.arcade_avatar_loadouts;
+      const loadout = Array.isArray(raw) ? raw[0] : raw;
+      return sanitizeLoadout(loadout);
+    } catch {
+      return null;
+    }
+  }
+
   private async fetchMapFromSupabase(): Promise<MapConfig | null> {
     const supabaseUrl = this.room.env.NEXT_PUBLIC_SUPABASE_URL as string;
     const supabaseKey = this.room.env.SUPABASE_SERVICE_ROLE_KEY as string;
@@ -466,6 +565,20 @@ export default class ArcadeServer implements Party.Server {
     const joinMsg: ServerMsg = { type: "join", player };
     this.room.broadcast(JSON.stringify(joinMsg), [conn.id]);
 
+    // Async: fetch this player's loadout from Supabase, then broadcast it so
+    // remote clients render the right avatar. Keeps onConnect sync path fast.
+    this.fetchLoadoutFromSupabase(userId).then((loadout) => {
+      if (!loadout) return;
+      const stored = this.players.get(userId);
+      if (!stored) return;
+      stored.loadout = loadout;
+      this.room.storage.put(`player:${userId}`, stored);
+      const loadoutMsg: ServerMsg = { type: "loadout", id: userId, loadout };
+      this.room.broadcast(JSON.stringify(loadoutMsg));
+    }).catch(() => {
+      // best-effort
+    });
+
     // Update lobby
     this.pingLobby();
   }
@@ -575,6 +688,19 @@ export default class ArcadeServer implements Party.Server {
       this.room.storage.put(`player:${userId}`, player);
       const avatarMsg: ServerMsg = { type: "avatar", id: userId, sprite_id: spriteId };
       this.room.broadcast(JSON.stringify(avatarMsg));
+    }
+
+    if (msg.type === "loadout") {
+      const lastAvatarTime = this.lastAvatar.get(userId) ?? 0;
+      if (now - lastAvatarTime < AVATAR_INTERVAL_MS) return;
+      this.lastAvatar.set(userId, now);
+
+      const clean = sanitizeLoadout(msg.loadout);
+      if (!clean) return;
+      player.loadout = clean;
+      this.room.storage.put(`player:${userId}`, player);
+      const loadoutMsg: ServerMsg = { type: "loadout", id: userId, loadout: clean };
+      this.room.broadcast(JSON.stringify(loadoutMsg));
     }
 
     if (msg.type === "chat") {

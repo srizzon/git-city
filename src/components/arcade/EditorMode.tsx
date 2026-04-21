@@ -699,8 +699,6 @@ export default function EditorMode({ map, canvas, slug, onSave, onExit }: Editor
     try {
       const cleanFurniture = furniture.map(({ catalogId, ...f }) => f);
       const newObjects = rebuildObjects(furniture);
-      console.log("[editor save] Objects rebuilt:", newObjects.filter(o => o.type === "seat").map(o => `seat(${o.x},${o.y}) dir=${o.dir}`));
-      console.log("[editor save] Furniture:", furniture.map(f => `${f.sprite} tile(${f.x/ts},${f.y/ts}) ${f.width/ts}x${f.height/ts}`));
       const updatedMap: GameMap = {
         ...map,
         furniture: cleanFurniture,

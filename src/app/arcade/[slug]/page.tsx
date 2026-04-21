@@ -39,6 +39,7 @@ import {
   sendSit,
   sendStand,
   sendAvatar,
+  sendLoadout,
   disconnect,
 } from "@/lib/arcade/network/client";
 import { findNearbySeat, findNearbyObject } from "@/lib/arcade/engine/tileMap";
@@ -390,6 +391,12 @@ export default function ArcadeRoomPage({
       const p = playersRef.current.get(id);
       if (p) p.sprite_id = spriteId;
     },
+    onLoadout(id, loadout) {
+      const p = playersRef.current.get(id);
+      if (p) p.loadout = loadout;
+      setPlayerAvatar(id, loadout);
+      preloadLoadout(loadout).catch(() => {});
+    },
     onMapReload(mapData) {
       const map = mapData as unknown as GameMap;
       loadMapFromData(map);
@@ -481,9 +488,15 @@ export default function ArcadeRoomPage({
         loadFurnitureSprites("/sprites/arcade", spriteKeys),
       ]);
 
-      // 3. Preload the local player's loadout sprites
+      // 3. Preload the local player's loadout + the default loadout.
+      // The default is used to render remote players whose loadout wasn't synced
+      // through PartyKit — without preloading, their hair/clothes sprites are
+      // missing and they appear naked.
       const loadout = avatarRes.loadout ?? getDefaultLoadout();
-      await preloadLoadout(loadout);
+      await Promise.all([
+        preloadLoadout(loadout),
+        preloadLoadout(getDefaultLoadout()),
+      ]);
 
       // 3. Pre-render static tile layers to offscreen canvases
       buildLayerCaches(map);
@@ -698,6 +711,7 @@ export default function ArcadeRoomPage({
     preloadLoadout(newLoadout).catch(() => {});
     setPetEnabled(!!newLoadout.pet_id);
     if (newLoadout.pet_id) setActivePet(newLoadout.pet_id);
+    sendLoadout(newLoadout);
     setShowAvatarModal(false);
   };
 
