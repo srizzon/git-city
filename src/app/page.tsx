@@ -412,6 +412,11 @@ function HomeContent() {
     raw?: string;
   } | null>(null);
   const [flyMode, setFlyMode] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   const [flyVehicle, setFlyVehicle] = useState<string>("airplane");
   const [introMode, setIntroMode] = useState(false);
   const [introPhase, setIntroPhase] = useState(-1); // -1 = not started, 0-3 = text phases, 4 = done
@@ -1395,9 +1400,9 @@ function HomeContent() {
         setLoadProgress(30);
 
         if (!allDevs || allDevs.length === 0) {
-          setLoadProgress(100);
-          setLoadStage("ready");
-          return;
+          // If the city is empty, we must still proceed to generate the layout
+          // otherwise the LoadingScreen gets stuck waiting for buildings to render
+          allDevs = [];
         }
 
         // Apply loadout override from localStorage (saved in shop, TTL 10 min)
@@ -3094,16 +3099,19 @@ function HomeContent() {
                                 {vsCodeKeyCopied ? "Copied!" : "Copy"}
                               </button>
                             </div>
+
+                            <div id="gc-radio-slot" suppressHydrationWarning />
                             <div className="space-y-2.5 text-xs normal-case text-muted">
-                              <p><span className="text-cream">1.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code</p>
-                              <p><span className="text-cream">2.</span> Cmd+Shift+P &rarr; &ldquo;Pulse: Connect&rdquo;</p>
+                              <p><span className="text-cream">1.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code<br/>
+                              <span className="text-cream/50 pl-3">or <a href="https://github.com/srizzon/git-city/tree/main/packages/neovim-plugin" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">gitcity.nvim</a> for Neovim</span></p>
+                              <p><span className="text-cream">2.</span> Cmd+Shift+P &rarr; &ldquo;Pulse: Connect&rdquo; <span className="text-cream/50">(or <code>:GitCityLogin</code>)</span></p>
                               <p><span className="text-cream">3.</span> Paste your key and start coding</p>
                             </div>
                             <p className="mt-3 text-[10px] normal-case text-muted/50">
                               Your building lights up in ~30s
                             </p>
                             <p className="mt-1.5 text-[10px] normal-case text-muted/50">
-                              Only your username and language are shared publicly. Control what&apos;s sent in VS Code Settings &gt; Git City &gt; Privacy.
+                              Only your username and language are shared publicly. Manage this in your editor&apos;s Git City privacy settings.
                             </p>
                           </div>
                         ) : (
@@ -3116,8 +3124,9 @@ function HomeContent() {
                             </p>
                             <div className="mb-4 space-y-2.5 text-xs normal-case text-muted">
                               <p><span className="text-cream">1.</span> Generate your key below</p>
-                              <p><span className="text-cream">2.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code</p>
-                              <p><span className="text-cream">3.</span> Paste key in VS Code, start coding</p>
+                              <p><span className="text-cream">2.</span> Install <a href="https://marketplace.visualstudio.com/items?itemName=git-city.gitcity" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">Git City: Pulse</a> in VS Code<br/>
+                              <span className="text-cream/50 pl-3">or <a href="https://github.com/srizzon/git-city/tree/main/packages/neovim-plugin" target="_blank" rel="noopener noreferrer" className="text-[#4ade80] hover:underline">gitcity.nvim</a> for Neovim</span></p>
+                              <p><span className="text-cream">3.</span> Paste key in your editor, start coding</p>
                             </div>
                             <button
                               onClick={async () => {
@@ -3142,7 +3151,7 @@ function HomeContent() {
                               {vsCodeKeyLoading ? "Generating..." : vsCodeKeyCopied ? "Key copied to clipboard!" : "Generate API Key"}
                             </button>
                             <p className="mt-3 text-[10px] normal-case text-muted/50">
-                              Only your username and language are shared publicly. You can control this in VS Code Settings &gt; Git City &gt; Privacy.
+                              Only your username and language are shared publicly. Manage this in your editor&apos;s Git City privacy settings.
                             </p>
                           </div>
                         )}
