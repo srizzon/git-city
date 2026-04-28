@@ -26,6 +26,7 @@ const REOWN_PROJECT_ID = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID ?? "";
 interface Recoverable {
   quoteId: string;
   gitcAmountWei: bigint;
+  usdAmountCents: number;
   redirect: string;
   wallet: `0x${string}`;
   txHash: `0x${string}`;
@@ -34,18 +35,27 @@ interface Recoverable {
 type Status =
   | { kind: "idle" }
   | { kind: "quoting" }
-  | { kind: "ready"; quoteId: string; gitcAmountWei: bigint; redirect: string; wallet: `0x${string}` }
-  | { kind: "signing"; quoteId: string; gitcAmountWei: bigint; redirect: string; wallet: `0x${string}` }
-  | { kind: "confirming"; quoteId: string; gitcAmountWei: bigint; redirect: string; wallet: `0x${string}`; txHash: `0x${string}` }
-  | { kind: "verifying"; quoteId: string; gitcAmountWei: bigint; redirect: string; wallet: `0x${string}`; txHash: `0x${string}` }
-  | { kind: "done"; gitcAmountWei: bigint; redirect: string }
+  | { kind: "ready"; quoteId: string; gitcAmountWei: bigint; usdAmountCents: number; redirect: string; wallet: `0x${string}` }
+  | { kind: "signing"; quoteId: string; gitcAmountWei: bigint; usdAmountCents: number; redirect: string; wallet: `0x${string}` }
+  | { kind: "confirming"; quoteId: string; gitcAmountWei: bigint; usdAmountCents: number; redirect: string; wallet: `0x${string}`; txHash: `0x${string}` }
+  | { kind: "verifying"; quoteId: string; gitcAmountWei: bigint; usdAmountCents: number; redirect: string; wallet: `0x${string}`; txHash: `0x${string}` }
+  | { kind: "done"; gitcAmountWei: bigint; usdAmountCents: number; redirect: string }
   | { kind: "error"; message: string; recoverable?: Recoverable };
 
 export interface GitcQuoteResponse {
   quoteId: string;
   gitcAmountWei: string;
+  /** USD price the quote was generated against (in cents). */
+  usdAmountCents: number;
   /** Frontend chooses where to send the user after success. */
   redirectUrl: string;
+}
+
+function formatUsd(cents: number): string {
+  const dollars = cents / 100;
+  return Number.isInteger(dollars)
+    ? `$${dollars.toFixed(0)}`
+    : `$${dollars.toFixed(2)}`;
 }
 
 export interface GitcPayButtonProps {
@@ -143,6 +153,7 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
     const recoverable: Recoverable = {
       quoteId: current.quoteId,
       gitcAmountWei: current.gitcAmountWei,
+      usdAmountCents: current.usdAmountCents,
       redirect: current.redirect,
       wallet: current.wallet,
       txHash: current.txHash,
@@ -179,6 +190,7 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
               safeSetStatus({
                 kind: "done",
                 gitcAmountWei: current.gitcAmountWei,
+                usdAmountCents: current.usdAmountCents,
                 redirect: current.redirect,
               });
               return;
@@ -237,6 +249,7 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
         kind: "ready",
         quoteId: data.quoteId,
         gitcAmountWei: BigInt(data.gitcAmountWei),
+        usdAmountCents: data.usdAmountCents,
         redirect: data.redirectUrl,
         wallet: address,
       });
@@ -246,6 +259,17 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
       onError?.(msg);
     }
   }
+
+  // Auto-fetch the quote as soon as we have a connected wallet and the form
+  // is valid (disabled === false). Avoids a redundant click — user clicks
+  // GITC tab once, sees the amount + USD equivalent, hits Pay → done.
+  useEffect(() => {
+    if (status.kind !== "idle") return;
+    if (!isConnected || !address) return;
+    if (disabled) return;
+    handleQuote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status.kind, isConnected, address, disabled]);
 
   async function handlePay() {
     if (status.kind !== "ready") return;
@@ -263,6 +287,7 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
         kind: "confirming",
         quoteId: current.quoteId,
         gitcAmountWei: current.gitcAmountWei,
+        usdAmountCents: current.usdAmountCents,
         redirect: current.redirect,
         wallet: current.wallet,
         txHash: hash,
@@ -298,6 +323,7 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
       kind: "confirming",
       quoteId: r.quoteId,
       gitcAmountWei: r.gitcAmountWei,
+      usdAmountCents: r.usdAmountCents,
       redirect: r.redirect,
       wallet: r.wallet,
       txHash: r.txHash,
@@ -395,13 +421,18 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
 
   if (status.kind === "ready" || status.kind === "signing") {
     const shortAddress = status.wallet.slice(0, 6) + "…" + status.wallet.slice(-4);
+    const usdLabel = formatUsd(status.usdAmountCents);
+    const gitcLabel = `${formatGitcAmount(status.gitcAmountWei)} GITC`;
     return (
       <div className="flex flex-col gap-1.5">
         <div className="border-2 border-border bg-bg-raised px-2.5 py-2 text-[10px] normal-case">
           <div className="flex items-baseline justify-between">
             <span className="text-muted">You pay</span>
-            <span style={{ color: ACCENT }} className="text-xs">
-              {formatGitcAmount(status.gitcAmountWei)} GITC
+            <span className="text-right">
+              <span style={{ color: ACCENT }} className="text-xs">
+                {gitcLabel}
+              </span>
+              <span className="ml-1 text-[9px] text-dim">≈ {usdLabel}</span>
             </span>
           </div>
           <div className="mt-0.5 flex items-baseline justify-between text-[9px]">
@@ -437,7 +468,7 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
             ? "Confirm in wallet..."
             : insufficient
               ? "Insufficient GITC"
-              : `Pay ${formatGitcAmount(status.gitcAmountWei)} GITC`}
+              : `Pay ${gitcLabel} (${usdLabel})`}
         </button>
         {!insufficient && (
           <button
@@ -464,10 +495,18 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
     );
   }
 
-  // idle / quoting — connected, awaiting quote request
+  // idle / quoting — connected, the auto-fetch effect is fetching the quote.
+  // If the form isn't valid yet, `disabled` is true and we wait for the
+  // parent to enable; auto-fetch will fire as soon as it does.
   const shortConnectedAddress = address
     ? address.slice(0, 6) + "…" + address.slice(-4)
     : "";
+  const idleLabel =
+    status.kind === "quoting"
+      ? "Fetching price..."
+      : disabled
+        ? "Complete the form above"
+        : "Loading…";
   return (
     <div className="flex flex-col gap-1.5">
       <button
@@ -480,12 +519,11 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
       </button>
       <button
         type="button"
-        onClick={handleQuote}
-        disabled={disabled || status.kind === "quoting"}
-        className="btn-press w-full py-2.5 text-xs transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+        disabled
+        className="btn-press w-full py-2.5 text-xs opacity-60 cursor-not-allowed"
         style={accentButtonStyle}
       >
-        {status.kind === "quoting" ? "Fetching quote..." : `Pay with GITC${discountLabel}`}
+        {idleLabel}
       </button>
     </div>
   );

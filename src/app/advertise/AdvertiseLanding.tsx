@@ -821,6 +821,7 @@ export default function AdvertiseLanding({ serverCountry }: AdvertiseLandingProp
                           return {
                             quoteId: data.quoteId,
                             gitcAmountWei: data.gitcAmountWei,
+                            usdAmountCents: data.usdQuoteCents,
                             redirectUrl: redirect,
                           };
                         }}

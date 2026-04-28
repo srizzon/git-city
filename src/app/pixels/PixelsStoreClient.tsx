@@ -554,6 +554,7 @@ export default function PixelsStoreClient({
                           return {
                             quoteId: data.quoteId,
                             gitcAmountWei: data.gitcAmountWei,
+                            usdAmountCents: data.usdQuoteCents,
                             redirectUrl: `/pixels?pixels_purchased=${encodeURIComponent(checkoutPkg.id)}`,
                           };
                         }}
