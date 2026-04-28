@@ -23,6 +23,14 @@ const DEAD = "#ff6b6b";
 
 const REOWN_PROJECT_ID = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID ?? "";
 
+interface Recoverable {
+  quoteId: string;
+  gitcAmountWei: bigint;
+  redirect: string;
+  wallet: `0x${string}`;
+  txHash: `0x${string}`;
+}
+
 type Status =
   | { kind: "idle" }
   | { kind: "quoting" }
@@ -31,7 +39,7 @@ type Status =
   | { kind: "confirming"; quoteId: string; gitcAmountWei: bigint; redirect: string; wallet: `0x${string}`; txHash: `0x${string}` }
   | { kind: "verifying"; quoteId: string; gitcAmountWei: bigint; redirect: string; wallet: `0x${string}`; txHash: `0x${string}` }
   | { kind: "done"; gitcAmountWei: bigint; redirect: string }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; recoverable?: Recoverable };
 
 export interface GitcQuoteResponse {
   quoteId: string;
@@ -85,7 +93,7 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
 
   const { data: receipt, isError: receiptError } = useWaitForTransactionReceipt({
     hash: pendingTxHash,
-    confirmations: 2,
+    confirmations: 3,
     chainId: base.id,
     query: { enabled: !!pendingTxHash },
   });
@@ -109,6 +117,9 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
   }, [address, status, resetWrite]);
 
   // Once the receipt arrives, ask the backend to verify and activate.
+  // We retry transient errors (await confirms, network) automatically so a
+  // user who has already paid on-chain doesn't lose their payment to a UI
+  // race condition.
   useEffect(() => {
     if (status.kind !== "confirming") return;
     if (receiptError) {
@@ -118,22 +129,76 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
     if (!receipt) return;
     const current = status;
     setStatus({ ...current, kind: "verifying" });
+
+    let cancelled = false;
+    const recoverable: Recoverable = {
+      quoteId: current.quoteId,
+      gitcAmountWei: current.gitcAmountWei,
+      redirect: current.redirect,
+      wallet: current.wallet,
+      txHash: current.txHash,
+    };
+
+    const TRANSIENT_PATTERNS = [
+      "awaiting confirmation",
+      "not found",
+      "network",
+      "rate limit",
+      "timeout",
+      "could not confirm",
+    ];
+    const isTransient = (msg: string) =>
+      TRANSIENT_PATTERNS.some((p) => msg.toLowerCase().includes(p));
+
+    const MAX_ATTEMPTS = 8; // ~80s at 10s spacing — covers Base reorgs
+    const RETRY_MS = 10_000;
+
     (async () => {
-      try {
-        const result = await onConfirm({ quoteId: current.quoteId, txHash: current.txHash });
-        if (!result.ok) {
-          setStatus({ kind: "error", message: result.error || "Verification failed" });
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (cancelled) return;
+        try {
+          const result = await onConfirm({
+            quoteId: current.quoteId,
+            txHash: current.txHash,
+          });
+          if (cancelled) return;
+          if (result.ok) {
+            setStatus({
+              kind: "done",
+              gitcAmountWei: current.gitcAmountWei,
+              redirect: current.redirect,
+            });
+            return;
+          }
+          if (result.error && isTransient(result.error) && attempt < MAX_ATTEMPTS) {
+            await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+            continue;
+          }
+          setStatus({
+            kind: "error",
+            message: result.error || "Verification failed",
+            recoverable,
+          });
+          return;
+        } catch {
+          if (cancelled) return;
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+            continue;
+          }
+          setStatus({
+            kind: "error",
+            message: "Network error during verification",
+            recoverable,
+          });
           return;
         }
-        setStatus({
-          kind: "done",
-          gitcAmountWei: current.gitcAmountWei,
-          redirect: current.redirect,
-        });
-      } catch {
-        setStatus({ kind: "error", message: "Network error during verification" });
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [receipt, receiptError, status, onConfirm]);
 
   const insufficient = useMemo(() => {
@@ -208,6 +273,22 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
     disconnect();
   }
 
+  function handleRetryVerification() {
+    if (status.kind !== "error" || !status.recoverable) return;
+    const r = status.recoverable;
+    // Re-enter the confirming state; the verify-effect will pick it up and
+    // run the retry loop again against the SAME tx hash. The user does not
+    // need to re-pay.
+    setStatus({
+      kind: "confirming",
+      quoteId: r.quoteId,
+      gitcAmountWei: r.gitcAmountWei,
+      redirect: r.redirect,
+      wallet: r.wallet,
+      txHash: r.txHash,
+    });
+  }
+
   useEffect(() => {
     if (status.kind !== "done") return;
     const t = setTimeout(() => {
@@ -240,6 +321,7 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
   }
 
   if (status.kind === "error") {
+    const recoverable = status.recoverable;
     return (
       <div className="flex flex-col gap-1.5">
         <div
@@ -248,9 +330,36 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
         >
           {status.message}
         </div>
-        <button type="button" onClick={handleReset} className={subtleButtonClass}>
-          Try again
-        </button>
+        {recoverable && (
+          <p className="text-center text-[9px] text-dim normal-case">
+            Your payment is on-chain (tx {recoverable.txHash.slice(0, 10)}…). It
+            will be credited automatically — retrying verification will not
+            charge you again.
+          </p>
+        )}
+        {recoverable ? (
+          <>
+            <button
+              type="button"
+              onClick={handleRetryVerification}
+              className="btn-press w-full py-2.5 text-xs transition-opacity"
+              style={accentButtonStyle}
+            >
+              Retry verification
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-[9px] text-muted underline normal-case"
+            >
+              Cancel and reset
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={handleReset} className={subtleButtonClass}>
+            Try again
+          </button>
+        )}
       </div>
     );
   }

@@ -180,8 +180,18 @@ export async function verifyGitcPaymentTx(params: {
   }
 
   // Confirmations check (defends against shallow reorgs).
-  const head = await client.getBlockNumber();
-  const confirmations = head - receipt.blockNumber + BigInt(1);
+  // Grace period: wait up to ~12s for new blocks to accumulate before
+  // rejecting. Base mints a block every ~2s, so this is enough to absorb
+  // the timing race between frontend "got receipt" and backend "checks
+  // confirmations". Without this we'd reject a tx that's just a couple
+  // hundred ms shy of the threshold.
+  let head = await client.getBlockNumber();
+  let confirmations = head - receipt.blockNumber + BigInt(1);
+  for (let i = 0; i < 6 && confirmations < GITC_MIN_CONFIRMATIONS; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    head = await client.getBlockNumber();
+    confirmations = head - receipt.blockNumber + BigInt(1);
+  }
   if (confirmations < GITC_MIN_CONFIRMATIONS) {
     return { ok: false, reason: "Awaiting confirmations" };
   }
