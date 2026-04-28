@@ -115,9 +115,9 @@ function isBot(ua: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Middleware
+// Proxy (Next.js 16 — formerly Middleware)
 // ---------------------------------------------------------------------------
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── 0. Block bots from API routes ─────────────────────────────────
