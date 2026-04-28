@@ -4,6 +4,17 @@ import { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { trackAdvertiseCtaClick } from "@/lib/himetrica";
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
+import { GitcPayButton } from "@/components/GitcPayButton";
+import { PaymentMethodTabs, type PaymentMethodOption } from "@/components/PaymentMethodTabs";
+import AdPixModal from "@/components/AdPixModal";
+import { isGitcEnabled } from "@/lib/gitc";
+import { isBrazilClient } from "@/lib/geo";
+
+type PayMethod = "card" | "pix" | "gitc";
+
+interface AdvertiseLandingProps {
+  serverCountry?: string | null;
+}
 
 const AdPreview = dynamic(() => import("@/components/AdPreview"), { ssr: false });
 
@@ -55,15 +66,18 @@ const PACKAGE_LABELS: Record<string, string> = {
 };
 
 /* ─────────────── main component ─────────────── */
-export default function AdvertiseLanding() {
+export default function AdvertiseLanding({ serverCountry }: AdvertiseLandingProps = {}) {
   const [currency, setCurrency] = useState<Currency>("usd");
   const [checkoutPkg, setCheckoutPkg] = useState<CheckoutPkg>(null);
+  const [payMethod, setPayMethod] = useState<PayMethod>("card");
   const [brand, setBrand] = useState("");
   const [text, setText] = useState("");
   const [color, setColor] = useState("#f8d880");
   const [bgColor, setBgColor] = useState("#1a1018");
   const [link, setLink] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pixLoading, setPixLoading] = useState(false);
+  const [pixModal, setPixModal] = useState<{ brCode: string; brCodeBase64: string; adId: string; successUrl: string } | null>(null);
   const [error, setError] = useState("");
   const [previewVehicle, setPreviewVehicle] = useState<PreviewVehicle>(null);
 
@@ -80,12 +94,18 @@ export default function AdvertiseLanding() {
 
   const packagesRef = useRef<HTMLDivElement>(null);
 
+  // BR detection runs on the server (Vercel header) AND falls back to client
+  // signals (timezone, language) so devs with English-language OS in Brazil
+  // still see PIX.
   useEffect(() => {
-    if (typeof navigator !== "undefined") {
-      const lang = navigator.language || "";
-      if (lang.startsWith("pt")) setCurrency("brl");
+    if (isBrazilClient(serverCountry)) {
+      setCurrency("brl");
+      setPayMethod("pix");
     }
-  }, []);
+  }, [serverCountry]);
+
+  const isBrazil = currency === "brl";
+  const gitcEnabled = isGitcEnabled();
 
   function scrollToPackages() {
     packagesRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -158,7 +178,40 @@ export default function AdvertiseLanding() {
   const hexValid = (v: string) => /^#[0-9a-fA-F]{6}$/.test(v);
   const colorValid = hexValid(color);
   const bgColorValid = hexValid(bgColor);
-  const canSubmit = text.trim().length > 0 && !textOver && colorValid && bgColorValid && !loading;
+  const canSubmit = text.trim().length > 0 && !textOver && colorValid && bgColorValid && !loading && !pixLoading;
+
+  async function handlePixPackage() {
+    if (!canSubmit || !checkoutPkg) return;
+    setPixLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/ads/checkout/pix-package", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          package_id: checkoutPkg,
+          brand: brand.trim() || undefined,
+          text: text.trim(),
+          color,
+          bgColor,
+          link: link.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+        setPixLoading(false);
+        return;
+      }
+      const url = data.isLoggedIn
+        ? `/ads/dashboard/${data.adId}`
+        : `/advertise/setup/${data.trackingToken}`;
+      setPixModal({ brCode: data.brCode, brCodeBase64: data.brCodeBase64, adId: data.adId, successUrl: url });
+    } catch {
+      setError("Network error. Please try again.");
+    }
+    setPixLoading(false);
+  }
 
   async function handleCheckout() {
     if (!canSubmit || !checkoutPkg) return;
@@ -331,24 +384,8 @@ export default function AdvertiseLanding() {
 
       {/* ── Packages ── */}
       <section ref={packagesRef} className="pb-16 sm:pb-20">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6">
           <h2 className="text-2xl text-cream sm:text-3xl">Packages</h2>
-          <div className="flex border-2 border-border text-xs">
-            {(["usd", "brl"] as const).map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCurrency(c)}
-                className="px-4 py-1.5 transition-colors"
-                style={{
-                  backgroundColor: currency === c ? ACCENT : "transparent",
-                  color: currency === c ? "#1a1018" : "var(--color-muted)",
-                }}
-              >
-                {c.toUpperCase()}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className="grid gap-4 sm:gap-5 lg:grid-cols-3">
@@ -576,6 +613,11 @@ export default function AdvertiseLanding() {
             @samuelrizzondev
           </a>
         </p>
+        <p className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] text-dim normal-case">
+          <span>Git City &middot; CNPJ 66.241.579/0001-92</span>
+          <a href="/terms" className="transition-colors hover:text-cream">Terms</a>
+          <a href="/privacy" className="transition-colors hover:text-cream">Privacy</a>
+        </p>
       </footer>
 
       {/* ── Checkout Modal ── */}
@@ -704,23 +746,103 @@ export default function AdvertiseLanding() {
                 </div>
               )}
 
-              {/* Submit */}
-              <button
-                type="button"
-                onClick={handleCheckout}
-                disabled={!canSubmit}
-                className="btn-press w-full py-3.5 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-                style={{
-                  backgroundColor: ACCENT,
-                  boxShadow: "4px 4px 0 0 #5a7a00",
-                }}
-              >
-                {loading
-                  ? "Redirecting to checkout..."
-                  : `Start for ${getPriceLabel(checkoutPkg)}/mo`}
-              </button>
+              {/* Payment method tabs */}
+              {(() => {
+                const methods: PaymentMethodOption<PayMethod>[] = [
+                  { id: "card", label: "Card" },
+                  { id: "pix", label: "PIX", visible: isBrazil },
+                  { id: "gitc", label: "GITC", visible: gitcEnabled },
+                ];
+                // Auto-correct selection if current method is hidden
+                const visibleIds = methods.filter((m) => m.visible !== false).map((m) => m.id);
+                const safeSelected = visibleIds.includes(payMethod) ? payMethod : visibleIds[0];
+
+                return (
+                  <PaymentMethodTabs<PayMethod>
+                    methods={methods}
+                    selected={safeSelected}
+                    onChange={setPayMethod}
+                  >
+                    {safeSelected === "card" && (
+                      <button
+                        type="button"
+                        onClick={handleCheckout}
+                        disabled={!canSubmit}
+                        className="btn-press w-full py-3 text-sm text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                        style={{ backgroundColor: ACCENT, boxShadow: "4px 4px 0 0 #5a7a00" }}
+                      >
+                        {loading
+                          ? "Redirecting..."
+                          : `Subscribe ${getPriceLabel(checkoutPkg)}/mo`}
+                      </button>
+                    )}
+
+                    {safeSelected === "pix" && (
+                      <button
+                        type="button"
+                        onClick={handlePixPackage}
+                        disabled={!canSubmit}
+                        className="btn-press w-full py-3 text-sm transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                        style={{
+                          backgroundColor: "transparent",
+                          border: `2px solid ${ACCENT}`,
+                          color: ACCENT,
+                          boxShadow: "4px 4px 0 0 #5a7a00",
+                        }}
+                      >
+                        {pixLoading ? "Generating PIX..." : `Pay ${getPriceLabel(checkoutPkg)} with PIX`}
+                      </button>
+                    )}
+
+                    {safeSelected === "gitc" && (
+                      <GitcPayButton
+                        disabled={!canSubmit}
+                        onError={(msg) => setError(msg)}
+                        onRequestQuote={async (wallet) => {
+                          if (!canSubmit || !checkoutPkg) return null;
+                          const res = await fetch("/api/ads/checkout/gitc-package-quote", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              package_id: checkoutPkg,
+                              brand: brand.trim() || undefined,
+                              text: text.trim(),
+                              color,
+                              bgColor,
+                              link: link.trim() || undefined,
+                              wallet,
+                            }),
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          if (!res.ok) throw new Error(data.error || "Could not get a quote");
+                          const redirect = data.isLoggedIn
+                            ? `/ads/dashboard/${data.primaryAdId}`
+                            : `/advertise/setup/${data.trackingToken}`;
+                          return {
+                            quoteId: data.quoteId,
+                            gitcAmountWei: data.gitcAmountWei,
+                            redirectUrl: redirect,
+                          };
+                        }}
+                        onConfirm={async ({ quoteId, txHash }) => {
+                          const res = await fetch("/api/ads/checkout/gitc-package-confirm", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ quoteId, txHash }),
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          return { ok: res.ok, error: data.error };
+                        }}
+                      />
+                    )}
+                  </PaymentMethodTabs>
+                );
+              })()}
+
               <p className="text-center text-[9px] text-muted normal-case">
-                Monthly subscription, cancel anytime. Secure checkout via Stripe.
+                {payMethod === "card" && "Monthly subscription, cancel anytime."}
+                {payMethod === "pix" && "One-time payment for 30 days. PIX via AbacatePay."}
+                {payMethod === "gitc" && "One-time payment for 30 days. GITC sent on Base."}
               </p>
             </div>
           </div>
@@ -942,6 +1064,18 @@ export default function AdvertiseLanding() {
             />
           </div>
         </div>
+      )}
+
+      {/* ── PIX Modal (package checkout) ── */}
+      {pixModal && checkoutPkg && (
+        <AdPixModal
+          brCode={pixModal.brCode}
+          brCodeBase64={pixModal.brCodeBase64}
+          adId={pixModal.adId}
+          planLabel={`Git City Ads: ${PACKAGE_LABELS[checkoutPkg]} Package`}
+          successUrl={pixModal.successUrl}
+          onClose={() => setPixModal(null)}
+        />
       )}
     </>
   );

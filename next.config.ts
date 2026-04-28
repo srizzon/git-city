@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import type { Configuration as WebpackConfig } from "webpack";
 
 const securityHeaders = [
   // Prevent clickjacking – block all framing
@@ -35,6 +36,15 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
+  },
+  webpack: (config: WebpackConfig) => {
+    config.resolve = config.resolve ?? {};
+    config.resolve.alias = {
+      ...(config.resolve.alias as Record<string, string | false>),
+      "pino-pretty": false,
+      "@react-native-async-storage/async-storage": false,
+    };
+    return config;
   },
   async headers() {
     return [

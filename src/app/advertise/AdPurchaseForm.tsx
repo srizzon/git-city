@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { SKY_AD_PLANS, getPriceCents, formatPrice, PROMO_DISCOUNT, PROMO_LABEL, PERIOD_OPTIONS, type SkyAdPlanId, type AdCurrency, type AdPeriod } from "@/lib/skyAdPlans";
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
 import AdPixModal from "@/components/AdPixModal";
+import { GitcPayButton } from "@/components/GitcPayButton";
 
 const AdPreview = dynamic(() => import("@/components/AdPreview"), { ssr: false });
 
@@ -426,14 +427,57 @@ export function AdPurchaseForm() {
                 {pixLoading ? "Generating PIX..." : `Pay ${brlPrice} with PIX`}
               </button>
             )}
+
+            <GitcPayButton
+              disabled={!canSubmit}
+              onError={(msg) => setError(msg)}
+              onRequestQuote={async (wallet) => {
+                if (!canSubmit) return null;
+                const res = await fetch("/api/ads/checkout/gitc-quote", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    plan_id: planId,
+                    period,
+                    brand: brand.trim() || undefined,
+                    text: text.trim(),
+                    description: description.trim() || undefined,
+                    color,
+                    bgColor,
+                    link: link.trim() || undefined,
+                    wallet,
+                  }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || "Could not get a quote");
+                const redirect = data.isLoggedIn
+                  ? `/ads/dashboard/${data.adId}`
+                  : `/advertise/setup/${data.trackingToken}`;
+                return {
+                  quoteId: data.quoteId,
+                  gitcAmountWei: data.gitcAmountWei,
+                  redirectUrl: redirect,
+                };
+              }}
+              onConfirm={async ({ quoteId, txHash }) => {
+                const res = await fetch("/api/ads/checkout/gitc-confirm", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ quoteId, txHash }),
+                });
+                const data = await res.json().catch(() => ({}));
+                return { ok: res.ok, error: data.error };
+              }}
+            />
+
             <p className="mt-1 text-center text-[9px] text-muted normal-case">
               {showPix && isMonthly
-                ? "Card = monthly subscription (auto-renews). PIX = one-time payment for 30 days."
+                ? "Card = monthly subscription. PIX = 30 days. GITC = burn on Base for 30 days."
                 : showPix
-                  ? "Card or PIX. Secure checkout."
+                  ? "Card, PIX, or burn GITC on Base."
                   : isMonthly
-                    ? "Monthly subscription, cancel anytime. Secure checkout via Stripe."
-                    : "Secure checkout via Stripe."}
+                    ? "Card subscription, or burn GITC on Base for 30 days."
+                    : "Card or burn GITC on Base."}
             </p>
           </div>
         </div>

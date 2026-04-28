@@ -17,14 +17,18 @@ export interface InvitePreview {
 interface InviteCardProps {
   developer: InvitePreview;
   isLoggedIn: boolean;
+  isAdmin?: boolean;
   onLogin: () => void;
   onClose: () => void;
+  onAdminAdd?: (login: string) => Promise<void> | void;
   accent: string;
   shadow: string;
 }
 
-export default function InviteCard({ developer, isLoggedIn, onLogin, onClose, accent, shadow }: InviteCardProps) {
+export default function InviteCard({ developer, isLoggedIn, isAdmin, onLogin, onClose, onAdminAdd, accent, shadow }: InviteCardProps) {
   const [copied, setCopied] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const inviteUrl = `${window.location.origin}/?user=${developer.github_login}`;
 
@@ -32,6 +36,18 @@ export default function InviteCard({ developer, isLoggedIn, onLogin, onClose, ac
     navigator.clipboard.writeText(inviteUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAdminAdd = async () => {
+    if (!onAdminAdd || adding) return;
+    setAdding(true);
+    setAddError(null);
+    try {
+      await onAdminAdd(developer.github_login);
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : "Failed to add");
+      setAdding(false);
+    }
   };
 
   return (
@@ -85,17 +101,31 @@ export default function InviteCard({ developer, isLoggedIn, onLogin, onClose, ac
 
         {/* CTAs */}
         <div className="mt-4 flex flex-col items-center gap-2 sm:mt-5 sm:flex-row sm:justify-center sm:gap-3">
-          {!isLoggedIn && (
+          {isAdmin && onAdminAdd ? (
             <button
-              onClick={() => { onLogin(); onClose(); }}
-              className="btn-press whitespace-nowrap px-4 py-2 text-[10px] text-bg"
+              onClick={handleAdminAdd}
+              disabled={adding}
+              className="btn-press whitespace-nowrap px-4 py-2 text-[10px] text-bg disabled:opacity-60"
               style={{
                 backgroundColor: accent,
                 boxShadow: `3px 3px 0 0 ${shadow}`,
               }}
             >
-              This is me? Sign in
+              {adding ? "Adding…" : "Add to city"}
             </button>
+          ) : (
+            !isLoggedIn && (
+              <button
+                onClick={() => { onLogin(); onClose(); }}
+                className="btn-press whitespace-nowrap px-4 py-2 text-[10px] text-bg"
+                style={{
+                  backgroundColor: accent,
+                  boxShadow: `3px 3px 0 0 ${shadow}`,
+                }}
+              >
+                This is me? Sign in
+              </button>
+            )
           )}
 
           <button
@@ -105,6 +135,10 @@ export default function InviteCard({ developer, isLoggedIn, onLogin, onClose, ac
             {copied ? "Link copied!" : "Invite this dev"}
           </button>
         </div>
+
+        {addError && (
+          <p className="mt-3 text-[10px] text-red-400 normal-case">{addError}</p>
+        )}
       </div>
     </div>
   );

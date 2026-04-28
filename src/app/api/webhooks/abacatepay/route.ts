@@ -4,6 +4,7 @@ import { autoEquipIfSolo } from "@/lib/items";
 import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import { SKY_AD_PLANS, isValidPlanId, getPriceCents, type AdPeriod } from "@/lib/skyAdPlans";
+import { AD_PACKAGES, isValidPackageId, getPackagePriceCents, type AdPackageId } from "@/lib/adPackages";
 
 export const dynamic = "force-dynamic";
 
@@ -47,42 +48,58 @@ export async function POST(request: Request) {
       case "pixQrCode.paid": {
         if (!pixId) break;
 
-        // --- Sky Ad purchase ---
-        const { data: ad } = await sb
+        // --- Sky Ad purchase (single OR package) ---
+        // A package shares one pix_id across N ads. Single-ad purchases
+        // return one row; packages return many.
+        const { data: ads } = await sb
           .from("sky_ads")
-          .select("id, plan_id, active")
-          .eq("pix_id", pixId)
-          .maybeSingle();
+          .select("id, plan_id, active, vehicle")
+          .eq("pix_id", pixId);
 
-        if (ad && !ad.active) {
-          const now = new Date();
-          // Use period from metadata if available, default to 30 days
-          const periodMeta = body.data?.metadata?.period;
-          const PERIOD_DAYS: Record<string, number> = { "1w": 7, "7d": 7, "14d": 14, "1m": 30 };
-          const days = (periodMeta && PERIOD_DAYS[periodMeta]) || 30;
-          const endsAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+        if (ads && ads.length > 0) {
+          const inactiveAds = ads.filter((a) => !a.active);
 
-          // Derive amount from plan + period (PIX is always BRL)
-          const pixPlanId = ad.plan_id;
-          const pixAmountCents = pixPlanId && isValidPlanId(pixPlanId)
-            ? getPriceCents(pixPlanId, "brl", (periodMeta === "1w" ? "1w" : "1m") as AdPeriod)
-            : undefined;
+          if (inactiveAds.length > 0) {
+            const now = new Date();
+            const periodMeta = body.data?.metadata?.period;
+            const PERIOD_DAYS: Record<string, number> = { "1w": 7, "7d": 7, "14d": 14, "1m": 30 };
+            const days = (periodMeta && PERIOD_DAYS[periodMeta]) || 30;
+            const endsAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
-          await sb
-            .from("sky_ads")
-            .update({
-              active: true,
-              starts_at: now.toISOString(),
-              ends_at: endsAt.toISOString(),
-              amount_paid_cents: pixAmountCents,
-              currency: "brl",
-            })
-            .eq("id", ad.id);
+            const isPackage = ads.length > 1;
+            let amountCentsPerAd: number | undefined;
+            if (isPackage) {
+              const packageMeta = body.data?.metadata?.package_id;
+              if (packageMeta && isValidPackageId(packageMeta)) {
+                const totalCents = getPackagePriceCents(packageMeta as AdPackageId, "brl");
+                amountCentsPerAd = Math.floor(totalCents / ads.length);
+              }
+            } else {
+              const pixPlanId = ads[0].plan_id;
+              amountCentsPerAd = pixPlanId && isValidPlanId(pixPlanId)
+                ? getPriceCents(pixPlanId, "brl", (periodMeta === "1w" ? "1w" : "1m") as AdPeriod)
+                : undefined;
+            }
 
-          const planId = ad.plan_id;
-          if (planId && isValidPlanId(planId)) {
-            const plan = SKY_AD_PLANS[planId];
-            if (plan.vehicle === "plane") {
+            await sb
+              .from("sky_ads")
+              .update({
+                active: true,
+                starts_at: now.toISOString(),
+                ends_at: endsAt.toISOString(),
+                amount_paid_cents: amountCentsPerAd,
+                currency: "brl",
+              })
+              .in(
+                "id",
+                inactiveAds.map((a) => a.id),
+              );
+
+            // If any plane was activated, hide the placeholder.
+            const hasPlane = ads.some(
+              (a) => a.vehicle === "plane" || (a.plan_id && isValidPlanId(a.plan_id) && SKY_AD_PLANS[a.plan_id].vehicle === "plane"),
+            );
+            if (hasPlane) {
               await sb
                 .from("sky_ads")
                 .update({ active: false })

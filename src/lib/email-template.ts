@@ -1,3 +1,5 @@
+import { LEGAL_CNPJ, LEGAL_NAME } from "./legal";
+
 const BASE_URL = "https://thegitcity.com";
 const FONT = `'Silkscreen', monospace`;
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');`;
@@ -50,6 +52,9 @@ export function wrapInBaseTemplate(bodyHtml: string, unsubscribeUrl?: string): s
             <td align="center" style="padding-top: 24px;">
               <p style="margin: 0; font-size: 12px; color: #999999; font-family: Helvetica, Arial, sans-serif;">
                 ${footer}<a href="${BASE_URL}" style="color: #999999; text-decoration: none; font-size: 12px;">thegitcity.com</a>
+              </p>
+              <p style="margin: 6px 0 0; font-size: 11px; color: #999999; font-family: Helvetica, Arial, sans-serif;">
+                ${LEGAL_NAME} &middot; CNPJ ${LEGAL_CNPJ}
               </p>
             </td>
           </tr>

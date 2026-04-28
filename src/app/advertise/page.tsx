@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { AdvertisePageTracker } from "./tracking";
 import AdvertiseLanding from "./AdvertiseLanding";
 
@@ -22,7 +23,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AdvertisePage() {
+export default async function AdvertisePage() {
+  const h = await headers();
+  const country =
+    h.get("x-vercel-ip-country") ?? h.get("cf-ipcountry") ?? null;
+
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
       <AdvertisePageTracker />
@@ -44,7 +49,7 @@ export default function AdvertisePage() {
           </Link>
         </div>
 
-        <AdvertiseLanding />
+        <AdvertiseLanding serverCountry={country} />
       </div>
     </main>
   );

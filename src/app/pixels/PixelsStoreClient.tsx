@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { GitcPayButton } from "@/components/GitcPayButton";
+import { PaymentMethodTabs, type PaymentMethodOption } from "@/components/PaymentMethodTabs";
+import { isGitcEnabled } from "@/lib/gitc";
+import { isBrazilClient } from "@/lib/geo";
+
+type PayMethod = "card" | "pix" | "gitc";
 
 interface PixelPackage {
   id: string;
@@ -26,6 +32,7 @@ interface Props {
   balance: number;
   isAuthenticated: boolean;
   githubLogin: string;
+  serverCountry?: string | null;
 }
 
 const BADGES: Record<string, { label: string; color: string }> = {
@@ -200,12 +207,24 @@ export default function PixelsStoreClient({
   balance,
   isAuthenticated,
   githubLogin,
+  serverCountry,
 }: Props) {
   const [buying, setBuying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pixModal, setPixModal] = useState<PixModalData | null>(null);
   const [successPkg, setSuccessPkg] = useState<string | null>(null);
-  const [currentBalance, setCurrentBalance] = useState(balance);
+  const [, setCurrentBalance] = useState(balance);
+  const [checkoutPkgId, setCheckoutPkgId] = useState<string | null>(null);
+  const [payMethod, setPayMethod] = useState<PayMethod>("card");
+  const [isBR, setIsBR] = useState(false);
+
+  // BR detection: server header (Vercel) → timezone → language fallback.
+  useEffect(() => {
+    if (isBrazilClient(serverCountry)) {
+      setIsBR(true);
+      setPayMethod("pix");
+    }
+  }, [serverCountry]);
 
   // Check for Stripe success redirect
   useEffect(() => {
@@ -213,9 +232,7 @@ export default function PixelsStoreClient({
     const purchased = params.get("pixels_purchased");
     if (purchased) {
       setSuccessPkg(purchased);
-      // Clean up URL
       window.history.replaceState({}, "", "/pixels");
-      // Refresh balance
       fetch("/api/pixels/balance")
         .then((r) => r.json())
         .then((d) => setCurrentBalance(d.balance ?? 0))
@@ -223,33 +240,47 @@ export default function PixelsStoreClient({
     }
   }, []);
 
-  const handleBuy = async (pkgId: string, provider: "stripe" | "abacatepay") => {
+  const handleStripeBuy = async (pkgId: string) => {
     if (buying || !isAuthenticated) return;
     setBuying(pkgId);
     setError(null);
-    setSuccessPkg(null);
-
     try {
       const res = await fetch("/api/pixels/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ package_id: pkgId, provider }),
+        body: JSON.stringify({ package_id: pkgId, provider: "stripe" }),
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         setError(data.error || "Checkout failed. Try again.");
+        setBuying(null);
         return;
       }
-
-      // Stripe redirect
       if (data.url) {
         window.location.href = data.url;
+      }
+    } catch {
+      setError("Network error. Please try again.");
+      setBuying(null);
+    }
+  };
+
+  const handlePixBuy = async (pkgId: string) => {
+    if (buying || !isAuthenticated) return;
+    setBuying(pkgId);
+    setError(null);
+    try {
+      const res = await fetch("/api/pixels/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ package_id: pkgId, provider: "abacatepay" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Checkout failed. Try again.");
+        setBuying(null);
         return;
       }
-
-      // PIX: show QR modal
       if (data.brCode) {
         const pkg = packages.find((p) => p.id === pkgId);
         const totalPx = pkg ? pkg.pixels + pkg.bonus_pixels : 0;
@@ -260,6 +291,7 @@ export default function PixelsStoreClient({
           packageName: pkg?.name ?? pkgId,
           totalPx,
         });
+        setCheckoutPkgId(null);
       }
     } catch {
       setError("Network error. Please try again.");
@@ -271,7 +303,6 @@ export default function PixelsStoreClient({
   const handlePixClose = (purchased: boolean) => {
     setPixModal(null);
     if (purchased) {
-      // Refresh balance
       fetch("/api/pixels/balance")
         .then((r) => r.json())
         .then((d) => setCurrentBalance(d.balance ?? 0))
@@ -279,7 +310,9 @@ export default function PixelsStoreClient({
     }
   };
 
+  const gitcEnabled = isGitcEnabled();
   const highlightId = "popular";
+  const checkoutPkg = checkoutPkgId ? packages.find((p) => p.id === checkoutPkgId) : null;
 
   return (
     <div>
@@ -379,9 +412,12 @@ export default function PixelsStoreClient({
                 )}
               </div>
 
-              {/* Buy button */}
+              {/* Buy button — opens checkout modal */}
               <button
-                onClick={() => handleBuy(pkg.id, "stripe")}
+                onClick={() => {
+                  setError(null);
+                  setCheckoutPkgId(pkg.id);
+                }}
                 disabled={!!buying || !isAuthenticated}
                 className="btn-press w-full py-3.5 text-sm font-bold text-bg disabled:opacity-40 transition-all cursor-pointer"
                 style={{
@@ -389,25 +425,142 @@ export default function PixelsStoreClient({
                   boxShadow: "2px 2px 0 0 #5a7a00",
                 }}
               >
-                {isBuying ? "Processing..." : "Buy Now"}
+                {isBuying ? "Processing..." : "Buy"}
               </button>
-
-              {/* PIX option */}
-              {pkg.price_brl_cents && (
-                <button
-                  onClick={() => handleBuy(pkg.id, "abacatepay")}
-                  disabled={!!buying || !isAuthenticated}
-                  className="w-full mt-3 py-2.5 text-xs text-muted border-2 border-border hover:border-border-light hover:text-cream transition-colors disabled:opacity-40 cursor-pointer"
-                >
-                  {isBuying
-                    ? "..."
-                    : `PIX R$${(pkg.price_brl_cents / 100).toFixed(2)}`}
-                </button>
-              )}
             </div>
           );
         })}
       </div>
+
+      {/* ── Checkout Modal ── */}
+      {checkoutPkg && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !buying) setCheckoutPkgId(null);
+          }}
+        >
+          <div className="w-full max-w-sm border-[3px] border-border bg-bg p-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base text-cream sm:text-lg">
+                {checkoutPkg.name}{" "}
+                <span className="text-sm text-muted">
+                  · {(checkoutPkg.pixels + checkoutPkg.bonus_pixels).toLocaleString()} PX
+                </span>
+              </h3>
+              <button
+                onClick={() => !buying && setCheckoutPkgId(null)}
+                className="text-sm text-muted transition-colors hover:text-cream cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <p className="mt-2 text-[10px] text-dim normal-case">
+              ${(checkoutPkg.price_usd_cents / 100).toFixed(2)}
+              {checkoutPkg.price_brl_cents && (
+                <> · R${(checkoutPkg.price_brl_cents / 100).toFixed(2)} via PIX</>
+              )}
+            </p>
+
+            {error && (
+              <div className="mt-3 border-2 border-red-500/40 bg-red-500/10 p-2 text-center">
+                <p className="text-[10px] text-red-400 normal-case">{error}</p>
+              </div>
+            )}
+
+            <div className="mt-4">
+              {(() => {
+                const methods: PaymentMethodOption<PayMethod>[] = [
+                  { id: "card", label: "Card" },
+                  { id: "pix", label: "PIX", visible: isBR && !!checkoutPkg.price_brl_cents },
+                  { id: "gitc", label: "GITC", visible: gitcEnabled },
+                ];
+                const visibleIds = methods.filter((m) => m.visible !== false).map((m) => m.id);
+                const safeSelected = visibleIds.includes(payMethod) ? payMethod : visibleIds[0];
+
+                return (
+                  <PaymentMethodTabs<PayMethod>
+                    methods={methods}
+                    selected={safeSelected}
+                    onChange={setPayMethod}
+                  >
+                    {safeSelected === "card" && (
+                      <button
+                        onClick={() => handleStripeBuy(checkoutPkg.id)}
+                        disabled={!!buying || !isAuthenticated}
+                        className="btn-press w-full py-3 text-sm text-bg disabled:opacity-40 transition-all cursor-pointer"
+                        style={{
+                          backgroundColor: "#c8e64a",
+                          boxShadow: "2px 2px 0 0 #5a7a00",
+                        }}
+                      >
+                        {buying === checkoutPkg.id
+                          ? "Redirecting..."
+                          : `Pay $${(checkoutPkg.price_usd_cents / 100).toFixed(2)} with card`}
+                      </button>
+                    )}
+
+                    {safeSelected === "pix" && checkoutPkg.price_brl_cents && (
+                      <button
+                        onClick={() => handlePixBuy(checkoutPkg.id)}
+                        disabled={!!buying || !isAuthenticated}
+                        className="btn-press w-full py-3 text-sm transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                        style={{
+                          backgroundColor: "transparent",
+                          border: "2px solid #c8e64a",
+                          color: "#c8e64a",
+                          boxShadow: "2px 2px 0 0 #5a7a00",
+                        }}
+                      >
+                        {buying === checkoutPkg.id
+                          ? "Generating PIX..."
+                          : `Pay R$${(checkoutPkg.price_brl_cents / 100).toFixed(2)} with PIX`}
+                      </button>
+                    )}
+
+                    {safeSelected === "gitc" && (
+                      <GitcPayButton
+                        disabled={!!buying}
+                        onError={(msg) => setError(msg)}
+                        onRequestQuote={async (wallet) => {
+                          const res = await fetch("/api/pixels/checkout/gitc-quote", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ package_id: checkoutPkg.id, wallet }),
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          if (!res.ok) throw new Error(data.error || "Could not get a quote");
+                          return {
+                            quoteId: data.quoteId,
+                            gitcAmountWei: data.gitcAmountWei,
+                            redirectUrl: `/pixels?pixels_purchased=${encodeURIComponent(checkoutPkg.id)}`,
+                          };
+                        }}
+                        onConfirm={async ({ quoteId, txHash }) => {
+                          const res = await fetch("/api/pixels/checkout/gitc-confirm", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ quoteId, txHash }),
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          return { ok: res.ok, error: data.error };
+                        }}
+                      />
+                    )}
+                  </PaymentMethodTabs>
+                );
+              })()}
+            </div>
+
+            <p className="mt-3 text-center text-[9px] text-muted normal-case">
+              {payMethod === "card" && "One-time payment via Stripe."}
+              {payMethod === "pix" && "Brazilian PIX via AbacatePay."}
+              {payMethod === "gitc" && "GITC sent on Base."}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

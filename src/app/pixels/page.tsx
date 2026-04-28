@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getBalance } from "@/lib/pixels";
@@ -12,6 +13,9 @@ export const metadata: Metadata = {
 };
 
 export default async function PixelsPage() {
+  const h = await headers();
+  const country = h.get("x-vercel-ip-country") ?? h.get("cf-ipcountry") ?? null;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -99,6 +103,7 @@ export default async function PixelsPage() {
           balance={balance}
           isAuthenticated={!!devId}
           githubLogin={githubLogin}
+          serverCountry={country}
         />
 
         {/* What you can buy */}

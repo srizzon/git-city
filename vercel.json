@@ -12,6 +12,7 @@
     { "path": "/api/cron/jobs-weekly-report",   "schedule": "0 10 * * 1" },
     { "path": "/api/cron/jobs-weekly-digest",   "schedule": "0 11 * * 1" },
     { "path": "/api/cron/jobs-notify-signups",  "schedule": "0 12 * * *" },
-    { "path": "/api/cron/jobs-flush-application-emails", "schedule": "*/15 * * * *" }
+    { "path": "/api/cron/jobs-flush-application-emails", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/gitc-cleanup",                  "schedule": "0 4 * * *" }
   ]
 }

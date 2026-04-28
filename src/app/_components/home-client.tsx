@@ -1955,6 +1955,69 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     searchUser();
   };
 
+  const adminAddDeveloper = useCallback(async (login: string) => {
+    const trimmed = login.trim().toLowerCase();
+    if (!trimmed) return;
+
+    const res = await fetch("/api/admin/dev/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: trimmed }),
+    });
+    const devData = await res.json();
+    if (!res.ok) {
+      throw new Error(devData?.error ?? "Failed to add developer");
+    }
+
+    const refreshedLogin = (devData.github_login ?? trimmed).toLowerCase();
+    const existedBefore = rawDevsRef.current.some(
+      (d) => d.github_login?.toLowerCase() === refreshedLogin,
+    );
+    const existingDev = rawDevsRef.current.find(
+      (d) => d.github_login?.toLowerCase() === refreshedLogin,
+    );
+    const syncedDev = {
+      ...(existingDev ?? {}),
+      ...devData,
+      owned_items: existingDev?.owned_items ?? [],
+      achievements: existingDev?.achievements ?? [],
+      loadout: existingDev?.loadout ?? null,
+      custom_color: existingDev?.custom_color ?? null,
+      billboard_images: existingDev?.billboard_images ?? [],
+      active_raid_tag: existingDev?.active_raid_tag ?? null,
+      kudos_count: devData.kudos_count ?? existingDev?.kudos_count ?? 0,
+      visit_count: devData.visit_count ?? existingDev?.visit_count ?? 0,
+      app_streak: devData.app_streak ?? existingDev?.app_streak ?? 0,
+      raid_xp: devData.raid_xp ?? existingDev?.raid_xp ?? 0,
+      rabbit_completed: devData.rabbit_completed ?? existingDev?.rabbit_completed ?? false,
+      xp_total: devData.xp_total ?? existingDev?.xp_total ?? 0,
+      xp_level: devData.xp_level ?? existingDev?.xp_level ?? 1,
+    };
+    rawDevsRef.current = existedBefore
+      ? rawDevsRef.current.map((d) =>
+        d.github_login?.toLowerCase() === refreshedLogin ? syncedDev : d
+      )
+      : [...rawDevsRef.current, syncedDev];
+
+    const layout = generateCityLayout(rawDevsRef.current);
+    mergeDrops(layout.buildings);
+    setBuildings(layout.buildings);
+    setPlazas(layout.plazas);
+    setDecorations(layout.decorations);
+    setRiver(layout.river);
+    setBridges(layout.bridges);
+    setDistrictZones(layout.districtZones);
+    setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+
+    setInvitePreview(null);
+    setFocusedBuilding(devData.github_login);
+    const foundBuilding = layout.buildings.find(
+      (b) => b.login.toLowerCase() === refreshedLogin,
+    );
+    if (foundBuilding) setSelectedBuilding(foundBuilding);
+    setExploreMode(true);
+  }, [stats, mergeDrops]);
+
   const handleSignIn = handleSignInWithRef;
 
   const handleSignOut = async () => {
@@ -5096,8 +5159,10 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         <InviteCard
           developer={invitePreview}
           isLoggedIn={!!session}
+          isAdmin={isAdmin}
           onLogin={handleSignIn}
           onClose={() => setInvitePreview(null)}
+          onAdminAdd={isAdmin ? adminAddDeveloper : undefined}
           accent={theme.accent}
           shadow={theme.shadow}
         />
