@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useAccount,
   useDisconnect,
@@ -116,10 +116,17 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
     }
   }, [address, status, resetWrite]);
 
+  // Tracks whether a verification cycle is already in flight. Prevents the
+  // effect from spawning duplicates when re-runs are triggered by setState
+  // calls inside the async loop. Reset only on terminal outcomes.
+  const verifyingRef = useRef(false);
+  // Tracks live mount; we never want to setState after unmount.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   // Once the receipt arrives, ask the backend to verify and activate.
-  // We retry transient errors (await confirms, network) automatically so a
-  // user who has already paid on-chain doesn't lose their payment to a UI
-  // race condition.
+  // Transient errors (await confirms, network, rate-limit) auto-retry so a
+  // user who has already paid on-chain never loses the payment to a UI race.
   useEffect(() => {
     if (status.kind !== "confirming") return;
     if (receiptError) {
@@ -127,10 +134,12 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
       return;
     }
     if (!receipt) return;
+    if (verifyingRef.current) return;
+    verifyingRef.current = true;
+
     const current = status;
     setStatus({ ...current, kind: "verifying" });
 
-    let cancelled = false;
     const recoverable: Recoverable = {
       quoteId: current.quoteId,
       gitcAmountWei: current.gitcAmountWei,
@@ -153,52 +162,58 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
     const MAX_ATTEMPTS = 8; // ~80s at 10s spacing — covers Base reorgs
     const RETRY_MS = 10_000;
 
+    function safeSetStatus(next: Status) {
+      if (!mountedRef.current) return;
+      setStatus(next);
+    }
+
     (async () => {
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        if (cancelled) return;
-        try {
-          const result = await onConfirm({
-            quoteId: current.quoteId,
-            txHash: current.txHash,
-          });
-          if (cancelled) return;
-          if (result.ok) {
-            setStatus({
-              kind: "done",
-              gitcAmountWei: current.gitcAmountWei,
-              redirect: current.redirect,
+      try {
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          try {
+            const result = await onConfirm({
+              quoteId: current.quoteId,
+              txHash: current.txHash,
+            });
+            if (result.ok) {
+              safeSetStatus({
+                kind: "done",
+                gitcAmountWei: current.gitcAmountWei,
+                redirect: current.redirect,
+              });
+              return;
+            }
+            if (
+              result.error &&
+              isTransient(result.error) &&
+              attempt < MAX_ATTEMPTS
+            ) {
+              await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+              continue;
+            }
+            safeSetStatus({
+              kind: "error",
+              message: result.error || "Verification failed",
+              recoverable,
+            });
+            return;
+          } catch {
+            if (attempt < MAX_ATTEMPTS) {
+              await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+              continue;
+            }
+            safeSetStatus({
+              kind: "error",
+              message: "Network error during verification",
+              recoverable,
             });
             return;
           }
-          if (result.error && isTransient(result.error) && attempt < MAX_ATTEMPTS) {
-            await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
-            continue;
-          }
-          setStatus({
-            kind: "error",
-            message: result.error || "Verification failed",
-            recoverable,
-          });
-          return;
-        } catch {
-          if (cancelled) return;
-          if (attempt < MAX_ATTEMPTS) {
-            await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
-            continue;
-          }
-          setStatus({
-            kind: "error",
-            message: "Network error during verification",
-            recoverable,
-          });
-          return;
         }
+      } finally {
+        verifyingRef.current = false;
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [receipt, receiptError, status, onConfirm]);
 
   const insufficient = useMemo(() => {

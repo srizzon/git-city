@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GitcPayButton } from "@/components/GitcPayButton";
 import { PaymentMethodTabs, type PaymentMethodOption } from "@/components/PaymentMethodTabs";
@@ -217,6 +218,16 @@ export default function PixelsStoreClient({
   const [checkoutPkgId, setCheckoutPkgId] = useState<string | null>(null);
   const [payMethod, setPayMethod] = useState<PayMethod>("card");
   const [isBR, setIsBR] = useState(false);
+  const router = useRouter();
+
+  /** Refresh the server-rendered balance + re-fetch any in-flight purchase state. */
+  const refreshBalance = useCallback(() => {
+    fetch("/api/pixels/balance")
+      .then((r) => r.json())
+      .then((d) => setCurrentBalance(d.balance ?? 0))
+      .catch(() => {});
+    router.refresh();
+  }, [router]);
 
   // BR detection: server header (Vercel) → timezone → language fallback.
   useEffect(() => {
@@ -437,7 +448,12 @@ export default function PixelsStoreClient({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
           onClick={(e) => {
-            if (e.target === e.currentTarget && !buying) setCheckoutPkgId(null);
+            if (e.target === e.currentTarget && !buying) {
+              setCheckoutPkgId(null);
+              // Defensive: if the user closes the modal mid-verification,
+              // refresh in case the backend completed the credit anyway.
+              refreshBalance();
+            }
           }}
         >
           <div className="w-full max-w-sm border-[3px] border-border bg-bg p-5 sm:p-6">
@@ -449,7 +465,11 @@ export default function PixelsStoreClient({
                 </span>
               </h3>
               <button
-                onClick={() => !buying && setCheckoutPkgId(null)}
+                onClick={() => {
+                  if (buying) return;
+                  setCheckoutPkgId(null);
+                  refreshBalance();
+                }}
                 className="text-sm text-muted transition-colors hover:text-cream cursor-pointer"
               >
                 &times;
@@ -544,6 +564,15 @@ export default function PixelsStoreClient({
                             body: JSON.stringify({ quoteId, txHash }),
                           });
                           const data = await res.json().catch(() => ({}));
+                          if (res.ok) {
+                            // Close the modal, show banner, and pull the new
+                            // balance from the server so the user sees the
+                            // updated PX immediately — no manual reload.
+                            setError(null);
+                            setSuccessPkg(checkoutPkg.id);
+                            setCheckoutPkgId(null);
+                            refreshBalance();
+                          }
                           return { ok: res.ok, error: data.error };
                         }}
                       />
