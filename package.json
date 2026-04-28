@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "dev": "next dev -p 3001 --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write .",
