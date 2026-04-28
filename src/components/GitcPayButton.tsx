@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   useAccount,
+  useDisconnect,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -63,6 +64,7 @@ export function GitcPayButton(props: GitcPayButtonProps) {
 
 function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: GitcPayButtonProps) {
   const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
   const { open } = useAppKit();
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
@@ -200,6 +202,12 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
     setStatus({ kind: "idle" });
   }
 
+  function handleSwitchWallet() {
+    resetWrite();
+    setStatus({ kind: "idle" });
+    disconnect();
+  }
+
   useEffect(() => {
     if (status.kind !== "done") return;
     const t = setTimeout(() => {
@@ -262,6 +270,7 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
   }
 
   if (status.kind === "ready" || status.kind === "signing") {
+    const shortAddress = status.wallet.slice(0, 6) + "…" + status.wallet.slice(-4);
     return (
       <div className="flex flex-col gap-1.5">
         <div className="border-2 border-border bg-bg-raised px-2.5 py-2 text-[10px] normal-case">
@@ -276,6 +285,18 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
             <span className={insufficient ? "" : "text-cream"} style={insufficient ? { color: DEAD } : undefined}>
               {formatGitcAmount(balance)} GITC
             </span>
+          </div>
+          <div className="mt-0.5 flex items-baseline justify-between text-[9px]">
+            <span className="text-dim">Wallet</span>
+            <button
+              type="button"
+              onClick={handleSwitchWallet}
+              disabled={status.kind === "signing"}
+              className="text-[9px] text-muted underline normal-case hover:text-cream"
+              title="Disconnect this wallet and pick another"
+            >
+              {shortAddress} · switch
+            </button>
           </div>
           <p className="mt-2 text-[9px] text-dim">
             Quote valid 5 min · sent to Git City treasury on Base · wallet linked to your account.
@@ -319,15 +340,29 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
     );
   }
 
+  // idle / quoting — connected, awaiting quote request
+  const shortConnectedAddress = address
+    ? address.slice(0, 6) + "…" + address.slice(-4)
+    : "";
   return (
-    <button
-      type="button"
-      onClick={handleQuote}
-      disabled={disabled || status.kind === "quoting"}
-      className="btn-press w-full py-2.5 text-xs transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-      style={accentButtonStyle}
-    >
-      {status.kind === "quoting" ? "Fetching quote..." : `Pay with GITC${discountLabel}`}
-    </button>
+    <div className="flex flex-col gap-1.5">
+      <button
+        type="button"
+        onClick={handleSwitchWallet}
+        className="self-end text-[9px] text-muted underline normal-case hover:text-cream"
+        title="Disconnect this wallet and pick another"
+      >
+        {shortConnectedAddress} · switch
+      </button>
+      <button
+        type="button"
+        onClick={handleQuote}
+        disabled={disabled || status.kind === "quoting"}
+        className="btn-press w-full py-2.5 text-xs transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+        style={accentButtonStyle}
+      >
+        {status.kind === "quoting" ? "Fetching quote..." : `Pay with GITC${discountLabel}`}
+      </button>
+    </div>
   );
 }
