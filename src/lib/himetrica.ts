@@ -98,6 +98,16 @@ export function trackAdvertiseCtaClick() {
   hm()?.track("advertise_cta_click");
 }
 
+// ─── Sponsorship Funnel ─────────────────────────────────────
+
+export function trackSponsorshipPageView(source?: string) {
+  hm()?.track("sponsorship_page_view", { source });
+}
+
+export function trackSponsorshipCtaClick(cta?: string) {
+  hm()?.track("sponsorship_cta_click", { cta });
+}
+
 // ─── Engagement ─────────────────────────────────────────────
 
 export function trackBuildingClicked(target_login: string) {
