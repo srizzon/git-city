@@ -85,6 +85,19 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
   const { disconnect } = useDisconnect();
   const { open } = useAppKit();
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [caCopied, setCaCopied] = useState(false);
+
+  async function handleCopyCa() {
+    try {
+      await navigator.clipboard.writeText(GITC_ADDRESS);
+      setCaCopied(true);
+      setTimeout(() => setCaCopied(false), 1800);
+    } catch {
+      // clipboard blocked — fall back to a no-op; user can long-press / select the text.
+    }
+  }
+
+  const shortCa = `${GITC_ADDRESS.slice(0, 6)}…${GITC_ADDRESS.slice(-4)}`;
 
   const { data: balanceData } = useReadContract({
     address: GITC_ADDRESS,
@@ -470,6 +483,31 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
               ? "Insufficient GITC"
               : `Pay ${gitcLabel} (${usdLabel})`}
         </button>
+        {insufficient && (
+          <button
+            type="button"
+            onClick={handleCopyCa}
+            className="flex w-full items-center justify-center gap-1.5 border-2 border-border bg-bg-raised px-2.5 py-2 text-[10px] text-muted normal-case hover:border-lime hover:text-lime transition-colors cursor-pointer"
+            title="Copy GITC contract address"
+          >
+            {caCopied ? (
+              <>
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+                </svg>
+                <span>CA copied</span>
+              </>
+            ) : (
+              <>
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <rect x="2" y="2" width="9" height="9" stroke="currentColor" strokeWidth="1.5" />
+                  <rect x="5" y="5" width="9" height="9" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+                <span>Copy GITC CA · {shortCa}</span>
+              </>
+            )}
+          </button>
+        )}
         {!insufficient && (
           <button
             type="button"
