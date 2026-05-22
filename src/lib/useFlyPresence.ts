@@ -49,6 +49,14 @@ export interface KillFeedEntry {
   at: number;
 }
 
+/** Latest server-issued respawn the VehicleFlight should teleport to. */
+export interface PendingRespawn {
+  x: number;
+  y: number;
+  z: number;
+  at: number; // Date.now() when the respawn msg arrived
+}
+
 export interface SelfPvpState {
   hp: number;
   pvpEnabled: boolean;
@@ -108,6 +116,7 @@ export function useFlyPresence(
   pilotsRef: React.MutableRefObject<Map<string, RemotePilot>>;
   projectilesRef: React.MutableRefObject<Map<string, ActiveProjectile>>;
   selfStateRef: React.MutableRefObject<SelfPvpState>;
+  pendingRespawnRef: React.MutableRefObject<PendingRespawn | null>;
   selfId: string | null;
   pvpEnabled: boolean;
   sendMove: (x: number, y: number, z: number, yaw: number, bank: number) => void;
@@ -117,6 +126,7 @@ export function useFlyPresence(
 } {
   const pilotsRef = useRef<Map<string, RemotePilot>>(new Map());
   const projectilesRef = useRef<Map<string, ActiveProjectile>>(new Map());
+  const pendingRespawnRef = useRef<PendingRespawn | null>(null);
   const selfStateRef = useRef<SelfPvpState>({
     hp: 3,
     pvpEnabled: readPvpPreference(),
@@ -253,12 +263,14 @@ export function useFlyPresence(
       }
 
       if (msg.type === "hit") {
+        console.log(
+          `[FORCE PUSH] server hit msg → target=${msg.targetId.slice(0, 8)} shooter=${msg.shooterId.slice(0, 8)} newHp=${msg.newHp} (me=${meId?.slice(0, 8)})`,
+        );
         if (meId && msg.targetId === meId) {
           selfStateRef.current.hp = msg.newHp;
           selfStateRef.current.lastAttackerId = msg.shooterId;
           selfStateRef.current.lastAttackerAt = Date.now();
           selfStateRef.current.lastDamageAt = Date.now();
-          // Capture attacker position for the damage-direction indicator
           const attacker = pilotsRef.current.get(msg.shooterId);
           if (attacker) {
             selfStateRef.current.lastAttackerX = attacker.x;
@@ -271,6 +283,9 @@ export function useFlyPresence(
       }
 
       if (msg.type === "kill") {
+        console.log(
+          `[FORCE PUSH] server kill msg → killer=${msg.killerLogin} victim=${msg.victimLogin} hh=${msg.happyHour} (me=${meId?.slice(0, 8)})`,
+        );
         // Always add to the kill feed — every player sees who killed who.
         const killerWasSelf = meId === msg.killerId;
         const victimWasSelf = meId === msg.victimId;
@@ -320,10 +335,22 @@ export function useFlyPresence(
       }
 
       if (msg.type === "respawn") {
+        console.log(
+          `[FORCE PUSH] server respawn msg → id=${msg.id.slice(0, 8)} at=(${msg.x.toFixed(0)},${msg.z.toFixed(0)}) (me=${meId?.slice(0, 8)})`,
+        );
         if (meId && msg.id === meId) {
           selfStateRef.current.hp = 3;
           selfStateRef.current.downedUntil = 0;
           selfStateRef.current.invulnUntil = msg.invulnUntil;
+          // Signal VehicleFlight to teleport the local vehicle to the
+          // server-issued respawn position. Without this the player
+          // keeps flying wherever they died.
+          pendingRespawnRef.current = {
+            x: msg.x,
+            y: msg.y,
+            z: msg.z,
+            at: Date.now(),
+          };
         } else {
           const target = pilotsRef.current.get(msg.id);
           if (target) {
@@ -448,6 +475,7 @@ export function useFlyPresence(
     pilotsRef,
     projectilesRef,
     selfStateRef,
+    pendingRespawnRef,
     selfId,
     pvpEnabled,
     sendMove,

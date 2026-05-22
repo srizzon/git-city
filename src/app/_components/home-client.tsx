@@ -747,6 +747,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     sendShoot: flySendShoot,
     reportHit: flyReportHit,
     togglePvp: flyTogglePvp,
+    pendingRespawnRef: flyPendingRespawnRef,
   } = useFlyPresence(
     flyMode,
     authLogin,
@@ -2528,6 +2529,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         flyOnShoot={flySendShoot}
         flyOnReportHit={flyReportHit}
         flyPvpEnabled={flyPvpEnabled}
+        flyPendingRespawnRef={flyPendingRespawnRef}
       />
       {flyMode && (
         <PvPHud

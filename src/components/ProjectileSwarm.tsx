@@ -10,9 +10,10 @@ import type { ActiveProjectile, RemotePilot, SelfPvpState } from "@/lib/useFlyPr
 // stays ~960u (more than enough across city blocks).
 const PROJECTILE_SPEED = 1200;
 const PROJECTILE_LIFE_MS = 800;
-const HIT_RADIUS = 14;
+const HIT_RADIUS = 18;
 const MUZZLE_FLASH_MS = 120;
 const HIT_THROTTLE_MS = 200;
+const DEBUG_HITS = true; // TEMP: log to console while debugging hit registration
 
 interface Props {
   projectilesRef: React.MutableRefObject<Map<string, ActiveProjectile>>;
@@ -98,22 +99,52 @@ export default function ProjectileSwarm({ projectilesRef, pilotsRef, selfStateRe
         flashIdx++;
       }
 
-      // ─── Local hit detection (shooter authority) ──────────
+      // ─── Local swept hit detection (shooter authority) ────
+      // At 1200 u/s the projectile advances ~19u per 60fps frame, which
+      // is wider than HIT_RADIUS. A point-only check at nextX/Y/Z would
+      // skip over targets sitting between p.{x,y,z} and next{X,Y,Z}.
+      // Instead, project each target onto the segment p→next and use
+      // the closest point on that segment for the distance check.
       if (selfId && p.shooterId === selfId) {
+        const segDx = nextX - p.x;
+        const segDy = nextY - p.y;
+        const segDz = nextZ - p.z;
+        const segLenSq = segDx * segDx + segDy * segDy + segDz * segDz;
+        const safeSegLenSq = segLenSq > 0.0001 ? segLenSq : 1;
+
         for (const [targetId, target] of pilotsRef.current) {
           if (!target.pvpEnabled) continue;
           if (target.hp <= 0) continue;
           if (target.invulnUntil > now) continue;
-          const dx = nextX - target.x;
-          const dy = nextY - target.y;
-          const dz = nextZ - target.z;
-          const distSq = dx * dx + dy * dy + dz * dz;
+
+          // Project the target onto the segment, clamp t in [0,1]
+          const tdx = target.x - p.x;
+          const tdy = target.y - p.y;
+          const tdz = target.z - p.z;
+          let t = (tdx * segDx + tdy * segDy + tdz * segDz) / safeSegLenSq;
+          if (t < 0) t = 0;
+          if (t > 1) t = 1;
+
+          const cpx = p.x + segDx * t;
+          const cpy = p.y + segDy * t;
+          const cpz = p.z + segDz * t;
+
+          const ddx = target.x - cpx;
+          const ddy = target.y - cpy;
+          const ddz = target.z - cpz;
+          const distSq = ddx * ddx + ddy * ddy + ddz * ddz;
+
           if (distSq < HIT_RADIUS * HIT_RADIUS) {
             const lastReport = recentHits.current.get(targetId) ?? 0;
             if (now - lastReport > HIT_THROTTLE_MS) {
               recentHits.current.set(targetId, now);
               reportHit(targetId);
               selfStateRef.current.lastHitConfirmedAt = now;
+              if (DEBUG_HITS) {
+                console.log(
+                  `[FORCE PUSH] HIT confirmed → target=${targetId.slice(0, 8)} dist=${Math.sqrt(distSq).toFixed(1)}u target=(${target.x.toFixed(0)},${target.z.toFixed(0)}) shooter=(${p.x.toFixed(0)},${p.z.toFixed(0)})`,
+                );
+              }
               projectilesRef.current.delete(pid);
               break;
             }

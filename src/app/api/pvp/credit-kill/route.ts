@@ -18,18 +18,24 @@ function getAllowedOrigins(): string[] {
   if (explicit) set.add(explicit);
   const vercel = process.env.VERCEL_URL;
   if (vercel) set.add(`https://${vercel}`);
-  if (process.env.NODE_ENV !== "production") {
-    set.add("http://localhost:3000");
-    set.add("http://127.0.0.1:3000");
-  }
   return [...set];
 }
 
+const LOCALHOST_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/;
+
 function isAllowedOrigin(origin: string | null, referer: string | null): boolean {
-  const allowed = getAllowedOrigins();
-  if (allowed.length === 0) return true; // misconfigured env should not block prod; rely on cookie auth
-  const candidates = [origin, referer].filter((v): v is string => typeof v === "string" && v.length > 0);
+  const candidates = [origin, referer].filter(
+    (v): v is string => typeof v === "string" && v.length > 0,
+  );
   if (candidates.length === 0) return false;
+
+  // Dev: accept any localhost / 127.0.0.1 port (Next may pick 3001+ if 3000 is taken)
+  if (process.env.NODE_ENV !== "production") {
+    if (candidates.some((c) => LOCALHOST_RE.test(c))) return true;
+  }
+
+  const allowed = getAllowedOrigins();
+  if (allowed.length === 0) return true; // misconfigured env should not block prod; cookie auth still required
   return candidates.some((c) => allowed.some((a) => c.startsWith(a)));
 }
 

@@ -29,7 +29,7 @@ import LocalizedFireworks from "./LocalizedFireworks";
 import WallpaperParallax from "./WallpaperParallax";
 import ThemeSkyFX from "./ThemeSkyFX";
 import RemotePilots from "./RemotePilots";
-import type { RemotePilot, ActiveProjectile, SelfPvpState } from "@/lib/useFlyPresence";
+import type { RemotePilot, ActiveProjectile, SelfPvpState, PendingRespawn } from "@/lib/useFlyPresence";
 import ProjectileSwarm from "./ProjectileSwarm";
 import { usePerfMode } from "@/lib/perfMode";
 
@@ -606,7 +606,7 @@ const _idealLook = new THREE.Vector3();
 const _blendedPos = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 
-function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, startPaused = false, vehicleType = "airplane", posRef, cityRadius = 3500, isMobile = false, onJoystickState, boostActive = false, brakeActive = false, onFlyMove, onShoot, canShoot = false }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; startPaused?: boolean; vehicleType?: string; posRef?: React.MutableRefObject<THREE.Vector3>; cityRadius?: number; isMobile?: boolean; onJoystickState?: (state: { baseX: number; baseY: number; dx: number; dy: number } | null) => void; boostActive?: boolean; brakeActive?: boolean; onFlyMove?: (x: number, y: number, z: number, yaw: number, bank: number) => void; onShoot?: (x: number, y: number, z: number, dirX: number, dirY: number, dirZ: number) => void; canShoot?: boolean }) {
+function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = false, startPaused = false, vehicleType = "airplane", posRef, cityRadius = 3500, isMobile = false, onJoystickState, boostActive = false, brakeActive = false, onFlyMove, onShoot, canShoot = false, pendingRespawnRef }: { onExit: () => void; onHud: (s: number, a: number, x: number, z: number, yaw: number) => void; onPause: (paused: boolean) => void; pauseSignal?: number; hasOverlay?: boolean; startPaused?: boolean; vehicleType?: string; posRef?: React.MutableRefObject<THREE.Vector3>; cityRadius?: number; isMobile?: boolean; onJoystickState?: (state: { baseX: number; baseY: number; dx: number; dy: number } | null) => void; boostActive?: boolean; brakeActive?: boolean; onFlyMove?: (x: number, y: number, z: number, yaw: number, bank: number) => void; onShoot?: (x: number, y: number, z: number, dirX: number, dirY: number, dirZ: number) => void; canShoot?: boolean; pendingRespawnRef?: React.MutableRefObject<PendingRespawn | null> }) {
   const { camera } = useThree();
   const ref = useRef<THREE.Group>(null);
   const orbitRef = useRef<any>(null);
@@ -627,6 +627,10 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
   // Camera smoothing
   const camPos = useRef(new THREE.Vector3(0, 140, 450));
   const camLook = useRef(new THREE.Vector3(0, 120, 400));
+
+  // Last applied respawn timestamp — used to detect a NEW respawn signal
+  // from the PartyKit server and teleport the local vehicle accordingly.
+  const lastAppliedRespawnAt = useRef(0);
 
   // Transition state
   const transitionProgress = useRef(1);
@@ -1047,6 +1051,14 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     }
 
     if (posRef) posRef.current.copy(pos.current);
+
+    // Apply pending respawn teleport (server-issued after a kill).
+    // We compare timestamps so we only teleport once per respawn event.
+    if (pendingRespawnRef?.current && pendingRespawnRef.current.at > lastAppliedRespawnAt.current) {
+      const r = pendingRespawnRef.current;
+      pos.current.set(r.x, r.y, r.z);
+      lastAppliedRespawnAt.current = r.at;
+    }
 
     // Broadcast position to multiplayer presence (throttled internally)
     onFlyMove?.(pos.current.x, pos.current.y, pos.current.z, yaw.current, bank.current);
@@ -2237,6 +2249,7 @@ interface Props {
   flyOnShoot?: (x: number, y: number, z: number, dirX: number, dirY: number, dirZ: number) => void;
   flyOnReportHit?: (targetId: string) => void;
   flyPvpEnabled?: boolean;
+  flyPendingRespawnRef?: React.MutableRefObject<PendingRespawn | null>;
   onCameraMove?: (x: number, z: number, tx: number, tz: number) => void;
 }
 
@@ -2261,7 +2274,7 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 // Downtown has no plaza, so district plazas start at index 0
 const RABBIT_PLAZA_INDICES = [0, 1, 3, 6, 9];
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, resolvedSponsors, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, onCameraMove }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, resolvedSponsors, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove }: Props) {
   const sponsors = resolvedSponsors ?? [];
   const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
   const prevComparePairRef = useRef<string>("");
@@ -2415,7 +2428,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
           {!introMode && flyMode && (
             <>
-              <VehicleFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} cityRadius={cityRadius} isMobile={isMobile} onJoystickState={onJoystickState} boostActive={flyBoostActive} brakeActive={flyBrakeActive} onFlyMove={onFlyMove} onShoot={flyOnShoot} canShoot={flyPvpEnabled === true} />
+              <VehicleFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} cityRadius={cityRadius} isMobile={isMobile} onJoystickState={onJoystickState} boostActive={flyBoostActive} brakeActive={flyBrakeActive} onFlyMove={onFlyMove} onShoot={flyOnShoot} canShoot={flyPvpEnabled === true} pendingRespawnRef={flyPendingRespawnRef} />
               <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={cityRadius} />
             </>
           )}
