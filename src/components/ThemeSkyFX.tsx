@@ -881,10 +881,13 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
     }, [themeIndex, streakGeo]);
 
     // ── Disc placement — elevation + azimuth, pushed to sky depth zone ─
+    // Camera spawns at (-800, _, -1000) looking toward E.Arcade (+X, +Z),
+    // so we put the disc in the +X, +Z quadrant → visible past the city
+    // from the initial view instead of hiding behind the camera.
     const discPos = useMemo(() => {
         const cfg = DISC_CFG[themeIndex];
         const elevRad = (cfg.elevDeg * Math.PI) / 180;
-        const azRad = Math.PI * 0.18; // slightly off-centre
+        const azRad = -Math.PI * 0.18; // slightly off-centre, in front of initial camera
         const d = skyD(cfg.dist); // always near camera.far → behind buildings
         return new THREE.Vector3(
             Math.cos(azRad) * Math.cos(elevRad) * d,

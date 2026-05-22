@@ -30,6 +30,7 @@ import WallpaperParallax from "./WallpaperParallax";
 import ThemeSkyFX from "./ThemeSkyFX";
 import RemotePilots from "./RemotePilots";
 import type { RemotePilot } from "@/lib/useFlyPresence";
+import { usePerfMode } from "@/lib/perfMode";
 
 // ─── Theme Definitions ───────────────────────────────────────
 
@@ -2194,8 +2195,18 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
   }, [buildings, focusedBuilding, focusedBuildingB]);
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
+  const { mode: perfMode, markDecline } = usePerfMode();
+  const lowPerf = perfMode === "low";
   const [dpr, setDpr] = useState(1);
   const [bloomEnabled, setBloomEnabled] = useState(false);
+
+  // Apply low-perf preset as soon as mode resolves (after mount)
+  useEffect(() => {
+    if (lowPerf) {
+      setDpr(0.75);
+      setBloomEnabled(false);
+    }
+  }, [lowPerf]);
   const flyPosRef = useRef(new THREE.Vector3());
 
   const cityRadius = useMemo(() => {
@@ -2217,8 +2228,16 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       {showPerf && <Stats />}
       <CityExposure cityEnergy={cityEnergy ?? 1} />
       <PerformanceMonitor
-        onIncline={() => { setDpr(1.25); setBloomEnabled(true); }}
-        onDecline={() => { setDpr(0.75); setBloomEnabled(false); }}
+        onIncline={() => {
+          if (lowPerf) return; // stay in low-perf preset; don't bump DPR or enable bloom
+          setDpr(1.25);
+          setBloomEnabled(true);
+        }}
+        onDecline={() => {
+          setDpr(lowPerf ? 0.6 : 0.75);
+          setBloomEnabled(false);
+          markDecline();
+        }}
       />
       <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
 
@@ -2372,6 +2391,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           liveByLogin={liveByLogin}
           cityEnergy={cityEnergy}
           dimAll={!!sponsorFocusPos}
+          lowPerf={lowPerf}
         />
 
       {!isCompareCinematicPlaying && (!focusedBuilding || !focusedBuildingB) && (
@@ -2399,7 +2419,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         </>
       )}
 
-      {bloomEnabled && (
+      {bloomEnabled && !lowPerf && (
         <EffectComposer multisampling={0}>
           <Bloom
             mipmapBlur

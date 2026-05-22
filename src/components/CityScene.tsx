@@ -80,6 +80,7 @@ interface CitySceneProps {
   liveByLogin?: Map<string, LiveSession>;
   cityEnergy?: number;
   dimAll?: boolean;
+  lowPerf?: boolean;
 }
 
 export default function CityScene({
@@ -98,6 +99,7 @@ export default function CityScene({
   liveByLogin,
   cityEnergy,
   dimAll,
+  lowPerf,
 }: CitySceneProps) {
   // Single atlas texture for all building windows (created once per theme)
   const atlasTexture = useMemo(() => createWindowAtlas(colors), [colors]);
@@ -201,6 +203,7 @@ export default function CityScene({
         introMode={introMode}
         flyMode={flyMode}
         ghostPreviewLogin={ghostPreviewLogin}
+        lowPerf={lowPerf}
       />
 
       {/* FocusBeacon: standalone, only when a building is focused */}

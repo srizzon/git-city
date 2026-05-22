@@ -91,6 +91,11 @@ const EFFECTS_RADIUS_HYSTERESIS = 380;
 const EFFECTS_UPDATE_INTERVAL = 0.3; // seconds
 const MAX_ACTIVE_EFFECTS = 25;
 
+// Low-perf preset: smaller bubble, fewer active components per frame.
+const LOW_PERF_RADIUS = 120;
+const LOW_PERF_RADIUS_HYSTERESIS = 160;
+const LOW_PERF_MAX_ACTIVE = 8;
+
 // ─── Component ─────────────────────────────────────────────────
 
 interface EffectsLayerProps {
@@ -104,6 +109,7 @@ interface EffectsLayerProps {
   introMode?: boolean;
   flyMode?: boolean;
   ghostPreviewLogin?: string | null;
+  lowPerf?: boolean;
 }
 
 export default function EffectsLayer({
@@ -117,7 +123,11 @@ export default function EffectsLayer({
   introMode,
   flyMode,
   ghostPreviewLogin,
+  lowPerf,
 }: EffectsLayerProps) {
+  const effectsRadius = lowPerf ? LOW_PERF_RADIUS : EFFECTS_RADIUS;
+  const effectsHysteresis = lowPerf ? LOW_PERF_RADIUS_HYSTERESIS : EFFECTS_RADIUS_HYSTERESIS;
+  const maxActiveEffects = lowPerf ? LOW_PERF_MAX_ACTIVE : MAX_ACTIVE_EFFECTS;
   const lastUpdate = useRef(-1);
   const activeSetRef = useRef(new Set<number>());
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
@@ -167,10 +177,10 @@ export default function EffectsLayer({
     prevCamTime.current = elapsed;
 
     // Wider hysteresis in fly mode so buildings stay active longer once loaded
-    const flyHyst = flyMode ? 450 : EFFECTS_RADIUS_HYSTERESIS;
+    const flyHyst = flyMode ? (lowPerf ? 220 : 450) : effectsHysteresis;
     const candidates = querySpatialGrid(grid, cx, cz, flyHyst);
 
-    const nearSq = EFFECTS_RADIUS * EFFECTS_RADIUS;
+    const nearSq = effectsRadius * effectsRadius;
     const farSq = flyHyst * flyHyst;
     const newSet = new Set<number>();
 
@@ -202,8 +212,8 @@ export default function EffectsLayer({
       if (fi !== undefined) newSet.add(fi);
     }
 
-    // Cap at MAX_ACTIVE_EFFECTS — keep closest buildings
-    if (newSet.size > MAX_ACTIVE_EFFECTS) {
+    // Cap at maxActiveEffects — keep closest buildings
+    if (newSet.size > maxActiveEffects) {
       const withDist = Array.from(newSet).map((idx) => {
         const b = buildings[idx];
         const dx = cx - b.position[0];
@@ -212,7 +222,7 @@ export default function EffectsLayer({
       });
       withDist.sort((a, b) => a.distSq - b.distSq);
       newSet.clear();
-      for (let i = 0; i < MAX_ACTIVE_EFFECTS && i < withDist.length; i++) {
+      for (let i = 0; i < maxActiveEffects && i < withDist.length; i++) {
         newSet.add(withDist[i].idx);
       }
       // Re-add focused buildings (always visible)
