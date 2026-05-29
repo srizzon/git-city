@@ -214,11 +214,21 @@ export default function EffectsLayer({
 
     // Cap at maxActiveEffects — keep closest buildings
     if (newSet.size > maxActiveEffects) {
+      const hysteresisBiasSq = Math.max(0, farSq - nearSq);
+      
       const withDist = Array.from(newSet).map((idx) => {
         const b = buildings[idx];
         const dx = cx - b.position[0];
         const dz = cz - b.position[2];
-        return { idx, distSq: dx * dx + dz * dz };
+        const actualDistSq = dx * dx + dz * dz;
+        
+        // Bias active buildings to reduce LOD churn near the cutoff boundary
+        const isActive = activeSetRef.current.has(idx);
+        const prioritizedDistSq = isActive 
+          ? Math.max(0, actualDistSq - hysteresisBiasSq) 
+          : actualDistSq;
+          
+        return { idx, distSq: prioritizedDistSq };
       });
       withDist.sort((a, b) => a.distSq - b.distSq);
       newSet.clear();
