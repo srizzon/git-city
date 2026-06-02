@@ -22,7 +22,8 @@ GRANT SELECT (
   timezone, last_active_at, city_theme,
   dailies_completed, dailies_streak, last_dailies_date,
   xp_total, xp_level, xp_github, xp_daily, xp_daily_date,
-  github_etag, suspended
+  -- github_etag created outside migration history; granted in 098_restore_prod_drift.sql
+  suspended
 ) ON developers TO anon, authenticated;
 
 -- Hidden columns: email, email_verified, email_updated_at, vscode_api_key_hash, vscode_api_key

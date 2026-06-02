@@ -99,13 +99,13 @@ ALTER FUNCTION find_auth_user_by_github_login(text) SET search_path = 'public';
 ALTER FUNCTION get_ad_daily_stats(date, date, text[]) SET search_path = 'public';
 ALTER FUNCTION get_ad_stats(date, date, text[]) SET search_path = 'public';
 ALTER FUNCTION get_auth_users_without_developer() SET search_path = 'public';
-ALTER FUNCTION get_endorsements_given_this_month(bigint) SET search_path = 'public';
+-- get_endorsements_given_this_month dropped in 060_drop_endorsements; nothing to harden.
 ALTER FUNCTION heartbeat_visitor(text) SET search_path = 'public';
 ALTER FUNCTION increment_hired_count(uuid) SET search_path = 'public';
 ALTER FUNCTION increment_job_counter(uuid, text) SET search_path = 'public';
-ALTER FUNCTION increment_kudos_count(bigint) SET search_path = 'public';
-ALTER FUNCTION increment_referral_count(bigint) SET search_path = 'public';
-ALTER FUNCTION increment_visit_count(bigint) SET search_path = 'public';
+-- increment_kudos_count / increment_referral_count / increment_visit_count were
+-- created outside the migration history (dashboard) and are missing on a fresh
+-- replay. Their definition + hardening lives in 098_restore_missing_functions.sql.
 ALTER FUNCTION recalculate_ranks() SET search_path = 'public';
 ALTER FUNCTION refresh_sky_ad_stats() SET search_path = 'public';
 ALTER FUNCTION spend_pixels(bigint, text, text, bigint, boolean, inet, text) SET search_path = 'public';
@@ -113,7 +113,7 @@ ALTER FUNCTION upsert_arcade_visit(uuid, uuid) SET search_path = 'public';
 
 -- SECURITY INVOKER functions (MEDIUM risk — run as caller, but still best practice)
 ALTER FUNCTION complete_all_dailies(bigint) SET search_path = 'public';
-ALTER FUNCTION count_devs_with_more_achievements(bigint) SET search_path = 'public';
+-- count_devs_with_more_achievements: see 098_restore_missing_functions.sql
 ALTER FUNCTION grant_streak_freeze(bigint) SET search_path = 'public';
 ALTER FUNCTION grant_xp(bigint, text, integer) SET search_path = 'public';
 ALTER FUNCTION increment_kudos_week(bigint, bigint) SET search_path = 'public';
@@ -121,7 +121,7 @@ ALTER FUNCTION perform_checkin(bigint) SET search_path = 'public';
 ALTER FUNCTION prevent_ledger_mutation() SET search_path = 'public';
 ALTER FUNCTION record_mission_progress(bigint, text, integer, integer) SET search_path = 'public';
 ALTER FUNCTION refresh_weekly_kudos() SET search_path = 'public';
-ALTER FUNCTION top_achievers(integer) SET search_path = 'public';
+-- top_achievers: see 098_restore_missing_functions.sql
 ALTER FUNCTION update_arcade_rooms_updated_at() SET search_path = 'public';
 ALTER FUNCTION update_job_updated_at() SET search_path = 'public';
 
@@ -145,13 +145,12 @@ REVOKE EXECUTE ON FUNCTION find_auth_user_by_github_login(text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION get_ad_daily_stats(date, date, text[]) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION get_ad_stats(date, date, text[]) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION get_auth_users_without_developer() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION get_endorsements_given_this_month(bigint) FROM PUBLIC;
+-- get_endorsements_given_this_month dropped in 060_drop_endorsements; nothing to revoke.
 REVOKE EXECUTE ON FUNCTION heartbeat_visitor(text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION increment_hired_count(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION increment_job_counter(uuid, text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION increment_kudos_count(bigint) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION increment_referral_count(bigint) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION increment_visit_count(bigint) FROM PUBLIC;
+-- increment_kudos_count / increment_referral_count / increment_visit_count:
+-- revoke lives in 098_restore_missing_functions.sql (see PART 5 note above).
 REVOKE EXECUTE ON FUNCTION recalculate_ranks() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION refresh_sky_ad_stats() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION spend_pixels(bigint, text, text, bigint, boolean, inet, text) FROM PUBLIC;
