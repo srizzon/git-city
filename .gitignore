@@ -73,3 +73,6 @@ packages/vscode-extension/*.vsix
 scripts/
 
 public/cozy/
+
+# Production schema dumps used for local bootstrapping (never commit prod artifacts)
+supabase/*.prod_schema.sql

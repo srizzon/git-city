@@ -1,0 +1,11 @@
+# Supabase local development state (do not commit)
+.branches
+.temp
+
+# Local schema dumps captured from production for bootstrapping
+*.prod_schema.sql
+
+# Environment files
+.env
+.env.local
+.env.*.local
