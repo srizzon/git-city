@@ -83,6 +83,57 @@ npm run dev
 
 Open [http://localhost:3001](http://localhost:3001) to see the city.
 
+## Local Supabase (no remote project needed)
+
+You can run the whole backend locally — no Supabase account, no GitHub OAuth app.
+
+**Prerequisites:** a container runtime and the Supabase CLI.
+
+```bash
+# macOS (Colima is a lightweight, free Docker alternative)
+brew install colima docker supabase/tap/supabase
+colima start
+
+# ...or use Docker Desktop instead of Colima, then just:
+# brew install supabase/tap/supabase
+```
+
+**Start the stack** (spins up Postgres/Auth/Storage/Studio and applies every
+migration from scratch):
+
+```bash
+supabase start          # first run pulls images; prints your local URL + keys
+supabase status         # re-print the URL and keys at any time
+```
+
+Point `.env.local` at the printed local values:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<Publishable key from `supabase status`>
+SUPABASE_SERVICE_ROLE_KEY=<Secret key from `supabase status`>
+```
+
+Then `npm run dev`. The city renders straight from your local database — no
+snapshot step needed in local dev.
+
+**Logging in (zero config):** the GitHub OAuth provider isn't configured for a
+local stack (it needs a client secret that can't ship in the repo). Instead,
+clicking **Sign in with GitHub** locally takes you to a built-in dev login —
+type any GitHub username and you're in, with a building created from that
+account. You can also go straight to
+[http://localhost:3001/api/dev/login](http://localhost:3001/api/dev/login).
+This route is automatically disabled in production.
+
+Useful commands:
+
+```bash
+supabase db reset       # re-apply all migrations on a clean database
+supabase stop           # shut the stack down (data is preserved)
+```
+
+Studio (DB browser) runs at [http://127.0.0.1:54323](http://127.0.0.1:54323).
+
 ## Environment Setup
 
 After copying `.env.example` to `.env.local`, fill in these values:
