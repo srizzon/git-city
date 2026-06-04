@@ -23,7 +23,7 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 // ─── i18n ─────────────────────────────────────────────────────
-type Lang = "en" | "pt";
+type Lang = "en" | "pt" | "zh-CN";
 
 const i18n: Record<Lang, {
   inTheCity: string;
@@ -51,6 +51,15 @@ const i18n: Record<Lang, {
     kudos: "KUDOS",
     cta: "Consegue me superar?",
     notFound: "Desenvolvedor nao encontrado",
+  },
+  "zh-CN": {
+    inTheCity: "城市排名",
+    commits: "提交",
+    repos: "仓库",
+    stars: "星标",
+    kudos: "赞赏",
+    cta: "你能超越他吗？",
+    notFound: "未找到开发者",
   },
 };
 
@@ -103,7 +112,14 @@ export async function GET(
 ) {
   const { username } = await params;
   const format = request.nextUrl.searchParams.get("format") ?? "landscape";
-  const lang = (request.nextUrl.searchParams.get("lang") === "pt" ? "pt" : "en") as Lang;
+  const langParam = request.nextUrl.searchParams.get("lang");
+
+  const lang: Lang =
+    langParam === "pt"
+      ? "pt"
+      : langParam === "zh-CN"
+        ? "zh-CN"
+        : "en";
 
   const fontData = await readFile(
     join(process.cwd(), "public/fonts/Silkscreen-Regular.ttf")
@@ -533,7 +549,26 @@ const TAUNTS: Record<Lang, { rank: [number, string][]; contribs: [number, string
       [50, "TODO ARRANHA-CEU COMEÇA EM ALGUM LUGAR"],
     ],
     fallback: "ACABEI DE CHEGAR. ME OBSERVE.",
-  },
+  },"zh-CN": {
+  rank: [
+    [5, "这片天际线归我管"],
+    [15, "站得高，看得远"],
+    [50, "你的楼我都看见了"],
+    [100, "我的电梯不到地下室"],
+    [250, "顶层住户专属"],
+    [500, "楼顶泳池了解一下"],
+    [1000, "睡觉都影响我冲榜"],
+  ],
+  contribs: [
+    [5000, "除了写代码，我没别的爱好"],
+    [2000, "你的楼能塞进我的大厅"],
+    [1000, "我的提交记录比你项目还长"],
+    [500, "高度直逼我的发际线"],
+    [200, "楼不高，但潜力无限"],
+    [50, "万丈高楼平地起"],
+  ],
+  fallback: "刚刚入住，未来可期。",
+}
 };
 
 function getTaunt(rank: number | null, contributions: number, lang: Lang): string {
