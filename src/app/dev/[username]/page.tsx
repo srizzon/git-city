@@ -10,6 +10,7 @@ import { TIER_COLORS } from "@/lib/achievements";
 import { inferDistrict } from "@/lib/github";
 import { ITEM_NAMES } from "@/lib/zones";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
+import { CITY_RANK_DESCRIPTION } from "@/lib/city-rank";
 import ClaimButton from "@/components/ClaimButton";
 import DeleteAccountButton from "@/components/DeleteAccountButton";
 import ShareButtons from "@/components/ShareButtons";
@@ -200,9 +201,19 @@ export default async function DevPage({ params }: Props) {
 
               {/* Rank Badge */}
               {dev.rank && (
-                <div className="mt-3 inline-block border-2 px-3 py-1 text-sm" style={{ borderColor: accent, color: accent }}>
-                  #{dev.rank} in the city
-                </div>
+                <>
+                  <div
+                    className="mt-3 inline-block border-2 px-3 py-1 text-sm"
+                    style={{ borderColor: accent, color: accent }}
+                    title={CITY_RANK_DESCRIPTION}
+                    aria-label={`Rank #${dev.rank} in the city. ${CITY_RANK_DESCRIPTION}`}
+                  >
+                    #{dev.rank} in the city
+                  </div>
+                  <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-muted normal-case sm:mx-0">
+                    {CITY_RANK_DESCRIPTION}
+                  </p>
+                </>
               )}
 
               {/* District badge */}

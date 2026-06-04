@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendNotificationAsync } from "@/lib/notifications";
 import { buildButton, buildStatsTable } from "@/lib/email-template";
+import { CITY_RANK_EMAIL_LABEL, CITY_RANK_SHORT_DESCRIPTION } from "@/lib/city-rank";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
           { label: "Current streak", value: `${dev.app_streak ?? 0} days` },
         ];
 
-        if (dev.rank) stats.push({ label: "City rank", value: `#${dev.rank}` });
+        if (dev.rank) stats.push({ label: CITY_RANK_EMAIL_LABEL, value: `#${dev.rank}` });
         if (achievements > 0) stats.push({ label: "Achievements unlocked", value: achievements });
         if (raids) {
           stats.push({ label: "Battles launched", value: raids.attacks });
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
           developerId: dev.id,
           dedupKey: `monthly_digest:${dev.id}:${yearMonth}`,
           title: `Your ${monthName} in Git City`,
-          body: `${monthName} recap: ${dev.contributions.toLocaleString()} total contributions, rank #${dev.rank ?? "?"}.`,
+          body: `${monthName} recap: ${dev.contributions.toLocaleString()} total contributions, rank #${dev.rank ?? "?"}. ${CITY_RANK_SHORT_DESCRIPTION}`,
           html: `
             <p style="color: #c8e64a; font-size: 16px;">Your ${monthName} in Git City</p>
             ${buildStatsTable(stats)}
