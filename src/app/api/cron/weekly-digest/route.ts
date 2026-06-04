@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendNotificationAsync } from "@/lib/notifications";
 import { buildButton, buildStatsTable } from "@/lib/email-template";
+import { CITY_RANK_EMAIL_LABEL, CITY_RANK_SHORT_DESCRIPTION } from "@/lib/city-rank";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
@@ -105,7 +106,7 @@ export async function GET(request: NextRequest) {
           stats.push({ label: "Achievements", value: weeklyAchievements });
         }
         if (dev.rank) {
-          stats.push({ label: "City rank", value: `#${dev.rank}` });
+          stats.push({ label: CITY_RANK_EMAIL_LABEL, value: `#${dev.rank}` });
         }
 
         sendNotificationAsync({
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
           developerId: dev.id,
           dedupKey: `weekly_digest:${dev.id}:${weekStartDate}`,
           title: `Your week in Git City: ${dev.app_streak ?? 0}-day streak, rank #${dev.rank ?? "?"}`,
-          body: `Streak: ${dev.app_streak ?? 0} days. Kudos: ${weeklyKudos}. Check your weekly recap.`,
+          body: `Streak: ${dev.app_streak ?? 0} days. Kudos: ${weeklyKudos}. ${CITY_RANK_SHORT_DESCRIPTION} Check your weekly recap.`,
           html: `
             <p style="color: #c8e64a; font-size: 16px;">Your week in Git City</p>
             ${buildStatsTable(stats)}
