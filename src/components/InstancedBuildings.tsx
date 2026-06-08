@@ -4,7 +4,7 @@ import { useRef, useMemo, useEffect, memo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
-import type { BuildingColors } from "./CityCanvas";
+import type { BuildingColors } from "@/config/themes";
 import { wasAdPointerConsumed } from "./SkyAds";
 
 // ─── Atlas Constants (must match Building3D.tsx) ───────────────

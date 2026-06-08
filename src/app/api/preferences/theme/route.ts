@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-const MAX_THEME = 3;
+import { getThemeKeys } from "@/config/themes";
+
+const MAX_THEME = getThemeKeys().length - 1;
 
 /**
  * GET /api/preferences/theme

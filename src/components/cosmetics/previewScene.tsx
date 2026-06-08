@@ -11,6 +11,8 @@ import { ClaimedGlow } from "@/components/Building3D";
 // a building with lit windows. Lets cosmetics be previewed exactly as they
 // look in the real city, across all 4 themes.
 
+import { THEMES } from "@/config/themes";
+
 export interface PreviewTheme {
   name: string;
   accent: string;
@@ -34,45 +36,28 @@ export interface PreviewTheme {
   roof: string;
 }
 
-// Subset of CityCanvas THEMES (same values) for the 4 themes.
-export const PREVIEW_THEMES: PreviewTheme[] = [
-  {
-    name: "Midnight", accent: "#6090e0",
-    sky: [[0, "#000206"], [0.3, "#061428"], [0.55, "#102850"], [0.8, "#061020"], [1, "#020608"]],
-    fogColor: "#0a1428", ambientColor: "#4060b0", ambientIntensity: 0.55,
-    sunColor: "#7090d0", sunIntensity: 0.75, sunPos: [300, 120, -200],
-    fillColor: "#304080", fillIntensity: 0.3, hemiSky: "#5080a0", hemiGround: "#202830", hemiIntensity: 0.5,
-    groundColor: "#242c38", grid: "#344050",
-    buildingFace: "#101828", windowLit: ["#a0c0f0", "#80a0e0", "#6080c8", "#c0d8f8", "#e0e8ff"], windowOff: "#0c0e18", roof: "#2a3858",
-  },
-  {
-    name: "Emerald", accent: "#f0c060",
-    sky: [[0, "#000804"], [0.3, "#002810"], [0.52, "#004828"], [0.75, "#002014"], [1, "#000604"]],
-    fogColor: "#0a2014", ambientColor: "#40a060", ambientIntensity: 0.55,
-    sunColor: "#70d090", sunIntensity: 0.75, sunPos: [300, 100, -250],
-    fillColor: "#20a080", fillIntensity: 0.35, hemiSky: "#50b068", hemiGround: "#183020", hemiIntensity: 0.5,
-    groundColor: "#1e3020", grid: "#2c4838",
-    buildingFace: "#0c1810", windowLit: ["#0e4429", "#006d32", "#26a641", "#39d353", "#c8e64a"], windowOff: "#060e08", roof: "#1e4028",
-  },
-  {
-    name: "Sunset", accent: "#c8e64a",
-    sky: [[0, "#0c0614"], [0.28, "#3a1850"], [0.52, "#d07060"], [0.62, "#f0b070"], [0.85, "#603030"], [1, "#180c10"]],
-    fogColor: "#80405a", ambientColor: "#e0a080", ambientIntensity: 0.7,
-    sunColor: "#f0b070", sunIntensity: 1.0, sunPos: [400, 120, -300],
-    fillColor: "#6050a0", fillIntensity: 0.35, hemiSky: "#d09080", hemiGround: "#4a2828", hemiIntensity: 0.55,
-    groundColor: "#3a3038", grid: "#504048",
-    buildingFace: "#281828", windowLit: ["#f8d880", "#f0b860", "#e89840", "#d07830", "#f0c060"], windowOff: "#1a1018", roof: "#604050",
-  },
-  {
-    name: "Neon", accent: "#e040c0",
-    sky: [[0, "#06001a"], [0.3, "#200440"], [0.52, "#500860"], [0.75, "#180230"], [1, "#06000c"]],
-    fogColor: "#1a0830", ambientColor: "#8040c0", ambientIntensity: 0.6,
-    sunColor: "#c050e0", sunIntensity: 0.85, sunPos: [300, 100, -200],
-    fillColor: "#00c0d0", fillIntensity: 0.4, hemiSky: "#9040d0", hemiGround: "#201028", hemiIntensity: 0.5,
-    groundColor: "#2c2038", grid: "#3c2c50",
-    buildingFace: "#180830", windowLit: ["#ff40c0", "#c040ff", "#00e0ff", "#40ff80", "#ff8040"], windowOff: "#0a0814", roof: "#3c1858",
-  },
-];
+export const PREVIEW_THEMES: PreviewTheme[] = Object.values(THEMES).map((t) => ({
+  name: t.name,
+  accent: t.accent,
+  sky: t.sky,
+  fogColor: t.fogColor,
+  ambientColor: t.ambientColor,
+  ambientIntensity: t.ambientIntensity,
+  sunColor: t.sunColor,
+  sunIntensity: t.sunIntensity,
+  sunPos: t.sunPos,
+  fillColor: t.fillColor,
+  fillIntensity: t.fillIntensity,
+  hemiSky: t.hemiSky,
+  hemiGround: t.hemiGround,
+  hemiIntensity: t.hemiIntensity,
+  groundColor: t.groundColor,
+  grid: t.grid1,
+  buildingFace: t.building.face,
+  windowLit: t.building.windowLit,
+  windowOff: t.building.windowOff,
+  roof: t.building.roof,
+}));
 
 // Deterministic pseudo-random for stable window pattern
 function rng(seed: number) {
