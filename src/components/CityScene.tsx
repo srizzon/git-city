@@ -11,7 +11,7 @@ import LiveDots from "./LiveDots";
 import DropBeacon from "./DropBeacon";
 import type { LiveSession } from "@/lib/useCodingPresence";
 import type { CityBuilding } from "@/lib/github";
-import type { BuildingColors } from "./CityCanvas";
+import type { BuildingColors } from "@/config/themes";
 
 const GRID_CELL_SIZE = 200;
 

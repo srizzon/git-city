@@ -14,18 +14,15 @@ import {
 
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), { ssr: false });
 
-const THEME_MAP: Record<string, number> = {
-  midnight: 0,
-  sunset: 1,
-  neon: 2,
-  emerald: 3,
-};
+import { getThemeKeys } from "@/config/themes";
 
 function WallpaperInner() {
   const params = useSearchParams();
 
   const themeParam = params.get("theme") ?? "emerald";
-  const themeIndex = THEME_MAP[themeParam] ?? 3;
+  const keys = getThemeKeys();
+  const normalized = themeParam.toLowerCase();
+  const themeName = keys.find(k => k.toLowerCase() === normalized) ?? "emerald";
 
   const speedParam = params.get("speed");
   const speed = speedParam ? Math.min(0.5, Math.max(0.05, parseFloat(speedParam) || 0.08)) : 0.08;
@@ -105,7 +102,7 @@ function WallpaperInner() {
       bridges={bridges}
       flyMode={false}
       onExitFly={() => {}}
-      themeIndex={themeIndex}
+      themeName={themeName}
       introMode={false}
       wallpaperMode
       wallpaperSpeed={speed}

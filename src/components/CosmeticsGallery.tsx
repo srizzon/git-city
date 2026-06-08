@@ -423,13 +423,13 @@ export default function CosmeticsGallery() {
                           </button>
                         )}
                       </div>
-                      <div className="pointer-events-auto flex items-center gap-1.5 border border-border bg-bg/70 px-1.5 py-1 backdrop-blur-sm">
+                      <div className="pointer-events-auto flex flex-wrap max-w-[120px] sm:max-w-[180px] md:max-w-none items-center justify-end gap-1 border border-border bg-bg/70 px-1.5 py-1 backdrop-blur-sm">
                         {PREVIEW_THEMES.map((th, i) => (
                           <button
                             key={th.name}
                             title={th.name}
                             onClick={() => setThemeIdx(i)}
-                            className={`h-3.5 w-3.5 rounded-full border ${themeIdx === i ? "border-cream" : "border-transparent"}`}
+                            className={`h-3 w-3 rounded-full border ${themeIdx === i ? "border-cream scale-110" : "border-transparent opacity-70 hover:opacity-100"}`}
                             style={{ background: th.accent }}
                           />
                         ))}

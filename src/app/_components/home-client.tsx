@@ -88,12 +88,13 @@ const LevelUpToast = dynamic(() => import("@/components/LevelUpToast"), { ssr: f
 // Feature flags — flip to switch milestone banner
 const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road to 1K, "devs" = total developers
 
-const THEMES = [
-  { name: "Emerald", accent: "#f0c060", shadow: "#806020" },
-  { name: "Midnight", accent: "#6090e0", shadow: "#203870" },
-  { name: "Sunset", accent: "#c8e64a", shadow: "#5a7a00" },
-  { name: "Neon", accent: "#e040c0", shadow: "#600860" },
-];
+import {
+  THEMES,
+  getThemeByKey,
+  getThemeIndexByKey,
+  getThemeKeyByIndex,
+  getThemeKeys,
+} from "@/config/themes";
 
 // Achievement display data for profile card (client-side, mirrors DB)
 const TIER_COLORS_MAP: Record<string, string> = {
@@ -523,16 +524,40 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [introMode, setIntroMode] = useState(false);
   const [introPhase, setIntroPhase] = useState(-1); // -1 = not started, 0-3 = text phases, 4 = done
   const [exploreMode, setExploreMode] = useState(false);
-  const [themeIndex, setThemeIndex] = useState(0);
+  const [themeName, setThemeName] = useState("emerald");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    
+    // 1. High priority: URL parameters (?theme=...)
+    const themeParam = searchParams.get("theme");
+    if (themeParam) {
+      const keys = getThemeKeys();
+      const normalized = themeParam.toLowerCase();
+      const matchedKey = keys.find(k => k.toLowerCase() === normalized);
+      if (matchedKey) {
+        setThemeName(matchedKey);
+        localStorage.setItem("gitcity_theme", matchedKey);
+        return;
+      }
+    }
+
+    // 2. Medium priority: localStorage
     const saved = localStorage.getItem("gitcity_theme");
     if (saved !== null) {
-      const n = parseInt(saved, 10);
-      if (n >= 0 && n <= 3) setThemeIndex(n);
+      if (/^\d+$/.test(saved)) {
+        const idx = parseInt(saved, 10);
+        const key = getThemeKeyByIndex(idx);
+        setThemeName(key);
+        localStorage.setItem("gitcity_theme", key);
+      } else {
+        const keys = getThemeKeys();
+        if (keys.includes(saved)) {
+          setThemeName(saved);
+        }
+      }
     }
-  }, []);
+  }, [searchParams]);
 
 
   // Merge active drops into a freshly generated layout (by rank)
@@ -782,7 +807,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
 
   const [isMobile, setIsMobile] = useState(false);
 
-  const theme = THEMES[themeIndex];
+  const theme = getThemeByKey(themeName);
   const didInit = useRef(false);
   const savedFocusRef = useRef<string | null>(null);
 
@@ -979,29 +1004,35 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     fetch("/api/preferences/theme")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data && typeof data.city_theme === "number" && data.city_theme >= 0 && data.city_theme <= 3) {
-          setThemeIndex(data.city_theme);
-          localStorage.setItem("gitcity_theme", String(data.city_theme));
+        if (data && typeof data.city_theme === "number" && data.city_theme >= 0 && data.city_theme < getThemeKeys().length) {
+          const key = getThemeKeyByIndex(data.city_theme);
+          setThemeName(key);
+          localStorage.setItem("gitcity_theme", key);
         }
       })
       .catch(() => { });
   }, [sessionUserId]);
 
+  const selectTheme = useCallback((key: string) => {
+    setThemeName(key);
+    localStorage.setItem("gitcity_theme", key);
+    if (sessionUserId) {
+      const idx = getThemeIndexByKey(key);
+      fetch("/api/preferences/theme", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city_theme: idx }),
+      }).catch(() => { });
+    }
+  }, [sessionUserId]);
+
   // Cycle theme: save to localStorage + sync to DB if logged in
   const cycleTheme = useCallback(() => {
-    setThemeIndex((i) => {
-      const next = (i + 1) % THEMES.length;
-      localStorage.setItem("gitcity_theme", String(next));
-      if (sessionUserId) {
-        fetch("/api/preferences/theme", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ city_theme: next }),
-        }).catch(() => { });
-      }
-      return next;
-    });
-  }, [sessionUserId]);
+    const keys = getThemeKeys();
+    const currentIndex = getThemeIndexByKey(themeName);
+    const nextIndex = (currentIndex + 1) % keys.length;
+    selectTheme(keys[nextIndex]);
+  }, [themeName, selectTheme]);
 
   // Save ?ref= to localStorage (7-day expiry)
   useEffect(() => {
@@ -2471,7 +2502,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             }
           }
         }}
-        themeIndex={themeIndex}
+        themeName={themeName}
         onHud={(s, a, x, z, yaw) => {
           setHud({ speed: s, altitude: a });
           setPlayerYaw(yaw);
@@ -3209,7 +3240,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             >
               <span style={{ color: theme.accent }}>&#9654;</span>
               <span className="text-cream">{theme.name}</span>
-              <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
+              <span className="text-dim">{getThemeIndexByKey(themeName) + 1}/{getThemeKeys().length}</span>
             </button>
             <div id="gc-radio-slot" />
           </div>
@@ -3837,16 +3868,17 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             {/* ── Theme ── */}
             <div className="border-t border-border px-5 py-4">
               <p className="mb-3 text-[10px] text-muted uppercase tracking-widest">Theme</p>
-              <div className="grid grid-cols-4 gap-2">
-                {THEMES.map((t, i) => (
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                {Object.entries(THEMES).map(([key, t]) => (
                   <button
-                    key={t.name}
-                    onClick={() => { setThemeIndex(i); try { localStorage.setItem("gitcity_theme", String(i)); } catch { } }}
-                    className="py-2.5 text-[10px] border-2 transition-colors"
+                    key={key}
+                    onClick={() => selectTheme(key)}
+                    className="py-2 text-[9px] border-2 transition-colors truncate px-1"
+                    title={t.name}
                     style={{
-                      borderColor: themeIndex === i ? t.accent : "var(--color-border)",
-                      color: themeIndex === i ? t.accent : "var(--color-muted)",
-                      backgroundColor: themeIndex === i ? t.accent + "18" : "transparent",
+                      borderColor: themeName === key ? t.accent : "var(--color-border)",
+                      color: themeName === key ? t.accent : "var(--color-muted)",
+                      backgroundColor: themeName === key ? t.accent + "18" : "transparent",
                     }}
                   >
                     {t.name}
@@ -5659,7 +5691,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           >
             <span style={{ color: theme.accent }}>&#9654;</span>
             <span className="text-cream">{theme.name}</span>
-            <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
+            <span className="text-dim">{getThemeIndexByKey(themeName) + 1}/{getThemeKeys().length}</span>
           </button>
           <div id="gc-radio-slot" suppressHydrationWarning />
           <button

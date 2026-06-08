@@ -3,43 +3,17 @@
 import { memo, useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { CityTheme } from "@/config/themes";
 
 // ─── Types ────────────────────────────────────────────────────
 
-type ThemeLike = {
-    sunPos: [number, number, number];
-    sunColor: string;
-    building: { windowLit: string[]; accent: string };
-};
-
 type Props = {
-    themeIndex: 0 | 1 | 2 | 3;
-    theme: ThemeLike;
+    theme: CityTheme;
 };
 
 // ─── Tunables ─────────────────────────────────────────────────
 
 const SKY_RADIUS = 1800;
-
-// Per-theme disc config (elevation degrees, distance, scale)
-// Kept separate from old STAR_COUNTS so old constants are not lost.
-const DISC_CFG = [
-    { elevDeg: 14, dist: 900, scale: 110 },  // 0: Midnight — crisp small moon
-    { elevDeg: 7, dist: 850, scale: 200 },  // 1: Sunset
-    { elevDeg: 5, dist: 800, scale: 300 },  // 2: Neon — synthwave disc
-    { elevDeg: 14, dist: 800, scale: 110 },  // 3: Emerald — small orb
-] as const;
-
-// Per-theme particle counts (conservative)
-const STAR_COUNTS = [900, 0, 600, 300] as const; // Midnight + Neon + Emerald faint
-const DUST_COUNTS = [0, 0, 400, 0] as const; // Neon dust
-const FIREFLY_COUNTS = [0, 0, 0, 280] as const; // Emerald pixels
-
-// Per-theme star distances (closer than SKY_RADIUS for a tighter feel)
-const STAR_DIST = [900, 0, 850, 900] as const;
-
-// Per-theme star min-elevation (degrees above horizon)
-const STAR_MIN_ELEV = [6, 0, 8, 12] as const;
 
 // Reduced-motion: skips meteor showers, halves particle counts
 const prefersReducedMotion =
@@ -399,7 +373,6 @@ function makeSunsetCirrusDomeTexture(seed = 1, w = 1024, h = 512): THREE.CanvasT
     return tex;
 }
 
-
 /** Patchy aurora curtain texture — two 1D noise layers create
  *  gaps where aurora fades out, giving a realistic non-uniform look.
  *  Blur pass smooths column edges. wrapS=Repeat enables UV drift. */
@@ -494,71 +467,70 @@ type Streak = {
 
 // ─── Component ────────────────────────────────────────────────
 
-export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
+export default memo(function ThemeSkyFX({ theme }: Props) {
     const { camera } = useThree();
     const rootRef = useRef<THREE.Group>(null);
 
-    // ── Sky depth helpers — push sky FX near camera.far so they're
-    // always behind opaque city geometry (Three.js renders opaque first,
-    // then transparent in depth order).
-    // Design-time distances in DISC_CFG/STAR_DIST are treated as ratios;
-    // at runtime we scale them to sit just inside camera.far.
+    const fx = theme.skyFX;
+
+    // ── Sky depth helpers
     const SKY_DIST = camera.far * 0.975;   // keep slightly inside far plane
     const SKY_CLAMP = camera.far * 0.99;    // hard upper-bound
-    const skyScale = SKY_DIST / DISC_CFG[themeIndex].dist;
+    const skyScale = SKY_DIST / fx.disc.dist;
     /** Scale a design-time distance to the sky-depth zone. */
     const skyD = (d: number) => Math.min(d * skyScale, SKY_CLAMP);
 
     // ── Disc material (moon / sun / synth sun / glow orb) ───────
-    // discScale is the design-time value; the runtime scale is skyD(discScale)
-    // so it keeps its angular size as the far plane changes.
     const { discTex, discScale, discOpacity, discColor } = useMemo(() => {
-        const cfg = DISC_CFG[themeIndex];
-        if (themeIndex === 0) return {
-            // Midnight: crisp moon with crater noise and narrow alpha edge
-            discTex: makeCrispMoonTexture(512),
-            discScale: cfg.scale, discOpacity: 0.95,
-            discColor: new THREE.Color(1, 1, 1),
-        };
-        if (themeIndex === 1) return {
-            // Sunset: warm orange sun
-            discTex: makeSunsetDiscTexture(512),
-            discScale: cfg.scale, discOpacity: 0.88,
-            discColor: new THREE.Color(1, 1, 1),
-        };
-        if (themeIndex === 2) return {
-            // Neon: synthwave striped moon (upgraded texture + scale from DISC_CFG)
-            discTex: makeSynthwaveMoonTexture(256),
-            discScale: cfg.scale, discOpacity: 0.95,
-            discColor: new THREE.Color(1.0, 1.0, 1.0),
-        };
-        // Emerald
+        const cfg = fx.disc;
+        let tex: THREE.CanvasTexture;
+        let color = new THREE.Color(cfg.color ?? "#ffffff");
+
+        if (cfg.type === "moon") {
+            tex = makeCrispMoonTexture(512);
+        } else if (cfg.type === "sun") {
+            tex = makeSunsetDiscTexture(512);
+        } else if (cfg.type === "synth") {
+            tex = makeSynthwaveMoonTexture(256);
+        } else if (cfg.type === "radial") {
+            const innerColor = cfg.color ?? "rgba(180,255,210,1.0)";
+            const midColor = innerColor.replace("1.0)", "0.6)").replace("0.8)", "0.5)");
+            tex = makeRadialTexture(innerColor, midColor, "rgba(0,0,0,0)", 128);
+            if (cfg.color) {
+                // If custom color is passed, boost/scale Three Color values
+                color = new THREE.Color(cfg.color);
+                color.multiplyScalar(1.5);
+            }
+        } else {
+            // "none" or default
+            tex = makeRadialTexture("rgba(0,0,0,0)", "rgba(0,0,0,0)", "rgba(0,0,0,0)", 16);
+        }
+
         return {
-            discTex: makeRadialTexture("rgba(180,255,210,1.0)", "rgba(60,200,120,0.6)", "rgba(0,0,0,0)", 128),
-            discScale: cfg.scale, discOpacity: 0.82,
-            discColor: new THREE.Color(1.2, 2.0, 1.4),
+            discTex: tex,
+            discScale: cfg.scale,
+            discOpacity: cfg.opacity ?? 0.95,
+            discColor: color,
         };
-    }, [themeIndex]);
+    }, [fx.disc]);
 
     const discMat = useMemo(() => {
         const m = new THREE.SpriteMaterial({
             map: discTex, transparent: true, opacity: discOpacity,
             depthWrite: false, depthTest: true, fog: false, color: discColor,
-            blending: themeIndex === 1 || themeIndex === 3 ? THREE.AdditiveBlending : THREE.NormalBlending
+            blending: fx.disc.type === "sun" || fx.disc.type === "radial" ? THREE.AdditiveBlending : THREE.NormalBlending
         });
         m.toneMapped = false;
-        // Crisp alpha edge for Midnight moon — trims near-transparent halo pixels
-        if (themeIndex === 0) m.alphaTest = 0.02;
-        if (themeIndex === 1) m.alphaTest = 0.015;
+        if (fx.disc.type === "moon") m.alphaTest = 0.02;
+        if (fx.disc.type === "sun") m.alphaTest = 0.015;
         return m;
-    }, [discTex, discOpacity, discColor, themeIndex]);
+    }, [discTex, discOpacity, discColor, fx.disc.type]);
 
-    // Ref for opacity pulses (safe to hold in ref — SpriteMaterial is mutable)
     const discMatRef = useRef(discMat);
     discMatRef.current = discMat;
 
     const sunsetHaloMat = useMemo(() => {
-        if (themeIndex !== 1) return null;
+        if (!fx.sunsetHaze) return null;
         const tex = makeSunsetHaloTexture(512);
         const m = new THREE.SpriteMaterial({
             map: tex,
@@ -572,40 +544,39 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         });
         m.toneMapped = false;
         return m;
-    }, [themeIndex]);
+    }, [fx.sunsetHaze]);
 
-    // ── Stars (Midnight + Neon + Emerald faint) ──────────────────
+    // ── Stars ──────────────────
     const starPointsRef = useRef<THREE.Points>(null);
 
     const starGeo = useMemo(() => {
-        const rawCount = STAR_COUNTS[themeIndex];
+        const rawCount = fx.stars?.count ?? 0;
         if (!rawCount) return null;
         const count = prefersReducedMotion ? Math.floor(rawCount * 0.4) : rawCount;
-        const rng = mulberry32(1000 + themeIndex);
+        const rng = mulberry32(1000 + (fx.stars?.count ?? 100));
         const pos = new Float32Array(count * 3);
         const col = new Float32Array(count * 3);
 
-        const dist = STAR_DIST[themeIndex] || SKY_RADIUS;
-        const minElev = STAR_MIN_ELEV[themeIndex] || 6;
-        // Push stars near camera.far so they render behind all city geometry
+        const dist = fx.stars?.dist || SKY_RADIUS;
+        const minElev = fx.stars?.minElev || 6;
         const scaledDist = skyD(dist);
 
+        const starColorBase = fx.stars?.color ? new THREE.Color(
+            fx.stars.color[0],
+            fx.stars.color[1],
+            fx.stars.color[2]
+        ) : new THREE.Color(0.85, 0.92, 1.20);
+
         for (let i = 0; i < count; i++) {
-            // Upper hemisphere only — no underground stars
             const dir = sampleUpperHemisphereDir(rng, minElev, 78);
             pos[i * 3] = dir.x * scaledDist;
             pos[i * 3 + 1] = dir.y * scaledDist;
             pos[i * 3 + 2] = dir.z * scaledDist;
 
-            const base = themeIndex === 0
-                ? new THREE.Color(0.85, 0.92, 1.20)   // cool blue-white (Midnight)
-                : themeIndex === 2
-                    ? new THREE.Color(1.10, 0.80, 1.35) // lavender-white (Neon)
-                    : new THREE.Color(0.65, 1.10, 0.85); // cool green-white (Emerald)
             const tw = randRange(rng, 0.7, 1.35);
-            col[i * 3] = base.r * tw;
-            col[i * 3 + 1] = base.g * tw;
-            col[i * 3 + 2] = base.b * tw;
+            col[i * 3] = starColorBase.r * tw;
+            col[i * 3 + 1] = starColorBase.g * tw;
+            col[i * 3 + 2] = starColorBase.b * tw;
         }
 
         const geo = new THREE.BufferGeometry();
@@ -613,46 +584,46 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
         return geo;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- skyD depends on camera.far, intentionally omitted
-    }, [themeIndex]);
+    }, [fx.stars]);
 
     const starMat = useMemo(() => {
-        if (!STAR_COUNTS[themeIndex]) return null;
+        if (!fx.stars?.count) return null;
         const m = new THREE.PointsMaterial({
-            size: themeIndex === 2 ? 2.0 : themeIndex === 3 ? 1.6 : 1.8,
-            sizeAttenuation: false, // stable screen-space size — stars don't shrink away
+            size: fx.stars.count < 500 ? 1.6 : 1.8,
+            sizeAttenuation: false,
             vertexColors: true, transparent: true,
-            opacity: themeIndex === 2 ? 0.85 : themeIndex === 3 ? 0.55 : 0.75,
+            opacity: 0.75,
             depthWrite: false,
-            depthTest: true, // ground/buildings occlude stars ✅
+            depthTest: true,
             fog: false,
         });
         m.toneMapped = false;
         return m;
-    }, [themeIndex]);
+    }, [fx.stars]);
 
-    // ── Neon Dust ────────────────────────────────────────────────
+    // ── Dust ────────────────────────────────────────────────
     const dustPointsRef = useRef<THREE.Points>(null);
 
     const dustGeo = useMemo(() => {
-        const rawCount = DUST_COUNTS[themeIndex];
+        const rawCount = fx.dust?.count ?? 0;
         if (!rawCount) return null;
         const count = prefersReducedMotion ? Math.floor(rawCount * 0.4) : rawCount;
-        const rng = mulberry32(2000 + themeIndex);
+        const rng = mulberry32(2000 + rawCount);
         const pos = new Float32Array(count * 3);
         const col = new Float32Array(count * 3);
 
+        const dCol1 = fx.dust?.color1 ? new THREE.Color(fx.dust.color1[0], fx.dust.color1[1], fx.dust.color1[2]) : new THREE.Color(2.5, 0.4, 2.2);
+        const dCol2 = fx.dust?.color2 ? new THREE.Color(fx.dust.color2[0], fx.dust.color2[1], fx.dust.color2[2]) : new THREE.Color(0.4, 2.2, 2.5);
+
         for (let i = 0; i < count; i++) {
             const dir = sampleUpperHemisphereDir(rng, 6, 45);
-            // Scale dust to sky depth zone so it stays behind buildings
             const r = skyD(SKY_RADIUS * randRange(rng, 0.38, 0.55));
             pos[i * 3] = dir.x * r;
             pos[i * 3 + 1] = dir.y * r;
             pos[i * 3 + 2] = dir.z * r;
 
             const pick = rng();
-            const c = pick < 0.5
-                ? new THREE.Color(2.5, 0.4, 2.2)
-                : new THREE.Color(0.4, 2.2, 2.5);
+            const c = pick < 0.5 ? dCol1 : dCol2;
             const a = randRange(rng, 0.5, 1.0);
             col[i * 3] = c.r * a;
             col[i * 3 + 1] = c.g * a;
@@ -664,10 +635,10 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
         return geo;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- skyD depends on camera.far, intentionally omitted
-    }, [themeIndex]);
+    }, [fx.dust]);
 
     const dustMat = useMemo(() => {
-        if (!DUST_COUNTS[themeIndex]) return null;
+        if (!fx.dust?.count) return null;
         const m = new THREE.PointsMaterial({
             size: 2.4, vertexColors: true, transparent: true, opacity: 0.55,
             depthWrite: false, depthTest: true, fog: false,
@@ -675,16 +646,16 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         });
         m.toneMapped = false;
         return m;
-    }, [themeIndex]);
+    }, [fx.dust]);
 
-    // ── Emerald Fireflies / Contribution Pixels ──────────────────
+    // ── Fireflies ──────────────────
     const flyPointsRef = useRef<THREE.Points>(null);
 
     const flyGeo = useMemo(() => {
-        const rawCount = FIREFLY_COUNTS[themeIndex];
+        const rawCount = fx.fireflies?.count ?? 0;
         if (!rawCount) return null;
         const count = prefersReducedMotion ? Math.floor(rawCount * 0.4) : rawCount;
-        const rng = mulberry32(3000 + themeIndex);
+        const rng = mulberry32(3000 + rawCount);
         const pos = new Float32Array(count * 3);
         const col = new Float32Array(count * 3);
 
@@ -699,8 +670,6 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
             pos[i * 3 + 2] = dir.z * r;
 
             const c = palette[Math.floor(randRange(rng, 0, palette.length))];
-            // Boost brightness 4× — the GitHub green hex values are perceptually dark;
-            // with toneMapped=false + AdditiveBlending multiplied values glow visibly.
             const a = randRange(rng, 3.5, 5.0);
             col[i * 3] = c.r * a;
             col[i * 3 + 1] = c.g * a;
@@ -711,33 +680,31 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
         geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
         return geo;
-    }, [themeIndex, theme.building]);
+    }, [fx.fireflies, theme.building]);
 
     const flyMat = useMemo(() => {
-        if (!FIREFLY_COUNTS[themeIndex]) return null;
+        if (!fx.fireflies?.count) return null;
         const m = new THREE.PointsMaterial({
             size: 3.5, vertexColors: true, transparent: true, opacity: 1.0,
             depthWrite: false,
-            depthTest: true, // fixed: was false — fireflies were drawing through ground
+            depthTest: true,
             fog: false,
             blending: THREE.AdditiveBlending,
         });
         m.toneMapped = false;
         return m;
-    }, [themeIndex]);
+    }, [fx.fireflies]);
 
     // ── Aurora Ring (Emerald) — CylinderGeometry so it wraps
-    // the full horizon with no billboard sprite edges.
     const auroraGeo = useMemo(() => {
-        if (themeIndex !== 3) return null;
+        if (!fx.aurora) return null;
         const radius = skyD(940);
-        const height = skyD(260);   // reduced from 420 — ring is less dominating
-        // 160 segments = smoother ring, openEnded
+        const height = skyD(260);
         return new THREE.CylinderGeometry(radius, radius, height, 160, 1, true);
-    }, [themeIndex, skyScale]);
+    }, [fx.aurora, skyScale]);
 
     const { auroraRingMat0, auroraRingMat1 } = useMemo(() => {
-        if (themeIndex !== 3) return { auroraRingMat0: null, auroraRingMat1: null };
+        if (!fx.aurora) return { auroraRingMat0: null, auroraRingMat1: null };
 
         const texW = prefersReducedMotion ? 512 : 1024;
         const texH = prefersReducedMotion ? 128 : 256;
@@ -745,57 +712,53 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         const t1 = makeAuroraCurtainTexture(7002, texW, texH);
 
         const m0 = new THREE.MeshBasicMaterial({
-            map: t0, transparent: true, opacity: 0.22, // ↓ from 0.26
+            map: t0, transparent: true, opacity: 0.22,
             depthWrite: false, depthTest: true, fog: false,
-            side: THREE.BackSide,   // camera is inside the cylinder
+            side: THREE.BackSide,
             blending: THREE.AdditiveBlending,
         });
         const m1 = new THREE.MeshBasicMaterial({
-            map: t1, transparent: true, opacity: 0.14, // ↓ from 0.17
+            map: t1, transparent: true, opacity: 0.14,
             depthWrite: false, depthTest: true, fog: false,
             side: THREE.BackSide,
             blending: THREE.AdditiveBlending,
         });
         m0.toneMapped = false;
         m1.toneMapped = false;
-        // Stagger seams so they don't line up at the front view
         m0.map!.offset.x = 0.13;
         m1.map!.offset.x = 0.57;
         return { auroraRingMat0: m0, auroraRingMat1: m1 };
-    }, [themeIndex]);
+    }, [fx.aurora]);
 
     const auroraPulse = useRef({ active: false, t: 0, dur: 1.5, nextIn: 12 });
 
-    // ── Sunset: horizon scattering sphere + cirrus streak sprites ──
-    // Far more cinematic than blob-cloud cylinders:
-    //   • 1 sphere draw call = seamless warm horizon glow
-    //   • 2 sprite draw calls = wispy cirrus over/near the sun
+    // ── Sunset: horizon scattering sphere + cirrus streak sprites
     const sunsetHazeGeo = useMemo(() => {
-        if (themeIndex !== 1) return null;
+        if (!fx.sunsetHaze) return null;
         return new THREE.SphereGeometry(skyD(1200), 48, 24);
-    }, [themeIndex, skyScale]);
+    }, [fx.sunsetHaze, skyScale]);
 
     const sunsetHazeMat = useMemo(() => {
-        if (themeIndex !== 1) return null;
+        if (!fx.sunsetHaze) return null;
         const tex = makeHorizonBandTexture(256);
         const m = new THREE.MeshBasicMaterial({
             map: tex, transparent: true, opacity: 0.18,
             depthWrite: false, depthTest: true, fog: false,
-            side: THREE.BackSide, // camera inside the sphere
+            side: THREE.BackSide,
             blending: THREE.AdditiveBlending,
             color: new THREE.Color("#ff9b7a"),
         });
         m.toneMapped = false;
         return m;
-    }, [themeIndex]);
+    }, [fx.sunsetHaze]);
 
     const sunsetCirrusGeo = useMemo(() => {
-        if (themeIndex !== 1) return null;
+        if (!fx.sunsetCirrus) return null;
         return new THREE.SphereGeometry(skyD(1300), 48, 24);
-    }, [themeIndex, skyScale]);
+    }, [fx.sunsetCirrus, skyScale]);
 
     const sunsetCirrusMat = useMemo(() => {
-        if (themeIndex !== 1) return null;
+        if (!fx.sunsetCirrus) return null;
         const texW = prefersReducedMotion ? 512 : 1024;
         const texH = prefersReducedMotion ? 256 : 512;
         const tex = makeSunsetCirrusDomeTexture(5301, texW, texH);
@@ -803,7 +766,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         const m = new THREE.MeshBasicMaterial({
             map: tex,
             transparent: true,
-            opacity: 0.09,             // keep LOW (subtle)
+            opacity: 0.09,
             depthWrite: false,
             depthTest: true,
             fog: false,
@@ -812,7 +775,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         });
         m.toneMapped = false;
         return m;
-    }, [themeIndex]);
+    }, [fx.sunsetCirrus]);
 
     // ── Shooting-star streak pool ────────────────────────────────
     const streakRef = useRef<THREE.Points>(null);
@@ -828,7 +791,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
     const streakGeo = useMemo(() => {
         const totalPts = MAX_STREAKS * STREAK_SEGMENTS;
         const pos = new Float32Array(totalPts * 3);
-        const col = new Float32Array(totalPts * 3); // init black = invisible
+        const col = new Float32Array(totalPts * 3);
         const geo = new THREE.BufferGeometry();
         geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
         geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
@@ -846,9 +809,9 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
     }, []);
 
     const nextStreakIn = useRef(10);
-    const rngRef = useRef(mulberry32(9000 + themeIndex));
+    const rngRef = useRef(mulberry32(9000 + (fx.stars?.count ?? 200)));
 
-    // Meteor shower state (Midnight only)
+    // Meteor shower state (Midnight/Emerald etc., if enabled with high stars count)
     const shower = useRef({ active: false, left: 0, nextIn: 0, showerNextIn: 0 });
 
     // ── Pulse state ──────────────────────────────────────────────
@@ -856,7 +819,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
 
     // Reset per-theme state on theme switch
     useEffect(() => {
-        rngRef.current = mulberry32(9000 + themeIndex);
+        rngRef.current = mulberry32(9000 + (fx.stars?.count ?? 200));
         nextStreakIn.current = randRange(rngRef.current, 8, 18);
 
         const colAttr = streakGeo.getAttribute("color") as THREE.BufferAttribute;
@@ -867,9 +830,9 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
 
         pulse.current = {
             t: 0, dur: 0, active: false,
-            nextIn: themeIndex === 2
-                ? randRange(rngRef.current, 4, 8)
-                : randRange(rngRef.current, 8, 16),
+            nextIn: fx.shootingStars?.pulseNextIn
+                ? randRange(rngRef.current, fx.shootingStars.pulseNextIn * 0.5, fx.shootingStars.pulseNextIn * 1.2)
+                : 12
         };
 
         shower.current = {
@@ -878,25 +841,21 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         };
 
         auroraPulse.current = { active: false, t: 0, dur: 1.5, nextIn: 12 };
-    }, [themeIndex, streakGeo]);
+    }, [theme, fx, streakGeo]);
 
-    // ── Disc placement — elevation + azimuth, pushed to sky depth zone ─
-    // Camera spawns at (-800, _, -1000) looking toward E.Arcade (+X, +Z),
-    // so we put the disc in the +X, +Z quadrant → visible past the city
-    // from the initial view instead of hiding behind the camera.
+    // ── Disc placement
     const discPos = useMemo(() => {
-        const cfg = DISC_CFG[themeIndex];
+        const cfg = fx.disc;
         const elevRad = (cfg.elevDeg * Math.PI) / 180;
-        const azRad = -Math.PI * 0.18; // slightly off-centre, in front of initial camera
-        const d = skyD(cfg.dist); // always near camera.far → behind buildings
+        const azRad = -Math.PI * 0.18;
+        const d = skyD(cfg.dist);
         return new THREE.Vector3(
             Math.cos(azRad) * Math.cos(elevRad) * d,
             Math.sin(elevRad) * d,
             -Math.sin(azRad) * Math.cos(elevRad) * d
         );
-    }, [themeIndex, skyScale]);
+    }, [fx.disc, skyScale]);
 
-    // Runtime disc scale (angular size preserved as depth changes)
     const discDisplayScale = skyD(discScale);
 
     // ── Spawn a streak ───────────────────────────────────────────
@@ -905,26 +864,24 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         const slot = streakState.current.find(s => !s.active);
         if (!slot) return;
 
-        // Streaks travel within the same depth zone as the stars
-        const dist = skyD(STAR_DIST[themeIndex] || SKY_RADIUS);
+        const ss = fx.shootingStars;
+        if (!ss) return;
+
+        const dist = skyD(fx.stars?.dist || SKY_RADIUS);
         const sd = sampleUpperHemisphereDir(rng, 18, 38);
         const ed = sampleUpperHemisphereDir(rng, 8, 18);
 
         slot.active = true;
         slot.t = 0;
-        slot.dur = themeIndex === 2
-            ? randRange(rng, 0.45, 0.85)   // Neon: snappier
-            : randRange(rng, 0.8, 1.35);
+        slot.dur = randRange(rng, ss.dur * 0.8, ss.dur * 1.3);
         slot.sx = sd.x * dist; slot.sy = sd.y * dist; slot.sz = sd.z * dist;
         slot.ex = ed.x * dist; slot.ey = ed.y * dist; slot.ez = ed.z * dist;
 
-        if (themeIndex === 0) { slot.r = 1.2; slot.g = 1.2; slot.b = 1.6; }       // cool white-blue
-        else if (themeIndex === 1) { slot.r = 1.6; slot.g = 1.1; slot.b = 0.6; }  // warm gold
-        else if (themeIndex === 2) { slot.r = 2.6; slot.g = 0.6; slot.b = 2.4; }  // neon magenta
-        else { slot.r = 0.7; slot.g = 2.0; slot.b = 1.0; }  // emerald
+        slot.r = ss.color[0];
+        slot.g = ss.color[1];
+        slot.b = ss.color[2];
     };
 
-    // Refs to bypass direct mutability linter warnings in useFrame
     const auroraMat0Ref = useRef(auroraRingMat0); auroraMat0Ref.current = auroraRingMat0;
     const auroraMat1Ref = useRef(auroraRingMat1); auroraMat1Ref.current = auroraRingMat1;
     const cirrusMatRef = useRef(sunsetCirrusMat); cirrusMatRef.current = sunsetCirrusMat;
@@ -940,64 +897,55 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
 
         const dt = Math.min(delta * UPDATE_EVERY_N_FRAMES, 0.08);
 
-        // Gentle slow rotation for "aliveness" (no per-point update)
         if (starPointsRef.current) starPointsRef.current.rotation.y += dt * 0.008;
         if (dustPointsRef.current) dustPointsRef.current.rotation.y -= dt * 0.015;
         if (flyPointsRef.current) flyPointsRef.current.rotation.y += dt * 0.010;
 
-        // ── Aurora ring scroll + pulse (Emerald) ─────────────────
-        if (themeIndex === 3 && auroraRingMat0 && auroraRingMat1) {
-            // Slower drift — patchy texture already has visual complexity
+        // ── Aurora ring scroll + pulse
+        if (fx.aurora && auroraRingMat0 && auroraRingMat1) {
             if (auroraRingMat0.map && auroraRingMat1.map) {
                 auroraRingMat0.map.offset.x = (auroraRingMat0.map.offset.x + dt * 0.010) % 1;
                 auroraRingMat1.map.offset.x = (auroraRingMat1.map.offset.x - dt * 0.006) % 1;
             }
 
-                auroraPulse.current.nextIn -= dt;
-                if (auroraPulse.current.nextIn <= 0 && !auroraPulse.current.active) {
-                    auroraPulse.current.active = true;
-                    auroraPulse.current.t = 0;
-                    auroraPulse.current.dur = 1.8;
-                    auroraPulse.current.nextIn = randRange(rngRef.current, 10, 22);
-                }
-                if (auroraPulse.current.active) {
-                    auroraPulse.current.t += dt;
-                    const p01 = Math.min(1, auroraPulse.current.t / auroraPulse.current.dur);
-                    const bump = Math.sin(p01 * Math.PI);
-                    auroraRingMat0.opacity = 0.22 + bump * 0.15;
-                    auroraRingMat1.opacity = 0.14 + bump * 0.11;
-                    if (p01 >= 1) {
-                        auroraPulse.current.active = false;
-                        auroraRingMat0.opacity = 0.22;
-                        auroraRingMat1.opacity = 0.14;
-                    }
+            auroraPulse.current.nextIn -= dt;
+            if (auroraPulse.current.nextIn <= 0 && !auroraPulse.current.active) {
+                auroraPulse.current.active = true;
+                auroraPulse.current.t = 0;
+                auroraPulse.current.dur = 1.8;
+                auroraPulse.current.nextIn = randRange(rngRef.current, 10, 22);
+            }
+            if (auroraPulse.current.active) {
+                auroraPulse.current.t += dt;
+                const p01 = Math.min(1, auroraPulse.current.t / auroraPulse.current.dur);
+                const bump = Math.sin(p01 * Math.PI);
+                auroraRingMat0.opacity = 0.22 + bump * 0.15;
+                auroraRingMat1.opacity = 0.14 + bump * 0.11;
+                if (p01 >= 1) {
+                    auroraPulse.current.active = false;
+                    auroraRingMat0.opacity = 0.22;
+                    auroraRingMat1.opacity = 0.14;
                 }
             }
+        }
 
-
-        // ── Sunset cirrus drift ───────────────────────────────────────
-        if (themeIndex === 1 && sunsetCirrusMat?.map) {
+        // ── Sunset cirrus drift
+        if (fx.sunsetCirrus && sunsetCirrusMat?.map) {
             sunsetCirrusMat.map.offset.x = (sunsetCirrusMat.map.offset.x + dt * 0.0012) % 1;
         }
 
-        // ── Streak spawner ───────────────────────────────────────
-        // Per-theme shooting star intervals
-        const ssIntervals = [
-            [18, 45],   // Midnight
-            [55, 100],  // Sunset (rare)
-            [10, 30],   // Neon (frequent)
-            [35, 75],   // Emerald
-        ];
-        const [ssMin, ssMax] = ssIntervals[themeIndex];
-
-        nextStreakIn.current -= dt;
-        if (nextStreakIn.current <= 0) {
-            spawnStreak();
-            nextStreakIn.current = randRange(rngRef.current, ssMin, ssMax);
+        // ── Streak spawner
+        if (fx.shootingStars) {
+            const ss = fx.shootingStars;
+            nextStreakIn.current -= dt;
+            if (nextStreakIn.current <= 0) {
+                spawnStreak();
+                nextStreakIn.current = randRange(rngRef.current, ss.nextIn, ss.nextIn * 2);
+            }
         }
 
-        // ── Meteor shower (Midnight only, skipped for reduced-motion) ──
-        if (themeIndex === 0 && !prefersReducedMotion) {
+        // ── Meteor shower (if stars are enabled and count > 800 and not reduced motion)
+        if (fx.stars && fx.stars.count >= 900 && !prefersReducedMotion) {
             shower.current.showerNextIn -= dt;
             if (shower.current.showerNextIn <= 0 && !shower.current.active) {
                 shower.current.active = true;
@@ -1016,7 +964,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
             }
         }
 
-        // Update streak geometry (~30 points max)
+        // Update streak geometry
         const streakPts = streakRef.current;
         if (streakPts) {
             const posAttr = streakPts.geometry.getAttribute("position") as THREE.BufferAttribute;
@@ -1059,28 +1007,28 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
             colAttr.needsUpdate = true;
         }
 
-        // ── Pulse scheduler ──────────────────────────────────────
-        pulse.current.nextIn -= dt;
-        if (pulse.current.nextIn <= 0 && !pulse.current.active) {
-            pulse.current.active = true;
-            pulse.current.t = 0;
-            // Neon: short glitch pulse; others: slow glow pulse
-            pulse.current.dur = themeIndex === 2 ? 0.12 : 0.5;
-            const rng = rngRef.current;
-            pulse.current.nextIn = themeIndex === 2
-                ? randRange(rng, 5, 12)
-                : randRange(rng, 10, 22);
-        }
+        // ── Pulse scheduler
+        if (fx.shootingStars?.pulseNextIn) {
+            const ss = fx.shootingStars;
+            pulse.current.nextIn -= dt;
+            if (pulse.current.nextIn <= 0 && !pulse.current.active) {
+                pulse.current.active = true;
+                pulse.current.t = 0;
+                pulse.current.dur = ss.pulseDur ?? 0.5;
+                const rng = rngRef.current;
+                pulse.current.nextIn = randRange(rng, (ss.pulseNextIn ?? 12) * 0.8, (ss.pulseNextIn ?? 12) * 1.5);
+            }
 
-        if (pulse.current.active) {
-            pulse.current.t += dt;
-            const p01 = Math.min(1, pulse.current.t / pulse.current.dur);
-            const bump = Math.sin(p01 * Math.PI); // 0 → 1 → 0 arc
-            const mat = discMatRef.current;
-            mat.opacity = discOpacity + bump * (themeIndex === 2 ? 0.40 : 0.12);
-            if (p01 >= 1) {
-                pulse.current.active = false;
-                discMatRef.current.opacity = discOpacity; // reset to baseline
+            if (pulse.current.active) {
+                pulse.current.t += dt;
+                const p01 = Math.min(1, pulse.current.t / pulse.current.dur);
+                const bump = Math.sin(p01 * Math.PI);
+                const mat = discMatRef.current;
+                mat.opacity = discOpacity + bump * (ss.pulseOpacityBump ?? 0.12);
+                if (p01 >= 1) {
+                    pulse.current.active = false;
+                    discMatRef.current.opacity = discOpacity;
+                }
             }
         }
     });
@@ -1092,17 +1040,14 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
             starGeo?.dispose(); starMat?.dispose();
             dustGeo?.dispose(); dustMat?.dispose();
             flyGeo?.dispose(); flyMat?.dispose();
-            // Aurora ring
             auroraGeo?.dispose();
             auroraRingMat0?.map?.dispose(); auroraRingMat0?.dispose();
             auroraRingMat1?.map?.dispose(); auroraRingMat1?.dispose();
-            // Sunset scattering + halo + cirrus dome
             sunsetHazeGeo?.dispose();
             sunsetHazeMat?.map?.dispose(); sunsetHazeMat?.dispose();
             sunsetHaloMat?.map?.dispose(); sunsetHaloMat?.dispose();
             sunsetCirrusGeo?.dispose();
             sunsetCirrusMat?.map?.dispose(); sunsetCirrusMat?.dispose();
-            // Streaks
             streakGeo.dispose(); streakMat.dispose();
         };
     }, [discTex, discMat, starGeo, starMat, dustGeo, dustMat,
@@ -1111,21 +1056,20 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         sunsetHazeGeo, sunsetHazeMat, sunsetHaloMat, sunsetCirrusGeo, sunsetCirrusMat,
         streakGeo, streakMat]);
 
-    // ─────────────────────────────────────────────────────────────
-
-
     return (
         <group ref={rootRef} renderOrder={-20}>
             {/* Moon / Sun / Synth Sun / Glow Orb disc */}
-            <sprite
-                position={[discPos.x, discPos.y, discPos.z]}
-                scale={[discDisplayScale, discDisplayScale, 1]}
-                renderOrder={-19}
-                frustumCulled={false}
-                material={discMat}
-            />
+            {fx.disc.type !== "none" && (
+                <sprite
+                    position={[discPos.x, discPos.y, discPos.z]}
+                    scale={[discDisplayScale, discDisplayScale, 1]}
+                    renderOrder={-19}
+                    frustumCulled={false}
+                    material={discMat}
+                />
+            )}
 
-            {/* Stars — Midnight + Neon + Emerald faint (upper hemisphere, depthTest: true) */}
+            {/* Stars */}
             {starGeo && starMat && (
                 <points
                     ref={starPointsRef}
@@ -1158,7 +1102,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
                 />
             )}
 
-            {/* Aurora Ring layers (Emerald) — lifted so bottom stays near horizon line */}
+            {/* Aurora Ring layers */}
             {auroraGeo && auroraRingMat0 && (
                 <mesh
                     geometry={auroraGeo}
@@ -1189,8 +1133,8 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
                 />
             )}
 
-            {/* Sunset Cirrus Dome (BackSide sphere) */}
-            {themeIndex === 1 && sunsetCirrusGeo && sunsetCirrusMat && (
+            {/* Sunset Cirrus Dome */}
+            {sunsetCirrusGeo && sunsetCirrusMat && (
                 <mesh
                     geometry={sunsetCirrusGeo}
                     material={sunsetCirrusMat}
@@ -1199,25 +1143,27 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
                 />
             )}
 
-            {/* Sunset Halo (subtle glow behind the crisp sun) */}
-            {themeIndex === 1 && sunsetHaloMat && (
+            {/* Sunset Halo */}
+            {sunsetHaloMat && (
                 <sprite
                     position={[discPos.x, discPos.y, discPos.z]}
                     scale={[discDisplayScale * 2.9, discDisplayScale * 2.9, 1]}
-                    renderOrder={-20} // Just behind the disc (-19)
+                    renderOrder={-20}
                     frustumCulled={false}
                     material={sunsetHaloMat}
                 />
             )}
 
-            {/* Shooting-star streak pool — active for all 4 themes */}
-            <points
-                ref={streakRef}
-                geometry={streakGeo}
-                material={streakMat}
-                renderOrder={-15}
-                frustumCulled={false}
-            />
+            {/* Shooting-star streak pool */}
+            {fx.shootingStars && (
+                <points
+                    ref={streakRef}
+                    geometry={streakGeo}
+                    material={streakMat}
+                    renderOrder={-15}
+                    frustumCulled={false}
+                />
+            )}
         </group>
     );
 });
