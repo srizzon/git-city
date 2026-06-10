@@ -134,6 +134,7 @@ export async function fetchExpandedGitHubData(login: string): Promise<ExpandedGi
       },
       body: JSON.stringify({ query, variables: { login } }),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      cache: "no-store",
     });
 
     if (!res.ok) return null;
@@ -248,7 +249,7 @@ export async function fetchGitHubDeveloperData(
 
   const userRes = await fetch(
     `https://api.github.com/users/${encodeURIComponent(login)}`,
-    { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+    { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" },
   );
 
   if (!userRes.ok) {
@@ -269,7 +270,7 @@ export async function fetchGitHubDeveloperData(
     fetchExpandedGitHubData(resolvedLogin),
     fetch(
       `https://api.github.com/users/${encodeURIComponent(resolvedLogin)}/repos?sort=pushed&per_page=100&page=1`,
-      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" },
     ),
   ]);
 
@@ -286,7 +287,7 @@ export async function fetchGitHubDeveloperData(
   if (repos.length >= 100) {
     const page2Res = await fetch(
       `https://api.github.com/users/${encodeURIComponent(resolvedLogin)}/repos?sort=pushed&per_page=100&page=2`,
-      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" },
     );
     if (page2Res.ok) {
       repos = repos.concat(await page2Res.json());
