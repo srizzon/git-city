@@ -5,6 +5,7 @@ import { sendWelcomeNotification } from "@/lib/notification-senders/welcome";
 import { sendReferralJoinedNotification } from "@/lib/notification-senders/referral";
 import { fetchGitHubDeveloperData } from "@/lib/github-api";
 import { calculateGithubXp } from "@/lib/xp";
+import { earnPixels } from "@/lib/pixels";
 
 /**
  * Provisions / claims the developer building for a freshly authenticated user.
@@ -139,6 +140,14 @@ export async function provisionDeveloperOnLogin(
             .eq("id", dev.id);
 
           await admin.rpc("increment_referral_count", { referrer_dev_id: referrer.id });
+
+          // Referral reward: +25 PX, idempotent per referred dev
+          earnPixels(
+            referrer.id,
+            "referral",
+            dev.id.toString(),
+            `referral:${dev.id}`
+          ).catch(() => {});
 
           await admin.from("activity_feed").insert({
             event_type: "referral",
