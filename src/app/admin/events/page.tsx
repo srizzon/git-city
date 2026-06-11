@@ -214,7 +214,8 @@ export default function AdminEventsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-[11px] text-muted">Boss HP</label>
-                <input type="number" value={bossMaxHp} onChange={(e) => setBossMaxHp(Number(e.target.value))} className={field} min={5000} max={2000000} />
+                <input type="number" value={bossMaxHp} onChange={(e) => setBossMaxHp(Number(e.target.value))} className={field} min={5000} max={20000000} />
+                <p className="mt-1 text-[9px] text-dim normal-case">~100 dmg/s per active player. HP ≈ players × 100 × seconds of fight</p>
               </div>
               <div>
                 <label className="mb-1 block text-[11px] text-muted">Sponsor</label>

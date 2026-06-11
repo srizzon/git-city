@@ -90,7 +90,7 @@ export async function POST(request: Request) {
   if (!endsAt || isNaN(endsAt.getTime())) return NextResponse.json({ error: "invalid ends_at" }, { status: 400 });
   if (endsAt <= startsAt) return NextResponse.json({ error: "ends_at must be after starts_at" }, { status: 400 });
 
-  const bossMaxHp = Math.max(5000, Math.min(2_000_000, Number(body.boss_max_hp) || 50000));
+  const bossMaxHp = Math.max(5000, Math.min(20_000_000, Number(body.boss_max_hp) || 50000));
   const bossName = typeof body.boss_name === "string" ? body.boss_name.slice(0, 80) : "The Original Bug";
   const lore = typeof body.lore === "string" ? body.lore.slice(0, 500) : "";
   const sponsorBrand = typeof body.sponsor_brand === "string" && body.sponsor_brand.trim()
