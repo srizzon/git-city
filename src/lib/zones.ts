@@ -87,6 +87,10 @@ export const ITEM_EMOJIS: Record<string, string> = {
 
 export const FACES_ITEMS = ["custom_color", "billboard", "led_banner"];
 
+// Legacy hand-coded vehicles only. New vehicles are data-driven: a GLB at
+// /models/vehicles/<id>.glb + a catalog row (render_kind 'asset', shop_section
+// 'battle', metadata.type 'raid_vehicle'). They are detected from the catalog,
+// not added to this array.
 export const RAID_VEHICLE_ITEMS = ["raid_helicopter", "raid_drone", "raid_rocket"];
 export const RAID_TAG_ITEMS = ["tag_neon", "tag_fire", "tag_gold"];
 export const RAID_BOOST_ITEMS = ["raid_boost_small", "raid_boost_medium", "raid_boost_large"];
