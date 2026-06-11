@@ -61,18 +61,48 @@ docs/
 # partykit local state
 .partykit/
 
-# arcade dev/test scripts
+# Local-only dev / asset-pipeline scripts (not needed to run or fork the app).
+# NOTE: scripts/bake-sf-map.mjs (regenerates public/maps/sf.json) and
+# scripts/upload-arcade-assets.mjs (seeds the arcade-assets bucket, per CLAUDE.md)
+# are intentionally NOT ignored — forkers need them.
 scripts/test-*.mjs
 scripts/recolor-*.mjs
+scripts/crop-walk-sprites.mjs
+scripts/gen-seed.mjs
+scripts/restore-from-backup.mjs
+scripts/seed-landmarks.mjs
+scripts/extract-cozy-furniture.py
+scripts/x-thread.txt
+# Bankr sponsor-vehicle GLB pipeline (output is gitignored under public/models/vehicles/)
+scripts/bankr-model.mjs
+scripts/gen-bankr-monitor.mjs
+scripts/render-preview.mjs
+public/bankr.svg
+public/bankr-monitor-preview.html
+
+# local POCs / scratch SQL / supabase CLI cache
+poc/
+supabase/snippets/
+supabase/.temp/
 
 # vscode extension build artifacts
 packages/vscode-extension/dist/
 packages/vscode-extension/package-lock.json
 packages/vscode-extension/*.vsix
 
-scripts/
-
 public/cozy/
+
+# Cosmetic GLB models live in Supabase Storage (bucket cosmetic-models), not git.
+# A new cosmetic is upload + a catalog row — never a commit. Generated locally as
+# upload staging via scripts/gen-*.mjs, then pushed with upload-cosmetic-models.mjs.
+public/models/vehicles/
 
 # Production schema dumps used for local bootstrapping (never commit prod artifacts)
 supabase/*.prod_schema.sql
+
+# OSM raw cache for SF map bake (re-downloadable)
+scripts/.osm-cache/
+
+# Raw Kenney asset-kit downloads. We commit only the GLBs we use (public/models);
+# the unpacked kit folders stay local.
+kenney/
