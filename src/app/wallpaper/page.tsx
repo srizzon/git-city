@@ -11,6 +11,7 @@ import {
   type CityRiver,
   type CityBridge,
 } from "@/lib/github";
+import { usePerfMode } from "@/lib/perfMode";
 
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), { ssr: false });
 
@@ -23,6 +24,7 @@ const THEME_MAP: Record<string, number> = {
 
 function WallpaperInner() {
   const params = useSearchParams();
+  const { mode: perfMode } = usePerfMode();
 
   const themeParam = params.get("theme") ?? "emerald";
   const themeIndex = THEME_MAP[themeParam] ?? 3;
@@ -107,6 +109,7 @@ function WallpaperInner() {
       onExitFly={() => {}}
       themeIndex={themeIndex}
       introMode={false}
+      perfMode={perfMode}
       wallpaperMode
       wallpaperSpeed={speed}
     />

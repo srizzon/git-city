@@ -4,13 +4,14 @@ import "@/lib/silenceThreeClockWarning";
 import { useRef, useEffect, useEffectEvent, useState, useMemo, useCallback } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/drei";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
+import { EffectComposer, Bloom, SMAA } from "@react-three/postprocessing";
 import * as THREE from "three";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
 import type { LiveSession } from "@/lib/useCodingPresence";
-import type { CityBuilding, CityPlaza, CityDecoration, CityRiver, CityBridge } from "@/lib/github";
+import type { CityBuilding, CityPlaza, CityDecoration, CityRiver, CityBridge, SFRenderMap } from "@/lib/github";
 import { seededRandom } from "@/lib/github";
+import SFMapLayers from "./SFMapLayers";
 import SkyAds from "./SkyAds";
 import BuildingAds from "./BuildingAds";
 import type { SkyAd } from "@/lib/skyAds";
@@ -19,8 +20,12 @@ import type { RaidPhase } from "@/lib/useRaidSequence";
 import type { RaidExecuteResponse } from "@/lib/raid";
 import FounderSpire from "./FounderSpire";
 import EArcadeLandmark from "./EArcadeLandmark";
+import BankBuilding from "./BankBuilding";
 import type { ResolvedSponsor } from "@/lib/landmarks/resolve";
 import SponsoredLandmark from "@/lib/sponsors/SponsoredLandmark";
+import { gridToWorldPos } from "@/lib/sponsors/registry";
+import { SF_PLAZA_RADIUS, SF_PLAZA_SCALE, sfSponsorLocalPos } from "@/lib/sponsors/sfPlaza";
+import { sunPosition, samplePalette, skyState } from "@/lib/sky";
 import WhiteRabbit from "./WhiteRabbit";
 import CelebrationEffect from "./CelebrationEffect";
 import ComparePath from "./ComparePath";
@@ -32,7 +37,6 @@ import ThemeSkyFX from "./ThemeSkyFX";
 import RemotePilots from "./RemotePilots";
 import type { RemotePilot, ActiveProjectile, SelfPvpState, PendingRespawn } from "@/lib/useFlyPresence";
 import ProjectileSwarm from "./ProjectileSwarm";
-import { usePerfMode } from "@/lib/perfMode";
 import BossPreview, { type BossVariant, type Phase as BossPhase } from "./BossPreview";
 import BossEvent from "./BossEvent";
 
@@ -273,7 +277,7 @@ function introEase(t: number): number {
 const _introPos = new THREE.Vector3();
 const _introLook = new THREE.Vector3();
 
-function IntroFlyover({ onEnd }: { onEnd: () => void }) {
+function IntroFlyover({ onEnd, lookScale = 1 }: { onEnd: () => void; lookScale?: number }) {
   const { camera } = useThree();
   const elapsed = useRef(0);
   const ended = useRef(false);
@@ -281,19 +285,21 @@ function IntroFlyover({ onEnd }: { onEnd: () => void }) {
   // Build CatmullRom curves once; centripetal = no cusps on uneven spacing
   const { posCurve, lookCurve } = useMemo(() => {
     const posPoints = INTRO_WAYPOINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z));
-    const lookPoints = INTRO_LOOK_TARGETS.map(([x, y, z]) => new THREE.Vector3(x, y, z));
+    // lookScale lets SF (where the landmark cluster is scaled down) aim lower.
+    const lookPoints = INTRO_LOOK_TARGETS.map(([x, y, z]) => new THREE.Vector3(x * lookScale, y * lookScale, z * lookScale));
     const posCurve = new THREE.CatmullRomCurve3(posPoints, false, 'centripetal');
     const lookCurve = new THREE.CatmullRomCurve3(lookPoints, false, 'centripetal');
     // Pre-compute arc-length tables so getPointAt() doesn't stutter on first call
     posCurve.getLength();
     lookCurve.getLength();
     return { posCurve, lookCurve };
-  }, []);
+  }, [lookScale]);
 
   useEffect(() => {
     camera.position.set(...INTRO_WAYPOINTS[0]);
-    camera.lookAt(...INTRO_LOOK_TARGETS[0]);
-  }, [camera]);
+    const [lx, ly, lz] = INTRO_LOOK_TARGETS[0];
+    camera.lookAt(lx * lookScale, ly * lookScale, lz * lookScale);
+  }, [camera, lookScale]);
 
   useFrame((_, delta) => {
     if (ended.current) return;
@@ -380,10 +386,16 @@ function RabbitFlyover({
     [plazaX, plazaZ]
   );
 
+  // Seed the camera from the curve's own start (WP0) so frame 0 matches
+  // frame 1 exactly. Previously this hardcoded the mirror corner
+  // (-800,700,-1000) while the curve began at (800,700,1000), so the very
+  // first frame teleported the camera across the city — the "buggy" jump.
   useEffect(() => {
-    camera.position.set(-800, 700, -1000);
-    camera.lookAt(0, 200, 0);
-  }, [camera]);
+    posCurve.getPointAt(0, _rabbitPos);
+    lookCurve.getPointAt(0, _rabbitLook);
+    camera.position.copy(_rabbitPos);
+    camera.lookAt(_rabbitLook);
+  }, [camera, posCurve, lookCurve]);
 
   useFrame((_, delta) => {
     if (ended.current) return;
@@ -1198,18 +1210,21 @@ const _cPos = new THREE.Vector3();
 const _cQuat = new THREE.Quaternion();
 const _cEuler = new THREE.Euler();
 
-function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius }: {
+function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius, sfMap, buildings }: {
   playerPosRef: React.MutableRefObject<THREE.Vector3>;
   accentColor: string;
   onCollect: (score: number, earned: number, combo: number, collected: number, maxCombo: number) => void;
   cityRadius: number;
+  sfMap?: SFRenderMap | null;
+  buildings: CityBuilding[];
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const flashRef = useRef<THREE.PointLight>(null);
 
-  // Generate collectible positions using radial zone distribution across the city
+  // Generate collectible positions. In SF mode the city footprint is irregular
+  // and off-center, so coins are anchored above real buildings (always over
+  // land/streets). Otherwise we fall back to radial zones around the origin.
   const items = useMemo<CollectibleDef[]>(() => {
-    const spread = cityRadius * 0.6;
     const now = new Date();
     const start = new Date(now.getFullYear(), 0, 0);
     const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
@@ -1217,8 +1232,68 @@ function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius }: {
 
     const rng = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
 
-    const MIN_SPACING = 80;
     const result: CollectibleDef[] = [];
+
+    // Tier plan: count + altitude band + scoring per ring (shared by both modes).
+    // Altitudes are absolute — player flies between MIN_ALT(25) and MAX_ALT(900).
+    const TIERS: { count: number; minAlt: number; maxAlt: number; type: "common" | "rare" | "epic"; points: number; size: number }[] = [
+      { count: 10, minAlt: 80, maxAlt: 250, type: "common", points: 1, size: 6 },
+      { count: 12, minAlt: 200, maxAlt: 500, type: "common", points: 1, size: 6 },
+      { count: 4, minAlt: 300, maxAlt: 600, type: "rare", points: 5, size: 9 },
+      { count: 8, minAlt: 250, maxAlt: 550, type: "common", points: 1, size: 6 },
+      { count: 4, minAlt: 400, maxAlt: 700, type: "rare", points: 5, size: 9 },
+      { count: 2, minAlt: 650, maxAlt: 850, type: "epic", points: 25, size: 14 },
+    ];
+
+    // ── SF mode: anchor coins above real buildings, spread across the city ──
+    if (sfMap && buildings.length > 0) {
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const b of buildings) {
+        const x = b.position[0], z = b.position[2];
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (z < minZ) minZ = z;
+        if (z > maxZ) maxZ = z;
+      }
+      const span = Math.max(maxX - minX, maxZ - minZ);
+      const total = TIERS.reduce((s, t) => s + t.count, 0);
+      // Target an even spread: spacing scaled to footprint size vs coin count.
+      const baseSep = (span / Math.sqrt(total)) * 0.7;
+
+      const placed: { x: number; z: number }[] = [];
+      const farEnough = (x: number, z: number, sep: number) =>
+        placed.every(p => (p.x - x) ** 2 + (p.z - z) ** 2 >= sep * sep);
+
+      // Pick a building, relaxing the spacing requirement if the map is crowded.
+      const pickXZ = (): [number, number] => {
+        for (let relax = 0; relax < 6; relax++) {
+          const sep = baseSep * (1 - relax * 0.15);
+          for (let attempt = 0; attempt < 30; attempt++) {
+            const b = buildings[Math.floor(rng() * buildings.length)];
+            const x = b.position[0] + (rng() - 0.5) * 60;
+            const z = b.position[2] + (rng() - 0.5) * 60;
+            if (farEnough(x, z, sep)) { placed.push({ x, z }); return [x, z]; }
+          }
+        }
+        const b = buildings[Math.floor(rng() * buildings.length)];
+        const x = b.position[0], z = b.position[2];
+        placed.push({ x, z });
+        return [x, z];
+      };
+
+      for (const tier of TIERS) {
+        for (let i = 0; i < tier.count; i++) {
+          const [x, z] = pickXZ();
+          const y = tier.minAlt + rng() * (tier.maxAlt - tier.minAlt);
+          result.push({ x, y, z, type: tier.type, points: tier.points, size: tier.size });
+        }
+      }
+      return result;
+    }
+
+    // ── Default mode: radial zone distribution around the origin ──
+    const spread = cityRadius * 0.6;
+    const MIN_SPACING = 80;
 
     // Check minimum distance against all placed items
     const tooClose = (x: number, y: number, z: number) =>
@@ -1261,7 +1336,6 @@ function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius }: {
       }
     };
 
-    // Altitudes are absolute — player flies between MIN_ALT(25) and MAX_ALT(900)
     // Inner ring: 10 commons between buildings, low altitude
     placeInZone(10, spread * 0.2, spread * 0.4, 80, 250, "common", 1, 6);
     // Mid ring: 12 commons + 4 rares, medium altitude
@@ -1273,7 +1347,7 @@ function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius }: {
     placeInZone(2, spread * 0.7, spread, 650, 850, "epic", 25, 14);
 
     return result;
-  }, [cityRadius]);
+  }, [cityRadius, sfMap, buildings]);
 
   // Track collected state
   const collected = useRef(new Uint8Array(COLLECTIBLE_COUNT));
@@ -2121,7 +2195,7 @@ function Waterfront({ river, dockColor }: { river: CityRiver; dockColor: string 
 
 // ─── Orbit Scene (controls + focus) ──────────────────────────
 
-function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition, isCompareCinematicPlaying, onCameraMove }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null; isCompareCinematicPlaying?: boolean; onCameraMove?: (x: number, z: number, tx: number, tz: number) => void }) {
+function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition, isCompareCinematicPlaying, onCameraMove, homeTarget, maxDistance }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null; isCompareCinematicPlaying?: boolean; onCameraMove?: (x: number, z: number, tx: number, tz: number) => void; homeTarget?: [number, number, number] | null; maxDistance?: number }) {
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
   const frameCount = useRef(0);
@@ -2150,9 +2224,9 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPositio
         enableDamping
         dampingFactor={0.06}
         minDistance={40}
-        maxDistance={2500}
+        maxDistance={maxDistance ?? 2500}
         maxPolarAngle={Math.PI / 2.1}
-        target={[TARGET_X, TARGET_Y, TARGET_Z]}
+        target={homeTarget ?? [TARGET_X, TARGET_Y, TARGET_Z]}
         autoRotate
         autoRotateSpeed={0.15}
       />
@@ -2200,6 +2274,7 @@ interface Props {
   decorations: CityDecoration[];
   river?: CityRiver | null;
   bridges?: CityBridge[];
+  sfMap?: SFRenderMap | null;
   flyMode: boolean;
   flyVehicle?: string;
   onExitFly: () => void;
@@ -2225,6 +2300,11 @@ interface Props {
   onAdViewed?: (adId: string) => void;
   introMode?: boolean;
   onIntroEnd?: () => void;
+  // Fixed quality tier for the session; "high" unless the device/user says otherwise.
+  perfMode?: "low" | "high";
+  // Fired on sustained frame drops (outside intro/cinematics) so the host UI
+  // can suggest switching to low. Never changes quality by itself.
+  onPerfDecline?: () => void;
   raidPhase?: RaidPhase;
   raidData?: RaidExecuteResponse | null;
   raidAttacker?: CityBuilding | null;
@@ -2232,6 +2312,7 @@ interface Props {
   onRaidPhaseComplete?: (phase: RaidPhase) => void;
   onLandmarkClick?: () => void;
   onEArcadeClick?: () => void;
+  onBankClick?: () => void;
   onSponsorClick?: (slug: string) => void;
   sponsorFocusPos?: [number, number, number] | null;
   activeSponsorSlug?: string | null;
@@ -2286,11 +2367,154 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
   return null;
 }
 
-// Plaza indices for rabbit sightings (progressively further from center)
-// Downtown has no plaza, so district plazas start at index 0
-const RABBIT_PLAZA_INDICES = [0, 1, 3, 6, 9];
+const _SRGB = THREE.SRGBColorSpace;
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, resolvedSponsors, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove, bossPreview, flyBossStateRef, flyEngageBoss, flySendBossHit, flySendBossSelfHit }: Props) {
+/**
+ * Sun / Moon + atmosphere driver — the new lighting core.
+ *
+ * Each frame it reads San Francisco's local time, derives the sun altitude, and
+ * samples a cinematic palette (night -> dawn -> day -> dusk). It then drives the
+ * directional light (sun/moon), ambient, hemisphere, fog, background and tone
+ * mapping exposure, and publishes a shared `skyState` the building shader and
+ * sky dome consume — so the whole city moves through a real day/night cycle.
+ *
+ * `forceHour` (0..24) overrides the time for previewing (?hour=).
+ */
+const SUN_DIST = 4000; // light distance from the scene centre
+
+function SunRig({ forceHour }: { forceHour?: number }) {
+  const { scene, gl } = useThree();
+  const dirRef = useRef<THREE.DirectionalLight>(null);
+  const ambRef = useRef<THREE.AmbientLight>(null);
+  const hemiRef = useRef<THREE.HemisphereLight>(null);
+  const targetObj = useMemo(() => new THREE.Object3D(), []);
+
+  useFrame(() => {
+    const { dir, altitudeDeg } = sunPosition(new Date(), forceHour);
+    const p = samplePalette(altitudeDeg);
+
+    if (dirRef.current) {
+      const light = dirRef.current;
+      light.color.setRGB(p.sunColor[0], p.sunColor[1], p.sunColor[2], _SRGB);
+      light.intensity = p.sunStrength;
+      // Shine from the sun/moon direction toward the scene centre (no shadows).
+      light.position.set(dir[0] * SUN_DIST, dir[1] * SUN_DIST, dir[2] * SUN_DIST);
+    }
+    if (ambRef.current) {
+      ambRef.current.color.setRGB(p.ambientColor[0], p.ambientColor[1], p.ambientColor[2], _SRGB);
+      ambRef.current.intensity = p.ambientStrength;
+    }
+    if (hemiRef.current) {
+      hemiRef.current.color.setRGB(p.hemiSky[0], p.hemiSky[1], p.hemiSky[2], _SRGB);
+      hemiRef.current.groundColor.setRGB(p.hemiGround[0], p.hemiGround[1], p.hemiGround[2], _SRGB);
+      hemiRef.current.intensity = p.hemiStrength;
+    }
+
+    // Fog (created by the <fog> element) — animate color + distance.
+    const fog = scene.fog as THREE.Fog | null;
+    if (fog) {
+      fog.color.setRGB(p.fogColor[0], p.fogColor[1], p.fogColor[2], _SRGB);
+      fog.near = p.fogNear;
+      fog.far = p.fogFar;
+    }
+    // Background base (the sky dome covers most of it; this fills any gap).
+    if (!(scene.background instanceof THREE.Color)) scene.background = new THREE.Color();
+    scene.background.setRGB(p.bg[0], p.bg[1], p.bg[2], _SRGB);
+
+    gl.toneMappingExposure = p.exposure;
+
+    // Publish for the building shader + sky dome.
+    const s = skyState;
+    s.sunDir = dir;
+    s.sunColor = p.sunColor;
+    s.sunStrength = p.sunStrength;
+    s.ambientColor = p.ambientColor;
+    s.ambientStrength = p.ambientStrength;
+    s.hemiSky = p.hemiSky;
+    s.hemiGround = p.hemiGround;
+    s.hemiStrength = p.hemiStrength;
+    s.skyTop = p.skyTop;
+    s.skyHorizon = p.skyHorizon;
+    s.nightFactor = p.nightFactor;
+    s.ready = true;
+  });
+
+  return (
+    <>
+      <primitive object={targetObj} />
+      <ambientLight ref={ambRef} />
+      <hemisphereLight ref={hemiRef} />
+      <directionalLight ref={dirRef} target={targetObj} />
+    </>
+  );
+}
+
+const SKY_VERT = /* glsl */ `
+  varying vec3 vDir;
+  void main() {
+    vDir = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const SKY_FRAG = /* glsl */ `
+  uniform vec3 uTop;
+  uniform vec3 uHorizon;
+  uniform float uNight;
+  varying vec3 vDir;
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  void main() {
+    vec3 d = normalize(vDir);
+    float t = smoothstep(-0.12, 0.55, d.y);
+    vec3 col = mix(uHorizon, uTop, t);
+    // sparse stars on the upper sky, only at night
+    if (d.y > 0.04 && uNight > 0.01) {
+      vec2 uv = floor((d.xz / (d.y + 0.25)) * 90.0);
+      float h = hash(uv);
+      float star = smoothstep(0.992, 1.0, h);
+      col += star * uNight * (0.5 + 0.5 * hash(uv + 3.7));
+    }
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+/** Gradient sky dome (+ night stars) that follows the camera and recolors by time. */
+function DynamicSky() {
+  const matRef = useRef<THREE.ShaderMaterial>(null);
+  const meshRef = useRef<THREE.Mesh>(null);
+  const uniforms = useMemo(
+    () => ({ uTop: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() }, uNight: { value: 1 } }),
+    [],
+  );
+  useFrame(({ camera }) => {
+    if (meshRef.current) meshRef.current.position.copy(camera.position);
+    const s = skyState;
+    uniforms.uTop.value.setRGB(s.skyTop[0], s.skyTop[1], s.skyTop[2], _SRGB);
+    uniforms.uHorizon.value.setRGB(s.skyHorizon[0], s.skyHorizon[1], s.skyHorizon[2], _SRGB);
+    uniforms.uNight.value = s.nightFactor;
+  });
+  return (
+    <mesh ref={meshRef} scale={[14000, 14000, 14000]} renderOrder={-1} frustumCulled={false}>
+      <sphereGeometry args={[1, 32, 16]} />
+      <shaderMaterial
+        ref={matRef}
+        uniforms={uniforms}
+        vertexShader={SKY_VERT}
+        fragmentShader={SKY_FRAG}
+        side={THREE.BackSide}
+        depthWrite={false}
+        depthTest={false}
+        fog={false}
+      />
+    </mesh>
+  );
+}
+
+// Each sighting maps 1:1 to a generated spawn anchor (sighting N → plazas[N-1]).
+// The SF layout emits exactly one park-centroid spawn per sighting, already
+// ordered near → far, so the mapping is a straight index.
+const RABBIT_PLAZA_INDICES = [0, 1, 2, 3, 4];
+
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, sfMap, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, perfMode = "high", onPerfDecline, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onBankClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, resolvedSponsors, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove, bossPreview, flyBossStateRef, flyEngageBoss, flySendBossHit, flySendBossSelfHit }: Props) {
   const sponsors = resolvedSponsors ?? [];
   const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
   const prevComparePairRef = useRef<string>("");
@@ -2323,18 +2547,24 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
   }, [buildings, focusedBuilding, focusedBuildingB]);
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
-  const { mode: perfMode, markDecline } = usePerfMode();
+  // Time of day is fixed at 20h for launch (we don't want the city in daylight
+  // yet). ?hour=14 still overrides for previewing.
+  const skyForceHour = useMemo(() => {
+    const DEFAULT_HOUR = 20;
+    if (typeof window === "undefined") return DEFAULT_HOUR;
+    const h = new URLSearchParams(window.location.search).get("hour");
+    if (h == null) return DEFAULT_HOUR;
+    const n = parseFloat(h);
+    return Number.isFinite(n) ? ((n % 24) + 24) % 24 : DEFAULT_HOUR;
+  }, []);
+  // Quality tier is decided before the canvas mounts (device heuristics or the
+  // user's pinned preference) and stays fixed for the whole session — swapping
+  // bloom/DPR mid-flight visibly changes the city's look, which was especially
+  // jarring during the intro flyover. The PerformanceMonitor below only
+  // *reports* sustained frame drops so the HUD can suggest switching to low;
+  // the user makes the call via the perf toggle.
   const lowPerf = perfMode === "low";
-  const [dpr, setDpr] = useState(1);
-  const [bloomEnabled, setBloomEnabled] = useState(false);
-
-  // Apply low-perf preset as soon as mode resolves (after mount)
-  useEffect(() => {
-    if (lowPerf) {
-      setDpr(0.75);
-      setBloomEnabled(false);
-    }
-  }, [lowPerf]);
+  const dpr = lowPerf ? 0.75 : 1.25;
   const flyPosRef = useRef(new THREE.Vector3());
 
   const cityRadius = useMemo(() => {
@@ -2346,38 +2576,59 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
     return max;
   }, [buildings]);
 
+  // San Francisco mode: camera + controls frame the downtown (Financial District)
+  const sfHome = useMemo(() => {
+    if (!sfMap) return null;
+    const [dx, dz] = sfMap.downtown;
+    return {
+      target: [dx, 70, dz] as [number, number, number],
+      camPos: [dx - 500, 1700, dz + 850] as [number, number, number],
+      maxDistance: 9000,
+    };
+  }, [sfMap]);
+
   return (
     <Canvas
-      camera={{ position: [-400, 450, -600], fov: 55, near: 0.5, far: 15000 }}
+      shadows={false}
+      camera={{ position: sfHome ? sfHome.camPos : [-400, 450, -600], fov: 55, near: sfHome ? 6 : 0.5, far: sfHome ? 16000 : 15000 }}
       dpr={dpr}
-      gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
+      gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3, logarithmicDepthBuffer: true }}
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
-      <CityExposure cityEnergy={cityEnergy ?? 1} />
+      {/* SunRig owns exposure in SF; CityExposure only drives the theme previews. */}
+      {!sfHome && <CityExposure cityEnergy={cityEnergy ?? 1} />}
       <PerformanceMonitor
-        onIncline={() => {
-          if (lowPerf) return; // stay in low-perf preset; don't bump DPR or enable bloom
-          setDpr(1.25);
-          setBloomEnabled(true);
-        }}
         onDecline={() => {
-          setDpr(lowPerf ? 0.6 : 0.75);
-          setBloomEnabled(false);
-          markDecline();
+          // Intro/cinematics are worst-case load — not a fair benchmark.
+          if (introMode || rabbitCinematic) return;
+          onPerfDecline?.();
         }}
       />
-      <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
+      <fog attach="fog" args={[sfHome ? "#0b1622" : t.fogColor, sfHome ? 1100 : t.fogNear, sfHome ? 6500 : t.fogFar * 0.8]} key={`fog-${themeIndex}-${sfHome ? "sf" : "n"}`} />
 
-      <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
-      <directionalLight position={t.sunPos} intensity={t.sunIntensity * 3.5} color={t.sunColor} />
-      <directionalLight position={t.fillPos} intensity={t.fillIntensity * 3} color={t.fillColor} />
-      <hemisphereLight args={[t.hemiSky, t.hemiGround, t.hemiIntensity * 3.5]} key={`hemi-${themeIndex}`} />
+      {/* Theme lighting (non-SF) */}
+      {!sfHome && (
+        <>
+          <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
+          <directionalLight position={t.sunPos} intensity={t.sunIntensity * 3.5} color={t.sunColor} />
+          <directionalLight position={t.fillPos} intensity={t.fillIntensity * 3} color={t.fillColor} />
+          <hemisphereLight args={[t.hemiSky, t.hemiGround, t.hemiIntensity * 3.5]} key={`hemi-${themeIndex}`} />
+          <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
+        </>
+      )}
 
-      <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
-      <ThemeSkyFX key={`sky-fx-${themeIndex}`} themeIndex={themeIndex as 0 | 1 | 2 | 3} theme={t} />
+      {/* San Francisco — real day/night cycle driven by SF local time. SunRig
+          drives all lighting + fog + exposure; DynamicSky is the gradient sky. */}
+      {sfHome && (
+        <>
+          <SunRig forceHour={skyForceHour} />
+          <DynamicSky />
+        </>
+      )}
+      {!sfHome && <ThemeSkyFX key={`sky-fx-${themeIndex}`} themeIndex={themeIndex as 0 | 1 | 2 | 3} theme={t} />}
 
-      {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => { })} />}
+      {introMode && <IntroFlyover onEnd={onIntroEnd ?? (() => { })} lookScale={sfMap ? 0.55 : 1} />}
 
       {rabbitCinematic && rabbitCinematicTarget != null && (
         <RabbitFlyover
@@ -2392,7 +2643,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       ) : (
         <>
           {!introMode && !rabbitCinematic && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
-            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} isCompareCinematicPlaying={isCompareCinematicPlaying} onCameraMove={onCameraMove} />
+            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} isCompareCinematicPlaying={isCompareCinematicPlaying} onCameraMove={onCameraMove} homeTarget={sfHome?.target ?? null} maxDistance={sfHome?.maxDistance} />
           )}
 
           {isCompareCinematicPlaying && focusedBuilding && focusedBuildingB && (() => {
@@ -2445,7 +2696,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           {!introMode && flyMode && (
             <>
               <VehicleFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} cityRadius={cityRadius} isMobile={isMobile} onJoystickState={onJoystickState} boostActive={flyBoostActive} brakeActive={flyBrakeActive} onFlyMove={onFlyMove} onShoot={flyOnShoot} canShoot={flyPvpEnabled === true} pendingRespawnRef={flyPendingRespawnRef} selfStateRef={flySelfStateRef} />
-              <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={cityRadius} />
+              <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={cityRadius} sfMap={sfMap} buildings={buildings} />
             </>
           )}
 
@@ -2465,26 +2716,66 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         </>
       )}
 
-      <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />
+      {!sfMap && <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />}
+      {sfMap && <SFMapLayers sfMap={sfMap} />}
 
-      <EArcadeLandmark
-        onClick={blockCityClicks ? () => { } : (onEArcadeClick ?? (() => { }))}
-        themeAccent={t.building.accent}
-        themeWindowLit={t.building.windowLit}
-        themeFace={t.building.face}
-      />
-      {sponsors.map((s) => (
-        <SponsoredLandmark
-          key={s.slug}
-          config={s}
-          onClick={blockCityClicks ? () => { } : () => onSponsorClick?.(s.slug)}
-          themeAccent={t.building.accent}
-          themeWindowLit={t.building.windowLit}
-          themeFace={t.building.face}
-          dimmed={!!activeSponsorSlug && activeSponsorSlug !== s.slug}
-        />
-      ))}
-      <FounderSpire onClick={blockCityClicks ? () => { } : (onLandmarkClick ?? (() => { }))} />
+      {(() => {
+        const arcade = (
+          <EArcadeLandmark
+            onClick={blockCityClicks ? () => { } : (onEArcadeClick ?? (() => { }))}
+            themeAccent={t.building.accent}
+            themeWindowLit={t.building.windowLit}
+            themeFace={t.building.face}
+          />
+        );
+        const spire = <FounderSpire onClick={blockCityClicks ? () => { } : (onLandmarkClick ?? (() => { }))} />;
+        const bank = (
+          <BankBuilding
+            onClick={blockCityClicks ? () => { } : (onBankClick ?? (() => { }))}
+            themeAccent={t.building.accent}
+            themeWindowLit={t.building.windowLit}
+            themeFace={t.building.face}
+          />
+        );
+        const sponsorEl = (s: ResolvedSponsor) => (
+          <SponsoredLandmark
+            config={s}
+            onClick={blockCityClicks ? () => { } : () => onSponsorClick?.(s.slug)}
+            themeAccent={t.building.accent}
+            themeWindowLit={t.building.windowLit}
+            themeFace={t.building.face}
+            dimmed={!!activeSponsorSlug && activeSponsorSlug !== s.slug}
+          />
+        );
+        if (!sfMap) {
+          return <>{arcade}{sponsors.map((s) => <group key={s.slug}>{sponsorEl(s)}</group>)}{spire}{bank}</>;
+        }
+        // SF civic plaza (cross): Bank (W) + Spire (E) keep their native axis;
+        // E.Arcade is moved north, sponsors form a tidy row to the south, fountain
+        // at center. Each is wrapped in a group that cancels its authored offset.
+        const N = sponsors.length;
+        // Native (authored) X offset of the Bank / Spire from their own origin.
+        const LANDMARK_NATIVE_X = 519;
+        return (
+          <group position={[sfMap.downtown[0], 0, sfMap.downtown[1]]} scale={SF_PLAZA_SCALE}>
+            {/* Bank (W, native -519) + Spire (E, native +519): counter-translate
+                so each ends up at ∓SF_PLAZA_RADIUS (pulled in toward the center). */}
+            <group position={[LANDMARK_NATIVE_X - SF_PLAZA_RADIUS, 0, 0]}>{bank}</group>
+            <group position={[SF_PLAZA_RADIUS - LANDMARK_NATIVE_X, 0, 0]}>{spire}</group>
+            {/* E.Arcade -> north (cancel its authored EARCADE position) */}
+            <group position={[-EARCADE_X, 0, -SF_PLAZA_RADIUS - EARCADE_Z]}>{arcade}</group>
+            {/* sponsors -> evenly spaced row to the south */}
+            {sponsors.map((s, i) => {
+              const g = gridToWorldPos(s.gridX, s.gridZ);
+              const [tx, tz] = sfSponsorLocalPos(i, N);
+              return <group key={s.slug} position={[tx - g[0], 0, tz - g[2]]}>{sponsorEl(s)}</group>;
+            })}
+            {/* central fountain */}
+            <mesh position={[0, 3, 0]}><cylinderGeometry args={[36, 42, 6, 28]} /><meshStandardMaterial color="#2b3038" roughness={0.9} /></mesh>
+            <mesh position={[0, 6.5, 0]}><cylinderGeometry args={[31, 31, 1.5, 28]} /><meshStandardMaterial color="#1d6075" emissive="#10394d" emissiveIntensity={0.5} /></mesh>
+          </group>
+        );
+      })()}
 
       {/* Boss Invasion:
             ?boss=X                  → live event (BossEvent: shoot, damage, attacks, victory)
@@ -2583,14 +2874,19 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         </>
       )}
 
-      {bloomEnabled && !lowPerf && (
+      {!lowPerf && (
         <EffectComposer multisampling={0}>
+          {/* NOTE: N8AO removed — it reconstructs positions from the depth buffer
+              and does not support the renderer's logarithmicDepthBuffer (needed for
+              the huge near:0.5 / far:15000 range), which produced warped windows. */}
+          {/* Glow for the lit contribution cells — the signature pop/halo. */}
           <Bloom
             mipmapBlur
-            luminanceThreshold={1}
-            luminanceSmoothing={0.3}
-            intensity={1.2 * Math.max(0.1, cityEnergy ?? 1)}
+            luminanceThreshold={0.5}
+            luminanceSmoothing={0.45}
+            intensity={1.5 * Math.max(0.25, cityEnergy ?? 1)}
           />
+          <SMAA />
         </EffectComposer>
       )}
     </Canvas>
