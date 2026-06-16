@@ -30,7 +30,7 @@ import Image from "next/image";
 import Link from "next/link";
 import CityPulse from "@/components/activity/CityPulse";
 import { type FeedEvent } from "@/components/activity/feed";
-import { ITEM_NAMES, ITEM_EMOJIS } from "@/lib/zones";
+import { ITEM_NAMES, ITEM_EMOJIS, FACES_ITEMS } from "@/lib/zones";
 import PixelEmblem from "@/components/profile/PixelEmblem";
 import { PixelSelect } from "@/components/ui/PixelSelect";
 import { useStreakCheckin } from "@/lib/useStreakCheckin";
@@ -103,6 +103,7 @@ const RaidOverlay = dynamic(() => import("@/components/RaidOverlay"), { ssr: fal
 const PillModal = dynamic(() => import("@/components/PillModal"), { ssr: false });
 const FounderMessage = dynamic(() => import("@/components/FounderMessage"), { ssr: false });
 const EArcadeCard = dynamic(() => import("@/components/EArcadeCard"), { ssr: false });
+const GiftPreview = dynamic(() => import("@/components/ShopPreview"), { ssr: false });
 const BankPanel = dynamic(() => import("@/components/BankPanel"), { ssr: false });
 const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ssr: false });
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
@@ -767,6 +768,10 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [giftItems, setGiftItems] = useState<{ id: string; price_usd_cents: number; price_pixels: number | null; name: string; owned: boolean }[] | null>(null);
   const [giftBuying, setGiftBuying] = useState<string | null>(null);
   const [giftError, setGiftError] = useState<string | null>(null);
+  // Item the sender picked and is now previewing/confirming (null = item list step)
+  const [giftPreviewItem, setGiftPreviewItem] = useState<{ id: string; price_usd_cents: number; price_pixels: number | null; name: string; owned: boolean } | null>(null);
+  // Set once a gift is successfully sent so the modal shows a confirmation state
+  const [giftSent, setGiftSent] = useState(false);
   const [compareCopied, setCompareCopied] = useState(false);
   const [compareLang, setCompareLang] = useState<"en" | "pt">("en");
   const [clickedAd, setClickedAd] = useState<import("@/lib/skyAds").SkyAd | null>(null);
@@ -1357,6 +1362,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     setGiftModalOpen(true);
     setGiftItems(null);
     setGiftError(null);
+    setGiftPreviewItem(null);
+    setGiftSent(false);
     try {
       const res = await fetch("/api/items");
       if (!res.ok) return;
@@ -1390,6 +1397,20 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setGiftItems((prev) =>
           prev?.map((i) => i.id === itemId ? { ...i, owned: true } : i) ?? null
         );
+        // Reflect the recipient's new ownership so the preview/equipped UI updates
+        setSelectedBuilding((prev) =>
+          prev && !prev.owned_items.includes(itemId)
+            ? { ...prev, owned_items: [...prev.owned_items, itemId] }
+            : prev
+        );
+        // Optimistically decrement the sender's wallet chip (authoritative balance
+        // comes back from the next /api/pixels/balance refresh)
+        if (typeof data.new_balance === "number") {
+          setPixelBalance(data.new_balance);
+        } else if (typeof data.price === "number") {
+          setPixelBalance((b) => (b == null ? b : Math.max(0, b - data.price)));
+        }
+        setGiftSent(true);
       } else {
         const msg = data.error === "insufficient_balance"
           ? "Not enough PX. Buy more at /pixels"
@@ -6058,69 +6079,195 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       )}
 
       {/* ─── Gift Modal ─── */}
-      {giftModalOpen && selectedBuilding && (
+      {giftModalOpen && selectedBuilding && (() => {
+        const closeGift = () => {
+          setGiftModalOpen(false);
+          setGiftItems(null);
+          setGiftPreviewItem(null);
+          setGiftError(null);
+          setGiftSent(false);
+        };
+        const inPreview = giftPreviewItem !== null;
+        // Recipient building props for the 3D preview (their real loadout/colors/dims)
+        const recipientLoadout = selectedBuilding.loadout ?? { crown: null, roof: null, aura: null };
+        const giftIsFaces = giftPreviewItem ? FACES_ITEMS.includes(giftPreviewItem.id) : false;
+        const previewFaces = [
+          ...FACES_ITEMS.filter((f) => selectedBuilding.owned_items.includes(f)),
+          ...(giftIsFaces && giftPreviewItem ? [giftPreviewItem.id] : []),
+        ];
+        const previewDims = {
+          width: selectedBuilding.width,
+          height: selectedBuilding.height,
+          depth: selectedBuilding.depth,
+        };
+        const px = giftPreviewItem?.price_pixels ?? null;
+        const priceLabel = giftPreviewItem
+          ? px != null
+            ? `${px} PX`
+            : `$${(giftPreviewItem.price_usd_cents / 100).toFixed(2)}`
+          : "";
+        const canAfford = px == null || pixelBalance == null || pixelBalance >= px;
+        const isBuying = giftPreviewItem ? giftBuying === giftPreviewItem.id : false;
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
             className="absolute inset-0 bg-bg/70 backdrop-blur-sm"
-            onClick={() => { setGiftModalOpen(false); setGiftItems(null); }}
+            onClick={closeGift}
           />
-          <div className="relative z-10 w-full max-w-70 border-[3px] border-border bg-bg-raised">
+          <div className={`relative z-10 max-h-[90vh] w-full overflow-y-auto scrollbar-thin border-[3px] border-border bg-bg-raised ${inPreview ? "max-w-sm sm:max-w-md" : "max-w-70"}`}>
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div>
-                <h3 className="text-xs" style={{ color: theme.accent }}>Send Gift</h3>
-                <p className="mt-0.5 text-[8px] text-muted normal-case">to @{selectedBuilding.login}</p>
+              <div className="flex items-center gap-2">
+                {inPreview && !giftSent && (
+                  <button
+                    onClick={() => { setGiftPreviewItem(null); setGiftError(null); }}
+                    className="text-xs text-muted hover:text-cream"
+                    aria-label="Back"
+                  >
+                    &#8592;
+                  </button>
+                )}
+                <div>
+                  <h3 className="text-xs" style={{ color: theme.accent }}>
+                    {giftSent ? "Gift Sent" : "Send Gift"}
+                  </h3>
+                  <p className="mt-0.5 text-[8px] text-muted normal-case">to @{selectedBuilding.login}</p>
+                </div>
               </div>
               <button
-                onClick={() => { setGiftModalOpen(false); setGiftItems(null); }}
+                onClick={closeGift}
                 className="text-xs text-muted hover:text-cream"
               >
                 &#10005;
               </button>
             </div>
 
-            {/* Items */}
-            {giftItems === null ? (
-              <p className="py-8 text-center text-[9px] text-dim normal-case animate-pulse">
-                Loading...
-              </p>
-            ) : giftItems.length === 0 ? (
-              <p className="py-8 text-center text-[9px] text-dim normal-case">
-                No items available
-              </p>
-            ) : (
-              <div className="max-h-72 overflow-y-auto scrollbar-thin">
-                {giftItems.map((item) => {
-                  const isBuying = giftBuying === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => !item.owned && handleGiftCheckout(item.id)}
-                      disabled={!!giftBuying || item.owned}
-                      className={`flex w-full items-center gap-3 border-b border-border/30 px-4 py-2.5 text-left transition-colors ${item.owned ? "opacity-35 cursor-not-allowed" : "hover:bg-bg-card/80 disabled:opacity-40"}`}
-                    >
-                      <span className="text-base shrink-0">{ITEM_EMOJIS[item.id] ?? "🎁"}</span>
-                      <span className="flex-1 text-[10px] text-cream">
-                        {ITEM_NAMES[item.id] ?? item.id}
-                      </span>
-                      <span className="text-[10px] shrink-0" style={{ color: item.owned ? undefined : theme.accent }}>
-                        {item.owned ? "Owned" : isBuying ? "..." : item.price_pixels != null ? `${item.price_pixels} PX` : `$${(item.price_usd_cents / 100).toFixed(2)}`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {/* ── Step 2: Preview + confirm ── */}
+            {inPreview && giftPreviewItem ? (
+              <div className="p-4">
+                {/* 3D preview of the gift on the recipient's real building */}
+                <GiftPreview
+                  loadout={recipientLoadout}
+                  ownedFacesItems={previewFaces}
+                  customColor={selectedBuilding.custom_color ?? null}
+                  billboardImages={selectedBuilding.billboard_images ?? []}
+                  buildingDims={previewDims}
+                  highlightItemId={giftPreviewItem.id}
+                />
 
-            {/* Error message */}
-            {giftError && (
-              <div className="border-t border-border px-4 py-2 bg-red-500/10">
-                <p className="text-[10px] text-red-400 normal-case text-center">{giftError}</p>
+                {/* Item summary */}
+                <div className="mt-3 flex items-center gap-3 border-2 border-border bg-bg-card px-3 py-2.5">
+                  <span className="text-xl shrink-0">{ITEM_EMOJIS[giftPreviewItem.id] ?? "🎁"}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-cream truncate">{ITEM_NAMES[giftPreviewItem.id] ?? giftPreviewItem.id}</p>
+                    <p className="text-[8px] text-muted normal-case">on @{selectedBuilding.login}&apos;s building</p>
+                  </div>
+                  <span className="text-[11px] shrink-0" style={{ color: theme.accent }}>{priceLabel}</span>
+                </div>
+
+                {giftSent ? (
+                  <>
+                    {/* Success state */}
+                    <div className="mt-3 border-2 border-green-500/40 bg-green-500/10 px-3 py-3 text-center">
+                      <p className="text-[11px] text-green-400">🎁 Sent to @{selectedBuilding.login}!</p>
+                      <p className="mt-1 text-[8px] text-muted normal-case">
+                        We emailed them so they know it&apos;s waiting on their building.
+                      </p>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => { setGiftPreviewItem(null); setGiftSent(false); setGiftError(null); }}
+                        className="btn-press border-2 border-border bg-bg-card py-2 text-[10px] text-cream hover:border-border-light"
+                      >
+                        Send another
+                      </button>
+                      <button
+                        onClick={closeGift}
+                        className="btn-press border-2 py-2 text-[10px] text-bg"
+                        style={{ backgroundColor: theme.accent, boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Email reassurance */}
+                    <p className="mt-2.5 text-center text-[8px] text-dim normal-case">
+                      @{selectedBuilding.login} gets an email when you send this.
+                    </p>
+
+                    {giftError && (
+                      <p className="mt-2 text-center text-[10px] text-red-400 normal-case">{giftError}</p>
+                    )}
+
+                    {/* Confirm / back */}
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => { setGiftPreviewItem(null); setGiftError(null); }}
+                        disabled={isBuying}
+                        className="btn-press border-2 border-border bg-bg-card py-2.5 text-[10px] text-cream hover:border-border-light disabled:opacity-40"
+                      >
+                        Back
+                      </button>
+                      {canAfford ? (
+                        <button
+                          onClick={() => handleGiftCheckout(giftPreviewItem.id)}
+                          disabled={isBuying}
+                          className="btn-press border-2 py-2.5 text-[10px] text-bg disabled:opacity-60"
+                          style={{ backgroundColor: theme.accent, boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
+                        >
+                          {isBuying ? "Sending..." : `Send for ${priceLabel}`}
+                        </button>
+                      ) : (
+                        <Link
+                          href="/pixels"
+                          className="btn-press border-2 border-border bg-bg-card py-2.5 text-center text-[10px] text-red-400 hover:border-border-light"
+                        >
+                          Not enough PX
+                        </Link>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
+            ) : (
+              /* ── Step 1: Pick an item ── */
+              <>
+                {giftItems === null ? (
+                  <p className="py-8 text-center text-[9px] text-dim normal-case animate-pulse">
+                    Loading...
+                  </p>
+                ) : giftItems.length === 0 ? (
+                  <p className="py-8 text-center text-[9px] text-dim normal-case">
+                    No items available
+                  </p>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto scrollbar-thin">
+                    {giftItems.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => { if (!item.owned) { setGiftError(null); setGiftPreviewItem(item); } }}
+                        disabled={item.owned}
+                        className={`flex w-full items-center gap-3 border-b border-border/30 px-4 py-2.5 text-left transition-colors ${item.owned ? "opacity-35 cursor-not-allowed" : "hover:bg-bg-card/80"}`}
+                      >
+                        <span className="text-base shrink-0">{ITEM_EMOJIS[item.id] ?? "🎁"}</span>
+                        <span className="flex-1 text-[10px] text-cream">
+                          {ITEM_NAMES[item.id] ?? item.id}
+                        </span>
+                        <span className="text-[10px] shrink-0" style={{ color: item.owned ? undefined : theme.accent }}>
+                          {item.owned ? "Owned" : item.price_pixels != null ? `${item.price_pixels} PX` : `$${(item.price_usd_cents / 100).toFixed(2)}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ─── Activity Hub (full feed destination) ─── */}
       <ActivityHub
