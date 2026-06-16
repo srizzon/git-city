@@ -2013,3 +2013,31 @@ ON CONFLICT (id) DO UPDATE
   SET total_developers = EXCLUDED.total_developers,
       total_contributions = EXCLUDED.total_contributions,
       updated_at = now();
+
+-- ---------------------------------------------------------------------------
+-- Resync identity/serial sequences after seeding.
+--
+-- The inserts above provide explicit `id` values (developers 1..2000, etc.),
+-- which does NOT advance the underlying identity sequences. Without this, the
+-- next real insert (e.g. a new developer via login) reuses a low id and fails
+-- with a duplicate-key error, so signups silently break on any freshly seeded
+-- database. This bumps every public sequence to MAX(id) so the next insert is
+-- collision-free. Idempotent and safe to run repeatedly.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT s.relname AS seq, t.relname AS tbl, a.attname AS col
+    FROM pg_class s
+    JOIN pg_depend d ON d.objid = s.oid AND d.deptype IN ('a', 'i')
+    JOIN pg_class t ON t.oid = d.refobjid
+    JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+    WHERE s.relkind = 'S' AND t.relnamespace = 'public'::regnamespace
+  LOOP
+    EXECUTE format(
+      'SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM public.%I), 1))',
+      r.seq, r.col, r.tbl
+    );
+  END LOOP;
+END $$;
