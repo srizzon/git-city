@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.107.0 # pinned: `latest` resolves via the GitHub API and hits its rate limit
       # Spins up the full local stack (Postgres + auth roles + extensions) and
       # applies every migration in order from scratch. Fails the job — and
       # blocks the deploy below — if any migration errors.
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.107.0 # pinned: `latest` resolves via the GitHub API and hits its rate limit
       - run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
       # Applies only the migrations that prod's history doesn't have yet.
       - run: supabase db push
