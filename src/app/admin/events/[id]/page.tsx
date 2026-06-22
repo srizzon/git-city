@@ -53,17 +53,38 @@ export default function EventMetricsPage({ params }: { params: Promise<{ id: str
     return () => clearInterval(t);
   }, [fetchMetrics]);
 
+  const [busy, setBusy] = useState(false);
+  const [newEnd, setNewEnd] = useState("");
+  const patch = useCallback(async (body: Record<string, unknown>, confirmMsg?: string) => {
+    if (confirmMsg && !confirm(confirmMsg)) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/events/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Action failed");
+      await fetchMetrics();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [id, fetchMetrics]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-bg p-8">
-        <div className="mx-auto max-w-4xl"><div className="h-4 w-40 animate-pulse bg-border" /></div>
+        <div className="mx-auto max-w-6xl"><div className="h-4 w-40 animate-pulse bg-border" /></div>
       </div>
     );
   }
   if (error || !m?.summary) {
     return (
       <div className="min-h-screen bg-bg p-8 text-cream">
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-6xl">
           <a href="/admin/events" className="text-[11px] text-muted hover:text-cream">← Events</a>
           <p className="mt-4 text-xs text-red-400">{error ?? "Event not found"}</p>
         </div>
@@ -77,7 +98,7 @@ export default function EventMetricsPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="min-h-screen bg-bg p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-6xl">
         <a href="/admin/events" className="text-[11px] text-muted transition-colors hover:text-cream">← Events</a>
         <div className="mb-6 mt-2 flex items-baseline gap-3">
           <h1 className="text-sm text-cream">{s.slug}</h1>
@@ -91,6 +112,38 @@ export default function EventMetricsPage({ params }: { params: Promise<{ id: str
           <Stat label="Total damage" value={s.total_damage.toLocaleString()} sub={`${hpPct.toFixed(0)}% of ${s.boss_max_hp.toLocaleString()} HP`} />
           <Stat label="Rewards granted" value={s.rewards_granted.toLocaleString()} />
           <Stat label="Flagged outliers" value={s.flagged_outliers.toLocaleString()} sub={s.flagged_outliers > 0 ? "review" : "clean"} />
+        </div>
+
+        {/* Live controls — manage the running event without a deploy */}
+        <div className="mb-6 border border-border bg-bg-raised p-4">
+          <p className="mb-3 text-[11px] text-muted">Live controls</p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="mb-1 block text-[10px] text-dim">New end time</label>
+              <input type="datetime-local" value={newEnd} onChange={(e) => setNewEnd(e.target.value)}
+                className="border border-border bg-bg px-2 py-1.5 text-[11px] text-cream outline-none focus:border-lime" />
+            </div>
+            <button disabled={busy || !newEnd}
+              onClick={() => patch({ action: "extend", ends_at: new Date(newEnd).toISOString() })}
+              className="border border-border px-3 py-1.5 text-[10px] text-muted transition-colors hover:border-lime/40 hover:text-lime disabled:opacity-40">
+              Apply end time
+            </button>
+            {s.status === "live" && (
+              <button disabled={busy} onClick={() => patch({ action: "end" }, "End event now?")}
+                className="border border-amber-700/40 px-3 py-1.5 text-[10px] text-amber-400 transition-colors hover:bg-amber-900/20 disabled:opacity-40">
+                End now
+              </button>
+            )}
+            {s.status === "wrap" && (
+              <button disabled={busy} onClick={() => patch({ action: "release" }, "Release rewards now? This grants Pixels/items to winners.")}
+                className="border border-lime/40 px-3 py-1.5 text-[10px] text-lime transition-colors hover:bg-lime/10 disabled:opacity-40">
+                Release rewards
+              </button>
+            )}
+          </div>
+          {s.status === "wrap" && (
+            <p className="mt-2 text-[9px] text-amber-400 normal-case">Held: standings computed, rewards NOT paid yet. Review flagged outliers in the leaderboard below, then Release.</p>
+          )}
         </div>
 
         {/* DAU lift + retention split — the "gold numbers" */}

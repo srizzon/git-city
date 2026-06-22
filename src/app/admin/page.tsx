@@ -39,6 +39,11 @@ const SECTIONS: { heading: string; links: AdminLink[] }[] = [
         description: "Avatar and building cosmetics gallery",
       },
       {
+        href: "/admin/emblems",
+        title: "Emblems",
+        description: "Merit-honors catalog — create, preview, grant",
+      },
+      {
         href: "/admin/jobs",
         title: "Jobs & Companies",
         description: "Job board listings and company profiles",

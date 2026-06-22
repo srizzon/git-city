@@ -18,15 +18,21 @@ import {
   type CityBridge,
   type DistrictZone,
   type DeveloperRecord,
+  type SFMapAsset,
+  type SFRenderMap,
 } from "@/lib/github";
 import { gridToWorldPos } from "@/lib/sponsors/registry";
+import { SF_PLAZA_SCALE, sfSponsorLocalPos } from "@/lib/sponsors/sfPlaza";
 import { resolveAssignmentsToSponsors, type ResolvedSponsor } from "@/lib/landmarks/resolve";
 import type { Assignment } from "@/lib/landmarks/types";
 import { getLandmarkAdId } from "@/lib/sponsors/landmarkAdIds";
 import Image from "next/image";
 import Link from "next/link";
-import ActivityTicker, { type FeedEvent } from "@/components/ActivityTicker";
-import { ITEM_NAMES, ITEM_EMOJIS } from "@/lib/zones";
+import CityPulse from "@/components/activity/CityPulse";
+import { type FeedEvent } from "@/components/activity/feed";
+import { ITEM_NAMES, ITEM_EMOJIS, FACES_ITEMS } from "@/lib/zones";
+import PixelEmblem from "@/components/profile/PixelEmblem";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 import { useStreakCheckin } from "@/lib/useStreakCheckin";
 import { useLiveUsers } from "@/lib/useLiveUsers";
 import { useCodingPresence } from "@/lib/useCodingPresence";
@@ -34,16 +40,20 @@ import { useFlyPresence } from "@/lib/useFlyPresence";
 import PvPHud from "@/components/PvPHud";
 import ForcePushFlyBadge from "@/components/ForcePushFlyBadge";
 import PixelHeart from "@/components/PixelHeart";
+import CurrencyIcon from "@/components/CurrencyIcon";
+import { SocialLinkChip } from "@/components/SocialIcons";
+import { SOCIAL_PLATFORMS, type SocialLinks } from "@/lib/social-links";
 import { useRaidSequence } from "@/lib/useRaidSequence";
 import { isFridayThe13th } from "@/lib/raid";
 import { useDailies } from "@/lib/useDailies";
 import InviteCard, { type InvitePreview } from "@/components/InviteCard";
 import XpBar from "@/components/XpBar";
-import PixelBalance from "@/components/PixelBalance";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
 import RadarMap from "@/components/RadarMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
+import { fetchCitySnapshot } from "@/lib/city-snapshot-client";
+import { usePerfMode } from "@/lib/perfMode";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
 import {
@@ -65,6 +75,19 @@ import {
   trackEArcadeClicked,
   trackLandmarkClicked,
 } from "@/lib/himetrica";
+import posthog from "posthog-js";
+
+// San Francisco map asset (baked from OSM). Fetched once, shared by every
+// layout recompute. Falls back to undefined (procedural layout) if missing.
+let _sfMapPromise: Promise<SFMapAsset | undefined> | null = null;
+function loadSFMap(): Promise<SFMapAsset | undefined> {
+  if (!_sfMapPromise) {
+    _sfMapPromise = fetch("/maps/sf.json")
+      .then((r) => (r.ok ? r.json() : undefined))
+      .catch(() => undefined);
+  }
+  return _sfMapPromise;
+}
 
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
   ssr: false,
@@ -73,13 +96,15 @@ const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
 const BossEventHUD = dynamic(() => import("@/components/BossEventHUD"), { ssr: false });
 const BossInvasionCard = dynamic(() => import("@/components/BossInvasionCard"), { ssr: false });
 
-const ActivityPanel = dynamic(() => import("@/components/ActivityPanel"), { ssr: false });
+const ActivityHub = dynamic(() => import("@/components/activity/ActivityHub"), { ssr: false });
 const DailiesWidget = dynamic(() => import("@/components/DailiesWidget"), { ssr: false });
 const RaidPreviewModal = dynamic(() => import("@/components/RaidPreviewModal"), { ssr: false });
 const RaidOverlay = dynamic(() => import("@/components/RaidOverlay"), { ssr: false });
 const PillModal = dynamic(() => import("@/components/PillModal"), { ssr: false });
 const FounderMessage = dynamic(() => import("@/components/FounderMessage"), { ssr: false });
 const EArcadeCard = dynamic(() => import("@/components/EArcadeCard"), { ssr: false });
+const GiftPreview = dynamic(() => import("@/components/ShopPreview"), { ssr: false });
+const BankPanel = dynamic(() => import("@/components/BankPanel"), { ssr: false });
 const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ssr: false });
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
 const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
@@ -98,9 +123,6 @@ const THEMES = [
 // Achievement display data for profile card (client-side, mirrors DB)
 const TIER_COLORS_MAP: Record<string, string> = {
   bronze: "#cd7f32", silver: "#c0c0c0", gold: "#ffd700", diamond: "#b9f2ff",
-};
-const TIER_EMOJI_MAP: Record<string, string> = {
-  bronze: "\uD83D\uDFE4", silver: "\u26AA", gold: "\uD83D\uDFE1", diamond: "\uD83D\uDC8E",
 };
 const ACHIEVEMENT_TIERS_MAP: Record<string, string> = {
   god_mode: "diamond", legend: "diamond", famous: "diamond", mayor: "diamond",
@@ -226,6 +248,64 @@ const ERROR_MESSAGES: Record<string, { primary: (u: string) => string; secondary
     hasRetry: true,
   },
 };
+
+// Graphics quality control: the chip shows the effective tier; the popover
+// lets the user pin AUTO / HIGH / LOW explicitly. Quality never changes on its
+// own — when the runtime detects sustained frame drops it raises a toast
+// suggesting LOW instead.
+function GraphicsControl({
+  mode,
+  preference,
+  accent,
+  onSelect,
+}: {
+  mode: "low" | "high";
+  preference: "low" | "high" | "auto";
+  accent: string;
+  onSelect: (p: "low" | "high" | "auto") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const options: { value: "auto" | "high" | "low"; label: string; hint: string }[] = [
+    { value: "auto", label: "AUTO", hint: "detect my GPU" },
+    { value: "high", label: "HIGH", hint: "full effects" },
+    { value: "low", label: "LOW", hint: "best FPS" },
+  ];
+  return (
+    <div className="relative">
+      {open && (
+        <div className="absolute bottom-full left-0 mb-2 flex w-44 flex-col border-[3px] border-border bg-bg/95 backdrop-blur-sm animate-[fade-in_0.15s_ease-out]">
+          <div className="border-b-2 border-border px-3 py-1.5 text-[9px] uppercase tracking-wider text-muted">
+            Graphics
+          </div>
+          {options.map((o) => (
+            <button
+              key={o.value}
+              onClick={() => { onSelect(o.value); setOpen(false); }}
+              className="flex items-baseline gap-2 px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-bg-raised"
+            >
+              <span style={{ color: preference === o.value ? accent : "transparent" }}>&#9656;</span>
+              <span className="text-cream">{o.label}</span>
+              <span className="ml-auto text-[8px] text-muted">{o.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Graphics quality"
+        className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+      >
+        <span style={{ color: accent }}>&#9670;</span>
+        <span className="text-cream">Graphics</span>
+        {/* The tier is resolved from client-only signals (localStorage, ?perf=,
+            GPU heuristic) so it legitimately differs from the SSR fallback
+            ("high"). Suppress the one-render text mismatch instead of deferring
+            the read, which the scene needs synchronously before the first frame. */}
+        <span className="text-dim" suppressHydrationWarning>{mode === "high" ? "HIGH" : "LOW"}</span>
+      </button>
+    </div>
+  );
+}
 
 function SearchFeedback({
   feedback,
@@ -405,7 +485,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   // Polls /api/events/active so the boss appears/disappears with the
   // scheduled window managed by the lifecycle cron.
   const [liveEvent, setLiveEvent] = useState<
-    { id: string; maxHp: number; variant: "duck" | "cafetopia"; participants: number } | null
+    { id: string; maxHp: number; variant: "duck" | "cafetopia"; participants: number; tuning?: import("@/lib/events/schema").BossTuning } | null
   >(null);
   const [liveLeaderboard, setLiveLeaderboard] = useState<
     { rank: number; login: string; damage: number; minions: number }[]
@@ -421,7 +501,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           const variant = (data.event.theme_config?.variant === "cafetopia" ? "cafetopia" : "duck") as
             | "duck"
             | "cafetopia";
-          setLiveEvent({ id: data.event.id, maxHp: data.event.boss_max_hp, variant, participants: data.participants ?? 0 });
+          setLiveEvent({ id: data.event.id, maxHp: data.event.boss_max_hp, variant, participants: data.participants ?? 0, tuning: data.event.boss_config ?? undefined });
           setLiveLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
         } else {
           setLiveEvent(null);
@@ -457,7 +537,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   //   live event from API  → real server-authoritative event
   const bossPreview = useMemo(():
     | { variant: "duck" | "cafetopia"; mode: "static"; phase: 1 | 2 | 3 | 4 }
-    | { variant: "duck" | "cafetopia"; mode: "live"; eventId?: string; maxHp?: number; serverAuthoritative?: boolean }
+    | { variant: "duck" | "cafetopia"; mode: "live"; eventId?: string; maxHp?: number; serverAuthoritative?: boolean; tuning?: import("@/lib/events/schema").BossTuning }
     | null => {
     const v = searchParams.get("boss");
     if (v === "duck" || v === "cafetopia") {
@@ -471,7 +551,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     }
     // Production: a real scheduled event is live
     if (liveEvent) {
-      return { variant: liveEvent.variant, mode: "live", eventId: liveEvent.id, maxHp: liveEvent.maxHp, serverAuthoritative: true };
+      return { variant: liveEvent.variant, mode: "live", eventId: liveEvent.id, maxHp: liveEvent.maxHp, serverAuthoritative: true, tuning: liveEvent.tuning };
     }
     return null;
   }, [searchParams, liveEvent]);
@@ -487,6 +567,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [decorations, setDecorations] = useState<CityDecoration[]>([]);
   const [river, setRiver] = useState<CityRiver | null>(null);
   const [bridges, setBridges] = useState<CityBridge[]>([]);
+  const [sfMap, setSfMap] = useState<SFRenderMap | null>(null);
+  const sfMapRef = useRef<SFMapAsset | undefined>(undefined);
   const [districtZones, setDistrictZones] = useState<DistrictZone[]>([]);
   const [loading, setLoading] = useState(false);
   // Loading state machine — skip on return visits that still have cached data
@@ -524,6 +606,31 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [introPhase, setIntroPhase] = useState(-1); // -1 = not started, 0-3 = text phases, 4 = done
   const [exploreMode, setExploreMode] = useState(false);
   const [themeIndex, setThemeIndex] = useState(0);
+
+  // Performance tier: resolved before the first frame (GPU benchmark, cached
+  // detection, or pinned preference) and fixed for the session. Frame drops
+  // never downgrade the visible city — while the loading screen still covers
+  // everything they correct the auto tier invisibly; after reveal they raise
+  // a toast suggesting LOW, and the user decides.
+  const { mode: perfMode, preference: perfPreference, setPreference: setPerfPreference, downgradeAutoTier } = usePerfMode();
+  const [perfToast, setPerfToast] = useState(false);
+  const perfDeclines = useRef(0);
+  const perfToastShown = useRef(false);
+  const loadStageRef = useRef<LoadingStage>("init");
+  useEffect(() => {
+    loadStageRef.current = loadStage;
+  }, [loadStage]);
+  const handlePerfDecline = useCallback(() => {
+    perfDeclines.current += 1;
+    if (perfDeclines.current < 2) return;
+    if (loadStageRef.current !== "done") {
+      downgradeAutoTier();
+      perfDeclines.current = 0;
+    } else if (!perfToastShown.current) {
+      perfToastShown.current = true;
+      setPerfToast(true);
+    }
+  }, [downgradeAutoTier]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -572,10 +679,6 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [flySelfHp, setFlySelfHp] = useState(3);
   const [playerYaw, setPlayerYaw] = useState(0);
   const [cameraPos, setCameraPos] = useState<{ x: number; z: number; tx: number; tz: number }>({ x: 800, z: 1000, tx: 0, tz: 0 });
-  const [districtAnnouncement, setDistrictAnnouncement] = useState<{ name: string; color: string; population: number } | null>(null);
-  const lastDistrictRef = useRef<string | null>(null);
-  const announceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const announceCooldownRef = useRef(0);
   const [flyPaused, setFlyPaused] = useState(false);
   const [flyPauseSignal, setFlyPauseSignal] = useState(0);
   const [flyJoystickState, setFlyJoystickState] = useState<{ baseX: number; baseY: number; dx: number; dy: number } | null>(null);
@@ -603,6 +706,20 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [vsCodeKeyLoading, setVsCodeKeyLoading] = useState(false);
   const [vsCodeKeyCopied, setVsCodeKeyCopied] = useState(false);
   const [codingPanelOpen, setCodingPanelOpen] = useState(false);
+  // User override: keep the city lights on even when nobody is coding.
+  const [forceLightsOn, setForceLightsOn] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("gc_force_lights_on") === "1") setForceLightsOn(true);
+    } catch { /* ignore */ }
+  }, []);
+  const toggleForceLightsOn = useCallback(() => {
+    setForceLightsOn((v) => {
+      const next = !v;
+      try { localStorage.setItem("gc_force_lights_on", next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [codingInfoOpen, setCodingInfoOpen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -613,6 +730,9 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [claimingGift, setClaimingGift] = useState(false);
   const [feedEvents, setFeedEvents] = useState<FeedEvent[]>([]);
   const [feedPanelOpen, setFeedPanelOpen] = useState(false);
+  // Visible feedback while opening a dev from the activity feed (the search
+  // feedback UI only renders on the landing/compare screens, not in explore).
+  const [feedNav, setFeedNav] = useState<{ login: string; phase: "loading" | "error" | "pending" } | null>(null);
   const [kudosSending, setKudosSending] = useState(false);
   const [kudosSent, setKudosSent] = useState(false);
   const [kudosError, setKudosError] = useState<string | null>(null);
@@ -630,6 +750,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [dropPlanting, setDropPlanting] = useState(false);
   const [dropPlantResult, setDropPlantResult] = useState<string | null>(null);
   const visitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [cardSocialLinks, setCardSocialLinks] = useState<SocialLinks | null>(null);
+  const socialLinksCacheRef = useRef<Map<string, SocialLinks>>(new Map());
   const [compareBuilding, setCompareBuilding] = useState<CityBuilding | null>(null);
   const [comparePair, setComparePair] = useState<[CityBuilding, CityBuilding] | null>(null);
   const [compareCinematicPlaying, setCompareCinematicPlaying] = useState(false);
@@ -646,6 +768,10 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [giftItems, setGiftItems] = useState<{ id: string; price_usd_cents: number; price_pixels: number | null; name: string; owned: boolean }[] | null>(null);
   const [giftBuying, setGiftBuying] = useState<string | null>(null);
   const [giftError, setGiftError] = useState<string | null>(null);
+  // Item the sender picked and is now previewing/confirming (null = item list step)
+  const [giftPreviewItem, setGiftPreviewItem] = useState<{ id: string; price_usd_cents: number; price_pixels: number | null; name: string; owned: boolean } | null>(null);
+  // Set once a gift is successfully sent so the modal shows a confirmation state
+  const [giftSent, setGiftSent] = useState(false);
   const [compareCopied, setCompareCopied] = useState(false);
   const [compareLang, setCompareLang] = useState<"en" | "pt">("en");
   const [clickedAd, setClickedAd] = useState<import("@/lib/skyAds").SkyAd | null>(null);
@@ -658,6 +784,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [pillModalOpen, setPillModalOpen] = useState(false);
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
   const [eArcadeOpen, setEArcadeOpen] = useState(false);
+  const [bankOpen, setBankOpen] = useState(false);
+  const [pixelBalance, setPixelBalance] = useState<number | null>(null);
   const [arcadeOnline, setArcadeOnline] = useState<number>(0);
   const [activeSponsor, setActiveSponsor] = useState<string | null>(null);
   const [districtChooserOpen, setDistrictChooserOpen] = useState(false);
@@ -688,7 +816,6 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   // Fly onboarding
   const [showDailyNudge, setShowDailyNudge] = useState(false);
   const [showFlyHint, setShowFlyHint] = useState(false);
-  const [showFlyControls, setShowFlyControls] = useState(false);
   const [showFlyResults, setShowFlyResults] = useState<{
     score: number; collected: number; maxCombo: number; timeBonus: number;
     isNewPB: boolean; rank: number; totalPilots: number;
@@ -815,14 +942,23 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       setSession(s);
       if (s) {
         const login = (s.user?.user_metadata?.user_name ?? s.user?.user_metadata?.preferred_username ?? "").toLowerCase();
-        if (login) identifyUser({ github_login: login, email: s.user?.email ?? undefined });
+        if (login) {
+          identifyUser({ github_login: login, email: s.user?.email ?? undefined });
+          posthog.identify(login, { github_login: login, email: s.user?.email });
+        }
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, s: Session | null) => {
       setSession(s);
       if (s && event !== "TOKEN_REFRESHED") {
         const login = (s.user?.user_metadata?.user_name ?? s.user?.user_metadata?.preferred_username ?? "").toLowerCase();
-        if (login) identifyUser({ github_login: login, email: s.user?.email ?? undefined });
+        if (login) {
+          identifyUser({ github_login: login, email: s.user?.email ?? undefined });
+          posthog.identify(login, { github_login: login, email: s.user?.email });
+        }
+      }
+      if (event === "SIGNED_OUT") {
+        posthog.reset();
       }
     });
     return () => subscription.unsubscribe();
@@ -856,6 +992,24 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     authAvatar,
     flyVehicle,
   );
+
+  // Boss escape notice: the event window closed (cron archived it) while the
+  // boss was still alive. Without this the duck just vanishes in silence —
+  // there is a victory screen but no defeat beat.
+  const [bossEscaped, setBossEscaped] = useState(false);
+  const prevLiveEventIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevLiveEventIdRef.current;
+    prevLiveEventIdRef.current = liveEvent?.id ?? null;
+    if (prev && !liveEvent) {
+      const bs = flyBossStateRef.current;
+      if (!bs.defeated && bs.updatedAt > 0) {
+        setBossEscaped(true);
+        const t = setTimeout(() => setBossEscaped(false), 12000);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [liveEvent, flyBossStateRef]);
 
   // Poll HP from the PvP self state so the central fly HUD card can show
   // pixel hearts inline next to the score. State (not ref) so React re-renders.
@@ -940,6 +1094,16 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     if (admin) {
       fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => { });
     }
+  }, [authLogin]);
+
+  // Pixel balance for the HUD wallet chip. Refreshed on auth change; the Bank
+  // panel pushes updates back via onBalanceChange after a purchase/swap.
+  useEffect(() => {
+    if (!authLogin) { setPixelBalance(null); return; }
+    fetch("/api/pixels/balance")
+      .then((r) => r.json())
+      .then((d) => setPixelBalance(d.balance ?? 0))
+      .catch(() => {});
   }, [authLogin]);
 
   // Fly timer — ticks every second while flying and not paused
@@ -1069,6 +1233,28 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     };
   }, [selectedBuilding, session, authLogin, buildings]);
 
+  // Social links: lazy-fetch when a card opens; in-memory cache per login
+  useEffect(() => {
+    setCardSocialLinks(null);
+    if (!selectedBuilding) return;
+    const login = selectedBuilding.login.toLowerCase();
+    const cached = socialLinksCacheRef.current.get(login);
+    if (cached) {
+      setCardSocialLinks(cached);
+      return;
+    }
+    const controller = new AbortController();
+    fetch(`/api/social-links?login=${encodeURIComponent(login)}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { links?: SocialLinks } | null) => {
+        const links = data?.links ?? {};
+        socialLinksCacheRef.current.set(login, links);
+        setCardSocialLinks(links);
+      })
+      .catch(() => { /* ignore — card shows the GitHub chip only */ });
+    return () => controller.abort();
+  }, [selectedBuilding]);
+
   // Kudos handler
   const handleGiveKudos = useCallback(async () => {
     if (!selectedBuilding || kudosSending || kudosSent || !session) return;
@@ -1176,6 +1362,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     setGiftModalOpen(true);
     setGiftItems(null);
     setGiftError(null);
+    setGiftPreviewItem(null);
+    setGiftSent(false);
     try {
       const res = await fetch("/api/items");
       if (!res.ok) return;
@@ -1209,6 +1397,20 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setGiftItems((prev) =>
           prev?.map((i) => i.id === itemId ? { ...i, owned: true } : i) ?? null
         );
+        // Reflect the recipient's new ownership so the preview/equipped UI updates
+        setSelectedBuilding((prev) =>
+          prev && !prev.owned_items.includes(itemId)
+            ? { ...prev, owned_items: [...prev.owned_items, itemId] }
+            : prev
+        );
+        // Optimistically decrement the sender's wallet chip (authoritative balance
+        // comes back from the next /api/pixels/balance refresh)
+        if (typeof data.new_balance === "number") {
+          setPixelBalance(data.new_balance);
+        } else if (typeof data.price === "number") {
+          setPixelBalance((b) => (b == null ? b : Math.max(0, b - data.price)));
+        }
+        setGiftSent(true);
       } else {
         const msg = data.error === "insufficient_balance"
           ? "Not enough PX. Buy more at /pixels"
@@ -1237,9 +1439,11 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   // Outside fly mode: compare → share modal → profile card → focus → explore mode
   useEffect(() => {
     if (flyMode && !selectedBuilding && !pillModalOpen && !founderMessageOpen && !eArcadeOpen && !activeSponsor) return;
-    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !eArcadeOpen && !activeSponsor && !rabbitCinematic && !invitePreview && raidState.phase === "idle") return;
+    if (!flyMode && !exploreMode && !focusedBuilding && !shareData && !selectedBuilding && !giftClaimed && !giftModalOpen && !comparePair && !compareBuilding && !founderMessageOpen && !pillModalOpen && !eArcadeOpen && !bankOpen && !activeSponsor && !rabbitCinematic && !invitePreview && raidState.phase === "idle") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") {
+        // Bank panel
+        if (bankOpen) { setBankOpen(false); return; }
         // Founder modals take highest priority
         if (founderMessageOpen) { setFounderMessageOpen(false); return; }
         if (pillModalOpen) { setPillModalOpen(false); return; }
@@ -1288,7 +1492,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, eArcadeOpen, activeSponsor, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions, invitePreview]);
+  }, [flyMode, exploreMode, focusedBuilding, shareData, selectedBuilding, giftClaimed, giftModalOpen, comparePair, compareBuilding, founderMessageOpen, pillModalOpen, eArcadeOpen, bankOpen, activeSponsor, rabbitCinematic, endRabbitCinematic, raidState.phase, raidActions, invitePreview]);
 
   // Rabbit cinematic text phase timing (8s total flyover)
   useEffect(() => {
@@ -1299,7 +1503,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     const timers: ReturnType<typeof setTimeout>[] = [];
     // Phase 0: "Follow the white rabbit..." at 0.5s
     timers.push(setTimeout(() => setRabbitCinematicPhase(0), 500));
-    // Phase 1: "It hides among the plazas..." at 4.0s
+    // Phase 1: "It hides among the parks..." at 4.0s
     timers.push(setTimeout(() => setRabbitCinematicPhase(1), 4000));
     return () => timers.forEach(clearTimeout);
   }, [rabbitCinematic]);
@@ -1409,20 +1613,12 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
 
     // Skip snapshot when busting cache — go straight to DB for fresh data
     if (!bustCache) {
-      try {
-        const v = Math.floor(Date.now() / 300_000);
-        const snapshotUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/city-data/snapshot.json?v=${v}`;
-        const snapshotRes = await fetch(snapshotUrl);
-        if (snapshotRes.ok) {
-          const buf = await snapshotRes.arrayBuffer();
-          const ds = new DecompressionStream("gzip");
-          const stream = new Blob([buf]).stream().pipeThrough(ds);
-          const snapshot = await new Response(stream).json();
-          allDevs = snapshot.developers;
-          cityStats = snapshot.stats;
-          dropsPayload = snapshot._d ?? [];
-        }
-      } catch { /* fall through to chunked */ }
+      const snapshot = await fetchCitySnapshot();
+      if (snapshot) {
+        allDevs = snapshot.developers;
+        cityStats = snapshot.stats;
+        dropsPayload = snapshot._d ?? [];
+      }
     }
 
     // Local dev has no storage snapshot — read straight from the DB so the
@@ -1460,7 +1656,9 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     rawDevsRef.current = allDevs;
     if (dropsPayload.length > 0) dropsPayloadRef.current = dropsPayload;
     setStats(cityStats);
-    const layout = generateCityLayout(allDevs);
+    const sf = await loadSFMap();
+    sfMapRef.current = sf;
+    const layout = generateCityLayout(allDevs, sf);
     mergeDrops(layout.buildings);
 
     setBuildings(layout.buildings);
@@ -1469,6 +1667,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     setRiver(layout.river);
     setBridges(layout.bridges);
     setDistrictZones(layout.districtZones);
+    setSfMap(layout.sfMap ?? null);
     setCityCache({ ...layout, stats: cityStats, rawDevs: rawDevsRef.current });
     return layout.buildings;
   }, []);
@@ -1505,7 +1704,10 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       setRiver(cached.river);
       setBridges(cached.bridges);
       setDistrictZones(cached.districtZones);
+      setSfMap(cached.sfMap ?? null);
       setStats(cached.stats);
+      // hydrate the full asset (with footprints) so later recomputes stay on SF
+      loadSFMap().then((sf) => { sfMapRef.current = sf; });
       setLoadStage("done");
       return;
     }
@@ -1536,21 +1738,14 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let dropsPayload: any[] = [];
 
-        // Try pre-computed snapshot first (single file from Supabase CDN)
-        try {
-          const v = Math.floor(Date.now() / 300_000); // changes every 5 min, aligned with cron
-          const snapshotUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/city-data/snapshot.json?v=${v}`;
-          const snapshotRes = await fetch(snapshotUrl);
-          if (snapshotRes.ok) {
-            const buf = await snapshotRes.arrayBuffer();
-            const ds = new DecompressionStream("gzip");
-            const stream = new Blob([buf]).stream().pipeThrough(ds);
-            const snapshot = await new Response(stream).json();
-            allDevs = snapshot.developers;
-            cityStats = snapshot.stats;
-            dropsPayload = snapshot._d ?? [];
-          }
-        } catch { /* snapshot failed */ }
+        // Try pre-computed snapshot first (single file from Supabase CDN).
+        // Self-heals on a fresh environment: builds the snapshot, then retries.
+        const snapshot = await fetchCitySnapshot();
+        if (snapshot) {
+          allDevs = snapshot.developers;
+          cityStats = snapshot.stats;
+          dropsPayload = snapshot._d ?? [];
+        }
 
         // Local dev has no storage snapshot — read straight from the DB so the
         // city renders without a snapshot-generation step. Local-only.
@@ -1598,7 +1793,9 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         rawDevsRef.current = allDevs;
         if (dropsPayload.length > 0) dropsPayloadRef.current = dropsPayload;
         setStats(cityStats);
-        const finalLayout = generateCityLayout(allDevs);
+        const sfInit = await loadSFMap();
+        sfMapRef.current = sfInit;
+        const finalLayout = generateCityLayout(allDevs, sfInit);
         mergeDrops(finalLayout.buildings);
 
         setBuildings(finalLayout.buildings);
@@ -1607,6 +1804,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setRiver(finalLayout.river);
         setBridges(finalLayout.bridges);
         setDistrictZones(finalLayout.districtZones);
+        setSfMap(finalLayout.sfMap ?? null);
 
         setLoadProgress(55);
 
@@ -1741,7 +1939,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             xp_level: devData.xp_level ?? 1,
           };
           rawDevsRef.current = [...rawDevsRef.current, newDev];
-          const layout = generateCityLayout(rawDevsRef.current);
+          const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
           mergeDrops(layout.buildings);
           setBuildings(layout.buildings);
           setPlazas(layout.plazas);
@@ -1864,7 +2062,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           xp_level: devData.xp_level ?? 1,
         };
         rawDevsRef.current = [...rawDevsRef.current, newDev];
-        const layout = generateCityLayout(rawDevsRef.current);
+        const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
         mergeDrops(layout.buildings);
         setBuildings(layout.buildings);
         setPlazas(layout.plazas);
@@ -1953,9 +2151,15 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     }
   }, [giftedParam, userParam, buildings, reloadCity]);
 
-  const searchUser = useCallback(async () => {
-    const trimmed = username.trim().toLowerCase();
-    if (!trimmed) return;
+  // Optional `targetLogin` lets other surfaces (e.g. the activity feed) drive
+  // the exact same search/focus flow — with all its guard rails, error
+  // feedback and dev injection — instead of reimplementing it. When omitted,
+  // it falls back to the search input. A non-string arg (e.g. a click event
+  // from onRetry) is treated as "from input".
+  const searchUser = useCallback(async (targetLogin?: string) => {
+    const fromInput = typeof targetLogin !== "string";
+    const trimmed = (typeof targetLogin === "string" ? targetLogin : username).trim().toLowerCase();
+    if (!trimmed) return "none" as const;
 
     trackSearchUsed(trimmed);
 
@@ -1963,7 +2167,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     const cachedError = failedUsernamesRef.current.get(trimmed);
     if (cachedError) {
       setFeedback({ type: "error", code: cachedError as NonNullable<typeof feedback>["code"], username: trimmed });
-      return;
+      return "error" as const;
     }
 
     // Snapshot compare state before async work — ESC may clear it mid-flight
@@ -1981,7 +2185,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setCompareSelfHint(true);
         setTimeout(() => setCompareSelfHint(false), 2000);
         setFeedback(null);
-        return;
+        return "none" as const;
       }
 
       // Check if dev already exists in the city before the fetch
@@ -2008,7 +2212,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           failedUsernamesRef.current.set(trimmed, code);
         }
         setFeedback({ type: "error", code, username: trimmed, raw: devData.error });
-        return;
+        return "error" as const;
       }
 
       setFeedback(null);
@@ -2016,8 +2220,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       // Dev not in the city yet: show invite card instead of creating a building
       if (devData.exists === false && devData.preview) {
         setInvitePreview(devData.preview);
-        setUsername("");
-        return;
+        if (fromInput) setUsername("");
+        return "invite" as const;
       }
 
       // Merge the refreshed dev back into the live city so searches update stats immediately
@@ -2050,7 +2254,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         )
         : [...rawDevsRef.current, syncedDev];
 
-      const layout = generateCityLayout(rawDevsRef.current);
+      const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
       mergeDrops(layout.buildings);
       setBuildings(layout.buildings);
       setPlazas(layout.plazas);
@@ -2094,8 +2298,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             setExploreMode(true);
           }
         }
-      } else if (!existedBefore) {
-        // New developer: show the share modal
+      } else if (!existedBefore && fromInput) {
+        // New developer searched from the input: show the share modal
         setShareData({
           login: devData.github_login,
           contributions: devData.contributions,
@@ -2105,13 +2309,19 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         if (foundBuilding) setSelectedBuilding(foundBuilding);
         setCopied(false);
       } else if (foundBuilding) {
-        // Existing developer: enter explore mode and show profile card
+        // Existing dev (or feed-driven focus): enter explore mode and show card
         setSelectedBuilding(foundBuilding);
         setExploreMode(true);
       }
-      setUsername("");
+      if (fromInput) setUsername("");
+      // The feed needs to know whether a building actually opened. If the dev
+      // exists but couldn't be placed (e.g. brand-new, not in the cached city
+      // snapshot yet), report "pending" so the caller can show a clear message
+      // instead of silently doing nothing.
+      return foundBuilding ? ("focused" as const) : ("pending" as const);
     } catch {
       setFeedback({ type: "error", code: "network", username: trimmed });
+      return "error" as const;
     } finally {
       setLoading(false);
     }
@@ -2122,6 +2332,48 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     e.preventDefault();
     searchUser();
   };
+
+  // Drive the activity feed's "open this dev" through the same search flow,
+  // with a visible loading/error indicator. Keeps the hub open while loading
+  // so there's context, closes it on success, and surfaces a retry on failure.
+  const openDeveloperFromFeed = useCallback(
+    async (login: string) => {
+      const l = login.trim().toLowerCase();
+      if (!l) return;
+
+      // Fast path: the dev is already a building in the loaded city — fly to it
+      // instantly, no full re-layout, no network.
+      const local = buildings.find((b) => b.login.toLowerCase() === l);
+      if (local) {
+        if (isMobile) setFeedPanelOpen(false);
+        setFocusedBuilding(local.login);
+        setSelectedBuilding(local);
+        if (!exploreMode) setExploreMode(true);
+        return;
+      }
+
+      // Slow path: dev not in the cached snapshot (often a brand-new dev). Try
+      // to inject + place them via the search flow, with visible feedback.
+      setFeedNav({ login: l, phase: "loading" });
+      // On mobile the building card is a bottom sheet that needs the full
+      // screen, so collapse the feed. On desktop keep it open beside the city.
+      if (isMobile) setFeedPanelOpen(false);
+      const status = await searchUser(l);
+      if (status === "focused" || status === "invite") {
+        setFeedNav(null);
+      } else if (status === "pending") {
+        // Exists but has no building yet (city refreshes on a cron).
+        setFeedNav({ login: l, phase: "pending" });
+        setTimeout(() => setFeedNav((c) => (c?.login === l ? null : c)), 5000);
+      } else if (status === "error") {
+        setFeedNav({ login: l, phase: "error" });
+        setTimeout(() => setFeedNav((c) => (c?.login === l ? null : c)), 5000);
+      } else {
+        setFeedNav(null);
+      }
+    },
+    [buildings, exploreMode, isMobile, searchUser]
+  );
 
   const adminAddDeveloper = useCallback(async (login: string) => {
     const trimmed = login.trim().toLowerCase();
@@ -2167,7 +2419,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       )
       : [...rawDevsRef.current, syncedDev];
 
-    const layout = generateCityLayout(rawDevsRef.current);
+    const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
     mergeDrops(layout.buildings);
     setBuildings(layout.buildings);
     setPlazas(layout.plazas);
@@ -2230,11 +2482,9 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     : null;
   const canClaim = !!session && !!myBuilding && !myBuilding.claimed;
 
-  // Shop link: logged in + claimed → own shop, otherwise → /shop landing
-  const shopHref =
-    session && myBuilding?.claimed
-      ? `/shop/${myBuilding.login}`
-      : "/shop";
+  // Every "Shop" / "Visit Shop" button goes to the public store (browse + buy).
+  // Customizing a building is a separate screen (/shop/[login]/customize).
+  const shopHref = "/shop";
 
   // Show free gift CTA when user claimed but hasn't picked up the free item
   const hasFreeGift =
@@ -2277,6 +2527,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
 
   // City energy: devs coding -> city lights up. 0 devs = nearly dark, 5+ = full brightness
   const cityEnergy = useMemo(() => {
+    // User chose to keep the lights on regardless of who's coding.
+    if (forceLightsOn) return 1.2;
     // Local dev has no live VSCode coding presence, so codingCount is always 0
     // and the city would sit nearly dark. Keep the lights on for development.
     if (isLocalSupabase()) return 1.0;
@@ -2286,7 +2538,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     if (codingCount <= 5) return 0.55 + (codingCount - 2) * 0.15; // 3->0.7, 5->1.0
     if (codingCount <= 15) return 1.0 + (Math.min(codingCount, 15) - 5) * 0.02; // 10->1.1, 15->1.2
     return Math.min(1.4, 1.2 + (codingCount - 15) * 0.02); // 25+->1.4 cap
-  }, [codingCount]);
+  }, [codingCount, forceLightsOn]);
 
   // ─── Milestone celebration system ──────────────────────────
   const forceCelebrate = searchParams.has("celebrate");
@@ -2382,8 +2634,27 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       {/* Boss Invasion HUD overlay (only when live event mode) */}
       {bossPreview?.mode === "live" && <BossEventHUD flyMode={flyMode} accentColor={theme.accent} shadowColor={theme.shadow} leaderboard={liveLeaderboard} participants={liveEvent?.participants ?? 0} selfLogin={authLogin} />}
 
+      {/* Boss escaped notice (event window closed with the boss still alive) */}
+      {bossEscaped && (
+        <div className="pointer-events-none fixed left-1/2 top-24 z-50 -translate-x-1/2">
+          <div
+            className="border-2 bg-bg/90 px-5 py-3 text-center font-pixel uppercase backdrop-blur-sm"
+            style={{ borderColor: "#f0c060", boxShadow: "4px 4px 0 0 rgba(240,192,96,0.35)" }}
+          >
+            <div className="text-[13px] tracking-[0.2em]" style={{ color: "#f0c060" }}>
+              The Boss Duck escaped
+            </div>
+            <div className="mt-1 text-[10px] tracking-wider text-cream/70">
+              The city held the line. It will return.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 3D Canvas */}
       <CityCanvas
+        perfMode={perfMode}
+        onPerfDecline={handlePerfDecline}
         bossPreview={bossPreview}
         onCompareCinematicEnd={() => setCompareCinematicPlaying(false)}
         buildings={buildings}
@@ -2391,6 +2662,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         decorations={decorations}
         river={river}
         bridges={bridges}
+        sfMap={sfMap}
         flyMode={flyMode}
         flyVehicle={flyVehicle}
         onExitFly={exitFlyRef.current = () => {
@@ -2446,7 +2718,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             } catch { }
           }
           // Exit fly immediately (don't block on API)
-          setFlyMode(false); setFlyPaused(false); setFlyBoostActive(false); setFlyBrakeActive(false); lastDistrictRef.current = null; setDistrictAnnouncement(null); clearTimeout(announceTimerRef.current);
+          setFlyMode(false); setFlyPaused(false); setFlyBoostActive(false); setFlyBrakeActive(false);
           // Feature 4: Show post-flight results (rank fills in async)
           if (finalScore > 0) {
             const captured = { score: finalScore, collected: flyScore.collected, maxCombo: flyScore.maxCombo, timeBonus, isNewPB };
@@ -2483,28 +2755,6 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           const mapX = x - Math.sin(yaw) * 40;
           const mapZ = z - Math.cos(yaw) * 40;
           setPlayerPos({ x: mapX, z: mapZ });
-          // Find nearest building to determine district
-          let nearestDistrict: string | null = null;
-          let bestDist = Infinity;
-          for (const b of buildings) {
-            const dx = mapX - b.position[0], dz = mapZ - b.position[2];
-            const dist = dx * dx + dz * dz;
-            if (dist < bestDist) { bestDist = dist; nearestDistrict = b.district ?? "fullstack"; }
-          }
-          const district = nearestDistrict
-            ? districtZones.find(d => d.id === nearestDistrict) ?? null
-            : null;
-          const now = Date.now();
-          if (district && district.id !== lastDistrictRef.current) {
-            lastDistrictRef.current = district.id;
-            // Only show announcement if cooldown elapsed (5s)
-            if (now - announceCooldownRef.current > 5000) {
-              announceCooldownRef.current = now;
-              clearTimeout(announceTimerRef.current);
-              setDistrictAnnouncement({ name: district.name, color: district.color, population: district.population });
-              announceTimerRef.current = setTimeout(() => setDistrictAnnouncement(null), 3000);
-            }
-          }
         }}
         onPause={(p) => {
           if (p) {
@@ -2526,7 +2776,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         flyBoostActive={flyBoostActive}
         flyBrakeActive={flyBrakeActive}
         flyHasOverlay={!!selectedBuilding || pillModalOpen || founderMessageOpen || eArcadeOpen || !!activeSponsor || rabbitCinematic}
-        flyStartPaused={showFlyControls}
+        flyStartPaused={false}
         holdRise={loadStage !== "done"}
         celebrationActive={celebrationActive}
         onCameraMove={(x, z, tx, tz) => setCameraPos({ x, z, tx, tz })}
@@ -2588,6 +2838,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         onRaidPhaseComplete={raidActions.onPhaseComplete}
         onLandmarkClick={() => { setPillModalOpen(true); setSelectedBuilding(null); }}
         onEArcadeClick={() => { trackEArcadeClicked(); setEArcadeOpen(true); setSelectedBuilding(null); }}
+        onBankClick={() => { setBankOpen(true); setSelectedBuilding(null); }}
         onSponsorClick={(slug) => {
           trackLandmarkClicked(slug);
           const adId = getLandmarkAdId(slug);
@@ -2601,6 +2852,14 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           if (!activeSponsor) return null;
           const sp = resolvedSponsors.find(s => s.slug === activeSponsor);
           if (!sp) return null;
+          if (sfMapRef.current) {
+            // SF: sponsors sit in the civic-plaza row (south), inside a scaled
+            // group at downtown (origin). Mirror that placement here for focus.
+            const i = resolvedSponsors.findIndex(s => s.slug === activeSponsor);
+            const [tx, tz] = sfSponsorLocalPos(i, resolvedSponsors.length);
+            const S = SF_PLAZA_SCALE;
+            return [tx * S, sp.hitboxHeight * 0.6 * S, tz * S] as [number, number, number];
+          }
           const pos = gridToWorldPos(sp.gridX, sp.gridZ);
           return [pos[0], sp.hitboxHeight * 0.6, pos[2]] as [number, number, number];
         })()}
@@ -2684,7 +2943,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           stage={loadStage}
           progress={loadProgress}
           error={loadError}
-          accentColor={theme.accent}
+          stats={stats}
           onRetry={handleLoadRetry}
           onFadeComplete={handleLoadFadeComplete}
         />
@@ -3020,22 +3279,12 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             </div>
           )}
 
-          {/* District announcement */}
-          {districtAnnouncement && (
-            <div key={districtAnnouncement.name} className="absolute bottom-6 left-1/2 -translate-x-1/2 animate-district-in">
-              <div className="border-l-4 bg-bg/80 px-4 py-2 backdrop-blur-sm" style={{ borderColor: districtAnnouncement.color }}>
-                <div className="text-[8px] uppercase tracking-widest text-muted">District</div>
-                <div className="font-pixel text-sm text-cream">{districtAnnouncement.name}</div>
-                <div className="text-[8px] text-muted">{districtAnnouncement.population.toLocaleString()} devs</div>
-              </div>
-            </div>
-          )}
 
         </div>
       )}
 
       {/* ─── Mobile Fly HUD (bottom controls only — top bar is unified above) ─── */}
-      {isMobile && flyMode && !showFlyControls && (
+      {isMobile && flyMode && (
         <>
           {/* Boost + Slow — bottom left, retro style */}
           {!flyPaused && (
@@ -3097,67 +3346,6 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         </>
       )}
 
-      {/* ─── Feature 3: First-Flight Controls Overlay ─── */}
-      {showFlyControls && flyMode && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-bg/50 backdrop-blur-[2px]">
-          <div
-            className="border-[3px] border-border bg-bg-raised px-8 py-6 text-center animate-[fade-in_0.3s_ease-out]"
-            style={{ borderColor: theme.accent + "60" }}
-          >
-            <p className="mb-4 text-xs tracking-widest text-muted">FLIGHT CONTROLS</p>
-            <div className="flex flex-col gap-2.5 text-[11px]">
-              {isMobile ? (
-                <>
-                  <div className="flex items-center justify-between gap-6">
-                    <span className="text-cream">Touch &amp; Drag</span>
-                    <span className="text-muted">Steer</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-6">
-                    <span className="text-cream">Buttons</span>
-                    <span className="text-muted">Pause / Exit</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between gap-6">
-                    <span className="text-cream">Mouse</span>
-                    <span className="text-muted">Steer</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-6">
-                    <span className="text-cream">Scroll</span>
-                    <span className="text-muted">Speed</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-6">
-                    <span className="text-cream">Shift / Alt</span>
-                    <span className="text-muted">Boost / Slow</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-6">
-                    <span style={{ color: theme.accent }}>R</span>
-                    <span className="text-muted">Return to City</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-6">
-                    <span style={{ color: theme.accent }}>ESC</span>
-                    <span className="text-muted">Pause &amp; Exit</span>
-                  </div>
-                </>
-              )}
-            </div>
-            <button
-              onClick={() => {
-                setShowFlyControls(false);
-                try { localStorage.setItem("gitcity_fly_controls_seen", "1"); } catch { }
-                // Resume the paused flight by dispatching Space keydown
-                window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true }));
-              }}
-              className="btn-press mt-5 px-6 py-2 text-[10px] text-bg"
-              style={{ backgroundColor: theme.accent, boxShadow: `3px 3px 0 0 ${theme.shadow}` }}
-            >
-              Got it, let&apos;s fly!
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ─── Radar Map ─── */}
       <RadarMap
         buildings={buildings}
@@ -3170,9 +3358,13 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         cameraTargetZ={cameraPos.tz}
         visible={loadStage === "done" && !introMode && !rabbitCinematic && (exploreMode || flyMode)}
         flyMode={flyMode}
-        currentDistrict={lastDistrictRef.current}
         districtZones={districtZones}
         remotePilotsRef={flyPilotsRef}
+        rabbitPos={
+          rabbitSighting && rabbitSighting >= 1 && rabbitSighting <= 5
+            ? plazas[rabbitSighting - 1]?.position ?? null
+            : null
+        }
       />
 
       {/* ─── Explore Mode: minimal UI ─── */}
@@ -3212,22 +3404,17 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
               <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
             <div id="gc-radio-slot" />
+            <GraphicsControl
+              mode={perfMode}
+              preference={perfPreference}
+              accent={theme.accent}
+              onSelect={(p) => { setPerfToast(false); setPerfPreference(p); }}
+            />
           </div>
 
-          {/* Feed toggle (top-right, below GitHub badges on desktop) */}
-          {feedEvents.length >= 1 && (
-            <div className="pointer-events-auto absolute top-3 right-3 sm:top-4 sm:right-4">
-              <button
-                onClick={() => setFeedPanelOpen(true)}
-                className="flex items-center gap-2 border-[3px] border-border bg-bg/70 px-3 py-1.5 text-[10px] backdrop-blur-sm transition-colors"
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = theme.accent + "80")}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "")}
-              >
-                <span style={{ color: theme.accent }}>&#9679;</span>
-                <span className="text-cream">Feed</span>
-              </button>
-            </div>
-          )}
+          {/* Feed is opened from the CITY ACTIVITY launcher in the bottom-left
+              bar, anchored where the popover rises. A separate top-right button
+              opened a bottom-left panel (spatial disconnect), so it was removed. */}
 
           {/* Navigation hints (bottom-right) — hidden when building card is open */}
           {!selectedBuilding && (
@@ -3292,6 +3479,20 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       {/* ─── Live + Coding + Jobs (top-right) ─── */}
       {!flyMode && !introMode && !rabbitCinematic && (
         <div className={`pointer-events-auto fixed top-3 right-3 z-30 items-center gap-1.5 sm:gap-2 sm:top-4 sm:right-4 ${exploreMode ? "hidden" : "hidden sm:flex"}`}>
+          {/* Wallet chip — Pixel balance, opens the Bank */}
+          {authLogin && (
+            <button
+              onClick={() => { setBankOpen(true); setSelectedBuilding(null); }}
+              className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light cursor-pointer"
+              title="Open the Git City Bank"
+            >
+              <CurrencyIcon currency="pixels" size={12} />
+              <span className="text-cream">
+                {pixelBalance === null ? "—" : pixelBalance.toLocaleString()}
+              </span>
+              <span className="ml-0.5" style={{ color: "#c8e64a" }}>+</span>
+            </button>
+          )}
           {/* Live users */}
           <div className="flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm">
             <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-[#ef4444]" />
@@ -3335,6 +3536,23 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                       <div className="border-b border-border px-5 py-3 text-xs text-muted">
                         Coding right now
                       </div>
+                      {/* Keep-lights-on override: city no longer goes dark when idle */}
+                      <button
+                        onClick={toggleForceLightsOn}
+                        className="flex w-full items-center justify-between gap-3 border-b border-border px-5 py-3 text-left transition-colors hover:bg-white/5"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-[11px] text-cream">Keep lights on</div>
+                          <div className="text-[10px] normal-case text-muted">Don&apos;t dim the city when idle</div>
+                        </div>
+                        <span
+                          className={`relative h-4 w-7 flex-shrink-0 rounded-full transition-colors ${forceLightsOn ? "bg-[#4ade80]" : "bg-muted/40"}`}
+                        >
+                          <span
+                            className={`absolute top-0.5 h-3 w-3 rounded-full bg-bg transition-transform ${forceLightsOn ? "translate-x-3.5" : "translate-x-0.5"}`}
+                          />
+                        </span>
+                      </button>
                       <div>
                         {displayDevs.map((dev) => {
                           const isCreator = dev.githubLogin.toLowerCase() === "srizzon";
@@ -3592,6 +3810,19 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             <p className="mb-5 text-xs text-muted normal-case leading-relaxed">
               Every developer coding right now is keeping the city alive. Their buildings light up in real time as they work.
             </p>
+            {/* Keep-lights-on override */}
+            <button
+              onClick={toggleForceLightsOn}
+              className="mb-4 flex w-full items-center justify-between gap-3 border-2 border-border px-4 py-3 text-left"
+            >
+              <div className="min-w-0">
+                <div className="text-xs text-cream">Keep lights on</div>
+                <div className="text-[10px] normal-case text-muted">Don&apos;t dim the city when idle</div>
+              </div>
+              <span className={`relative h-5 w-9 flex-shrink-0 rounded-full transition-colors ${forceLightsOn ? "bg-[#4ade80]" : "bg-muted/40"}`}>
+                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-bg transition-transform ${forceLightsOn ? "translate-x-4" : "translate-x-0.5"}`} />
+              </span>
+            </button>
             <Link
               href="/live"
               onClick={() => setCodingInfoOpen(false)}
@@ -4176,10 +4407,6 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                         flyTotalPauseMs.current = 0;
                         setFlyElapsedSec(0);
                         try { setFlyPersonalBest(parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0); } catch { setFlyPersonalBest(0); }
-                        // Feature 3: show controls overlay on first flight
-                        if (!localStorage.getItem("gitcity_fly_controls_seen")) {
-                          setShowFlyControls(true);
-                        }
                       }}
                       className="btn-press px-7 py-3 text-xs sm:py-3.5 sm:text-sm text-bg"
                       style={{
@@ -4240,9 +4467,6 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                       flyTotalPauseMs.current = 0;
                       setFlyElapsedSec(0);
                       try { setFlyPersonalBest(parseInt(localStorage.getItem("gitcity_fly_pb") || "0", 10) || 0); } catch { setFlyPersonalBest(0); }
-                      if (!localStorage.getItem("gitcity_fly_controls_seen")) {
-                        setShowFlyControls(true);
-                      }
                     }}
                     className="btn-press flex items-center gap-2 border-2 bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
                     style={{ borderColor: theme.accent + "60", color: theme.accent }}
@@ -4333,7 +4557,6 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                           xpLevel={myBuilding.xp_level ?? 1}
                           accent={theme.accent}
                         />
-                        <PixelBalance />
                       </>
                     )}
                     <a
@@ -4544,7 +4767,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
               Neon Outline, Particle Aura, Spotlight, and more
             </p>
             <Link
-              href={myBuilding?.claimed ? `/shop/${ghostPreviewLogin}` : `/dev/${ghostPreviewLogin}`}
+              href={myBuilding?.claimed ? `/shop/${ghostPreviewLogin}/customize` : `/dev/${ghostPreviewLogin}`}
               onClick={() => setGhostPreviewLogin(null)}
               className="btn-press block w-full py-2 text-center text-[10px] text-bg"
               style={{
@@ -4579,7 +4802,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
               You unlocked {streakData.streak_reward.item_name}
             </p>
             <Link
-              href={`/shop/${authLogin}`}
+              href={`/shop/${authLogin}/customize`}
               className="btn-press block w-full py-1.5 text-center text-[9px] text-bg"
               style={{
                 backgroundColor: theme.accent,
@@ -4625,40 +4848,65 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                 <div className="h-1 w-10 rounded-full bg-border" />
               </div>
 
-              {/* Header with avatar + name */}
-              <div className="flex items-center gap-3 px-4 pb-3 sm:pt-4">
-                {selectedBuilding.avatar_url && (
-                  <Image
-                    src={selectedBuilding.avatar_url}
-                    alt={selectedBuilding.login}
-                    width={48}
-                    height={48}
-                    className="border-2 border-border shrink-0"
-                    style={{ imageRendering: "pixelated" }}
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    {selectedBuilding.name && (
-                      <p className="truncate text-sm text-cream">{selectedBuilding.name}</p>
-                    )}
-                    {selectedBuilding.claimed && (
-                      <span
-                        className="shrink-0 px-1.5 py-0.5 text-[7px] text-bg"
-                        style={{ backgroundColor: theme.accent }}
-                      >
-                        Claimed
-                      </span>
-                    )}
+              {/* Header — mini hero banner in the building's XP-tier color */}
+              {(() => {
+                const hTier = tierFromLevel(selectedBuilding.xp_level ?? 1);
+                return (
+                  <div
+                    className="relative px-4 pb-3 pt-3 sm:pt-4"
+                    style={{
+                      background: `linear-gradient(135deg, ${hTier.color}1c 0%, ${hTier.color}06 55%, transparent 100%)`,
+                    }}
+                  >
+                    {/* Pixel grid overlay */}
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+                        backgroundSize: "8px 8px",
+                      }}
+                    />
+                    <div className="relative flex items-center gap-3">
+                      {selectedBuilding.avatar_url && (
+                        <div
+                          className="shrink-0 border-2 p-0.5"
+                          style={{ borderColor: hTier.color, backgroundColor: `${hTier.color}14` }}
+                        >
+                          <Image
+                            src={selectedBuilding.avatar_url}
+                            alt={selectedBuilding.login}
+                            width={44}
+                            height={44}
+                            className="border border-border"
+                            style={{ imageRendering: "pixelated" }}
+                          />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {selectedBuilding.name && (
+                            <p className="truncate text-sm text-cream">{selectedBuilding.name}</p>
+                          )}
+                          {selectedBuilding.claimed && (
+                            <span className="inline-flex shrink-0 items-center gap-1 border border-border-light bg-bg/40 px-1.5 py-0.5 text-[7px] text-muted">
+                              <span className="h-1 w-1" style={{ backgroundColor: theme.accent }} />
+                              Claimed
+                            </span>
+                          )}
+                        </div>
+                        <p className="truncate text-[10px] text-muted">@{selectedBuilding.login}</p>
+                        {selectedBuilding.active_raid_tag && (
+                          <p className="text-[8px] text-red-400">
+                            Attacked by @{selectedBuilding.active_raid_tag.attacker_login}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <p className="truncate text-[10px] text-muted">@{selectedBuilding.login}</p>
-                  {selectedBuilding.active_raid_tag && (
-                    <p className="text-[8px] text-red-400">
-                      Attacked by @{selectedBuilding.active_raid_tag.attacker_login}
-                    </p>
-                  )}
-                </div>
-              </div>
+                );
+              })()}
 
               {/* XP Level badge + progress */}
               {(() => {
@@ -4668,33 +4916,37 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                 const bXpCurrent = (selectedBuilding.xp_total ?? 0) - xpForLevel(selectedBuilding.xp_level ?? 1);
                 const bXpNeeded = xpForLevel((selectedBuilding.xp_level ?? 1) + 1) - xpForLevel(selectedBuilding.xp_level ?? 1);
                 return (
-                  <div className="mx-4 mb-2 flex items-center gap-2">
+                  <div className="mx-4 mb-2.5 mt-1 flex items-center gap-2.5">
                     <span
-                      className="flex h-7 w-7 items-center justify-center border-2 text-xs font-bold"
-                      style={{ borderColor: bTier.color, color: bTier.color }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center border-2 text-xs font-bold"
+                      style={{
+                        borderColor: bTier.color,
+                        color: bTier.color,
+                        backgroundColor: `${bTier.color}10`,
+                      }}
                     >
                       {selectedBuilding.xp_level ?? 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold" style={{ color: bTier.color }}>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="truncate text-[10px] font-bold text-cream">
                           Lv {selectedBuilding.xp_level ?? 1} · {bRank.title}
                         </span>
                         <span
-                          className="px-1 py-px text-[7px] font-bold"
+                          className="shrink-0 px-1 py-px text-[7px] font-bold tracking-wider"
                           style={{ backgroundColor: bTier.color + "22", color: bTier.color }}
                         >
                           {bTier.name.toUpperCase()}
                         </span>
                       </div>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <div className="h-1 flex-1 bg-border">
-                          <div
-                            className="h-full"
-                            style={{ width: `${Math.max(2, Math.round(bProgress * 100))}%`, backgroundColor: bTier.color }}
-                          />
-                        </div>
-                        <span className="text-[7px] text-muted">{bXpCurrent}/{bXpNeeded}</span>
+                      <div className="mt-1 h-1.5 w-full bg-border">
+                        <div
+                          className="h-full"
+                          style={{ width: `${Math.max(2, Math.round(bProgress * 100))}%`, backgroundColor: bTier.color }}
+                        />
+                      </div>
+                      <div className="mt-0.5 text-[7px] text-dim">
+                        {bXpCurrent.toLocaleString()} / {bXpNeeded.toLocaleString()} XP
                       </div>
                     </div>
                   </div>
@@ -4703,13 +4955,35 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
 
               {/* District badge */}
               {selectedBuilding.district && (
-                <div className="px-4 pb-2">
-                  <span
-                    className="inline-block px-2 py-0.5 text-[8px] text-bg"
-                    style={{ backgroundColor: DISTRICT_COLORS[selectedBuilding.district] ?? '#888' }}
-                  >
+                <div className="px-4 pb-2.5">
+                  <span className="inline-flex items-center gap-1.5 border border-border-light px-2 py-1 text-[8px] text-cream">
+                    <span
+                      className="h-1.5 w-1.5 shrink-0"
+                      style={{ backgroundColor: DISTRICT_COLORS[selectedBuilding.district] ?? '#888' }}
+                    />
                     {DISTRICT_NAMES[selectedBuilding.district] ?? selectedBuilding.district}
                   </span>
+                </div>
+              )}
+
+              {/* Social links — lazy-fetched; section only renders when the dev has links
+                  (GitHub already has its own button at the bottom of the card) */}
+              {cardSocialLinks && SOCIAL_PLATFORMS.some((p) => cardSocialLinks[p]) && (
+                <div className="mx-4 mb-3">
+                  <div className="mb-1.5 text-[7px] tracking-widest text-dim">LINKS</div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {SOCIAL_PLATFORMS.map((p) =>
+                      cardSocialLinks[p] ? (
+                        <SocialLinkChip
+                          key={p}
+                          name={p}
+                          href={cardSocialLinks[p]!}
+                          size={24}
+                          hoverColor={theme.accent}
+                        />
+                      ) : null
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -4720,7 +4994,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                   { label: "Contribs", value: selectedBuilding.contributions.toLocaleString() },
                   { label: "Repos", value: selectedBuilding.public_repos.toLocaleString() },
                   { label: "Stars", value: selectedBuilding.total_stars.toLocaleString() },
-                  { label: "Kudos", value: (selectedBuilding.kudos_count ?? 0).toLocaleString() },
+                  { label: "+1s", value: (selectedBuilding.kudos_count ?? 0).toLocaleString() },
                   { label: "Visits", value: (selectedBuilding.visit_count ?? 0).toLocaleString() },
                 ].map((s) => (
                   <div key={s.label} className="bg-bg-card p-2 text-center">
@@ -4730,43 +5004,36 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                 ))}
               </div>
 
-              {/* Achievements with tier colors, sorted by tier */}
+              {/* Achievements — top 3 by tier; total in the section label */}
               {selectedBuilding.achievements && selectedBuilding.achievements.length > 0 && (
-                <div className="mx-4 mb-3 flex flex-wrap gap-1">
-                  {[...selectedBuilding.achievements]
-                    .sort((a, b) => {
-                      const tierOrder = ["diamond", "gold", "silver", "bronze"];
-                      const ta = tierOrder.indexOf(ACHIEVEMENT_TIERS_MAP[a] ?? "bronze");
-                      const tb = tierOrder.indexOf(ACHIEVEMENT_TIERS_MAP[b] ?? "bronze");
-                      return ta - tb;
-                    })
-                    .slice(0, 3)
-                    .map((ach) => {
-                      const tier = ACHIEVEMENT_TIERS_MAP[ach];
-                      const color = tier ? TIER_COLORS_MAP[tier] : undefined;
-                      const emoji = tier ? TIER_EMOJI_MAP[tier] : "";
-                      return (
-                        <span
-                          key={ach}
-                          className="px-1.5 py-0.5 text-[8px] border normal-case"
-                          style={{
-                            borderColor: color ?? "rgba(255,255,255,0.15)",
-                            color: color ?? "#a0a0b0",
-                          }}
-                        >
-                          {emoji} {ACHIEVEMENT_NAMES_MAP[ach] ?? ach.replace(/_/g, " ")}
-                        </span>
-                      );
-                    })}
-                  {selectedBuilding.achievements.length > 3 && (
-                    <Link
-                      href={`/dev/${selectedBuilding.login}`}
-                      className="px-1.5 py-0.5 text-[8px] transition-colors hover:text-cream"
-                      style={{ color: theme.accent }}
-                    >
-                      +{selectedBuilding.achievements.length - 3} more &rarr;
-                    </Link>
-                  )}
+                <div className="mx-4 mb-3">
+                  <div className="mb-1.5 text-[7px] tracking-widest text-dim">
+                    TROPHIES · {selectedBuilding.achievements.length}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...selectedBuilding.achievements]
+                      .sort((a, b) => {
+                        const tierOrder = ["diamond", "gold", "silver", "bronze"];
+                        const ta = tierOrder.indexOf(ACHIEVEMENT_TIERS_MAP[a] ?? "bronze");
+                        const tb = tierOrder.indexOf(ACHIEVEMENT_TIERS_MAP[b] ?? "bronze");
+                        return ta - tb;
+                      })
+                      .slice(0, 3)
+                      .map((ach) => {
+                        const tier = ACHIEVEMENT_TIERS_MAP[ach] ?? "bronze";
+                        const color = TIER_COLORS_MAP[tier] ?? "#a0a0b0";
+                        return (
+                          <span
+                            key={ach}
+                            className="inline-flex items-center gap-1.5 border-2 bg-bg-card px-1.5 py-1 text-[8px] text-cream"
+                            style={{ borderColor: `${color}55` }}
+                          >
+                            <PixelEmblem tier={tier} size={11} />
+                            {ACHIEVEMENT_NAMES_MAP[ach] ?? ach.replace(/_/g, " ")}
+                          </span>
+                        );
+                      })}
+                  </div>
                 </div>
               )}
 
@@ -4843,14 +5110,18 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                     className="mx-4 mb-3 border-2 p-2.5"
                     style={{ borderColor: `${theme.accent}33`, backgroundColor: `${theme.accent}08` }}
                   >
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="mb-1.5 text-[7px] tracking-widest text-dim">EQUIPPED</div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1.5">
                       {shown.map((id) => (
                         <span
                           key={id}
-                          className="text-[9px] normal-case"
-                          style={{ color: theme.accent }}
+                          className="inline-flex items-center gap-1.5 text-[9px] text-warm"
                         >
-                          {ITEM_EMOJIS[id] ?? "🎁"} {ITEM_NAMES[id] ?? id}
+                          <span
+                            className="h-1.5 w-1.5 shrink-0"
+                            style={{ backgroundColor: theme.accent }}
+                          />
+                          {ITEM_NAMES[id] ?? id}
                         </span>
                       ))}
                       {extra > 0 && (
@@ -4861,117 +5132,138 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                     </div>
                     {session && (
                       <Link
-                        href={`/shop/${authLogin}`}
+                        href="/shop"
                         className="btn-press mt-2 block w-full py-1.5 text-center text-[9px] text-bg"
                         style={{
                           backgroundColor: theme.accent,
                           boxShadow: `2px 2px 0 0 ${theme.shadow}`,
                         }}
                       >
-                        Get these for your building
+                        Get this look &rarr;
                       </Link>
                     )}
                   </div>
                 );
               })()}
 
-              {/* Kudos: give kudos (other's building, logged in) */}
-              {session && selectedBuilding.login.toLowerCase() !== authLogin && (
+              {/* Actions: 2x2 grid built exactly like the stats grid (one container,
+                  hairline dividers) so it reads as part of the card, not loose boxes.
+                  Hierarchy via color only: +1 accent, Battle red, utilities cream. */}
+              {selectedBuilding.login.toLowerCase() !== authLogin ? (
                 <div className="relative mx-4 mb-3">
-                  {/* Floating emoji animation on success */}
+                  {/* Floating pixel animation on +1 success */}
                   {kudosSent && (
-                    <div className="pointer-events-none absolute inset-0 overflow-visible">
+                    <div className="pointer-events-none absolute inset-0 z-10 overflow-visible">
                       {Array.from({ length: 6 }).map((_, i) => (
                         <span
                           key={i}
-                          className="kudos-float absolute text-sm"
+                          className="kudos-float absolute h-2 w-2"
                           style={{
                             left: `${15 + i * 14}%`,
                             animationDelay: `${i * 0.08}s`,
+                            backgroundColor: [theme.accent, "#ffd700", "#4ade80", "#e8dcc8", theme.accent, "#ffd700"][i],
                           }}
-                        >
-                          {["👏", "⭐", "💛", "✨", "👏", "⭐"][i]}
-                        </span>
+                        />
                       ))}
                     </div>
                   )}
-                  <button
-                    onClick={handleGiveKudos}
-                    disabled={kudosSending || kudosSent || !!kudosError}
-                    className={[
-                      "btn-press w-full py-2 text-[10px] text-bg transition-all duration-300",
-                      kudosSent ? "scale-[1.02]" : "",
-                    ].join(" ")}
-                    style={{
-                      backgroundColor: kudosError ? "#ff4444" : kudosSent ? "#39d353" : theme.accent,
-                      boxShadow: kudosError
-                        ? "0 0 12px rgba(255,68,68,0.4)"
-                        : kudosSent
-                          ? "0 0 12px rgba(57,211,83,0.4)"
-                          : `2px 2px 0 0 ${theme.shadow}`,
-                    }}
-                  >
-                    {kudosSending ? (
-                      <span className="animate-pulse">Sending...</span>
-                    ) : kudosError ? (
-                      <span>{kudosError}</span>
-                    ) : kudosSent ? (
-                      <span>+1 Kudos!</span>
-                    ) : (
-                      "Give Kudos"
-                    )}
-                  </button>
-                  <button
-                    onClick={handleOpenGift}
-                    className="btn-press mt-1.5 w-full border-2 border-border py-1.5 text-[9px] text-cream transition-colors hover:border-border-light"
-                  >
-                    Send Gift
-                  </button>
-                  {/* Raid button */}
                   {raidState.phase === "idle" && raidState.error && (
-                    <p className="mt-1.5 text-center text-[10px] text-red-400">{raidState.error}</p>
+                    <p className="mb-1.5 text-center text-[10px] text-red-400">{raidState.error}</p>
                   )}
-                  <button
-                    onClick={() => {
-                      if (authLogin && selectedBuilding) {
-                        raidActions.startPreview(selectedBuilding.login, buildings, authLogin);
+
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {/* +1: primary social action, dev code-review slang */}
+                    <button
+                      onClick={
+                        session
+                          ? handleGiveKudos
+                          : () => { trackDisabledButtonClicked("kudos"); handleSignIn(); }
                       }
-                    }}
-                    disabled={raidState.loading}
-                    className="btn-press mt-1.5 w-full border-[3px] border-red-500/60 px-4 py-2 text-xs text-red-400 transition-colors hover:bg-red-500/10"
-                  >
-                    {raidState.loading ? "Loading..." : "\u2694\ufe0f BATTLE \u2014 Win +50 XP"}
-                  </button>
-                </div>
-              )}
+                      disabled={session ? kudosSending || kudosSent || !!kudosError : false}
+                      title="Free, 5 per day"
+                      className="btn-press border-2 bg-bg-card p-2.5 text-center transition-colors"
+                      style={{ borderColor: `${kudosSent ? "#39d353" : theme.accent}66` }}
+                    >
+                      <div
+                        className="flex items-center justify-center gap-1.5 text-xs font-bold"
+                        style={{
+                          color: kudosError ? "#ff4444" : kudosSent ? "#39d353" : theme.accent,
+                        }}
+                      >
+                        {session && kudosSending ? (
+                          <span className="animate-pulse">...</span>
+                        ) : session && kudosError ? (
+                          <span className="text-[9px]">{kudosError}</span>
+                        ) : (
+                          <>
+                            <PixelHeart
+                              filled
+                              size={14}
+                              color={kudosSent ? "#39d353" : theme.accent}
+                            />
+                            <span>{session && kudosSent ? "+1 sent!" : "+1"}</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="mt-0.5 text-[7px] text-muted">
+                        {session ? "free · 5/day" : "sign in"}
+                      </div>
+                    </button>
 
-              {/* A3: Disabled action buttons for non-logged users */}
-              {!session && (
-                <div className="mx-4 mb-3 space-y-1.5">
-                  <button
-                    onClick={() => { trackDisabledButtonClicked("kudos"); handleSignIn(); }}
-                    className="btn-press w-full py-2 text-[10px] border-2 border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
-                  >
-                    &#x1F512; Give Kudos
-                  </button>
-                  <button
-                    onClick={() => { trackDisabledButtonClicked("gift"); handleSignIn(); }}
-                    className="btn-press w-full py-1.5 text-[9px] border-2 border-dashed border-border/50 text-muted/60 transition-colors hover:border-border hover:text-muted"
-                  >
-                    &#x1F512; Send Gift
-                  </button>
-                  <button
-                    onClick={() => { trackDisabledButtonClicked("raid"); handleSignIn(); }}
-                    className="btn-press w-full py-2 text-[10px] border-2 border-dashed border-red-500/30 text-red-400/40 transition-colors hover:border-red-500/60 hover:text-red-400/70"
-                  >
-                    &#x1F512; &#x2694;&#xFE0F; BATTLE
-                  </button>
-                </div>
-              )}
+                    {/* Battle */}
+                    <button
+                      onClick={
+                        session
+                          ? () => {
+                              if (authLogin && selectedBuilding) {
+                                raidActions.startPreview(selectedBuilding.login, buildings, authLogin);
+                              }
+                            }
+                          : () => { trackDisabledButtonClicked("raid"); handleSignIn(); }
+                      }
+                      disabled={session ? raidState.loading : false}
+                      className="btn-press border-2 border-red-500/40 bg-bg-card p-2.5 text-center transition-colors hover:border-red-500/70 hover:bg-red-500/5"
+                    >
+                      <div className="text-xs font-bold text-red-400">
+                        {session && raidState.loading ? "..." : "Battle"}
+                      </div>
+                      <div className="mt-0.5 text-[7px] text-muted">
+                        {session ? "win +50 XP" : "sign in"}
+                      </div>
+                    </button>
 
-              {/* Own building: copy invite link */}
-              {selectedBuilding.login.toLowerCase() === authLogin && (
-                <div className="mx-4 mb-3">
+                    {/* Send Gift */}
+                    <button
+                      onClick={
+                        session
+                          ? handleOpenGift
+                          : () => { trackDisabledButtonClicked("gift"); handleSignIn(); }
+                      }
+                      className={`btn-press border-2 border-border bg-bg-card p-2.5 text-center text-[9px] transition-colors hover:border-border-light hover:text-cream ${
+                        session ? "text-cream" : "text-muted"
+                      } ${flyMode ? "col-span-2" : ""}`}
+                    >
+                      Send Gift
+                    </button>
+
+                    {/* Compare */}
+                    {!flyMode && (
+                      <button
+                        onClick={() => {
+                          setCompareBuilding(selectedBuilding);
+                          setSelectedBuilding(null);
+                          if (!exploreMode) setExploreMode(true);
+                        }}
+                        className="btn-press border-2 border-border bg-bg-card p-2.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                      >
+                        Compare
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Own building: invite (earns PX) + compare, same grid language */
+                <div className="mx-4 mb-3 grid grid-cols-2 gap-1.5">
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(
@@ -4980,26 +5272,32 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
                     }}
-                    className="btn-press w-full border-2 border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                    className={`btn-press border-2 bg-bg-card p-2.5 text-center transition-colors ${
+                      flyMode ? "col-span-2" : ""
+                    }`}
+                    style={{ borderColor: `${theme.accent}66` }}
                   >
-                    {copied ? "Copied!" : "\uD83D\uDCCB Copy Invite Link"}
+                    <div
+                      className="flex items-center justify-center gap-1.5 text-[10px] font-bold"
+                      style={{ color: theme.accent }}
+                    >
+                      <CurrencyIcon currency="pixels" size={12} />
+                      {copied ? "Link copied!" : "Invite"}
+                    </div>
+                    <div className="mt-0.5 text-[7px] text-muted">earn +25 PX</div>
                   </button>
-                </div>
-              )}
-
-              {/* Compare button */}
-              {!flyMode && (
-                <div className="mx-4 mb-3">
-                  <button
-                    onClick={() => {
-                      setCompareBuilding(selectedBuilding);
-                      setSelectedBuilding(null);
-                      if (!exploreMode) setExploreMode(true);
-                    }}
-                    className="btn-press w-full border-2 border-border py-1.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
-                  >
-                    Compare
-                  </button>
+                  {!flyMode && (
+                    <button
+                      onClick={() => {
+                        setCompareBuilding(selectedBuilding);
+                        setSelectedBuilding(null);
+                        if (!exploreMode) setExploreMode(true);
+                      }}
+                      className="btn-press border-2 border-border bg-bg-card p-2.5 text-center text-[9px] text-cream transition-colors hover:border-border-light"
+                    >
+                      Compare
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -5016,25 +5314,29 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                   ) : (
                     <div className="border-2 border-yellow-500/30 bg-yellow-500/5 p-3 space-y-2">
                       <div className="flex gap-2">
-                        <select
-                          value={dropPlantRarity}
-                          onChange={(e) => setDropPlantRarity(e.target.value)}
-                          className="flex-1 border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
-                        >
-                          <option value="common">Common 10pts</option>
-                          <option value="rare">Rare 50pts</option>
-                          <option value="epic">Epic 200pts</option>
-                          <option value="legendary">Legendary 500pts</option>
-                        </select>
-                        <select
-                          value={dropPlantDuration}
-                          onChange={(e) => setDropPlantDuration(Number(e.target.value))}
-                          className="border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
-                        >
-                          <option value={24}>24h</option>
-                          <option value={48}>48h</option>
-                          <option value={72}>72h</option>
-                        </select>
+                        <PixelSelect
+                          value={String(dropPlantRarity)}
+                          onChange={(v) => setDropPlantRarity(v)}
+                          ariaLabel="Drop rarity"
+                          className="flex-1"
+                          options={[
+                            { value: "common", label: "Common 10pts" },
+                            { value: "rare", label: "Rare 50pts" },
+                            { value: "epic", label: "Epic 200pts" },
+                            { value: "legendary", label: "Legendary 500pts" },
+                          ]}
+                        />
+                        <PixelSelect
+                          value={String(dropPlantDuration)}
+                          onChange={(v) => setDropPlantDuration(Number(v))}
+                          ariaLabel="Drop duration"
+                          className="w-24"
+                          options={[
+                            { value: "24", label: "24h" },
+                            { value: "48", label: "48h" },
+                            { value: "72", label: "72h" },
+                          ]}
+                        />
                       </div>
                       <input
                         type="number"
@@ -5046,16 +5348,14 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                         max={500}
                       />
                       {dropPlantRarity === "legendary" && (
-                        <select
-                          value={dropPlantItem}
-                          onChange={(e) => setDropPlantItem(e.target.value)}
-                          className="w-full border border-border bg-bg px-2 py-1 text-[9px] text-cream outline-none"
-                        >
-                          <option value="">Select item reward...</option>
-                          {dropPlantItems.map((item) => (
-                            <option key={item.id} value={item.id}>{item.name}</option>
-                          ))}
-                        </select>
+                        <PixelSelect
+                          value={String(dropPlantItem)}
+                          onChange={(v) => setDropPlantItem(v)}
+                          placeholder="Select item reward..."
+                          ariaLabel="Item reward"
+                          className="w-full"
+                          options={dropPlantItems.map((item) => ({ value: item.id, label: item.name }))}
+                        />
                       )}
                       {dropPlantResult && (
                         <p className={`text-[9px] ${dropPlantResult === "Planted!" ? "text-lime" : "text-red-400"}`}>{dropPlantResult}</p>
@@ -5086,14 +5386,14 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                 {selectedBuilding.login.toLowerCase() === authLogin ? (
                   <>
                     <Link
-                      href={`/shop/${selectedBuilding.login}?tab=loadout`}
+                      href={`/shop/${selectedBuilding.login}/customize`}
                       className="btn-press flex-1 py-2 text-center text-[10px] text-bg"
                       style={{
                         backgroundColor: theme.accent,
                         boxShadow: `2px 2px 0 0 ${theme.shadow}`,
                       }}
                     >
-                      Loadout
+                      Customize
                     </Link>
                     <Link
                       href={`/dev/${selectedBuilding.login}`}
@@ -5202,7 +5502,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           { label: "Contributions", key: "contributions" },
           { label: "Stars", key: "total_stars" },
           { label: "Repos", key: "public_repos" },
-          { label: "Kudos", key: "kudos_count" },
+          { label: "+1s", key: "kudos_count" },
         ];
         let totalAWins = 0;
         let totalBWins = 0;
@@ -5670,6 +5970,41 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             <span style={{ color: theme.accent }}>&#9654;</span>
             <span className="text-cream">Intro</span>
           </button>
+          <GraphicsControl
+            mode={perfMode}
+            preference={perfPreference}
+            accent={theme.accent}
+            onSelect={(p) => { setPerfToast(false); setPerfPreference(p); }}
+          />
+        </div>
+      )}
+
+      {/* ─── Perf suggestion toast: frames are dropping, offer LOW.
+          Bottom-center above the ticker — clear of the hero title (top),
+          leaderboard (bottom-right), settings cluster (bottom-left) and the
+          fly-mode HUD (gated out). ─── */}
+      {perfToast && perfMode === "high" && loadStage === "done" && !introMode && !flyMode && !rabbitCinematic && (
+        <div className="pointer-events-auto fixed bottom-14 left-1/2 z-60 -translate-x-1/2 animate-[fade-in_0.3s_ease-out]">
+          <div
+            className="flex items-center gap-3 border-2 border-border bg-bg-raised/95 px-4 py-2 text-[11px] text-cream backdrop-blur-sm"
+            style={{ borderColor: "#ffaa0044" }}
+          >
+            <span style={{ color: "#ffaa00" }}>&#9888;</span>
+            <span>Running heavy on this device</span>
+            <button
+              onClick={() => { setPerfPreference("low"); setPerfToast(false); }}
+              className="btn-press border-2 px-2 py-0.5 text-[10px]"
+              style={{ borderColor: theme.accent, color: theme.accent }}
+            >
+              SWITCH TO LOW
+            </button>
+            <button
+              onClick={() => setPerfToast(false)}
+              className="text-muted transition-colors hover:text-cream"
+            >
+              &#10005;
+            </button>
+          </div>
         </div>
       )}
 
@@ -5730,108 +6065,269 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         <LevelUpToast level={levelUpLevel} onDone={() => setLevelUpLevel(null)} />
       )}
 
-      {/* ─── Activity Ticker ─── */}
+      {/* ─── City Pulse (ambient live activity) ─── */}
       {!flyMode && !introMode && !rabbitCinematic && feedEvents.length >= 1 && (
-        <ActivityTicker
+        <CityPulse
           events={feedEvents}
+          viewerLogin={authLogin || null}
           hasBottomBar={false}
-          onEventClick={(evt) => {
-            if (compareBuilding || comparePair) return;
-            const login = evt.actor?.login;
-            if (login) {
-              setFocusedBuilding(login);
-              const found = buildings.find(b => b.login.toLowerCase() === login.toLowerCase());
-              if (found) {
-                setSelectedBuilding(found);
-                if (!exploreMode) setExploreMode(true);
-              }
-            }
-          }}
-          onOpenPanel={() => setFeedPanelOpen(true)}
+          hubOpen={feedPanelOpen}
+          onOpenHub={() => setFeedPanelOpen((o) => !o)}
+          onNavigate={openDeveloperFromFeed}
+          onCounterAttack={openDeveloperFromFeed}
         />
       )}
 
       {/* ─── Gift Modal ─── */}
-      {giftModalOpen && selectedBuilding && (
+      {giftModalOpen && selectedBuilding && (() => {
+        const closeGift = () => {
+          setGiftModalOpen(false);
+          setGiftItems(null);
+          setGiftPreviewItem(null);
+          setGiftError(null);
+          setGiftSent(false);
+        };
+        const inPreview = giftPreviewItem !== null;
+        // Recipient building props for the 3D preview (their real loadout/colors/dims)
+        const recipientLoadout = selectedBuilding.loadout ?? { crown: null, roof: null, aura: null };
+        const giftIsFaces = giftPreviewItem ? FACES_ITEMS.includes(giftPreviewItem.id) : false;
+        const previewFaces = [
+          ...FACES_ITEMS.filter((f) => selectedBuilding.owned_items.includes(f)),
+          ...(giftIsFaces && giftPreviewItem ? [giftPreviewItem.id] : []),
+        ];
+        const previewDims = {
+          width: selectedBuilding.width,
+          height: selectedBuilding.height,
+          depth: selectedBuilding.depth,
+        };
+        const px = giftPreviewItem?.price_pixels ?? null;
+        const priceLabel = giftPreviewItem
+          ? px != null
+            ? `${px} PX`
+            : `$${(giftPreviewItem.price_usd_cents / 100).toFixed(2)}`
+          : "";
+        const canAfford = px == null || pixelBalance == null || pixelBalance >= px;
+        const isBuying = giftPreviewItem ? giftBuying === giftPreviewItem.id : false;
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
             className="absolute inset-0 bg-bg/70 backdrop-blur-sm"
-            onClick={() => { setGiftModalOpen(false); setGiftItems(null); }}
+            onClick={closeGift}
           />
-          <div className="relative z-10 w-full max-w-70 border-[3px] border-border bg-bg-raised">
+          <div className={`relative z-10 max-h-[90vh] w-full overflow-y-auto scrollbar-thin border-[3px] border-border bg-bg-raised ${inPreview ? "max-w-sm sm:max-w-md" : "max-w-70"}`}>
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div>
-                <h3 className="text-xs" style={{ color: theme.accent }}>Send Gift</h3>
-                <p className="mt-0.5 text-[8px] text-muted normal-case">to @{selectedBuilding.login}</p>
+              <div className="flex items-center gap-2">
+                {inPreview && !giftSent && (
+                  <button
+                    onClick={() => { setGiftPreviewItem(null); setGiftError(null); }}
+                    className="text-xs text-muted hover:text-cream"
+                    aria-label="Back"
+                  >
+                    &#8592;
+                  </button>
+                )}
+                <div>
+                  <h3 className="text-xs" style={{ color: theme.accent }}>
+                    {giftSent ? "Gift Sent" : "Send Gift"}
+                  </h3>
+                  <p className="mt-0.5 text-[8px] text-muted normal-case">to @{selectedBuilding.login}</p>
+                </div>
               </div>
               <button
-                onClick={() => { setGiftModalOpen(false); setGiftItems(null); }}
+                onClick={closeGift}
                 className="text-xs text-muted hover:text-cream"
               >
                 &#10005;
               </button>
             </div>
 
-            {/* Items */}
-            {giftItems === null ? (
-              <p className="py-8 text-center text-[9px] text-dim normal-case animate-pulse">
-                Loading...
-              </p>
-            ) : giftItems.length === 0 ? (
-              <p className="py-8 text-center text-[9px] text-dim normal-case">
-                No items available
-              </p>
-            ) : (
-              <div className="max-h-72 overflow-y-auto scrollbar-thin">
-                {giftItems.map((item) => {
-                  const isBuying = giftBuying === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => !item.owned && handleGiftCheckout(item.id)}
-                      disabled={!!giftBuying || item.owned}
-                      className={`flex w-full items-center gap-3 border-b border-border/30 px-4 py-2.5 text-left transition-colors ${item.owned ? "opacity-35 cursor-not-allowed" : "hover:bg-bg-card/80 disabled:opacity-40"}`}
-                    >
-                      <span className="text-base shrink-0">{ITEM_EMOJIS[item.id] ?? "🎁"}</span>
-                      <span className="flex-1 text-[10px] text-cream">
-                        {ITEM_NAMES[item.id] ?? item.id}
-                      </span>
-                      <span className="text-[10px] shrink-0" style={{ color: item.owned ? undefined : theme.accent }}>
-                        {item.owned ? "Owned" : isBuying ? "..." : item.price_pixels != null ? `${item.price_pixels} PX` : `$${(item.price_usd_cents / 100).toFixed(2)}`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {/* ── Step 2: Preview + confirm ── */}
+            {inPreview && giftPreviewItem ? (
+              <div className="p-4">
+                {/* 3D preview of the gift on the recipient's real building */}
+                <GiftPreview
+                  loadout={recipientLoadout}
+                  ownedFacesItems={previewFaces}
+                  customColor={selectedBuilding.custom_color ?? null}
+                  billboardImages={selectedBuilding.billboard_images ?? []}
+                  buildingDims={previewDims}
+                  highlightItemId={giftPreviewItem.id}
+                />
 
-            {/* Error message */}
-            {giftError && (
-              <div className="border-t border-border px-4 py-2 bg-red-500/10">
-                <p className="text-[10px] text-red-400 normal-case text-center">{giftError}</p>
+                {/* Item summary */}
+                <div className="mt-3 flex items-center gap-3 border-2 border-border bg-bg-card px-3 py-2.5">
+                  <span className="text-xl shrink-0">{ITEM_EMOJIS[giftPreviewItem.id] ?? "🎁"}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-cream truncate">{ITEM_NAMES[giftPreviewItem.id] ?? giftPreviewItem.id}</p>
+                    <p className="text-[8px] text-muted normal-case">on @{selectedBuilding.login}&apos;s building</p>
+                  </div>
+                  <span className="text-[11px] shrink-0" style={{ color: theme.accent }}>{priceLabel}</span>
+                </div>
+
+                {giftSent ? (
+                  <>
+                    {/* Success state */}
+                    <div className="mt-3 border-2 border-green-500/40 bg-green-500/10 px-3 py-3 text-center">
+                      <p className="text-[11px] text-green-400">🎁 Sent to @{selectedBuilding.login}!</p>
+                      <p className="mt-1 text-[8px] text-muted normal-case">
+                        We emailed them so they know it&apos;s waiting on their building.
+                      </p>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => { setGiftPreviewItem(null); setGiftSent(false); setGiftError(null); }}
+                        className="btn-press border-2 border-border bg-bg-card py-2 text-[10px] text-cream hover:border-border-light"
+                      >
+                        Send another
+                      </button>
+                      <button
+                        onClick={closeGift}
+                        className="btn-press border-2 py-2 text-[10px] text-bg"
+                        style={{ backgroundColor: theme.accent, boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Email reassurance */}
+                    <p className="mt-2.5 text-center text-[8px] text-dim normal-case">
+                      @{selectedBuilding.login} gets an email when you send this.
+                    </p>
+
+                    {giftError && (
+                      <p className="mt-2 text-center text-[10px] text-red-400 normal-case">{giftError}</p>
+                    )}
+
+                    {/* Confirm / back */}
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => { setGiftPreviewItem(null); setGiftError(null); }}
+                        disabled={isBuying}
+                        className="btn-press border-2 border-border bg-bg-card py-2.5 text-[10px] text-cream hover:border-border-light disabled:opacity-40"
+                      >
+                        Back
+                      </button>
+                      {canAfford ? (
+                        <button
+                          onClick={() => handleGiftCheckout(giftPreviewItem.id)}
+                          disabled={isBuying}
+                          className="btn-press border-2 py-2.5 text-[10px] text-bg disabled:opacity-60"
+                          style={{ backgroundColor: theme.accent, boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
+                        >
+                          {isBuying ? "Sending..." : `Send for ${priceLabel}`}
+                        </button>
+                      ) : (
+                        <Link
+                          href="/pixels"
+                          className="btn-press border-2 border-border bg-bg-card py-2.5 text-center text-[10px] text-red-400 hover:border-border-light"
+                        >
+                          Not enough PX
+                        </Link>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
+            ) : (
+              /* ── Step 1: Pick an item ── */
+              <>
+                {giftItems === null ? (
+                  <p className="py-8 text-center text-[9px] text-dim normal-case animate-pulse">
+                    Loading...
+                  </p>
+                ) : giftItems.length === 0 ? (
+                  <p className="py-8 text-center text-[9px] text-dim normal-case">
+                    No items available
+                  </p>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto scrollbar-thin">
+                    {giftItems.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => { if (!item.owned) { setGiftError(null); setGiftPreviewItem(item); } }}
+                        disabled={item.owned}
+                        className={`flex w-full items-center gap-3 border-b border-border/30 px-4 py-2.5 text-left transition-colors ${item.owned ? "opacity-35 cursor-not-allowed" : "hover:bg-bg-card/80"}`}
+                      >
+                        <span className="text-base shrink-0">{ITEM_EMOJIS[item.id] ?? "🎁"}</span>
+                        <span className="flex-1 text-[10px] text-cream">
+                          {ITEM_NAMES[item.id] ?? item.id}
+                        </span>
+                        <span className="text-[10px] shrink-0" style={{ color: item.owned ? undefined : theme.accent }}>
+                          {item.owned ? "Owned" : item.price_pixels != null ? `${item.price_pixels} PX` : `$${(item.price_usd_cents / 100).toFixed(2)}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ─── Activity Hub (full feed destination) ─── */}
+      <ActivityHub
+        initialEvents={feedEvents}
+        open={feedPanelOpen}
+        onClose={() => setFeedPanelOpen(false)}
+        viewerLogin={authLogin || null}
+        onNavigate={openDeveloperFromFeed}
+        onCounterAttack={openDeveloperFromFeed}
+      />
+
+      {/* ─── Activity feed navigation indicator ─── */}
+      {feedNav && (
+        <div className="fixed left-1/2 top-16 z-[60] -translate-x-1/2 px-3">
+          <div className="flex items-center gap-2.5 border border-border bg-bg-raised px-3 py-2 shadow-lg shadow-black/50">
+            {feedNav.phase === "loading" ? (
+              <>
+                <span className="blink-dot text-sm" style={{ color: theme.accent }}>_</span>
+                <span className="text-[10px] text-cream normal-case">
+                  Finding @{feedNav.login} in the city...
+                </span>
+              </>
+            ) : feedNav.phase === "pending" ? (
+              <>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: theme.accent }} />
+                <span className="text-[10px] text-cream normal-case">
+                  @{feedNav.login} just joined — their building appears after the next city refresh.
+                </span>
+                <button
+                  onClick={() => setFeedNav(null)}
+                  className="text-xs text-muted hover:text-cream"
+                  aria-label="Dismiss"
+                >
+                  &#10005;
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+                <span className="text-[10px] text-cream normal-case">
+                  Couldn&apos;t open @{feedNav.login}
+                </span>
+                <button
+                  onClick={() => openDeveloperFromFeed(feedNav.login)}
+                  className="border border-border px-2 py-0.5 text-[9px] text-cream transition-colors hover:text-[#c8e64a]"
+                >
+                  Retry
+                </button>
+                <button
+                  onClick={() => setFeedNav(null)}
+                  className="text-xs text-muted hover:text-cream"
+                  aria-label="Dismiss"
+                >
+                  &#10005;
+                </button>
+              </>
             )}
           </div>
         </div>
       )}
-
-      {/* ─── Activity Panel (slide-in) ─── */}
-      <ActivityPanel
-        initialEvents={feedEvents}
-        open={feedPanelOpen}
-        onClose={() => setFeedPanelOpen(false)}
-        onNavigate={(login) => {
-          if (compareBuilding || comparePair) return;
-          setFeedPanelOpen(false);
-          setFocusedBuilding(login);
-          const found = buildings.find(b => b.login.toLowerCase() === login.toLowerCase());
-          if (found) {
-            setSelectedBuilding(found);
-            if (!exploreMode) setExploreMode(true);
-          }
-        }}
-      />
 
       {/* ─── Feature 4: Post-Flight Results Modal ─── */}
       {showFlyResults && !flyMode && (
@@ -6125,6 +6621,32 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         />
       )}
 
+      {/* OpenStreetMap attribution — required by ODbL whenever the SF map is
+          shown. Hidden in fly/intro so it never sits over the cinematic. */}
+      {sfMap && !flyMode && !introMode && (
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="pointer-events-auto fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 hover:text-muted"
+        >
+          {sfMap.attribution}
+        </a>
+      )}
+
+      {/* Git City Bank — wallet/buy/swap. Opens instantly; the heavy web3
+          bundle loads only when the Swap tab is opened (inside BankSwapTab). */}
+      {bankOpen && (
+        <BankPanel
+          open
+          onClose={() => setBankOpen(false)}
+          isAuthenticated={!!authLogin}
+          githubLogin={authLogin}
+          initialBalance={pixelBalance}
+          onBalanceChange={setPixelBalance}
+        />
+      )}
+
       {/* Sponsored landmark card */}
       {activeSponsor && (() => {
         const cfg = resolvedSponsors.find((s) => s.slug === activeSponsor);
@@ -6155,7 +6677,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
 
           {/* Text in lower bar */}
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-center" style={{ height: "18%" }}>
-            {["Follow the white rabbit...", "It hides among the plazas..."].map((text, i) => (
+            {["Follow the white rabbit...", "It hides among the parks..."].map((text, i) => (
               <p
                 key={i}
                 className="absolute text-center font-pixel normal-case px-4"

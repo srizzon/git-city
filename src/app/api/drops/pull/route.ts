@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabase();
@@ -139,6 +140,19 @@ export async function POST(request: Request) {
 
   const total_points = (totalData ?? []).reduce((sum, r) => sum + r.points_earned, 0);
   const total_pulls = (totalData ?? []).length;
+
+  const phDrop = getPostHogClient();
+  phDrop.capture({
+    distinctId: githubLogin,
+    event: "drop_pulled",
+    properties: {
+      drop_id,
+      rarity: dropData.rarity,
+      points_earned: dropData.points,
+      item_reward: dropData.rarity === "legendary" ? dropData.item_reward : null,
+    },
+  });
+  await phDrop.shutdown();
 
   return NextResponse.json({
     ok: true,

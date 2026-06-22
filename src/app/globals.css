@@ -51,6 +51,11 @@ body {
   box-shadow: 4px 4px 0 0 #5a7a00;
 }
 
+/* Tailwind v4 preflight sets cursor: default on buttons — restore clickable affordance */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 .btn-press {
   transition: transform 0.05s, box-shadow 0.05s;
 }
@@ -74,6 +79,24 @@ body {
   background: rgba(200, 230, 74, 0.3);
   color: #e8dcc8;
 }
+
+/* ─── App-wide pixel scrollbar ───────────────────────────────────────────
+   Themed scrollbar on every scroll container by default. The .no-scrollbar /
+   .scrollbar-thin utilities below are class-specific, so they still override
+   this per-element where needed. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--color-border-light); }
+*::-webkit-scrollbar-corner { background: transparent; }
 
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

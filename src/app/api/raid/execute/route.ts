@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
-import { checkAchievements } from "@/lib/achievements";
+import { evaluateEmblems } from "@/lib/emblems";
 import { touchLastActive } from "@/lib/notification-helpers";
 import { sendRaidAlertNotification } from "@/lib/notification-senders/raid";
 import { trackDailyMission } from "@/lib/dailies";
+import { getPostHogClient } from "@/lib/posthog-server";
 import {
   calculateAttackScore,
   calculateDefenseScore,
@@ -329,7 +330,7 @@ export async function POST(request: Request) {
     const newDefenderXp = (defender.raid_xp ?? 0) + (success ? XP_WIN_DEFENDER : XP_LOSE_DEFENDER);
 
     const [attackerAchievements] = await Promise.all([
-      checkAchievements(
+      evaluateEmblems(
         attacker.id,
         {
           contributions: attacker.contributions ?? 0,
@@ -343,7 +344,7 @@ export async function POST(request: Request) {
         },
         attacker.github_login,
       ),
-      checkAchievements(
+      evaluateEmblems(
         defender.id,
         {
           contributions: defender.contributions ?? 0,
@@ -358,6 +359,22 @@ export async function POST(request: Request) {
         defender.github_login,
       ),
     ]);
+
+    const phRaidDirect = getPostHogClient();
+    phRaidDirect.capture({
+      distinctId: attacker.github_login,
+      event: "raid_executed",
+      properties: {
+        success,
+        attack_score: attack.total,
+        defense_score: defense.total,
+        vehicle,
+        boost_used: !!boostItemId,
+        boost_item: boostItemId,
+        defender: defender.github_login,
+      },
+    });
+    await phRaidDirect.shutdown();
 
     // Build building position approximations (will be overridden client-side)
     const xpEarned = success ? XP_WIN_ATTACKER : 0;
@@ -404,6 +421,22 @@ export async function POST(request: Request) {
     attack.total,
     defense.total,
   );
+
+  const phRaidRpc = getPostHogClient();
+  phRaidRpc.capture({
+    distinctId: attacker.github_login,
+    event: "raid_executed",
+    properties: {
+      success,
+      attack_score: attack.total,
+      defense_score: defense.total,
+      vehicle,
+      boost_used: !!boostItemId,
+      boost_item: boostItemId,
+      defender: defender.github_login,
+    },
+  });
+  await phRaidRpc.shutdown();
 
   return NextResponse.json(raidRow);
 }

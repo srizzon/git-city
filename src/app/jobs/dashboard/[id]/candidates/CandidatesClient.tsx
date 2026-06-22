@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BADGE_INFO } from "@/lib/jobs/quality-score";
 import type { CandidateBadge, CandidateWithScore } from "@/lib/jobs/types";
 import { SENIORITY_LABELS } from "@/lib/jobs/constants";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 import {
   trackJobCandidateHired,
   trackJobCandidatesExported,
@@ -208,15 +209,13 @@ export default function CandidatesClient({ listingId }: { listingId: string }) {
             Candidates ({candidates?.candidates.length ?? 0})
           </h2>
           <div className="flex items-center gap-3">
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="cursor-pointer border-[2px] border-border bg-bg px-3 py-1.5 text-xs text-muted outline-none"
-            >
-              {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <PixelSelect
+              value={String(sort)}
+              onChange={(v) => setSort(v)}
+              options={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              ariaLabel="Sort candidates"
+              className="w-44"
+            />
             <button
               onClick={handleExport}
               className="cursor-pointer border-[2px] border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-lime/30 hover:text-lime"

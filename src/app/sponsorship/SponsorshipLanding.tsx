@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { trackSponsorshipCtaClick } from "@/lib/himetrica";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 
 const ACCENT = "#c8e64a";
 const CREAM = "#e8dcc8";
@@ -682,33 +683,25 @@ export default function SponsorshipLanding() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Format interest">
-                  <select
+                  <PixelSelect
                     value={formatInterest}
-                    onChange={(e) => setFormatInterest(e.target.value)}
-                    className="w-full border-[3px] border-border bg-transparent px-3 py-2 font-pixel text-xs text-cream outline-none transition-colors focus:border-lime"
-                  >
-                    <option value="">Select an option</option>
-                    {FORMAT_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setFormatInterest(v)}
+                    placeholder="Select an option"
+                    ariaLabel="Format interest"
+                    className="w-full"
+                    options={FORMAT_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
+                  />
                 </Field>
 
                 <Field label="Budget (optional)">
-                  <select
+                  <PixelSelect
                     value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
-                    className="w-full border-[3px] border-border bg-transparent px-3 py-2 font-pixel text-xs text-cream outline-none transition-colors focus:border-lime"
-                  >
-                    <option value="">Select an option</option>
-                    {BUDGET_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setBudget(v)}
+                    placeholder="Select an option"
+                    ariaLabel="Budget"
+                    className="w-full"
+                    options={BUDGET_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
+                  />
                 </Field>
               </div>
 

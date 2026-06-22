@@ -53,23 +53,20 @@ export default function ProfileDistrict({
         {canChange ? (
           <button
             onClick={() => setShowChooser(true)}
-            className="btn-press group flex cursor-pointer items-center gap-1.5 border-2 px-2.5 py-1 transition-colors hover:border-border-light"
-            style={{ borderColor: color }}
+            className="btn-press group flex cursor-pointer items-center gap-1.5 border-2 border-border px-2.5 py-1 transition-colors hover:border-border-light"
           >
             <span
-              className="h-2 w-2 rounded-full shrink-0"
+              className="h-2 w-2 shrink-0"
               style={{ backgroundColor: color }}
             />
             <span className="text-[10px] text-cream">{name}</span>
             <span className="text-[10px] text-muted transition-colors group-hover:text-cream">
-              &#9998;
+              edit
             </span>
           </button>
         ) : (
-          <span
-            className="px-2 py-0.5 text-[10px] text-bg"
-            style={{ backgroundColor: color }}
-          >
+          <span className="inline-flex items-center gap-1.5 border-2 border-border px-2.5 py-1 text-[10px] text-cream">
+            <span className="h-2 w-2 shrink-0" style={{ backgroundColor: color }} />
             {name}
           </span>
         )}

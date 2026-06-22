@@ -1,0 +1,363 @@
+[
+  "6",
+  [
+    "apple a10 gpu",
+    "10",
+    "a10 apple gpu",
+    0,
+    [
+      [
+        1136,
+        640,
+        60,
+        "apple ipod touch (7th gen)"
+      ],
+      [
+        1334,
+        750,
+        59,
+        "apple iphone 7"
+      ],
+      [
+        1920,
+        1080,
+        47,
+        "apple iphone 7 plus"
+      ],
+      [
+        2001,
+        1125,
+        54,
+        "apple iphone x"
+      ]
+    ]
+  ],
+  [
+    "apple a11 gpu",
+    "11",
+    "a11 apple gpu",
+    0,
+    [
+      [
+        1334,
+        750,
+        60,
+        "apple iphone 8"
+      ],
+      [
+        1920,
+        1080,
+        58,
+        "apple iphone 8 plus"
+      ]
+    ]
+  ],
+  [
+    "apple a12 gpu",
+    "12",
+    "a12 apple gpu",
+    0,
+    [
+      [
+        1792,
+        828,
+        60,
+        "apple iphone xr"
+      ],
+      [
+        2436,
+        1125,
+        59,
+        "apple iphone xs"
+      ],
+      [
+        2208,
+        1242,
+        58,
+        "apple iphone xs max"
+      ],
+      [
+        2688,
+        1242,
+        57,
+        "apple iphone xs max"
+      ]
+    ]
+  ],
+  [
+    "apple a13 gpu",
+    "13",
+    "a13 apple gpu",
+    0,
+    [
+      [
+        1334,
+        750,
+        60,
+        "apple iphone se (2nd gen)"
+      ],
+      [
+        1792,
+        828,
+        60,
+        "apple iphone 11"
+      ],
+      [
+        2436,
+        1125,
+        60,
+        "apple iphone 11 pro"
+      ],
+      [
+        2688,
+        1242,
+        60,
+        "apple iphone 11 pro max"
+      ]
+    ]
+  ],
+  [
+    "apple a14 gpu",
+    "14",
+    "a14 apple gpu",
+    0,
+    [
+      [
+        2338,
+        1080,
+        60,
+        "apple iphone 12 mini"
+      ],
+      [
+        2532,
+        1170,
+        60,
+        "apple iphone 12 pro"
+      ],
+      [
+        2778,
+        1284,
+        60,
+        "apple iphone 12 pro max"
+      ]
+    ]
+  ],
+  [
+    "apple a15 gpu",
+    "15",
+    "a15 apple gpu",
+    0,
+    [
+      [
+        1334,
+        750,
+        60,
+        "apple iphone se (2022)"
+      ],
+      [
+        2338,
+        1080,
+        60,
+        "apple iphone 13 mini"
+      ],
+      [
+        2532,
+        1170,
+        60,
+        "apple iphone 14"
+      ],
+      [
+        2778,
+        1284,
+        60,
+        "apple iphone 14 plus"
+      ]
+    ]
+  ],
+  [
+    "apple a16 gpu",
+    "16",
+    "a16 apple gpu",
+    0,
+    [
+      [
+        2532,
+        1170,
+        60,
+        "apple iphone 15"
+      ],
+      [
+        2778,
+        1284,
+        60,
+        "apple iphone 15 plus"
+      ]
+    ]
+  ],
+  [
+    "apple a17 pro gpu",
+    "17",
+    "a17 apple gpu pro",
+    0,
+    [
+      [
+        2532,
+        1170,
+        60,
+        "apple iphone 15 pro"
+      ],
+      [
+        2778,
+        1284,
+        60,
+        "apple iphone 15 pro max"
+      ]
+    ]
+  ],
+  [
+    "apple a18 gpu",
+    "18",
+    "a18 apple gpu",
+    0,
+    [
+      [
+        2532,
+        1170,
+        60,
+        "apple iphone 16 (iphone17,5)"
+      ],
+      [
+        2778,
+        1284,
+        60,
+        "apple iphone 16 (iphone17,4)"
+      ]
+    ]
+  ],
+  [
+    "apple a18 pro gpu",
+    "18",
+    "a18 apple gpu pro",
+    0,
+    [
+      [
+        2532,
+        1170,
+        60,
+        "apple iphone 16 (iphone17,1)"
+      ],
+      [
+        2778,
+        1284,
+        60,
+        "apple iphone 16 (iphone17,2)"
+      ]
+    ]
+  ],
+  [
+    "apple a19 gpu",
+    "19",
+    "a19 apple gpu",
+    0,
+    [
+      [
+        2532,
+        1170,
+        60,
+        "apple iphone 17"
+      ]
+    ]
+  ],
+  [
+    "apple a19 pro gpu",
+    "19",
+    "a19 apple gpu pro",
+    0,
+    [
+      [
+        2532,
+        1170,
+        60,
+        "apple iphone 17 pro"
+      ],
+      [
+        2688,
+        1242,
+        60,
+        "apple iphone air"
+      ],
+      [
+        2778,
+        1284,
+        60,
+        "apple iphone 17 pro max"
+      ]
+    ]
+  ],
+  [
+    "apple a7 gpu",
+    "7",
+    "a7 apple gpu",
+    0,
+    [
+      [
+        1136,
+        640,
+        29,
+        "apple iphone 5s"
+      ]
+    ]
+  ],
+  [
+    "apple a8 gpu",
+    "8",
+    "a8 apple gpu",
+    0,
+    [
+      [
+        1136,
+        640,
+        42,
+        "apple ipod touch 6"
+      ],
+      [
+        1334,
+        750,
+        34,
+        "apple iphone 6"
+      ],
+      [
+        1920,
+        1080,
+        21,
+        "apple iphone 6 plus"
+      ]
+    ]
+  ],
+  [
+    "apple a9 gpu",
+    "9",
+    "a9 apple gpu",
+    0,
+    [
+      [
+        1136,
+        640,
+        58,
+        "apple iphone se"
+      ],
+      [
+        1334,
+        750,
+        56,
+        "apple iphone 6s"
+      ],
+      [
+        1920,
+        1080,
+        39,
+        "apple iphone 6s plus"
+      ]
+    ]
+  ]
+]

@@ -67,10 +67,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to update" }, { status: 500 });
     }
 
-    // Grant achievement
-    await admin
-      .from("developer_achievements")
-      .upsert({ developer_id: dev.id, achievement_id: "white_rabbit" }, { onConflict: "developer_id,achievement_id" });
+    // Grant emblem (unified). Same claim_key the 112 backfill used → idempotent.
+    await admin.rpc("grant_emblem", {
+      p_developer_id: dev.id,
+      p_emblem_id: "white_rabbit",
+      p_claim_key: `threshold:white_rabbit:${dev.id}`,
+      p_meta: {},
+      p_source: "secret",
+    });
 
     // Grant white_rabbit item (free purchase record, skip if already owned)
     const { data: existingPurchase } = await admin

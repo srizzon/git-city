@@ -9,6 +9,7 @@ import {
 } from "@/lib/himetrica";
 
 const RichTextEditor = lazy(() => import("@/components/jobs/RichTextEditor"));
+import { PixelSelect } from "@/components/ui/PixelSelect";
 import {
   SENIORITY_LABELS,
   ROLE_TYPE_LABELS,
@@ -401,14 +402,22 @@ export default function PostJobForm() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <Field label="Role" required>
-                <select value={form.roleType} onChange={(e) => update({ roleType: e.target.value as JobRoleType })} className={`${inputClass} mt-2 cursor-pointer`}>
-                  {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{ROLE_TYPE_LABELS[r]}</option>)}
-                </select>
+                <PixelSelect
+                  value={String(form.roleType)}
+                  onChange={(v) => update({ roleType: v as JobRoleType })}
+                  options={ROLE_OPTIONS.map((r) => ({ value: r, label: ROLE_TYPE_LABELS[r] }))}
+                  ariaLabel="Role"
+                  className="w-full mt-2"
+                />
               </Field>
               <Field label="Seniority" required>
-                <select value={form.seniority} onChange={(e) => update({ seniority: e.target.value as JobSeniority })} className={`${inputClass} mt-2 cursor-pointer`}>
-                  {SENIORITY_OPTIONS.map((s) => <option key={s} value={s}>{SENIORITY_LABELS[s]}</option>)}
-                </select>
+                <PixelSelect
+                  value={String(form.seniority)}
+                  onChange={(v) => update({ seniority: v as JobSeniority })}
+                  options={SENIORITY_OPTIONS.map((s) => ({ value: s, label: SENIORITY_LABELS[s] }))}
+                  ariaLabel="Seniority"
+                  className="w-full mt-2"
+                />
               </Field>
             </div>
 

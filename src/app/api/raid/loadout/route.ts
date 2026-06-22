@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { RAID_VEHICLE_ITEMS, RAID_TAG_ITEMS } from "@/lib/zones";
+import { RAID_TAG_ITEMS } from "@/lib/zones";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -93,6 +93,13 @@ export async function POST(request: Request) {
     .eq("status", "completed");
 
   const ownedSet = new Set((purchases ?? []).map((p) => p.item_id));
+  // Data-driven vehicle ownership: any owned item whose metadata.type is
+  // 'raid_vehicle' qualifies — no hardcoded vehicle list to maintain.
+  const ownedVehicleSet = new Set(
+    (purchases ?? [])
+      .filter((p) => (p.items as unknown as { metadata?: { type?: string } })?.metadata?.type === "raid_vehicle")
+      .map((p) => p.item_id),
+  );
 
   // Build config from current + updates
   const { data: currentData } = await admin
@@ -112,7 +119,7 @@ export async function POST(request: Request) {
   if (vehicle !== undefined) {
     if (vehicle === "airplane") {
       config.vehicle = "airplane";
-    } else if (RAID_VEHICLE_ITEMS.includes(vehicle) && ownedSet.has(vehicle)) {
+    } else if (ownedVehicleSet.has(vehicle)) {
       config.vehicle = vehicle;
     } else {
       return NextResponse.json({ error: "Vehicle not owned or invalid" }, { status: 403 });
@@ -130,8 +137,8 @@ export async function POST(request: Request) {
     }
   }
 
-  // Upsert
-  await admin.from("developer_customizations").upsert(
+  // Upsert — surface write failures instead of reporting a false ok.
+  const { error: saveErr } = await admin.from("developer_customizations").upsert(
     {
       developer_id: dev.id,
       item_id: "raid_loadout",
@@ -140,6 +147,9 @@ export async function POST(request: Request) {
     },
     { onConflict: "developer_id,item_id" }
   );
+  if (saveErr) {
+    return NextResponse.json({ error: `Couldn't save raid loadout: ${saveErr.message}` }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, vehicle: config.vehicle, tag: config.tag });
 }

@@ -148,17 +148,14 @@ export async function POST(req: NextRequest) {
         p_source: "career_profile",
         p_amount: 500,
       }),
-      admin
-        .from("developer_achievements")
-        .upsert(
-          {
-            developer_id: auth.developerId,
-            achievement_id: "career_ready",
-            name: "Career Ready",
-            tier: "bronze",
-          },
-          { onConflict: "developer_id,achievement_id" },
-        ),
+      // Unified emblem grant (idempotent; same claim_key as the 112 backfill).
+      admin.rpc("grant_emblem", {
+        p_developer_id: auth.developerId,
+        p_emblem_id: "career_ready",
+        p_claim_key: `threshold:career_ready:${auth.developerId}`,
+        p_meta: {},
+        p_source: "job",
+      }),
     ]);
   }
 

@@ -69,6 +69,13 @@ export interface GitcPayButtonProps {
   /** Async callback that confirms the on-chain payment with the backend. */
   onConfirm: (params: { quoteId: string; txHash: `0x${string}` }) => Promise<{ ok: boolean; error?: string }>;
   onError?: (message: string) => void;
+  /**
+   * Called once the payment is verified. When provided, it REPLACES the
+   * default hard redirect — used by the in-city Bank panel so the player
+   * stays in the city. When omitted (e.g. /pixels store), the button keeps
+   * its redirect-to-`redirectUrl` behavior.
+   */
+  onDone?: () => void;
 }
 
 /**
@@ -80,7 +87,7 @@ export function GitcPayButton(props: GitcPayButtonProps) {
   return <GitcPayButtonInner {...props} />;
 }
 
-function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: GitcPayButtonProps) {
+function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError, onDone }: GitcPayButtonProps) {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { open } = useAppKit();
@@ -345,11 +352,16 @@ function GitcPayButtonInner({ disabled, onRequestQuote, onConfirm, onError }: Gi
 
   useEffect(() => {
     if (status.kind !== "done") return;
+    // In-city panel: refresh inline instead of navigating away.
+    if (onDone) {
+      const t = setTimeout(onDone, 1500);
+      return () => clearTimeout(t);
+    }
     const t = setTimeout(() => {
       window.location.href = status.redirect;
     }, 1500);
     return () => clearTimeout(t);
-  }, [status]);
+  }, [status, onDone]);
 
   const accentButtonStyle = {
     backgroundColor: "transparent",

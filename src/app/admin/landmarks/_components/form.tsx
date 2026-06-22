@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Landmark, OrnamentName, AccentSource, TemplateConfig } from "@/lib/landmarks/types";
 import { LivePreview } from "./live-preview";
 import { ToastContainer, type Toast } from "./toast";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 
 interface FormProps {
   mode: "create" | "edit";
@@ -364,16 +365,14 @@ export function LandmarkForm({
             {buildingKind === "custom" && (
               <Section title="CUSTOM COMPONENT">
                 <Field label="Component name">
-                  <select
-                    value={customComponent}
-                    onChange={(e) => setCustomComponent(e.target.value)}
-                    className="w-full border border-border bg-bg-raised px-3 py-2 text-sm text-cream outline-none focus:border-lime/50"
-                  >
-                    <option value="">— choose —</option>
-                    {customComponentNames.map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
+                  <PixelSelect
+                    value={String(customComponent)}
+                    onChange={(v) => setCustomComponent(v)}
+                    options={customComponentNames.map((n) => ({ value: n, label: n }))}
+                    placeholder="— choose —"
+                    className="w-full"
+                    ariaLabel="Component name"
+                  />
                 </Field>
               </Section>
             )}
@@ -413,40 +412,38 @@ export function LandmarkForm({
 
                   {facadeMode === "facade_bitmap" && (
                     <Field label="Bitmap name">
-                      <select
-                        value={facadeBitmap}
-                        onChange={(e) => setFacadeBitmap(e.target.value)}
-                        className="w-full border border-border bg-bg-raised px-3 py-2 text-sm text-cream outline-none focus:border-lime/50"
-                      >
-                        <option value="">— choose —</option>
-                        {facadeBitmapNames.map((n) => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
-                      </select>
+                      <PixelSelect
+                        value={String(facadeBitmap)}
+                        onChange={(v) => setFacadeBitmap(v)}
+                        options={facadeBitmapNames.map((n) => ({ value: n, label: n }))}
+                        placeholder="— choose —"
+                        className="w-full"
+                        ariaLabel="Bitmap name"
+                      />
                     </Field>
                   )}
 
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Roof ornament">
-                      <select
-                        value={roofOrnament}
-                        onChange={(e) => setRoofOrnament(e.target.value as OrnamentName)}
-                        className="w-full border border-border bg-bg-raised px-3 py-2 text-sm text-cream outline-none focus:border-lime/50"
-                      >
-                        {ornamentNames.map((n) => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
-                      </select>
+                      <PixelSelect
+                        value={String(roofOrnament)}
+                        onChange={(v) => setRoofOrnament(v as OrnamentName)}
+                        options={ornamentNames.map((n) => ({ value: n, label: n }))}
+                        className="w-full"
+                        ariaLabel="Roof ornament"
+                      />
                     </Field>
                     <Field label="Accent source">
-                      <select
-                        value={accentSource}
-                        onChange={(e) => setAccentSource(e.target.value as AccentSource)}
-                        className="w-full border border-border bg-bg-raised px-3 py-2 text-sm text-cream outline-none focus:border-lime/50"
-                      >
-                        <option value="theme">theme (adapts)</option>
-                        <option value="locked">locked (use accent)</option>
-                      </select>
+                      <PixelSelect
+                        value={String(accentSource)}
+                        onChange={(v) => setAccentSource(v as AccentSource)}
+                        options={[
+                          { value: "theme", label: "theme (adapts)" },
+                          { value: "locked", label: "locked (use accent)" },
+                        ]}
+                        className="w-full"
+                        ariaLabel="Accent source"
+                      />
                     </Field>
                   </div>
                 </div>

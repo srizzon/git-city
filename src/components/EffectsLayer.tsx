@@ -2,10 +2,12 @@
 
 import { useState, useRef, useMemo, memo } from "react";
 import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
 import { ClaimedGlow, BuildingItemEffects } from "./Building3D";
 import { StreakFlame, NeonOutline, ParticleAura, SpotlightEffect } from "./BuildingEffects";
+import { tierFromLevel } from "@/lib/xp";
 import RaidTag3D from "./RaidTag3D";
 
 // ─── Memoized per-building effects ────────────────────────────
@@ -28,7 +30,12 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
   return (
     <group position={[building.position[0], 0, building.position[2]]} visible={!isDimmed}>
       {building.claimed && (
-        <ClaimedGlow height={building.height} width={building.width} depth={building.depth} />
+        <ClaimedGlow
+          height={building.height}
+          width={building.width}
+          depth={building.depth}
+          color={tierFromLevel(building.xp_level ?? 1).color}
+        />
       )}
       <BuildingItemEffects
         building={building}
@@ -70,6 +77,14 @@ interface GridIndex {
 
 // Reused result buffer — callers iterate immediately and never store the ref.
 const _gridResultPool: number[] = [];
+// Reused math for camera-look + frustum culling (no per-frame allocations).
+const _camFwd = new THREE.Vector3();
+const _frustum = new THREE.Frustum();
+const _projScreen = new THREE.Matrix4();
+const _sphere = new THREE.Sphere();
+// Per-frame distance² from the look target per candidate, used to rank the
+// budget (nearest to where you're looking wins). Reused to avoid allocation.
+const _scoreByIdx = new Map<number, number>();
 
 function querySpatialGrid(grid: GridIndex, x: number, z: number, radius: number): number[] {
   const result = _gridResultPool;
@@ -94,15 +109,25 @@ function querySpatialGrid(grid: GridIndex, x: number, z: number, radius: number)
 
 // ─── Constants ─────────────────────────────────────────────────
 
-const EFFECTS_RADIUS = 300;
-const EFFECTS_RADIUS_HYSTERESIS = 380;
+const EFFECTS_RADIUS = 300; // minimum candidate-gather radius (floor)
 const EFFECTS_UPDATE_INTERVAL = 0.3; // seconds
-const MAX_ACTIVE_EFFECTS = 25;
+const MAX_ACTIVE_EFFECTS = 300;
+// In orbit/overhead, candidates are taken from a wide ring around the camera's
+// ground focus and then trimmed by the actual view frustum — so customizations
+// fill the WHOLE visible area, not a disk at the center. The ring radius grows
+// with zoom up to this cap; when more than the budget are on screen, the ones
+// nearest the focus win.
+const EFFECTS_MAX_RADIUS = 9000;
+
+// Cosmetics show based on what the camera is LOOKING AT (view frustum + gather
+// range), NOT on how big the building is — a short building's crown shows just
+// like a tall tower's, as long as it's in view. The only limit is the budget
+// (MAX_ACTIVE_EFFECTS), which keeps the buildings NEAREST the camera when more
+// than the cap are on screen at once.
 
 // Low-perf preset: smaller bubble, fewer active components per frame.
 const LOW_PERF_RADIUS = 120;
-const LOW_PERF_RADIUS_HYSTERESIS = 160;
-const LOW_PERF_MAX_ACTIVE = 8;
+const LOW_PERF_MAX_ACTIVE = 40;
 
 // ─── Component ─────────────────────────────────────────────────
 
@@ -134,11 +159,11 @@ export default function EffectsLayer({
   lowPerf,
 }: EffectsLayerProps) {
   const effectsRadius = lowPerf ? LOW_PERF_RADIUS : EFFECTS_RADIUS;
-  const effectsHysteresis = lowPerf ? LOW_PERF_RADIUS_HYSTERESIS : EFFECTS_RADIUS_HYSTERESIS;
   const maxActiveEffects = lowPerf ? LOW_PERF_MAX_ACTIVE : MAX_ACTIVE_EFFECTS;
   const lastUpdate = useRef(-1);
   const activeSetRef = useRef(new Set<number>());
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
+  // Camera velocity tracking (fly mode look-ahead, so effects preload ahead).
   const prevCamPos = useRef<[number, number]>([0, 0]);
   const prevCamTime = useRef(0);
   const smoothVel = useRef<[number, number]>([0, 0]);
@@ -158,39 +183,67 @@ export default function EffectsLayer({
     if (introMode) return; // Skip effects during intro
 
     const elapsed = clock.elapsedTime;
-    const interval = flyMode ? 0.15 : EFFECTS_UPDATE_INTERVAL;
+    const interval = flyMode ? 0.08 : EFFECTS_UPDATE_INTERVAL;
     if (elapsed - lastUpdate.current < interval) return;
     lastUpdate.current = elapsed;
 
-    const rawCx = camera.position.x;
-    const rawCz = camera.position.z;
-    let cx = rawCx;
-    let cz = rawCz;
+    const camX = camera.position.x, camY = camera.position.y, camZ = camera.position.z;
+    camera.getWorldDirection(_camFwd);
 
-    // In fly mode, predict ahead using smoothed velocity so effects pre-load without flickering
+    // Fly look-ahead: predict where the camera will be (smoothed velocity) so
+    // buildings ahead get scored as if already near and preload before you pass.
     const dt = elapsed - prevCamTime.current;
-    if (flyMode && dt > 0.01) {
-      const vxRaw = (rawCx - prevCamPos.current[0]) / dt;
-      const vzRaw = (rawCz - prevCamPos.current[1]) / dt;
-      // Exponential moving average to avoid jitter on turns
+    let predX = camX, predZ = camZ;
+    if (flyMode && dt > 0.001 && dt < 0.5) {
+      const vx = (camX - prevCamPos.current[0]) / dt;
+      const vz = (camZ - prevCamPos.current[1]) / dt;
       const SMOOTH = 0.3;
-      smoothVel.current[0] += (vxRaw - smoothVel.current[0]) * SMOOTH;
-      smoothVel.current[1] += (vzRaw - smoothVel.current[1]) * SMOOTH;
-      const LOOK_AHEAD_SECS = 2.0;
-      cx += smoothVel.current[0] * LOOK_AHEAD_SECS;
-      cz += smoothVel.current[1] * LOOK_AHEAD_SECS;
+      smoothVel.current[0] += (vx - smoothVel.current[0]) * SMOOTH;
+      smoothVel.current[1] += (vz - smoothVel.current[1]) * SMOOTH;
+      const LOOK_AHEAD_SECS = 2;
+      predX = camX + smoothVel.current[0] * LOOK_AHEAD_SECS;
+      predZ = camZ + smoothVel.current[1] * LOOK_AHEAD_SECS;
     }
-    prevCamPos.current[0] = rawCx;
-    prevCamPos.current[1] = rawCz;
+    prevCamPos.current[0] = camX;
+    prevCamPos.current[1] = camZ;
     prevCamTime.current = elapsed;
 
-    // Wider hysteresis in fly mode so buildings stay active longer once loaded
-    const flyHyst = flyMode ? (lowPerf ? 220 : 450) : effectsHysteresis;
-    const candidates = querySpatialGrid(grid, cx, cz, flyHyst);
+    // Center the candidate gather on what the camera LOOKS at — the ground point
+    // when looking down (orbit), or a point ahead when looking level (fly) — and
+    // size the ring with distance. The view frustum + screen-size LOD below trim
+    // it to exactly the buildings on screen, so fly and orbit behave the same:
+    // customizations show across the view ahead, not in a bubble on the vehicle.
+    let cx: number, cz: number, keepRadius: number;
+    if (flyMode) {
+      // Gather a wide ring around the predicted-ahead point so fast flight has
+      // candidates loaded before arrival.
+      cx = predX;
+      cz = predZ;
+      keepRadius = EFFECTS_MAX_RADIUS;
+    } else if (_camFwd.y < -0.001) {
+      const dist = -camY / _camFwd.y;
+      cx = camX + _camFwd.x * dist;
+      cz = camZ + _camFwd.z * dist;
+      const focusDist = Math.hypot(cx - camX, camY, cz - camZ);
+      keepRadius = Math.min(EFFECTS_MAX_RADIUS, Math.max(effectsRadius, focusDist * 2.5));
+    } else {
+      // Looking level/up: gather a wide ring ahead.
+      cx = camX + _camFwd.x * 1500;
+      cz = camZ + _camFwd.z * 1500;
+      keepRadius = EFFECTS_MAX_RADIUS;
+    }
 
-    const nearSq = effectsRadius * effectsRadius;
-    const farSq = flyHyst * flyHyst;
+    // Orbit trims to the exact view frustum; fly uses a path bubble so buildings
+    // entering from the sides preload too.
+    if (!flyMode) {
+      _projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      _frustum.setFromProjectionMatrix(_projScreen);
+    }
+
+    const candidates = querySpatialGrid(grid, cx, cz, keepRadius);
+    const farSq = keepRadius * keepRadius;
     const newSet = new Set<number>();
+    _scoreByIdx.clear();
 
     for (let c = 0; c < candidates.length; c++) {
       const idx = candidates[c];
@@ -200,13 +253,30 @@ export default function EffectsLayer({
       const hasEffects = b.claimed || (b.owned_items && b.owned_items.length > 0) || (b.app_streak > 0) || !!b.active_raid_tag || b.rabbit_completed;
       if (!hasEffects) continue;
 
+      // Distance from the LOOK TARGET (the ground point the camera is aimed at,
+      // or the predicted-ahead point in fly mode) — NOT from the camera. This is
+      // what makes the budget follow where you're LOOKING instead of clustering
+      // at your feet: buildings around the centre of your view rank highest.
+      // Building height is deliberately not a factor.
       const dx = cx - b.position[0];
       const dz = cz - b.position[2];
       const distSq = dx * dx + dz * dz;
+      if (distSq > farSq) continue; // outside the gather ring
 
-      const alreadyActive = activeSetRef.current.has(idx);
-      if (distSq < nearSq || (alreadyActive && distSq < farSq)) {
+      let qualifies: boolean;
+      if (flyMode) {
+        // Path bubble: everything within the gather ring (already cut by farSq).
+        qualifies = true;
+      } else {
+        // Show it if it's in view — i.e. where the camera is looking — no matter
+        // how tall or short the building is.
+        _sphere.center.set(b.position[0], b.height * 0.5, b.position[2]);
+        _sphere.radius = Math.max(b.width, b.depth, b.height) * 0.5 + 30;
+        qualifies = _frustum.intersectsSphere(_sphere);
+      }
+      if (qualifies) {
         newSet.add(idx);
+        _scoreByIdx.set(idx, distSq);
       }
     }
 
@@ -220,18 +290,17 @@ export default function EffectsLayer({
       if (fi !== undefined) newSet.add(fi);
     }
 
-    // Cap at maxActiveEffects — keep closest buildings
+    // Cap at maxActiveEffects — keep the buildings nearest the LOOK TARGET so the
+    // budget spreads across the centre of your view (size-independent), instead
+    // of bunching up on the closest buildings directly under the camera.
     if (newSet.size > maxActiveEffects) {
-      const withDist = Array.from(newSet).map((idx) => {
-        const b = buildings[idx];
-        const dx = cx - b.position[0];
-        const dz = cz - b.position[2];
-        return { idx, distSq: dx * dx + dz * dz };
-      });
-      withDist.sort((a, b) => a.distSq - b.distSq);
+      // Keep the buildings NEAREST the look target (distance, not size).
+      const ranked = Array.from(newSet).sort(
+        (a, b) => (_scoreByIdx.get(a) ?? Infinity) - (_scoreByIdx.get(b) ?? Infinity),
+      );
       newSet.clear();
-      for (let i = 0; i < maxActiveEffects && i < withDist.length; i++) {
-        newSet.add(withDist[i].idx);
+      for (let i = 0; i < maxActiveEffects && i < ranked.length; i++) {
+        newSet.add(ranked[i]);
       }
       // Re-add focused buildings (always visible)
       if (focusedLower) {

@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, Suspense } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { PREVIEW_THEMES, PreviewLights, PreviewBuilding } from "./previewScene";
 import { VehicleMesh } from "@/components/RaidSequence3D";
 import RaidTag3D from "@/components/RaidTag3D";
-import { buildingItemVisual, classifyItem, PREVIEW_BD, PREVIEW_VIEWS } from "./itemRenderers";
+import { cosmeticVisual, classifyItem, PREVIEW_BD, PREVIEW_VIEWS } from "./itemRenderers";
+import type { Cosmetic } from "@/lib/cosmetics/types";
 
 // ─── Card thumbnail factory ────────────────────────────────────
 // The browser caps live WebGL contexts (~16), so we can't give every grid
@@ -17,7 +18,7 @@ import { buildingItemVisual, classifyItem, PREVIEW_BD, PREVIEW_VIEWS } from "./i
 
 const THEME = PREVIEW_THEMES.find((t) => t.name === "Emerald") ?? PREVIEW_THEMES[0];
 
-export interface ThumbItem { id: string; zone: string | null }
+export interface ThumbItem { id: string; zone: string | null; shop_section?: string | null; render_kind?: string | null; render_spec?: Record<string, unknown> | null }
 
 // Reads the canvas after a few frames (so animated effects have started)
 // and hands the PNG back. Only reads `gl` — never mutates hook state.
@@ -40,11 +41,19 @@ function Content({ item }: { item: ThumbItem }) {
       {onBuilding && (
         <PreviewBuilding theme={THEME} faceOverride={item.id === "custom_color" ? THEME.accent : undefined} />
       )}
-      {kind === "building" && buildingItemVisual(item.id, { width: PREVIEW_BD.width, height: PREVIEW_BD.height, depth: PREVIEW_BD.depth, color: THEME.accent, billboardImages: [] })}
+      {kind === "building" && cosmeticVisual(
+        {
+          id: item.id,
+          slot: (item.zone ?? null) as Cosmetic["slot"],
+          render_kind: (item.render_kind ?? "code") as Cosmetic["render_kind"],
+          render_spec: (item.render_spec ?? { key: item.id }) as unknown as Cosmetic["render_spec"],
+        },
+        { width: PREVIEW_BD.width, height: PREVIEW_BD.height, depth: PREVIEW_BD.depth, color: THEME.accent, billboardImages: [] }
+      )}
       {kind === "tag" && (
         <RaidTag3D width={PREVIEW_BD.width} height={PREVIEW_BD.height} depth={PREVIEW_BD.depth} attackerLogin="preview" tagStyle={item.id} />
       )}
-      {kind === "vehicle" && <VehicleMesh type={item.id} />}
+      {kind === "vehicle" && <VehicleMesh type={item.id} propagateSuspense />}
     </>
   );
 }
@@ -59,8 +68,12 @@ export default function ThumbnailFactory({ next, onThumb }: { next: ThumbItem | 
         {/* enableDamping keeps update() running each frame so the camera is
             aimed at target before we snapshot. Input is disabled (offscreen). */}
         <OrbitControls target={v.target} enableDamping dampingFactor={0.2} enableRotate={false} enableZoom={false} enablePan={false} />
-        <Snapshot onShot={(url) => onThumb(next.id, url)} />
-        <Content item={next} />
+        {/* Snapshot + Content share one Suspense: while an async GLB loads, both
+            unmount, so the snapshot only fires once the model is actually drawn. */}
+        <Suspense fallback={null}>
+          <Snapshot onShot={(url) => onThumb(next.id, url)} />
+          <Content item={next} />
+        </Suspense>
       </Canvas>
     </div>
   );

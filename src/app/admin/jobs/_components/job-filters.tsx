@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { JobStatus } from "@/lib/jobs/types";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 
 export type StatusFilter = JobStatus | "all";
 export type SortKey = "date" | "salary" | "views" | "applies";
@@ -102,22 +103,23 @@ export function JobFilters({
 
       {/* Row 2: Sort + Count */}
       <div className="flex flex-wrap items-center gap-3">
-        <select
+        <PixelSelect
           value={`${filters.sort}-${filters.dir}`}
-          onChange={(e) => {
-            const [sort, dir] = e.target.value.split("-") as [SortKey, SortDir];
+          onChange={(v) => {
+            const [sort, dir] = v.split("-") as [SortKey, SortDir];
             setFilter("sort", sort);
             setFilter("dir", dir);
           }}
-          className="cursor-pointer border border-border bg-bg px-3 py-1.5 text-[11px] text-cream outline-none focus:border-lime"
-        >
-          <option value="date-desc">Newest first</option>
-          <option value="date-asc">Oldest first</option>
-          <option value="salary-desc">Highest salary</option>
-          <option value="salary-asc">Lowest salary</option>
-          <option value="views-desc">Most views</option>
-          <option value="applies-desc">Most applies</option>
-        </select>
+          options={[
+            { value: "date-desc", label: "Newest first" },
+            { value: "date-asc", label: "Oldest first" },
+            { value: "salary-desc", label: "Highest salary" },
+            { value: "salary-asc", label: "Lowest salary" },
+            { value: "views-desc", label: "Most views" },
+            { value: "applies-desc", label: "Most applies" },
+          ]}
+          ariaLabel="Sort order"
+        />
 
         <p className="ml-auto text-[11px] text-dim">
           {filteredCount} of {totalCount} listings

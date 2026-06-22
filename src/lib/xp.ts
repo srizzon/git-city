@@ -36,10 +36,11 @@ export type XpSourceType =
 // ─── Constants ──────────────────────────────────────────────
 
 export const XP_TIERS: XpTier[] = [
-  { id: "localhost", name: "Localhost", color: "#4ade80", minLevel: 1, maxLevel: 4 },
+  // Localhost is city lime — most devs are here, so claimed borders keep the classic look
+  { id: "localhost", name: "Localhost", color: "#c8e64a", minLevel: 1, maxLevel: 4 },
   { id: "staging", name: "Staging", color: "#60a5fa", minLevel: 5, maxLevel: 8 },
   { id: "production", name: "Production", color: "#a78bfa", minLevel: 9, maxLevel: 13 },
-  { id: "open_source", name: "Open Source", color: "#fbbf24", minLevel: 14, maxLevel: 18 },
+  { id: "open_source", name: "Open Source", color: "#4ade80", minLevel: 14, maxLevel: 18 },
   { id: "unicorn", name: "Unicorn", color: "#22d3ee", minLevel: 19, maxLevel: 23 },
   { id: "founder", name: "Founder", color: "#ffffff", minLevel: 24, maxLevel: 999 },
 ];

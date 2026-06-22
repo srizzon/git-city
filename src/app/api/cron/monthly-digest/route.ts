@@ -47,11 +47,11 @@ export async function GET(request: NextRequest) {
 
     const [achievementsResult, raidsResult] = await Promise.allSettled([
       sb
-        .from("developer_achievements")
+        .from("emblem_grants")
         .select("developer_id")
         .in("developer_id", devIds)
-        .gte("unlocked_at", monthStart)
-        .lt("unlocked_at", monthEnd),
+        .gte("first_earned_at", monthStart)
+        .lt("first_earned_at", monthEnd),
       sb
         .from("raids")
         .select("attacker_id, defender_id, success")

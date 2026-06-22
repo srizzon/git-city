@@ -115,8 +115,8 @@ export async function POST(request: Request) {
     .maybeSingle();
   const prev = (currentLoadout?.config ?? { crown: null, roof: null, aura: null }) as Record<string, string | null>;
 
-  // Upsert loadout
-  await admin.from("developer_customizations").upsert(
+  // Upsert loadout — surface write failures instead of reporting a false ok.
+  const { error: saveErr } = await admin.from("developer_customizations").upsert(
     {
       developer_id: dev.id,
       item_id: "loadout",
@@ -125,6 +125,9 @@ export async function POST(request: Request) {
     },
     { onConflict: "developer_id,item_id" }
   );
+  if (saveErr) {
+    return NextResponse.json({ error: `Couldn't save loadout: ${saveErr.message}` }, { status: 500 });
+  }
 
   // Feed event for newly equipped items
   for (const zone of ["crown", "roof", "aura"] as const) {

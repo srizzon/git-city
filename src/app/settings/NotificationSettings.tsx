@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 
 interface Prefs {
   email_enabled: boolean;
@@ -277,35 +278,35 @@ export default function NotificationSettings() {
             No push notifications during these hours (email is unaffected)
           </p>
           <div className="flex items-center gap-3">
-            <select
-              value={prefs.quiet_hours_start ?? ""}
-              onChange={(e) => {
-                const val = e.target.value === "" ? null : Number(e.target.value);
-                save({ quiet_hours_start: val });
-              }}
+            <PixelSelect
+              value={prefs.quiet_hours_start === null ? "" : String(prefs.quiet_hours_start)}
+              onChange={(v) => save({ quiet_hours_start: v === "" ? null : Number(v) })}
               disabled={emailOff}
-              className="bg-bg border-[3px] border-border px-3 py-2 text-sm text-cream normal-case focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c8e64a]/50"
-            >
-              <option value="">Off</option>
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>
-              ))}
-            </select>
+              ariaLabel="Quiet hours start"
+              className="w-28"
+              options={[
+                { value: "", label: "Off" },
+                ...Array.from({ length: 24 }, (_, i) => ({
+                  value: String(i),
+                  label: `${String(i).padStart(2, "0")}:00`,
+                })),
+              ]}
+            />
             <span className="text-xs text-muted">to</span>
-            <select
-              value={prefs.quiet_hours_end ?? ""}
-              onChange={(e) => {
-                const val = e.target.value === "" ? null : Number(e.target.value);
-                save({ quiet_hours_end: val });
-              }}
+            <PixelSelect
+              value={prefs.quiet_hours_end === null ? "" : String(prefs.quiet_hours_end)}
+              onChange={(v) => save({ quiet_hours_end: v === "" ? null : Number(v) })}
               disabled={emailOff}
-              className="bg-bg border-[3px] border-border px-3 py-2 text-sm text-cream normal-case focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c8e64a]/50"
-            >
-              <option value="">Off</option>
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>
-              ))}
-            </select>
+              ariaLabel="Quiet hours end"
+              className="w-28"
+              options={[
+                { value: "", label: "Off" },
+                ...Array.from({ length: 24 }, (_, i) => ({
+                  value: String(i),
+                  label: `${String(i).padStart(2, "0")}:00`,
+                })),
+              ]}
+            />
             <span className="text-xs text-muted/40 normal-case">UTC</span>
           </div>
         </div>

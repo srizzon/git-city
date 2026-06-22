@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useMemo, useEffect, useState } from "react";
+import { useRef, useMemo, useEffect, useState, Suspense, type ReactElement } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { resolveModelUrl } from "@/lib/cosmetics/modelBase";
 import type { RaidPhase } from "@/lib/useRaidSequence";
 import type { RaidExecuteResponse } from "@/lib/raid";
 import type { CityBuilding } from "@/lib/github";
@@ -498,7 +500,9 @@ function HackerRigMesh() {
   });
 
   return (
-    <group>
+    // Modeled facing +Z; rotate to the -Z "front" convention so it matches the
+    // other vehicles in flight and in thumbnails/previews.
+    <group rotation={[0, Math.PI, 0]}>
       {/* Desk surface (compact beige wood, matching CRT housing) */}
       <mesh position={[0, -0.1, 0]}>
         <boxGeometry args={[4, 0.18, 2.4]} />
@@ -595,13 +599,33 @@ function HackerRigMesh() {
   );
 }
 
-export function VehicleMesh({ type }: { type: string }) {
-  switch (type) {
-    case "raid_helicopter": return <MechanicalKeyboardMesh />;
-    case "raid_drone": return <PCTowerMesh />;
-    case "raid_rocket": return <HackerRigMesh />;
-    default: return <CRTTerminalMesh />;
-  }
+// ─── Vehicle dispatch ─────────────────────────────────────────────
+// Legacy vehicles are hand-coded meshes. Every NEW vehicle is data-driven: a
+// GLB in Supabase Storage (cosmetic-models/vehicles/<id>.glb) + a catalog row.
+// VehicleMesh resolves the model from the storage base by id, so adding a
+// vehicle is upload + DB row — never a code change or a git commit.
+const BUILTIN_VEHICLES: Record<string, () => ReactElement> = {
+  airplane: () => <CRTTerminalMesh />,
+  raid_helicopter: () => <MechanicalKeyboardMesh />,
+  raid_drone: () => <PCTowerMesh />,
+  raid_rocket: () => <HackerRigMesh />,
+};
+
+// Loads a GLB vehicle from a URL. useGLTF suspends + caches per-URL; clone so
+// multiple pilots fly it independently. Scaled ~0.9 to match the CRT footprint.
+function GLBVehicle({ url }: { url: string }) {
+  const gltf = useGLTF(url);
+  const scene = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
+  return <group scale={0.9}><primitive object={scene} /></group>;
+}
+
+export function VehicleMesh({ type, propagateSuspense = false }: { type: string; propagateSuspense?: boolean }) {
+  const builtin = BUILTIN_VEHICLES[type];
+  if (builtin) return builtin();
+  const node = <GLBVehicle url={resolveModelUrl(`vehicles/${type}.glb`)} />;
+  // Live use: show the CRT while the model loads. Thumbnail factory: let the
+  // suspension bubble up (propagateSuspense) so the snapshot waits for the model.
+  return propagateSuspense ? node : <Suspense fallback={<CRTTerminalMesh />}>{node}</Suspense>;
 }
 
 // ─── Smoke Trail ──────────────────────────────────────────────

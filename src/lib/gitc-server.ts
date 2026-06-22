@@ -4,11 +4,15 @@ import { base } from "viem/chains";
 import {
   GITC_ABI,
   GITC_ADDRESS,
+  GITC_CHAIN_ID,
   GITC_DECIMALS,
   GITC_DISCOUNT_BPS,
   GITC_MIN_CONFIRMATIONS,
   GITC_SLIPPAGE_BPS,
+  GITC_SWAP_DEFAULT_SLIPPAGE_BPS,
   GITC_TREASURY_ADDRESS,
+  NATIVE_ETH_SENTINEL,
+  USDC_BASE_ADDRESS,
   assertTreasuryConfigured,
 } from "./gitc";
 
@@ -115,6 +119,77 @@ export async function getGitcPriceUsd(): Promise<number> {
   return price;
 }
 
+export interface GitcMarket {
+  priceUsd: number | null;
+  /** 24h price change in percent (e.g. -3.2 for -3.2%). Null if unavailable. */
+  change24h: number | null;
+}
+
+interface MarketCache {
+  market: GitcMarket;
+  fetchedAt: number;
+}
+let marketCache: MarketCache | null = null;
+
+/**
+ * Fetch the GITC market snapshot (price + 24h change) for the bank ticker and
+ * the wallet panel. DexScreener exposes `priceChange.h24` on the Base pair, so
+ * we read both from there in one call. If DexScreener is unavailable we fall
+ * back to the price-only sources (`getGitcPriceUsd`) and report `change24h`
+ * as null. Never throws — returns `{ priceUsd: null, change24h: null }` when
+ * every source fails, which the ticker/chip render gracefully.
+ */
+export async function getGitcMarket(): Promise<GitcMarket> {
+  if (marketCache && Date.now() - marketCache.fetchedAt < PRICE_TTL_MS) {
+    return marketCache.market;
+  }
+
+  let market: GitcMarket = { priceUsd: null, change24h: null };
+
+  try {
+    const url = `https://api.dexscreener.com/latest/dex/tokens/${GITC_ADDRESS}`;
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 30 },
+    });
+    if (res.ok) {
+      const json = (await res.json()) as {
+        pairs?: Array<{
+          chainId?: string;
+          priceUsd?: string;
+          priceChange?: { h24?: number };
+          liquidity?: { usd?: number };
+        }>;
+      };
+      const basePairs = (json.pairs ?? []).filter((p) => p.chainId === "base");
+      basePairs.sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0));
+      const top = basePairs[0];
+      if (top) {
+        const price = top.priceUsd ? Number(top.priceUsd) : NaN;
+        const change = top.priceChange?.h24;
+        market = {
+          priceUsd: Number.isFinite(price) && price > 0 ? price : null,
+          change24h: typeof change === "number" && Number.isFinite(change) ? change : null,
+        };
+      }
+    }
+  } catch {
+    /* fall through to price-only fallback */
+  }
+
+  // If DexScreener gave no price, fall back to the cached/Gecko price source.
+  if (market.priceUsd === null) {
+    try {
+      market = { priceUsd: await getGitcPriceUsd(), change24h: market.change24h };
+    } catch {
+      /* keep nulls */
+    }
+  }
+
+  marketCache = { market, fetchedAt: Date.now() };
+  return market;
+}
+
 /**
  * Convert a USD cents amount into GITC wei, applying:
  *   - the configured discount (cheaper to pay in GITC)
@@ -138,6 +213,80 @@ export async function quoteGitcWeiForUsdCents(usdCents: number): Promise<{
     gitcPriceUsd: priceUsd,
     discountBps: GITC_DISCOUNT_BPS,
   };
+}
+
+// ─── 0x Swap API v2 (AllowanceHolder) ────────────────────────
+// Native USDC/ETH → GITC swaps on Base. The API key is server-only, so the
+// browser talks to our proxy routes (/api/gitc/swap/{price,quote}) which inject
+// the key and force chainId + buyToken so the proxy can't be used as a generic
+// 0x relay.
+
+/** True when a 0x API key is configured (enables the native in-city swap). */
+export function is0xEnabled(): boolean {
+  return !!process.env.ZEROX_API_KEY;
+}
+
+const ZEROX_BASE = "https://api.0x.org/swap/allowance-holder";
+const ALLOWED_SELL_TOKENS = new Set([
+  USDC_BASE_ADDRESS.toLowerCase(),
+  NATIVE_ETH_SENTINEL.toLowerCase(),
+]);
+
+export type ZeroxResult =
+  | { ok: true; data: unknown }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Proxy a /price (indicative) or /quote (firm, returns a ready-to-send tx) call
+ * to 0x for a USDC|ETH → GITC swap on Base. Validates and pins the dangerous
+ * params (chainId, buyToken, sellToken whitelist) server-side.
+ */
+export async function fetchZeroxSwap(
+  kind: "price" | "quote",
+  params: { sellToken: string; sellAmount: string; taker?: string; slippageBps?: string },
+): Promise<ZeroxResult> {
+  const apiKey = process.env.ZEROX_API_KEY;
+  if (!apiKey) return { ok: false, status: 503, error: "disabled" };
+
+  if (!ALLOWED_SELL_TOKENS.has(params.sellToken.toLowerCase())) {
+    return { ok: false, status: 400, error: "Unsupported sell token" };
+  }
+  if (!/^\d+$/.test(params.sellAmount) || params.sellAmount === "0") {
+    return { ok: false, status: 400, error: "Invalid sell amount" };
+  }
+
+  const slippage =
+    params.slippageBps && /^\d+$/.test(params.slippageBps)
+      ? params.slippageBps
+      : String(GITC_SWAP_DEFAULT_SLIPPAGE_BPS);
+
+  const qs = new URLSearchParams({
+    chainId: String(GITC_CHAIN_ID),
+    sellToken: params.sellToken,
+    buyToken: GITC_ADDRESS,
+    sellAmount: params.sellAmount,
+    slippageBps: slippage,
+  });
+
+  const takerValid = params.taker && /^0x[a-fA-F0-9]{40}$/.test(params.taker);
+  if (takerValid) qs.set("taker", params.taker!);
+  // A firm quote needs a taker to build the transaction.
+  if (kind === "quote" && !takerValid) {
+    return { ok: false, status: 400, error: "A connected wallet is required to quote" };
+  }
+
+  try {
+    const res = await fetch(`${ZEROX_BASE}/${kind}?${qs.toString()}`, {
+      headers: { "0x-api-key": apiKey, "0x-version": "v2" },
+    });
+    const data = (await res.json().catch(() => ({}))) as { message?: string; reason?: string };
+    if (!res.ok) {
+      return { ok: false, status: res.status, error: data.message || data.reason || `0x ${kind} failed` };
+    }
+    return { ok: true, data };
+  } catch {
+    return { ok: false, status: 502, error: "Could not reach the swap service" };
+  }
 }
 
 export interface PaymentVerification {

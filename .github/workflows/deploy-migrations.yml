@@ -4,6 +4,9 @@ name: Deploy migrations to production
 # A validation job first applies every migration to a throwaway local Supabase
 # stack, so a broken migration fails CI *before* it can ever touch production.
 #
+# The staging counterpart is deploy-staging-migrations.yml (any other branch
+# -> staging project). Full setup guide: ENVIRONMENTS.md
+#
 # Required repo secrets (Settings -> Secrets and variables -> Actions):
 #   SUPABASE_ACCESS_TOKEN  – personal token from supabase.com/dashboard/account/tokens
 #   SUPABASE_DB_PASSWORD   – the production database password

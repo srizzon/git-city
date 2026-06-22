@@ -145,17 +145,14 @@ export async function POST(
           p_source: "job_apply",
           p_amount: 200,
         }),
-        admin
-          .from("developer_achievements")
-          .upsert(
-            {
-              developer_id: dev.id,
-              achievement_id: "job_hunter",
-              name: "Job Hunter",
-              tier: "bronze",
-            },
-            { onConflict: "developer_id,achievement_id" },
-          ),
+        // Unified emblem grant (idempotent; same claim_key as the 112 backfill).
+        admin.rpc("grant_emblem", {
+          p_developer_id: dev.id,
+          p_emblem_id: "job_hunter",
+          p_claim_key: `threshold:job_hunter:${dev.id}`,
+          p_meta: {},
+          p_source: "job",
+        }),
       ]);
     }
   }

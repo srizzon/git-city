@@ -1,0 +1,252 @@
+[
+  "6",
+  [
+    "qualcomm adreno 540",
+    "540",
+    "540 adreno qualcomm",
+    0,
+    [
+      [
+        1919,
+        1279,
+        18
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 540 gpu",
+    "540",
+    "540 adreno gpu qualcomm",
+    0,
+    [
+      [
+        1919,
+        1279,
+        24
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 618 gpu",
+    "618",
+    "618 adreno gpu qualcomm",
+    0,
+    [
+      [
+        1920,
+        1080,
+        19
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 630 gpu",
+    "630",
+    "630 adreno gpu qualcomm",
+    0,
+    [
+      [
+        1920,
+        1080,
+        20
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 675 gpu",
+    "675",
+    "675 adreno gpu qualcomm",
+    0,
+    [
+      [
+        1920,
+        1080,
+        58
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 680 gpu",
+    "680",
+    "680 adreno gpu qualcomm",
+    0,
+    [
+      [
+        2880,
+        1920,
+        24
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 685 gpu",
+    "685",
+    "685 adreno gpu qualcomm",
+    0,
+    [
+      [
+        1920,
+        1080,
+        23
+      ],
+      [
+        2560,
+        1600,
+        57
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 690 gpu",
+    "690",
+    "690 adreno gpu qualcomm",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        1920,
+        1280,
+        28
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 7c gen 3 gpu",
+    "7",
+    "3 7c adreno gen gpu qualcomm",
+    0,
+    [
+      [
+        1920,
+        1080,
+        48
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 7c+ gen 3",
+    "7",
+    "3 7c+ adreno gen qualcomm",
+    0,
+    [
+      [
+        1920,
+        1080,
+        40
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 8cx gen 3",
+    "8",
+    "3 8cx adreno gen qualcomm",
+    0,
+    [
+      [
+        1920,
+        1080,
+        21
+      ],
+      [
+        1920,
+        1200,
+        59
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno 8cx gen 4",
+    "8",
+    "4 8cx adreno gen qualcomm",
+    0,
+    [
+      [
+        2880,
+        1800,
+        60
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno x1-45 gpu",
+    "1",
+    "adreno gpu qualcomm x1-45",
+    0,
+    [
+      [
+        2880,
+        1800,
+        80
+      ]
+    ]
+  ],
+  [
+    "qualcomm adreno x1-85 gpu",
+    "1",
+    "adreno gpu qualcomm x1-85",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "qualcomm mi pad 5 adreno 640 gpu",
+    "5",
+    "5 640 adreno gpu mi pad qualcomm",
+    0,
+    [
+      [
+        2560,
+        1600,
+        34
+      ]
+    ]
+  ],
+  [
+    "qualcomm snapdragon x elite - x1e78100 - qualcomm adreno gpu",
+    "1",
+    "- adreno elite gpu qualcomm snapdragon x x1e78100",
+    0,
+    [
+      [
+        2880,
+        1620,
+        115
+      ]
+    ]
+  ],
+  [
+    "qualcomm snapdragon x elite - x1e80100 - qualcomm adreno gpu",
+    "1",
+    "- adreno elite gpu qualcomm snapdragon x x1e80100",
+    0,
+    [
+      [
+        2496,
+        1664,
+        60
+      ]
+    ]
+  ],
+  [
+    "qualcomm snapdragon x elite - x1e84100 - qualcomm adreno gpu",
+    "1",
+    "- adreno elite gpu qualcomm snapdragon x x1e84100",
+    0,
+    [
+      [
+        2880,
+        1800,
+        60
+      ]
+    ]
+  ]
+]

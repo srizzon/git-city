@@ -35,7 +35,7 @@ export async function POST() {
   }
 
   await sb
-    .from("developer_achievements")
+    .from("emblem_grants")
     .update({ seen: true })
     .eq("developer_id", dev.id)
     .eq("seen", false);

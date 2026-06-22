@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 
 interface Drop {
   id: string;
@@ -163,29 +164,33 @@ export default function AdminDropsPage() {
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="mb-1 block text-[11px] text-muted">Rarity</label>
-                <select
-                  value={rarity}
-                  onChange={(e) => setRarity(e.target.value)}
-                  className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-                >
-                  <option value="common">Common (10 pts)</option>
-                  <option value="rare">Rare (50 pts)</option>
-                  <option value="epic">Epic (200 pts)</option>
-                  <option value="legendary">Legendary (500 pts)</option>
-                </select>
+                <PixelSelect
+                  value={String(rarity)}
+                  onChange={(v) => setRarity(v)}
+                  options={[
+                    { value: "common", label: "Common (10 pts)" },
+                    { value: "rare", label: "Rare (50 pts)" },
+                    { value: "epic", label: "Epic (200 pts)" },
+                    { value: "legendary", label: "Legendary (500 pts)" },
+                  ]}
+                  className="w-full"
+                  ariaLabel="Rarity"
+                />
               </div>
 
               <div className="flex-1">
                 <label className="mb-1 block text-[11px] text-muted">Duration</label>
-                <select
-                  value={durationHours}
-                  onChange={(e) => setDurationHours(Number(e.target.value))}
-                  className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-                >
-                  <option value={24}>24 hours</option>
-                  <option value={48}>48 hours</option>
-                  <option value={72}>72 hours</option>
-                </select>
+                <PixelSelect
+                  value={String(durationHours)}
+                  onChange={(v) => setDurationHours(Number(v))}
+                  options={[
+                    { value: "24", label: "24 hours" },
+                    { value: "48", label: "48 hours" },
+                    { value: "72", label: "72 hours" },
+                  ]}
+                  className="w-full"
+                  ariaLabel="Duration"
+                />
               </div>
             </div>
 
@@ -204,19 +209,17 @@ export default function AdminDropsPage() {
             {rarity === "legendary" && (
               <div>
                 <label className="mb-1 block text-[11px] text-muted">Item Reward</label>
-                <select
-                  value={itemReward}
-                  onChange={(e) => setItemReward(e.target.value)}
-                  className="w-full border border-border bg-bg px-3 py-2.5 text-xs text-cream outline-none focus:border-lime"
-                  required
-                >
-                  <option value="">Select an item...</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} ({item.category})
-                    </option>
-                  ))}
-                </select>
+                <PixelSelect
+                  value={String(itemReward)}
+                  onChange={(v) => setItemReward(v)}
+                  options={items.map((item) => ({
+                    value: item.id,
+                    label: `${item.name} (${item.category})`,
+                  }))}
+                  placeholder="Select an item..."
+                  className="w-full"
+                  ariaLabel="Item Reward"
+                />
               </div>
             )}
 

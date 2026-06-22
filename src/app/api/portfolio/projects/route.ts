@@ -60,10 +60,15 @@ export async function POST(req: NextRequest) {
 
   // First project achievement
   if (count === 0) {
-    await admin
-      .from("developer_achievements")
-      .upsert({ developer_id: dev.id, achievement_id: "portfolio_complete" }, { onConflict: "developer_id,achievement_id" });
-    await admin.rpc("grant_xp", { p_developer_id: dev.id, p_source: "achievement", p_amount: 10 });
+    // Unified emblem grant. Idempotent; grants the catalog's 10 xp itself, so the
+    // separate grant_xp(10) is no longer needed.
+    await admin.rpc("grant_emblem", {
+      p_developer_id: dev.id,
+      p_emblem_id: "portfolio_complete",
+      p_claim_key: `threshold:portfolio_complete:${dev.id}`,
+      p_meta: {},
+      p_source: "job",
+    });
   }
 
   return NextResponse.json({ project });

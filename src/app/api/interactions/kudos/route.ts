@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
-import { checkAchievements } from "@/lib/achievements";
+import { evaluateEmblems } from "@/lib/emblems";
+import { getPostHogClient } from "@/lib/posthog-server";
 import { touchLastActive } from "@/lib/notification-helpers";
 import { trackDailyMission } from "@/lib/dailies";
 
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
     }
 
     // Check kudos streak achievements
-    await checkAchievements(giver.id, {
+    await evaluateEmblems(giver.id, {
       contributions: giver.contributions ?? 0,
       public_repos: giver.public_repos ?? 0,
       total_stars: giver.total_stars ?? 0,
@@ -151,6 +152,18 @@ export async function POST(request: Request) {
       gifts_received: 0,
       kudos_streak: newKudosStreak,
     }, githubLogin);
+  }
+
+  if (!insertError) {
+    const phKudos = getPostHogClient();
+    phKudos.capture({
+      distinctId: githubLogin,
+      event: "kudos_given",
+      properties: {
+        receiver: receiver_login,
+      },
+    });
+    await phKudos.shutdown();
   }
 
   return NextResponse.json({ ok: true });

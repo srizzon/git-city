@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { AdsFilters, Period, StatusFilter, VehicleFilter, SourceFilter } from "../_lib/types";
 import { VEHICLE_LABELS } from "../_lib/constants";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 
 interface AdFiltersProps {
   filters: AdsFilters;
@@ -102,28 +103,26 @@ export function AdFilters({
 
       {/* Row 2: Vehicle + Source dropdowns + count */}
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={filters.vehicle}
-          onChange={(e) => setFilter("vehicle", e.target.value as VehicleFilter)}
-          className="cursor-pointer border border-border bg-bg px-3 py-1.5 text-[11px] text-cream outline-none focus:border-lime"
-        >
-          <option value="all">All vehicles</option>
-          {Object.entries(VEHICLE_LABELS).map(([val, label]) => (
-            <option key={val} value={val}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <PixelSelect
+          value={String(filters.vehicle)}
+          onChange={(v) => setFilter("vehicle", v as VehicleFilter)}
+          options={[
+            { value: "all", label: "All vehicles" },
+            ...Object.entries(VEHICLE_LABELS).map(([val, label]) => ({ value: val, label })),
+          ]}
+          ariaLabel="Vehicle filter"
+        />
 
-        <select
-          value={filters.source}
-          onChange={(e) => setFilter("source", e.target.value as SourceFilter)}
-          className="cursor-pointer border border-border bg-bg px-3 py-1.5 text-[11px] text-cream outline-none focus:border-lime"
-        >
-          <option value="all">All sources</option>
-          <option value="paid">Paid</option>
-          <option value="manual">Manual</option>
-        </select>
+        <PixelSelect
+          value={String(filters.source)}
+          onChange={(v) => setFilter("source", v as SourceFilter)}
+          options={[
+            { value: "all", label: "All sources" },
+            { value: "paid", label: "Paid" },
+            { value: "manual", label: "Manual" },
+          ]}
+          ariaLabel="Source filter"
+        />
 
         <p className="ml-auto text-[11px] text-dim">
           {filteredCount} of {totalCount} ads

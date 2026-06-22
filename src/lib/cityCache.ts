@@ -5,6 +5,7 @@ import type {
   CityRiver,
   CityBridge,
   DistrictZone,
+  SFRenderMap,
 } from "@/lib/github";
 
 interface CityCache {
@@ -14,6 +15,7 @@ interface CityCache {
   river: CityRiver | null;
   bridges: CityBridge[];
   districtZones: DistrictZone[];
+  sfMap?: SFRenderMap | null;
   stats: { total_developers: number; total_contributions: number };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rawDevs: any[];

@@ -1,0 +1,77 @@
+name: Deploy migrations to staging
+
+# Solo-dev flow: pushing ANY branch other than `main` deploys pending
+# migrations to the staging Supabase project. Combined with Vercel preview
+# deployments (whose Preview env vars point at staging), every feature branch
+# gets a working preview URL backed by the staging database.
+#
+# The prod counterpart is deploy-migrations.yml (push to `main` -> prod).
+# Full setup guide: ENVIRONMENTS.md
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_ACCESS_TOKEN          – personal token (shared with the prod workflow)
+#   SUPABASE_STAGING_DB_PASSWORD   – the staging database password
+#   SUPABASE_STAGING_PROJECT_ID    – the staging project ref
+#
+# Until the staging secrets are set, the deploy job skips itself gracefully;
+# the validate job still runs so broken migrations are caught on every push.
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - "supabase/migrations/**"
+      - ".github/workflows/deploy-staging-migrations.yml"
+  workflow_dispatch: {} # run manually to seed a fresh staging project with all migrations
+
+concurrency:
+  group: supabase-staging-migrations
+  cancel-in-progress: false
+
+jobs:
+  check-config:
+    name: Check staging secrets
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          STAGING_REF: ${{ secrets.SUPABASE_STAGING_PROJECT_ID }}
+        run: |
+          if [ -n "$STAGING_REF" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SUPABASE_STAGING_PROJECT_ID secret not set — validating only, skipping staging deploy."
+          fi
+
+  validate:
+    name: Validate migrations apply from scratch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      # Spins up the full local stack and applies every migration in order from
+      # scratch. Fails the job — and blocks the staging deploy — on any error.
+      - run: supabase start
+      - run: supabase stop
+
+  deploy:
+    name: Push migrations to staging
+    needs: [check-config, validate]
+    if: needs.check-config.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_STAGING_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase link --project-ref ${{ secrets.SUPABASE_STAGING_PROJECT_ID }}
+      # Applies only the migrations that staging's history doesn't have yet.
+      - run: supabase db push

@@ -1,25 +1,29 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createClient } from "@supabase/supabase-js";
 import { type NextRequest } from "next/server";
+import { tierFromLevel, rankFromLevel } from "@/lib/xp";
+import {
+  OG,
+  loadDevForCard,
+  tierBackdrop,
+  building,
+  chip,
+  districtChip,
+  tierAvatar,
+  heroCardLayout,
+  type CardDev,
+  type CardAchievement,
+} from "@/lib/og/devHero";
 
 export const runtime = "nodejs";
 
+// Achievement tier colors (trophy tiers — distinct from XP tiers)
 const TIER_COLORS: Record<string, string> = {
   bronze: "#cd7f32",
   silver: "#c0c0c0",
   gold: "#ffd700",
   diamond: "#b9f2ff",
-};
-
-const TIER_ORDER = ["diamond", "gold", "silver", "bronze"];
-
-const TIER_LABELS: Record<string, string> = {
-  bronze: "RISING",
-  silver: "SKILLED",
-  gold: "ELITE",
-  diamond: "LEGEND",
 };
 
 // ─── i18n ─────────────────────────────────────────────────────
@@ -53,444 +57,6 @@ const i18n: Record<Lang, {
     notFound: "Desenvolvedor nao encontrado",
   },
 };
-
-// ─── Colors ───────────────────────────────────────────────────
-const accent = "#c8e64a";
-const bg = "#0d0d0f";
-const cream = "#e8dcc8";
-const border = "#2a2a30";
-const cardBg = "#1c1c20";
-const muted = "#8c8c9c";
-
-// ─── Window renderer (shared) ─────────────────────────────────
-const WSIZE = 24;
-const WGAP = 10;
-const WCOLS = 5;
-
-function renderWindows(bHeight: number, color: string) {
-  const rowH = WSIZE + WGAP;
-  const usable = bHeight - 36;
-  const nRows = Math.max(2, Math.floor(usable / rowH));
-  const rows = [];
-  for (let r = 0; r < nRows; r++) {
-    const cells = [];
-    for (let c = 0; c < WCOLS; c++) {
-      const lit = (r * 5 + c * 3) % 7 > 1;
-      cells.push(
-        <div
-          key={c}
-          style={{
-            width: WSIZE,
-            height: WSIZE,
-            backgroundColor: lit ? color : `${color}18`,
-          }}
-        />
-      );
-    }
-    rows.push(
-      <div key={r} style={{ display: "flex", gap: WGAP }}>
-        {cells}
-      </div>
-    );
-  }
-  return rows;
-}
-
-// ─── GET handler ──────────────────────────────────────────────
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ username: string }> }
-) {
-  const { username } = await params;
-  const format = request.nextUrl.searchParams.get("format") ?? "landscape";
-  const lang = (request.nextUrl.searchParams.get("lang") === "pt" ? "pt" : "en") as Lang;
-
-  const fontData = await readFile(
-    join(process.cwd(), "public/fonts/Silkscreen-Regular.ttf")
-  );
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  const { data: dev } = await supabase
-    .from("developers")
-    .select(
-      "id, github_login, name, avatar_url, contributions, contributions_total, public_repos, total_stars, rank, kudos_count"
-    )
-    .eq("github_login", username.toLowerCase())
-    .single();
-
-  if (!dev) {
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: bg,
-            fontFamily: "Silkscreen",
-            color: cream,
-            fontSize: 48,
-            border: `6px solid ${border}`,
-          }}
-        >
-          {i18n[lang].notFound}
-        </div>
-      ),
-      {
-        width: 1200,
-        height: 675,
-        fonts: [
-          {
-            name: "Silkscreen",
-            data: fontData,
-            style: "normal" as const,
-            weight: 400 as const,
-          },
-        ],
-      }
-    );
-  }
-
-  // Fetch achievements
-  const { data: devAchievements } = await supabase
-    .from("developer_achievements")
-    .select("achievement_id, achievements(name, tier)")
-    .eq("developer_id", dev.id);
-
-  const achievements = (devAchievements ?? []).map(
-    (a: Record<string, unknown>) => ({
-      name:
-        ((a.achievements as Record<string, unknown>)?.name as string) ??
-        (a.achievement_id as string),
-      tier:
-        ((a.achievements as Record<string, unknown>)?.tier as string) ??
-        "bronze",
-    })
-  );
-
-  // Find highest tier
-  const highestTier =
-    achievements.length > 0
-      ? TIER_ORDER.find((tier) => achievements.some((a) => a.tier === tier)) ??
-        "bronze"
-      : null;
-
-  // Effective contributions (matches rank calculation)
-  const contribs = (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions;
-  const devEff = { ...dev, contributions: contribs };
-
-  const t = i18n[lang];
-  if (format === "stories") {
-    return renderStories(devEff, achievements, highestTier, fontData, t, lang);
-  }
-  return renderLandscape(devEff, achievements, highestTier, fontData, t);
-}
-
-// ─── Landscape (1200x675) ─────────────────────────────────────
-function renderLandscape(
-  dev: Record<string, unknown>,
-  achievements: { name: string; tier: string }[],
-  highestTier: string | null,
-  fontData: Buffer,
-  t: typeof i18n.en
-) {
-  const buildingH = Math.round(
-    Math.min(
-      520,
-      Math.max(320, 320 + ((dev.contributions as number) / 1000) * 160)
-    )
-  );
-  const GROUND_Y = 590;
-
-  const stats = [
-    { label: t.commits, value: (dev.contributions as number).toLocaleString() },
-    { label: t.repos, value: (dev.public_repos as number).toLocaleString() },
-    { label: t.stars, value: (dev.total_stars as number).toLocaleString() },
-    { label: t.kudos, value: ((dev.kudos_count as number) ?? 0).toLocaleString() },
-  ];
-
-  return new ImageResponse(
-    (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          backgroundColor: bg,
-          fontFamily: "Silkscreen",
-          border: `6px solid ${border}`,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {/* Building */}
-        <div
-          style={{
-            position: "absolute",
-            left: 80,
-            top: GROUND_Y - buildingH,
-            width: 260,
-            height: buildingH,
-            backgroundColor: cardBg,
-            borderTop: `6px solid ${accent}`,
-            borderLeft: `3px solid ${accent}50`,
-            borderRight: `3px solid ${accent}50`,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            paddingTop: 16,
-            gap: WGAP,
-          }}
-        >
-          {renderWindows(buildingH, accent)}
-        </div>
-
-        {/* Right column */}
-        <div
-          style={{
-            position: "absolute",
-            left: 420,
-            top: 36,
-            width: 720,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Avatar + Name */}
-          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            {dev.avatar_url ? (
-              <img
-                src={dev.avatar_url as string}
-                width={110}
-                height={110}
-                style={{ border: `4px solid ${accent}` }}
-              />
-            ) : null}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {dev.name ? (
-                <div
-                  style={{
-                    display: "flex",
-                    fontSize: 44,
-                    color: cream,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {dev.name as string}
-                </div>
-              ) : null}
-              <div
-                style={{
-                  display: "flex",
-                  fontSize: 24,
-                  color: muted,
-                  textTransform: "uppercase",
-                }}
-              >
-                {`@${dev.github_login}`}
-              </div>
-              {dev.rank ? (
-                <div
-                  style={{
-                    display: "flex",
-                    fontSize: 18,
-                    color: accent,
-                    border: `3px solid ${accent}`,
-                    padding: "4px 14px",
-                    marginTop: 2,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {`#${dev.rank} ${t.inTheCity}`}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Stats 2x2 */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 16,
-              marginTop: 30,
-            }}
-          >
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                style={{
-                  width: 310,
-                  display: "flex",
-                  flexDirection: "column",
-                  backgroundColor: cardBg,
-                  border: `3px solid ${border}`,
-                  padding: "12px 20px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    fontSize: 16,
-                    color: muted,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {stat.label}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    fontSize: 40,
-                    color: accent,
-                    marginTop: 2,
-                  }}
-                >
-                  {stat.value}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Achievements + Tier label */}
-          {achievements.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                marginTop: 20,
-                flexWrap: "wrap",
-              }}
-            >
-              {highestTier && (
-                <div
-                  style={{
-                    display: "flex",
-                    fontSize: 18,
-                    color: TIER_COLORS[highestTier],
-                    border: `3px solid ${TIER_COLORS[highestTier]}`,
-                    padding: "4px 14px",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {TIER_LABELS[highestTier] ?? highestTier.toUpperCase()}
-                </div>
-              )}
-              {achievements.slice(0, 4).map((ach, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    fontSize: 12,
-                    color: TIER_COLORS[ach.tier] ?? accent,
-                    border: `2px solid ${TIER_COLORS[ach.tier] ?? accent}`,
-                    padding: "3px 10px",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {ach.name}
-                </div>
-              ))}
-              {achievements.length > 4 && (
-                <div
-                  style={{
-                    display: "flex",
-                    fontSize: 12,
-                    color: muted,
-                  }}
-                >
-                  +{achievements.length - 4}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Ground line */}
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            top: GROUND_Y,
-            width: 1200,
-            height: 4,
-            backgroundColor: accent,
-            display: "flex",
-          }}
-        />
-
-        {/* Ground fill */}
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            top: GROUND_Y + 4,
-            width: 1200,
-            height: 90,
-            backgroundColor: "#141418",
-            display: "flex",
-          }}
-        />
-
-        {/* Branding bottom */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 14,
-            left: 0,
-            width: 1200,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "0 40px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              gap: 8,
-              textTransform: "uppercase",
-            }}
-          >
-            <span style={{ fontSize: 24, color: cream }}>GIT</span>
-            <span style={{ fontSize: 24, color: accent }}>CITY</span>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              fontSize: 16,
-              color: muted,
-              textTransform: "uppercase",
-            }}
-          >
-            thegitcity.com/dev/{dev.github_login as string}
-          </div>
-        </div>
-      </div>
-    ),
-    {
-      width: 1200,
-      height: 675,
-      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
-      fonts: [
-        {
-          name: "Silkscreen",
-          data: fontData,
-          style: "normal" as const,
-          weight: 400 as const,
-        },
-      ],
-    }
-  );
-}
 
 // ─── Taunt phrases by rank/contributions ──────────────────────
 const TAUNTS: Record<Lang, { rank: [number, string][]; contribs: [number, string][]; fallback: string }> = {
@@ -549,42 +115,155 @@ function getTaunt(rank: number | null, contributions: number, lang: Lang): strin
   return t.fallback;
 }
 
+// Achievement chips row (shared by both formats)
+function achievementChips(
+  achievements: CardAchievement[],
+  max: number,
+  fontSize: number
+) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap",
+        justifyContent: "center",
+      }}
+    >
+      {achievements.slice(0, max).map((ach, i) => (
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            fontSize,
+            color: TIER_COLORS[ach.tier] ?? OG.accent,
+            border: `2px solid ${TIER_COLORS[ach.tier] ?? OG.accent}`,
+            padding: "3px 10px",
+            textTransform: "uppercase",
+          }}
+        >
+          {ach.name}
+        </div>
+      ))}
+      {achievements.length > max && (
+        <div style={{ display: "flex", fontSize, color: OG.muted }}>
+          +{achievements.length - max}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── GET handler ──────────────────────────────────────────────
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ username: string }> }
+) {
+  const { username } = await params;
+  const format = request.nextUrl.searchParams.get("format") ?? "landscape";
+  const lang = (request.nextUrl.searchParams.get("lang") === "pt" ? "pt" : "en") as Lang;
+
+  const fontData = await readFile(
+    join(process.cwd(), "public/fonts/Silkscreen-Regular.ttf")
+  );
+
+  const loaded = await loadDevForCard(username);
+  const t = i18n[lang];
+
+  if (!loaded) {
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: OG.bg,
+            fontFamily: "Silkscreen",
+            color: OG.cream,
+            fontSize: 48,
+            border: `6px solid ${OG.border}`,
+          }}
+        >
+          {t.notFound}
+        </div>
+      ),
+      {
+        width: 1200,
+        height: 675,
+        fonts: [
+          { name: "Silkscreen", data: fontData, style: "normal" as const, weight: 400 as const },
+        ],
+      }
+    );
+  }
+
+  const { dev, achievements } = loaded;
+  if (format === "stories") {
+    return renderStories(dev, achievements, fontData, t, lang);
+  }
+  return renderLandscape(dev, achievements, fontData, t);
+}
+
+// ─── Landscape (1200x675) — shared hero layout + achievements row ─
+function renderLandscape(
+  dev: CardDev,
+  achievements: CardAchievement[],
+  fontData: Buffer,
+  t: typeof i18n.en
+) {
+  return new ImageResponse(
+    heroCardLayout({
+      dev,
+      width: 1200,
+      height: 675,
+      statLabels: { contribs: t.commits, repos: t.repos, stars: t.stars, kudos: t.kudos },
+      extraRow: achievements.length > 0 ? achievementChips(achievements, 4, 13) : undefined,
+      footerRight: `thegitcity.com/dev/${dev.github_login}`,
+    }),
+    {
+      width: 1200,
+      height: 675,
+      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+      fonts: [
+        { name: "Silkscreen", data: fontData, style: "normal" as const, weight: 400 as const },
+      ],
+    }
+  );
+}
+
 // ─── Stories (1080x1920) ──────────────────────────────────────
 // IG safe zones: top ~130px, bottom ~120px
-// Precise Y map (no overlaps):
-//   150  taunt phrase                → ends ~200
-//   230  avatar (110px)              → ends 340
-//   356  name                        → ends ~406
-//   418  @login                      → ends ~446
-//   462  rank + tier                 → ends ~498
-//   ≥540 building top (dynamic)      → building hero
+//   150  taunt phrase
+//   230  avatar + name + chips
+//   ≥560 building top (dynamic)
 //   1320 ground line
-//   1360 stats (3 flat)              → ends ~1440
-//   1470 achievement badges          → ends ~1502
-//   1540 CTA                         → ends ~1598
-//   1620 branding                    → ends ~1644
-//   1800+ bottom safe zone
+//   1360 stats (3 flat)
+//   1470 achievement badges
+//   1540 CTA
 function renderStories(
-  dev: Record<string, unknown>,
-  achievements: { name: string; tier: string }[],
-  highestTier: string | null,
+  dev: CardDev,
+  achievements: CardAchievement[],
   fontData: Buffer,
   t: typeof i18n.en,
   lang: Lang
 ) {
-  const contributions = dev.contributions as number;
-  const rank = dev.rank as number | null;
+  const tier = tierFromLevel(dev.xp_level);
+  const rank = rankFromLevel(dev.xp_level);
   const buildingH = Math.round(
-    Math.min(750, Math.max(500, 500 + (contributions / 1000) * 200))
+    Math.min(720, Math.max(480, 480 + (dev.contributions / 1000) * 200))
   );
   const BWIDTH = 320;
   const GROUND_Y = 1320;
-  const taunt = getTaunt(rank, contributions, lang);
+  const taunt = getTaunt(dev.rank, dev.contributions, lang);
 
   const stats = [
-    { label: t.commits, value: contributions.toLocaleString() },
-    { label: t.repos, value: (dev.public_repos as number).toLocaleString() },
-    { label: t.stars, value: (dev.total_stars as number).toLocaleString() },
+    { label: t.commits, value: dev.contributions.toLocaleString() },
+    { label: t.repos, value: dev.public_repos.toLocaleString() },
+    { label: t.stars, value: dev.total_stars.toLocaleString() },
   ];
 
   return new ImageResponse(
@@ -595,13 +274,15 @@ function renderStories(
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          backgroundColor: bg,
+          backgroundColor: OG.bg,
           fontFamily: "Silkscreen",
           position: "relative",
           overflow: "hidden",
           alignItems: "center",
         }}
       >
+        {tierBackdrop(tier.color, 20)}
+
         {/* ── Taunt (the hook — first thing you read) ── */}
         <div
           style={{
@@ -616,7 +297,7 @@ function renderStories(
             style={{
               display: "flex",
               fontSize: 36,
-              color: accent,
+              color: OG.accent,
               textTransform: "uppercase",
               textAlign: "center",
               justifyContent: "center",
@@ -637,100 +318,59 @@ function renderStories(
             width: 920,
           }}
         >
-          {dev.avatar_url ? (
-            <img
-              src={dev.avatar_url as string}
-              width={110}
-              height={110}
-              style={{ border: `4px solid ${accent}` }}
-            />
-          ) : null}
-          {dev.name ? (
-            <div
-              style={{
-                display: "flex",
-                fontSize: 42,
-                color: cream,
-                textTransform: "uppercase",
-                marginTop: 16,
-                textAlign: "center",
-                justifyContent: "center",
-              }}
-            >
-              {dev.name as string}
-            </div>
-          ) : null}
+          {dev.avatar_url && tierAvatar(dev.avatar_url, tier, 104)}
           <div
             style={{
               display: "flex",
-              fontSize: 22,
-              color: muted,
-              textTransform: "uppercase",
-              marginTop: 6,
+              alignItems: "baseline",
+              gap: 12,
+              marginTop: 16,
+              justifyContent: "center",
             }}
           >
-            @{dev.github_login as string}
+            <span
+              style={{ fontSize: 42, color: OG.cream, textTransform: "uppercase" }}
+            >
+              {dev.name ?? `@${dev.github_login}`}
+            </span>
           </div>
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 12,
-              marginTop: 10,
+              marginTop: 6,
             }}
           >
-            {rank ? (
-              <div
-                style={{
-                  display: "flex",
-                  fontSize: 18,
-                  color: accent,
-                  border: `3px solid ${accent}`,
-                  padding: "5px 14px",
-                  textTransform: "uppercase",
-                }}
-              >
-                #{rank} {t.inTheCity}
-              </div>
-            ) : null}
-            {highestTier ? (
-              <div
-                style={{
-                  display: "flex",
-                  fontSize: 18,
-                  color: TIER_COLORS[highestTier],
-                  border: `3px solid ${TIER_COLORS[highestTier]}`,
-                  padding: "5px 14px",
-                  textTransform: "uppercase",
-                }}
-              >
-                {TIER_LABELS[highestTier] ?? highestTier.toUpperCase()}
-              </div>
-            ) : null}
+            <span style={{ fontSize: 22, color: OG.muted, textTransform: "uppercase" }}>
+              {`@${dev.github_login}`}
+            </span>
+            <span style={{ fontSize: 20, color: tier.color, textTransform: "uppercase" }}>
+              {`«${dev.title}»`}
+            </span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginTop: 12,
+            }}
+          >
+            {dev.rank && chip(`#${dev.rank.toLocaleString()} ${t.inTheCity}`, tier.color, 17)}
+            {chip(`LVL ${dev.xp_level} · ${rank.title}`, tier.color, 17)}
+            {dev.district && districtChip(dev.district, 15)}
           </div>
         </div>
 
         {/* ── Building (HERO — fills the center) ── */}
-        <div
-          style={{
-            position: "absolute",
-            left: (1080 - BWIDTH) / 2,
-            top: GROUND_Y - buildingH,
-            width: BWIDTH,
-            height: buildingH,
-            backgroundColor: cardBg,
-            borderTop: `6px solid ${accent}`,
-            borderLeft: `3px solid ${accent}50`,
-            borderRight: `3px solid ${accent}50`,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            paddingTop: 16,
-            gap: WGAP,
-          }}
-        >
-          {renderWindows(buildingH, accent)}
-        </div>
+        {building({
+          left: (1080 - BWIDTH) / 2,
+          groundY: GROUND_Y,
+          height: buildingH,
+          width: BWIDTH,
+          color: tier.color,
+        })}
 
         {/* ── Ground line ── */}
         <div
@@ -740,7 +380,7 @@ function renderStories(
             top: GROUND_Y,
             width: 880,
             height: 4,
-            backgroundColor: accent,
+            backgroundColor: tier.color,
             display: "flex",
           }}
         />
@@ -765,14 +405,14 @@ function renderStories(
                 alignItems: "center",
               }}
             >
-              <div style={{ display: "flex", fontSize: 50, color: accent }}>
+              <div style={{ display: "flex", fontSize: 50, color: OG.accent }}>
                 {stat.value}
               </div>
               <div
                 style={{
                   display: "flex",
                   fontSize: 16,
-                  color: muted,
+                  color: OG.muted,
                   textTransform: "uppercase",
                   marginTop: 4,
                 }}
@@ -784,7 +424,7 @@ function renderStories(
         </div>
 
         {/* ── Achievement badges ── */}
-        {achievements.length > 0 ? (
+        {achievements.length > 0 && (
           <div
             style={{
               position: "absolute",
@@ -792,28 +432,12 @@ function renderStories(
               left: 80,
               width: 920,
               display: "flex",
-              flexWrap: "wrap",
-              gap: 10,
               justifyContent: "center",
             }}
           >
-            {achievements.slice(0, 5).map((ach, i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  fontSize: 15,
-                  color: TIER_COLORS[ach.tier] ?? accent,
-                  border: `2px solid ${TIER_COLORS[ach.tier] ?? accent}`,
-                  padding: "4px 10px",
-                  textTransform: "uppercase",
-                }}
-              >
-                {ach.name}
-              </div>
-            ))}
+            {achievementChips(achievements, 5, 15)}
           </div>
-        ) : null}
+        )}
 
         {/* ── Challenge CTA ── */}
         <div
@@ -831,8 +455,8 @@ function renderStories(
             style={{
               display: "flex",
               fontSize: 26,
-              color: bg,
-              backgroundColor: accent,
+              color: OG.bg,
+              backgroundColor: OG.accent,
               padding: "14px 44px",
               textTransform: "uppercase",
             }}
@@ -847,8 +471,8 @@ function renderStories(
               textTransform: "uppercase",
             }}
           >
-            <span style={{ fontSize: 20, color: cream }}>GIT</span>
-            <span style={{ fontSize: 20, color: accent }}>CITY</span>
+            <span style={{ fontSize: 20, color: OG.cream }}>GIT</span>
+            <span style={{ fontSize: 20, color: OG.accent }}>CITY</span>
           </div>
         </div>
       </div>
@@ -858,12 +482,7 @@ function renderStories(
       height: 1920,
       headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
       fonts: [
-        {
-          name: "Silkscreen",
-          data: fontData,
-          style: "normal" as const,
-          weight: 400 as const,
-        },
+        { name: "Silkscreen", data: fontData, style: "normal" as const, weight: 400 as const },
       ],
     }
   );

@@ -1,0 +1,7490 @@
+[
+  "6",
+  [
+    "intel geforce gtx 960",
+    "960",
+    "960 geforce gtx intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gt 430",
+    "430",
+    "430 asus geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        34
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gt 440",
+    "440",
+    "440 asus geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        21
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gt 520",
+    "520",
+    "520 asus geforce gt nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        12
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gt 610",
+    "610",
+    "610 asus geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1200,
+        15
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gt 630",
+    "630",
+    "630 asus geforce gt nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        31
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gt 640",
+    "640",
+    "640 asus geforce gt nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        34
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gt 710",
+    "710",
+    "710 asus geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        31
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gt 730",
+    "730",
+    "730 asus geforce gt nvidia",
+    0,
+    [
+      [
+        2560,
+        1080,
+        28
+      ],
+      [
+        3840,
+        2160,
+        12
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gts 450",
+    "450",
+    "450 asus geforce gts nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        43
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 1060",
+    "1060",
+    "1060 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        3840,
+        2160,
+        38
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 1080",
+    "1080",
+    "1080 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 460",
+    "460",
+    "460 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 480",
+    "480",
+    "480 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 550 ti",
+    "550",
+    "550 asus geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        54
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 560",
+    "560",
+    "560 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        53
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 560 se",
+    "560",
+    "560 asus geforce gtx nvidia se",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 560 ti",
+    "560",
+    "560 asus geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1680,
+        1050,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 570",
+    "570",
+    "570 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1280,
+        1024,
+        74
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 570 hd",
+    "570",
+    "570 asus geforce gtx hd nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 580",
+    "580",
+    "580 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1200,
+        57
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 660",
+    "660",
+    "660 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 670",
+    "670",
+    "670 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 750 ti",
+    "750",
+    "750 asus geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1360,
+        768,
+        30
+      ],
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 760",
+    "760",
+    "760 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        1920,
+        1200,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 770",
+    "770",
+    "770 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 780",
+    "780",
+    "780 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 950",
+    "950",
+    "950 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 960",
+    "960",
+    "960 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        55
+      ],
+      [
+        2560,
+        1600,
+        116
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 970",
+    "970",
+    "970 asus geforce gtx nvidia",
+    0,
+    [
+      [
+        2560,
+        1600,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia asus geforce gtx 980 ti",
+    "980",
+    "980 asus geforce gtx nvidia ti",
+    0,
+    [
+      [
+        2560,
+        1440,
+        131
+      ]
+    ]
+  ],
+  [
+    "nvidia colorful geforce gtx 960",
+    "960",
+    "960 colorful geforce gtx nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia elitegroup geforce gtx 460",
+    "460",
+    "460 elitegroup geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gt 545",
+    "545",
+    "545 evga geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        36
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gt 640",
+    "640",
+    "640 evga geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gt 710",
+    "710",
+    "710 evga geforce gt nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        36
+      ],
+      [
+        1920,
+        1080,
+        29
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gt 730",
+    "730",
+    "730 evga geforce gt nvidia",
+    0,
+    [
+      [
+        1600,
+        900,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gt 740",
+    "740",
+    "740 evga geforce gt nvidia",
+    0,
+    [
+      [
+        1280,
+        1024,
+        45
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 1050 ti",
+    "1050",
+    "1050 evga geforce gtx nvidia ti",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ],
+      [
+        4096,
+        2304,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 1070",
+    "1070",
+    "1070 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        5120,
+        2880,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 1080 ti",
+    "1080",
+    "1080 evga geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1200,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 560 ti",
+    "560",
+    "560 evga geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1680,
+        1050,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 570",
+    "570",
+    "570 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 580",
+    "580",
+    "580 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 650",
+    "650",
+    "650 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1200,
+        87
+      ],
+      [
+        2560,
+        1600,
+        43
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 650 ti",
+    "650",
+    "650 evga geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1680,
+        1050,
+        116
+      ],
+      [
+        2560,
+        1440,
+        55
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 650 ti boost",
+    "650",
+    "650 boost evga geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        56
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 660 ti",
+    "660",
+    "660 evga geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1200,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 680",
+    "680",
+    "680 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        1600,
+        1200,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 750 ti",
+    "750",
+    "750 evga geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        119
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 760",
+    "760",
+    "760 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        119
+      ],
+      [
+        1920,
+        1200,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 780",
+    "780",
+    "780 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 960",
+    "960",
+    "960 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        2560,
+        1440,
+        115
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 970",
+    "970",
+    "970 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 980",
+    "980",
+    "980 evga geforce gtx nvidia",
+    0,
+    [
+      [
+        3440,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia evga geforce gtx 980 ti",
+    "980",
+    "980 evga geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia gainward geforce gt 630",
+    "630",
+    "630 gainward geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        28
+      ]
+    ]
+  ],
+  [
+    "nvidia gainward geforce gts 450",
+    "450",
+    "450 gainward geforce gts nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        55
+      ]
+    ]
+  ],
+  [
+    "nvidia gainward geforce gtx 460",
+    "460",
+    "460 gainward geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ]
+    ]
+  ],
+  [
+    "nvidia gainward geforce gtx 550 ti",
+    "550",
+    "550 gainward geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1280,
+        1024,
+        66
+      ]
+    ]
+  ],
+  [
+    "nvidia gainward geforce gtx 560 ti",
+    "560",
+    "560 gainward geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        35
+      ]
+    ]
+  ],
+  [
+    "nvidia gainward geforce gtx 570",
+    "570",
+    "570 gainward geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia gainward geforce gtx 750 ti",
+    "750",
+    "750 gainward geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 210",
+    "210",
+    "210 geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        8
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 410m",
+    "410",
+    "410m geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        24
+      ],
+      [
+        1600,
+        900,
+        19
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 510",
+    "510",
+    "510 geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        13
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 605",
+    "605",
+    "605 geforce nvidia",
+    0,
+    [
+      [
+        1768,
+        992,
+        17
+      ],
+      [
+        1920,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 610m",
+    "610",
+    "610m geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        26
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 610m/710m/810m/820m / gt 620m/625m/630m/720m",
+    "610",
+    " 610m 620m 625m 630m 710m 720m 810m 820m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        49
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 615",
+    "615",
+    "615 geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        21
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 705m",
+    "705",
+    "705m geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        25
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 710a",
+    "710",
+    "710a geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        16
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 710m",
+    "710",
+    "710m geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        48
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 730a",
+    "730",
+    "730a geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        37
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 800m",
+    "800",
+    "800m geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        23
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 810m",
+    "810",
+    "810m geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        40
+      ],
+      [
+        1920,
+        1080,
+        30
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 820a",
+    "820",
+    "820a geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        28
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 820m",
+    "820",
+    "820m geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        48
+      ],
+      [
+        1920,
+        1080,
+        23
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 830a",
+    "830",
+    "830a geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        47
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 830m",
+    "830",
+    "830m geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        43
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 8400 gs",
+    "8400",
+    "8400 geforce gs nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        4
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 8400 gs rev. 3",
+    "8400",
+    " 3 8400 geforce gs nvidia rev",
+    0,
+    [
+      [
+        1920,
+        1080,
+        4
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 840a",
+    "840",
+    "840a geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        35
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 840m",
+    "840",
+    "840m geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        44
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 845m",
+    "845",
+    "845m geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 8600 gt",
+    "8600",
+    "8600 geforce gt nvidia",
+    1,
+    [
+      [
+        1920,
+        1200,
+        -1
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 910m",
+    "910",
+    "910m geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        55
+      ],
+      [
+        1600,
+        900,
+        42
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 920m",
+    "920",
+    "920m geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        57
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 920mx",
+    "920",
+    "920mx geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        60
+      ],
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 9300 / nforce 730i",
+    "9300",
+    " 730i 9300 geforce nforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        6
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 930a",
+    "930",
+    "930a geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 930m",
+    "930",
+    "930m geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        74
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 930mx",
+    "930",
+    "930mx geforce nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        60
+      ],
+      [
+        1920,
+        1080,
+        52
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 9400 gt",
+    "9400",
+    "9400 geforce gt nvidia",
+    1,
+    [
+      [
+        1366,
+        768,
+        -1
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 940a",
+    "940",
+    "940a geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 940m",
+    "940",
+    "940m geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        49
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 940mx",
+    "940",
+    "940mx geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        54
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 945m",
+    "945",
+    "945m geforce nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 9600 gt",
+    "9600",
+    "9600 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1200,
+        2
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 9600m gt",
+    "9600",
+    "9600m geforce gt nvidia",
+    1,
+    [
+      [
+        1440,
+        900,
+        -1
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 9800 gt",
+    "9800",
+    "9800 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1200,
+        46
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce 9800 gtx / 9800 gtx+",
+    "9800",
+    " 9800 geforce gtx gtx+ nvidia",
+    0,
+    [
+      [
+        1280,
+        1024,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gpu",
+    "gpu",
+    "geforce gpu nvidia",
+    0,
+    [
+      [
+        3000,
+        2000,
+        23
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 1010",
+    "1010",
+    "1010 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        135
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 1030",
+    "1030",
+    "1030 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 1030 opengl engine",
+    "1030",
+    "1030 engine geforce gt nvidia opengl",
+    0,
+    [
+      [
+        6720,
+        3780,
+        15
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 120",
+    "120",
+    "120 geforce gt nvidia",
+    1,
+    [
+      [
+        1920,
+        1080,
+        -1
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 240",
+    "240",
+    "240 geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        32
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 320m",
+    "320",
+    "320m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        24
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 415m",
+    "415",
+    "415m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        23
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 420",
+    "420",
+    "420 geforce gt nvidia",
+    0,
+    [
+      [
+        1024,
+        768,
+        30
+      ],
+      [
+        1920,
+        1080,
+        19
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 420m",
+    "420",
+    "420m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        33
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 425m",
+    "425",
+    "425m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        45
+      ],
+      [
+        1600,
+        900,
+        28
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 430",
+    "430",
+    "430 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        19
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 435m",
+    "435",
+    "435m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        52
+      ],
+      [
+        1920,
+        1080,
+        20
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 440",
+    "440",
+    "440 geforce gt nvidia",
+    0,
+    [
+      [
+        1280,
+        1024,
+        44
+      ],
+      [
+        1680,
+        1050,
+        33
+      ],
+      [
+        1920,
+        1080,
+        29
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 445m",
+    "445",
+    "445m geforce gt nvidia",
+    0,
+    [
+      [
+        1600,
+        900,
+        66
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 520",
+    "520",
+    "520 geforce gt nvidia",
+    0,
+    [
+      [
+        1440,
+        900,
+        19
+      ],
+      [
+        1920,
+        1080,
+        18
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 520m",
+    "520",
+    "520m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        32
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 520mx",
+    "520",
+    "520mx geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        26
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 525m",
+    "525",
+    "525m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        32
+      ],
+      [
+        1600,
+        900,
+        22
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 530",
+    "530",
+    "530 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 540m",
+    "540",
+    "540m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        45
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 545",
+    "545",
+    "545 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        54
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 550m",
+    "550",
+    "550m geforce gt nvidia",
+    0,
+    [
+      [
+        1600,
+        900,
+        39
+      ],
+      [
+        1920,
+        1080,
+        43
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 555m",
+    "555",
+    "555m geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        34
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 555m/635m",
+    "555",
+    "555m 635m geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        36
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 610",
+    "610",
+    "610 geforce gt nvidia",
+    0,
+    [
+      [
+        1280,
+        1024,
+        19
+      ],
+      [
+        1920,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 620",
+    "620",
+    "620 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        19
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 620 oem",
+    "620",
+    "620 geforce gt nvidia oem",
+    0,
+    [
+      [
+        1920,
+        1080,
+        18
+      ],
+      [
+        1920,
+        1200,
+        20
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 620m",
+    "620",
+    "620m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        50
+      ],
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 620m/630m/635m/640m le",
+    "620",
+    "620m 630m 635m 640m geforce gt le nvidia",
+    0,
+    [
+      [
+        1368,
+        768,
+        38
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 625",
+    "625",
+    "625 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        18
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 625m",
+    "625",
+    "625m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        38
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 630",
+    "630",
+    "630 geforce gt nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        30
+      ],
+      [
+        1920,
+        1080,
+        33
+      ],
+      [
+        1920,
+        1200,
+        30
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 630 oem",
+    "630",
+    "630 geforce gt nvidia oem",
+    0,
+    [
+      [
+        1600,
+        900,
+        33
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 630 opengl engine",
+    "630",
+    "630 engine geforce gt nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        25
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 630 rev. 2",
+    "630",
+    " 2 630 geforce gt nvidia rev",
+    0,
+    [
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 630m",
+    "630",
+    "630m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        51
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 635",
+    "635",
+    "635 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        30
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 635m",
+    "635",
+    "635m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        39
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 640",
+    "640",
+    "640 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        36
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 640 oem",
+    "640",
+    "640 geforce gt nvidia oem",
+    0,
+    [
+      [
+        1920,
+        1080,
+        44
+      ],
+      [
+        2560,
+        1440,
+        17
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 640 opengl engine",
+    "640",
+    "640 engine geforce gt nvidia opengl",
+    0,
+    [
+      [
+        1280,
+        1024,
+        43
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 640 rev. 2",
+    "640",
+    " 2 640 geforce gt nvidia rev",
+    0,
+    [
+      [
+        1280,
+        1024,
+        60
+      ],
+      [
+        1920,
+        1080,
+        27
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 640m",
+    "640",
+    "640m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        59
+      ],
+      [
+        1600,
+        900,
+        58
+      ],
+      [
+        1920,
+        1080,
+        32
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 640m le",
+    "640",
+    "640m geforce gt le nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        37
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 640m mac",
+    "640",
+    "640m geforce gt mac nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        56
+      ],
+      [
+        1920,
+        1080,
+        40
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 640m opengl engine",
+    "640",
+    "640m engine geforce gt nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        45
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 645m",
+    "645",
+    "645m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 650m",
+    "650",
+    "650m geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        54
+      ],
+      [
+        2560,
+        1440,
+        19
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 650m mac",
+    "650",
+    "650m geforce gt mac nvidia",
+    0,
+    [
+      [
+        1440,
+        900,
+        57
+      ],
+      [
+        1920,
+        1080,
+        65
+      ],
+      [
+        2880,
+        1800,
+        28
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 650m opengl engine",
+    "650",
+    "650m engine geforce gt nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        56
+      ],
+      [
+        3840,
+        2160,
+        14
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 705",
+    "705",
+    "705 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        17
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 710",
+    "710",
+    "710 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        29
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 710b",
+    "710",
+    "710b geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 710m",
+    "710",
+    "710m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        43
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 720",
+    "720",
+    "720 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        33
+      ],
+      [
+        2560,
+        1440,
+        15
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 720 opengl engine",
+    "720",
+    "720 engine geforce gt nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1600,
+        20
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 720m",
+    "720",
+    "720m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        46
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 730",
+    "730",
+    "730 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        37
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 730a",
+    "730",
+    "730a geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        23
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 730m",
+    "730",
+    "730m geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        38
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 735m",
+    "735",
+    "735m geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        27
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 740",
+    "740",
+    "740 geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        3440,
+        1440,
+        23
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 740 opengl engine",
+    "740",
+    "740 engine geforce gt nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1200,
+        51
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 740m",
+    "740",
+    "740m geforce gt nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 745m",
+    "745",
+    "745m geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        55
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 750m",
+    "750",
+    "750m geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 750m mac",
+    "750",
+    "750m geforce gt mac nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        55
+      ],
+      [
+        2880,
+        1800,
+        28
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 755m",
+    "755",
+    "755m geforce gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        56
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 755m mac",
+    "755",
+    "755m geforce gt mac nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        48
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 755m opengl engine",
+    "755",
+    "755m engine geforce gt nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        49
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gt 820m",
+    "820",
+    "820m geforce gt nvidia",
+    0,
+    [
+      [
+        1600,
+        900,
+        45
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gts 250",
+    "250",
+    "250 geforce gts nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        50
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gts 450",
+    "450",
+    "450 geforce gts nvidia",
+    0,
+    [
+      [
+        1360,
+        768,
+        47
+      ],
+      [
+        1680,
+        1050,
+        56
+      ],
+      [
+        1920,
+        1080,
+        54
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gts 450 rev. 2",
+    "450",
+    " 2 450 geforce gts nvidia rev",
+    0,
+    [
+      [
+        1920,
+        1080,
+        54
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1050",
+    "1050",
+    "1050 geforce gtx nvidia",
+    0,
+    [
+      [
+        1280,
+        1024,
+        60
+      ],
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1050 mobile",
+    "1050",
+    "1050 geforce gtx mobile nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1050 opengl engine",
+    "1050",
+    "1050 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1050 ti",
+    "1050",
+    "1050 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1050 ti mobile",
+    "1050",
+    "1050 geforce gtx mobile nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        164
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1050 ti opengl engine",
+    "1050",
+    "1050 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1050 ti with max-q design",
+    "1050",
+    "1050 design geforce gtx max-q nvidia ti with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1050 with max-q design",
+    "1050",
+    "1050 design geforce gtx max-q nvidia with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        24
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1060",
+    "1060",
+    "1060 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        113
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1060 mobile",
+    "1060",
+    "1060 geforce gtx mobile nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        90
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1060 opengl engine",
+    "1060",
+    "1060 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1060 with max-q design",
+    "1060",
+    "1060 design geforce gtx max-q nvidia with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1060se",
+    "1060",
+    "1060se geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        265
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1070",
+    "1070",
+    "1070 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1070 a17",
+    "1070",
+    "1070 a17 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1070 mobile",
+    "1070",
+    "1070 geforce gtx mobile nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        75
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1070 opengl engine",
+    "1070",
+    "1070 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1070 ti",
+    "1070",
+    "1070 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        6016,
+        3384,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1070 ti opengl engine",
+    "1070",
+    "1070 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1070 with max-q design",
+    "1070",
+    "1070 design geforce gtx max-q nvidia with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1070 with maxq design",
+    "1070",
+    "1070 design geforce gtx maxq nvidia with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1080",
+    "1080",
+    "1080 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        88
+      ],
+      [
+        3840,
+        2160,
+        219
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1080 mobile",
+    "1080",
+    "1080 geforce gtx mobile nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        75
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1080 opengl engine",
+    "1080",
+    "1080 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1080 ti",
+    "1080",
+    "1080 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1080 ti opengl engine",
+    "1080",
+    "1080 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1080 with max-q design",
+    "1080",
+    "1080 design geforce gtx max-q nvidia with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        116
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1180",
+    "1180",
+    "1180 geforce gtx nvidia",
+    0,
+    [
+      [
+        3440,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1630",
+    "1630",
+    "1630 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1650",
+    "1650",
+    "1650 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1650 mobile / max-q",
+    "1650",
+    " 1650 geforce gtx max-q mobile nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1650 super",
+    "1650",
+    "1650 geforce gtx nvidia super",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1650 ti",
+    "1650",
+    "1650 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        119
+      ],
+      [
+        3840,
+        2400,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1650 ti mobile",
+    "1650",
+    "1650 geforce gtx mobile nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1650 ti with max-q design",
+    "1650",
+    "1650 design geforce gtx max-q nvidia ti with",
+    0,
+    [
+      [
+        3839,
+        2160,
+        60
+      ],
+      [
+        3840,
+        2160,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1650 with max-q design",
+    "1650",
+    "1650 design geforce gtx max-q nvidia with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3000,
+        2000,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1660",
+    "1660",
+    "1660 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1660 super",
+    "1660",
+    "1660 geforce gtx nvidia super",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1660 ti",
+    "1660",
+    "1660 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        75
+      ],
+      [
+        3840,
+        2160,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1660 ti mobile",
+    "1660",
+    "1660 geforce gtx mobile nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        244
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 1660 ti with max-q design",
+    "1660",
+    "1660 design geforce gtx max-q nvidia ti with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 280",
+    "280",
+    "280 geforce gtx nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        44
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 295",
+    "295",
+    "295 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        28
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 460",
+    "460",
+    "460 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 460 oem",
+    "460",
+    "460 geforce gtx nvidia oem",
+    0,
+    [
+      [
+        1360,
+        768,
+        60
+      ],
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 460 opengl engine",
+    "460",
+    "460 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 460 se",
+    "460",
+    "460 geforce gtx nvidia se",
+    0,
+    [
+      [
+        1920,
+        1080,
+        56
+      ],
+      [
+        1920,
+        1200,
+        57
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 460 v2",
+    "460",
+    "460 geforce gtx nvidia v2",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        1920,
+        1200,
+        60
+      ],
+      [
+        2560,
+        1600,
+        55
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 460m",
+    "460",
+    "460m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        53
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 465",
+    "465",
+    "465 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        1920,
+        1200,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 470",
+    "470",
+    "470 geforce gtx nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        60
+      ],
+      [
+        1920,
+        1080,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 470m",
+    "470",
+    "470m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1200,
+        12
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 480",
+    "480",
+    "480 geforce gtx nvidia",
+    0,
+    [
+      [
+        1440,
+        900,
+        191
+      ],
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        1920,
+        1200,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 480 opengl engine",
+    "480",
+    "480 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1600,
+        1200,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 550 ti",
+    "550",
+    "550 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1280,
+        1024,
+        56
+      ],
+      [
+        1920,
+        1080,
+        56
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 550 ti opengl engine",
+    "550",
+    "550 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        27
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 555",
+    "555",
+    "555 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 560",
+    "560",
+    "560 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 560 se",
+    "560",
+    "560 geforce gtx nvidia se",
+    0,
+    [
+      [
+        1680,
+        1050,
+        26
+      ],
+      [
+        1920,
+        1080,
+        102
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 560 ti",
+    "560",
+    "560 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1600,
+        900,
+        60
+      ],
+      [
+        1920,
+        1080,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 560 ti 448 cores",
+    "560",
+    "448 560 cores geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        34
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 560 ti oem",
+    "560",
+    "560 geforce gtx nvidia oem ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        111
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 560 ti opengl engine",
+    "560",
+    "560 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        48
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 560m",
+    "560",
+    "560m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        53
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 570",
+    "570",
+    "570 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 570 opengl engine",
+    "570",
+    "570 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 570 rev. 2",
+    "570",
+    " 2 570 geforce gtx nvidia rev",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        1920,
+        1200,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 570m",
+    "570",
+    "570m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        77
+      ],
+      [
+        2560,
+        1440,
+        8
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 580",
+    "580",
+    "580 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 580 opengl engine",
+    "580",
+    "580 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1680,
+        1050,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 580m",
+    "580",
+    "580m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        100
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 590",
+    "590",
+    "590 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 645",
+    "645",
+    "645 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        1920,
+        1200,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 645 opengl engine",
+    "645",
+    "645 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1200,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 650",
+    "650",
+    "650 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 650 oem",
+    "650",
+    "650 geforce gtx nvidia oem",
+    0,
+    [
+      [
+        1366,
+        768,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 650 opengl engine",
+    "650",
+    "650 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 650 ti",
+    "650",
+    "650 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 650 ti boost",
+    "650",
+    "650 boost geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1600,
+        1200,
+        60
+      ],
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 650 ti opengl engine",
+    "650",
+    "650 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 660",
+    "660",
+    "660 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 660 oem",
+    "660",
+    "660 geforce gtx nvidia oem",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 660 ti",
+    "660",
+    "660 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 660 ti opengl engine",
+    "660",
+    "660 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        1280,
+        1024,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 660m",
+    "660",
+    "660m geforce gtx nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        36
+      ],
+      [
+        1920,
+        1080,
+        57
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 660m mac",
+    "660",
+    "660m geforce gtx mac nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        35
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 660m opengl engine",
+    "660",
+    "660m engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        33
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 670",
+    "670",
+    "670 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 670 opengl engine",
+    "670",
+    "670 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 670m",
+    "670",
+    "670m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 670mx",
+    "670",
+    "670mx geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 675m",
+    "675",
+    "675m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 675mx",
+    "675",
+    "675mx geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        55
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 675mx mac",
+    "675",
+    "675mx geforce gtx mac nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        56
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 675mx opengl engine",
+    "675",
+    "675mx engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 680",
+    "680",
+    "680 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 680 opengl engine",
+    "680",
+    "680 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 680m",
+    "680",
+    "680m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        39
+      ],
+      [
+        1920,
+        1200,
+        53
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 680m opengl engine",
+    "680",
+    "680m engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        35
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 680mx",
+    "680",
+    "680mx geforce gtx nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 680mx opengl engine",
+    "680",
+    "680mx engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        30
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 690",
+    "690",
+    "690 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        30
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 745",
+    "745",
+    "745 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ],
+      [
+        2560,
+        1600,
+        29
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 750",
+    "750",
+    "750 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 750 opengl engine",
+    "750",
+    "750 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1200,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 750 ti",
+    "750",
+    "750 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        115
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 760",
+    "760",
+    "760 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        1920,
+        1200,
+        116
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 760 oem",
+    "760",
+    "760 geforce gtx nvidia oem",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 760 opengl engine",
+    "760",
+    "760 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 760 ti",
+    "760",
+    "760 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        1920,
+        1200,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 760 ti oem",
+    "760",
+    "760 geforce gtx nvidia oem ti",
+    0,
+    [
+      [
+        1920,
+        1200,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 760 ti opengl engine",
+    "760",
+    "760 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 760a",
+    "760",
+    "760a geforce gtx nvidia",
+    0,
+    [
+      [
+        2560,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 760m",
+    "760",
+    "760m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 765m",
+    "765",
+    "765m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        2560,
+        1440,
+        54
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 765m by nick[d]vb",
+    "765",
+    "765m by d geforce gtx nick nvidia vb",
+    0,
+    [
+      [
+        2560,
+        1440,
+        55
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 765m opengl engine",
+    "765",
+    "765m engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        52
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 770",
+    "770",
+    "770 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        118
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 770 mac",
+    "770",
+    "770 geforce gtx mac nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 770 opengl engine",
+    "770",
+    "770 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 770m",
+    "770",
+    "770m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 770m by nick[d]vb",
+    "770",
+    "770m by d geforce gtx nick nvidia vb",
+    0,
+    [
+      [
+        2560,
+        1440,
+        34
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 770m opengl engine",
+    "770",
+    "770m engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 775m by idopt mac",
+    "775",
+    "775m by geforce gtx idopt mac nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        56
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 775m mac",
+    "775",
+    "775m geforce gtx mac nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 775m opengl engine",
+    "775",
+    "775m engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780",
+    "780",
+    "780 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780 by st3phl3",
+    "780",
+    "780 by geforce gtx nvidia st3phl3",
+    0,
+    [
+      [
+        3840,
+        2160,
+        30
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780 mac",
+    "780",
+    "780 geforce gtx mac nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        60
+      ],
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780 rev. 2",
+    "780",
+    " 2 780 geforce gtx nvidia rev",
+    0,
+    [
+      [
+        1920,
+        1080,
+        90
+      ],
+      [
+        2560,
+        1440,
+        60
+      ],
+      [
+        3840,
+        2160,
+        58
+      ],
+      [
+        5120,
+        2880,
+        25
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780 ti",
+    "780",
+    "780 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1280,
+        1024,
+        60
+      ],
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780 ti opengl engine",
+    "780",
+    "780 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780m",
+    "780",
+    "780m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780m by nick[d]vb",
+    "780",
+    "780m by d geforce gtx nick nvidia vb",
+    0,
+    [
+      [
+        1920,
+        1080,
+        58
+      ],
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780m mac",
+    "780",
+    "780m geforce gtx mac nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 780m opengl engine",
+    "780",
+    "780m engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        46
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 850a",
+    "850",
+    "850a geforce gtx nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        48
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 850m",
+    "850",
+    "850m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 860m",
+    "860",
+    "860m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 860m opengl engine",
+    "860",
+    "860m engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 870m",
+    "870",
+    "870m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        102
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 880m",
+    "880",
+    "880m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 880m opengl engine",
+    "880",
+    "880m engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 950",
+    "950",
+    "950 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        119
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 950 opengl engine",
+    "950",
+    "950 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        1920,
+        1200,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 950a",
+    "950",
+    "950a geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        35
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 950m",
+    "950",
+    "950m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 960",
+    "960",
+    "960 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 960a",
+    "960",
+    "960a geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1440,
+        94
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 960m",
+    "960",
+    "960m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 965m",
+    "965",
+    "965m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3000,
+        2000,
+        48
+      ],
+      [
+        3840,
+        2160,
+        41
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 965m opengl engine",
+    "965",
+    "965m engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2880,
+        1620,
+        54
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 970",
+    "970",
+    "970 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 970 opengl engine",
+    "970",
+    "970 engine geforce gtx nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1600,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 970m",
+    "970",
+    "970m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 980",
+    "980",
+    "980 geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 980 ti",
+    "980",
+    "980 geforce gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 980 ti opengl engine",
+    "980",
+    "980 engine geforce gtx nvidia opengl ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx 980m",
+    "980",
+    "980m geforce gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        104
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx titan",
+    "gtx",
+    "geforce gtx nvidia titan",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        1920,
+        1200,
+        60
+      ],
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx titan black",
+    "gtx",
+    "black geforce gtx nvidia titan",
+    0,
+    [
+      [
+        1680,
+        1050,
+        60
+      ],
+      [
+        1920,
+        1080,
+        30
+      ],
+      [
+        1920,
+        1200,
+        59
+      ],
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx titan black opengl engine",
+    "gtx",
+    "black engine geforce gtx nvidia opengl titan",
+    0,
+    [
+      [
+        3840,
+        2160,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx titan opengl engine",
+    "gtx",
+    "engine geforce gtx nvidia opengl titan",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx titan x",
+    "gtxx",
+    "geforce gtx nvidia titan x",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        120
+      ],
+      [
+        2560,
+        1600,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx titan xp",
+    "gtxxp",
+    "geforce gtx nvidia titan xp",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ],
+      [
+        3440,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx titan z",
+    "gtxz",
+    "geforce gtx nvidia titan z",
+    0,
+    [
+      [
+        1440,
+        900,
+        59
+      ],
+      [
+        1920,
+        1080,
+        39
+      ],
+      [
+        3840,
+        2160,
+        44
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx780m by nikey22",
+    "780",
+    "by geforce gtx780m nikey22 nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx870m by nikey22",
+    "870",
+    "by geforce gtx870m nikey22 nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx880m",
+    "880",
+    "geforce gtx880m nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx880m by nikey22",
+    "880",
+    "by geforce gtx880m nikey22 nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce gtx880m opengl engine",
+    "880",
+    "engine geforce gtx880m nvidia opengl",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx110",
+    "110",
+    "geforce mx110 nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        49
+      ],
+      [
+        1920,
+        1080,
+        54
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx130",
+    "130",
+    "geforce mx130 nvidia",
+    0,
+    [
+      [
+        1366,
+        768,
+        60
+      ],
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx150",
+    "150",
+    "geforce mx150 nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        115
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx230",
+    "230",
+    "geforce mx230 nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx250",
+    "250",
+    "geforce mx250 nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx330",
+    "330",
+    "geforce mx330 nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        45
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx350",
+    "350",
+    "geforce mx350 nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx450",
+    "450",
+    "geforce mx450 nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx550",
+    "550",
+    "geforce mx550 nvidia",
+    0,
+    [
+      [
+        3840,
+        2400,
+        5
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce mx570 a",
+    "570",
+    "a geforce mx570 nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce pre-release graphics device",
+    "pre",
+    "device geforce graphics nvidia pre-release",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce pre-release tesla c2075 opengl engine",
+    "2075",
+    "c2075 engine geforce nvidia opengl pre-release tesla",
+    0,
+    [
+      [
+        1600,
+        900,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce pre-release titan x opengl engine",
+    "prex",
+    "engine geforce nvidia opengl pre-release titan x",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce pre-release titan xp collectors edition opengl e",
+    "prexpe",
+    "collectors e edition geforce nvidia opengl pre-release titan xp",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce pre-release titan xp opengl engine",
+    "prexp",
+    "engine geforce nvidia opengl pre-release titan xp",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2050",
+    "2050",
+    "2050 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2060",
+    "2060",
+    "2060 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        381
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2060 max-q",
+    "2060",
+    "2060 geforce max-q nvidia rtx",
+    0,
+    [
+      [
+        2560,
+        1440,
+        180
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2060 mobile",
+    "2060",
+    "2060 geforce mobile nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2060 rev. a",
+    "2060",
+    " 2060 a geforce nvidia rev rtx",
+    0,
+    [
+      [
+        3840,
+        2160,
+        236
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2060 super",
+    "2060",
+    "2060 geforce nvidia rtx super",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        90
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2060 with max-q design",
+    "2060",
+    "2060 design geforce max-q nvidia rtx with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2070",
+    "2070",
+    "2070 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2070 mobile",
+    "2070",
+    "2070 geforce mobile nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2070 mobile / max-q",
+    "2070",
+    " 2070 geforce max-q mobile nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        515
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2070 mobile / max-q refresh",
+    "2070",
+    " 2070 geforce max-q mobile nvidia refresh rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        143
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2070 rev. a",
+    "2070",
+    " 2070 a geforce nvidia rev rtx",
+    0,
+    [
+      [
+        2560,
+        1440,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2070 super",
+    "2070",
+    "2070 geforce nvidia rtx super",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2070 super with max-q design",
+    "2070",
+    "2070 design geforce max-q nvidia rtx super with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        297
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2070 with max-q design",
+    "2070",
+    "2070 design geforce max-q nvidia rtx with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        143
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2080",
+    "2080",
+    "2080 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        112
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2080 mobile",
+    "2080",
+    "2080 geforce mobile nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        102
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2080 rev. a",
+    "2080",
+    " 2080 a geforce nvidia rev rtx",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2080 super",
+    "2080",
+    "2080 geforce nvidia rtx super",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2080 super mobile / max-q",
+    "2080",
+    " 2080 geforce max-q mobile nvidia rtx super",
+    0,
+    [
+      [
+        3840,
+        2160,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2080 super with max-q design",
+    "2080",
+    "2080 design geforce max-q nvidia rtx super with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        186
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2080 ti",
+    "2080",
+    "2080 geforce nvidia rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2080 ti rev. a",
+    "2080",
+    " 2080 a geforce nvidia rev rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 2080 with max-q design",
+    "2080",
+    "2080 design geforce max-q nvidia rtx with",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3050",
+    "3050",
+    "3050 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3050 laptop gpu",
+    "3050",
+    "3050 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ],
+      [
+        2560,
+        1440,
+        164
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3050 ti laptop gpu",
+    "3050",
+    "3050 geforce gpu laptop nvidia rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        143
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3060",
+    "3060",
+    "3060 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3060 laptop gpu",
+    "3060",
+    "3060 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3060 lite hash rate",
+    "3060",
+    "3060 geforce hash lite nvidia rate rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3060 mobile / max-q",
+    "3060",
+    " 3060 geforce max-q mobile nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        101
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3060 ti",
+    "3060",
+    "3060 geforce nvidia rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3070",
+    "3070",
+    "3070 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        87
+      ],
+      [
+        2560,
+        1440,
+        219
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3070 laptop gpu",
+    "3070",
+    "3070 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3070 mobile / max-q",
+    "3070",
+    " 3070 geforce max-q mobile nvidia rtx",
+    0,
+    [
+      [
+        2560,
+        1440,
+        208
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3070 ti",
+    "3070",
+    "3070 geforce nvidia rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3070 ti laptop gpu",
+    "3070",
+    "3070 geforce gpu laptop nvidia rtx ti",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3080",
+    "3080",
+    "3080 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3080 laptop gpu",
+    "3080",
+    "3080 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        298
+      ],
+      [
+        2560,
+        1600,
+        242
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3080 mobile / max-q/16gb",
+    "3080",
+    " 16gb 3080 geforce max-q mobile nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        151
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3080 ti",
+    "3080",
+    "3080 geforce nvidia rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3080 ti laptop gpu",
+    "3080",
+    "3080 geforce gpu laptop nvidia rtx ti",
+    0,
+    [
+      [
+        2560,
+        1440,
+        239
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3090",
+    "3090",
+    "3090 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 3090 ti",
+    "3090",
+    "3090 geforce nvidia rtx ti",
+    0,
+    [
+      [
+        3840,
+        2160,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4050 laptop gpu",
+    "4050",
+    "4050 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4060",
+    "4060",
+    "4060 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4060 laptop gpu",
+    "4060",
+    "4060 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4060 ti",
+    "4060",
+    "4060 geforce nvidia rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        90
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4070",
+    "4070",
+    "4070 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4070 laptop gpu",
+    "4070",
+    "4070 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        2560,
+        1600,
+        237
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4070 super",
+    "4070",
+    "4070 geforce nvidia rtx super",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4070 ti",
+    "4070",
+    "4070 geforce nvidia rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        153
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4070 ti super",
+    "4070",
+    "4070 geforce nvidia rtx super ti",
+    0,
+    [
+      [
+        2560,
+        1440,
+        144
+      ],
+      [
+        3840,
+        2160,
+        239
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4080",
+    "4080",
+    "4080 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        143
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4080 laptop gpu",
+    "4080",
+    "4080 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        2560,
+        1600,
+        236
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4080 super",
+    "4080",
+    "4080 geforce nvidia rtx super",
+    0,
+    [
+      [
+        2560,
+        1440,
+        144
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4090",
+    "4090",
+    "4090 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        100
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 4090 laptop gpu",
+    "4090",
+    "4090 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        2560,
+        1440,
+        140
+      ],
+      [
+        2560,
+        1600,
+        238
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5050",
+    "5050",
+    "5050 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5050 laptop gpu",
+    "5050",
+    "5050 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5060",
+    "5060",
+    "5060 geforce nvidia rtx",
+    0,
+    [
+      [
+        2560,
+        1440,
+        165
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5060 laptop gpu",
+    "5060",
+    "5060 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        102
+      ],
+      [
+        2560,
+        1600,
+        239
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5060 ti",
+    "5060",
+    "5060 geforce nvidia rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5070",
+    "5070",
+    "5070 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ],
+      [
+        2560,
+        1440,
+        162
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5070 laptop gpu",
+    "5070",
+    "5070 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        2560,
+        1600,
+        180
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5070 ti",
+    "5070",
+    "5070 geforce nvidia rtx ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        147
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5070 ti laptop gpu",
+    "5070",
+    "5070 geforce gpu laptop nvidia rtx ti",
+    0,
+    [
+      [
+        2560,
+        1600,
+        230
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5080",
+    "5080",
+    "5080 geforce nvidia rtx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        90
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5080 laptop gpu",
+    "5080",
+    "5080 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        2560,
+        1600,
+        239
+      ],
+      [
+        3840,
+        2400,
+        276
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5090",
+    "5090",
+    "5090 geforce nvidia rtx",
+    0,
+    [
+      [
+        3440,
+        1440,
+        160
+      ],
+      [
+        3840,
+        2160,
+        90
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx 5090 laptop gpu",
+    "5090",
+    "5090 geforce gpu laptop nvidia rtx",
+    0,
+    [
+      [
+        2560,
+        1600,
+        192
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx t10-16",
+    "10",
+    "geforce nvidia rtx t10-16",
+    0,
+    [
+      [
+        2560,
+        1600,
+        3
+      ]
+    ]
+  ],
+  [
+    "nvidia geforce rtx t10-8",
+    "10",
+    "geforce nvidia rtx t10-8",
+    0,
+    [
+      [
+        2560,
+        1600,
+        3
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gt 440",
+    "440",
+    "440 geforce gigabyte gt nvidia",
+    0,
+    [
+      [
+        1280,
+        1024,
+        34
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gt 610",
+    "610",
+    "610 geforce gigabyte gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        17
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gt 630",
+    "630",
+    "630 geforce gigabyte gt nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        33
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gts 450",
+    "450",
+    "450 geforce gigabyte gts nvidia",
+    0,
+    [
+      [
+        1280,
+        1024,
+        37
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 1050 ti",
+    "1050",
+    "1050 geforce gigabyte gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 460",
+    "460",
+    "460 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 550 ti",
+    "550",
+    "550 geforce gigabyte gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        56
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 560 ti",
+    "560",
+    "560 geforce gigabyte gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 570 hd",
+    "570",
+    "570 geforce gigabyte gtx hd nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 580",
+    "580",
+    "580 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1200,
+        50
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 650",
+    "650",
+    "650 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        28
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 650 ti",
+    "650",
+    "650 geforce gigabyte gtx nvidia ti",
+    0,
+    [
+      [
+        2560,
+        1440,
+        40
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 660",
+    "660",
+    "660 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        31
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 660 ti",
+    "660",
+    "660 geforce gigabyte gtx nvidia ti",
+    0,
+    [
+      [
+        5120,
+        2880,
+        29
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 670",
+    "670",
+    "670 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 750",
+    "750",
+    "750 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 750 ti",
+    "750",
+    "750 geforce gigabyte gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 760",
+    "760",
+    "760 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        3440,
+        1440,
+        17
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 770",
+    "770",
+    "770 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 780 ti",
+    "780",
+    "780 geforce gigabyte gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        240
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 960",
+    "960",
+    "960 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        142
+      ],
+      [
+        1920,
+        1200,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 970",
+    "970",
+    "970 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 980",
+    "980",
+    "980 geforce gigabyte gtx nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia gigabyte geforce gtx 980 ti",
+    "980",
+    "980 geforce gigabyte gtx nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia hp geforce gt 730",
+    "730",
+    "730 geforce gt hp nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        56
+      ]
+    ]
+  ],
+  [
+    "nvidia inno3d geforce gtx660",
+    "3",
+    "geforce gtx660 inno3d nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        106
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gt 610",
+    "610",
+    "610 geforce gt msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        13
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gt 630",
+    "630",
+    "630 geforce gt msi nvidia",
+    0,
+    [
+      [
+        1440,
+        900,
+        10
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gt 635",
+    "635",
+    "635 geforce gt msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        37
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gt 710",
+    "710",
+    "710 geforce gt msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        14
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gt 730",
+    "730",
+    "730 geforce gt msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        27
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 1050 ti",
+    "1050",
+    "1050 geforce gtx msi nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        56
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 1060",
+    "1060",
+    "1060 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 1070",
+    "1070",
+    "1070 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1200,
+        45
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 460",
+    "460",
+    "460 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 560 ti",
+    "560",
+    "560 geforce gtx msi nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 570 hd",
+    "570",
+    "570 geforce gtx hd msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1200,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 580",
+    "580",
+    "580 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 650",
+    "650",
+    "650 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        2560,
+        1080,
+        52
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 650 ti",
+    "650",
+    "650 geforce gtx msi nvidia ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 660",
+    "660",
+    "660 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 660 ti",
+    "660",
+    "660 geforce gtx msi nvidia ti",
+    0,
+    [
+      [
+        1680,
+        1050,
+        49
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 670",
+    "670",
+    "670 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 745",
+    "745",
+    "745 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        77
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 760",
+    "760",
+    "760 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1280,
+        1024,
+        30
+      ],
+      [
+        1920,
+        1080,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 780",
+    "780",
+    "780 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 950",
+    "950",
+    "950 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 960",
+    "960",
+    "960 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        120
+      ],
+      [
+        2560,
+        1440,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 970",
+    "970",
+    "970 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1680,
+        1050,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 980",
+    "980",
+    "980 geforce gtx msi nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        120
+      ],
+      [
+        3840,
+        2160,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia msi geforce gtx 980 ti",
+    "980",
+    "980 geforce gtx msi nvidia ti",
+    0,
+    [
+      [
+        5120,
+        2880,
+        56
+      ]
+    ]
+  ],
+  [
+    "nvidia null geforce 920a",
+    "920",
+    "920a geforce null nvidia",
+    0,
+    [
+      [
+        1920,
+        1080,
+        25
+      ]
+    ]
+  ],
+  [
+    "nvidia palit geforce gtx 650",
+    "650",
+    "650 geforce gtx nvidia palit",
+    0,
+    [
+      [
+        1920,
+        1080,
+        49
+      ]
+    ]
+  ],
+  [
+    "nvidia palit geforce gtx 650 ti",
+    "650",
+    "650 geforce gtx nvidia palit ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia palit geforce gtx 660",
+    "660",
+    "660 geforce gtx nvidia palit",
+    0,
+    [
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "nvidia pegatron geforce gt 420",
+    "420",
+    "420 geforce gt nvidia pegatron",
+    0,
+    [
+      [
+        1400,
+        1050,
+        24
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gt 610",
+    "610",
+    "610 geforce gt nvidia pny",
+    0,
+    [
+      [
+        1280,
+        1024,
+        19
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gtx 1060",
+    "1060",
+    "1060 geforce gtx nvidia pny",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gtx 460",
+    "460",
+    "460 geforce gtx nvidia pny",
+    0,
+    [
+      [
+        1360,
+        768,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gtx 550 ti",
+    "550",
+    "550 geforce gtx nvidia pny ti",
+    0,
+    [
+      [
+        1920,
+        1080,
+        55
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gtx 570 hd",
+    "570",
+    "570 geforce gtx hd nvidia pny",
+    0,
+    [
+      [
+        1280,
+        1024,
+        72
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gtx 580",
+    "580",
+    "580 geforce gtx nvidia pny",
+    0,
+    [
+      [
+        1920,
+        1200,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gtx 680",
+    "680",
+    "680 geforce gtx nvidia pny",
+    0,
+    [
+      [
+        2560,
+        1080,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gtx 750",
+    "750",
+    "750 geforce gtx nvidia pny",
+    0,
+    [
+      [
+        1280,
+        1024,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gtx 970",
+    "970",
+    "970 geforce gtx nvidia pny",
+    0,
+    [
+      [
+        2560,
+        1440,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia pny geforce gtx 980",
+    "980",
+    "980 geforce gtx nvidia pny",
+    0,
+    [
+      [
+        1920,
+        1080,
+        120
+      ]
+    ]
+  ],
+  [
+    "nvidia point of view geforce gtx 470",
+    "470",
+    "470 geforce gtx nvidia of point view",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia point of view geforce gtx 660 ti",
+    "660",
+    "660 geforce gtx nvidia of point ti view",
+    0,
+    [
+      [
+        1680,
+        1050,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia sony geforce 410m",
+    "410",
+    "410m geforce nvidia sony",
+    0,
+    [
+      [
+        1366,
+        768,
+        24
+      ]
+    ]
+  ],
+  [
+    "nvidia toshiba geforce gt 525m",
+    "525",
+    "525m geforce gt nvidia toshiba",
+    0,
+    [
+      [
+        1366,
+        768,
+        29
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gt 430",
+    "430",
+    "430 geforce gt nvidia zotac",
+    0,
+    [
+      [
+        1600,
+        900,
+        32
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gt 610",
+    "610",
+    "610 geforce gt nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gt 630",
+    "630",
+    "630 geforce gt nvidia zotac",
+    0,
+    [
+      [
+        1360,
+        768,
+        41
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gt 740",
+    "740",
+    "740 geforce gt nvidia zotac",
+    0,
+    [
+      [
+        1280,
+        1024,
+        118
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 460",
+    "460",
+    "460 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 550 ti",
+    "550",
+    "550 geforce gtx nvidia ti zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        42
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 560",
+    "560",
+    "560 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 560 ti",
+    "560",
+    "560 geforce gtx nvidia ti zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 580",
+    "580",
+    "580 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        24
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 650",
+    "650",
+    "650 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 650 ti",
+    "650",
+    "650 geforce gtx nvidia ti zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        58
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 660",
+    "660",
+    "660 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 680",
+    "680",
+    "680 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        55
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 750",
+    "750",
+    "750 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1680,
+        1050,
+        114
+      ],
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 760",
+    "760",
+    "760 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        101
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 770",
+    "770",
+    "770 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 780",
+    "780",
+    "780 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        1920,
+        1080,
+        30
+      ]
+    ]
+  ],
+  [
+    "nvidia zotac geforce gtx 960",
+    "960",
+    "960 geforce gtx nvidia zotac",
+    0,
+    [
+      [
+        2048,
+        1152,
+        60
+      ]
+    ]
+  ]
+]

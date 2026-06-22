@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     sb
       .from("developers")
       .select(
-        "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, active_days_last_year, language_diversity, app_streak, rabbit_completed, district, district_chosen, xp_total, xp_level"
+        "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, claimed_at, created_at, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, active_days_last_year, language_diversity, app_streak, rabbit_completed, district, district_chosen, xp_total, xp_level"
       )
       .order("rank", { ascending: true })
       .range(from, to - 1),
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const devs = (devsResult.data ?? []) as Record<string, any>[];
-  const devIds = devs.map((d: Record<string, any>) => d.id);
+  const devIds = devs.map((d) => d.id);
 
   if (devIds.length === 0) {
     return NextResponse.json(
@@ -37,8 +37,8 @@ export async function GET(request: Request) {
     );
   }
 
-  // Round 2: purchases + customizations + achievements + raid tags + active drops in parallel
-  const [purchasesResult, giftPurchasesResult, customizationsResult, achievementsResult, raidTagsResult, activeDropsResult] = await Promise.all([
+  // Round 2: purchases + customizations + achievements + raid tags + active drops + wallets in parallel
+  const [purchasesResult, giftPurchasesResult, customizationsResult, achievementsResult, raidTagsResult, activeDropsResult, walletsResult] = await Promise.all([
     sb
       .from("purchases")
       .select("developer_id, item_id")
@@ -56,8 +56,8 @@ export async function GET(request: Request) {
       .in("developer_id", devIds)
       .in("item_id", ["custom_color", "billboard", "loadout"]),
     sb
-      .from("developer_achievements")
-      .select("developer_id, achievement_id")
+      .from("emblem_grants")
+      .select("developer_id, achievement_id:emblem_id")
       .in("developer_id", devIds),
     sb
       .from("raid_tags")
@@ -68,6 +68,10 @@ export async function GET(request: Request) {
       .from("building_drops")
       .select("id, building_id, rarity, points, max_pulls, pull_count, expires_at")
       .gt("expires_at", new Date().toISOString()),
+    sb
+      .from("wallets")
+      .select("developer_id, lifetime_spent")
+      .in("developer_id", devIds),
   ]);
 
   // Build owned items map (direct purchases + received gifts)
@@ -138,6 +142,12 @@ export async function GET(request: Request) {
     }
   }
 
+  // Build wallet spend map (cumulative pixels spent → centrality signal)
+  const walletSpentMap: Record<number, number> = {};
+  for (const row of walletsResult.data ?? []) {
+    walletSpentMap[row.developer_id] = Number(row.lifetime_spent) || 0;
+  }
+
   // Merge everything
   const developersWithItems = devs.map((dev) => ({
     ...dev,
@@ -157,6 +167,7 @@ export async function GET(request: Request) {
     rabbit_completed: dev.rabbit_completed ?? false,
     xp_total: dev.xp_total ?? 0,
     xp_level: dev.xp_level ?? 1,
+    pixels_spent: walletSpentMap[dev.id] ?? 0,
   }));
 
   return NextResponse.json(

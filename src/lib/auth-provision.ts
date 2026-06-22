@@ -1,10 +1,11 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { checkAchievements } from "@/lib/achievements";
+import { evaluateEmblems } from "@/lib/emblems";
 import { cacheEmailFromAuth, touchLastActive, ensurePreferences } from "@/lib/notification-helpers";
 import { sendWelcomeNotification } from "@/lib/notification-senders/welcome";
 import { sendReferralJoinedNotification } from "@/lib/notification-senders/referral";
 import { fetchGitHubDeveloperData } from "@/lib/github-api";
 import { calculateGithubXp } from "@/lib/xp";
+import { earnPixels } from "@/lib/pixels";
 
 /**
  * Provisions / claims the developer building for a freshly authenticated user.
@@ -140,6 +141,14 @@ export async function provisionDeveloperOnLogin(
 
           await admin.rpc("increment_referral_count", { referrer_dev_id: referrer.id });
 
+          // Referral reward: +25 PX, idempotent per referred dev
+          earnPixels(
+            referrer.id,
+            "referral",
+            dev.id.toString(),
+            `referral:${dev.id}`
+          ).catch(() => {});
+
           await admin.from("activity_feed").insert({
             event_type: "referral",
             actor_id: referrer.id,
@@ -160,7 +169,7 @@ export async function provisionDeveloperOnLogin(
           if (referrerFull) {
             const giftsSent = await countGifts(admin, referrer.id, "sent");
             const giftsReceived = await countGifts(admin, referrer.id, "received");
-            await checkAchievements(referrer.id, {
+            await evaluateEmblems(referrer.id, {
               contributions: referrerFull.contributions,
               public_repos: referrerFull.public_repos,
               total_stars: referrerFull.total_stars,
@@ -176,7 +185,7 @@ export async function provisionDeveloperOnLogin(
       // Run achievement check for this developer
       const giftsSent = await countGifts(admin, dev.id, "sent");
       const giftsReceived = await countGifts(admin, dev.id, "received");
-      await checkAchievements(dev.id, {
+      await evaluateEmblems(dev.id, {
         contributions: dev.contributions,
         public_repos: dev.public_repos,
         total_stars: dev.total_stars,

@@ -7,6 +7,7 @@ import BossPreview, { type BossVariant } from "./BossPreview";
 import BossMinions from "./BossMinions";
 import { bossEventStore, computePhase } from "@/lib/bossEventStore";
 import type { ActiveProjectile } from "@/lib/useFlyPresence";
+import type { BossTuning } from "@/lib/events/schema";
 
 // ─── Boss Event ────────────────────────────────────────────────
 //
@@ -72,6 +73,9 @@ interface Props {
   engageBoss?: (maxHp: number) => void;
   sendBossHit?: (kind: "boss" | "minion") => void;
   sendBossSelfHit?: () => void;
+  // Combat balance, config-driven from event_instances.boss_config. Each field
+  // falls back to the literal defaults below — tunable live, no deploy.
+  tuning?: BossTuning;
 }
 
 export default function BossEvent({
@@ -83,9 +87,27 @@ export default function BossEvent({
   engageBoss,
   sendBossHit,
   sendBossSelfHit,
+  tuning,
 }: Props) {
   const { camera } = useThree();
   const engagedRef = useRef(false);
+
+  // Effective combat tuning, kept in a ref so the useFrame loop reads fresh
+  // values. Defaults = the module constants (DAMAGE_PER_HIT, ORBIT_SPEED, …).
+  const tuneRef = useRef({
+    damagePerHit: DAMAGE_PER_HIT,
+    minionKillBonus: MINION_KILL_BONUS,
+    telegraphMs: TELEGRAPH_MS,
+    orbitSpeed: ORBIT_SPEED,
+    attackInterval: ATTACK_INTERVAL,
+  });
+  tuneRef.current = {
+    damagePerHit: tuning?.damage_per_hit ?? DAMAGE_PER_HIT,
+    minionKillBonus: tuning?.minion_kill_bonus ?? MINION_KILL_BONUS,
+    telegraphMs: tuning?.telegraph_ms ?? TELEGRAPH_MS,
+    orbitSpeed: tuning?.orbit_speed ?? ORBIT_SPEED,
+    attackInterval: tuning?.attack_interval ?? ATTACK_INTERVAL,
+  };
 
   const consumed = useRef<Set<string>>(new Set());
   const lastAttackScheduledAt = useRef<number>(Date.now());
@@ -152,7 +174,7 @@ export default function BossEvent({
     const s = bossEventStore.get();
 
     // ─── BOSS WORLD POSITION (orbit + shake) ────────────────
-    const orbitSpeed = ORBIT_SPEED[s.phase];
+    const orbitSpeed = tuneRef.current.orbitSpeed[s.phase];
     const angle = t * orbitSpeed;
     const orbitX = Math.cos(angle) * ORBIT_RADIUS;
     const orbitZ = Math.sin(angle) * ORBIT_RADIUS;
@@ -176,7 +198,7 @@ export default function BossEvent({
     if (isCharging) {
       // Lean forward proportional to how close to firing
       const tg = s.incomingAttack!;
-      const k = 1 - Math.max(0, (tg.firesAt - now) / TELEGRAPH_MS);
+      const k = 1 - Math.max(0, (tg.firesAt - now) / tuneRef.current.telegraphMs);
       lean = -0.35 * k;
     } else if (sinceFire < 400) {
       // Recoil
@@ -218,16 +240,16 @@ export default function BossEvent({
               // optimistic local damage tally and the hit flash.
               sendBossHit?.("boss");
               bossEventStore.set({
-                playerDamage: s.playerDamage + DAMAGE_PER_HIT,
+                playerDamage: s.playerDamage + tuneRef.current.damagePerHit,
                 lastHitFlashAt: now,
               });
             } else {
-              const newHp = Math.max(0, s.hp - DAMAGE_PER_HIT);
+              const newHp = Math.max(0, s.hp - tuneRef.current.damagePerHit);
               const newPhase = computePhase(newHp, s.maxHp);
               const newStatus = newHp <= 0 ? "dying" : "engage";
               bossEventStore.set({
                 hp: newHp,
-                playerDamage: s.playerDamage + DAMAGE_PER_HIT,
+                playerDamage: s.playerDamage + tuneRef.current.damagePerHit,
                 phase: newPhase,
                 status: newStatus,
                 lastHitFlashAt: now,
@@ -243,7 +265,7 @@ export default function BossEvent({
       // Schedule next attack (phase-driven cadence)
       if (
         !s.incomingAttack &&
-        now - lastAttackScheduledAt.current > ATTACK_INTERVAL[s.phase]
+        now - lastAttackScheduledAt.current > tuneRef.current.attackInterval[s.phase]
       ) {
         // Alternate attack types so player learns both
         const type: "laser" | "shockwave" =
@@ -267,7 +289,7 @@ export default function BossEvent({
           incomingAttack: {
             id: attackIdCounter.current,
             type,
-            firesAt: now + TELEGRAPH_MS,
+            firesAt: now + tuneRef.current.telegraphMs,
             targetX,
             targetZ,
           },
@@ -336,7 +358,7 @@ export default function BossEvent({
           8,
           s.incomingAttack.targetZ,
         );
-        const tLeft = (s.incomingAttack.firesAt - now) / TELEGRAPH_MS;
+        const tLeft = (s.incomingAttack.firesAt - now) / tuneRef.current.telegraphMs;
         const expand = 1 + (1 - Math.max(0, Math.min(1, tLeft))) * 0.6;
         telegraphRef.current.scale.set(expand, expand, expand);
         const mat = telegraphRef.current.material as THREE.MeshBasicMaterial;
@@ -355,7 +377,7 @@ export default function BossEvent({
           s.incomingAttack.targetZ,
         );
         // Grow toward SHOCKWAVE_PEAK_RADIUS as fires_at approaches
-        const tLeft = (s.incomingAttack.firesAt - now) / TELEGRAPH_MS;
+        const tLeft = (s.incomingAttack.firesAt - now) / tuneRef.current.telegraphMs;
         const k = 1 - Math.max(0, Math.min(1, tLeft));
         const radius = 60 + k * (SHOCKWAVE_PEAK_RADIUS - 60);
         shockwaveTelegraphRef.current.scale.set(radius, 1, radius);
@@ -477,12 +499,12 @@ export default function BossEvent({
               sendBossHit?.("minion");
               bossEventStore.set({
                 minionKills: cur.minionKills + 1,
-                playerDamage: cur.playerDamage + MINION_KILL_BONUS,
+                playerDamage: cur.playerDamage + tuneRef.current.minionKillBonus,
                 lastHitFlashAt: Date.now(),
               });
               return;
             }
-            const newHp = Math.max(0, cur.hp - MINION_KILL_BONUS);
+            const newHp = Math.max(0, cur.hp - tuneRef.current.minionKillBonus);
             const newPhase = computePhase(newHp, cur.maxHp);
             const newStatus = newHp <= 0 ? "dying" : "engage";
             bossEventStore.set({

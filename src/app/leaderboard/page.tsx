@@ -201,6 +201,12 @@ export default async function LeaderboardPage({
           >
             &larr; Back to City
           </Link>
+          <Link
+            href="/levels"
+            className="text-xs text-muted transition-colors hover:text-cream"
+          >
+            How levels work &rarr;
+          </Link>
         </div>
 
         <div className="mt-6 text-center">

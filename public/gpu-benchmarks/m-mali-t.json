@@ -1,0 +1,1295 @@
+[
+  "6",
+  [
+    "arm mali-t604 mp4",
+    "604",
+    "arm mali-t604 mp4",
+    0,
+    [
+      [
+        2560,
+        1504,
+        3,
+        "google nexus 10"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t622",
+    "622",
+    "arm mali-t622",
+    0,
+    [
+      [
+        1024,
+        564,
+        12,
+        "telechips tcc896x (quad core, development board)"
+      ],
+      [
+        1280,
+        720,
+        7,
+        "xiaomi redmi 2a (mali-t622, hm 2a)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t624",
+    "624",
+    "arm mali-t624",
+    0,
+    [
+      [
+        1794,
+        1080,
+        6,
+        "huawei p8 gra-ul10 (2.2 ghz)"
+      ],
+      [
+        1812,
+        1080,
+        9,
+        "huawei mt7"
+      ],
+      [
+        1830,
+        1080,
+        7,
+        "huawei p8 max (dav-70x)"
+      ],
+      [
+        1920,
+        1080,
+        4,
+        "sony bravia 4k 2015"
+      ],
+      [
+        1920,
+        1104,
+        8,
+        "huawei dtab compact d-02h (docomo)"
+      ],
+      [
+        1920,
+        1128,
+        8,
+        "huawei mediapad m2 (m2-a01l)"
+      ],
+      [
+        1824,
+        1200,
+        8,
+        "huawei mediapad m2 (m2-80xx)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t624 mp2",
+    "624",
+    "arm mali-t624 mp2",
+    0,
+    [
+      [
+        1280,
+        720,
+        5,
+        "samsung sm-g910f (mali-t624)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t624 mp4",
+    "624",
+    "arm mali-t624 mp4",
+    0,
+    [
+      [
+        1794,
+        1080,
+        9,
+        "huawei z100"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t628",
+    "628",
+    "arm mali-t628",
+    0,
+    [
+      [
+        1024,
+        600,
+        30,
+        "thinkware inavi davinci"
+      ],
+      [
+        2560,
+        1536,
+        6,
+        "meizu mx4 pro"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t628 mp2",
+    "628",
+    "arm mali-t628 mp2",
+    0,
+    [
+      [
+        1280,
+        720,
+        7,
+        "leadcore l1860 (development board)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t628 mp6",
+    "628",
+    "arm mali-t628 mp6",
+    0,
+    [
+      [
+        800,
+        480,
+        34,
+        "gen2wave rp1600"
+      ],
+      [
+        1280,
+        672,
+        7,
+        "hardkernel odroid-xu3 (development board)"
+      ],
+      [
+        1280,
+        720,
+        18,
+        "samsung galaxy alpha (mali-t628, sm-g850)"
+      ],
+      [
+        1920,
+        1080,
+        6,
+        "samsung sm-g900x galaxy s5 (mali-t628)"
+      ],
+      [
+        2560,
+        1600,
+        3,
+        "samsung sm-t900 galaxy tab pro 12.2"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t720",
+    "720",
+    "arm mali-t720",
+    0,
+    [
+      [
+        432,
+        240,
+        16,
+        "unihertz jelly pro"
+      ],
+      [
+        782,
+        480,
+        8,
+        "mobiistar lai zoro"
+      ],
+      [
+        784,
+        480,
+        7,
+        "lg k3 (k100)"
+      ],
+      [
+        791,
+        480,
+        6,
+        "senseit r450"
+      ],
+      [
+        800,
+        480,
+        6,
+        "zte blade a410 (orange dive 30, ee rook)"
+      ],
+      [
+        854,
+        480,
+        3,
+        "zte z820"
+      ],
+      [
+        897,
+        540,
+        5,
+        "proline xm-502"
+      ],
+      [
+        960,
+        540,
+        4,
+        "vkworld vk560"
+      ],
+      [
+        1024,
+        552,
+        4,
+        "utok hello 7q lte"
+      ],
+      [
+        1024,
+        714,
+        9,
+        "bluedot bnt-791 (2g)"
+      ],
+      [
+        1024,
+        720,
+        3,
+        "zte e8qp"
+      ],
+      [
+        1280,
+        624,
+        10,
+        "panasonic p55 novo 4g"
+      ],
+      [
+        1280,
+        648,
+        4,
+        "tcl 9025"
+      ],
+      [
+        1280,
+        656,
+        8,
+        "acer b1-780 iconia one 7"
+      ],
+      [
+        1184,
+        720,
+        6,
+        "wheatek x6069"
+      ],
+      [
+        1187,
+        720,
+        7,
+        "lg k8 (k350)"
+      ],
+      [
+        1189,
+        720,
+        5,
+        "ark impulse p2"
+      ],
+      [
+        1193,
+        720,
+        7,
+        "lg x power (k220, f750)"
+      ],
+      [
+        1196,
+        720,
+        5,
+        "zte nx597j nubia n1 lite"
+      ],
+      [
+        1198,
+        720,
+        9,
+        "nomu s10 pro"
+      ],
+      [
+        1205,
+        720,
+        7,
+        "firefly aurii passion"
+      ],
+      [
+        1206,
+        720,
+        9,
+        "archos diamond s"
+      ],
+      [
+        1208,
+        720,
+        3,
+        "lenovo tb-7504"
+      ],
+      [
+        1217,
+        720,
+        6,
+        "energy sistem energy phone max 2+"
+      ],
+      [
+        1238,
+        720,
+        7,
+        "vnpt technology vivas lotus s3 lte"
+      ],
+      [
+        1280,
+        720,
+        6,
+        "zuum orion"
+      ],
+      [
+        1280,
+        736,
+        6,
+        "wiz 8288"
+      ],
+      [
+        1280,
+        737,
+        3,
+        "waywalkers t805g"
+      ],
+      [
+        1280,
+        740,
+        4,
+        "teclast p80h"
+      ],
+      [
+        1280,
+        746,
+        3,
+        "philips tle821l e line 4g"
+      ],
+      [
+        1280,
+        752,
+        3,
+        "vonino epic e8"
+      ],
+      [
+        1280,
+        755,
+        7,
+        "leotec letab1020 supernova qi32"
+      ],
+      [
+        1356,
+        720,
+        8,
+        "xiaolajiao la-v11"
+      ],
+      [
+        1360,
+        720,
+        7,
+        "tecno in5"
+      ],
+      [
+        1368,
+        720,
+        7,
+        "tinno p100"
+      ],
+      [
+        1280,
+        800,
+        4,
+        "samsung galaxy tab e 8.0 (sm-t375x, sm-t377x)"
+      ],
+      [
+        1920,
+        936,
+        2,
+        "panasonic eluga note"
+      ],
+      [
+        1920,
+        996,
+        4,
+        "cube technology u83 iplay10"
+      ],
+      [
+        1776,
+        1080,
+        4,
+        "fly fs522 cirrus 14"
+      ],
+      [
+        1787,
+        1080,
+        5,
+        "lg x cam (k580, f690)"
+      ],
+      [
+        1920,
+        1008,
+        5,
+        "alcatel one touch xess (p17aa)"
+      ],
+      [
+        1794,
+        1080,
+        4,
+        "zopo zp952"
+      ],
+      [
+        1800,
+        1080,
+        5,
+        "tcl 6058"
+      ],
+      [
+        1815,
+        1080,
+        4,
+        "archos diamond plus"
+      ],
+      [
+        1920,
+        1032,
+        5,
+        "virgin media tellytablet"
+      ],
+      [
+        1920,
+        1080,
+        4,
+        "zte bv0701 (p653n11)"
+      ],
+      [
+        1920,
+        1104,
+        4,
+        "vestel v tab 7030"
+      ],
+      [
+        1920,
+        1116,
+        4,
+        "jty q101"
+      ],
+      [
+        1920,
+        1128,
+        4,
+        "xgody t1004"
+      ],
+      [
+        2009,
+        1080,
+        4,
+        "tcl 5099"
+      ],
+      [
+        1920,
+        1136,
+        4,
+        "asus zenpad 10 (p028 z301m)"
+      ],
+      [
+        2712,
+        1440,
+        43,
+        "lenovo tab 2 501lv (softbank)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t760",
+    "760",
+    "arm mali-t760",
+    0,
+    [
+      [
+        854,
+        480,
+        15,
+        "zte fit 4g smart"
+      ],
+      [
+        897,
+        540,
+        13,
+        "sony xperia e4g (e20xx)"
+      ],
+      [
+        960,
+        540,
+        13,
+        "uhappy up320"
+      ],
+      [
+        960,
+        568,
+        23,
+        "asus c100pa chromebook flip"
+      ],
+      [
+        1024,
+        552,
+        20,
+        "gpd q9psv"
+      ],
+      [
+        1024,
+        720,
+        10,
+        "wiz t-8168"
+      ],
+      [
+        1188,
+        720,
+        9,
+        "lg h520 magna, h522 prime plus"
+      ],
+      [
+        1196,
+        720,
+        10,
+        "wiko highway star"
+      ],
+      [
+        1280,
+        720,
+        8,
+        "zte mtc smart run 4g"
+      ],
+      [
+        1280,
+        736,
+        8,
+        "archos 80b helium"
+      ],
+      [
+        1280,
+        752,
+        8,
+        "frael m10g 4g"
+      ],
+      [
+        1280,
+        768,
+        8,
+        "meizu m1"
+      ],
+      [
+        1794,
+        1080,
+        6,
+        "sugar 2 ss136 l8560"
+      ],
+      [
+        1920,
+        1032,
+        10,
+        "qbic bxp-301 box pc"
+      ],
+      [
+        1920,
+        1080,
+        6,
+        "zopo zp920"
+      ],
+      [
+        1920,
+        1104,
+        6,
+        "cube technology t7"
+      ],
+      [
+        1920,
+        1128,
+        6,
+        "vestel v tab 10.1 fatih"
+      ],
+      [
+        2048,
+        1440,
+        4,
+        "teclast t98 4g"
+      ],
+      [
+        2560,
+        1440,
+        6,
+        "samsung galaxy note 4 (mali-t760, sm-n910x, sm-n916)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t760 mp6",
+    "760",
+    "arm mali-t760 mp6",
+    0,
+    [
+      [
+        1920,
+        1080,
+        9,
+        "samsung galaxy a8 (mali-t760, sm-a800x, scv32)"
+      ],
+      [
+        2048,
+        1536,
+        10,
+        "samsung galaxy tab s 2 9.7 (sm-t810, sm-t815, sm-t817)"
+      ],
+      [
+        2560,
+        1532,
+        10,
+        "samsung galaxy note edge (mali-t760, sm-n915x)"
+      ],
+      [
+        2560,
+        1600,
+        9,
+        "samsung galaxy tab s 10.5 (mali-t760, sm-t805s)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t760 mp8",
+    "760",
+    "arm mali-t760 mp8",
+    0,
+    [
+      [
+        1280,
+        768,
+        41,
+        "samsung sm-w2016"
+      ],
+      [
+        1920,
+        1080,
+        24,
+        "samsung galaxy a8 2016 (sm-a810)"
+      ],
+      [
+        2160,
+        1200,
+        17,
+        "idealens k2"
+      ],
+      [
+        2560,
+        1440,
+        13,
+        "samsung galaxy s6 edge+ (sm-g928)"
+      ],
+      [
+        2560,
+        1504,
+        15,
+        "bungbungame kalos 2"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t764",
+    "764",
+    "arm mali-t764",
+    0,
+    [
+      [
+        1024,
+        600,
+        18,
+        "gpd q9"
+      ],
+      [
+        1280,
+        720,
+        14,
+        "gpd xd"
+      ],
+      [
+        1280,
+        752,
+        13,
+        "pipo m9s"
+      ],
+      [
+        1280,
+        800,
+        13,
+        "pipo p7"
+      ],
+      [
+        1920,
+        1008,
+        11,
+        "ugoos ut3s"
+      ],
+      [
+        1920,
+        1010,
+        7,
+        "pipo p7 hd"
+      ],
+      [
+        1920,
+        1020,
+        5,
+        "rockchip mk903v mini tv"
+      ],
+      [
+        1920,
+        1032,
+        7,
+        "acooo oneboard pro+"
+      ],
+      [
+        1872,
+        1080,
+        7,
+        "contextmedia wallboard 32 tablet (p-wal-106-yit-01)"
+      ],
+      [
+        1920,
+        1080,
+        7,
+        "zeuss rk3288 4k android box"
+      ],
+      [
+        1920,
+        1128,
+        7,
+        "pipo p9"
+      ],
+      [
+        2048,
+        1437,
+        5,
+        "haier pad 971"
+      ],
+      [
+        2048,
+        1440,
+        5,
+        "sungwoo mobile connectia qx sm-700rs"
+      ],
+      [
+        2560,
+        1504,
+        4,
+        "teclast p90hd"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t820",
+    "820",
+    "arm mali-t820",
+    0,
+    [
+      [
+        1344,
+        720,
+        5,
+        "lenovo k320t"
+      ],
+      [
+        1776,
+        1080,
+        6,
+        "leagoo t5c"
+      ],
+      [
+        1920,
+        1008,
+        8,
+        "yundoo y2 tv box"
+      ],
+      [
+        1920,
+        1080,
+        5,
+        "zidoo x9s tv box"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t830",
+    "830",
+    "arm mali-t830",
+    0,
+    [
+      [
+        1280,
+        720,
+        9,
+        "samsung galaxy on7 (mali-t830, sm-g600x)"
+      ],
+      [
+        1280,
+        800,
+        9,
+        "samsung sm-t536 (mali-t830)"
+      ],
+      [
+        1776,
+        1080,
+        9,
+        "huawei pic-xxx"
+      ],
+      [
+        1794,
+        1080,
+        8,
+        "huawei p9 lite (vns-xxx, gt3 nmo-xxx)"
+      ],
+      [
+        1920,
+        1080,
+        6,
+        "xiaomi mitv3s-55"
+      ],
+      [
+        2033,
+        1080,
+        8,
+        "huawei p smart (fig-xxx)"
+      ],
+      [
+        2040,
+        1080,
+        8,
+        "huawei maimang 6 (rne-xxx)"
+      ],
+      [
+        1920,
+        1200,
+        4,
+        "samsung galaxy tab a 10.1 (sm-t580, sm-t585)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t860",
+    "860",
+    "arm mali-t860",
+    0,
+    [
+      [
+        1184,
+        720,
+        8,
+        "tcl a626"
+      ],
+      [
+        1196,
+        720,
+        8,
+        "green orange go t2"
+      ],
+      [
+        1280,
+        720,
+        14,
+        "htc one a9s"
+      ],
+      [
+        1920,
+        1024,
+        17,
+        "hardkernel odroid-n1 (development board)"
+      ],
+      [
+        1920,
+        1032,
+        16,
+        "contextmedia p-wal-108-elc-02"
+      ],
+      [
+        1920,
+        1080,
+        15,
+        "yundoo y8 tv box"
+      ],
+      [
+        1920,
+        1116,
+        15,
+        "imuz revolution a8"
+      ],
+      [
+        1920,
+        1128,
+        6,
+        "rockchip rk3399 (development board)"
+      ],
+      [
+        2400,
+        1440,
+        9,
+        "samsung chromebook plus (kevin)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t860 mp2",
+    "860",
+    "arm mali-t860 mp2",
+    0,
+    [
+      [
+        598,
+        480,
+        25,
+        "cipherlab 9700a"
+      ],
+      [
+        1184,
+        720,
+        14,
+        "zopo z5000"
+      ],
+      [
+        1193,
+        720,
+        11,
+        "lg x power 2 (u+, x500, m-x320, m320)"
+      ],
+      [
+        1196,
+        720,
+        15,
+        "sony xperia xa (f311x)"
+      ],
+      [
+        1199,
+        720,
+        11,
+        "lg stylus 3 (m400)"
+      ],
+      [
+        1212,
+        720,
+        11,
+        "meeg 306"
+      ],
+      [
+        1280,
+        720,
+        10,
+        "zte nx573j nubia m2 lite"
+      ],
+      [
+        1336,
+        720,
+        10,
+        "asus pegasus 4s (x018d zb570tl)"
+      ],
+      [
+        1344,
+        720,
+        13,
+        "doogee homtom s8"
+      ],
+      [
+        1776,
+        1080,
+        7,
+        "umi crystal"
+      ],
+      [
+        1794,
+        1080,
+        8,
+        "wolder wiam #65"
+      ],
+      [
+        1798,
+        1080,
+        7,
+        "energy sistem energy phone pro 3"
+      ],
+      [
+        1806,
+        1080,
+        8,
+        "tecno phantom 6"
+      ],
+      [
+        1807,
+        1080,
+        7,
+        "covia fleaz cp-j55a g07"
+      ],
+      [
+        1810,
+        1080,
+        8,
+        "archos bush spira e3x 5.5"
+      ],
+      [
+        1920,
+        1080,
+        5,
+        "zte nx541j nubia n1"
+      ],
+      [
+        2004,
+        1080,
+        7,
+        "asus zenfone max plus m1 (x018d zb570tl)"
+      ],
+      [
+        1920,
+        1128,
+        7,
+        "verizon qtaxia1"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t880",
+    "880",
+    "arm mali-t880",
+    0,
+    [
+      [
+        1184,
+        720,
+        21,
+        "doogee mix"
+      ],
+      [
+        1280,
+        720,
+        20,
+        "lenovo k8"
+      ],
+      [
+        1344,
+        720,
+        18,
+        "gionee sw17w08"
+      ],
+      [
+        1776,
+        1080,
+        11,
+        "vernee mars pro"
+      ],
+      [
+        1794,
+        1080,
+        15,
+        "huawei p9 plus (vie-xxx)"
+      ],
+      [
+        1824,
+        1080,
+        11,
+        "ulefone t1"
+      ],
+      [
+        1920,
+        1080,
+        18,
+        "umi z pro"
+      ],
+      [
+        2016,
+        1080,
+        9,
+        "vernee mix 2"
+      ],
+      [
+        2064,
+        1080,
+        10,
+        "umi s2 pro"
+      ],
+      [
+        2392,
+        1440,
+        8,
+        "huawei honor v8 (knt-al20)"
+      ],
+      [
+        2434,
+        1440,
+        8,
+        "huawei honor note 8 premium edition (edi-al10)"
+      ],
+      [
+        2560,
+        1440,
+        23,
+        "meizu pro 6 plus"
+      ],
+      [
+        2560,
+        1480,
+        8,
+        "huawei dtab compact d-01j (docomo)"
+      ],
+      [
+        2560,
+        1600,
+        8,
+        "huawei mediapad m3 (btv-xxx)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t880 mp12",
+    "880",
+    "arm mali-t880 mp12",
+    0,
+    [
+      [
+        1920,
+        1080,
+        32,
+        "samsung galaxy s7 (sm-g930f)"
+      ],
+      [
+        2560,
+        1440,
+        25,
+        "samsung galaxy s7 edge (mali-t880, sm-g935x)"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t880 mp2",
+    "880",
+    "arm mali-t880 mp2",
+    0,
+    [
+      [
+        1184,
+        720,
+        19,
+        "sony xperia xa1 (g31xx)"
+      ],
+      [
+        1376,
+        720,
+        17,
+        "umi s2"
+      ],
+      [
+        1776,
+        1080,
+        10,
+        "sony xperia xa1 ultra (g32xx)"
+      ],
+      [
+        1800,
+        1080,
+        11,
+        "infinix x603"
+      ],
+      [
+        1920,
+        1080,
+        9,
+        "umi plus e"
+      ]
+    ]
+  ],
+  [
+    "arm mali-t880 mp4",
+    "880",
+    "arm mali-t880 mp4",
+    0,
+    [
+      [
+        1280,
+        672,
+        18,
+        "mediatek x20 (development board)"
+      ],
+      [
+        1794,
+        1080,
+        13,
+        "zopo zp955 speed 8"
+      ],
+      [
+        1800,
+        1080,
+        16,
+        "infinix x602 zero 4 plus"
+      ],
+      [
+        1806,
+        1080,
+        16,
+        "tecno phantom a9"
+      ],
+      [
+        1810,
+        1080,
+        8,
+        "mobiistar prime x pro"
+      ],
+      [
+        1815,
+        1080,
+        16,
+        "tecno phantom 6 plus"
+      ],
+      [
+        1920,
+        1080,
+        15,
+        "xiaomi redmi pro"
+      ],
+      [
+        2048,
+        1440,
+        12,
+        "brown tab 1"
+      ],
+      [
+        2392,
+        1440,
+        12,
+        "vernee apollo"
+      ],
+      [
+        2416,
+        1440,
+        11,
+        "freetel ftj162b kiwami2"
+      ],
+      [
+        2560,
+        1440,
+        10,
+        "reeder p11s"
+      ]
+    ]
+  ],
+  [
+    "mali-t830",
+    "830",
+    "mali-t830",
+    0,
+    [
+      [
+        1480,
+        720,
+        10,
+        "samsung gm-j600fn"
+      ]
+    ]
+  ]
+]

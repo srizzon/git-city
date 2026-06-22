@@ -5,18 +5,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getOwnedItems } from "@/lib/items";
-import { TIER_COLORS } from "@/lib/achievements";
-import { inferDistrict } from "@/lib/github";
-import { ITEM_NAMES } from "@/lib/zones";
-import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
-import ClaimButton from "@/components/ClaimButton";
+import {
+  buildTitlePool,
+  resolveTitle,
+  type ProfileShowcaseConfig,
+  type ShowcaseAchievement,
+} from "@/lib/profile-showcase";
 import DeleteAccountButton from "@/components/DeleteAccountButton";
-import ShareButtons from "@/components/ShareButtons";
-import CompareChallenge from "@/components/CompareChallenge";
-import ProfileDistrict from "@/components/ProfileDistrict";
 import ReferralCTA from "@/components/ReferralCTA";
 import ProfileTracker from "@/components/ProfileTracker";
+import ProfileHero from "@/components/profile/ProfileHero";
+import { sanitizeSocialLinks } from "@/lib/social-links";
+import TrophyCase from "@/components/profile/TrophyCase";
+import ProfileStats from "@/components/profile/ProfileStats";
+import ProfileActions from "@/components/profile/ProfileActions";
 
 export const revalidate = 3600; // ISR: regenerate every 1 hour
 
@@ -61,12 +63,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-interface AchievementRow {
-  achievement_id: string;
-  name: string;
-  tier: string;
-}
-
 export default async function DevPage({ params }: Props) {
   const { username } = await params;
   const dev = await getDeveloper(username);
@@ -75,19 +71,56 @@ export default async function DevPage({ params }: Props) {
 
   const accent = "#c8e64a";
   const shadow = "#5a7a00";
-  const ownedItems = await getOwnedItems(dev.id);
 
-  // Fetch achievements with name+tier from DB (no hardcoded maps)
+  // Fetch earned emblems (the Trophy Case source) + their catalog metadata.
+  // The grant's `tier` is the evolved tier (after milestones); name/glyph/etc
+  // come from the catalog. emblem ids == old achievement ids, so saved pins/titles
+  // keep resolving.
   const sb = getSupabaseAdmin();
-  const { data: devAchievements } = await sb
-    .from("developer_achievements")
-    .select("achievement_id, achievements(name, tier)")
-    .eq("developer_id", dev.id);
-  const achievements: AchievementRow[] = (devAchievements ?? []).map((a: Record<string, unknown>) => ({
-    achievement_id: a.achievement_id as string,
-    name: (a.achievements as Record<string, unknown>)?.name as string ?? (a.achievement_id as string),
-    tier: (a.achievements as Record<string, unknown>)?.tier as string ?? "bronze",
-  }));
+  const [{ data: devEmblems }, { data: profileRow }, { data: socialRow }] = await Promise.all([
+    sb
+      .from("emblem_grants")
+      .select("emblem_id, count, tier, first_earned_at, emblems(name, description, glyph, is_counter, tier)")
+      .eq("developer_id", dev.id),
+    sb
+      .from("developer_customizations")
+      .select("config")
+      .eq("developer_id", dev.id)
+      .eq("item_id", "profile")
+      .maybeSingle(),
+    sb
+      .from("developer_customizations")
+      .select("config")
+      .eq("developer_id", dev.id)
+      .eq("item_id", "social_links")
+      .maybeSingle(),
+  ]);
+  const socialLinks = sanitizeSocialLinks(socialRow?.config);
+  const achievements: ShowcaseAchievement[] = (devEmblems ?? []).map(
+    (row: Record<string, unknown>) => {
+      const meta = row.emblems as Record<string, unknown> | null;
+      return {
+        achievement_id: row.emblem_id as string,
+        name: (meta?.name as string) ?? (row.emblem_id as string),
+        tier: (row.tier as string) ?? (meta?.tier as string) ?? "bronze",
+        description: (meta?.description as string) ?? null,
+        unlocked_at: (row.first_earned_at as string) ?? null,
+        glyph: (meta?.glyph as string) ?? null,
+        count: (row.count as number) ?? 1,
+        is_counter: (meta?.is_counter as boolean) ?? false,
+      };
+    }
+  );
+
+  // Showcase curation (item_id = "profile" row; separate from "loadout")
+  const showcase = (profileRow?.config ?? {}) as ProfileShowcaseConfig;
+  const xpLevel = dev.xp_level ?? 1;
+  const equippedTitle = resolveTitle(showcase.equipped_title, xpLevel, achievements);
+  const titlePool = buildTitlePool(xpLevel, achievements);
+  const ownedIds = new Set(achievements.map((a) => a.achievement_id));
+  const pinnedIds = (showcase.featured_achievements ?? []).filter((id) =>
+    ownedIds.has(id)
+  );
 
   // Fetch referred developers (who this dev brought to the city)
   const { data: referredDevs } = await sb
@@ -139,7 +172,7 @@ export default async function DevPage({ params }: Props) {
       alternateName: dev.github_login,
       image: dev.avatar_url,
       url: `${baseUrl}/dev/${dev.github_login}`,
-      sameAs: `https://github.com/${dev.github_login}`,
+      sameAs: [`https://github.com/${dev.github_login}`, ...Object.values(socialLinks)],
     },
   };
 
@@ -157,6 +190,11 @@ export default async function DevPage({ params }: Props) {
     ],
   };
 
+  const contributions =
+    (dev.contributions_total && dev.contributions_total > 0)
+      ? dev.contributions_total
+      : dev.contributions;
+
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
       <ProfileTracker login={dev.github_login} />
@@ -168,7 +206,7 @@ export default async function DevPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <div className="mx-auto max-w-2xl px-3 py-6 sm:px-4 sm:py-10">
+      <div className="mx-auto max-w-5xl px-3 py-6 sm:px-4 sm:py-10">
         {/* Header */}
         <Link
           href="/"
@@ -177,304 +215,131 @@ export default async function DevPage({ params }: Props) {
           &larr; Back to City
         </Link>
 
-        {/* Profile Card */}
-        <div className="border-[3px] border-border bg-bg-raised p-4 sm:p-8">
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6">
-            {/* Avatar */}
-            {dev.avatar_url && (
-              <Image
-                src={dev.avatar_url}
-                alt={dev.github_login}
-                width={100}
-                height={100}
-                className="border-[3px] border-border shrink-0"
-                style={{ imageRendering: "pixelated" }}
-              />
-            )}
+        {/* Hero banner */}
+        <ProfileHero
+          dev={dev}
+          isOwner={isOwner}
+          equippedTitle={equippedTitle}
+          titlePool={titlePool}
+          socialLinks={socialLinks}
+        />
 
-            <div className="flex-1 text-center sm:text-left">
-              {dev.name && (
-                <h1 className="text-xl text-cream sm:text-2xl">{dev.name}</h1>
-              )}
-              <p className="mt-1 text-sm text-muted">@{dev.github_login}</p>
-
-              {/* Rank Badge */}
-              {dev.rank && (
-                <div className="mt-3 inline-block border-2 px-3 py-1 text-sm" style={{ borderColor: accent, color: accent }}>
-                  #{dev.rank} in the city
-                </div>
-              )}
-
-              {/* District badge */}
-              {dev.district && (
-                <ProfileDistrict
-                  district={dev.district}
-                  districtRank={dev.district_rank}
-                  inferredDistrict={inferDistrict(dev.primary_language)}
-                  isOwner={isOwner}
-                  districtChosen={dev.district_chosen ?? false}
-                  districtChangesCount={dev.district_changes_count ?? 0}
-                  districtChangedAt={dev.district_changed_at ?? null}
-                />
-              )}
-
-              {/* Claim */}
-              <div className="mt-3">
-                <ClaimButton githubLogin={dev.github_login} claimed={dev.claimed ?? false} />
-              </div>
-            </div>
-          </div>
-
-          {/* Bio */}
-          {dev.bio && (
-            <p className="mt-5 text-sm leading-relaxed text-muted normal-case">
-              {dev.bio}
-            </p>
-          )}
-        </div>
-
-        {/* XP & Level */}
-        {(() => {
-          const xpLevel = dev.xp_level ?? 1;
-          const xpTotal = dev.xp_total ?? 0;
-          const tier = tierFromLevel(xpLevel);
-          const rank = rankFromLevel(xpLevel);
-          const progress = levelProgress(xpTotal);
-          const xpCurrent = xpTotal - xpForLevel(xpLevel);
-          const xpNeeded = xpForLevel(xpLevel + 1) - xpForLevel(xpLevel);
-          return (
-            <div className="mt-5 border-[3px] border-border bg-bg-raised p-4">
-              <div className="flex items-center gap-3">
-                <span
-                  className="flex h-10 w-10 items-center justify-center border-2 text-lg font-bold"
-                  style={{ borderColor: tier.color, color: tier.color }}
-                >
-                  {xpLevel}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold" style={{ color: tier.color }}>
-                      {rank.title}
-                    </span>
-                    <span
-                      className="px-1.5 py-0.5 text-[8px] font-bold"
-                      style={{ backgroundColor: tier.color + "22", color: tier.color }}
-                    >
-                      {tier.name.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <div className="h-1.25 flex-1 bg-border">
-                      <div
-                        className="h-full"
-                        style={{
-                          width: `${Math.max(2, Math.round(progress * 100))}%`,
-                          backgroundColor: tier.color,
-                        }}
-                      />
-                    </div>
-                    <span className="text-[9px] text-muted whitespace-nowrap">
-                      {xpCurrent.toLocaleString()} / {xpNeeded.toLocaleString()} XP
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-2 text-right text-[9px] text-muted">
-                {xpTotal.toLocaleString()} XP total
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* View in City (prominent) */}
-        <div className="mt-5">
-          <Link
-            href={`/?user=${dev.github_login}`}
-            className="btn-press flex w-full items-center justify-center gap-2 px-6 py-3.5 text-sm text-bg"
-            style={{
-              backgroundColor: accent,
-              boxShadow: `4px 4px 0 0 ${shadow}`,
-            }}
-          >
-            View in City
-          </Link>
-        </div>
-
-        {/* Customize Building — only for the logged-in owner */}
-        {isOwner && (
-          <div className="mt-3">
-            <Link
-              href={`/shop/${dev.github_login}`}
-              className="btn-press flex w-full items-center justify-center gap-2 border-[3px] border-border px-6 py-3 text-sm text-cream transition-colors hover:border-border-light"
-            >
-              Customize Building
-            </Link>
-          </div>
-        )}
-
-        {/* Share + Compare */}
-        <div className="mt-5 space-y-3">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <ShareButtons
+        {/* Trophy case (hero content) + side rail.
+            Mobile DOM order: actions → trophy case → stats.
+            Desktop: trophy case spans cols 1-2; rail = stats over actions in col 3. */}
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3 lg:grid-rows-[auto_auto_1fr] lg:items-start">
+          <div className="lg:col-start-3 lg:row-start-2">
+            <ProfileActions
               login={dev.github_login}
-              contributions={(dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions}
+              isOwner={isOwner}
+              contributions={contributions}
               rank={dev.rank}
               accent={accent}
               shadow={shadow}
             />
           </div>
-          <CompareChallenge login={dev.github_login} accent={accent} shadow={shadow} />
+          <div className="lg:col-start-1 lg:col-span-2 lg:row-start-1 lg:row-span-3">
+            <TrophyCase
+              achievements={achievements}
+              pinnedIds={pinnedIds}
+              isOwner={isOwner}
+            />
+          </div>
+          <div className="lg:col-start-3 lg:row-start-1">
+            <ProfileStats
+              contributions={contributions}
+              repos={dev.public_repos}
+              stars={dev.total_stars}
+              kudos={dev.kudos_count ?? 0}
+              visits={dev.visit_count ?? 0}
+              referrals={dev.referral_count ?? 0}
+              accent={accent}
+            />
+          </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {[
-            { label: "Contributions", value: ((dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : dev.contributions).toLocaleString() },
-            { label: "Repos", value: dev.public_repos.toLocaleString() },
-            { label: "Stars", value: dev.total_stars.toLocaleString() },
-            { label: "Kudos", value: (dev.kudos_count ?? 0).toLocaleString() },
-            { label: "Visits", value: (dev.visit_count ?? 0).toLocaleString() },
-            { label: "Referrals", value: (dev.referral_count ?? 0).toLocaleString() },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="border-[3px] border-border bg-bg-card p-4 text-center"
-            >
-              <div className="text-xl" style={{ color: accent }}>
-                {stat.value}
+        {/* Social — invite + invited devs */}
+        {(isOwner || (referredDevs?.length ?? 0) > 0) && (
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            {isOwner && (
+              <div className={referredDevs?.length ? "" : "md:col-span-2"}>
+                <ReferralCTA login={dev.github_login} accent={accent} />
               </div>
-              <div className="mt-2 text-xs text-muted">{stat.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Achievements */}
-        {achievements.length > 0 && (
-          <div className="mt-5">
-            <h2 className="mb-3 text-sm text-cream">
-              Achievements
-              <span className="ml-2 text-[10px] text-muted">{achievements.length}</span>
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {achievements
-                .sort((a, b) => {
-                  const tierOrder = ["diamond", "gold", "silver", "bronze"];
-                  return tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier);
-                })
-                .map((ach) => {
-                  const color = TIER_COLORS[ach.tier] ?? accent;
-                  return (
-                    <span
-                      key={ach.achievement_id}
-                      className="border-2 px-3 py-1 text-[10px]"
-                      style={{ borderColor: color, color }}
+            )}
+            {referredDevs && referredDevs.length > 0 && (
+              <section
+                className={`border-[3px] border-border bg-bg-raised p-4 sm:p-6 ${
+                  isOwner ? "" : "md:col-span-2"
+                }`}
+              >
+                <h2 className="text-sm text-cream">
+                  Invited Devs
+                  <span className="ml-2 text-[10px] text-dim">
+                    {dev.referral_count ?? referredDevs.length}
+                  </span>
+                </h2>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {referredDevs.map((rd) => (
+                    <Link
+                      key={rd.github_login}
+                      href={`/dev/${rd.github_login}`}
+                      className="flex items-center gap-2 border-2 border-border px-2.5 py-1.5 text-[10px] text-muted transition-colors hover:border-border-light hover:text-cream"
                     >
-                      {ach.name}
-                    </span>
-                  );
-                })}
-            </div>
+                      {rd.avatar_url && (
+                        <Image
+                          src={rd.avatar_url}
+                          alt={rd.github_login}
+                          width={16}
+                          height={16}
+                          className="border border-border"
+                          style={{ imageRendering: "pixelated" }}
+                        />
+                      )}
+                      @{rd.github_login}
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 
-        {/* Owned Items */}
-        {ownedItems.length > 0 && (
-          <div className="mt-5">
-            <h2 className="mb-3 text-sm text-cream">Building Items</h2>
-            <div className="flex flex-wrap gap-2">
-              {ownedItems.map((itemId) => (
-                <span
-                  key={itemId}
-                  className="border-2 px-3 py-1 text-[10px]"
-                  style={{ borderColor: accent, color: accent }}
-                >
-                  {ITEM_NAMES[itemId] ?? itemId}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Referral CTA — only for the logged-in owner */}
-        {isOwner && (
-          <div className="mt-5">
-            <ReferralCTA login={dev.github_login} accent={accent} />
-          </div>
-        )}
-
-        {/* Referred Developers */}
-        {referredDevs && referredDevs.length > 0 && (
-          <div className="mt-5">
-            <h2 className="mb-3 text-sm text-cream">
-              Invited Devs
-              <span className="ml-2 text-[10px] text-muted">{dev.referral_count ?? referredDevs.length}</span>
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {referredDevs.map((rd) => (
-                <Link
-                  key={rd.github_login}
-                  href={`/dev/${rd.github_login}`}
-                  className="flex items-center gap-2 border-2 border-border px-3 py-1.5 text-[10px] text-muted transition-colors hover:border-border-light hover:text-cream"
-                >
-                  {rd.avatar_url && (
-                    <Image
-                      src={rd.avatar_url}
-                      alt={rd.github_login}
-                      width={16}
-                      height={16}
-                      className="border border-border"
-                      style={{ imageRendering: "pixelated" }}
-                    />
-                  )}
-                  @{rd.github_login}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* GitHub link */}
-        <div className="mt-8 text-center">
-          <a
-            href={`https://github.com/${dev.github_login}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-muted transition-colors hover:text-cream normal-case"
-          >
-            github.com/{dev.github_login} &rarr;
-          </a>
-        </div>
-
-        {/* Danger Zone — owner only */}
-        {isOwner && (
-          <div className="mt-8 border-[3px] border-red-500/40 p-5">
-            <h2 className="text-xs text-red-400">Danger Zone</h2>
-            <div className="mt-3 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[10px] text-muted normal-case">
-                  Permanently delete your account, your building, and all associated data.
-                </p>
-              </div>
-              <DeleteAccountButton />
-            </div>
-          </div>
-        )}
-
-        {/* Creator credit */}
-        <div className="mt-6 border-t border-border/50 pt-4 text-center">
-          <p className="text-[9px] text-muted normal-case">
-            built by{" "}
+        {/* Footer */}
+        <footer className="mt-10 border-t-2 border-border/60 pt-5">
+          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
             <a
-              href="https://x.com/samuelrizzondev"
+              href={`https://github.com/${dev.github_login}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="transition-colors hover:text-cream"
-              style={{ color: accent }}
+              className="inline-flex items-center gap-2 border-2 border-border px-3 py-1.5 text-[9px] text-muted transition-colors hover:border-border-light hover:text-cream normal-case"
             >
-              @samuelrizzondev
+              github.com/{dev.github_login} &rarr;
             </a>
-          </p>
-        </div>
+            <p className="text-[9px] text-dim normal-case">
+              built by{" "}
+              <a
+                href="https://x.com/samuelrizzondev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-cream"
+                style={{ color: accent }}
+              >
+                @samuelrizzondev
+              </a>
+            </p>
+          </div>
+
+          {/* Danger zone — subdued, owner only */}
+          {isOwner && (
+            <div className="mt-6 flex flex-col gap-3 border-t border-border/40 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[9px] text-dim normal-case">
+                <span className="text-red-400/80 uppercase">Danger zone</span>
+                {" — "}permanently delete your account, your building, and all associated data.
+              </p>
+              <DeleteAccountButton />
+            </div>
+          )}
+        </footer>
       </div>
     </main>
   );

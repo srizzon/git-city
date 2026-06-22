@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { PortfolioExperience } from "@/lib/portfolio/types";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 
 interface Props {
   experiences: PortfolioExperience[];
@@ -185,7 +186,6 @@ export default function PortfolioExperiences({ experiences: initialExperiences, 
 
   if (!isOwner && experiences.length === 0) return null;
 
-  const selectClass = "bg-bg border-[3px] border-border px-3 py-2.5 text-sm text-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c8e64a]/50 cursor-pointer appearance-none";
   const inputClass = "w-full bg-bg border-[3px] border-border px-3 py-2.5 text-sm text-cream normal-case placeholder:text-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c8e64a]/50";
 
   return (
@@ -300,13 +300,22 @@ export default function PortfolioExperiences({ experiences: initialExperiences, 
                 <div>
                   <label className="block text-xs text-muted font-pixel uppercase mb-1.5">Start date *</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <select value={form.start_month} onChange={(e) => setForm((f) => ({ ...f, start_month: e.target.value }))} className={selectClass}>
-                      {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </select>
-                    <select value={form.start_year} onChange={(e) => setForm((f) => ({ ...f, start_year: e.target.value }))} className={selectClass}>
-                      <option value="">Year *</option>
-                      {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-                    </select>
+                    <PixelSelect
+                      value={String(form.start_month)}
+                      onChange={(v) => setForm((f) => ({ ...f, start_month: v }))}
+                      options={MONTHS.filter((m) => m.value !== "").map((m) => ({ value: m.value, label: m.label }))}
+                      placeholder="Month"
+                      ariaLabel="Start month"
+                      className="w-full"
+                    />
+                    <PixelSelect
+                      value={String(form.start_year)}
+                      onChange={(v) => setForm((f) => ({ ...f, start_year: v }))}
+                      options={YEARS.map((y) => ({ value: y, label: y }))}
+                      placeholder="Year *"
+                      ariaLabel="Start year"
+                      className="w-full"
+                    />
                   </div>
                 </div>
 
@@ -330,13 +339,22 @@ export default function PortfolioExperiences({ experiences: initialExperiences, 
                   <div>
                     <label className="block text-xs text-muted font-pixel uppercase mb-1.5">End date</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <select value={form.end_month} onChange={(e) => setForm((f) => ({ ...f, end_month: e.target.value }))} className={selectClass}>
-                        {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                      </select>
-                      <select value={form.end_year} onChange={(e) => setForm((f) => ({ ...f, end_year: e.target.value }))} className={selectClass}>
-                        <option value="">Year</option>
-                        {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-                      </select>
+                      <PixelSelect
+                        value={String(form.end_month)}
+                        onChange={(v) => setForm((f) => ({ ...f, end_month: v }))}
+                        options={MONTHS.filter((m) => m.value !== "").map((m) => ({ value: m.value, label: m.label }))}
+                        placeholder="Month"
+                        ariaLabel="End month"
+                        className="w-full"
+                      />
+                      <PixelSelect
+                        value={String(form.end_year)}
+                        onChange={(v) => setForm((f) => ({ ...f, end_year: v }))}
+                        options={YEARS.map((y) => ({ value: y, label: y }))}
+                        placeholder="Year"
+                        ariaLabel="End year"
+                        className="w-full"
+                      />
                     </div>
                   </div>
                 )}

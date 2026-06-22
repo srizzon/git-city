@@ -76,10 +76,13 @@ export async function PATCH(
       // Award achievement
       await Promise.all([
         admin.rpc("grant_xp", { p_developer_id: developer_id, p_source: "job_hired", p_amount: 500 }),
-        admin.from("developer_achievements").upsert(
-          { developer_id: developer_id, achievement_id: "hired_in_the_city", name: "Hired in the City", tier: "gold" },
-          { onConflict: "developer_id,achievement_id" },
-        ),
+        admin.rpc("grant_emblem", {
+          p_developer_id: developer_id,
+          p_emblem_id: "hired_in_the_city",
+          p_claim_key: `threshold:hired_in_the_city:${developer_id}`,
+          p_meta: {},
+          p_source: "job",
+        }),
       ]);
     }
   }

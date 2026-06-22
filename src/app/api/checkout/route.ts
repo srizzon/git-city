@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { createCheckoutSession } from "@/lib/stripe";
 import { createPixQrCode } from "@/lib/abacatepay";
 import { createCryptoInvoice } from "@/lib/nowpayments";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 // Defense-in-depth: per-user rate limit IN ADDITION to the IP-based
 // middleware rate limit.  This one is keyed by Supabase user ID so it
@@ -250,6 +251,20 @@ export async function POST(request: Request) {
     // Delete stale pending purchase to allow retry
     await sb.from("purchases").delete().eq("id", pendingPurchase.id);
   }
+
+  const phCheckout = getPostHogClient();
+  phCheckout.capture({
+    distinctId: githubLogin,
+    event: "checkout_initiated",
+    properties: {
+      item_id,
+      provider,
+      is_gift: !!gifted_to_login,
+      currency: provider === "abacatepay" ? "brl" : provider === "stripe" ? stripeCurrency : "usd",
+      price_cents: provider === "abacatepay" ? item.price_brl_cents : item.price_usd_cents,
+    },
+  });
+  await phCheckout.shutdown();
 
   try {
     if (provider === "stripe") {

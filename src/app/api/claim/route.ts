@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { seedSocialLinksFromGithub } from "@/lib/social-links-server";
 
 export async function POST() {
   const supabase = await createServerSupabase();
@@ -76,6 +77,10 @@ export async function POST() {
       actor_id: dev.id,
       metadata: { login: githubLogin },
     });
+
+    // Auto-fill social links (twitter/blog) from the public GitHub profile.
+    // Fire-and-forget after the response — never slows or breaks the claim.
+    after(() => seedSocialLinksFromGithub(dev.id, githubLogin));
   }
 
   return NextResponse.json({ claimed: true, github_login: data.github_login });

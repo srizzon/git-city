@@ -1,0 +1,397 @@
+[
+  "6",
+  [
+    "apple a10 gpu",
+    "10",
+    "a10 apple gpu",
+    0,
+    [
+      [
+        2048,
+        1536,
+        40,
+        "apple ipad (6th gen)"
+      ],
+      [
+        2160,
+        1620,
+        36,
+        "apple ipad (10.2-inch) (7th generation)"
+      ]
+    ]
+  ],
+  [
+    "apple a10x gpu",
+    "10",
+    "a10x apple gpu",
+    0,
+    [
+      [
+        2048,
+        1536,
+        57,
+        "apple ipad pro (10.5-inch)"
+      ],
+      [
+        2224,
+        1668,
+        48,
+        "apple ipad pro (10.5-inch)"
+      ],
+      [
+        2732,
+        2048,
+        44,
+        "apple ipad pro (12.9-inch, 2nd gen)"
+      ]
+    ]
+  ],
+  [
+    "apple a12 gpu",
+    "12",
+    "a12 apple gpu",
+    0,
+    [
+      [
+        2048,
+        1536,
+        59,
+        "apple ipad mini (2019)"
+      ],
+      [
+        2160,
+        1620,
+        57,
+        "apple ipad 8th gen (wifi+cellular)"
+      ],
+      [
+        2224,
+        1668,
+        58,
+        "apple ipad air (2019)"
+      ]
+    ]
+  ],
+  [
+    "apple a12x gpu",
+    "12",
+    "a12x apple gpu",
+    0,
+    [
+      [
+        2388,
+        1668,
+        105,
+        "apple ipad pro (11-inch)"
+      ],
+      [
+        2732,
+        2048,
+        93,
+        "apple ipad pro (12.9-inch) (3rd generation)"
+      ]
+    ]
+  ],
+  [
+    "apple a12z gpu",
+    "12",
+    "a12z apple gpu",
+    0,
+    [
+      [
+        2388,
+        1668,
+        101,
+        "apple ipad pro (11-inch) (2rd generation)"
+      ],
+      [
+        2732,
+        2048,
+        60,
+        "apple ipad pro (12.9 inch) (4th generation)"
+      ]
+    ]
+  ],
+  [
+    "apple a13 gpu",
+    "13",
+    "a13 apple gpu",
+    0,
+    [
+      [
+        2160,
+        1620,
+        60,
+        "apple ipad 9th gen"
+      ]
+    ]
+  ],
+  [
+    "apple a14 gpu",
+    "14",
+    "a14 apple gpu",
+    0,
+    [
+      [
+        2360,
+        1640,
+        60,
+        "apple ipad air (4th generation)"
+      ],
+      [
+        2388,
+        1668,
+        52,
+        "apple ipad air 4th gen (wi-fi only)"
+      ]
+    ]
+  ],
+  [
+    "apple a15 gpu",
+    "15",
+    "a15 apple gpu",
+    0,
+    [
+      [
+        2266,
+        1488,
+        60,
+        "apple ipad mini (6th gen)"
+      ],
+      [
+        2388,
+        1668,
+        60,
+        "apple ipad mini (6th gen)"
+      ]
+    ]
+  ],
+  [
+    "apple a16 gpu",
+    "16",
+    "a16 apple gpu",
+    0,
+    [
+      [
+        2360,
+        1640,
+        60,
+        "apple ipad 11th gen (wifi+cellular)"
+      ]
+    ]
+  ],
+  [
+    "apple a17 pro gpu",
+    "17",
+    "a17 apple gpu pro",
+    0,
+    [
+      [
+        2266,
+        1488,
+        60,
+        "apple ipad mini 7th gen cellular (a17)"
+      ]
+    ]
+  ],
+  [
+    "apple a7 gpu",
+    "7",
+    "a7 apple gpu",
+    0,
+    [
+      [
+        2048,
+        1536,
+        10,
+        "apple ipad mini retina"
+      ]
+    ]
+  ],
+  [
+    "apple a8 gpu",
+    "8",
+    "a8 apple gpu",
+    0,
+    [
+      [
+        2048,
+        1536,
+        15,
+        "apple ipad mini 4"
+      ]
+    ]
+  ],
+  [
+    "apple a8x gpu",
+    "8",
+    "a8x apple gpu",
+    0,
+    [
+      [
+        2048,
+        1536,
+        29,
+        "apple ipad air 2"
+      ]
+    ]
+  ],
+  [
+    "apple a9 gpu",
+    "9",
+    "a9 apple gpu",
+    0,
+    [
+      [
+        2048,
+        1536,
+        26,
+        "apple ipad 9.7 (5th gen)"
+      ]
+    ]
+  ],
+  [
+    "apple a9x gpu",
+    "9",
+    "a9x apple gpu",
+    0,
+    [
+      [
+        2048,
+        1536,
+        35,
+        "apple ipad pro 9.7"
+      ],
+      [
+        2732,
+        2048,
+        33,
+        "apple ipad pro"
+      ]
+    ]
+  ],
+  [
+    "apple m1 gpu",
+    "1",
+    "apple gpu m1",
+    0,
+    [
+      [
+        2360,
+        1640,
+        60,
+        "apple ipad air (5th generation)"
+      ],
+      [
+        2388,
+        1668,
+        120,
+        "apple ipad pro (11-inch) (3rd generation)"
+      ],
+      [
+        2730,
+        2048,
+        114,
+        "apple ipad pro (12.9-inch) (5th generation)"
+      ],
+      [
+        2732,
+        2048,
+        60,
+        "apple ipad pro (12.9-inch) (5th generation)"
+      ]
+    ]
+  ],
+  [
+    "apple m2 gpu",
+    "2",
+    "apple gpu m2",
+    0,
+    [
+      [
+        2360,
+        1640,
+        60,
+        "apple ipad air 6th gen (m2)"
+      ],
+      [
+        2388,
+        1668,
+        120,
+        "apple ipad pro 11 inch (4th gen)"
+      ],
+      [
+        2732,
+        2048,
+        119,
+        "apple ipad pro 12.9-inch (6th generation)"
+      ],
+      [
+        2752,
+        2064,
+        120,
+        "apple ipad pro 12.9 inch (6th gen)"
+      ]
+    ]
+  ],
+  [
+    "apple m3 gpu",
+    "3",
+    "apple gpu m3",
+    0,
+    [
+      [
+        2360,
+        1640,
+        60,
+        "apple ipad air 11-inch 7th gen (wifi+cellular)"
+      ],
+      [
+        2732,
+        2048,
+        60,
+        "apple ipad air 13-inch 7th gen (wifi+cellular)"
+      ]
+    ]
+  ],
+  [
+    "apple m4 gpu",
+    "4",
+    "apple gpu m4",
+    0,
+    [
+      [
+        2420,
+        1668,
+        78,
+        "apple ipad pro 11 inch 5th gen"
+      ],
+      [
+        2752,
+        2064,
+        120,
+        "apple ipad pro 12.9 inch 7th gen"
+      ]
+    ]
+  ],
+  [
+    "apple m5 gpu",
+    "5",
+    "apple gpu m5",
+    0,
+    [
+      [
+        2420,
+        1668,
+        120,
+        "apple ipad pro m5 11 inch"
+      ],
+      [
+        2752,
+        2064,
+        76,
+        "apple ipad pro m5 13 inch"
+      ]
+    ]
+  ]
+]

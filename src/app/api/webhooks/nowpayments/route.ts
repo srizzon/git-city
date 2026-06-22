@@ -4,6 +4,7 @@ import { verifyIpnSignature } from "@/lib/nowpayments";
 import { autoEquipIfSolo } from "@/lib/items";
 import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +112,18 @@ export async function POST(request: Request) {
           });
           sendPurchaseNotification(purchase.developer_id, dev?.github_login ?? "", purchase.id, purchase.item_id);
         }
+
+        const phCrypto = getPostHogClient();
+        phCrypto.capture({
+          distinctId: dev?.github_login ?? String(purchase.developer_id),
+          event: "item_purchase_completed",
+          properties: {
+            item_id: purchase.item_id,
+            provider: "nowpayments",
+            is_gift: !!purchase.gifted_to,
+          },
+        });
+        await phCrypto.shutdown();
         break;
       }
 

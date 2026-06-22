@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       .eq("items.metadata->>type", "raid_boost"),
     admin
       .from("purchases")
-      .select("item_id, items!inner(metadata)")
+      .select("item_id, items!inner(name, metadata)")
       .eq("developer_id", attacker.id)
       .eq("status", "completed")
       .eq("items.metadata->>type", "raid_vehicle"),
@@ -159,20 +159,16 @@ export async function POST(request: Request) {
     };
   });
 
-  // Build available vehicles list (always includes the default vehicle, id "airplane" = CRT Terminal)
-  const VEHICLE_META: Record<string, { name: string; emoji: string }> = {
-    airplane: { name: "CRT Terminal", emoji: "📟" },
-    raid_helicopter: { name: "Mech Keyboard", emoji: "⌨️" },
-    raid_drone: { name: "PC Tower", emoji: "🗄️" },
-    raid_rocket: { name: "Hacker Rig", emoji: "🖥️" },
-  };
-
+  // Build available vehicles list from the catalog (data-driven): name/emoji
+  // come from the item row, so a new vehicle needs no code here. The default
+  // vehicle (id "airplane" = CRT Terminal) is the free built-in.
   const ownedVehicleIds = new Set((vehiclePurchases ?? []).map((p) => p.item_id));
   const available_vehicles = [
     { item_id: "airplane", name: "CRT Terminal", emoji: "📟" },
-    ...Array.from(ownedVehicleIds)
-      .filter((id) => VEHICLE_META[id])
-      .map((id) => ({ item_id: id, ...VEHICLE_META[id] })),
+    ...(vehiclePurchases ?? []).map((p) => {
+      const item = p.items as unknown as { name: string; metadata: { emoji?: string } };
+      return { item_id: p.item_id, name: item.name, emoji: item.metadata?.emoji ?? "🖥️" };
+    }),
   ];
 
   // Use saved selection, fallback to the default vehicle (id "airplane")

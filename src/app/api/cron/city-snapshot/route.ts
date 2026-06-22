@@ -48,12 +48,12 @@ export async function GET(request: NextRequest) {
   await sb.storage.createBucket(STORAGE_BUCKET, { public: true }).catch(() => {});
 
   // Fetch everything in parallel
-  const [devs, purchases, giftPurchases, customizations, achievements, raidTags, activeDropsResult, statsResult] =
+  const [devs, purchases, giftPurchases, customizations, achievements, raidTags, wallets, activeDropsResult, statsResult] =
     await Promise.all([
       fetchAll<Record<string, any>>(
         sb,
         "developers",
-        "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, active_days_last_year, language_diversity, app_streak, rabbit_completed, district, district_chosen, xp_total, xp_level",
+        "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, claimed_at, created_at, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, active_days_last_year, language_diversity, app_streak, rabbit_completed, district, district_chosen, xp_total, xp_level",
         undefined,
         "rank",
       ),
@@ -77,14 +77,19 @@ export async function GET(request: NextRequest) {
       ),
       fetchAll<{ developer_id: number; achievement_id: string }>(
         sb,
-        "developer_achievements",
-        "developer_id, achievement_id",
+        "emblem_grants",
+        "developer_id, achievement_id:emblem_id",
       ),
       fetchAll<{ building_id: number; attacker_login: string; tag_style: string; expires_at: string }>(
         sb,
         "raid_tags",
         "building_id, attacker_login, tag_style, expires_at",
         (q) => q.eq("active", true),
+      ),
+      fetchAll<{ developer_id: number; lifetime_spent: number }>(
+        sb,
+        "wallets",
+        "developer_id, lifetime_spent",
       ),
       sb
         .from("building_drops")
@@ -157,6 +162,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Build wallet spend map (cumulative pixels spent → centrality signal)
+  const walletSpentMap: Record<number, number> = {};
+  for (const row of wallets) {
+    walletSpentMap[row.developer_id] = Number(row.lifetime_spent) || 0;
+  }
+
   // Merge
   const developers = devs.map((dev) => ({
     ...dev,
@@ -176,6 +187,7 @@ export async function GET(request: NextRequest) {
     rabbit_completed: dev.rabbit_completed ?? false,
     xp_total: dev.xp_total ?? 0,
     xp_level: dev.xp_level ?? 1,
+    pixels_spent: walletSpentMap[dev.id] ?? 0,
   }));
 
   const snapshot = JSON.stringify({

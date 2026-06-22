@@ -93,10 +93,15 @@ export async function POST(
           // Award XP + achievement
           await Promise.all([
             admin.rpc("grant_xp", { p_developer_id: referrer.id, p_source: "referral_converted", p_amount: 1000 }),
-            admin.from("developer_achievements").upsert(
-              { developer_id: referrer.id, achievement_id: "city_recruiter", name: "City Recruiter", tier: "silver" },
-              { onConflict: "developer_id,achievement_id" },
-            ),
+            // Unified emblem grant. Same claim_key the 112 backfill used, so a
+            // pre-launch holder dedups (no double count); xp comes from the catalog.
+            admin.rpc("grant_emblem", {
+              p_developer_id: referrer.id,
+              p_emblem_id: "city_recruiter",
+              p_claim_key: `threshold:city_recruiter:${referrer.id}`,
+              p_meta: {},
+              p_source: "job",
+            }),
           ]);
 
           const { data: companyInfo } = await admin

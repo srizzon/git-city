@@ -26,7 +26,16 @@ if (typeof window !== "undefined") {
       networks: [base],
       defaultNetwork: base,
       metadata,
-      features: { analytics: false, email: false, socials: false },
+      features: {
+        analytics: false,
+        email: false,
+        socials: false,
+        // In-app fiat on-ramp (card/Apple Pay via Coinbase Pay) and token
+        // swaps. Both default to true, but we set them explicitly so the
+        // in-city Bank panel can rely on them being present.
+        onramp: true,
+        swaps: true,
+      },
       themeMode: "dark",
       themeVariables: {
         "--w3m-accent": "#c8e64a",
@@ -62,12 +71,22 @@ export function Web3Provider({
   cookies,
 }: {
   children: ReactNode;
-  cookies: string | null;
+  /**
+   * SSR cookie header for hydration. Omit when mounting client-side (e.g. the
+   * in-city Bank panel) and we fall back to `document.cookie`.
+   */
+  cookies?: string | null;
 }) {
   const [queryClient] = useState(() => new QueryClient());
+  const cookieSource =
+    cookies !== undefined
+      ? cookies
+      : typeof document !== "undefined"
+        ? document.cookie
+        : null;
   let initialState: ReturnType<typeof cookieToInitialState> | undefined;
   try {
-    initialState = cookieToInitialState(wagmiConfig as Config, sanitizeWagmiCookie(cookies));
+    initialState = cookieToInitialState(wagmiConfig as Config, sanitizeWagmiCookie(cookieSource));
   } catch {
     initialState = undefined;
   }

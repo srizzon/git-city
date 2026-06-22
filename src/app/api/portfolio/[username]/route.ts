@@ -38,9 +38,9 @@ export async function GET(
         .order("sort_order")
         .limit(5),
       admin
-        .from("developer_achievements")
+        .from("emblem_grants")
         .select(
-          "achievement_id, name:achievements(name), tier:achievements(tier)"
+          "achievement_id:emblem_id, name:emblems(name), tier:emblems(tier)"
         )
         .eq("developer_id", dev.id),
     ]);

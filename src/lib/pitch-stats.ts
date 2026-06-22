@@ -88,7 +88,7 @@ export async function getPitchStats(): Promise<PitchStats> {
     admin.from("sky_ads").select("plan_id, purchaser_email").not("purchaser_email", "is", null),
     admin.from("developer_kudos").select("*", { count: "exact", head: true }),
     admin.from("building_visits").select("*", { count: "exact", head: true }),
-    admin.from("developer_achievements").select("*", { count: "exact", head: true }),
+    admin.from("emblem_grants").select("*", { count: "exact", head: true }),
   ]);
 
   const developers = devsResult.count ?? 0;

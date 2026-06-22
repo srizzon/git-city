@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { JobCompanyProfileAdmin } from "@/lib/jobs/types";
 import type { JobListingAdmin } from "./job-row";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 import {
   ROLE_TYPE_LABELS,
   SENIORITY_LABELS,
@@ -193,15 +194,13 @@ export function JobForm({ mode, listing, companies, onSave, onClose, addToast }:
 
           {/* Company */}
           <Section title="COMPANY">
-            <select
-              value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
-              className="w-full bg-bg-raised border border-border px-3 py-2 text-sm text-cream outline-none focus:border-lime/50"
-            >
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <PixelSelect
+              value={String(companyId)}
+              onChange={(v) => setCompanyId(v)}
+              options={companies.map((c) => ({ value: c.id, label: c.name }))}
+              className="w-full"
+              ariaLabel="Company"
+            />
           </Section>
 
           {/* Basic Info */}
@@ -388,25 +387,28 @@ export function JobForm({ mode, listing, companies, onSave, onClose, addToast }:
           <Section title="ADMIN">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Tier">
-                <select
-                  value={tier}
-                  onChange={(e) => setTier(e.target.value)}
-                  className="w-full bg-bg-raised border border-border px-3 py-2 text-sm text-cream outline-none focus:border-lime/50"
-                >
-                  {Object.entries(JOB_TIERS).map(([k, v]) => (
-                    <option key={k} value={k}>{v.label} (${v.price_usd_cents / 100})</option>
-                  ))}
-                </select>
+                <PixelSelect
+                  value={String(tier)}
+                  onChange={(v) => setTier(v)}
+                  options={Object.entries(JOB_TIERS).map(([k, v]) => ({
+                    value: k,
+                    label: `${v.label} ($${v.price_usd_cents / 100})`,
+                  }))}
+                  className="w-full"
+                  ariaLabel="Tier"
+                />
               </Field>
               <Field label="Language">
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="w-full bg-bg-raised border border-border px-3 py-2 text-sm text-cream outline-none focus:border-lime/50"
-                >
-                  <option value="en">English</option>
-                  <option value="pt">Portuguese</option>
-                </select>
+                <PixelSelect
+                  value={String(language)}
+                  onChange={(v) => setLanguage(v)}
+                  options={[
+                    { value: "en", label: "English" },
+                    { value: "pt", label: "Portuguese" },
+                  ]}
+                  className="w-full"
+                  ariaLabel="Language"
+                />
               </Field>
             </div>
           </Section>
@@ -462,14 +464,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: Record<string, string> }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-bg-raised border border-border px-3 py-2 text-sm text-cream outline-none focus:border-lime/50"
-    >
-      {Object.entries(options).map(([k, v]) => (
-        <option key={k} value={k}>{v}</option>
-      ))}
-    </select>
+    <PixelSelect
+      value={String(value)}
+      onChange={(v) => onChange(v)}
+      options={Object.entries(options).map(([k, v]) => ({ value: k, label: v }))}
+      className="w-full"
+    />
   );
 }

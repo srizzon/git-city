@@ -23,11 +23,14 @@ const BOSS_BASE_POS = { x: 0, y: 800, z: 0 };
 const BOSS_DAMAGE_PER_HIT = 30;
 const BOSS_MINION_BONUS = 50;
 const BOSS_DEFAULT_MAX_HP = 50_000;
-const BOSS_MAX_HP_CEILING = 2_000_000;
+const BOSS_MAX_HP_CEILING = 20_000_000;
 const BOSS_MAX_HP_FLOOR = 5_000;
 const BOSS_HIT_MAX_DIST = 3_000; // loose: player must be near the boss
 const BOSS_SHOT_WINDOW_MS = 1_000;
-const BOSS_MAX_SHOTS_PER_WINDOW = 12; // boss + minion fire; generous
+const BOSS_MAX_SHOTS_PER_WINDOW = 8; // client fire rate caps at ~7 projectiles/s
+const BOSS_MINION_WINDOW_MS = 10_000;
+const BOSS_MAX_MINIONS_PER_WINDOW = 20; // covers honest spray-into-flock bursts; caps headless claim bots
+const BOSS_EVENT_FETCH_CACHE_MS = 15_000;
 const BOSS_BROADCAST_THROTTLE_MS = 200; // 5 Hz HP broadcast
 const DAMAGE_RECEIPT_THRESHOLD = 300; // issue a signed receipt every N damage
 const DAMAGE_RECEIPT_TTL_MS = 90_000;
@@ -203,8 +206,18 @@ export default class FlyServer implements Party.Server {
   // Per-connection i-frame timestamp for boss attacks hitting the player
   readonly bossSelfHitAt = new Map<string, number>();
   readonly bossShots = new Map<string, number[]>();
+  readonly bossMinionClaims = new Map<string, number[]>();
   bossLastBroadcast = 0;
   bossResetAt = 0;
+  // Which event this boss belongs to, and which events already had their boss
+  // defeated (so late engage_boss messages can't respawn it at full HP while
+  // the event window is still open). Also persisted to room storage so a
+  // server restart mid-window can't bring the boss back.
+  bossEventId: string | null = null;
+  readonly bossDefeatedEventIds = new Set<string>();
+  bossEngageInflight = false;
+  bossEventFetchAt = 0;
+  bossEventFetchCache: { id: string; maxHp: number } | null | undefined = undefined;
 
   constructor(readonly room: Party.Room) {}
 
@@ -239,6 +252,86 @@ export default class FlyServer implements Party.Server {
     arr.push(now);
     this.bossShots.set(id, arr);
     return true;
+  }
+
+  // Minions only exist client-side, so a kill claim can't be verified against
+  // a server entity. The separate (slower) window bounds how much damage a
+  // headless client can farm from fabricated claims.
+  private canClaimMinion(id: string, now: number): boolean {
+    const arr = (this.bossMinionClaims.get(id) ?? []).filter((t) => t > now - BOSS_MINION_WINDOW_MS);
+    if (arr.length >= BOSS_MAX_MINIONS_PER_WINDOW) {
+      this.bossMinionClaims.set(id, arr);
+      return false;
+    }
+    arr.push(now);
+    this.bossMinionClaims.set(id, arr);
+    return true;
+  }
+
+  // Resolve the currently-live event from the app API (cached briefly).
+  // Returns the event → engage with ITS config; null → no live event, no
+  // boss; "unavailable" → SITE_URL not configured (local dev) or API down,
+  // fall back to the legacy client-supplied HP.
+  private async fetchActiveEvent(): Promise<{ id: string; maxHp: number } | null | "unavailable"> {
+    const siteUrl = (this.room.env as Record<string, unknown>).SITE_URL as string | undefined;
+    if (!siteUrl) return "unavailable";
+    const now = Date.now();
+    if (now - this.bossEventFetchAt < BOSS_EVENT_FETCH_CACHE_MS && this.bossEventFetchCache !== undefined) {
+      return this.bossEventFetchCache;
+    }
+    this.bossEventFetchAt = now;
+    try {
+      const res = await fetch(`${siteUrl.replace(/\/+$/, "")}/api/events/active`);
+      if (!res.ok) return "unavailable";
+      const data = (await res.json()) as { live?: boolean; event?: { id?: unknown; boss_max_hp?: unknown } };
+      this.bossEventFetchCache =
+        data.live && typeof data.event?.id === "string"
+          ? { id: data.event.id, maxHp: Number(data.event.boss_max_hp) || BOSS_DEFAULT_MAX_HP }
+          : null;
+      return this.bossEventFetchCache;
+    } catch {
+      return "unavailable";
+    }
+  }
+
+  private async handleEngageBoss(clientMaxHp: unknown) {
+    if (this.bossEngageInflight) return;
+    this.bossEngageInflight = true;
+    try {
+      const ev = await this.fetchActiveEvent();
+      let eventId: string;
+      let maxHp: number;
+      if (ev === "unavailable") {
+        eventId = "fallback";
+        maxHp = isFiniteNumber(clientMaxHp) ? Math.floor(clientMaxHp) : BOSS_DEFAULT_MAX_HP;
+      } else if (ev === null) {
+        return; // No live event → nothing to engage.
+      } else {
+        eventId = ev.id;
+        maxHp = Math.floor(ev.maxHp);
+      }
+
+      const defeated =
+        this.bossDefeatedEventIds.has(eventId) ||
+        !!(await this.room.storage.get(`boss:defeated:${eventId}`));
+      if (defeated) {
+        this.bossDefeatedEventIds.add(eventId);
+        return;
+      }
+
+      // Re-check after the awaits: another engage may have landed meanwhile.
+      if (this.boss.active || Date.now() <= this.bossResetAt) {
+        this.broadcastBossState(true);
+        return;
+      }
+
+      maxHp = Math.max(BOSS_MAX_HP_FLOOR, Math.min(BOSS_MAX_HP_CEILING, maxHp));
+      this.bossEventId = eventId;
+      this.boss = { active: true, hp: maxHp, maxHp, phase: 1 };
+      this.broadcastBossState(true);
+    } finally {
+      this.bossEngageInflight = false;
+    }
   }
 
   // Issue a signed damage receipt to a connection for its pending chunk.
@@ -343,12 +436,11 @@ export default class FlyServer implements Party.Server {
     // pilot guard, so it works even when engage_boss arrives before the player's
     // join message (which was silently dropping it and leaving the boss inert).
     if (msg.type === "engage_boss") {
-      if (!this.boss.active && now > this.bossResetAt) {
-        let maxHp = isFiniteNumber(msg.maxHp) ? Math.floor(msg.maxHp) : BOSS_DEFAULT_MAX_HP;
-        maxHp = Math.max(BOSS_MAX_HP_FLOOR, Math.min(BOSS_MAX_HP_CEILING, maxHp));
-        this.boss = { active: true, hp: maxHp, maxHp, phase: 1 };
+      if (this.boss.active || now <= this.bossResetAt) {
+        this.broadcastBossState(true);
+        return;
       }
-      this.broadcastBossState(true);
+      void this.handleEngageBoss(msg.maxHp);
       return;
     }
 
@@ -398,7 +490,12 @@ export default class FlyServer implements Party.Server {
     if (msg.type === "boss_hit") {
       if (!this.boss.active || this.boss.hp <= 0) return;
       if (!pilot.pvpEnabled || isDowned(pilot, now)) return;
+      // Anonymous pilots can't be credited (their receipts are dropped), so
+      // they must not burn shared HP either — otherwise the boss dies with
+      // less credited damage than its HP and the event outcome skews.
+      if (pilot.login === "anonymous") return;
       if (msg.kind !== "boss" && msg.kind !== "minion") return;
+      if (msg.kind === "minion" && !this.canClaimMinion(id, now)) return;
       if (!this.canBossShoot(id, now)) return;
       // Loose proximity check: player must be reasonably near the boss.
       if (distance(pilot, BOSS_BASE_POS) > BOSS_HIT_MAX_DIST) return;
@@ -426,6 +523,13 @@ export default class FlyServer implements Party.Server {
       if (this.boss.hp <= 0) {
         this.boss.active = false;
         this.bossResetAt = now + BOSS_RESET_DELAY_MS;
+        // Once an event's boss dies it stays dead: without this, any new
+        // visitor's engage_boss would respawn it at full HP for as long as
+        // the event window stayed open. Persisted so restarts can't undo it.
+        if (this.bossEventId) {
+          this.bossDefeatedEventIds.add(this.bossEventId);
+          void this.room.storage.put(`boss:defeated:${this.bossEventId}`, true);
+        }
         // Flush all pending receipts so final damage is credited
         for (const connId of this.bossDamage.keys()) {
           void this.issueBossReceipt(connId);
@@ -638,6 +742,7 @@ export default class FlyServer implements Party.Server {
     this.lastMove.delete(id);
     this.bossDamage.delete(id);
     this.bossShots.delete(id);
+    this.bossMinionClaims.delete(id);
     const leaveMsg: ServerMsg = { type: "leave", id };
     this.room.broadcast(JSON.stringify(leaveMsg));
   }

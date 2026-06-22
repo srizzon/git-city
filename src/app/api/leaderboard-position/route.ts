@@ -52,8 +52,8 @@ export async function GET(request: Request) {
     metricValue = (dev.referral_count ?? 0).toLocaleString();
   } else if (tab === "achievers") {
     const { count: userAchCount } = await sb
-      .from("developer_achievements")
-      .select("id", { count: "exact", head: true })
+      .from("emblem_grants")
+      .select("emblem_id", { count: "exact", head: true })
       .eq("developer_id", dev.id);
     const achCount = userAchCount ?? 0;
     // Count how many devs have more achievements using DB-side aggregation

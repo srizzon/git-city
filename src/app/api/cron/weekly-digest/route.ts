@@ -51,10 +51,10 @@ export async function GET(request: NextRequest) {
         .gte("created_at", weekStart),
       // Achievements this week
       sb
-        .from("developer_achievements")
-        .select("developer_id, achievement_id")
+        .from("emblem_grants")
+        .select("developer_id, achievement_id:emblem_id")
         .in("developer_id", devIds)
-        .gte("unlocked_at", weekStart),
+        .gte("first_earned_at", weekStart),
     ]);
 
     // Build lookup maps

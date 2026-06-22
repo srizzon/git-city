@@ -21,7 +21,8 @@
   ],
   "scripts": {
     "dev": "next dev -p 3001 --webpack",
-    "dev:prod": "node --env-file=.env.prod node_modules/next/dist/bin/next dev -p 3001 --webpack",
+    "dev:prod": "dotenv -e .env.prod -- next dev -p 3001 --webpack",
+    "dev:staging": "dotenv -e .env.dev -- next dev -p 3001 --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "db:up": "supabase migration up",
@@ -31,6 +32,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@pmndrs/detect-gpu": "^6.0.8",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
@@ -54,6 +56,8 @@
     "next": "16.2.3",
     "partykit": "^0.0.115",
     "partysocket": "^1.1.16",
+    "posthog-js": "^1.386.8",
+    "posthog-node": "^5.37.1",
     "postprocessing": "^6.38.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -77,6 +81,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/webpack": "^5.28.5",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.1.8",

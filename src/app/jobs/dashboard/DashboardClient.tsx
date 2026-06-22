@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { JobCompanyProfile, JobListing } from "@/lib/jobs/types";
 import { SENIORITY_LABELS, ROLE_TYPE_LABELS, LOCATION_TYPE_LABELS, SALARY_PERIOD_LABELS } from "@/lib/jobs/constants";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 import {
   trackJobDashboardView,
   trackJobListingAction,
@@ -368,15 +369,13 @@ export default function DashboardClient({ advertiserEmail }: { advertiserEmail: 
                     </button>
                   )}
                 </div>
-                <select
-                  value={sortBy}
-                  onChange={(e) => { const v = e.target.value as SortKey; setSortBy(v); updateURL({ sort: v }); }}
-                  className="cursor-pointer border-[2px] border-border bg-bg px-3 py-2 text-xs text-muted outline-none"
-                >
-                  {SORT_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
+                <PixelSelect
+                  value={String(sortBy)}
+                  onChange={(v) => { const key = v as SortKey; setSortBy(key); updateURL({ sort: key }); }}
+                  options={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                  ariaLabel="Sort listings"
+                  className="w-48"
+                />
               </div>
             </div>
 

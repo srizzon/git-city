@@ -48,7 +48,7 @@ const getPortfolio = cache(async (username: string) => {
       admin.from("career_profiles").select("id, skills, seniority, years_experience, bio, web_type, contract_type, salary_min, salary_max, salary_currency, salary_visible, languages, timezone, link_portfolio, link_linkedin, link_website, open_to_work, created_at, updated_at").eq("id", dev.id).maybeSingle(),
       admin.from("portfolio_projects").select("*").eq("developer_id", dev.id).order("sort_order").limit(6),
       admin.from("portfolio_experiences").select("*").eq("developer_id", dev.id).order("sort_order").limit(5),
-      admin.from("developer_achievements").select("achievement_id, name:achievements(name), tier:achievements(tier)").eq("developer_id", dev.id),
+      admin.from("emblem_grants").select("achievement_id:emblem_id, name:emblems(name), tier:emblems(tier)").eq("developer_id", dev.id),
     ]);
 
   const contribs = (dev.contributions_total && dev.contributions_total > 0) ? dev.contributions_total : (dev.contributions ?? 0);

@@ -15,6 +15,7 @@
     { "path": "/api/cron/jobs-flush-application-emails", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/gitc-cleanup",                  "schedule": "0 4 * * *" },
     { "path": "/api/cron/event-lifecycle",               "schedule": "* * * * *" },
-    { "path": "/api/cron/daily-snapshot",                "schedule": "5 0 * * *" }
+    { "path": "/api/cron/daily-snapshot",                "schedule": "5 0 * * *" },
+    { "path": "/api/cron/refresh-buildings",             "schedule": "0 */2 * * *" }
   ]
 }

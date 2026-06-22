@@ -9,6 +9,7 @@ import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import type Stripe from "stripe";
 import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pending-review";
 import { getResend } from "@/lib/resend";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 // Disable body parsing — Stripe needs raw body for signature verification
 export const dynamic = "force-dynamic";
@@ -153,6 +154,21 @@ export async function POST(request: Request) {
               .eq("id", "advertise")
               .eq("active", true);
           }
+
+          const phSkyAd = getPostHogClient();
+          phSkyAd.capture({
+            distinctId: purchaserEmail ?? session.id,
+            event: "sky_ad_activated",
+            properties: {
+              ad_id: ad.id,
+              plan_id: planId,
+              vehicle: plan.vehicle,
+              amount_cents: session.amount_total ?? 0,
+              currency: session.currency ?? "usd",
+              is_subscription: !!subscriptionId,
+            },
+          });
+          await phSkyAd.shutdown();
 
           break;
         }
@@ -330,6 +346,19 @@ export async function POST(request: Request) {
             ).catch((err) => console.error("[job-notify] Failed to send pending review email:", err));
           }
 
+          const phJob = getPostHogClient();
+          phJob.capture({
+            distinctId: session.customer_details?.email ?? session.id,
+            event: "job_listing_paid",
+            properties: {
+              listing_id: listingId,
+              tier: session.metadata.tier ?? "standard",
+              amount_cents: session.amount_total ?? 0,
+              currency: session.currency ?? "usd",
+            },
+          });
+          await phJob.shutdown();
+
           console.log(`Job listing ${listingId} moved to pending_review after payment`);
           break;
         }
@@ -378,6 +407,19 @@ export async function POST(request: Request) {
             .eq("provider_tx_id", session.id)
             .eq("status", "pending")
             .eq("provider", "stripe");
+
+          const phPx = getPostHogClient();
+          phPx.capture({
+            distinctId: String(pxDevId),
+            event: "pixel_purchase_completed",
+            properties: {
+              package_id: pxPackageId,
+              pixels_credited: totalPx,
+              amount_cents: session.amount_total ?? 0,
+              currency: session.currency ?? "usd",
+            },
+          });
+          await phPx.shutdown();
 
           break;
         }
@@ -478,6 +520,21 @@ export async function POST(request: Request) {
             // Purchase receipt notification
             sendPurchaseNotification(Number(developerId), githubLogin ?? "", pending.id, itemId);
           }
+
+          const phItem = getPostHogClient();
+          phItem.capture({
+            distinctId: githubLogin ?? String(developerId),
+            event: "item_purchase_completed",
+            properties: {
+              item_id: itemId,
+              provider: "stripe",
+              is_gift: !!session.metadata?.gifted_to,
+              amount_cents: session.amount_total ?? 0,
+              currency: session.currency ?? "usd",
+              buyer_country: fiscalData.buyer_country,
+            },
+          });
+          await phItem.shutdown();
         } else {
           // Check if already completed (webhook duplicate)
           const { data: existing } = await sb

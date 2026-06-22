@@ -39,6 +39,15 @@ supabase/
 - When fixing security/permissions issues, ONLY change grants/policies — never touch the data itself
 - Always propose SQL as code for the user to review, never execute destructive SQL directly
 
+## Environments
+
+- Three environments, one-directional flow: local → staging → prod (see `ENVIRONMENTS.md`)
+- `main` = production. Any other pushed branch = Vercel preview + staging Supabase
+- Pushing a branch with migration changes triggers `deploy-staging-migrations.yml` (validate + `db push` to staging)
+- Merging into `main` triggers `deploy-migrations.yml` (validate + `db push` to prod) — migrations deploy automatically, never push them to prod by hand
+- Vercel Preview-scoped env vars point at the staging Supabase project; Production-scoped at prod
+- Staging is disposable: reset with `supabase db reset --linked` while linked to staging. Never copy prod data into it
+
 ## Git
 
 - Squash and merge for PRs
@@ -53,8 +62,10 @@ supabase/
 - **License terms**: "Can be used in any commercial or non commercial project, may modify. Can't be resold or redistributed even if modified."
 - **NEVER commit Cozy assets to the repo** — they are NOT covered by AGPL. They live in Supabase Storage and are loaded at runtime via `NEXT_PUBLIC_COZY_BASE_URL`.
 - **NEVER include Cozy PNGs in git add** — the `public/cozy/` folder is gitignored.
-- Forkers must buy their own license from shubibubi on itch.io, place files in `public/cozy/`, then run `node --env-file=.env.local scripts/upload-arcade-assets.mjs` to seed the `arcade-assets` Supabase bucket.
+- Forkers must buy their own license from shubibubi on itch.io and place files in `public/cozy/`, then seed the `arcade-assets` Supabase bucket from those files. (The maintainer's upload script lives under the gitignored `scripts/` folder and is not shipped — write a small one-off uploader against the `arcade-assets` bucket.)
 - Original purchase links: https://shubibubi.itch.io/cozy-people and https://shubibubi.itch.io/cozy-interior
+- **Kenney models** (`public/models/trees/*.glb`, `public/models/props/*.glb`): from [Kenney](https://kenney.nl) Nature Kit / City Kit (CC0 — public domain). Free to use, modify, and redistribute; attribution appreciated but not required. These ARE in the repo. Raw unpacked kit folders stay local (`kenney/` is gitignored).
+- **San Francisco map** (`public/maps/sf.json`): baked from [OpenStreetMap](https://www.openstreetmap.org/copyright) data. OSM data is **ODbL** — the "© OpenStreetMap contributors" credit MUST stay visible on the SF map (rendered in `home-client.tsx`). The committed `public/maps/sf.json` is what ships; the bake script lives under the gitignored `scripts/` folder and is not in the repo.
 
 ## Key files
 

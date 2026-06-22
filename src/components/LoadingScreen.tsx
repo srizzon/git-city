@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -17,161 +17,365 @@ interface LoadingScreenProps {
   stage: LoadingStage;
   progress: number;
   error: string | null;
-  accentColor: string;
+  stats?: { total_developers: number; total_contributions: number };
   onRetry: () => void;
   onFadeComplete: () => void;
 }
 
+interface TermLine {
+  id: number;
+  cls: "cmd" | "out" | "remote" | "step" | "welcome" | "error" | "blank";
+  text: string;
+  done?: boolean;
+  typing?: boolean;
+}
+
 // ─── Constants ─────────────────────────────────────────────────
 
-const STAGE_MESSAGES: Record<string, string> = {
-  init: "Checking your browser...",
-  fetching: "Fetching developers...",
-  generating: "Laying down streets...",
-  rendering: "Building the skyline...",
-  ready: "Welcome to the city",
-};
+const LIME = "#c8e64a";
 
-const TIPS = [
-  "Click any building to see that dev's profile",
-  "Use Fly Mode to cruise above the skyline",
-  "Taller buildings = more contributions",
-  "Try searching for your GitHub username",
-  "Buildings glow brighter with more recent activity",
-  "You can customize your building in the shop",
-  "Explore Mode shows the full city layout",
+// Static facts about the baked SF map (public/maps/sf.json). The map file
+// only changes when scripts/bake-sf-map.mjs reruns, so these are constants.
+const BUILDINGS = 169458;
+const STREETS = 4883;
+const PARKS = 327;
+const SF_KIB = 2724; // 2,789,497 bytes
+
+// Fallbacks for when the snapshot stats haven't arrived yet (script reaches
+// the developer lines before fetch completes on slow connections).
+const FALLBACK_DEVS = 83586;
+const FALLBACK_CONTRIBS = 72132124;
+
+const EASTER_EGGS = [
+  "remote: warning: 3 devs pushed to main on a Friday",
+  "remote: hint: fog detected over Golden Gate, rendering anyway",
+  "remote: 42 merge conflicts resolved peacefully today",
+  "remote: note: someone force-pushed. the city forgives.",
+  "remote: tip: tallest building belongs to whoever commits most",
 ];
 
-// Pixel-art skyline building configs: [width, height, left%]
-const SKYLINE_BUILDINGS: [number, number, number][] = [
-  [28, 40, 2],
-  [20, 65, 8],
-  [32, 85, 14],
-  [18, 50, 22],
-  [24, 70, 28],
-  [36, 110, 35],
-  [22, 55, 44],
-  [26, 75, 50],
-  [30, 95, 58],
-  [20, 45, 66],
-  [34, 80, 72],
-  [24, 60, 80],
-  [28, 90, 87],
+const KEEPALIVE = [
+  "remote: still receiving objects...",
+  "remote: network is slow, hang tight...",
+  "remote: almost there...",
 ];
+
+// Script plays at this relaxed pace by default; when the real load finishes
+// (stage === "ready") the clock runs at READY_BOOST so it wraps up fast.
+const READY_BOOST = 10;
+const TICK_MS = 40;
+
+const fmt = (n: number) => Math.floor(n).toLocaleString("en-US");
 
 // ─── Component ─────────────────────────────────────────────────
 
 export default function LoadingScreen({
   stage,
-  progress,
   error,
-  accentColor,
+  stats,
   onRetry,
   onFadeComplete,
 }: LoadingScreenProps) {
-  const [tipIndex, setTipIndex] = useState(0);
+  const [lines, setLines] = useState<TermLine[]>([]);
+  const [showCursor, setShowCursor] = useState(false);
+  const [flashing, setFlashing] = useState(false);
   const [fading, setFading] = useState(false);
 
-  // Rotate tips every 4s
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTipIndex((i) => (i + 1) % TIPS.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Trigger fade-out when stage becomes "ready"
-  useEffect(() => {
-    if (stage === "ready") {
-      setFading(true);
-    }
-  }, [stage]);
-
-  const handleTransitionEnd = useCallback(() => {
-    if (fading) {
-      onFadeComplete();
-    }
-  }, [fading, onFadeComplete]);
+  const lineIdRef = useRef(0);
+  const stageRef = useRef(stage);
+  const statsRef = useRef(stats);
+  const [restartKey, setRestartKey] = useState(0);
 
   const isError = stage === "error";
-  const message = isError ? error : STAGE_MESSAGES[stage] ?? "";
+
+  useEffect(() => {
+    stageRef.current = stage;
+    statsRef.current = stats;
+  }, [stage, stats]);
+
+  // ── Line helpers ──────────────────────────────────────────────
+
+  const addLine = useCallback((cls: TermLine["cls"], text: string, extra?: Partial<TermLine>) => {
+    const id = ++lineIdRef.current;
+    setLines((prev) => [...prev, { id, cls, text, ...extra }]);
+    return id;
+  }, []);
+
+  const updateLine = useCallback((id: number, patch: Partial<TermLine>) => {
+    setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  }, []);
+
+  // ── Script engine ─────────────────────────────────────────────
+
+  useEffect(() => {
+    let aborted = false;
+    const alive = () => !aborted && stageRef.current !== "error";
+
+    // Sleeps `virtualMs` of script time; real time shrinks when the city is
+    // already loaded so the script fast-forwards instead of holding the user.
+    // Boosted ticks overshoot small sleeps (e.g. per-character typing), so the
+    // surplus carries over as credit — without it every sleep would still cost
+    // a full real tick and the fast-forward would crawl.
+    let credit = 0;
+    const vsleep = async (virtualMs: number) => {
+      if (credit >= virtualMs) {
+        credit -= virtualMs;
+        return;
+      }
+      let remaining = virtualMs - credit;
+      credit = 0;
+      while (remaining > 0) {
+        if (!alive()) throw new Error("aborted");
+        await new Promise((r) => setTimeout(r, TICK_MS));
+        const speed = stageRef.current === "ready" ? READY_BOOST : 1;
+        remaining -= TICK_MS * speed;
+      }
+      credit = -remaining;
+    };
+
+    const typeCmd = async (text: string) => {
+      const id = addLine("cmd", "", { typing: true });
+      let typed = "";
+      for (const ch of text) {
+        typed += ch;
+        updateLine(id, { text: typed });
+        await vsleep(12 + Math.random() * 14);
+      }
+      updateLine(id, { typing: false });
+    };
+
+    const progressLine = async (
+      cls: TermLine["cls"],
+      render: (p: number) => string,
+      virtualMs: number,
+    ) => {
+      const id = addLine(cls, render(0));
+      let consumed = 0;
+      while (consumed < virtualMs) {
+        await vsleep(60);
+        consumed += 60;
+        // occasional stall, like a real network
+        if (Math.random() < 0.15) continue;
+        updateLine(id, { text: render(Math.min(1, consumed / virtualMs)) });
+      }
+      updateLine(id, { text: render(1) });
+    };
+
+    const task = async (label: string, virtualMs: number) => {
+      const id = addLine("step", label);
+      await vsleep(virtualMs);
+      updateLine(id, { done: true });
+    };
+
+    async function run() {
+      setLines([]);
+      setShowCursor(false);
+      setFlashing(false);
+      setFading(false);
+
+      const devs = () => statsRef.current?.total_developers || FALLBACK_DEVS;
+      const contribs = () => statsRef.current?.total_contributions || FALLBACK_CONTRIBS;
+
+      await typeCmd("git clone git@git.city:world/san-francisco.git");
+      await vsleep(150);
+      addLine("out", "Cloning into 'san-francisco'...");
+      await vsleep(200);
+
+      addLine("remote", `remote: Enumerating buildings: ${fmt(BUILDINGS)}, done.`);
+      await vsleep(180);
+      await progressLine(
+        "remote",
+        (p) =>
+          `remote: Counting developers: ${Math.floor(p * 100)}% (${fmt(p * devs())}/${fmt(devs())})${p >= 1 ? ", done." : ""}`,
+        300,
+      );
+
+      if (Math.random() < 0.6) {
+        await vsleep(120);
+        addLine("remote", EASTER_EGGS[Math.floor(Math.random() * EASTER_EGGS.length)]);
+      }
+      await vsleep(150);
+
+      await progressLine(
+        "out",
+        (p) => {
+          const kib = p * SF_KIB;
+          const size = kib >= 1024 ? `${(kib / 1024).toFixed(2)} MiB` : `${Math.floor(kib)} KiB`;
+          const tail = p >= 1 ? "done." : `${(1.4 + Math.random() * 1.2).toFixed(2)} MiB/s`;
+          return `Receiving objects: ${Math.floor(p * 100)}% (${fmt(p * BUILDINGS)}/${fmt(BUILDINGS)}), ${size} | ${tail}`;
+        },
+        800,
+      );
+
+      await progressLine(
+        "out",
+        (p) =>
+          `Resolving streets: ${Math.floor(p * 100)}% (${fmt(p * STREETS)}/${fmt(STREETS)})${p >= 1 ? ", done." : ""}`,
+        350,
+      );
+
+      addLine("out", "Checking out the skyline... done.");
+      await vsleep(180);
+      addLine("blank", "");
+
+      await typeCmd("cd san-francisco && npm run city");
+      await vsleep(150);
+
+      await task("compiling shaders", 200);
+      await task(`planting ${fmt(PARKS)} parks`, 180);
+      await task(`indexing ${fmt(contribs())} contributions`, 200);
+      await task(`turning on ${fmt(BUILDINGS)} lights`, 250);
+
+      addLine("blank", "");
+      addLine("welcome", `Welcome to GIT CITY — population ${fmt(devs())}`);
+      setShowCursor(true);
+
+      // Script finished before the real load? Blink and drop a keep-alive
+      // line every few seconds so it never looks frozen.
+      let waited = 0;
+      let keepaliveIdx = 0;
+      while (stageRef.current !== "ready") {
+        if (!alive()) throw new Error("aborted");
+        await new Promise((r) => setTimeout(r, TICK_MS));
+        waited += TICK_MS;
+        if (waited >= 4000 && keepaliveIdx < KEEPALIVE.length) {
+          addLine("remote", KEEPALIVE[keepaliveIdx++]);
+          waited = 0;
+        }
+      }
+      await vsleep(500 * READY_BOOST); // brief hold on the welcome line (real ms × boost)
+
+      // Exit: the terminal "executes" the city — flash, then fade out.
+      if (!alive()) throw new Error("aborted");
+      setShowCursor(false);
+      setFlashing(true);
+      await new Promise((r) => setTimeout(r, 120));
+      if (!alive()) throw new Error("aborted");
+      setFading(true);
+    }
+
+    run().catch(() => { /* aborted: unmount, error stage, or retry */ });
+
+    return () => {
+      aborted = true;
+    };
+  }, [restartKey, addLine, updateLine]);
+
+  // On error the script self-aborts (alive() checks stageRef every tick) and
+  // the fatal lines render declaratively below. Retry replays from the top.
+  const handleRetry = useCallback(() => {
+    setRestartKey((k) => k + 1);
+    onRetry();
+  }, [onRetry]);
+
+  const handleTransitionEnd = useCallback(() => {
+    if (fading) onFadeComplete();
+  }, [fading, onFadeComplete]);
+
+  // ── Render ────────────────────────────────────────────────────
 
   return (
     <div
-      className={`fixed inset-0 z-100 flex flex-col items-center justify-center bg-bg transition-opacity duration-600 ${
+      className={`fixed inset-0 z-100 bg-bg transition-opacity duration-400 ${
         fading ? "opacity-0" : "opacity-100"
       }`}
       onTransitionEnd={handleTransitionEnd}
     >
-      {/* Skyline silhouette */}
-      <div className="absolute bottom-0 left-0 right-0 h-35 overflow-hidden opacity-20">
-        {SKYLINE_BUILDINGS.map(([w, h, left], i) => (
-          <div
-            key={i}
-            className="absolute bottom-0"
-            style={{
-              width: w,
-              height: h,
-              left: `${left}%`,
-              backgroundColor: accentColor,
-              // Pixel-art stepped top
-              clipPath:
-                i % 3 === 0
-                  ? "polygon(0 8px, 30% 8px, 30% 0, 70% 0, 70% 8px, 100% 8px, 100% 100%, 0 100%)"
-                  : i % 3 === 1
-                    ? "polygon(0 4px, 50% 4px, 50% 0, 100% 0, 100% 100%, 0 100%)"
-                    : undefined,
-            }}
-          />
-        ))}
+      <style>{`
+        @keyframes gc-cursor { 50% { opacity: 0; } }
+        @keyframes gc-flicker { 0%, 97%, 99%, 100% { opacity: 1; } 98% { opacity: 0.92; } }
+        @keyframes gc-flash { 0% { opacity: 0; } 15% { opacity: 0.9; } 100% { opacity: 0; } }
+      `}</style>
+
+      <div className="flex h-full items-center justify-center p-6">
+        <div
+          className="w-full max-w-2xl overflow-hidden font-pixel text-[11px] leading-[1.9] tracking-wide sm:text-xs"
+          style={{
+            fontVariantNumeric: "tabular-nums",
+            textShadow: `0 0 6px ${LIME}40`,
+            animation: "gc-flicker 4s infinite",
+          }}
+        >
+          {lines.map((l) => (
+            <div key={l.id} className="min-h-[1.9em] whitespace-pre-wrap break-all">
+              {l.cls === "cmd" && (
+                <>
+                  <span style={{ color: LIME }}>$ </span>
+                  <span className="text-neutral-300">{l.text}</span>
+                  {l.typing && <Cursor />}
+                </>
+              )}
+              {l.cls === "out" && <span className="text-neutral-300">{l.text}</span>}
+              {l.cls === "remote" && <span className="text-neutral-500">{l.text}</span>}
+              {l.cls === "step" && (
+                <span className="text-neutral-500">
+                  {"  ▸ "}{l.text}...{l.done && <span style={{ color: LIME }}> done</span>}
+                </span>
+              )}
+              {l.cls === "welcome" && <span style={{ color: LIME }}>{l.text}</span>}
+              {l.cls === "error" && <span className="text-[#e05252]">{l.text}</span>}
+            </div>
+          ))}
+
+          {showCursor && !isError && (
+            <div className="min-h-[1.9em]">
+              <span style={{ color: LIME }}>$ </span>
+              <Cursor />
+            </div>
+          )}
+
+          {isError && (
+            <>
+              <div className="min-h-[1.9em]" />
+              <div className="min-h-[1.9em] text-[#e05252]">
+                {`fatal: unable to access 'git.city': ${error ?? "something went wrong"}`}
+              </div>
+              <div className="min-h-[1.9em] text-[#e05252]">
+                hint: check your connection and try again
+              </div>
+              <button
+                onClick={handleRetry}
+                className="btn-press mt-4 px-6 py-2 font-pixel text-xs text-bg"
+                style={{ backgroundColor: LIME }}
+              >
+                RETRY
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Title */}
-      <h1
-        className="font-pixel text-3xl tracking-[0.2em] sm:text-4xl"
-        style={{ color: accentColor }}
-      >
-        GIT CITY
-      </h1>
+      {/* CRT scanlines + vignette */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.18) 3px, rgba(0,0,0,0.18) 4px)",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: "radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%)",
+        }}
+      />
 
-      {/* Stage message */}
-      <p className="mt-4 font-pixel text-xs tracking-wider text-neutral-400 sm:text-sm">
-        {message}
-      </p>
-
-      {/* Progress bar (hidden on error) */}
-      {!isError && (
+      {/* Exit flash */}
+      {flashing && (
         <div
-          className="mt-6 h-4 w-56 sm:w-72"
-          style={{ border: `3px solid ${accentColor}` }}
-        >
-          <div
-            className="h-full transition-[width] duration-300"
-            style={{
-              width: `${Math.min(100, progress)}%`,
-              backgroundColor: accentColor,
-            }}
-          />
-        </div>
-      )}
-
-      {/* Error retry */}
-      {isError && (
-        <button
-          onClick={onRetry}
-          className="btn-press mt-6 px-6 py-2 font-pixel text-xs text-bg"
-          style={{ backgroundColor: accentColor }}
-        >
-          Retry
-        </button>
-      )}
-
-      {/* Tips rotator */}
-      {!isError && (
-        <p className="mt-8 max-w-xs text-center font-pixel text-[10px] leading-relaxed tracking-wide text-neutral-600 sm:text-xs">
-          {TIPS[tipIndex]}
-        </p>
+          className="pointer-events-none absolute inset-0 bg-white"
+          style={{ animation: "gc-flash 500ms ease-out forwards" }}
+        />
       )}
     </div>
+  );
+}
+
+function Cursor() {
+  return (
+    <span
+      className="inline-block h-[1.1em] w-2 align-text-bottom"
+      style={{ backgroundColor: LIME, animation: "gc-cursor 1s steps(1) infinite" }}
+    />
   );
 }

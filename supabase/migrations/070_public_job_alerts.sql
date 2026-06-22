@@ -1,13 +1,18 @@
 -- Public job alerts: allow anyone (with or without account) to subscribe
 -- to recurring weekly job digest emails filtered by tech stack.
 
+-- gen_random_bytes() below needs pgcrypto. Prod had it enabled manually via
+-- the dashboard, so fresh environments (staging, forks) broke here.
+-- Idempotent prepend: prod already applied this file and never re-runs it.
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
 CREATE TABLE IF NOT EXISTS job_alert_subscriptions (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email        text NOT NULL,
   tech_stack   text[] NOT NULL DEFAULT '{}',
   verified     boolean NOT NULL DEFAULT false,
   verify_token text UNIQUE,
-  unsubscribe_token text NOT NULL DEFAULT encode(gen_random_bytes(24), 'hex'),
+  unsubscribe_token text NOT NULL DEFAULT encode(extensions.gen_random_bytes(24), 'hex'),
   developer_id bigint REFERENCES developers(id) ON DELETE SET NULL,
   last_sent_at timestamptz,
   created_at   timestamptz NOT NULL DEFAULT now()

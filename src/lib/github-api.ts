@@ -194,6 +194,135 @@ export async function fetchExpandedGitHubData(login: string): Promise<ExpandedGi
   }
 }
 
+// ─── Contribution refresh fetchers (rolling building-refresh cron) ───────────
+// Past calendar years are immutable, so a refresh only needs the CURRENT year.
+// Fetching one current-year collection per login is light enough to batch ~25
+// per request (rate-limit cost 1). Fetching all 10 years, however, is heavy for
+// GitHub to compute — batching even 2 of those 502s — so the full (seed) fetch
+// must be one login per request.
+//
+// GitHub login charset: alphanumeric + single hyphens, max 39 chars. Because
+// these queries inline the login into the GraphQL string, this guard is also
+// what prevents GraphQL injection — anything failing it is dropped.
+const LOGIN_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,38})$/;
+
+const GQL_HEADERS = (token: string): HeadersInit => ({
+  Authorization: `Bearer ${token}`,
+  "Content-Type": "application/json",
+  "User-Agent": "git-city-app",
+});
+
+export interface FullContributions {
+  contributions_total: number; // sum of all calendar years (matches profile)
+  contribution_years: number[];
+  current_year: number;
+  current_year_value: number; // this calendar year's total — the split anchor
+}
+
+/**
+ * Full per-dev contribution fetch (all years). HEAVY for GitHub to compute, so
+ * it MUST be one login per request — batching multiple multi-year collections
+ * 502s. Used once to (re)seed a building's current-year split; cheap thereafter.
+ */
+export async function fetchFullContributions(login: string): Promise<FullContributions | null> {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token || !LOGIN_RE.test(login)) return null;
+
+  const currentYear = new Date().getFullYear();
+  let yearLines = "";
+  for (let y = currentYear; y >= currentYear - 9; y--) {
+    yearLines += ` y${y}: contributionsCollection(from:"${y}-01-01T00:00:00Z", to:"${y}-12-31T23:59:59Z"){contributionCalendar{totalContributions}}`;
+  }
+  const query = `query { u: user(login: ${JSON.stringify(login)}) {${yearLines} } }`;
+
+  try {
+    const res = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: GQL_HEADERS(token),
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const u = json?.data?.u as any;
+    if (!u) return null; // deleted / suspended / renamed / organization
+
+    let total = 0;
+    let currentYearValue = 0;
+    const years: number[] = [];
+    for (let y = currentYear; y >= currentYear - 9; y--) {
+      const v = u[`y${y}`]?.contributionCalendar?.totalContributions ?? 0;
+      if (y === currentYear) currentYearValue = v;
+      if (v > 0) {
+        total += v;
+        years.push(y);
+      }
+    }
+    return {
+      contributions_total: total,
+      contribution_years: years,
+      current_year: currentYear,
+      current_year_value: currentYearValue,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Batched current-calendar-year fetch (one collection per login → light enough
+ * to batch ~25/request at rate-limit cost 1). Returns login(lowercased) -> this
+ * year's contribution total, plus the rate-limit snapshot for back-off. Logins
+ * GitHub couldn't resolve are simply absent from the map.
+ */
+export async function fetchCurrentYearBatch(logins: string[]): Promise<{
+  results: Map<string, number>;
+  rateLimit: { remaining: number; resetAt: string } | null;
+}> {
+  const token = process.env.GITHUB_TOKEN;
+  const empty = { results: new Map<string, number>(), rateLimit: null };
+  if (!token) return empty;
+
+  const valid = logins.filter((l) => LOGIN_RE.test(l));
+  if (valid.length === 0) return empty;
+
+  const cy = new Date().getFullYear();
+  const blocks = valid
+    .map(
+      (login, i) =>
+        `u${i}: user(login: ${JSON.stringify(login)}) { cy: contributionsCollection(from:"${cy}-01-01T00:00:00Z", to:"${cy}-12-31T23:59:59Z"){contributionCalendar{totalContributions}} }`,
+    )
+    .join("\n");
+  const query = `query {\n${blocks}\n  rateLimit { remaining resetAt }\n}`;
+
+  try {
+    const res = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: GQL_HEADERS(token),
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return empty;
+    const json = await res.json();
+    const data = json?.data;
+    if (!data) return empty;
+
+    const results = new Map<string, number>();
+    for (let i = 0; i < valid.length; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const u = data[`u${i}`] as any;
+      if (!u) continue;
+      results.set(valid[i].toLowerCase(), u.cy?.contributionCalendar?.totalContributions ?? 0);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rl = data.rateLimit as any;
+    return { results, rateLimit: rl ? { remaining: rl.remaining, resetAt: rl.resetAt } : null };
+  } catch {
+    return empty;
+  }
+}
+
 // ─── Full Developer Fetch ────────────────────────────────────
 
 export class GitHubFetchError extends Error {

@@ -15,9 +15,14 @@ interface RadarMapProps {
   cameraTargetZ?: number;
   visible: boolean;
   flyMode: boolean;
-  currentDistrict?: string | null;
+  // Reserved for the upcoming SF-neighborhoods layer (lots, buy/sell).
+  // Not rendered on the radar anymore — districts are scattered citywide.
   districtZones?: DistrictZone[];
   remotePilotsRef?: React.MutableRefObject<Map<string, RemotePilot>>;
+  // White Rabbit hunt: world position of the currently-active rabbit, or null
+  // when no hunt is in progress. Rendered as a pulsing ping so the player knows
+  // where to go (the rabbit hides in parks scattered across the city).
+  rabbitPos?: [number, number, number] | null;
 }
 
 // ─── Dimensions ─────────────────────────────────────────────
@@ -29,22 +34,18 @@ const DISPLAY = 170;
 const PAD     = 5;
 const SCALE   = DISPLAY / RES;
 
-// Palette redesign: buildings now in a flat neutral grey so the player
-// marker (white) and accent (lime) never compete with them. Active
-// district is no longer a re-color of buildings — it shows up as a
-// faint lime zone overlay + lime label only.
+// Flat neutral palette: buildings in grey so the player marker (white)
+// and accents (lime/cream) never compete with them. Districts are no
+// longer drawn here — on the real SF map their members are scattered
+// citywide, so highlighting one lit up the whole map.
 const COL_BG       = "#0d0d0f";
 const COL_PANEL    = "#13131a";
 const COL_GRID     = "#1d1d24";
 const COL_BORDER   = "#2a2a30";
-const COL_BUILDING = "#3d3d45"; // neutral grey, uniform for all districts
+const COL_BUILDING = "#3d3d45"; // neutral grey, uniform for all buildings
 const COL_LIME     = "#c8e64a";
 const COL_CREAM    = "#e8dcc8";
 const COL_WHITE    = "#ffffff"; // player only — maximum contrast
-const COL_ZONE_FILL      = "rgba(200,230,74,0.10)"; // active district overlay
-const COL_ZONE_STROKE    = "rgba(200,230,74,0.85)"; // active district outline (lime, bright)
-const COL_ZONE_BORDER    = "rgba(168,168,180,0.45)"; // inactive district outline — visible grey
-const COL_ZONE_FILL_INA  = "rgba(168,168,180,0.04)"; // very faint inactive zone fill (helps boundaries pop)
 
 export default function RadarMap({
   buildings,
@@ -57,9 +58,8 @@ export default function RadarMap({
   cameraTargetZ = 0,
   visible,
   flyMode,
-  currentDistrict,
-  districtZones = [],
   remotePilotsRef,
+  rabbitPos = null,
 }: RadarMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [remotePilotBlips, setRemotePilotBlips] = useState<{ id: string; x: number; z: number; yaw: number; login: string }[]>([]);
@@ -99,9 +99,6 @@ export default function RadarMap({
   }, [w2c]);
 
   // ── Building draw data ───────────────────────────────────────
-  // Active-district buildings get highlighted individually in lime
-  // so the player sees the REAL location of their district's buildings,
-  // not a bbox that wildly over-covers the map.
   const bData = useMemo(() => {
     if (!sp || !wb) return [];
     return buildings.map(b => ({
@@ -109,9 +106,8 @@ export default function RadarMap({
       cy: sp.oy + (b.position[2] - wb.z0) * sp.s,
       cw: Math.max(1.0, b.width * sp.s * 0.7),
       cd: Math.max(1.0, b.depth * sp.s * 0.7),
-      active: b.district === currentDistrict,
     }));
-  }, [buildings, sp, wb, currentDistrict]);
+  }, [buildings, sp, wb]);
 
   // ── Canvas draw ──────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -131,23 +127,13 @@ export default function RadarMap({
       ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(RES, i); ctx.stroke();
     }
 
-    // Buildings — neutral grey by default, lime for the active district.
-    // Two passes so all inactive buildings are drawn first, and active
-    // ones go on top (slightly bigger so they pop on this tiny scale).
+    // Buildings — flat neutral grey, uniform. No district highlighting:
+    // on the real SF map a district's members are scattered citywide, so
+    // lighting them up just lit the whole map.
     ctx.fillStyle = COL_BUILDING;
     for (const b of bData) {
-      if (b.active) continue;
       if (b.cx < -3 || b.cx > RES + 3 || b.cy < -3 || b.cy > RES + 3) continue;
       ctx.fillRect(b.cx - b.cw / 2, b.cy - b.cd / 2, b.cw, b.cd);
-    }
-    ctx.fillStyle = COL_LIME;
-    for (const b of bData) {
-      if (!b.active) continue;
-      if (b.cx < -3 || b.cx > RES + 3 || b.cy < -3 || b.cy > RES + 3) continue;
-      // Slight bump in size so they read above the inactive crowd
-      const w = Math.max(1.6, b.cw + 0.4);
-      const h = Math.max(1.6, b.cd + 0.4);
-      ctx.fillRect(b.cx - w / 2, b.cy - h / 2, w, h);
     }
   }, [bData]);
 
@@ -169,7 +155,7 @@ export default function RadarMap({
       setRemotePilotBlips(blips);
     }, 200);
     return () => clearInterval(id);
-  }, [visible, remotePilotsRef]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visible, remotePilotsRef]);
 
   // ── SVG indicator geometry ───────────────────────────────────
   const [camSx, camSy] = w2s(cameraX, cameraZ);
@@ -313,6 +299,23 @@ export default function RadarMap({
             );
           })}
 
+          {/* White Rabbit ping — pulsing ring so the active rabbit is
+              findable from anywhere. Lime to match the HUD accent; the
+              expanding ring + steady dot reads as "objective here". */}
+          {rabbitPos && sp && (() => {
+            const [rx2, ry2] = w2s(rabbitPos[0], rabbitPos[2]);
+            return (
+              <g>
+                <circle cx={rx2} cy={ry2} r={3} fill="none" stroke={COL_LIME} strokeWidth="1.2">
+                  <animate attributeName="r" values="3;11;3" dur="1.8s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.9;0;0.9" dur="1.8s" repeatCount="indefinite" />
+                </circle>
+                <circle cx={rx2} cy={ry2} r={4} fill={COL_BG} />
+                <circle cx={rx2} cy={ry2} r={2.4} fill={COL_LIME} />
+              </g>
+            );
+          })()}
+
           {/* District labels removed — only the active district is
               named, in a pill below the N indicator (outside the SVG
               layer, see the wrapper div). This keeps the map quiet. */}
@@ -339,37 +342,6 @@ export default function RadarMap({
       >
         N
       </div>
-
-      {/* Active district pill — directly under the N. Only shown when
-          we know which district the player is in. */}
-      {(() => {
-        if (!currentDistrict) return null;
-        const z = districtZones.find((z) => z.id === currentDistrict);
-        if (!z) return null;
-        const name = z.name.split(" ")[0].toUpperCase();
-        return (
-          <div
-            style={{
-              position: "absolute",
-              top: 21,
-              left: "50%",
-              transform: "translateX(-50%)",
-              color: COL_LIME,
-              fontFamily: "Silkscreen, monospace",
-              fontSize: 9,
-              letterSpacing: "0.12em",
-              lineHeight: 1,
-              padding: "2px 7px",
-              background: COL_BG,
-              border: `1px solid ${COL_ZONE_STROKE}`,
-              pointerEvents: "none",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {name}
-          </div>
-        );
-      })()}
     </div>
   );
 }

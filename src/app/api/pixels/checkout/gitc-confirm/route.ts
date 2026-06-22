@@ -130,7 +130,12 @@ export async function POST(request: NextRequest) {
 
   const totalPx = pkg.pixels + pkg.bonus_pixels;
 
-  const { error: rpcErr } = await sb.rpc("credit_pixels", {
+  // Credit via the canonical RPC. It returns either
+  //   { success: true, new_balance }                — fresh credit, or
+  //   { error: 'duplicate_transaction' }             — this txHash already
+  //     credited (idempotent: the player already has these pixels).
+  // A thrown rpcErr means the credit genuinely failed at the DB level.
+  const { data: creditResult, error: rpcErr } = await sb.rpc("credit_pixels", {
     p_developer_id: payment.developer_id,
     p_amount: totalPx,
     p_source: "purchase",
@@ -141,21 +146,41 @@ export async function POST(request: NextRequest) {
   });
 
   if (rpcErr) {
+    // Payment is confirmed on-chain but crediting failed. Do NOT mark the
+    // purchase completed or claim pixels were credited — leave it pending so
+    // the confirmed pixel_gitc_payments row can be reconciled, and tell the
+    // client honestly instead of returning a false success.
     console.error("credit_pixels failed for GITC payment:", rpcErr);
-    // Don't fail the whole request; the payment is on-chain, manual reconciliation possible.
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Payment received, but crediting is delayed. Your pixels will be added shortly.",
+        needsReconciliation: true,
+      },
+      { status: 500 },
+    );
   }
+
+  // Reflect what THIS confirmation actually credited: a duplicate added nothing
+  // (the tx already credited an earlier quote), a fresh credit added totalPx.
+  const result = (creditResult ?? {}) as { error?: string; new_balance?: number };
+  const duplicate = result.error === "duplicate_transaction";
+  const pixelsCredited = duplicate ? 0 : totalPx;
+  const newBalance = typeof result.new_balance === "number" ? result.new_balance : null;
 
   await sb
     .from("pixel_purchases")
     .update({
       status: "completed",
-      pixels_credited: totalPx,
+      pixels_credited: pixelsCredited,
     })
     .eq("id", payment.pixel_purchase_id);
 
   return NextResponse.json({
     ok: true,
-    pixelsCredited: totalPx,
+    pixelsCredited,
+    alreadyCredited: duplicate,
+    newBalance,
     paidAmountWei: verification.paidAmountWei?.toString() ?? null,
   });
 }

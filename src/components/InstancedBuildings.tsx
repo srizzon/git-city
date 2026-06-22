@@ -30,6 +30,8 @@ const vertexShader = /* glsl */ `
   varying float vInstanceId;
   varying vec4 vTint;
   varying float vLive;
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
 
   void main() {
     vUv = uv;
@@ -48,6 +50,7 @@ const vertexShader = /* glsl */ `
     vInstanceId = float(gl_InstanceID);
 
     gl_Position = projectionMatrix * mvPos;
+    #include <logdepthbuf_vertex>
   }
 `;
 
@@ -72,11 +75,14 @@ const fragmentShader = /* glsl */ `
   varying float vInstanceId;
   varying vec4 vTint;
   varying float vLive;
+  #include <logdepthbuf_pars_fragment>
 
   void main() {
     // Early discard: skip fragments fully inside fog (invisible anyway)
     float fogDepth = length(vViewPos);
     if (fogDepth > uFogFar) discard;
+    #include <logdepthbuf_fragment>
+
 
     vec3 absN = abs(vNormal);
     float isRoof = step(0.5, absN.y);
@@ -392,16 +398,17 @@ export default memo(function InstancedBuildings({
   const lastFogFar = useRef(0);
   const cityEnergyRef = useRef(cityEnergy);
   cityEnergyRef.current = cityEnergy;
-  useFrame(({ scene, clock }) => {
+  useFrame(({ scene }) => {
     if (!material.uniforms) return;
     const fog = scene.fog as THREE.Fog | null;
-    if (!fog) return;
-    if (fog.near !== lastFogNear.current || fog.far !== lastFogFar.current) {
-      material.uniforms.uFogColor.value.copy(fog.color);
-      material.uniforms.uFogNear.value = fog.near;
-      material.uniforms.uFogFar.value = fog.far;
-      lastFogNear.current = fog.near;
-      lastFogFar.current = fog.far;
+    if (fog) {
+      if (fog.near !== lastFogNear.current || fog.far !== lastFogFar.current) {
+        material.uniforms.uFogColor.value.copy(fog.color);
+        material.uniforms.uFogNear.value = fog.near;
+        material.uniforms.uFogFar.value = fog.far;
+        lastFogNear.current = fog.near;
+        lastFogFar.current = fog.far;
+      }
     }
 
     // Smooth lerp city energy (transition over ~5 seconds)
@@ -564,7 +571,7 @@ export default memo(function InstancedBuildings({
     const onPointerDown = (e: PointerEvent) => {
       if (introRef.current) return;
       if (wasAdPointerConsumed()) return;
-      if ((window as any).__spireClicked || (window as any).__arcadeClicked || (window as any).__sponsorClicked) return;
+      if ((window as any).__spireClicked || (window as any).__arcadeClicked || (window as any).__sponsorClicked || (window as any).__bankClicked) return;
       const id = raycastInstance(e.clientX, e.clientY);
       if (id !== null && id < buildingsRef.current.length) {
         tapRef.current = { time: performance.now(), id, x: e.clientX, y: e.clientY };

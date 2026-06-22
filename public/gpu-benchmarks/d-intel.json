@@ -1,0 +1,3702 @@
+[
+  "6",
+  [
+    "intel",
+    "",
+    "intel",
+    0,
+    [
+      [
+        2880,
+        1800,
+        92
+      ],
+      [
+        2880,
+        1920,
+        81
+      ],
+      [
+        4096,
+        2304,
+        11
+      ]
+    ]
+  ],
+  [
+    "intel 0x496e74656c2048442047726170686963000732034343",
+    "0",
+    "0x496e74656c2048442047726170686963000732034343 intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        22
+      ]
+    ]
+  ],
+  [
+    "intel arc",
+    "arc",
+    "arc intel",
+    0,
+    [
+      [
+        2880,
+        1800,
+        67
+      ]
+    ]
+  ],
+  [
+    "intel arc [3] gpu ri",
+    "3",
+    " 3 arc gpu intel ri",
+    0,
+    [
+      [
+        2880,
+        1800,
+        188
+      ]
+    ]
+  ],
+  [
+    "intel arc 130v gpu",
+    "130",
+    "130v arc gpu intel",
+    0,
+    [
+      [
+        1920,
+        1200,
+        160
+      ]
+    ]
+  ],
+  [
+    "intel arc 140t gpu",
+    "140",
+    "140t arc gpu intel",
+    0,
+    [
+      [
+        1920,
+        1200,
+        60
+      ],
+      [
+        2880,
+        1800,
+        110
+      ],
+      [
+        3200,
+        2000,
+        96
+      ]
+    ]
+  ],
+  [
+    "intel arc 140v gpu",
+    "140",
+    "140v arc gpu intel",
+    0,
+    [
+      [
+        2880,
+        1800,
+        88
+      ]
+    ]
+  ],
+  [
+    "intel arc a310",
+    "310",
+    "a310 arc intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        58
+      ],
+      [
+        3840,
+        2160,
+        96
+      ]
+    ]
+  ],
+  [
+    "intel arc a310 lp",
+    "310",
+    "a310 arc intel lp",
+    0,
+    [
+      [
+        3840,
+        2160,
+        84
+      ]
+    ]
+  ],
+  [
+    "intel arc a350m",
+    "350",
+    "a350m arc intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        209
+      ],
+      [
+        3840,
+        2400,
+        4
+      ]
+    ]
+  ],
+  [
+    "intel arc a370m",
+    "370",
+    "a370m arc intel",
+    0,
+    [
+      [
+        2880,
+        1620,
+        85
+      ],
+      [
+        3840,
+        2160,
+        91
+      ]
+    ]
+  ],
+  [
+    "intel arc a380",
+    "380",
+    "a380 arc intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "intel arc a530m",
+    "530",
+    "a530m arc intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        2560,
+        1440,
+        312
+      ]
+    ]
+  ],
+  [
+    "intel arc a550m",
+    "550",
+    "a550m arc intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        144
+      ]
+    ]
+  ],
+  [
+    "intel arc a570m",
+    "570",
+    "a570m arc intel",
+    0,
+    [
+      [
+        3840,
+        2400,
+        96
+      ]
+    ]
+  ],
+  [
+    "intel arc a580",
+    "580",
+    "a580 arc intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ],
+      [
+        3840,
+        2160,
+        351
+      ]
+    ]
+  ],
+  [
+    "intel arc a730m",
+    "730",
+    "a730m arc intel",
+    0,
+    [
+      [
+        3840,
+        2160,
+        265
+      ]
+    ]
+  ],
+  [
+    "intel arc a750",
+    "750",
+    "a750 arc intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        776
+      ]
+    ]
+  ],
+  [
+    "intel arc a770",
+    "770",
+    "a770 arc intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        371
+      ]
+    ]
+  ],
+  [
+    "intel arc a770m",
+    "770",
+    "a770m arc intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        950
+      ]
+    ]
+  ],
+  [
+    "intel arc b570",
+    "570",
+    "arc b570 intel",
+    0,
+    [
+      [
+        3840,
+        2160,
+        392
+      ]
+    ]
+  ],
+  [
+    "intel arc b580",
+    "580",
+    "arc b580 intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        332
+      ],
+      [
+        2560,
+        1440,
+        144
+      ]
+    ]
+  ],
+  [
+    "intel arc graphics ri",
+    "arcri",
+    "arc graphics intel ri",
+    0,
+    [
+      [
+        1920,
+        1080,
+        114
+      ]
+    ]
+  ],
+  [
+    "intel arc pro",
+    "arc",
+    "arc intel pro",
+    0,
+    [
+      [
+        2560,
+        1600,
+        148
+      ],
+      [
+        3840,
+        2160,
+        122
+      ]
+    ]
+  ],
+  [
+    "intel arc pro a30m",
+    "30",
+    "a30m arc intel pro",
+    0,
+    [
+      [
+        3840,
+        2160,
+        105
+      ]
+    ]
+  ],
+  [
+    "intel arc pro a40",
+    "40",
+    "a40 arc intel pro",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        3840,
+        2160,
+        116
+      ]
+    ]
+  ],
+  [
+    "intel arc pro a60",
+    "60",
+    "a60 arc intel pro",
+    0,
+    [
+      [
+        1920,
+        1080,
+        486
+      ],
+      [
+        3840,
+        2160,
+        59
+      ]
+    ]
+  ],
+  [
+    "intel arc pro a60m",
+    "60",
+    "a60m arc intel pro",
+    0,
+    [
+      [
+        3840,
+        2160,
+        48
+      ]
+    ]
+  ],
+  [
+    "intel arc pro b50",
+    "50",
+    "arc b50 intel pro",
+    0,
+    [
+      [
+        3840,
+        2160,
+        231
+      ]
+    ]
+  ],
+  [
+    "intel arc pro b60",
+    "60",
+    "arc b60 intel pro",
+    0,
+    [
+      [
+        2560,
+        1440,
+        158
+      ]
+    ]
+  ],
+  [
+    "intel broxton-p hd",
+    "p",
+    "broxton-p hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        23
+      ]
+    ]
+  ],
+  [
+    "intel cherryview hd",
+    "hd",
+    "cherryview hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "intel coffee lake uhd",
+    "uhd",
+    "coffee intel lake uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        49
+      ]
+    ]
+  ],
+  [
+    "intel coffeelake-h gt2 [uhd graphics 630]",
+    "2",
+    " 630 coffeelake-h graphics gt2 intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "intel coffeelake-u gt3e [iris plus graphics 655]",
+    "3",
+    " 655 coffeelake-u graphics gt3e intel iris plus",
+    0,
+    [
+      [
+        2560,
+        1440,
+        26
+      ]
+    ]
+  ],
+  [
+    "intel cometlake uhd graphics 630",
+    "630",
+    "630 cometlake graphics intel uhd",
+    0,
+    [
+      [
+        2560,
+        1440,
+        40
+      ]
+    ]
+  ],
+  [
+    "intel cometlake-s gt2 [uhd graphics 630]",
+    "2",
+    " 630 cometlake-s graphics gt2 intel uhd",
+    0,
+    [
+      [
+        1360,
+        768,
+        60
+      ]
+    ]
+  ],
+  [
+    "intel corporation 2nd gen core processor family integrated graphics controller",
+    "2",
+    "2nd controller core corporation family gen graphics integrated intel processor",
+    0,
+    [
+      [
+        1366,
+        768,
+        19
+      ]
+    ]
+  ],
+  [
+    "intel corporation 2nd generation core processor family integrated graphics controller",
+    "2",
+    "2nd controller core corporation family generation graphics integrated intel processor",
+    0,
+    [
+      [
+        1600,
+        900,
+        28
+      ]
+    ]
+  ],
+  [
+    "intel corporation 3rd gen core processor graphics controller",
+    "3",
+    "3rd controller core corporation gen graphics intel processor",
+    0,
+    [
+      [
+        1366,
+        768,
+        26
+      ]
+    ]
+  ],
+  [
+    "intel corporation 8th gen core processor gaussian mixture model",
+    "8",
+    "8th core corporation gaussian gen intel mixture model processor",
+    0,
+    [
+      [
+        1366,
+        768,
+        17
+      ]
+    ]
+  ],
+  [
+    "intel corporation atom processor z36xxx/z37xxx series graphics & display",
+    "36",
+    "& atom corporation display graphics intel processor series z36xxx z37xxx",
+    0,
+    [
+      [
+        1280,
+        799,
+        13
+      ],
+      [
+        1366,
+        768,
+        14
+      ]
+    ]
+  ],
+  [
+    "intel corporation atom/celeron/pentium processor n4200 series integrated graphics controller",
+    "4200",
+    "atom celeron controller corporation graphics integrated intel n4200 pentium processor series",
+    0,
+    [
+      [
+        1280,
+        1024,
+        1
+      ]
+    ]
+  ],
+  [
+    "intel corporation atom/celeron/pentium processor x5-e8000 integrated graphics controller",
+    "5",
+    "atom celeron controller corporation graphics integrated intel pentium processor x5-e8000",
+    0,
+    [
+      [
+        1366,
+        768,
+        23
+      ]
+    ]
+  ],
+  [
+    "intel corporation atom/celeron/pentium processor x5-e8000 series pci configuration registers",
+    "5",
+    "atom celeron configuration corporation intel pci pentium processor registers series x5-e8000",
+    0,
+    [
+      [
+        1920,
+        1080,
+        14
+      ]
+    ]
+  ],
+  [
+    "intel corporation broadwell-u integrated",
+    "u",
+    "broadwell-u corporation integrated intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        38
+      ]
+    ]
+  ],
+  [
+    "intel corporation celeron n3350 n4200/atom e3900 series integrated graphics controller",
+    "3350",
+    "atom celeron controller corporation e3900 graphics integrated intel n3350 n4200 series",
+    0,
+    [
+      [
+        1680,
+        1050,
+        11
+      ]
+    ]
+  ],
+  [
+    "intel corporation coffeelake-h gt2 [uhd graphics 630]",
+    "2",
+    " 630 coffeelake-h corporation graphics gt2 intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        56
+      ]
+    ]
+  ],
+  [
+    "intel corporation cometlake-h gt2 [uhd graphics]",
+    "2",
+    " cometlake-h corporation graphics gt2 intel uhd",
+    0,
+    [
+      [
+        3072,
+        1728,
+        29
+      ]
+    ]
+  ],
+  [
+    "intel corporation cometlake-s gt2 [uhd graphics 630]",
+    "2",
+    " 630 cometlake-s corporation graphics gt2 intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        52
+      ]
+    ]
+  ],
+  [
+    "intel corporation cometlake-u gt2 [uhd graphics]",
+    "2",
+    " cometlake-u corporation graphics gt2 intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        33
+      ]
+    ]
+  ],
+  [
+    "intel corporation device",
+    "",
+    "corporation device intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        31
+      ]
+    ]
+  ],
+  [
+    "intel corporation geminilake [uhd graphics 600]",
+    "600",
+    " 600 corporation geminilake graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "intel corporation haswell-ult integrated graphics controller",
+    "ult",
+    "controller corporation graphics haswell-ult integrated intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        31
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd",
+    "hd",
+    "corporation hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        24
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 500",
+    "500",
+    "500 corporation graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        17
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 510",
+    "510",
+    "510 corporation graphics hd intel",
+    0,
+    [
+      [
+        1368,
+        768,
+        48
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 515",
+    "515",
+    "515 corporation graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        29
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 520",
+    "520",
+    "520 corporation graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        58
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 530",
+    "530",
+    "530 corporation graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        45
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 5300",
+    "5300",
+    "5300 corporation graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        34
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 5500",
+    "5500",
+    "5500 corporation graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        28
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 610",
+    "610",
+    "610 corporation graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        28
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 620",
+    "620",
+    "620 corporation graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        43
+      ],
+      [
+        3200,
+        1800,
+        17
+      ]
+    ]
+  ],
+  [
+    "intel corporation hd graphics 630",
+    "630",
+    "630 corporation graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        38
+      ]
+    ]
+  ],
+  [
+    "intel corporation iris graphics 540",
+    "540",
+    "540 corporation graphics intel iris",
+    0,
+    [
+      [
+        1920,
+        1080,
+        53
+      ]
+    ]
+  ],
+  [
+    "intel corporation iris graphics 6100",
+    "6100",
+    "6100 corporation graphics intel iris",
+    0,
+    [
+      [
+        2560,
+        1600,
+        19
+      ]
+    ]
+  ],
+  [
+    "intel corporation iris plus graphics 650",
+    "650",
+    "650 corporation graphics intel iris plus",
+    0,
+    [
+      [
+        1440,
+        900,
+        60
+      ]
+    ]
+  ],
+  [
+    "intel corporation iris plus graphics 655",
+    "655",
+    "655 corporation graphics intel iris plus",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ]
+    ]
+  ],
+  [
+    "intel corporation iris plus graphics g1",
+    "1",
+    "corporation g1 graphics intel iris plus",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ]
+    ]
+  ],
+  [
+    "intel corporation iris plus graphics g7",
+    "7",
+    "corporation g7 graphics intel iris plus",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "intel corporation iris pro graphics 580",
+    "580",
+    "580 corporation graphics intel iris pro",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "intel corporation iris pro graphics 6200",
+    "6200",
+    "6200 corporation graphics intel iris pro",
+    0,
+    [
+      [
+        2560,
+        1080,
+        41
+      ]
+    ]
+  ],
+  [
+    "intel corporation iris xe",
+    "xe",
+    "corporation intel iris xe",
+    0,
+    [
+      [
+        1920,
+        1200,
+        60
+      ]
+    ]
+  ],
+  [
+    "intel corporation sky lake integrated",
+    "sky",
+    "corporation integrated intel lake sky",
+    0,
+    [
+      [
+        2560,
+        1440,
+        52
+      ]
+    ]
+  ],
+  [
+    "intel corporation skylake gt2 [hd graphics 520]",
+    "2",
+    " 520 corporation graphics gt2 hd intel skylake",
+    0,
+    [
+      [
+        1920,
+        1080,
+        42
+      ],
+      [
+        2560,
+        1440,
+        31
+      ]
+    ]
+  ],
+  [
+    "intel corporation skylake integrated",
+    "",
+    "corporation integrated intel skylake",
+    0,
+    [
+      [
+        1920,
+        1080,
+        28
+      ]
+    ]
+  ],
+  [
+    "intel corporation tigerlake gt2 [iris xe graphics]",
+    "2",
+    " corporation graphics gt2 intel iris tigerlake xe",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "intel corporation tigerlake-lp gt2 [iris xe graphics]",
+    "2",
+    " corporation graphics gt2 intel iris tigerlake-lp xe",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "intel corporation uhd",
+    "uhd",
+    "corporation intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        49
+      ]
+    ]
+  ],
+  [
+    "intel corporation uhd graphics 605",
+    "605",
+    "605 corporation graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        18
+      ]
+    ]
+  ],
+  [
+    "intel corporation uhd graphics 615",
+    "615",
+    "615 corporation graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        30
+      ]
+    ]
+  ],
+  [
+    "intel corporation uhd graphics 620",
+    "620",
+    "620 corporation graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        48
+      ]
+    ]
+  ],
+  [
+    "intel corporation uhd graphics 630",
+    "630",
+    "630 corporation graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        53
+      ]
+    ]
+  ],
+  [
+    "intel corporation whiskeylake-u gt2 [uhd graphics 620]",
+    "2",
+    " 620 corporation graphics gt2 intel uhd whiskeylake-u",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ]
+    ]
+  ],
+  [
+    "intel corporation xeon e3-1200 v2 gen core processor graphics controller",
+    "3",
+    "controller core corporation e3-1200 gen graphics intel processor v2 xeon",
+    0,
+    [
+      [
+        1920,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "intel corporation xeon e3-1200 v3 gen core processor integrated graphics controller",
+    "3",
+    "controller core corporation e3-1200 gen graphics integrated intel processor v3 xeon",
+    0,
+    [
+      [
+        1360,
+        768,
+        42
+      ],
+      [
+        1440,
+        900,
+        34
+      ],
+      [
+        1280,
+        1024,
+        23
+      ],
+      [
+        1920,
+        1080,
+        22
+      ]
+    ]
+  ],
+  [
+    "intel corporation, series chipset iris plus graphics 655",
+    "655",
+    " 655 chipset corporation graphics intel iris plus series",
+    0,
+    [
+      [
+        1920,
+        1080,
+        42
+      ]
+    ]
+  ],
+  [
+    "intel data center gpu flex series 140",
+    "140",
+    "140 center data flex gpu intel series",
+    0,
+    [
+      [
+        1920,
+        1080,
+        203
+      ]
+    ]
+  ],
+  [
+    "intel geforce gtx 960",
+    "960",
+    "960 geforce gtx intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "intel gen12 desktop graphics controller",
+    "12",
+    "controller desktop gen12 graphics intel",
+    0,
+    [
+      [
+        3840,
+        2160,
+        19
+      ]
+    ]
+  ],
+  [
+    "intel graphics gfx-driver-user-feature_dg1_poweron-27723 dch releaseinternal",
+    "1",
+    "dch gfx-driver-user-feature_dg1_poweron-27723 graphics intel releaseinternal",
+    0,
+    [
+      [
+        3840,
+        2160,
+        11
+      ]
+    ]
+  ],
+  [
+    "intel graphics hd 4600",
+    "4600",
+    "4600 graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        35
+      ]
+    ]
+  ],
+  [
+    "intel hd",
+    "hd",
+    "hd intel",
+    0,
+    [
+      [
+        1280,
+        800,
+        18
+      ],
+      [
+        1366,
+        768,
+        30
+      ],
+      [
+        1600,
+        900,
+        20
+      ],
+      [
+        1920,
+        1080,
+        20
+      ],
+      [
+        1920,
+        1200,
+        17
+      ],
+      [
+        1920,
+        1280,
+        14
+      ],
+      [
+        3000,
+        2002,
+        6
+      ],
+      [
+        4096,
+        2160,
+        4
+      ]
+    ]
+  ],
+  [
+    "intel hd 4000",
+    "4000",
+    "4000 hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        45
+      ]
+    ]
+  ],
+  [
+    "intel hd 530",
+    "530",
+    "530 hd intel",
+    0,
+    [
+      [
+        1920,
+        1200,
+        53
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 3000",
+    "3000",
+    "3000 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        44
+      ],
+      [
+        1920,
+        1080,
+        18
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 4000",
+    "4000",
+    "4000 graphics hd intel",
+    0,
+    [
+      [
+        1280,
+        800,
+        37
+      ],
+      [
+        1366,
+        768,
+        29
+      ],
+      [
+        1440,
+        900,
+        29
+      ],
+      [
+        1680,
+        1050,
+        27
+      ],
+      [
+        1920,
+        1080,
+        21
+      ],
+      [
+        2560,
+        1600,
+        11
+      ],
+      [
+        2880,
+        1800,
+        12
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 4000,,,,,,,",
+    "4000",
+    " 4000 graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        19
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 4400",
+    "4400",
+    "4400 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        41
+      ],
+      [
+        1280,
+        1024,
+        32
+      ],
+      [
+        1600,
+        900,
+        36
+      ],
+      [
+        1680,
+        1050,
+        32
+      ],
+      [
+        1920,
+        1080,
+        23
+      ],
+      [
+        2160,
+        1440,
+        17
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 4600",
+    "4600",
+    "4600 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        14
+      ],
+      [
+        1280,
+        960,
+        65
+      ],
+      [
+        1280,
+        1024,
+        60
+      ],
+      [
+        1600,
+        900,
+        33
+      ],
+      [
+        1680,
+        1050,
+        30
+      ],
+      [
+        1600,
+        1200,
+        47
+      ],
+      [
+        1920,
+        1080,
+        26
+      ],
+      [
+        2880,
+        1620,
+        14
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 500",
+    "500",
+    "500 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        27
+      ],
+      [
+        1920,
+        1080,
+        9
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 5000",
+    "5000",
+    "5000 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        52
+      ],
+      [
+        1440,
+        900,
+        45
+      ],
+      [
+        1920,
+        1032,
+        16
+      ],
+      [
+        1920,
+        1080,
+        32
+      ],
+      [
+        2160,
+        1439,
+        18
+      ],
+      [
+        2160,
+        1440,
+        18
+      ],
+      [
+        2560,
+        1440,
+        15
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 505",
+    "505",
+    "505 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        28
+      ],
+      [
+        1920,
+        1080,
+        15
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 510",
+    "510",
+    "510 graphics hd intel",
+    0,
+    [
+      [
+        1024,
+        768,
+        75
+      ],
+      [
+        1366,
+        768,
+        28
+      ],
+      [
+        1440,
+        900,
+        46
+      ],
+      [
+        1680,
+        1050,
+        12
+      ],
+      [
+        1920,
+        1080,
+        25
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 515",
+    "515",
+    "515 graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        42
+      ],
+      [
+        2720,
+        768,
+        22
+      ],
+      [
+        1920,
+        1280,
+        31
+      ],
+      [
+        2160,
+        1440,
+        23
+      ],
+      [
+        2560,
+        1600,
+        14
+      ],
+      [
+        2736,
+        1824,
+        17
+      ],
+      [
+        3200,
+        1800,
+        12
+      ],
+      [
+        3840,
+        2160,
+        10
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 520",
+    "520",
+    "520 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        53
+      ],
+      [
+        1920,
+        1080,
+        28
+      ],
+      [
+        2736,
+        1824,
+        22
+      ],
+      [
+        3000,
+        2000,
+        18
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 530",
+    "530",
+    "530 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        21
+      ],
+      [
+        1280,
+        1024,
+        33
+      ],
+      [
+        1920,
+        1080,
+        29
+      ],
+      [
+        1920,
+        1200,
+        39
+      ],
+      [
+        3360,
+        2100,
+        16
+      ],
+      [
+        3840,
+        2160,
+        6
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 5300",
+    "5300",
+    "5300 graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        25
+      ],
+      [
+        2304,
+        1440,
+        19
+      ],
+      [
+        2560,
+        1600,
+        11
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 5500",
+    "5500",
+    "5500 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        30
+      ],
+      [
+        1920,
+        1080,
+        20
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 5600",
+    "5600",
+    "5600 graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        26
+      ],
+      [
+        1920,
+        1200,
+        39
+      ],
+      [
+        2880,
+        1620,
+        21
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 6000",
+    "6000",
+    "6000 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        49
+      ],
+      [
+        1440,
+        900,
+        51
+      ],
+      [
+        1920,
+        1080,
+        22
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 610",
+    "610",
+    "610 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        52
+      ],
+      [
+        1600,
+        900,
+        41
+      ],
+      [
+        1920,
+        1080,
+        33
+      ],
+      [
+        3840,
+        2160,
+        7
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 615",
+    "615",
+    "615 graphics hd intel",
+    0,
+    [
+      [
+        1600,
+        900,
+        13
+      ],
+      [
+        1920,
+        1080,
+        26
+      ],
+      [
+        1800,
+        1200,
+        39
+      ],
+      [
+        1920,
+        1200,
+        30
+      ],
+      [
+        2560,
+        1440,
+        23
+      ],
+      [
+        2560,
+        1600,
+        18
+      ],
+      [
+        2736,
+        1824,
+        19
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 620",
+    "620",
+    "620 graphics hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        28
+      ],
+      [
+        2736,
+        1824,
+        21
+      ],
+      [
+        3200,
+        1800,
+        25
+      ],
+      [
+        3840,
+        2160,
+        18
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 620 macos",
+    "620",
+    "620 graphics hd intel macos",
+    0,
+    [
+      [
+        1920,
+        1080,
+        54
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 630",
+    "630",
+    "630 graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        69
+      ],
+      [
+        1920,
+        1080,
+        38
+      ],
+      [
+        2560,
+        1440,
+        27
+      ],
+      [
+        2560,
+        1600,
+        25
+      ],
+      [
+        3360,
+        2100,
+        18
+      ],
+      [
+        3840,
+        2160,
+        17
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics 630 gt2",
+    "630",
+    "630 graphics gt2 hd intel",
+    0,
+    [
+      [
+        1920,
+        1080,
+        39
+      ],
+      [
+        1720,
+        1440,
+        120
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics cfl crb",
+    "hdcfl",
+    "cfl crb graphics hd intel",
+    0,
+    [
+      [
+        2560,
+        1440,
+        41
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics family",
+    "hd",
+    "family graphics hd intel",
+    0,
+    [
+      [
+        1366,
+        768,
+        44
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics icl rvp",
+    "hdicl",
+    "graphics hd icl intel rvp",
+    0,
+    [
+      [
+        1920,
+        1080,
+        58
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics icl rvp bigsur",
+    "hdicl",
+    "bigsur graphics hd icl intel rvp",
+    0,
+    [
+      [
+        1920,
+        1080,
+        46
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics kbl crb",
+    "hdkbl",
+    "crb graphics hd intel kbl",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ],
+      [
+        3840,
+        2160,
+        12
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics p4600",
+    "4600",
+    "graphics hd intel p4600",
+    0,
+    [
+      [
+        1280,
+        1024,
+        54
+      ],
+      [
+        1920,
+        1080,
+        17
+      ],
+      [
+        2560,
+        1600,
+        54
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics p530",
+    "530",
+    "graphics hd intel p530",
+    0,
+    [
+      [
+        2560,
+        1440,
+        36
+      ],
+      [
+        3840,
+        2160,
+        20
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics p630",
+    "630",
+    "graphics hd intel p630",
+    0,
+    [
+      [
+        1440,
+        900,
+        35
+      ],
+      [
+        1920,
+        1200,
+        50
+      ]
+    ]
+  ],
+  [
+    "intel hd graphics, gen10",
+    "10",
+    " gen10 graphics hd intel",
+    0,
+    [
+      [
+        3840,
+        2160,
+        4
+      ]
+    ]
+  ],
+  [
+    "intel hd5500 broadwell pg7",
+    "5500",
+    "broadwell hd5500 intel pg7",
+    0,
+    [
+      [
+        1366,
+        768,
+        31
+      ]
+    ]
+  ],
+  [
+    "intel hd5500 graphics pg7",
+    "5500",
+    "graphics hd5500 intel pg7",
+    0,
+    [
+      [
+        1366,
+        768,
+        56
+      ]
+    ]
+  ],
+  [
+    "intel iris",
+    "",
+    "intel iris",
+    0,
+    [
+      [
+        1600,
+        900,
+        34
+      ],
+      [
+        1920,
+        1080,
+        34
+      ],
+      [
+        2560,
+        1600,
+        22
+      ],
+      [
+        3840,
+        2160,
+        9
+      ]
+    ]
+  ],
+  [
+    "intel iris graphics 5100",
+    "5100",
+    "5100 graphics intel iris",
+    0,
+    [
+      [
+        1920,
+        1080,
+        37
+      ],
+      [
+        2560,
+        1600,
+        10
+      ],
+      [
+        3840,
+        2160,
+        8
+      ]
+    ]
+  ],
+  [
+    "intel iris graphics 540",
+    "540",
+    "540 graphics intel iris",
+    0,
+    [
+      [
+        1920,
+        1080,
+        19
+      ],
+      [
+        2736,
+        1824,
+        27
+      ],
+      [
+        2880,
+        1800,
+        20
+      ],
+      [
+        3200,
+        1800,
+        15
+      ],
+      [
+        3840,
+        2160,
+        17
+      ]
+    ]
+  ],
+  [
+    "intel iris graphics 550",
+    "550",
+    "550 graphics intel iris",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        2160,
+        1440,
+        29
+      ],
+      [
+        2560,
+        1600,
+        28
+      ],
+      [
+        2880,
+        1800,
+        21
+      ],
+      [
+        3840,
+        2160,
+        24
+      ]
+    ]
+  ],
+  [
+    "intel iris graphics 6100",
+    "6100",
+    "6100 graphics intel iris",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        2560,
+        1600,
+        20
+      ],
+      [
+        3360,
+        2100,
+        12
+      ]
+    ]
+  ],
+  [
+    "intel iris graphics 6200",
+    "6200",
+    "6200 graphics intel iris",
+    0,
+    [
+      [
+        4096,
+        2304,
+        13
+      ]
+    ]
+  ],
+  [
+    "intel iris graphics 640",
+    "640",
+    "640 graphics intel iris",
+    0,
+    [
+      [
+        2256,
+        1504,
+        24
+      ],
+      [
+        3840,
+        2160,
+        9
+      ]
+    ]
+  ],
+  [
+    "intel iris graphics 650",
+    "650",
+    "650 graphics intel iris",
+    0,
+    [
+      [
+        2560,
+        1440,
+        21
+      ]
+    ]
+  ],
+  [
+    "intel iris graphics p580",
+    "580",
+    "graphics intel iris p580",
+    0,
+    [
+      [
+        3840,
+        2160,
+        12
+      ]
+    ]
+  ],
+  [
+    "intel iris plus",
+    "",
+    "intel iris plus",
+    0,
+    [
+      [
+        1920,
+        1080,
+        51
+      ],
+      [
+        2256,
+        1504,
+        79
+      ],
+      [
+        2496,
+        1664,
+        85
+      ],
+      [
+        2736,
+        1824,
+        46
+      ],
+      [
+        2880,
+        1800,
+        47
+      ],
+      [
+        3000,
+        2000,
+        46
+      ]
+    ]
+  ],
+  [
+    "intel iris plus graphics 640",
+    "640",
+    "640 graphics intel iris plus",
+    0,
+    [
+      [
+        1920,
+        1080,
+        81
+      ],
+      [
+        2256,
+        1504,
+        36
+      ],
+      [
+        2560,
+        1600,
+        40
+      ],
+      [
+        2736,
+        1824,
+        27
+      ],
+      [
+        2880,
+        1800,
+        24
+      ],
+      [
+        3072,
+        1728,
+        25
+      ],
+      [
+        3200,
+        1800,
+        28
+      ],
+      [
+        3840,
+        2160,
+        16
+      ]
+    ]
+  ],
+  [
+    "intel iris plus graphics 645",
+    "645",
+    "645 graphics intel iris plus",
+    0,
+    [
+      [
+        2560,
+        1599,
+        29
+      ],
+      [
+        2560,
+        1600,
+        56
+      ],
+      [
+        2880,
+        1800,
+        44
+      ]
+    ]
+  ],
+  [
+    "intel iris plus graphics 650",
+    "650",
+    "650 graphics intel iris plus",
+    0,
+    [
+      [
+        1920,
+        1080,
+        52
+      ],
+      [
+        2560,
+        1600,
+        49
+      ],
+      [
+        2880,
+        1800,
+        40
+      ],
+      [
+        3840,
+        2160,
+        29
+      ]
+    ]
+  ],
+  [
+    "intel iris plus graphics 655",
+    "655",
+    "655 graphics intel iris plus",
+    0,
+    [
+      [
+        1920,
+        1080,
+        110
+      ],
+      [
+        2880,
+        1800,
+        47
+      ],
+      [
+        3840,
+        2160,
+        29
+      ]
+    ]
+  ],
+  [
+    "intel iris plus graphics g1",
+    "1",
+    "g1 graphics intel iris plus",
+    0,
+    [
+      [
+        1920,
+        1080,
+        30
+      ]
+    ]
+  ],
+  [
+    "intel iris plus graphics g7",
+    "7",
+    "g7 graphics intel iris plus",
+    0,
+    [
+      [
+        1920,
+        1080,
+        53
+      ]
+    ]
+  ],
+  [
+    "intel iris pro",
+    "pro",
+    "intel iris pro",
+    0,
+    [
+      [
+        1920,
+        1080,
+        46
+      ]
+    ]
+  ],
+  [
+    "intel iris pro graphics 5200",
+    "5200",
+    "5200 graphics intel iris pro",
+    0,
+    [
+      [
+        1920,
+        1080,
+        53
+      ],
+      [
+        2879,
+        1800,
+        22
+      ],
+      [
+        2880,
+        1800,
+        23
+      ],
+      [
+        3360,
+        2100,
+        22
+      ]
+    ]
+  ],
+  [
+    "intel iris pro graphics 580",
+    "580",
+    "580 graphics intel iris pro",
+    0,
+    [
+      [
+        1920,
+        1080,
+        54
+      ],
+      [
+        2560,
+        1440,
+        57
+      ],
+      [
+        3840,
+        1600,
+        27
+      ]
+    ]
+  ],
+  [
+    "intel iris pro graphics 6200",
+    "6200",
+    "6200 graphics intel iris pro",
+    0,
+    [
+      [
+        1366,
+        696,
+        38
+      ],
+      [
+        1920,
+        1080,
+        54
+      ],
+      [
+        1920,
+        1200,
+        59
+      ],
+      [
+        3840,
+        2160,
+        19
+      ],
+      [
+        4096,
+        2304,
+        16
+      ]
+    ]
+  ],
+  [
+    "intel iris pro graphics p580",
+    "580",
+    "graphics intel iris p580 pro",
+    0,
+    [
+      [
+        1024,
+        768,
+        42
+      ],
+      [
+        1920,
+        1080,
+        103
+      ],
+      [
+        3840,
+        2160,
+        27
+      ]
+    ]
+  ],
+  [
+    "intel iris pro graphics p6300",
+    "6300",
+    "graphics intel iris p6300 pro",
+    0,
+    [
+      [
+        1366,
+        768,
+        34
+      ],
+      [
+        1440,
+        900,
+        128
+      ],
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "intel iris xe",
+    "xe",
+    "intel iris xe",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ]
+    ]
+  ],
+  [
+    "intel iris xe graphics releaseinternal",
+    "xe",
+    "graphics intel iris releaseinternal xe",
+    0,
+    [
+      [
+        3840,
+        2160,
+        38
+      ]
+    ]
+  ],
+  [
+    "intel iris xe graphics ri",
+    "xeri",
+    "graphics intel iris ri xe",
+    0,
+    [
+      [
+        3840,
+        2160,
+        48
+      ]
+    ]
+  ],
+  [
+    "intel iris xe max",
+    "xe",
+    "intel iris max xe",
+    0,
+    [
+      [
+        1920,
+        1080,
+        59
+      ],
+      [
+        3840,
+        2160,
+        56
+      ]
+    ]
+  ],
+  [
+    "intel kabylake hd graphics ult gt2",
+    "2",
+    "graphics gt2 hd intel kabylake ult",
+    0,
+    [
+      [
+        3840,
+        2160,
+        11
+      ]
+    ]
+  ],
+  [
+    "intel kabylake hd graphics ulx gt2",
+    "2",
+    "graphics gt2 hd intel kabylake ulx",
+    0,
+    [
+      [
+        1920,
+        1080,
+        28
+      ],
+      [
+        3840,
+        2160,
+        6
+      ]
+    ]
+  ],
+  [
+    "intel kbl unknown",
+    "kbl",
+    "intel kbl unknown",
+    0,
+    [
+      [
+        1920,
+        1080,
+        49
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel bay trail",
+    "dribay",
+    "bay dri intel mesa trail",
+    0,
+    [
+      [
+        1366,
+        768,
+        14
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel haswell mobile",
+    "dri",
+    "dri haswell intel mesa mobile",
+    0,
+    [
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel hd",
+    "drihd",
+    "dri hd intel mesa",
+    0,
+    [
+      [
+        1920,
+        1080,
+        10
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel hd graphics 400",
+    "400",
+    "400 dri graphics hd intel mesa",
+    0,
+    [
+      [
+        1366,
+        768,
+        36
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel hd graphics 505",
+    "505",
+    "505 dri graphics hd intel mesa",
+    0,
+    [
+      [
+        1920,
+        1080,
+        27
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel hd graphics 520",
+    "520",
+    "520 dri graphics hd intel mesa",
+    0,
+    [
+      [
+        1920,
+        1080,
+        45
+      ],
+      [
+        2560,
+        1440,
+        21
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel hd graphics 530",
+    "530",
+    "530 dri graphics hd intel mesa",
+    0,
+    [
+      [
+        3840,
+        2160,
+        12
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel hd graphics 5500",
+    "5500",
+    "5500 dri graphics hd intel mesa",
+    0,
+    [
+      [
+        1366,
+        768,
+        40
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel hd graphics 620",
+    "620",
+    "620 dri graphics hd intel mesa",
+    0,
+    [
+      [
+        1920,
+        1080,
+        38
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel hd graphics 630",
+    "630",
+    "630 dri graphics hd intel mesa",
+    0,
+    [
+      [
+        1477,
+        831,
+        58
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel hd graphics p4000",
+    "4000",
+    "dri graphics hd intel mesa p4000",
+    0,
+    [
+      [
+        1920,
+        1080,
+        36
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel iris graphics 540",
+    "540",
+    "540 dri graphics intel iris mesa",
+    0,
+    [
+      [
+        1280,
+        720,
+        40
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel ivybridge desktop",
+    "dri",
+    "desktop dri intel ivybridge mesa",
+    0,
+    [
+      [
+        2560,
+        1080,
+        16
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel ivybridge mobile",
+    "dri",
+    "dri intel ivybridge mesa mobile",
+    0,
+    [
+      [
+        1920,
+        1080,
+        25
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel kabylake gt2",
+    "2",
+    "dri gt2 intel kabylake mesa",
+    0,
+    [
+      [
+        1920,
+        1080,
+        36
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel sandybridge desktop",
+    "dri",
+    "desktop dri intel mesa sandybridge",
+    0,
+    [
+      [
+        1280,
+        1024,
+        12
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel sandybridge mobile",
+    "dri",
+    "dri intel mesa mobile sandybridge",
+    0,
+    [
+      [
+        1366,
+        768,
+        30
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel uhd graphics 620",
+    "620",
+    "620 dri graphics intel mesa uhd",
+    0,
+    [
+      [
+        2736,
+        1824,
+        22
+      ]
+    ]
+  ],
+  [
+    "intel mesa dri intel uhd graphics 630",
+    "630",
+    "630 dri graphics intel mesa uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        42
+      ]
+    ]
+  ],
+  [
+    "intel mesa intel hd graphics 520",
+    "520",
+    "520 graphics hd intel mesa",
+    0,
+    [
+      [
+        1920,
+        1080,
+        47
+      ]
+    ]
+  ],
+  [
+    "intel mesa intel hd graphics 530",
+    "530",
+    "530 graphics hd intel mesa",
+    0,
+    [
+      [
+        1920,
+        1080,
+        55
+      ]
+    ]
+  ],
+  [
+    "intel phdgd ivy 4",
+    "4",
+    "4 intel ivy phdgd",
+    0,
+    [
+      [
+        1366,
+        768,
+        37
+      ]
+    ]
+  ],
+  [
+    "intel radeon pro vega 16",
+    "16",
+    "16 intel pro radeon vega",
+    0,
+    [
+      [
+        3360,
+        1890,
+        20
+      ]
+    ]
+  ],
+  [
+    "intel radeong 0.4 on amd bonaire",
+    "0",
+    "0 4 amd bonaire intel on radeong",
+    0,
+    [
+      [
+        1920,
+        1200,
+        92
+      ]
+    ]
+  ],
+  [
+    "intel radeong 0.4 on amd cape verde",
+    "0",
+    "0 4 amd cape intel on radeong verde",
+    0,
+    [
+      [
+        1920,
+        1200,
+        73
+      ]
+    ]
+  ],
+  [
+    "intel radeong 0.4 on amd polaris10",
+    "0",
+    "0 4 amd intel on polaris10 radeong",
+    0,
+    [
+      [
+        3840,
+        2160,
+        108
+      ]
+    ]
+  ],
+  [
+    "intel radeong 0.4 on amd tonga",
+    "0",
+    "0 4 amd intel on radeong tonga",
+    0,
+    [
+      [
+        1920,
+        1080,
+        119
+      ]
+    ]
+  ],
+  [
+    "intel skl unknown",
+    "skl",
+    "intel skl unknown",
+    0,
+    [
+      [
+        1920,
+        1080,
+        42
+      ]
+    ]
+  ],
+  [
+    "intel skylake gt2 [hd graphics 520]",
+    "2",
+    " 520 graphics gt2 hd intel skylake",
+    0,
+    [
+      [
+        1920,
+        1080,
+        39
+      ]
+    ]
+  ],
+  [
+    "intel uhd",
+    "uhd",
+    "intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        29
+      ],
+      [
+        2560,
+        1600,
+        22
+      ],
+      [
+        3440,
+        1440,
+        14
+      ],
+      [
+        2736,
+        1824,
+        28
+      ],
+      [
+        3840,
+        2160,
+        14
+      ]
+    ]
+  ],
+  [
+    "intel uhd 630",
+    "630",
+    "630 intel uhd",
+    0,
+    [
+      [
+        2560,
+        1440,
+        37
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 600",
+    "600",
+    "600 graphics intel uhd",
+    0,
+    [
+      [
+        1366,
+        768,
+        21
+      ],
+      [
+        1920,
+        1080,
+        17
+      ],
+      [
+        1920,
+        1200,
+        13
+      ],
+      [
+        2560,
+        1440,
+        11
+      ],
+      [
+        3840,
+        2160,
+        5
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 600 universal",
+    "600",
+    "600 graphics intel uhd universal",
+    0,
+    [
+      [
+        1919,
+        1031,
+        15
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 605",
+    "605",
+    "605 graphics intel uhd",
+    0,
+    [
+      [
+        1366,
+        768,
+        26
+      ],
+      [
+        1920,
+        1080,
+        29
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 610",
+    "610",
+    "610 graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        24
+      ],
+      [
+        1920,
+        1200,
+        37
+      ],
+      [
+        2560,
+        1440,
+        17
+      ],
+      [
+        3840,
+        2160,
+        11
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 615",
+    "615",
+    "615 graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        33
+      ],
+      [
+        1920,
+        1280,
+        37
+      ],
+      [
+        3840,
+        2160,
+        9
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 617",
+    "617",
+    "617 graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        43
+      ],
+      [
+        2560,
+        1599,
+        24
+      ],
+      [
+        2560,
+        1600,
+        26
+      ],
+      [
+        2880,
+        1800,
+        20
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 620",
+    "620",
+    "620 graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        29
+      ],
+      [
+        2736,
+        1824,
+        29
+      ],
+      [
+        3200,
+        1800,
+        14
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 630",
+    "630",
+    "630 graphics intel uhd",
+    0,
+    [
+      [
+        1440,
+        900,
+        112
+      ],
+      [
+        1920,
+        1080,
+        52
+      ],
+      [
+        1920,
+        1200,
+        65
+      ],
+      [
+        2560,
+        1080,
+        68
+      ],
+      [
+        2560,
+        1440,
+        26
+      ],
+      [
+        3440,
+        1440,
+        23
+      ],
+      [
+        3584,
+        2240,
+        22
+      ],
+      [
+        3840,
+        2160,
+        14
+      ],
+      [
+        6016,
+        3384,
+        8
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 710",
+    "710",
+    "710 graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        44
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 730",
+    "730",
+    "730 graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        26
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 750",
+    "750",
+    "750 graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        57
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics 770",
+    "770",
+    "770 graphics intel uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        60
+      ],
+      [
+        3840,
+        2160,
+        13
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics g1",
+    "1",
+    "g1 graphics intel uhd",
+    0,
+    [
+      [
+        1600,
+        900,
+        57
+      ],
+      [
+        3360,
+        1890,
+        25
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics gfx-driver-user-comp_core-23599",
+    "23599",
+    "gfx-driver-user-comp_core-23599 graphics intel uhd",
+    0,
+    [
+      [
+        3840,
+        2160,
+        18
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics p630",
+    "630",
+    "graphics intel p630 uhd",
+    0,
+    [
+      [
+        1920,
+        1080,
+        85
+      ],
+      [
+        3840,
+        2160,
+        21
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics releaseinternal",
+    "uhd",
+    "graphics intel releaseinternal uhd",
+    0,
+    [
+      [
+        3199,
+        1800,
+        22
+      ],
+      [
+        3000,
+        2000,
+        47
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics ri",
+    "uhdri",
+    "graphics intel ri uhd",
+    0,
+    [
+      [
+        1920,
+        1280,
+        37
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics, gen11 lp",
+    "11",
+    " gen11 graphics intel lp uhd",
+    0,
+    [
+      [
+        3840,
+        2160,
+        4
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics, gen12 lp releaseinternal",
+    "12",
+    " gen12 graphics intel lp releaseinternal uhd",
+    0,
+    [
+      [
+        3839,
+        2159,
+        4
+      ]
+    ]
+  ],
+  [
+    "intel uhd graphics, lkf",
+    "uhdlkf",
+    " graphics intel lkf uhd",
+    0,
+    [
+      [
+        1927,
+        1439,
+        14
+      ]
+    ]
+  ],
+  [
+    "intel unknown",
+    "",
+    "intel unknown",
+    0,
+    [
+      [
+        1920,
+        1080,
+        36
+      ]
+    ]
+  ],
+  [
+    "intel xe",
+    "xe",
+    "intel xe",
+    0,
+    [
+      [
+        1920,
+        1080,
+        257
+      ],
+      [
+        2560,
+        1440,
+        129
+      ]
+    ]
+  ],
+  [
+    "intel xe graphics releaseinternal",
+    "xe",
+    "graphics intel releaseinternal xe",
+    0,
+    [
+      [
+        3840,
+        2160,
+        151
+      ]
+    ]
+  ],
+  [
+    "intel xeon e3-1200 v3 gen core processor integrated graphics controller",
+    "3",
+    "controller core e3-1200 gen graphics integrated intel processor v3 xeon",
+    0,
+    [
+      [
+        1600,
+        900,
+        25
+      ]
+    ]
+  ]
+]

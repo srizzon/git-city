@@ -170,10 +170,21 @@ function createWindowTexture(
 
 // ─── Claimed Glow (neon trim + roof light) ────────────────────
 
-export const ClaimedGlow = memo(function ClaimedGlow({ height, width, depth }: { height: number; width: number; depth: number }) {
+export const ClaimedGlow = memo(function ClaimedGlow({
+  height,
+  width,
+  depth,
+  color,
+}: {
+  height: number;
+  width: number;
+  depth: number;
+  /** Roofline trim color — pass the owner's XP-tier color; defaults to city lime. */
+  color?: string;
+}) {
   const trimThickness = 1.2;
   const trimHeight = 2;
-  const accent = "#c8e64a";
+  const accent = color ?? "#c8e64a";
   const hw = width / 2 + trimThickness / 2;
   const hd = depth / 2 + trimThickness / 2;
 
@@ -667,7 +678,14 @@ export default function Building3D({ building, colors, atlasTexture, introMode, 
       />
 
       {/* Skip heavy effects during intro - camera moves too fast to see them */}
-      {!introMode && building.claimed && <ClaimedGlow height={building.height} width={building.width} depth={building.depth} />}
+      {!introMode && building.claimed && (
+        <ClaimedGlow
+          height={building.height}
+          width={building.width}
+          depth={building.depth}
+          color={tierFromLevel(building.xp_level ?? 1).color}
+        />
+      )}
 
       {!introMode && focused && <FocusBeacon height={building.height} width={building.width} depth={building.depth} accentColor={accentColor ?? "#c8e64a"} />}
 

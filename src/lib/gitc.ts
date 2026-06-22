@@ -53,6 +53,48 @@ export function assertTreasuryConfigured(): void {
   }
 }
 
+/** USDC on Base (6 decimals) — an input token for the Exchange. */
+export const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
+
+/** 0x's sentinel address for the chain-native token (ETH on Base). */
+export const NATIVE_ETH_SENTINEL = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE" as const;
+
+/** Default slippage tolerance for GITC swaps (micro-cap → needs headroom). */
+export const GITC_SWAP_DEFAULT_SLIPPAGE_BPS = 300; // 3%
+
+/** Selectable slippage presets shown in the Exchange ⚙ control, in bps. */
+export const GITC_SWAP_SLIPPAGE_PRESETS_BPS = [100, 300, 500] as const;
+
+/** An input token the player can sell to acquire GITC in the Exchange. */
+export interface SwapInput {
+  id: "USDC" | "ETH";
+  label: string;
+  decimals: number;
+  /** What the 0x Swap API expects as `sellToken`. */
+  zeroxToken: string;
+  /** What Uniswap's `inputCurrency` query param expects (fallback deep-link). */
+  uniToken: string;
+  /** Brand dot color for the token pill. */
+  dot: string;
+}
+
+export const SWAP_INPUTS: SwapInput[] = [
+  { id: "USDC", label: "USDC", decimals: 6, zeroxToken: USDC_BASE_ADDRESS, uniToken: USDC_BASE_ADDRESS, dot: "#2775ca" },
+  { id: "ETH", label: "ETH", decimals: 18, zeroxToken: NATIVE_ETH_SENTINEL, uniToken: "ETH", dot: "#8a92b2" },
+];
+
+/**
+ * Uniswap deep-link to buy GITC on Base — the Exchange's fallback when the 0x
+ * native swap is unavailable (no API key) or can't route the trade.
+ */
+export function buildUniswapSwapUrl(opts: { inputCurrency: string; amount?: number }): string {
+  const base =
+    `https://app.uniswap.org/swap?chain=base` +
+    `&inputCurrency=${encodeURIComponent(opts.inputCurrency)}` +
+    `&outputCurrency=${GITC_ADDRESS}`;
+  return opts.amount && opts.amount > 0 ? `${base}&exactAmount=${opts.amount}&exactField=input` : base;
+}
+
 /** Discount applied when paying with GITC, in basis points (0 = no discount). */
 export const GITC_DISCOUNT_BPS = 0;
 

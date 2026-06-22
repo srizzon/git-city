@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { autoEquipIfSolo } from "@/lib/items";
 import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
@@ -7,6 +8,17 @@ import { SKY_AD_PLANS, isValidPlanId, getPriceCents, type AdPeriod } from "@/lib
 import { AD_PACKAGES, isValidPackageId, getPackagePriceCents, type AdPackageId } from "@/lib/adPackages";
 
 export const dynamic = "force-dynamic";
+
+/** Constant-time secret compare — avoids leaking the secret via response timing. */
+function secretsMatch(received: string | null, expected: string): boolean {
+  if (!received) return false;
+  const a = Buffer.from(received);
+  const b = Buffer.from(expected);
+  // Length check is safe to short-circuit (length isn't the secret) and is
+  // required because timingSafeEqual throws on differing buffer lengths.
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractPixId(data: any): string | undefined {
@@ -25,7 +37,7 @@ export async function POST(request: Request) {
   }
   const { searchParams } = new URL(request.url);
   const receivedSecret = searchParams.get("webhookSecret");
-  if (receivedSecret !== expectedSecret) {
+  if (!secretsMatch(receivedSecret, expectedSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
