@@ -240,6 +240,7 @@ async function refreshDeveloper(
         ...(cached.github_etag ? { "If-None-Match": String(cached.github_etag) } : {}),
       },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      cache: "no-store",
     },
   );
 
@@ -255,7 +256,7 @@ async function refreshDeveloper(
     fetchExpandedGitHubData(login),
     fetch(
       `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=1`,
-      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" },
     ),
   ]);
 
@@ -267,7 +268,7 @@ async function refreshDeveloper(
   if (repos.length >= 100) {
     const page2Res = await fetch(
       `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=2`,
-      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" },
     );
     if (page2Res.ok) {
       const page2: RepoItem[] = await page2Res.json();
