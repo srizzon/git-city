@@ -106,6 +106,7 @@ const EArcadeCard = dynamic(() => import("@/components/EArcadeCard"), { ssr: fal
 const GiftPreview = dynamic(() => import("@/components/ShopPreview"), { ssr: false });
 const BankPanel = dynamic(() => import("@/components/BankPanel"), { ssr: false });
 const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ssr: false });
+const SponsorCityCard = dynamic(() => import("@/lib/sponsors/SponsorCityCard"), { ssr: false });
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
 const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
 const LevelUpToast = dynamic(() => import("@/components/LevelUpToast"), { ssr: false });
@@ -6627,10 +6628,15 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         />
       )}
 
-      {/* Sponsored landmark card */}
+      {/* Sponsored landmark card — Git City's own sponsor landmark gets a
+          dedicated, persuasive card; third-party sponsors use the generic one. */}
       {activeSponsor && (() => {
         const cfg = resolvedSponsors.find((s) => s.slug === activeSponsor);
-        return cfg ? <SponsoredCard config={cfg} onClose={() => setActiveSponsor(null)} /> : null;
+        if (!cfg) return null;
+        const isOwnSponsor = cfg.url.includes("github.com/sponsors");
+        return isOwnSponsor
+          ? <SponsorCityCard config={cfg} onClose={() => setActiveSponsor(null)} />
+          : <SponsoredCard config={cfg} onClose={() => setActiveSponsor(null)} />;
       })()}
 
       {/* Rabbit Quest Cinematic Overlay */}

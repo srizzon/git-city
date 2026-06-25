@@ -1,4 +1,5 @@
 import { FIRECRAWL_FLAME_BM, FIRECRAWL_FLAME_CORE_BM } from "./firecrawl-flame";
+import { HEART_BM, HEART_CORE_BM } from "./sponsor-heart";
 
 export interface FacadeBitmap {
   name: string;
@@ -15,6 +16,12 @@ export const FACADE_BITMAPS: Record<string, FacadeBitmap> = {
     bitmap: FIRECRAWL_FLAME_BM,
     coreBitmap: FIRECRAWL_FLAME_CORE_BM,
     coreColor: "#ffe27a",
+  },
+  "sponsor-heart": {
+    name: "Sponsor heart",
+    bitmap: HEART_BM,
+    coreBitmap: HEART_CORE_BM,
+    coreColor: "#fff3c4",
   },
 };
 

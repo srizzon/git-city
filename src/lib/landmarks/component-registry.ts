@@ -6,6 +6,7 @@ import FirecrawlBuilding from "@/lib/sponsors/buildings/FirecrawlBuilding";
 import GuaraCloudBuilding from "@/lib/sponsors/buildings/GuaraCloudBuilding";
 import SolanaHackathonBuilding from "@/lib/sponsors/buildings/SolanaHackathonBuilding";
 import UltraContextBuilding from "@/lib/sponsors/buildings/UltraContextBuilding";
+import SponsorCityBuilding from "@/lib/sponsors/buildings/SponsorCityBuilding";
 import type { CustomComponentName } from "./custom-component-names";
 
 /**
@@ -34,4 +35,5 @@ export const CUSTOM_COMPONENTS: Record<
   guaracloud: GuaraCloudBuilding,
   "solana-hackathon": SolanaHackathonBuilding,
   ultracontext: UltraContextBuilding,
+  "sponsor-city": SponsorCityBuilding,
 };
