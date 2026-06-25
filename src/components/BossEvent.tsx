@@ -25,7 +25,7 @@ import type { BossTuning } from "@/lib/events/schema";
 // Player position is approximated from camera position (camera follows
 // the plane in fly mode). Hit checks happen on the local client only.
 
-const BOSS_BASE = new THREE.Vector3(0, 800, 0);
+const BOSS_BASE = new THREE.Vector3(0, 500, 0);
 const ORBIT_RADIUS = 300;
 const BOSS_HIT_RADIUS = 130;
 const DAMAGE_PER_HIT = 30;
@@ -39,8 +39,11 @@ const SHOCKWAVE_FX_MS = 900;
 // Laser hit radius on the ground (XZ distance from telegraph center)
 const LASER_HIT_RADIUS = 120;
 // Shockwave hit "shell" — player within R±W at fires_at time gets hit
-const SHOCKWAVE_PEAK_RADIUS = 900;
-const SHOCKWAVE_SHELL_WIDTH = 140;
+const SHOCKWAVE_PEAK_RADIUS = 400;
+const SHOCKWAVE_SHELL_WIDTH = 120;
+// Attacks only land if the player is within this vertical range of the
+// attack origin — flying well above/below the boss is a valid dodge.
+const ATTACK_VERTICAL_RANGE = 320;
 
 const PROJECTILE_SPEED = 1200;
 const PROJECTILE_LIFE_S = 0.8;
@@ -304,12 +307,16 @@ export default function BossEvent({
         lastAttackPos.current = { x: atk.targetX, z: atk.targetZ };
         lastFiredType.current = atk.type;
 
-        // Damage check based on attack type
+        // Damage check based on attack type. Attacks only land when the
+        // player is within ATTACK_VERTICAL_RANGE of the boss — flying well
+        // above/below is a valid dodge (no more "hit from anywhere").
         let hit = false;
+        const withinHeight =
+          Math.abs(camera.position.y - bossWorldPos.current.y) < ATTACK_VERTICAL_RANGE;
         if (atk.type === "laser") {
           const dx = camera.position.x - atk.targetX;
           const dz = camera.position.z - atk.targetZ;
-          if (dx * dx + dz * dz < LASER_HIT_RADIUS * LASER_HIT_RADIUS) {
+          if (withinHeight && dx * dx + dz * dz < LASER_HIT_RADIUS * LASER_HIT_RADIUS) {
             hit = true;
           }
         } else {
@@ -318,6 +325,7 @@ export default function BossEvent({
           const dz = camera.position.z - atk.targetZ;
           const distToWave = Math.sqrt(dx * dx + dz * dz);
           if (
+            withinHeight &&
             distToWave > SHOCKWAVE_PEAK_RADIUS - SHOCKWAVE_SHELL_WIDTH &&
             distToWave < SHOCKWAVE_PEAK_RADIUS + SHOCKWAVE_SHELL_WIDTH
           ) {
