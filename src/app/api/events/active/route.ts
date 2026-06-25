@@ -32,6 +32,16 @@ export async function GET() {
     .select("developer_id", { count: "exact", head: true })
     .eq("event_id", event.id);
 
+  // Live total credited damage. The event row's total_damage is only summed
+  // at wrap, so sum the per-player rows here. PartyKit uses this to derive the
+  // boss's remaining HP (HP = base_hp − creditedDamage) so it survives room
+  // restarts/hibernation instead of resetting to full.
+  const { data: dmgRows } = await admin
+    .from("event_participations")
+    .select("damage_dealt")
+    .eq("event_id", event.id);
+  const creditedDamage = (dmgRows ?? []).reduce((sum, r) => sum + (r.damage_dealt ?? 0), 0);
+
   // Top 10 leaderboard
   const { data: top } = await admin
     .from("event_participations")
@@ -59,7 +69,7 @@ export async function GET() {
   }));
 
   return NextResponse.json(
-    { live: true, event, leaderboard, participants: participantCount ?? 0 },
+    { live: true, event, leaderboard, participants: participantCount ?? 0, creditedDamage },
     { headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=20" } },
   );
 }

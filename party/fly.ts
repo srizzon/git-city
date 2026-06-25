@@ -31,6 +31,7 @@ const BOSS_MAX_SHOTS_PER_WINDOW = 8; // client fire rate caps at ~7 projectiles/
 const BOSS_MINION_WINDOW_MS = 10_000;
 const BOSS_MAX_MINIONS_PER_WINDOW = 20; // covers honest spray-into-flock bursts; caps headless claim bots
 const BOSS_EVENT_FETCH_CACHE_MS = 15_000;
+const BOSS_MAXHP_SYNC_MS = 5_000; // how often an active boss re-checks base_hp
 const BOSS_BROADCAST_THROTTLE_MS = 200; // 5 Hz HP broadcast
 const DAMAGE_RECEIPT_THRESHOLD = 300; // issue a signed receipt every N damage
 const DAMAGE_RECEIPT_TTL_MS = 90_000;
@@ -217,7 +218,8 @@ export default class FlyServer implements Party.Server {
   readonly bossDefeatedEventIds = new Set<string>();
   bossEngageInflight = false;
   bossEventFetchAt = 0;
-  bossEventFetchCache: { id: string; maxHp: number } | null | undefined = undefined;
+  bossEventFetchCache: { id: string; maxHp: number; creditedDamage: number } | null | undefined = undefined;
+  lastMaxHpSyncAt = 0;
 
   constructor(readonly room: Party.Room) {}
 
@@ -272,7 +274,7 @@ export default class FlyServer implements Party.Server {
   // Returns the event → engage with ITS config; null → no live event, no
   // boss; "unavailable" → SITE_URL not configured (local dev) or API down,
   // fall back to the legacy client-supplied HP.
-  private async fetchActiveEvent(): Promise<{ id: string; maxHp: number } | null | "unavailable"> {
+  private async fetchActiveEvent(): Promise<{ id: string; maxHp: number; creditedDamage: number } | null | "unavailable"> {
     const siteUrl = (this.room.env as Record<string, unknown>).SITE_URL as string | undefined;
     if (!siteUrl) return "unavailable";
     const now = Date.now();
@@ -283,15 +285,50 @@ export default class FlyServer implements Party.Server {
     try {
       const res = await fetch(`${siteUrl.replace(/\/+$/, "")}/api/events/active`);
       if (!res.ok) return "unavailable";
-      const data = (await res.json()) as { live?: boolean; event?: { id?: unknown; boss_max_hp?: unknown } };
-      this.bossEventFetchCache =
-        data.live && typeof data.event?.id === "string"
-          ? { id: data.event.id, maxHp: Number(data.event.boss_max_hp) || BOSS_DEFAULT_MAX_HP }
-          : null;
+      const data = (await res.json()) as {
+        live?: boolean;
+        creditedDamage?: unknown;
+        event?: { id?: unknown; boss_max_hp?: unknown; boss_config?: { base_hp?: unknown } | null };
+      };
+      if (data.live && typeof data.event?.id === "string") {
+        // base_hp (boss_config) is live-editable with no DB lock, so admins can
+        // retune the boss mid-event; fall back to the locked boss_max_hp column.
+        const baseHp = Number(data.event.boss_config?.base_hp);
+        const maxHp =
+          (Number.isFinite(baseHp) && baseHp > 0 ? baseHp : Number(data.event.boss_max_hp)) ||
+          BOSS_DEFAULT_MAX_HP;
+        const creditedDamage = Math.max(0, Math.floor(Number(data.creditedDamage)) || 0);
+        this.bossEventFetchCache = { id: data.event.id, maxHp, creditedDamage };
+      } else {
+        this.bossEventFetchCache = null;
+      }
       return this.bossEventFetchCache;
     } catch {
       return "unavailable";
     }
+  }
+
+  // Apply live boss_config.base_hp changes to an ACTIVE boss without a restart.
+  // Throttled; the underlying fetch is itself cached (BOSS_EVENT_FETCH_CACHE_MS).
+  // Damage taken so far is preserved, so lowering base_hp drops the remaining HP
+  // (and can bring the boss within a hit of death). Called from boss_hit.
+  private async syncBossMaxHp() {
+    if (!this.boss.active) return;
+    const now = Date.now();
+    if (now - this.lastMaxHpSyncAt < BOSS_MAXHP_SYNC_MS) return;
+    this.lastMaxHpSyncAt = now;
+    const ev = await this.fetchActiveEvent();
+    if (ev === "unavailable" || ev === null) return;
+    if (ev.id !== this.bossEventId) return;
+    const newMax = Math.max(BOSS_MAX_HP_FLOOR, Math.min(BOSS_MAX_HP_CEILING, Math.floor(ev.maxHp)));
+    if (newMax === this.boss.maxHp) return;
+    const damageTaken = this.boss.maxHp - this.boss.hp;
+    this.boss.maxHp = newMax;
+    // Floor at 1 while active so a too-low base_hp can't strand the boss at 0
+    // HP (where boss_hit's `hp <= 0` guard would block the finishing blow).
+    this.boss.hp = Math.max(1, newMax - damageTaken);
+    this.boss.phase = this.bossPhaseFor(this.boss.hp, this.boss.maxHp);
+    this.broadcastBossState(true);
   }
 
   private async handleEngageBoss(clientMaxHp: unknown) {
@@ -301,6 +338,7 @@ export default class FlyServer implements Party.Server {
       const ev = await this.fetchActiveEvent();
       let eventId: string;
       let maxHp: number;
+      let credited = 0;
       if (ev === "unavailable") {
         eventId = "fallback";
         maxHp = isFiniteNumber(clientMaxHp) ? Math.floor(clientMaxHp) : BOSS_DEFAULT_MAX_HP;
@@ -309,6 +347,7 @@ export default class FlyServer implements Party.Server {
       } else {
         eventId = ev.id;
         maxHp = Math.floor(ev.maxHp);
+        credited = ev.creditedDamage;
       }
 
       const defeated =
@@ -327,7 +366,11 @@ export default class FlyServer implements Party.Server {
 
       maxHp = Math.max(BOSS_MAX_HP_FLOOR, Math.min(BOSS_MAX_HP_CEILING, maxHp));
       this.bossEventId = eventId;
-      this.boss = { active: true, hp: maxHp, maxHp, phase: 1 };
+      // Derive remaining HP from credited damage so the boss survives room
+      // hibernation/restarts (DB is the source of truth) instead of resetting to
+      // full. Floor at 1 while active so it can still take a finishing hit.
+      const hp = Math.max(1, maxHp - credited);
+      this.boss = { active: true, hp, maxHp, phase: this.bossPhaseFor(hp, maxHp) };
       this.broadcastBossState(true);
     } finally {
       this.bossEngageInflight = false;
@@ -488,6 +531,7 @@ export default class FlyServer implements Party.Server {
     }
 
     if (msg.type === "boss_hit") {
+      void this.syncBossMaxHp(); // apply live base_hp retunes (throttled)
       if (!this.boss.active || this.boss.hp <= 0) return;
       if (!pilot.pvpEnabled || isDowned(pilot, now)) return;
       // Anonymous pilots can't be credited (their receipts are dropped), so
