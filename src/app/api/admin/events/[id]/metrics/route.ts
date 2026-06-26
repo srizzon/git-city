@@ -17,7 +17,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params;
   const admin = getSupabaseAdmin();
 
-  const [summary, funnel, tiers, lift, retention, board] = await Promise.all([
+  const [summary, funnel, tiers, lift, retention, board, bossCfg, dmgRows] = await Promise.all([
     admin.from("v_event_summary").select("*").eq("id", id).maybeSingle(),
     admin.rpc("event_funnel", { p_event_id: id }),
     admin.rpc("event_tier_distribution", { p_event_id: id }),
@@ -29,7 +29,16 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       .eq("event_id", id)
       .order("damage_dealt", { ascending: false })
       .limit(20),
+    admin.from("event_instances").select("boss_config").eq("id", id).maybeSingle(),
+    admin.from("event_participations").select("damage_dealt").eq("event_id", id),
   ]);
+
+  // Live boss HP control values. base_hp (boss_config) is the live HP cap;
+  // remaining HP = base_hp − creditedDamage. The view's total_damage is only
+  // filled at wrap, so sum the per-player rows for a live figure.
+  const bossConfig = (bossCfg.data?.boss_config ?? {}) as { base_hp?: number };
+  const baseHp = Number(bossConfig.base_hp) || null;
+  const creditedDamage = (dmgRows.data ?? []).reduce((sum, r) => sum + (r.damage_dealt ?? 0), 0);
 
   // Resolve logins for the leaderboard
   const ids = (board.data ?? []).map((r) => r.developer_id);
@@ -54,5 +63,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     lift: lift.data ?? null,
     retention: retention.data ?? null,
     leaderboard,
+    baseHp,
+    creditedDamage,
   });
 }

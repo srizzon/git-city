@@ -16,6 +16,8 @@ interface Metrics {
     non_participant_total: number; non_participant_d7_retained: number; non_participant_d7_pct: number | null;
   } | null;
   leaderboard: { rank: number; login: string; damage: number; minions: number; tier: string | null; flagged: boolean }[];
+  baseHp: number | null;
+  creditedDamage: number;
 }
 
 function statusPill(status: string): string {
@@ -67,6 +69,11 @@ export default function EventMetricsPage({ params }: { params: Promise<{ id: str
 
   const [busy, setBusy] = useState(false);
   const [newEnd, setNewEnd] = useState("");
+  const [hpInput, setHpInput] = useState("");
+  // Seed the HP input from the live base_hp once (don't clobber while editing).
+  useEffect(() => {
+    if (m?.baseHp != null) setHpInput((prev) => (prev === "" ? String(m.baseHp) : prev));
+  }, [m?.baseHp]);
   const patch = useCallback(async (body: Record<string, unknown>, confirmMsg?: string) => {
     if (confirmMsg && !confirm(confirmMsg)) return;
     setBusy(true);
@@ -106,7 +113,12 @@ export default function EventMetricsPage({ params }: { params: Promise<{ id: str
 
   const s = m.summary;
   const f = m.funnel;
-  const hpPct = s.boss_max_hp > 0 ? Math.min(100, (s.total_damage / s.boss_max_hp) * 100) : 0;
+  // Live-accurate HP: base_hp (live cap) and credited damage. Falls back to the
+  // event row's columns (which are only filled at wrap).
+  const hpCap = m.baseHp ?? s.boss_max_hp;
+  const dmgDone = Math.max(s.total_damage, m.creditedDamage);
+  const hpPct = hpCap > 0 ? Math.min(100, (dmgDone / hpCap) * 100) : 0;
+  const remainingHp = Math.max(0, hpCap - dmgDone);
 
   return (
     <div className="min-h-screen bg-bg p-4 sm:p-6 lg:p-8">
@@ -122,18 +134,19 @@ export default function EventMetricsPage({ params }: { params: Promise<{ id: str
           )}
         </div>
 
-        {/* Boss HP — the hero bar */}
+        {/* Boss HP — the hero bar (remaining HP, live) */}
         <div className="mb-6 border border-border bg-bg-raised p-4">
           <div className="mb-2 flex items-baseline justify-between">
             <span className="text-[11px] uppercase tracking-widest text-muted">Boss HP</span>
             <span className="text-[11px] text-cream">
-              {s.total_damage.toLocaleString()} <span className="text-dim">/ {s.boss_max_hp.toLocaleString()} dmg</span>
+              {remainingHp.toLocaleString()} <span className="text-dim">/ {hpCap.toLocaleString()} left</span>
             </span>
           </div>
           <div className="relative h-5 w-full overflow-hidden border border-border bg-bg">
+            {/* Width = remaining HP (drains as the boss takes damage) */}
             <div
-              className={`absolute inset-y-0 left-0 transition-all duration-500 ${hpPct >= 100 ? "bg-lime" : hpPct >= 75 ? "bg-amber-400" : "bg-red-500"}`}
-              style={{ width: `${Math.max(hpPct, 1)}%` }}
+              className={`absolute inset-y-0 left-0 transition-all duration-500 ${hpPct >= 75 ? "bg-red-500" : hpPct >= 50 ? "bg-amber-400" : "bg-lime"}`}
+              style={{ width: `${Math.max(100 - hpPct, 0)}%` }}
             />
             <span className="absolute inset-0 flex items-center justify-center text-[10px] text-cream mix-blend-difference">
               {hpPct.toFixed(1)}% defeated
@@ -144,7 +157,7 @@ export default function EventMetricsPage({ params }: { params: Promise<{ id: str
         {/* Headline stats */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Participants" value={s.distinct_participants.toLocaleString()} accent />
-          <Stat label="Total damage" value={s.total_damage.toLocaleString()} sub={`${hpPct.toFixed(0)}% of ${s.boss_max_hp.toLocaleString()} HP`} />
+          <Stat label="Total damage" value={dmgDone.toLocaleString()} sub={`${hpPct.toFixed(0)}% of ${hpCap.toLocaleString()} HP`} />
           <Stat label="Rewards granted" value={s.rewards_granted.toLocaleString()} />
           <Stat label="Flagged outliers" value={s.flagged_outliers.toLocaleString()} sub={s.flagged_outliers > 0 ? "review" : "clean"} />
         </div>
@@ -153,6 +166,21 @@ export default function EventMetricsPage({ params }: { params: Promise<{ id: str
         <div className="mb-6 border border-border bg-bg-raised p-4">
           <p className="mb-3 text-[11px] text-muted">Live controls</p>
           <div className="flex flex-wrap items-end gap-3">
+            {(s.status === "live" || s.status === "scheduled") && (
+              <div>
+                <label className="mb-1 block text-[10px] text-dim">Boss HP (base_hp, live)</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" min={5000} max={20000000} step={10000} value={hpInput}
+                    onChange={(e) => setHpInput(e.target.value)}
+                    className="w-32 border border-border bg-bg px-2 py-1.5 text-[11px] text-cream outline-none focus:border-lime" />
+                  <button disabled={busy || !hpInput || Number(hpInput) < 5000}
+                    onClick={() => patch({ action: "update", boss_config: { base_hp: Math.round(Number(hpInput)) } })}
+                    className="border border-lime/40 px-3 py-1.5 text-[10px] text-lime transition-colors hover:bg-lime/10 disabled:opacity-40">
+                    Set HP
+                  </button>
+                </div>
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-[10px] text-dim">New end time</label>
               <input type="datetime-local" value={newEnd} onChange={(e) => setNewEnd(e.target.value)}
@@ -177,6 +205,11 @@ export default function EventMetricsPage({ params }: { params: Promise<{ id: str
               </button>
             )}
           </div>
+          {(s.status === "live" || s.status === "scheduled") && (
+            <p className="mt-2 text-[9px] text-dim normal-case">
+              Boss HP sets <code>base_hp</code> live — remaining = base_hp − {dmgDone.toLocaleString()} damage dealt. A live boss applies it in ~30–45s. Lower it to make the fight winnable; credited damage and the leaderboard are never reset.
+            </p>
+          )}
           {s.status === "wrap" && (
             <p className="mt-2 text-[9px] text-amber-400 normal-case">Held: standings computed, rewards NOT paid yet. Review flagged outliers in the leaderboard below, then Release.</p>
           )}

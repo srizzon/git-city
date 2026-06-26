@@ -49,6 +49,13 @@ export default function BossShareCard({ accentColor, shadowColor, leaderboard = 
   const yourRank = rankRows.findIndex((r) => r.isYou) + 1;
   const totalParticipants = Math.max(participants, rankRows.length);
 
+  // Real damage/minions come from the DB-backed leaderboard. The local counters
+  // reset whenever the PartyKit room restarts, so prefer the authoritative
+  // leaderboard value and only fall back to the local meter when not listed.
+  const selfRow = leaderboard.find((r) => !!selfLogin && r.login.toLowerCase() === selfLogin.toLowerCase());
+  const yourDamage = Math.max(selfRow?.damage ?? 0, playerDamage);
+  const yourMinions = Math.max(selfRow?.minions ?? 0, minionKills);
+
   // Listen for open event
   useEffect(() => {
     const handler = () => setOpen(true);
@@ -130,9 +137,9 @@ export default function BossShareCard({ accentColor, shadowColor, leaderboard = 
     const startX = (CARD_W - totalW) / 2;
 
     const stats = [
-      { label: "DAMAGE", value: playerDamage.toLocaleString() },
+      { label: "DAMAGE", value: yourDamage.toLocaleString() },
       { label: "RANK", value: `#${yourRank}/${totalParticipants}` },
-      { label: "MINIONS", value: minionKills.toString() },
+      { label: "MINIONS", value: yourMinions.toString() },
     ];
 
     stats.forEach((s, i) => {
@@ -169,7 +176,7 @@ export default function BossShareCard({ accentColor, shadowColor, leaderboard = 
     // Convert to PNG and stash for preview + download
     const url = canvas.toDataURL("image/png");
     setPreviewUrl(url);
-  }, [open, playerDamage, minionKills, yourRank, totalParticipants, accentColor, shadowColor]);
+  }, [open, yourDamage, yourMinions, yourRank, totalParticipants, accentColor, shadowColor]);
 
   if (!open) return null;
 
@@ -178,7 +185,7 @@ export default function BossShareCard({ accentColor, shadowColor, leaderboard = 
     ? `https://www.thegitcity.com/battle/boss/${encodeURIComponent(selfLogin.toLowerCase())}`
     : "https://www.thegitcity.com";
   const tweetText = encodeURIComponent(
-    `Just helped defeat the Original Bug in Git City. Dealt ${playerDamage.toLocaleString()} damage, ranked #${yourRank}/${totalParticipants}.`,
+    `Just helped defeat the Original Bug in Git City. Dealt ${yourDamage.toLocaleString()} damage, ranked #${yourRank}/${totalParticipants}.`,
   );
   const tweetUrl = `https://x.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(shareUrl)}`;
 
