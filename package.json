@@ -21,6 +21,8 @@
   ],
   "scripts": {
     "dev": "next dev -p 3001 --webpack",
+    "dev:portless": "portless run next dev --webpack",
+    "dev:portless:prod": "portless run dotenv -e .env.prod -- next dev --webpack",
     "dev:prod": "dotenv -e .env.prod -- next dev -p 3001 --webpack",
     "dev:staging": "dotenv -e .env.dev -- next dev -p 3001 --webpack",
     "build": "next build --webpack",
@@ -85,6 +87,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.1.8",
+    "portless": "^0.15.1",
     "prettier": "^3.8.1",
     "tailwindcss": "^4",
     "typescript": "^5"

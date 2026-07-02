@@ -23,6 +23,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Portless serve cada worktree em <branch>.git-city.localhost (via proxy HTTPS).
+  // O Next 16 bloqueia recursos de dev (HMR, fontes) de origens cross-site por
+  // padrão; o wildcard libera qualquer subdomínio de worktree de uma vez.
+  // Efeito só em desenvolvimento — ignorado no build de produção.
+  allowedDevOrigins: ["git-city.localhost", "*.git-city.localhost"],
   images: {
     unoptimized: true,
     remotePatterns: [

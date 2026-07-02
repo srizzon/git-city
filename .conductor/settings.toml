@@ -1,0 +1,31 @@
+#:schema https://conductor.build/schemas/settings.repo.schema.json
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+# Copia os arquivos locais gitignored (.env*, exceto .env.example versionado)
+# para dentro de cada nova worktree, senão o dev server sobe sem config.
+file_include_globs = ".env.local\n.env.dev\n.env.prod\n"
+
+[scripts]
+# Instala deps de forma determinística a partir do package-lock.json.
+setup = "npm ci"
+# Limpa dev servers órfãos do portless (de sessões que crasharam) ao arquivar.
+# Só mata órfãos; não toca em servers ativos de outras worktrees. Nunca falha.
+archive = "npx portless prune || true"
+# Portless dá a cada worktree um subdomínio próprio (todos via proxy 443),
+# então vários workspaces rodam em paralelo sem colisão de porta.
+run_mode = "concurrent"
+
+# PADRÃO: dev apontando para PRODUÇÃO (.env.prod) via Portless.
+# `portless run` deriva o nome do projeto (git-city) e prepende a worktree:
+#   worktree -> https://<worktree>.git-city.localhost
+# 🔥 ATENÇÃO: usa Supabase/Stripe de PROD (service role + live keys) — ações no
+# browser escrevem em dados reais. Trocar por dev-local para o ambiente local.
+[scripts.run.dev]
+command = "npm run dev:portless:prod"
+default = true
+icon = "flame"
+
+# Alternativa: dev apontando para o env LOCAL (.env.local) via Portless.
+[scripts.run.dev-local]
+command = "npm run dev:portless"
+icon = "globe"
