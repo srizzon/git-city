@@ -7,7 +7,12 @@ import { provisionDeveloperOnLogin } from "@/lib/auth-provision";
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const url = new URL(request.url);
+  const { searchParams } = url;
+  // Atrás do proxy dev do portless, request.url é o localhost:PORT interno, então
+  // os redirects cairiam em https://localhost:PORT (SSL error). PORTLESS_URL é a
+  // URL pública https desta worktree; em produção não existe → usa o origin real.
+  const origin = (process.env.PORTLESS_URL ?? url.origin).replace(/\/$/, "");
   const code = searchParams.get("code");
 
   if (!code) {

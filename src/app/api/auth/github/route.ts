@@ -3,7 +3,11 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { isLocalSupabase } from "@/lib/sign-in";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const url = new URL(request.url);
+  const { searchParams } = url;
+  // Atrás do proxy dev do portless, request.url é o localhost:PORT interno.
+  // PORTLESS_URL é a URL pública https da worktree; em produção não existe.
+  const origin = (process.env.PORTLESS_URL ?? url.origin).replace(/\/$/, "");
   const redirectPath = searchParams.get("redirect") ?? "/";
 
   // Local dev has no GitHub OAuth provider configured — use the dev-login.
