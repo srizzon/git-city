@@ -848,6 +848,7 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     const FLIGHT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight"]);
 
     const down = (e: KeyboardEvent) => {
+      if (e.repeat) return;
       keys.current[e.code] = true;
       if (e.code === "Escape") {
         if (!paused.current) {
