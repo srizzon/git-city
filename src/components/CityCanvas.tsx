@@ -1153,9 +1153,9 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     hudTimer.current += dt;
     if (hudTimer.current > 0.25) {
       hudTimer.current = 0;
-      lastHudSpeed.current = Math.round(flySpeed.current);
+      lastHudSpeed.current = Math.round(actualSpeed);
       lastHudAlt.current = Math.round(pos.current.y);
-      onHud(flySpeed.current, pos.current.y, pos.current.x, pos.current.z, yaw.current);
+      onHud(actualSpeed, pos.current.y, pos.current.x, pos.current.z, yaw.current);
     }
   });
 
