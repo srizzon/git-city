@@ -6,6 +6,7 @@ import type {
   CityBridge,
   DistrictZone,
   SFRenderMap,
+  LayoutNorms,
 } from "@/lib/github";
 
 interface CityCache {
@@ -19,6 +20,7 @@ interface CityCache {
   stats: { total_developers: number; total_contributions: number };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rawDevs: any[];
+  norms?: LayoutNorms;
   timestamp: number;
 }
 

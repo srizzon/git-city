@@ -20,6 +20,7 @@ import {
   type DeveloperRecord,
   type SFMapAsset,
   type SFRenderMap,
+  type LayoutNorms,
 } from "@/lib/github";
 import { gridToWorldPos } from "@/lib/sponsors/registry";
 import { SF_PLAZA_SCALE, sfSponsorLocalPos } from "@/lib/sponsors/sfPlaza";
@@ -52,7 +53,8 @@ import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/x
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
 import RadarMap from "@/components/RadarMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
-import { fetchCitySnapshot } from "@/lib/city-snapshot-client";
+import { loadHomeSnapshot, loadSFMap, type HomeSnapshot } from "@/lib/city-snapshot-client";
+import { sfRenderMap } from "@/lib/city-sf-layout";
 import { usePerfMode } from "@/lib/perfMode";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
@@ -76,18 +78,6 @@ import {
   trackLandmarkClicked,
 } from "@/lib/himetrica";
 import posthog from "posthog-js";
-
-// San Francisco map asset (baked from OSM). Fetched once, shared by every
-// layout recompute. Falls back to undefined (procedural layout) if missing.
-let _sfMapPromise: Promise<SFMapAsset | undefined> | null = null;
-function loadSFMap(): Promise<SFMapAsset | undefined> {
-  if (!_sfMapPromise) {
-    _sfMapPromise = fetch("/maps/sf.json")
-      .then((r) => (r.ok ? r.json() : undefined))
-      .catch(() => undefined);
-  }
-  return _sfMapPromise;
-}
 
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
   ssr: false,
@@ -562,6 +552,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [buildings, setBuildings] = useState<CityBuilding[]>([]);
   // Keep raw dev records so we can inject new devs and regenerate layout locally
   const rawDevsRef = useRef<DeveloperRecord[]>([]);
+  // City-wide layout maxima from the v2 snapshot (which only ships placed devs).
+  const layoutNormsRef = useRef<LayoutNorms | undefined>(undefined);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dropsPayloadRef = useRef<any[]>([]);
   const [plazas, setPlazas] = useState<CityPlaza[]>([]);
@@ -620,6 +612,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const loadStageRef = useRef<LoadingStage>("init");
   useEffect(() => {
     loadStageRef.current = loadStage;
+    // Timeline marks for profiling the load (visible in DevTools > Performance).
+    performance.mark(`city:${loadStage}`);
   }, [loadStage]);
   const handlePerfDecline = useCallback(() => {
     perfDeclines.current += 1;
@@ -1613,12 +1607,15 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     let dropsPayload: any[] = [];
 
     // Skip snapshot when busting cache — go straight to DB for fresh data
+    let prebuilt: HomeSnapshot["layout"];
     if (!bustCache) {
-      const snapshot = await fetchCitySnapshot();
+      const snapshot = await loadHomeSnapshot();
       if (snapshot) {
         allDevs = snapshot.developers;
         cityStats = snapshot.stats;
         dropsPayload = snapshot._d ?? [];
+        layoutNormsRef.current = snapshot.norms;
+        prebuilt = snapshot.layout;
       }
     }
 
@@ -1659,7 +1656,9 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     setStats(cityStats);
     const sf = await loadSFMap();
     sfMapRef.current = sf;
-    const layout = generateCityLayout(allDevs, sf);
+    const layout = prebuilt && sf
+      ? { ...prebuilt, sfMap: sfRenderMap(sf) }
+      : generateCityLayout(allDevs, sf, layoutNormsRef.current);
     mergeDrops(layout.buildings);
 
     setBuildings(layout.buildings);
@@ -1669,7 +1668,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     setBridges(layout.bridges);
     setDistrictZones(layout.districtZones);
     setSfMap(layout.sfMap ?? null);
-    setCityCache({ ...layout, stats: cityStats, rawDevs: rawDevsRef.current });
+    setCityCache({ ...layout, stats: cityStats, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
     return layout.buildings;
   }, []);
 
@@ -1699,6 +1698,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     const cached = getCityCache();
     if (cached) {
       rawDevsRef.current = cached.rawDevs ?? [];
+      layoutNormsRef.current = cached.norms;
       setBuildings(cached.buildings);
       setPlazas(cached.plazas);
       setDecorations(cached.decorations);
@@ -1741,11 +1741,13 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
 
         // Try pre-computed snapshot first (single file from Supabase CDN).
         // Self-heals on a fresh environment: builds the snapshot, then retries.
-        const snapshot = await fetchCitySnapshot();
+        const snapshot = await loadHomeSnapshot();
+        const prebuilt = snapshot?.layout;
         if (snapshot) {
           allDevs = snapshot.developers;
           cityStats = snapshot.stats;
           dropsPayload = snapshot._d ?? [];
+          layoutNormsRef.current = snapshot.norms;
         }
 
         // Local dev has no storage snapshot — read straight from the DB so the
@@ -1763,6 +1765,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         }
 
         setLoadProgress(30);
+        performance.mark("city:data");
 
         if (!allDevs || allDevs.length === 0) {
           setLoadProgress(100);
@@ -1796,8 +1799,12 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setStats(cityStats);
         const sfInit = await loadSFMap();
         sfMapRef.current = sfInit;
-        const finalLayout = generateCityLayout(allDevs, sfInit);
+        // v2 snapshots arrive already laid out by the worker.
+        const finalLayout = prebuilt && sfInit
+          ? { ...prebuilt, sfMap: sfRenderMap(sfInit) }
+          : generateCityLayout(allDevs, sfInit, layoutNormsRef.current);
         mergeDrops(finalLayout.buildings);
+        performance.mark("city:layout");
 
         setBuildings(finalLayout.buildings);
         setPlazas(finalLayout.plazas);
@@ -1829,7 +1836,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setLoadProgress(80);
 
         // Save to cache for return visits
-        setCityCache({ ...finalLayout, stats: cityStats, rawDevs: rawDevsRef.current });
+        setCityCache({ ...finalLayout, stats: cityStats, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
         setLoadProgress(95);
 
         // Enforce minimum 800ms display time to avoid flash
@@ -1940,7 +1947,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             xp_level: devData.xp_level ?? 1,
           };
           rawDevsRef.current = [...rawDevsRef.current, newDev];
-          const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
+          const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
           mergeDrops(layout.buildings);
           setBuildings(layout.buildings);
           setPlazas(layout.plazas);
@@ -1948,7 +1955,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           setRiver(layout.river);
           setBridges(layout.bridges);
           setDistrictZones(layout.districtZones);
-          setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+          setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
 
           // Focus immediately after injection instead of waiting for re-run
           const injected = layout.buildings.find(
@@ -2063,7 +2070,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           xp_level: devData.xp_level ?? 1,
         };
         rawDevsRef.current = [...rawDevsRef.current, newDev];
-        const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
+        const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
         mergeDrops(layout.buildings);
         setBuildings(layout.buildings);
         setPlazas(layout.plazas);
@@ -2071,7 +2078,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setRiver(layout.river);
         setBridges(layout.bridges);
         setDistrictZones(layout.districtZones);
-        setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+        setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
       } catch {
         // Allow retry on next dep change (e.g. transient network error)
         ensuringAuthBuilding.current = null;
@@ -2255,7 +2262,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         )
         : [...rawDevsRef.current, syncedDev];
 
-      const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
+      const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
       mergeDrops(layout.buildings);
       setBuildings(layout.buildings);
       setPlazas(layout.plazas);
@@ -2263,7 +2270,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       setRiver(layout.river);
       setBridges(layout.bridges);
       setDistrictZones(layout.districtZones);
-      setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+      setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
       updatedBuildings = layout.buildings;
 
       // Focus camera on the searched building
@@ -2420,7 +2427,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       )
       : [...rawDevsRef.current, syncedDev];
 
-    const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
+    const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
     mergeDrops(layout.buildings);
     setBuildings(layout.buildings);
     setPlazas(layout.plazas);
@@ -2428,7 +2435,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     setRiver(layout.river);
     setBridges(layout.bridges);
     setDistrictZones(layout.districtZones);
-    setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+    setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
 
     setInvitePreview(null);
     setFocusedBuilding(devData.github_login);
