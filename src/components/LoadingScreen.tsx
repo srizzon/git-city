@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, type TransitionEvent } from "react";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -60,10 +60,14 @@ const KEEPALIVE = [
   "remote: almost there...",
 ];
 
-// Script plays at this relaxed pace by default; when the real load finishes
-// (stage === "ready") the clock runs at READY_BOOST so it wraps up fast.
-const READY_BOOST = 10;
+// Script plays at this relaxed pace while the city loads. Once the real load
+// finishes (stage === "ready") every remaining sleep is skipped and the script
+// dumps its last lines at once — the city is waiting, so is the user. (A
+// time-scaled fast-forward still needs dozens of timer ticks, and those starve
+// behind the renderer's first-frame work on slow devices: 5s+ of pure delay.)
 const TICK_MS = 40;
+const READY_HOLD_MS = 250; // brief beat on the welcome line before the exit flash
+const FLASH_LEAD_MS = 120; // flash peaks before the fade starts
 
 const fmt = (n: number) => Math.floor(n).toLocaleString("en-US");
 
@@ -111,13 +115,12 @@ export default function LoadingScreen({
     let aborted = false;
     const alive = () => !aborted && stageRef.current !== "error";
 
-    // Sleeps `virtualMs` of script time; real time shrinks when the city is
-    // already loaded so the script fast-forwards instead of holding the user.
-    // Boosted ticks overshoot small sleeps (e.g. per-character typing), so the
-    // surplus carries over as credit — without it every sleep would still cost
-    // a full real tick and the fast-forward would crawl.
+    // Sleeps `virtualMs` of script time, or not at all once the city is ready.
+    // Ticks overshoot small sleeps (e.g. per-character typing), so the surplus
+    // carries over as credit instead of costing a full tick each.
     let credit = 0;
     const vsleep = async (virtualMs: number) => {
+      if (stageRef.current === "ready") return;
       if (credit >= virtualMs) {
         credit -= virtualMs;
         return;
@@ -126,9 +129,9 @@ export default function LoadingScreen({
       credit = 0;
       while (remaining > 0) {
         if (!alive()) throw new Error("aborted");
+        if (stageRef.current === "ready") return;
         await new Promise((r) => setTimeout(r, TICK_MS));
-        const speed = stageRef.current === "ready" ? READY_BOOST : 1;
-        remaining -= TICK_MS * speed;
+        remaining -= TICK_MS;
       }
       credit = -remaining;
     };
@@ -243,14 +246,12 @@ export default function LoadingScreen({
           waited = 0;
         }
       }
-      await vsleep(500 * READY_BOOST); // brief hold on the welcome line (real ms × boost)
-
-      // Exit: the terminal "executes" the city — flash, then fade out.
+      // Exit: the terminal "executes" the city — hold, flash, fade out. The
+      // whole sequence is scheduled at once as CSS delays: it runs on the
+      // compositor, so the renderer's first-frame work can't stretch it.
       if (!alive()) throw new Error("aborted");
       setShowCursor(false);
       setFlashing(true);
-      await new Promise((r) => setTimeout(r, 120));
-      if (!alive()) throw new Error("aborted");
       setFading(true);
     }
 
@@ -268,8 +269,8 @@ export default function LoadingScreen({
     onRetry();
   }, [onRetry]);
 
-  const handleTransitionEnd = useCallback(() => {
-    if (fading) onFadeComplete();
+  const handleTransitionEnd = useCallback((e: TransitionEvent<HTMLDivElement>) => {
+    if (fading && e.target === e.currentTarget) onFadeComplete();
   }, [fading, onFadeComplete]);
 
   // ── Render ────────────────────────────────────────────────────
@@ -277,8 +278,9 @@ export default function LoadingScreen({
   return (
     <div
       className={`fixed inset-0 z-100 bg-bg transition-opacity duration-400 ${
-        fading ? "opacity-0" : "opacity-100"
+        fading ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
+      style={fading ? { transitionDelay: `${READY_HOLD_MS + FLASH_LEAD_MS}ms` } : undefined}
       onTransitionEnd={handleTransitionEnd}
     >
       <style>{`
@@ -364,7 +366,7 @@ export default function LoadingScreen({
       {flashing && (
         <div
           className="pointer-events-none absolute inset-0 bg-white"
-          style={{ animation: "gc-flash 500ms ease-out forwards" }}
+          style={{ opacity: 0, animation: `gc-flash 500ms ease-out ${READY_HOLD_MS}ms forwards` }}
         />
       )}
     </div>
