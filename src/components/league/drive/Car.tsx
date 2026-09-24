@@ -71,6 +71,7 @@ export default function Car({
   apiRef,
   impact,
   onReset,
+  children,
 }: {
   spawn: Spawn;
   objects: CityObject[];
@@ -83,6 +84,8 @@ export default function Car({
   impact: React.MutableRefObject<{ strength: number; at: number }>;
   /** R, or fell out of the world: back to the spawn point. */
   onReset?: () => void;
+  /** Rendered inside the visible car (lights). */
+  children?: React.ReactNode;
 }) {
   const { world } = useRapier();
   const bodyRef = useRef<RapierRigidBody>(null);
@@ -237,6 +240,7 @@ export default function Car({
             <primitive object={m} scale={WHEEL_SCALE} />
           </group>
         ))}
+        {children}
       </group>
     </>
   );

@@ -20,6 +20,10 @@ import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/te
 import { GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
 import Car, { type CarApi } from "./Car";
 import DriveCamera from "./DriveCamera";
+import Lights from "./Lights";
+import { BoostTrail, Smoke } from "./Particles";
+import SkidMarks from "./SkidMarks";
+import { useDriveAudio } from "./useDriveAudio";
 import { useDriveInput } from "./useDriveInput";
 
 // Drive mode's physics world. Loaded with next/dynamic only when someone
@@ -139,6 +143,11 @@ function CameraKey({ input, onToggle }: { input: ReturnType<typeof useDriveInput
   return null;
 }
 
+function DriveAudio(props: Parameters<typeof useDriveAudio>[0]) {
+  useDriveAudio(props);
+  return null;
+}
+
 // ─── World ───────────────────────────────────────────────────
 
 export default function DriveWorld({
@@ -149,6 +158,7 @@ export default function DriveWorld({
   telemetry,
   camera,
   onCameraToggle,
+  muted,
   onReady,
   onFail,
 }: DriveWorldProps) {
@@ -189,7 +199,13 @@ export default function DriveWorld({
             telemetry={telemetry}
             apiRef={car}
             impact={impact}
-          />
+          >
+            <Lights car={car} />
+          </Car>
+          <SkidMarks car={car} />
+          <Smoke car={car} />
+          <BoostTrail car={car} />
+          <DriveAudio car={car} input={input} impact={impact} muted={muted} />
           <DriveCamera mode={camera} car={car} impact={impact} />
           <CameraKey input={input} onToggle={onCameraToggle} />
           <Ready onReady={onReady} />
