@@ -45,6 +45,8 @@ export interface DriverInfo {
 }
 
 /** A box slot's generation and how long until it's back (ms, 0 = there now). */
+import type { CrownState } from "./crown";
+
 export interface BoxState {
   gen: number;
   wait: number;
@@ -55,15 +57,20 @@ export type ClientMsg =
   | { t: "hello"; name: string }
   | { t: "bump"; to: string; x: number; z: number }
   | { t: "take"; box: number; gen: number }
-  | { t: "use"; item: string; x: number; z: number; dx: number; dz: number }
+  | { t: "use"; item: string; x: number; z: number; dx: number; dz: number; target?: string }
   | { t: "hit"; id: number }
+  | { t: "crown_start"; x: number; z: number }
+  | { t: "crown_grab" }
+  | { t: "crown_hit"; victim: string; steal: boolean }
+  | { t: "crown_drop" }
   | ["s", ...number[]];
 // Server → client
 export type ServerMsg =
-  | { t: "welcome"; you: string; drivers: (DriverInfo & { s: number[] | null })[]; boxes: BoxState[] }
+  | { t: "welcome"; you: string; drivers: (DriverInfo & { s: number[] | null })[]; boxes: BoxState[]; crown: CrownState; now: number }
+  | { t: "crown"; crown: CrownState; now: number }
   | { t: "box"; box: number; gen: number; wait: number }
   | { t: "got"; item: string }
-  | { t: "fx"; id: number; from: string; item: string; x: number; z: number; dx: number; dz: number }
+  | { t: "fx"; id: number; from: string; item: string; x: number; z: number; dx: number; dz: number; target?: string }
   | { t: "gone"; id: number }
   | { t: "join"; id: string; name: string }
   | { t: "leave"; id: string }

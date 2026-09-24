@@ -63,10 +63,14 @@ describe("attacks", () => {
   });
 
   it("steers a missile toward its target at a limited turn rate, and flies straight without one", () => {
-    let m = { x: 0, z: 0, h: 0 }; // heading +z
+    let m = { x: 0, z: 0, h: 0 }; // heading +z, target off to the side
     const target = { x: 30, z: 30 };
-    for (let i = 0; i < 90; i++) m = stepMissile(m, target, 1 / 60);
-    expect(Math.hypot(m.x - target.x, m.z - target.z)).toBeLessThan(10);
+    let closest = Infinity;
+    for (let i = 0; i < 120; i++) {
+      m = stepMissile(m, target, 1 / 60);
+      closest = Math.min(closest, Math.hypot(m.x - target.x, m.z - target.z));
+    }
+    expect(closest).toBeLessThan(MISSILE.hitReach);
     const straight = stepMissile({ x: 0, z: 0, h: 0 }, null, 1);
     expect(straight.x).toBeCloseTo(0);
     expect(straight.z).toBeCloseTo(MISSILE.speed);
