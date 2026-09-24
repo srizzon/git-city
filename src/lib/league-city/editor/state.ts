@@ -21,7 +21,7 @@ export type Tool =
   | { kind: "road" }
   | { kind: "bulldoze" };
 
-export type HotbarTab = "streets" | "nature" | "plaza" | "buildings";
+export type HotbarTab = "streets" | "nature" | "plaza" | "stunts" | "buildings";
 
 /** One user action: what to send, and how to take it back. */
 export interface Edit {
@@ -107,9 +107,10 @@ export const MAX_BATCH_OPS = 200;
 export const PROP_TURN = 45;
 
 export const HOTBAR: Record<Exclude<HotbarTab, "buildings">, ItemType[]> = {
-  streets: ["road", "lamp", "bench", "ramp"],
+  streets: ["road", "lamp", "bench"],
   nature: ["tree_default", "tree_oak", "tree_fat", "tree_detailed", "tree_palm_tall", "tree_pine_tall_a"],
   plaza: ["plaza", "fountain"],
+  stunts: ["ramp", "ramp_big", "boost_pad", "speed_bump", "cone", "crates", "tire_wall"],
 };
 
 // ─── Applying ops locally ───────────────────────────────────

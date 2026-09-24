@@ -131,6 +131,18 @@ export const PROPS = {
   bench: { mass: 40, half: [1.0, 0.4, 0.35] as [number, number, number] },
   fountain: { mass: 600, radius: 3.4, halfHeight: 1.5 },
   tree: { radius: 0.8, halfHeight: 5 },
+  cone: { mass: 4 },
+  crate: { mass: 25 },
+};
+
+/** Toys: tire walls bounce the car back, pads fire it forward. */
+export const TOYS = {
+  tireRestitution: 0.9,
+  /** A boost pad sets your speed along it to at least this (m/s), plus a kick. */
+  padSpeed: 30,
+  padKick: 6,
+  /** Seconds before the same pad fires again for you. */
+  padCooldown: 0.6,
 };
 
 export const WALL = { height: 4, thickness: 1 };

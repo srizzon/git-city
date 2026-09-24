@@ -5,6 +5,12 @@ export const ITEM_TYPES = [
   "fountain",
   "plaza",
   "ramp",
+  "ramp_big",
+  "boost_pad",
+  "speed_bump",
+  "cone",
+  "crates",
+  "tire_wall",
   "tree_default",
   "tree_oak",
   "tree_fat",
@@ -23,6 +29,13 @@ export const TREE_TYPES = [
   "tree_pine_tall_a",
 ] as const satisfies readonly ItemType[];
 export type TreeType = (typeof TREE_TYPES)[number];
+
+/** Props for drive mode. Unlike other props they may stand on asphalt. */
+export const DRIVE_TOYS = ["ramp", "ramp_big", "boost_pad", "speed_bump", "cone", "crates", "tire_wall"] as const satisfies readonly ItemType[];
+
+export function isDriveToy(t: ItemType | null | undefined): boolean {
+  return !!t && (DRIVE_TOYS as readonly string[]).includes(t);
+}
 
 /** Items that own a whole lot. Everything else is a free-standing prop. */
 export const SURFACE_TYPES = ["road", "plaza"] as const satisfies readonly ItemType[];

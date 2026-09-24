@@ -241,18 +241,22 @@ describe("server sync", () => {
 });
 
 describe("ramps", () => {
-  it("is in the streets hotbar", () => {
-    expect(HOTBAR.streets).toContain("ramp");
-  });
-
-  it("places a ramp on grass, turns it 45° at a time, and keeps it off asphalt", () => {
+  it("places a ramp on grass or on the road, and turns it 45° at a time", () => {
     const ramp: EditorAction = { type: "setTool", tool: { kind: "place", item: "ramp" } };
     let s = run(start(), ramp, { type: "rotate" }, { type: "rotate" }, { type: "place", id: "n1", ...spot(-4 * LOT, 4 * LOT) });
     expect(at(s, "n1")).toMatchObject({ item_type: "ramp", px: -4 * LOT, pz: 4 * LOT, rot: 90 });
     s = run(s, { type: "select", id: "n1" }, { type: "rotate", id: "n1" });
     expect(at(s, "n1")?.rot).toBe(135);
-    s = run(s, { type: "place", id: "n2", ...spot(0, -2 * LOT) });
-    expect(at(s, "n2")).toBeUndefined();
+    s = run(s, { type: "place", id: "n2", ...spot(0, -2 * LOT - 16) });
+    expect(at(s, "n2")).toMatchObject({ item_type: "ramp" }); // driving toys may sit on asphalt
+  });
+
+  it("puts every driving toy in the stunts tab and keeps lamps off asphalt", () => {
+    expect(HOTBAR.stunts).toEqual(["ramp", "ramp_big", "boost_pad", "speed_bump", "cone", "crates", "tire_wall"]);
+    const lamp: EditorAction = { type: "setTool", tool: { kind: "place", item: "lamp" } };
+    const s = run(start(), lamp, { type: "place", id: "n1", ...spot(0, -2 * LOT - 4) });
+    expect(at(s, "n1")).toBeUndefined();
     expect(s.notice?.message).toMatch(/asphalt/i);
   });
+
 });
