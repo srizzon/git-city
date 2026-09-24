@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Volume2, VolumeX, X } from "lucide-react";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import PixelSpinner from "@/components/leagues/PixelSpinner";
 import { HUD_BOX } from "../shared";
 import PauseMenu, { CONTROLS } from "./PauseMenu";
+import StartScreen from "./StartScreen";
 
 // Drive mode HUD: speed and boost meter (bottom), camera, mute and exit (top
-// right), a controls hint that fades after 6 s, and "Starting engine…" while
-// Rapier loads. Speed and boost update from the telemetry object every
+// right), a controls hint that fades after 6 s, the start screen while Rapier
+// loads, and the pause menu. Speed and boost update from the telemetry object every
 // animation frame without re-rendering.
 
 const SEG = "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
@@ -64,12 +64,6 @@ export default function DriveHud({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
-      {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center gap-3 text-[10px] text-cream">
-          <PixelSpinner />
-          Starting engine…
-        </div>
-      )}
 
       <div className={`${HUD_BOX} absolute right-4 top-4 flex items-stretch divide-x-2 divide-border`}>
         <button
@@ -130,7 +124,8 @@ export default function DriveHud({
         </div>
       )}
 
-      {/* Last, so it blurs and covers the rest of the HUD. */}
+      {/* Last, so they blur and cover the rest of the HUD. */}
+      <StartScreen ready={ready} />
       {paused && ready && (
         <PauseMenu camera={camera} muted={muted} onResume={onResume} onCamera={onCamera} onMute={onMute} onExit={onExit} />
       )}
