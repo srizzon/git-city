@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
 import { CuboidCollider, RigidBody, useBeforePhysicsStep, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
@@ -11,7 +10,7 @@ import type { CityObject } from "@/lib/league-city/types";
 import { nearestFreeLot, type Spawn } from "@/lib/league-city/drive/spawn";
 import { surfaceAt, surfaceIndex } from "@/lib/league-city/drive/surface";
 import type { DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import { CHASSIS, MODEL_TO_M, M_TO_UNIT, UNIT_TO_M, WHEEL } from "@/lib/league-city/drive/tuning";
+import { CHASSIS, M_TO_UNIT, UNIT_TO_M, WHEEL } from "@/lib/league-city/drive/tuning";
 import {
   WHEELS,
   carHeading,
@@ -23,19 +22,11 @@ import {
   type CarState,
   type VehicleController,
 } from "@/lib/league-city/drive/vehicle";
+import CarModel from "./CarModel";
 import type { DriveInputRef } from "./useDriveInput";
 
 // The drivable sedan. Physics runs in meters on a collider-only rigid body;
 // the visible car (city units) copies its interpolated pose every frame.
-
-const BODY_URL = "/models/cars/sedan.glb";
-const WHEEL_URL = "/models/cars/wheel.glb";
-useGLTF.preload([BODY_URL, WHEEL_URL]);
-
-/** Model units → city units. */
-const MODEL_SCALE = MODEL_TO_M * M_TO_UNIT;
-/** Kenney wheel radius is 0.3 model units; match the physics wheel. */
-const WHEEL_SCALE = (WHEEL.radius * M_TO_UNIT) / 0.3;
 
 // Box inertia for the chassis, around its center of mass.
 const [HX, HY, HZ] = CHASSIS.half;
@@ -70,6 +61,7 @@ export default function Car({
   telemetry,
   apiRef,
   impact,
+  color,
   onReset,
   children,
 }: {
@@ -82,6 +74,8 @@ export default function Car({
   apiRef: React.MutableRefObject<CarApi | null>;
   /** Set on every hard hit: strength 0…1 and when (performance.now ms). */
   impact: React.MutableRefObject<{ strength: number; at: number }>;
+  /** Paint, the same color everyone else sees you in. */
+  color: string;
   /** R, or fell out of the world: back to the spawn point. */
   onReset?: () => void;
   /** Rendered inside the visible car (lights). */
@@ -94,11 +88,6 @@ export default function Car({
   const wheelRefs = useRef<(THREE.Object3D | null)[]>([]);
   const state = useRef<CarState>(newCarState());
   const controller = useRef<VehicleController | null>(null);
-
-  const { scene: bodyScene } = useGLTF(BODY_URL);
-  const { scene: wheelScene } = useGLTF(WHEEL_URL);
-  const bodyModel = useMemo(() => bodyScene.clone(true), [bodyScene]);
-  const wheelModels = useMemo(() => WHEELS.map(() => wheelScene.clone(true)), [wheelScene]);
 
   const surfaces = useMemo(() => surfaceIndex(objects), [objects]);
   const gripAt = useMemo(() => (wx: number, wz: number) => surfaceAt(surfaces, wx, wz), [surfaces]);
@@ -228,18 +217,9 @@ export default function Car({
       </RigidBody>
 
       <group ref={group}>
-        <primitive object={bodyModel} scale={MODEL_SCALE} />
-        {wheelModels.map((m, i) => (
-          <group
-            key={i}
-            ref={(el) => {
-              wheelRefs.current[i] = el;
-            }}
-          >
-            <primitive object={m} scale={WHEEL_SCALE} />
-          </group>
-        ))}
-        {children}
+        <CarModel color={color} wheelRefs={wheelRefs}>
+          {children}
+        </CarModel>
       </group>
     </>
   );
