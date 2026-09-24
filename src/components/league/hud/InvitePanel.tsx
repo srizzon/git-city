@@ -4,7 +4,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import PixelSpinner, { Pending } from "@/components/leagues/PixelSpinner";
 import Panel from "./Panel";
-import { Avatar } from "./shared";
+import { Check, Copy } from "lucide-react";
+import type { LeagueMemberRow } from "@/lib/leagues/queries";
+import { Avatar, NO_AUTOFILL } from "./shared";
 
 type InviteState =
   | { kind: "idle" }
@@ -12,7 +14,17 @@ type InviteState =
   | { kind: "done"; login: string; avatar: string | null; link: string }
   | { kind: "error"; message: string };
 
-export default function InvitePanel({ slug, onClose }: { slug: string; onClose: () => void }) {
+export default function InvitePanel({
+  slug,
+  viewerLogin,
+  pending,
+  onClose,
+}: {
+  slug: string;
+  viewerLogin: string;
+  pending: LeagueMemberRow[];
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [login, setLogin] = useState("");
   const [state, setState] = useState<InviteState>({ kind: "idle" });
@@ -46,6 +58,8 @@ export default function InvitePanel({ slug, onClose }: { slug: string; onClose: 
     }
   }
 
+  const [copiedLogin, setCopiedLogin] = useState<string | null>(null);
+
   async function copy(link: string) {
     try {
       await navigator.clipboard.writeText(link);
@@ -54,6 +68,20 @@ export default function InvitePanel({ slug, onClose }: { slug: string; onClose: 
       setCopied(false);
     }
   }
+
+  // Same personal link the invite returned: ref = whoever is sharing it now.
+  async function copyPending(login: string) {
+    const link = `${window.location.origin}/league/${slug}?ref=${encodeURIComponent(viewerLogin)}&invite=${encodeURIComponent(login)}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedLogin(login);
+      setTimeout(() => setCopiedLogin((c) => (c === login ? null : c)), 1800);
+    } catch {
+      setCopiedLogin(null);
+    }
+  }
+  const justInvited = state.kind === "done" ? state.login.toLowerCase() : null;
+  const others = pending.filter((m) => m.login.toLowerCase() !== justInvited);
 
   return (
     <Panel title="Invite a colleague" onClose={onClose}>
@@ -64,6 +92,7 @@ export default function InvitePanel({ slug, onClose }: { slug: string; onClose: 
           onChange={(e) => setLogin(e.target.value)}
           placeholder="GitHub username"
           aria-label="GitHub username"
+          {...NO_AUTOFILL}
           autoCapitalize="off"
           autoFocus
           spellCheck={false}
@@ -123,6 +152,30 @@ export default function InvitePanel({ slug, onClose }: { slug: string; onClose: 
           </div>
         )}
       </div>
+
+      {others.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-[10px] text-muted">Pending · {others.length}</h3>
+          <ul className="mt-2 divide-y-2 divide-border border-2 border-border">
+            {others.map((m) => (
+              <li key={m.developer_id} className="flex items-center gap-2.5 px-3 py-2">
+                <Avatar src={m.avatar_url} size={20} faded />
+                <span className="min-w-0 flex-1 truncate text-[11px] text-cream normal-case">@{m.login}</span>
+                <button
+                  type="button"
+                  onClick={() => copyPending(m.login)}
+                  className={`btn-press flex min-w-[88px] items-center justify-center gap-1.5 border-2 px-2 py-1 text-[9px] transition-colors ${
+                    copiedLogin === m.login ? "border-lime bg-lime text-bg" : "border-border text-cream hover:border-lime"
+                  }`}
+                >
+                  {copiedLogin === m.login ? <Check size={11} strokeWidth={3} aria-hidden /> : <Copy size={11} strokeWidth={2.5} aria-hidden />}
+                  {copiedLogin === m.login ? "Copied" : "Copy link"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </Panel>
   );
 }

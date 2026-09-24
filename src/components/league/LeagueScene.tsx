@@ -2,7 +2,7 @@
 
 import "@/lib/silenceThreeClockWarning";
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -107,24 +107,81 @@ function cameraFrame(size: number, aspect = 1.6) {
   return {
     target: new THREE.Vector3(cx, 30, cz),
     position: new THREE.Vector3(cx - dist * 0.55, dist * 0.6, cz + dist * 0.65),
-    min: Math.max(120, width * 0.2),
     max: width * 2.4 + 400,
   };
 }
 
-function LeagueCamera({ size }: { size: number }) {
+const _fromPos = new THREE.Vector3();
+const _fromLook = new THREE.Vector3();
+
+// Frames the terrain, and flies to a selected building like the home city
+// (camera outside the building, looking at its top), then back on close.
+function LeagueCamera({ size, focus }: { size: number; focus: CityBuilding | null }) {
   const camera = useThree((s) => s.camera);
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
   const frame = useMemo(() => cameraFrame(size, aspect), [size, aspect]);
   const controls = useRef<OrbitControlsImpl>(null);
   const [rotate, setRotate] = useState(true);
+  const fly = useRef({ t: 1, toPos: new THREE.Vector3(), toLook: new THREE.Vector3() });
+  const framed = useRef(false);
 
-  // Frame the terrain on mount and when it grows.
+  // First frame: jump. Later (terrain grew, screen turned): fly.
+  const flyTo = (pos: THREE.Vector3, look: THREE.Vector3) => {
+    const c = controls.current;
+    if (!c) return;
+    if (!framed.current) {
+      framed.current = true;
+      camera.position.copy(pos);
+      c.target.copy(look);
+      c.update();
+      return;
+    }
+    _fromPos.copy(camera.position);
+    _fromLook.copy(c.target);
+    fly.current.toPos.copy(pos);
+    fly.current.toLook.copy(look);
+    fly.current.t = 0;
+  };
+
   useEffect(() => {
-    camera.position.copy(frame.position);
-    controls.current?.target.copy(frame.target);
-    controls.current?.update();
-  }, [camera, frame]);
+    if (!focus) {
+      flyTo(frame.position, frame.target);
+      setRotate(true);
+      return;
+    }
+    setRotate(false);
+    const mobile = window.innerWidth < 640;
+    const dist = mobile ? 300 : 180;
+    const camHeight = mobile ? 200 : 120;
+    const lookDrop = mobile ? 60 : 0;
+    const [bx, , bz] = focus.position;
+    // Step outward from the terrain center, or along the current view when
+    // the building sits at the center.
+    let dx = bx - frame.target.x;
+    let dz = bz - frame.target.z;
+    let len = Math.hypot(dx, dz);
+    if (len < 1) {
+      dx = camera.position.x - bx;
+      dz = camera.position.z - bz;
+      len = Math.hypot(dx, dz) || 1;
+    }
+    flyTo(
+      new THREE.Vector3(bx + (dx / len) * dist, focus.height + camHeight, bz + (dz / len) * dist),
+      new THREE.Vector3(bx, Math.max(0, focus.height + 15 - lookDrop), bz),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, frame]);
+
+  useFrame((_, delta) => {
+    const f = fly.current;
+    const c = controls.current;
+    if (f.t >= 1 || !c) return;
+    f.t = Math.min(1, f.t + delta * 0.9);
+    const e = 1 - Math.pow(1 - f.t, 3); // ease-out cubic, as the home city
+    camera.position.lerpVectors(_fromPos, f.toPos, e);
+    c.target.lerpVectors(_fromLook, f.toLook, e);
+    c.update();
+  });
 
   // Auto-rotate pauses while the tab is hidden and stops once the viewer
   // takes the camera.
@@ -139,15 +196,17 @@ function LeagueCamera({ size }: { size: number }) {
     <OrbitControls
       ref={controls}
       makeDefault
-      target={frame.target}
       enableDamping
       dampingFactor={0.08}
-      minDistance={frame.min}
+      minDistance={80}
       maxDistance={frame.max}
       maxPolarAngle={Math.PI * 0.44}
-      autoRotate={rotate && !hidden}
+      autoRotate={rotate && !hidden && !focus}
       autoRotateSpeed={0.35}
-      onStart={() => setRotate(false)}
+      onStart={() => {
+        fly.current.t = 1;
+        setRotate(false);
+      }}
     />
   );
 }
@@ -163,6 +222,10 @@ export interface LeagueSceneProps {
 }
 
 export default function LeagueScene({ size, objects, buildings, focused, onBuildingClick }: LeagueSceneProps) {
+  const focusedBuilding = useMemo(
+    () => (focused ? (buildings.find((b) => b.loginLower === focused.toLowerCase()) ?? null) : null),
+    [buildings, focused],
+  );
   const [lost, setLost] = useState(false);
   const decorations = useMemo(() => toDecorations(objects), [objects]);
   const initial = useMemo(() => cameraFrame(size), [size]);
@@ -199,7 +262,7 @@ export default function LeagueScene({ size, objects, buildings, focused, onBuild
     >
       <fog attach="fog" args={[theme.fogColor, theme.fogNear * 2, theme.fogFar * 1.2]} />
       <ThemeLights theme={theme} themeIndex={THEME_INDEX} />
-      <LeagueCamera size={size} />
+      <LeagueCamera size={size} focus={focusedBuilding} />
 
       <LeagueGround size={size} />
       <LeagueRoads objects={objects} markingColor={theme.roadMarkingColor} />

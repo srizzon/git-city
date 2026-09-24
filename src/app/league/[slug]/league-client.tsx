@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import PixelSpinner from "@/components/leagues/PixelSpinner";
 import { generateCityLayout, type CityBuilding, type DeveloperRecord, type LayoutNorms } from "@/lib/github";
@@ -15,7 +14,8 @@ import HallOfFamePanel from "@/components/league/hud/HallOfFamePanel";
 import StandingsPanel from "@/components/league/hud/StandingsPanel";
 import InvitePanel from "@/components/league/hud/InvitePanel";
 import JoinPanel from "@/components/league/hud/JoinPanel";
-import { Avatar, HUD_BOX } from "@/components/league/hud/shared";
+import BuildingCard from "@/components/league/hud/BuildingCard";
+import { HUD_BOX } from "@/components/league/hud/shared";
 
 const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
   ssr: false,
@@ -65,7 +65,6 @@ export default function LeagueClient({
     return leagueBuildings(city.objects, byDevId);
   }, [city.objects, cityDevs, cityNorms]);
 
-  const focusedMember = focused ? members.find((m) => m.login.toLowerCase() === focused.loginLower) : undefined;
   const verifyHref = !isMember && !showJoinCta && viewer && league.kind === "company" ? "/leagues/verify" : null;
   const close = () => setPanel(null);
 
@@ -76,7 +75,10 @@ export default function LeagueClient({
         objects={city.objects}
         buildings={buildings}
         focused={focused?.login ?? null}
-        onBuildingClick={(b) => setFocused((f) => (f?.loginLower === b.loginLower ? null : b))}
+        onBuildingClick={(b) => {
+          setPanel(null);
+          setFocused(b);
+        }}
       />
 
       {/* HUD: the wrappers ignore the pointer so the city stays draggable. */}
@@ -84,26 +86,11 @@ export default function LeagueClient({
         <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} />
       </div>
 
-      <div className="pointer-events-none fixed right-4 top-4 z-30 hidden sm:block">
+      <div className={`pointer-events-none fixed right-4 top-4 z-30 hidden transition-opacity duration-200 sm:block ${focused || panel ? "opacity-0" : ""}`}>
         <RaceWidget data={data} onHallOfFame={() => setPanel("hall")} onStandings={() => setPanel("standings")} />
       </div>
 
-      <div className="pointer-events-none fixed inset-x-4 bottom-4 z-30 flex flex-col items-center gap-2">
-        {focused && (
-          <div className={`${HUD_BOX} flex max-w-full items-center gap-3 px-3 py-2`}>
-            <Avatar src={focused.avatar_url} size={24} faded={focusedMember?.status === "invited"} />
-            <div className="min-w-0">
-              <p className="truncate text-[11px] text-cream normal-case">@{focused.login}</p>
-              <p className="text-[9px] text-muted">{focusedMember?.status === "invited" ? "Invited · not joined yet" : "Member"}</p>
-            </div>
-            <Link href={`/dev/${focused.login}`} className="btn-press shrink-0 text-[10px] text-lime hover:text-cream">
-              Profile ›
-            </Link>
-            <button type="button" onClick={() => setFocused(null)} aria-label="Close" className="shrink-0 px-1 text-[10px] text-muted hover:text-cream">
-              ✕
-            </button>
-          </div>
-        )}
+      <div className={`pointer-events-none fixed inset-x-4 bottom-4 z-30 flex flex-col items-center gap-2 ${focused ? "max-sm:hidden" : ""}`}>
         <div className="pointer-events-none flex w-full items-end justify-center gap-2">
           <div className="sm:hidden">
             <button
@@ -119,14 +106,25 @@ export default function LeagueClient({
             canInvite={isMember}
             isAdmin={!!viewer?.is_admin}
             verifyHref={verifyHref}
-            onInvite={() => setPanel("invite")}
+            onInvite={() => {
+              setFocused(null);
+              setPanel("invite");
+            }}
           />
         </div>
       </div>
 
       {panel === "hall" && <HallOfFamePanel data={data} onClose={close} />}
       {panel === "standings" && <StandingsPanel data={data} onClose={close} />}
-      {panel === "invite" && isMember && <InvitePanel slug={league.slug} onClose={close} />}
+      {panel === "invite" && isMember && viewer && (
+        <InvitePanel
+          slug={league.slug}
+          viewerLogin={viewer.login}
+          pending={members.filter((m) => m.status === "invited")}
+          onClose={close}
+        />
+      )}
+      {focused && <BuildingCard key={focused.loginLower} building={focused} data={data} onClose={() => setFocused(null)} />}
       {panel === "join" && (
         <JoinPanel
           leagueSlug={league.slug}
