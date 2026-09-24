@@ -16,8 +16,10 @@ import { activateOnClaim } from "@/lib/leagues/joined";
  * building creation from GitHub data, XP, rank, activity feed, welcome
  * notification, referral attribution and achievement checks.
  *
- * Keyed on the GitHub login (from `user_metadata.user_name`) and the Supabase
- * auth user id — the only two values either entry point needs to provide.
+ * Keyed on the GitHub login and the Supabase auth user id — the only two
+ * values either entry point needs to provide. The login must come from the
+ * GitHub identity (githubLoginFromIdentity), never from user_metadata, which
+ * the user can rewrite to claim someone else's building.
  */
 export async function provisionDeveloperOnLogin(
   githubLogin: string,

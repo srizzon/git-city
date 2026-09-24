@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { PUBLIC_DEVELOPER_COLUMNS } from "@/lib/developer-columns";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { githubLoginsFromIdentities, isAdminUser } from "@/lib/auth-identity";
 import type { TopRepo } from "@/lib/github";
 import { calculateGithubXp } from "@/lib/xp";
 import {
@@ -80,14 +80,24 @@ export async function GET(
     let isOwnProfile = false;
     let isAdmin = false;
     let authUserId: string | null = null;
+    // GitHub numeric id of the identity whose login matches `username`, used
+    // to confirm the fetched account is really theirs before claiming it.
+    let authGithubId: string | null = null;
     try {
       const authClient = await createServerSupabase();
       const { data: { user } } = await authClient.auth.getUser();
       if (user) {
         authUserId = user.id;
-        const authLogin = getGithubLoginFromUser(user);
-        isOwnProfile = authLogin === username.toLowerCase();
-        isAdmin = isAdminGithubLogin(authLogin);
+        // Identity data, not user_metadata: metadata is user-editable.
+        isOwnProfile = githubLoginsFromIdentities(user).includes(username.toLowerCase());
+        isAdmin = isAdminUser(user);
+        const identity = (user.identities ?? []).find((i) => {
+          const d = i.identity_data as { user_name?: unknown; preferred_username?: unknown } | undefined;
+          const login = typeof d?.user_name === "string" ? d.user_name : d?.preferred_username;
+          return i.provider === "github" && typeof login === "string" && login.toLowerCase() === username.toLowerCase();
+        });
+        const providerId = (identity?.identity_data as { provider_id?: unknown } | undefined)?.provider_id ?? identity?.id;
+        authGithubId = typeof providerId === "string" && providerId ? providerId : null;
       }
     } catch {}
 
@@ -110,10 +120,14 @@ export async function GET(
       const data = await fetchGitHubDeveloperData(username, allowEmpty ? { allowEmpty: true } : undefined);
       if (rateLimitKey) await recordRateLimitRequest(rateLimitKey);
 
+      // Own profile only counts when the GitHub account id matches the
+      // identity too (a login can be renamed and re-registered by someone else).
+      const ownsFetched = isOwnProfile && !!authUserId && (!authGithubId || String(data.github_id) === authGithubId);
+
       // Own profile or admin: create the building.
       // Own profile claims it; admin creation leaves the dev unclaimed so the real user can claim later.
-      if ((isOwnProfile && authUserId) || isAdmin) {
-        const claimFields = isOwnProfile && authUserId
+      if (ownsFetched || isAdmin) {
+        const claimFields = ownsFetched && authUserId
           ? {
               claimed: true,
               claimed_by: authUserId,
@@ -365,7 +379,20 @@ async function refreshDeveloper(
       p_github_login: upserted.github_login,
     });
     const matchedUser = (matchedUsers as { id: string }[] | null)?.[0];
+    // Never hand a second building to a user who already owns one for a
+    // different GitHub account.
+    let ownsOther = false;
     if (matchedUser?.id) {
+      const { data: owned } = await admin
+        .from("developers")
+        .select("github_id")
+        .eq("claimed_by", matchedUser.id)
+        .neq("id", devId);
+      ownsOther = (owned ?? []).some(
+        (r: { github_id: number | null }) => r.github_id == null || r.github_id !== upserted.github_id,
+      );
+    }
+    if (matchedUser?.id && !ownsOther) {
       await admin
         .from("developers")
         .update({
