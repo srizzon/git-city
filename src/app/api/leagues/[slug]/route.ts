@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLeagueBySlug, getViewer, setScoringMode, transferAdmin } from "@/lib/leagues/service";
 import { getLeaguePageData } from "@/lib/leagues/queries";
-import { leagueErrorResponse, readJson } from "@/lib/leagues/http";
+import { assertSameOrigin, leagueErrorResponse, readJson } from "@/lib/leagues/http";
 import type { ScoringMode } from "@/lib/leagues/scoring";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,8 @@ export async function GET(_req: Request, { params }: Ctx) {
 
 // PATCH: admin settings { scoring_mode?, admin_login? }.
 export async function PATCH(req: Request, { params }: Ctx) {
+  const bad = assertSameOrigin(req);
+  if (bad) return bad;
   const { slug } = await params;
   const viewer = await getViewer();
   if (!viewer) return NextResponse.json({ error: "Sign in first." }, { status: 401 });

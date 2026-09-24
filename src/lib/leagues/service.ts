@@ -2,11 +2,12 @@ import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getGithubLoginFromUser } from "@/lib/admin";
-import { GitHubFetchError } from "@/lib/github-api";
+import { FETCH_TIMEOUT_MS, GitHubFetchError, ghHeaders } from "@/lib/github-api";
 import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import type { ScoringMode } from "./scoring";
 import { notifyJoined } from "./joined";
 import { autoPlace, ensureCity } from "@/lib/league-city/service";
+import { cleanLeagueName } from "./names";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ export class LeagueError extends Error {
 
 export const MAX_CUSTOM_LEAGUES = 5;
 export const MAX_INVITES_PER_DAY = 10;
+export const MAX_LEAGUES_CREATED_PER_DAY = 5;
 const LOGIN_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,38})$/;
 
 // ─── Viewer ─────────────────────────────────────────────────
@@ -112,6 +114,19 @@ export function slugify(name: string): string {
   );
 }
 
+/** True when GitHub has an org with this login (its company league owns /league/<org>). */
+async function isGithubOrg(login: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://api.github.com/orgs/${encodeURIComponent(login)}`, {
+      headers: ghHeaders(),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    return res.status === 200;
+  } catch {
+    return false;
+  }
+}
+
 async function uniqueSlug(base: string): Promise<string> {
   const sb = getSupabaseAdmin();
   const { data } = await sb.from("leagues").select("slug").like("slug", `${base}%`);
@@ -127,16 +142,25 @@ async function uniqueSlug(base: string): Promise<string> {
 // ─── Create / join ──────────────────────────────────────────
 
 export async function createCustomLeague(viewer: Viewer, rawName: string): Promise<League> {
-  const name = rawName.trim().replace(/\s+/g, " ");
-  if (name.length < 2 || name.length > 40) {
-    throw new LeagueError("invalid_name", "League name must be 2 to 40 characters.");
-  }
+  const name = cleanLeagueName(rawName);
   if ((await countActiveCustomLeagues(viewer.id)) >= MAX_CUSTOM_LEAGUES) {
     throw new LeagueError("limit", `You can be in up to ${MAX_CUSTOM_LEAGUES} custom leagues.`, 403);
   }
 
   const sb = getSupabaseAdmin();
-  const slug = await uniqueSlug(slugify(name));
+  const since = new Date(Date.now() - 86_400_000).toISOString();
+  const { count: createdToday } = await sb
+    .from("leagues")
+    .select("id", { count: "exact", head: true })
+    .eq("created_by", viewer.id)
+    .gte("created_at", since);
+  if ((createdToday ?? 0) >= MAX_LEAGUES_CREATED_PER_DAY) {
+    throw new LeagueError("create_limit", `You can create ${MAX_LEAGUES_CREATED_PER_DAY} leagues a day. Try again tomorrow.`, 429);
+  }
+
+  // /league/<org> stays reserved for the org's company league.
+  const base = slugify(name);
+  const slug = await uniqueSlug((await isGithubOrg(base)) ? `${base}-league` : base);
   const { data: league, error } = await sb
     .from("leagues")
     .insert({ slug, name, kind: "custom", admin_id: viewer.id, created_by: viewer.id })

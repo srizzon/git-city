@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { rateLimit } from "@/lib/rate-limit";
 import { createCustomLeague, getViewer } from "@/lib/leagues/service";
 import { getGlobalRanking } from "@/lib/leagues/queries";
-import { leagueErrorResponse, readJson } from "@/lib/leagues/http";
+import { assertSameOrigin, leagueErrorResponse, readJson } from "@/lib/leagues/http";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +19,11 @@ export async function GET() {
 
 // POST: create a custom league { name }.
 export async function POST(req: Request) {
+  const bad = assertSameOrigin(req);
+  if (bad) return bad;
   const viewer = await getViewer();
   if (!viewer) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   if (!viewer.claimed) return NextResponse.json({ error: "Claim your building first." }, { status: 403 });
-
-  const { ok } = rateLimit(`league-create:${viewer.id}`, 3, 60_000);
-  if (!ok) return NextResponse.json({ error: "Too fast." }, { status: 429 });
 
   const body = await readJson(req);
   try {
