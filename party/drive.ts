@@ -27,6 +27,7 @@ import {
   grabCrown,
   idleCrown,
   leaveCrown,
+  knockFrom,
   scatterFrom,
   startCrown,
   stealCrown,
@@ -163,14 +164,14 @@ export default class DriveServer implements Party.Server {
         if (!a || !v || Math.hypot(a[0] - v[0], a[1] - v[1]) > CROWN.hitRange) return;
         if (steal === true) changed = stealCrown(this.crown, sender.id, now);
         else {
-          const [cx, cz] = scatterFrom(v[0], v[1], now);
-          changed = dropCrown(this.crown, now, cx, cz);
+          const [cx, cz] = knockFrom(a[0], a[1], v[0], v[1], now);
+          changed = dropCrown(this.crown, now, cx, cz, v[0], v[1]);
         }
       } else if (t === "crown_drop") {
         if (this.crown.holder !== sender.id) return;
         const v = this.where(sender.id) ?? [this.crown.x, this.crown.z];
         const [cx, cz] = scatterFrom(v[0], v[1], now);
-        changed = dropCrown(this.crown, now, cx, cz);
+        changed = dropCrown(this.crown, now, cx, cz, v[0], v[1]);
       }
       if (changed) this.sendCrown();
       return;

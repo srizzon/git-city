@@ -101,7 +101,9 @@ export default function CrownPanel({
             ? "You have the crown! Don't get hit"
             : crown.holder
               ? `${at(crown.holder)} has the crown. Bump them (boost to steal)`
-              : "The crown is loose! Grab it"}
+              : crown.lockId === you && serverNow < crown.lockUntil
+                ? `You lost the crown! Back in ${secs(crown.lockUntil - serverNow)}s`
+                : "The crown is loose! Grab it"}
         </p>
       </>
     );

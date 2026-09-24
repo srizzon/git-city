@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWN, dropCrown, grabCrown, idleCrown, leaveCrown, scatterFrom, startCrown, stealCrown, tickCrown } from "./crown";
+import { CROWN, dropCrown, grabCrown, idleCrown, knockFrom, leaveCrown, scatterFrom, startCrown, stealCrown, tickCrown } from "./crown";
 
 function live() {
   const s = idleCrown();
@@ -91,5 +91,30 @@ describe("crown rush", () => {
   it("scatters a knocked-off crown a few meters away", () => {
     const [x, z] = scatterFrom(10, 10, 3);
     expect(Math.hypot(x - 10, z - 10)).toBeCloseTo(CROWN.scatter);
+  });
+
+  it("throws a bumped crown the way the bump pushed", () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const [x, z] = knockFrom(0, 0, 10, 0, seed); // hit from the west
+      expect(x).toBeGreaterThan(10 + CROWN.scatter * 0.9);
+      expect(Math.abs(z)).toBeLessThan(CROWN.scatter * 0.35);
+    }
+  });
+
+  it("keeps whoever lost it from taking it straight back, but lets the others in", () => {
+    const s = live();
+    grabCrown(s, "a", T0);
+    dropCrown(s, T0 + 5000, 20, 0, 11, 0);
+    expect(s).toMatchObject({ fromX: 11, x: 20, lockId: "a" });
+    expect(grabCrown(s, "a", T0 + 5000 + CROWN.loose)).toBe(false);
+    expect(grabCrown(s, "a", T0 + 5000 + CROWN.regrab - 1)).toBe(false);
+    expect(grabCrown(s, "b", T0 + 5000 + CROWN.loose)).toBe(true);
+  });
+
+  it("lets the one who lost it take it back once the lockout ends", () => {
+    const s = live();
+    grabCrown(s, "a", T0);
+    dropCrown(s, T0 + 5000, 20, 0);
+    expect(grabCrown(s, "a", T0 + 5000 + CROWN.regrab)).toBe(true);
   });
 });

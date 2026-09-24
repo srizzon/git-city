@@ -8,6 +8,7 @@ import { boxPosition, boxSpots } from "@/lib/league-city/drive/battle";
 import { CROWN, type CrownState } from "@/lib/league-city/drive/crown";
 import { INTERP_MS, emptySnapshot, type ClientMsg } from "@/lib/league-city/drive/net";
 import { M_TO_UNIT, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
+import { spinOut } from "@/lib/league-city/drive/vehicle";
 import type { CarApi } from "./Car";
 import type { BattleEvent, RemoteDriver } from "./useDrivePresence";
 import { Bursts, type VoxelBursts } from "./Voxels";
@@ -110,6 +111,9 @@ export default function CrownMode({
       offset.current = e.now - Date.now();
       setCrown(e.crown);
       view.current({ crown: e.crown, offset: offset.current, you: selfId.current });
+      // Lost it: spin for a moment, like a Mario Kart hit.
+      const me = selfId.current;
+      if (e.crown.phase === "live" && prev?.holder === me && e.crown.holder !== me && carRef.current) spinOut(carRef.current.state, 1);
       // Confetti of gold cubes when someone wins.
       if (e.crown.phase === "over" && prev?.phase === "live" && bursts.current) {
         const at = prev.holder && prev.holder === e.crown.winner ? null : { x: e.crown.x, z: e.crown.z };
@@ -162,6 +166,14 @@ export default function CrownMode({
     let x = s.x * M_TO_UNIT;
     let z = s.z * M_TO_UNIT;
     let y = 3 + Math.sin(t * 2) * 0.8;
+    // Just knocked off: it arcs from the car to where it lands.
+    const flying = !s.holder && (serverNow - (s.takeAt - CROWN.loose)) / CROWN.loose;
+    if (flying !== false && flying < 1) {
+      const k = Math.max(0, flying);
+      x = (s.fromX + (s.x - s.fromX) * k) * M_TO_UNIT;
+      z = (s.fromZ + (s.z - s.fromZ) * k) * M_TO_UNIT;
+      y = 6 + Math.sin(Math.PI * k) * 12;
+    }
     if (s.holder) {
       if (s.holder === me && c) {
         x = c.group.position.x;
@@ -184,7 +196,8 @@ export default function CrownMode({
     }
 
     // Drive into a loose crown to take it.
-    if (s.phase === "live" && !s.holder && c && serverNow >= s.takeAt) {
+    const locked = s.lockId === me && serverNow < s.lockUntil;
+    if (s.phase === "live" && !s.holder && c && serverNow >= s.takeAt && !locked) {
       const p = c.body.translation();
       const now = performance.now();
       if (Math.hypot(p.x - s.x, p.z - s.z) < CROWN.reach && now - lastGrab.current > 300) {
