@@ -105,6 +105,7 @@ END;
 $$;
 
 REVOKE EXECUTE ON FUNCTION public.record_town_visit(uuid, bigint, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_town_visit(uuid, bigint, boolean) TO service_role;
 
 -- ─── rollup_town_visits ────────────────────────────────────
 -- Distinct visitors per town for the week starting p_week_start (Monday).
@@ -131,6 +132,7 @@ END;
 $$;
 
 REVOKE EXECUTE ON FUNCTION public.rollup_town_visits(date) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.rollup_town_visits(date) TO service_role;
 
 -- ─── town_visit_trend ──────────────────────────────────────
 -- Distinct visitors per town over the last 7 UTC days and the 7 before.
@@ -150,6 +152,53 @@ AS $$
 $$;
 
 REVOKE EXECUTE ON FUNCTION public.town_visit_trend() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.town_visit_trend() TO service_role;
+
+-- ─── town_catalog ──────────────────────────────────────────
+-- Every listed town with what Discover sorts by: buildings, the admin's
+-- object changes in the last 7 days, and visitors (last 7 days vs the 7
+-- before). One call; the app caches it for 5 minutes.
+CREATE OR REPLACE FUNCTION public.town_catalog()
+RETURNS TABLE (
+  league_id     uuid,
+  slug          text,
+  name          text,
+  kind          text,
+  github_org    text,
+  created_at    timestamptz,
+  featured_week date,
+  buildings     int,
+  ops_7d        int,
+  visitors_7d   int,
+  visitors_prev int
+)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  WITH b AS (
+    SELECT o.league_id, count(*)::int AS n
+    FROM public.league_objects o
+    WHERE o.kind = 'building'
+    GROUP BY o.league_id
+  ), ops AS (
+    SELECT c.league_id, sum(jsonb_array_length(c.ops))::int AS n
+    FROM public.league_city_ops c
+    WHERE c.at > now() - interval '7 days' AND c.actor_id IS NOT NULL
+    GROUP BY c.league_id
+  )
+  SELECT l.id, l.slug, l.name, l.kind, l.github_org, l.created_at, l.featured_week,
+         COALESCE(b.n, 0), COALESCE(ops.n, 0), COALESCE(t.last7, 0), COALESCE(t.prev7, 0)
+  FROM public.leagues l
+  LEFT JOIN b ON b.league_id = l.id
+  LEFT JOIN ops ON ops.league_id = l.id
+  LEFT JOIN public.town_visit_trend() t ON t.league_id = l.id
+  WHERE NOT l.hidden;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.town_catalog() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.town_catalog() TO service_role;
 
 -- ─── record_town_milestones ────────────────────────────────
 -- Writes each milestone the first time its threshold holds. Called at the end
@@ -178,6 +227,7 @@ END;
 $$;
 
 REVOKE EXECUTE ON FUNCTION public.record_town_milestones(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_town_milestones(uuid) TO service_role;
 
 -- Towns that already crossed a threshold get their milestones now.
 DO $$
