@@ -12,13 +12,16 @@ import { isTypingTarget } from "@/lib/league-city/editor/shortcuts";
 // mesh raycasts. Runs under frameloop="demand", so it invalidates whenever
 // the view changes and keeps invalidating while something animates.
 
+/** The lot under the pointer, the exact ground point, and Shift (no snap). */
+export type LotPoint = { x: number; z: number; wx: number; wz: number; free: boolean };
+
 export type LotEvent =
-  | { kind: "hover"; x: number; z: number }
+  | ({ kind: "hover" } & LotPoint)
   | { kind: "leave" }
-  | { kind: "down"; x: number; z: number }
-  | { kind: "drag"; x: number; z: number }
-  | { kind: "up"; x: number; z: number }
-  | { kind: "pick"; x: number; z: number };
+  | ({ kind: "down" } & LotPoint)
+  | ({ kind: "drag" } & LotPoint)
+  | ({ kind: "up" } & LotPoint)
+  | ({ kind: "pick" } & LotPoint);
 
 export interface EditCameraApi {
   /** Eases the camera to look at a lot. */
@@ -107,11 +110,13 @@ export default function EditCamera({
     let press: { x: number; y: number; button: number; alt: boolean; moved: boolean } | null = null;
     let space = false;
 
-    const lotAt = (e: PointerEvent | MouseEvent): [number, number] | null => {
+    const lotAt = (e: PointerEvent | MouseEvent): LotPoint | null => {
       const r = el.getBoundingClientRect();
       _ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       _ray.setFromCamera(_ndc, camera);
-      return _ray.ray.intersectPlane(_ground, _hit) ? worldToLot(_hit.x, _hit.z) : null;
+      if (!_ray.ray.intersectPlane(_ground, _hit)) return null;
+      const [x, z] = worldToLot(_hit.x, _hit.z);
+      return { x, z, wx: _hit.x, wz: _hit.z, free: e.shiftKey };
     };
     const worldPerPixel = () => {
       const cam = camera as THREE.PerspectiveCamera;
@@ -131,7 +136,7 @@ export default function EditCamera({
       const lot = lotAt(e);
       if (!lot) return;
       el.setPointerCapture(e.pointerId);
-      if (!e.altKey) onLotRef.current({ kind: "down", x: lot[0], z: lot[1] });
+      if (!e.altKey) onLotRef.current({ kind: "down", ...lot });
     };
 
     const onMove = (e: PointerEvent) => {
@@ -153,7 +158,7 @@ export default function EditCamera({
       }
       const lot = lotAt(e);
       if (!lot) return onLotRef.current({ kind: "leave" });
-      onLotRef.current({ kind: press && press.button === 0 && !press.alt ? "drag" : "hover", x: lot[0], z: lot[1] });
+      onLotRef.current({ kind: press && press.button === 0 && !press.alt ? "drag" : "hover", ...lot });
     };
 
     const onUp = (e: PointerEvent) => {
@@ -166,14 +171,14 @@ export default function EditCamera({
         // A middle click that didn't move picks the item under the cursor.
         if (p && p.button === 1 && !p.moved) {
           const lot = lotAt(e);
-          if (lot) onLotRef.current({ kind: "pick", x: lot[0], z: lot[1] });
+          if (lot) onLotRef.current({ kind: "pick", ...lot });
         }
         return;
       }
       if (!p || p.button !== 0) return;
       const lot = lotAt(e);
       if (!lot) return;
-      onLotRef.current(p.alt ? { kind: "pick", x: lot[0], z: lot[1] } : { kind: "up", x: lot[0], z: lot[1] });
+      onLotRef.current({ kind: p.alt ? "pick" : "up", ...lot });
     };
 
     const onLeave = () => {

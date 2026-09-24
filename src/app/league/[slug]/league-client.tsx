@@ -32,7 +32,7 @@ import { useEditorController } from "@/components/league/editor/useEditorControl
 import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { SceneMode } from "@/components/league/LeagueScene";
 import { createEditorStore } from "@/lib/league-city/editor/store";
-import { HOTBAR, initEditor, type Notice } from "@/lib/league-city/editor/state";
+import { HOTBAR, initEditor, objectAtSpot, type Notice } from "@/lib/league-city/editor/state";
 
 const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
   ssr: false,
@@ -126,7 +126,7 @@ export default function LeagueClient({
   const enterEdit = () => {
     setFocused(null);
     setPanel(null);
-    store.dispatch({ type: "resync", city });
+    if (city.version > store.getState().version) store.dispatch({ type: "resync", city });
     setMode("edit");
     window.history.replaceState(null, "", `/league/${league.slug}?edit=1`);
   };
@@ -157,12 +157,27 @@ export default function LeagueClient({
 
   // While carried (and the cursor is on the city), the object only shows as
   // the ghost under the cursor.
+  // The city on screen always comes from the editor store, so Done shows the
+  // edits right away; fresher server data (router.refresh) syncs in below.
   const carrying = mode === "edit" && es.held && editor.hover ? es.held : null;
+  const replacing =
+    mode === "edit" && editor.ghost?.fit.ok ? (editor.ghost.fit.replaces?.id ?? null) : null;
   const sceneObjects = useMemo(
-    () => (editing ? [...es.objects.values()].filter((o) => o.id !== carrying) : city.objects),
-    [editing, es.objects, city.objects, carrying],
+    () => [...es.objects.values()].filter((o) => o.id !== carrying && o.id !== replacing),
+    [es.objects, carrying, replacing],
   );
-  const sceneSize = editing ? es.size : city.size;
+
+  const sceneSize = es.size;
+
+  // Server data changed (refresh after Done, an invite): take it if it's not older.
+  const lastCity = useRef(city);
+  useEffect(() => {
+    if (lastCity.current === city) return;
+    lastCity.current = city;
+    const s = store.getState();
+    if (city.version >= s.version && s.pending.length === 0 && !s.inflight)
+      store.dispatch({ type: "resync", city });
+  }, [city, store]);
   const buildings = useMemo(() => leagueBuildings(sceneObjects, byDevId), [sceneObjects, byDevId]);
   const newBuildings = useMemo(
     () => sceneObjects.filter((o) => o.kind === "building" && o.is_new),
@@ -195,6 +210,11 @@ export default function LeagueClient({
             buildingByDev={byDevId}
             grid={editor.grid}
             hover={editor.hover}
+            hovered={
+              es.tool.kind === "select" && !es.held && editor.hover
+                ? objectAtSpot(es.objects, editor.hover)
+                : undefined
+            }
             ghost={editor.ghost}
             roadPath={editor.roadPath}
           />

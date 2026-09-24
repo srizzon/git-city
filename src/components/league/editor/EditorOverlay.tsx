@@ -7,6 +7,7 @@ import type { CityBuilding } from "@/lib/github";
 import { LOT, lotToWorld, maxLot, minLot, rotToRadians } from "@/lib/league-city/grid";
 import type { GhostFit } from "@/lib/league-city/editor/ghost";
 import type { CityObject, ItemType } from "@/lib/league-city/types";
+import { propRadius } from "@/lib/league-city/props";
 import { GhostRoads } from "../LeagueRoads";
 
 // Build-mode overlays inside the Canvas: lot grid, hover highlight, the
@@ -16,6 +17,7 @@ import { GhostRoads } from "../LeagueRoads";
 const OK = "#4ade80";
 const BAD = "#ef4444";
 const SELECT = "#c8e64a";
+const REPLACE = "#facc15";
 
 export interface GhostSpec {
   x: number;
@@ -23,10 +25,11 @@ export interface GhostSpec {
   fit: GhostFit;
   /** What follows the cursor. */
   thing:
-    | { kind: "item"; item: ItemType; rot: number }
+    | { kind: "prop"; item: ItemType; rot: number }
+    | { kind: "surface"; item: ItemType }
     | { kind: "building"; building: CityBuilding; rot: number }
     | { kind: "road" }
-    | { kind: "bulldoze" }
+    | { kind: "bulldoze"; target: CityObject }
     | null;
 }
 
@@ -115,28 +118,80 @@ function ItemProxy({ item, color }: { item: ItemType; color: string }) {
   );
 }
 
+/** Footprint ring for props, so their size reads before they land. */
+function Ring({ wx, wz, r, color }: { wx: number; wz: number; r: number; color: string }) {
+  return (
+    <mesh position={[wx, 1, wz]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={6}>
+      <ringGeometry args={[Math.max(0.5, r - 1.2), r, 32]} />
+      <meshBasicMaterial color={color} transparent opacity={0.85} depthWrite={false} />
+    </mesh>
+  );
+}
+
 function Ghost({ ghost, objects }: { ghost: GhostSpec; objects: CityObject[] }) {
   const { x, z, fit, thing } = ghost;
   const [wx, wz] = lotToWorld(x, z);
   if (!thing) return null;
+
   if (thing.kind === "bulldoze") {
     // Red means "this goes"; a building can't, so it stays grey.
+    const t = thing.target;
+    if (t.px !== null && t.pz !== null) {
+      return (
+        <group>
+          <Ring wx={t.px} wz={t.pz} r={propRadius(t.item_type) + 2} color={BAD} />
+          <Billboard position={[t.px, 24, t.pz]} renderOrder={8}>
+            {[Math.PI / 4, -Math.PI / 4].map((r) => (
+              <mesh key={r} rotation={[0, 0, r]}>
+                <planeGeometry args={[12, 2.6]} />
+                <meshBasicMaterial color={BAD} depthTest={false} transparent />
+              </mesh>
+            ))}
+          </Billboard>
+        </group>
+      );
+    }
     return fit.ok ? (
       <group>
-        <LotTile x={x} z={z} color={BAD} opacity={0.35} />
-        <Cross x={x} z={z} y={22} />
+        <LotTile x={t.x} z={t.z} color={BAD} opacity={0.35} />
+        <Cross x={t.x} z={t.z} y={22} />
       </group>
     ) : (
-      <LotTile x={x} z={z} color="#9ca3af" opacity={0.18} />
+      <LotTile x={t.x} z={t.z} color="#9ca3af" opacity={0.18} />
     );
   }
-  const color = fit.ok ? OK : BAD;
+
+  const color = fit.ok ? (fit.replaces ? REPLACE : OK) : BAD;
+
+  if (thing.kind === "prop") {
+    const px = fit.px ?? wx;
+    const pz = fit.pz ?? wz;
+    return (
+      <group>
+        <Ring wx={px} wz={pz} r={propRadius(thing.item)} color={color} />
+        <group position={[px, 0, pz]} rotation={[0, rotToRadians(thing.rot), 0]}>
+          <ItemProxy item={thing.item} color={color} />
+        </group>
+        {!fit.ok && (
+          <Billboard position={[px, 26, pz]} renderOrder={8}>
+            {[Math.PI / 4, -Math.PI / 4].map((r) => (
+              <mesh key={r} rotation={[0, 0, r]}>
+                <planeGeometry args={[12, 2.6]} />
+                <meshBasicMaterial color={BAD} depthTest={false} transparent />
+              </mesh>
+            ))}
+          </Billboard>
+        )}
+      </group>
+    );
+  }
+
   return (
     <group>
-      <LotTile x={x} z={z} color={color} opacity={0.22} />
+      <LotTile x={x} z={z} color={color} opacity={fit.ok && fit.replaces ? 0.32 : 0.22} />
       {thing.kind === "road" && fit.ok && <GhostRoads objects={objects} lots={[[x, z]]} ok />}
-      {thing.kind === "item" && (
-        <group position={[wx, 0, wz]} rotation={[0, rotToRadians(thing.rot), 0]}>
+      {thing.kind === "surface" && (
+        <group position={[wx, 0, wz]}>
           <ItemProxy item={thing.item} color={color} />
         </group>
       )}
@@ -193,6 +248,7 @@ export default function EditorOverlay({
   buildingByDev,
   grid,
   hover,
+  hovered,
   ghost,
   roadPath,
 }: {
@@ -201,7 +257,9 @@ export default function EditorOverlay({
   /** Laid-out buildings (for heights), keyed by developer id. */
   buildingByDev: ReadonlyMap<number, CityBuilding>;
   grid: boolean;
-  hover: [number, number] | null;
+  hover: { x: number; z: number } | null;
+  /** What's under the cursor with the hand tool: ringed if a prop, tiled if a lot object. */
+  hovered?: CityObject;
   ghost: GhostSpec | null;
   roadPath: [number, number][] | null;
 }) {
@@ -221,7 +279,10 @@ export default function EditorOverlay({
   return (
     <group>
       {grid && <Grid size={size} />}
-      {hover && !ghost && !roadPath && <LotTile x={hover[0]} z={hover[1]} color="#ffffff" opacity={0.08} />}
+      {hover && !ghost && !roadPath && hovered?.px != null && hovered.pz != null && (
+        <Ring wx={hovered.px} wz={hovered.pz} r={propRadius(hovered.item_type) + 2} color="#ffffff" />
+      )}
+      {hover && !ghost && !roadPath && hovered?.px == null && <LotTile x={hover.x} z={hover.z} color="#ffffff" opacity={0.1} />}
       {roadPath && roadPath.length > 0 && <GhostRoads objects={objects} lots={roadPath} ok />}
       {ghost && !roadPath && <Ghost ghost={ghost} objects={objects} />}
       <NewMarkers buildings={newOnes} />

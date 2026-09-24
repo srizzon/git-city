@@ -3,10 +3,15 @@
 // `{ops, inverse}`: ops wait in `pending` for the autosave queue, the inverse
 // goes on the undo stack. One edit is never split across save batches, so a
 // swap (two moves) always reaches the server together.
+//
+// Buildings, roads and plazas own lots. Props (lamps, benches, trees,
+// fountains) stand anywhere their footprint fits (see props.ts): on plazas,
+// on grass, on a road's sidewalk.
 
-import { canPlace, lotKey } from "../placement";
-import { inBounds, type Rot } from "../grid";
-import type { CityObject, CityOp, ItemType } from "../types";
+import { lotKey } from "../placement";
+import { inBounds } from "../grid";
+import { PROP_PROBLEM_TEXT, lotOf, propAt, propProblem, snap } from "../props";
+import { isSurface, type CityObject, type CityOp, type ItemType, type PropType } from "../types";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -42,7 +47,9 @@ export interface EditorState {
   /** Object picked up and following the cursor (The Sims build mode). */
   held: string | null;
   /** Rotation of the held object; applied when it's dropped. */
-  heldRot: Rot;
+  heldRot: number;
+  /** Rotation for the next prop placed from the hotbar. */
+  placeRot: number;
   selection: string | null;
   undo: Edit[];
   redo: Edit[];
@@ -60,19 +67,29 @@ export interface CitySnapshot {
   objects: CityObject[];
 }
 
+/** Where the pointer is: the lot under it and the exact ground point. */
+export interface Spot {
+  x: number;
+  z: number;
+  wx: number;
+  wz: number;
+  /** Shift: no 4-unit snap for props. */
+  free?: boolean;
+}
+
 export type EditorAction =
   | { type: "setTool"; tool: Tool }
   | { type: "setTab"; tab: HotbarTab }
   | { type: "setSlot"; slot: number }
   | { type: "select"; id: string | null }
-  | { type: "place"; x: number; z: number; id: string }
+  | ({ type: "place"; id: string } & Spot)
   | { type: "paintRoad"; lots: [number, number][]; ids: string[] }
   | { type: "pickUp"; id: string }
-  | { type: "drop"; x: number; z: number }
+  | ({ type: "drop" } & Spot)
   | { type: "cancel" }
-  | { type: "rotate"; id: string }
+  | { type: "rotate"; id?: string }
   | { type: "remove"; id: string }
-  | { type: "removeAt"; x: number; z: number }
+  | ({ type: "removeAt" } & Spot)
   | { type: "dismissNew"; id: string }
   | { type: "undo" }
   | { type: "redo" }
@@ -83,6 +100,7 @@ export type EditorAction =
   | { type: "notify"; kind: Notice["kind"]; message: string };
 
 export const MAX_BATCH_OPS = 200;
+export const PROP_TURN = 45;
 
 export const HOTBAR: Record<Exclude<HotbarTab, "buildings">, ItemType[]> = {
   streets: ["road", "lamp", "bench"],
@@ -113,18 +131,28 @@ export function applyLocal(objects: ReadonlyMap<string, CityObject>, ops: readon
   for (const op of ops) {
     switch (op.op) {
       case "place": {
-        const id = op.id ?? `local-${next.size}-${op.x}-${op.z}`;
-        next.set(
-          id,
-          op.kind === "item"
-            ? { id, kind: "item", item_type: op.item_type, developer_id: null, x: op.x, z: op.z, rot: op.rot ?? 0, is_new: false }
-            : { id, kind: "building", item_type: null, developer_id: op.developer_id, x: op.x, z: op.z, rot: op.rot ?? 0, is_new: false },
-        );
+        const id = op.id ?? `local-${next.size}`;
+        const rot = op.rot ?? 0;
+        if (op.kind === "building") {
+          next.set(id, { id, kind: "building", item_type: null, developer_id: op.developer_id, x: op.x, z: op.z, px: null, pz: null, rot, is_new: false });
+        } else if ("px" in op) {
+          const [x, z] = lotOf(op.px, op.pz);
+          next.set(id, { id, kind: "item", item_type: op.item_type, developer_id: null, x, z, px: op.px, pz: op.pz, rot, is_new: false });
+        } else if (isSurface(op.item_type)) {
+          next.set(id, { id, kind: "item", item_type: op.item_type, developer_id: null, x: op.x, z: op.z, px: null, pz: null, rot, is_new: false });
+        } else {
+          // A lot-only prop op lands at the lot's center (server does the same).
+          next.set(id, { id, kind: "item", item_type: op.item_type, developer_id: null, x: op.x, z: op.z, px: op.x * 48, pz: op.z * 48, rot, is_new: false });
+        }
         break;
       }
       case "move": {
         const o = next.get(op.id);
-        if (o) next.set(op.id, { ...o, x: op.x, z: op.z, is_new: false });
+        if (!o) break;
+        if ("px" in op) {
+          const [x, z] = lotOf(op.px, op.pz);
+          next.set(op.id, { ...o, x, z, px: op.px, pz: op.pz });
+        } else next.set(op.id, { ...o, x: op.x, z: op.z, is_new: false });
         break;
       }
       case "rotate": {
@@ -147,22 +175,64 @@ export function applyLocal(objects: ReadonlyMap<string, CityObject>, ops: readon
   return next;
 }
 
-function objectAt(objects: ReadonlyMap<string, CityObject>, x: number, z: number): CityObject | undefined {
-  for (const o of objects.values()) if (o.x === x && o.z === z) return o;
+/** The lot object (building, road, plaza) on a lot. Props don't own lots. */
+export function lotObjectAt(objects: ReadonlyMap<string, CityObject>, x: number, z: number): CityObject | undefined {
+  for (const o of objects.values()) if (o.px === null && o.x === x && o.z === z) return o;
   return undefined;
 }
 
-function placeOp(o: CityObject): CityOp {
-  return o.kind === "item"
-    ? { op: "place", kind: "item", item_type: o.item_type!, x: o.x, z: o.z, rot: o.rot, id: o.id }
-    : { op: "place", kind: "building", developer_id: o.developer_id!, x: o.x, z: o.z, rot: o.rot, id: o.id };
+/** What a click at this spot grabs: a prop under the cursor first, else the lot's object. */
+export function objectAtSpot(objects: ReadonlyMap<string, CityObject>, spot: Spot): CityObject | undefined {
+  const p = propAt(objects.values(), spot.wx, spot.wz);
+  return p ? objects.get(p.id) : lotObjectAt(objects, spot.x, spot.z);
+}
+
+export function placeOp(o: CityObject): CityOp {
+  if (o.kind === "building") return { op: "place", kind: "building", developer_id: o.developer_id!, x: o.x, z: o.z, rot: o.rot, id: o.id };
+  if (o.px !== null && o.pz !== null) return { op: "place", kind: "item", item_type: o.item_type as PropType, px: o.px, pz: o.pz, rot: o.rot, id: o.id };
+  return { op: "place", kind: "item", item_type: o.item_type as "road" | "plaza", x: o.x, z: o.z, rot: o.rot, id: o.id };
+}
+
+/**
+ * Props that no longer fit once `ops` apply (a new road took their
+ * sidewalk), as remove ops plus the places that bring them back on undo.
+ */
+function evictedProps(s: EditorState, ops: CityOp[]): { removes: CityOp[]; restores: CityOp[] } {
+  const after = applyLocal(s.objects, ops);
+  const removes: CityOp[] = [];
+  const restores: CityOp[] = [];
+  for (const o of after.values()) {
+    if (o.px === null || o.pz === null || !o.item_type) continue;
+    if (!s.objects.has(o.id)) continue; // placed by this edit: checked by the caller
+    if (propProblem(after.values(), s.size, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id }) === "on_road") {
+      removes.push({ op: "remove", id: o.id });
+      restores.push(placeOp(s.objects.get(o.id)!));
+    }
+  }
+  return { removes, restores };
+}
+
+/** A building landing on a lot must not sit on props there. */
+function propsOnLot(objects: ReadonlyMap<string, CityObject>, x: number, z: number, size: number): boolean {
+  const probe = new Map(objects);
+  probe.set("__probe", { id: "__probe", kind: "building", item_type: null, developer_id: 0, x, z, px: null, pz: null, rot: 0, is_new: false });
+  for (const o of objects.values()) {
+    if (o.px === null || o.pz === null || !o.item_type) continue;
+    if (Math.abs(o.x - x) > 1 || Math.abs(o.z - z) > 1) continue;
+    if (propProblem(probe.values(), size, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id }) === "on_building") return true;
+  }
+  return false;
 }
 
 // ─── Reducer helpers ────────────────────────────────────────
 
+function normalize(o: CityObject): CityObject {
+  return { ...o, px: o.px ?? null, pz: o.pz ?? null };
+}
+
 export function initEditor(city: CitySnapshot): EditorState {
   return {
-    objects: new Map(city.objects.map((o) => [o.id, o])),
+    objects: new Map(city.objects.map((o) => [o.id, normalize(o)])),
     size: city.size,
     version: city.version,
     tool: { kind: "select" },
@@ -170,6 +240,7 @@ export function initEditor(city: CitySnapshot): EditorState {
     slot: 0,
     held: null,
     heldRot: 0,
+    placeRot: 0,
     selection: null,
     undo: [],
     redo: [],
@@ -207,7 +278,7 @@ function replay(s: EditorState, from: "undo" | "redo"): EditorState {
   const ops = from === "undo" ? entry.inverse : entry.ops;
   const back = from === "undo" ? entry.ops : entry.inverse;
 
-  if (!canApply(s.objects, ops) || !lotsFree(s, ops)) {
+  if (!canApply(s.objects, ops) || !fits(s, ops)) {
     return notify({ ...s, [from]: rest }, "info", `That change can't be ${from === "undo" ? "undone" : "redone"}: the city changed since.`);
   }
   const edit: Edit = { id: s.seq + 1, ops, inverse: back };
@@ -222,17 +293,20 @@ function replay(s: EditorState, from: "undo" | "redo"): EditorState {
   return from === "undo" ? { ...next, redo: [...s.redo, stored] } : { ...next, undo: [...s.undo, stored] };
 }
 
-/** True when places and moves land on free lots once the whole list applies. */
-function lotsFree(s: EditorState, ops: readonly CityOp[]): boolean {
+/** True when lot objects don't collide and the props an op touches still stand. */
+function fits(s: EditorState, ops: readonly CityOp[]): boolean {
   const after = applyLocal(s.objects, ops);
   const seen = new Set<string>();
   for (const o of after.values()) {
+    if (o.px !== null) continue;
     const k = lotKey(o.x, o.z);
-    if (seen.has(k)) return false;
+    if (seen.has(k) || !inBounds(s.size, o.x, o.z)) return false;
     seen.add(k);
   }
-  for (const op of ops) {
-    if ((op.op === "place" || op.op === "move") && !inBounds(s.size, op.x, op.z)) return false;
+  const touched = new Set(ops.flatMap((op) => ("id" in op && op.id ? [op.id] : [])));
+  for (const o of after.values()) {
+    if (o.px === null || o.pz === null || !o.item_type || !touched.has(o.id)) continue;
+    if (propProblem(after.values(), s.size, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id })) return false;
   }
   return true;
 }
@@ -241,12 +315,16 @@ function dropEntries(stack: Edit[], ids: Set<number>): Edit[] {
   return stack.filter((e) => !ids.has(e.id));
 }
 
+function propSpot(spot: Spot): [number, number] {
+  return [snap(spot.wx, spot.free), snap(spot.wz, spot.free)];
+}
+
 // ─── Reducer ────────────────────────────────────────────────
 
 export function editorReducer(s: EditorState, a: EditorAction): EditorState {
   switch (a.type) {
     case "setTool":
-      return { ...s, tool: a.tool, held: null, selection: a.tool.kind === "select" ? s.selection : null };
+      return { ...s, tool: a.tool, held: null, selection: null, placeRot: 0 };
 
     case "setTab":
       return { ...s, hotbarTab: a.tab, slot: 0 };
@@ -259,22 +337,51 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
 
     case "place": {
       if (s.tool.kind !== "place") return s;
-      const fit = canPlace([...s.objects.values()], s.size, a.x, a.z);
-      if (!fit.ok) return notify(s, "hint", fit.reason === "lot_taken" ? "That lot is taken." : "That's outside the city.");
-      const op: CityOp = { op: "place", kind: "item", item_type: s.tool.item, x: a.x, z: a.z, rot: 0, id: a.id };
-      return commit(s, [op], [{ op: "remove", id: a.id }]);
+      const item = s.tool.item;
+
+      if (!isSurface(item)) {
+        const [px, pz] = propSpot(a);
+        const problem = propProblem(s.objects.values(), s.size, { item_type: item, px, pz });
+        if (problem) return notify(s, "hint", PROP_PROBLEM_TEXT[problem]);
+        return commit(
+          s,
+          [{ op: "place", kind: "item", item_type: item, px, pz, rot: s.placeRot, id: a.id }],
+          [{ op: "remove", id: a.id }],
+        );
+      }
+
+      // Surfaces own the lot; one on top of another replaces it.
+      if (!inBounds(s.size, a.x, a.z)) return notify(s, "hint", "That's outside the city.");
+      const there = lotObjectAt(s.objects, a.x, a.z);
+      if (there?.kind === "building") return notify(s, "hint", "A building is there. Move it first.");
+      if (there?.item_type === item) return s;
+      const place: CityOp = { op: "place", kind: "item", item_type: item, x: a.x, z: a.z, rot: 0, id: a.id };
+      const ops: CityOp[] = there ? [{ op: "remove", id: there.id }, place] : [place];
+      const inverse: CityOp[] = there ? [{ op: "remove", id: a.id }, placeOp(there)] : [{ op: "remove", id: a.id }];
+      const evicted = evictedProps(s, ops);
+      return commit(s, [...evicted.removes, ...ops], [...inverse, ...evicted.restores]);
     }
 
     case "paintRoad": {
-      const ops: CityOp[] = [];
+      const removes: CityOp[] = [];
+      const places: CityOp[] = [];
       const inverse: CityOp[] = [];
+      const restores: CityOp[] = [];
       a.lots.forEach(([x, z], i) => {
         const id = a.ids[i];
-        if (!id) return;
-        ops.push({ op: "place", kind: "item", item_type: "road", x, z, rot: 0, id });
-        inverse.unshift({ op: "remove", id });
+        if (!id || !inBounds(s.size, x, z)) return;
+        const there = lotObjectAt(s.objects, x, z);
+        if (there?.kind === "building" || there?.item_type === "road") return;
+        if (there) {
+          removes.push({ op: "remove", id: there.id });
+          restores.push(placeOp(there));
+        }
+        places.push({ op: "place", kind: "item", item_type: "road", x, z, rot: 0, id });
+        inverse.push({ op: "remove", id });
       });
-      return commit(s, ops, inverse);
+      const ops = [...removes, ...places];
+      const evicted = evictedProps(s, ops);
+      return commit(s, [...evicted.removes, ...ops], [...inverse, ...restores, ...evicted.restores]);
     }
 
     case "pickUp": {
@@ -283,22 +390,37 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
     }
 
     case "cancel":
-      if (s.held) return { ...s, held: null };
+      if (s.held) return { ...s, held: null, selection: null };
       if (s.selection) return { ...s, selection: null };
-      if (s.tool.kind !== "select") return { ...s, tool: { kind: "select" } };
+      if (s.tool.kind !== "select") return { ...s, tool: { kind: "select" }, placeRot: 0 };
       return s;
 
     case "drop": {
       const h = s.held ? s.objects.get(s.held) : undefined;
       if (!h) return { ...s, held: null };
+      const put = (next: EditorState) => ({ ...next, held: null, selection: null });
       const turn: { ops: CityOp[]; inverse: CityOp[] } =
         s.heldRot !== h.rot
           ? { ops: [{ op: "rotate", id: h.id, rot: s.heldRot }], inverse: [{ op: "rotate", id: h.id, rot: h.rot }] }
           : { ops: [], inverse: [] };
-      const put = (next: EditorState) => ({ ...next, held: null, selection: null });
+
+      // Props go where the cursor is.
+      if (h.px !== null && h.pz !== null && h.item_type) {
+        const [px, pz] = propSpot(a);
+        if (px === h.px && pz === h.pz) return put(commit(s, turn.ops, turn.inverse));
+        const problem = propProblem(s.objects.values(), s.size, { item_type: h.item_type, px, pz, id: h.id });
+        if (problem) return notify(s, "hint", PROP_PROBLEM_TEXT[problem]);
+        return put(
+          commit(s, [{ op: "move", id: h.id, px, pz }, ...turn.ops], [...turn.inverse, { op: "move", id: h.id, px: h.px, pz: h.pz }]),
+        );
+      }
+
       if (h.x === a.x && h.z === a.z) return put(commit(s, turn.ops, turn.inverse));
       if (!inBounds(s.size, a.x, a.z)) return notify(s, "hint", "That's outside the city.");
-      const there = objectAt(s.objects, a.x, a.z);
+      const there = lotObjectAt(s.objects, a.x, a.z);
+      if (h.kind === "building" && propsOnLot(s.objects, a.x, a.z, s.size)) {
+        return notify(s, "hint", "Move the props off that lot first.");
+      }
       if (there) {
         if (h.kind === "building" && there.kind === "building") {
           // Swap: both moves (and the turn) in one edit, so they share a batch.
@@ -316,21 +438,26 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
         }
         return notify(s, "hint", "That lot is taken.");
       }
+      const ops: CityOp[] = [{ op: "move", id: h.id, x: a.x, z: a.z }, ...turn.ops];
+      const evicted = h.item_type === "road" ? evictedProps(s, ops) : { removes: [], restores: [] };
       return put(
-        commit(
-          s,
-          [{ op: "move", id: h.id, x: a.x, z: a.z }, ...turn.ops],
-          [...turn.inverse, { op: "move", id: h.id, x: h.x, z: h.z }],
-        ),
+        commit(s, [...evicted.removes, ...ops], [...turn.inverse, { op: "move", id: h.id, x: h.x, z: h.z }, ...evicted.restores]),
       );
     }
 
     case "rotate": {
-      // In hand: turn the ghost; the turn lands with the drop.
-      if (a.id === s.held) return { ...s, heldRot: ((s.heldRot + 90) % 360) as Rot };
-      const o = s.objects.get(a.id);
+      // Nothing named: turn what's in hand, or the next prop to place.
+      const id = a.id ?? s.held;
+      if (!id) {
+        if (s.tool.kind === "place" && !isSurface(s.tool.item)) return { ...s, placeRot: (s.placeRot + PROP_TURN) % 360 };
+        return s;
+      }
+      const o = s.objects.get(id);
       if (!o) return s;
-      const rot = ((o.rot + 90) % 360) as Rot;
+      const step = o.px !== null ? PROP_TURN : 90;
+      // In hand: turn the ghost; the turn lands with the drop.
+      if (id === s.held) return { ...s, heldRot: (s.heldRot + step) % 360 };
+      const rot = (o.rot + step) % 360;
       return commit(s, [{ op: "rotate", id: o.id, rot }], [{ op: "rotate", id: o.id, rot: o.rot }]);
     }
 
@@ -343,7 +470,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
     }
 
     case "removeAt": {
-      const o = objectAt(s.objects, a.x, a.z);
+      const o = objectAtSpot(s.objects, a);
       return o ? editorReducer(s, { type: "remove", id: o.id }) : s;
     }
 
@@ -397,7 +524,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
 
     case "resync": {
       // Server truth, with our unsent edits replayed on top where they still apply.
-      let objects = new Map(a.city.objects.map((o) => [o.id, o]));
+      let objects = new Map(a.city.objects.map((o) => [o.id, normalize(o)]));
       const pending: Edit[] = [];
       for (const e of s.pending) {
         if (!canApply(objects, e.ops)) continue;

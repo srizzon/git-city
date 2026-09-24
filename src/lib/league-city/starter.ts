@@ -5,7 +5,7 @@
 // and trees along the edges. The terrain is the smallest size that fits
 // everyone without growing right away.
 
-import { GROW_AT, MAX_SIZE, START_SIZE, maxLot, minLot } from "./grid";
+import { GROW_AT, LOT, MAX_SIZE, START_SIZE, maxLot, minLot } from "./grid";
 import { faceRoad, freeLotsInOrder, lotKey } from "./placement";
 import { TREE_TYPES, type CityOp } from "./types";
 
@@ -26,7 +26,9 @@ const PLAZA: [number, number][] = [
   [-1, -1],
   [1, -1],
   [-1, 1],
+  [1, 1],
 ];
+/** The fountain is a prop standing in the middle of the (1, 1) plaza. */
 const FOUNTAIN: [number, number] = [1, 1];
 const MAX_TREES = 24;
 
@@ -40,7 +42,7 @@ function roadLots(size: number): [number, number][] {
 }
 
 function fixedCount(size: number): number {
-  return roadLots(size).length + PLAZA.length + 1;
+  return roadLots(size).length + PLAZA.length;
 }
 
 /** Smallest even size that fits `members` buildings under the growth threshold. */
@@ -74,8 +76,7 @@ export function starterOps(members: readonly StarterMember[]): StarterCity {
     occupied.add(lotKey(x, z));
     ops.push({ op: "place", kind: "item", item_type: "plaza", x, z });
   }
-  occupied.add(lotKey(...FOUNTAIN));
-  ops.push({ op: "place", kind: "item", item_type: "fountain", x: FOUNTAIN[0], z: FOUNTAIN[1] });
+  ops.push({ op: "place", kind: "item", item_type: "fountain", px: FOUNTAIN[0] * LOT, pz: FOUNTAIN[1] * LOT });
 
   const sorted = [...members].sort((a, b) => b.weight - a.weight || a.developer_id - b.developer_id);
   const lots = freeLotsInOrder(occupied, roads, lo, hi);
@@ -101,7 +102,7 @@ export function starterOps(members: readonly StarterMember[]): StarterCity {
       if (occupied.has(lotKey(x, z))) continue;
       if (ringIndex++ % 3 !== 0) continue;
       occupied.add(lotKey(x, z));
-      ops.push({ op: "place", kind: "item", item_type: treeFor(x, z), x, z });
+      ops.push({ op: "place", kind: "item", item_type: treeFor(x, z), px: x * LOT, pz: z * LOT });
       trees++;
     }
   }

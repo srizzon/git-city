@@ -65,7 +65,7 @@ function LeagueGround({ size }: { size: number }) {
 const _m = new THREE.Matrix4();
 
 function PlazaSlabs({ objects }: { objects: CityObject[] }) {
-  const lots = useMemo(() => objects.filter((o) => o.item_type === "plaza" || o.item_type === "fountain"), [objects]);
+  const lots = useMemo(() => objects.filter((o) => o.item_type === "plaza" && o.px === null), [objects]);
   const ref = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
     lots.forEach((o, i) => {
@@ -90,7 +90,7 @@ function PlazaSlabs({ objects }: { objects: CityObject[] }) {
 function toDecorations(objects: CityObject[]): CityDecoration[] {
   const out: CityDecoration[] = [];
   for (const o of objects) {
-    const [x, z] = lotToWorld(o.x, o.z);
+    const [x, z] = o.px !== null && o.pz !== null ? [o.px, o.pz] : lotToWorld(o.x, o.z);
     const rotation = rotToRadians(o.rot);
     if (o.item_type === "lamp") out.push({ type: "streetLamp", position: [x, 0, z], rotation, variant: 0 });
     else if (o.item_type === "bench") out.push({ type: "bench", position: [x, 0, z], rotation, variant: 0 });

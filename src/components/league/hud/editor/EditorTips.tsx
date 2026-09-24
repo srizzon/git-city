@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 import { HUD_BOX } from "../shared";
 
@@ -30,9 +30,13 @@ function remember() {
   }
 }
 
+const noSubscribe = () => () => {};
+
 export default function EditorTips() {
-  const [step, setStep] = useState(() => (seen() ? TIPS.length : 0));
-  if (step >= TIPS.length) return null;
+  // Server render and hydration count as "seen", so nothing mismatches.
+  const alreadySeen = useSyncExternalStore(noSubscribe, seen, () => true);
+  const [step, setStep] = useState(0);
+  if (alreadySeen || step >= TIPS.length) return null;
   const [key, text] = TIPS[step];
   const next = () => {
     if (step + 1 >= TIPS.length) remember();

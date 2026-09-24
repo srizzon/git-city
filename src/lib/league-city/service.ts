@@ -75,7 +75,7 @@ async function loadCity(leagueId: string): Promise<LeagueCity | null> {
   for (let from = 0; ; from += 1000) {
     const { data } = await sb
       .from("league_objects")
-      .select("id, kind, item_type, developer_id, x, z, rot, is_new")
+      .select("id, kind, item_type, developer_id, x, z, px, pz, rot, is_new")
       .eq("league_id", leagueId)
       .order("id")
       .range(from, from + 999)
