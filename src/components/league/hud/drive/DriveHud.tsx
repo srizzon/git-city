@@ -17,12 +17,12 @@ const ICON = { size: 14, strokeWidth: 2.5 } as const;
 
 const HINTS: [string, string][] = [
   ["W A S D", "drive"],
-  ["Space", "drift"],
-  ["Shift", "boost"],
+  ["Hold Space + steer", "drift"],
+  ["Hold Shift", "boost"],
   ["H", "horn"],
   ["C", "camera"],
   ["R", "reset"],
-  ["Esc", "exit"],
+  ["Esc", "pause"],
 ];
 
 export default function DriveHud({
@@ -30,6 +30,8 @@ export default function DriveHud({
   ready,
   camera,
   muted,
+  paused,
+  onResume,
   onCamera,
   onMute,
   onExit,
@@ -38,6 +40,8 @@ export default function DriveHud({
   ready: boolean;
   camera: DriveCameraMode;
   muted: boolean;
+  paused: boolean;
+  onResume: () => void;
   onCamera: () => void;
   onMute: () => void;
   onExit: () => void;
@@ -68,6 +72,22 @@ export default function DriveHud({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
+      {paused && ready && (
+        <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-bg/50">
+          <div className={`${HUD_BOX} flex flex-col items-center gap-4 px-8 py-6`}>
+            <p className="text-sm text-cream">Paused</p>
+            <div className="flex gap-2">
+              <button type="button" autoFocus onClick={onResume} className="btn-press border-2 border-lime px-4 py-2 text-[10px] text-lime">
+                Resume (Esc)
+              </button>
+              <button type="button" onClick={onExit} className="btn-press border-2 border-border px-4 py-2 text-[10px] text-cream hover:text-lime">
+                Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center gap-3 text-[10px] text-cream">
           <PixelSpinner />

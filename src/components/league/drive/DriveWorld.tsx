@@ -40,6 +40,8 @@ export interface DriveWorldProps {
   camera: DriveCameraMode;
   onCameraToggle: () => void;
   muted: boolean;
+  /** Esc: physics, input and sound stop. */
+  paused: boolean;
   /** Rapier and the car are loaded. */
   onReady: () => void;
   /** Rapier or the models failed to load. */
@@ -159,6 +161,7 @@ export default function DriveWorld({
   camera,
   onCameraToggle,
   muted,
+  paused,
   onReady,
   onFail,
 }: DriveWorldProps) {
@@ -174,14 +177,14 @@ export default function DriveWorld({
   const dynamic = useMemo(() => specs.filter((s) => s.body === "dynamic"), [specs]);
   const spawn = useMemo(() => spawnPoint(objects, viewerDevId, size), [objects, viewerDevId, size]);
 
-  const input = useDriveInput();
+  const input = useDriveInput(paused);
   const car = useRef<CarApi | null>(null);
   const impact = useRef({ strength: 0, at: 0 });
 
   return (
     <Boundary onFail={onFail}>
       <Suspense fallback={null}>
-        <Physics timeStep={1 / 60} interpolate paused={hidden} gravity={[0, GRAVITY, 0]} updatePriority={-50}>
+        <Physics timeStep={1 / 60} interpolate paused={hidden || paused} gravity={[0, GRAVITY, 0]} updatePriority={-50}>
           <RigidBody type="fixed" colliders={false}>
             {fixed.map((s) => (
               <SpecCollider key={colliderKey(s)} spec={s} />
@@ -205,7 +208,7 @@ export default function DriveWorld({
           <SkidMarks car={car} />
           <Smoke car={car} />
           <BoostTrail car={car} />
-          <DriveAudio car={car} input={input} impact={impact} muted={muted} />
+          <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} />
           <DriveCamera mode={camera} car={car} impact={impact} />
           <CameraKey input={input} onToggle={onCameraToggle} />
           <Ready onReady={onReady} />

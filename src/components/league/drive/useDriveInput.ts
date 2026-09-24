@@ -24,7 +24,7 @@ export interface DriveInputRef {
   pressed: { camera: boolean; reset: boolean; horn: boolean };
 }
 
-export function useDriveInput(): React.MutableRefObject<DriveInputRef> {
+export function useDriveInput(paused = false): React.MutableRefObject<DriveInputRef> {
   const keys = useRef(new Set<string>());
   // Keys pressed since the last frame: a tap shorter than a frame still counts once.
   const taps = useRef(new Set<string>());
@@ -65,7 +65,7 @@ export function useDriveInput(): React.MutableRefObject<DriveInputRef> {
     const prev = ref.current.input;
     const held = taps.current.size > 0 ? new Set([...keys.current, ...taps.current]) : keys.current;
     taps.current.clear();
-    const next = typing() ? NONE : readInput(held, pad);
+    const next = typing() || paused ? NONE : readInput(held, pad);
     ref.current.pressed = {
       camera: next.camera && !prev.camera,
       reset: next.reset && !prev.reset,

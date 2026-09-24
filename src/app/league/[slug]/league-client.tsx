@@ -237,6 +237,7 @@ export default function LeagueClient({
   const [telemetry, setTelemetry] = useState<DriveTelemetry>(() => ({ speed: 0, boost: 1, boosting: false }));
   const [driveReady, setDriveReady] = useState(false);
   const [driveCamera, setDriveCamera] = useState<DriveCameraMode>("chase");
+  const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(false);
   const toggleMute = useCallback(() => {
     setMuted((m) => {
@@ -254,6 +255,7 @@ export default function LeagueClient({
     setPanel(null);
     setDriveReady(false);
     setTelemetry({ speed: 0, boost: 1, boosting: false });
+    setPaused(false);
     try {
       setMuted(localStorage.getItem(MUTE_KEY) === "1");
     } catch {
@@ -268,18 +270,18 @@ export default function LeagueClient({
     setViewNotice({ kind: "error", message: "Couldn't start the car.", seq: Date.now() });
   }, []);
 
-  // Esc leaves the car.
+  // Esc pauses (and resumes); leaving is the Exit button.
   useEffect(() => {
     if (!driving) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        exitDrive();
+        setPaused((p) => !p);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [driving, exitDrive]);
+  }, [driving]);
 
   // Live city while driving: pick up an admin's changes (walls, buildings, props).
   useEffect(() => {
@@ -312,11 +314,12 @@ export default function LeagueClient({
             camera: driveCamera,
             onCameraToggle: toggleCamera,
             muted,
+            paused,
             onReady: onDriveReady,
             onFail: onDriveFail,
           }
         : undefined,
-    [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, onDriveReady, onDriveFail],
+    [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail],
   );
 
   const newBuildings = useMemo(
@@ -424,6 +427,8 @@ export default function LeagueClient({
           ready={driveReady}
           camera={driveCamera}
           muted={muted}
+          paused={paused}
+          onResume={() => setPaused(false)}
           onCamera={toggleCamera}
           onMute={toggleMute}
           onExit={exitDrive}
