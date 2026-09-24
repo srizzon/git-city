@@ -38,6 +38,34 @@ async function fetchAll<T>(
   return all;
 }
 
+/**
+ * Keyset-paginate a table by its integer `id`. OFFSET pagination re-scans every
+ * skipped row, and on `developers` (~88k rows) the deep pages took 7-8s each —
+ * right at the statement timeout — which failed the whole snapshot.
+ */
+async function fetchAllById<T extends { id: number }>(
+  sb: ReturnType<typeof getSupabaseAdmin>,
+  table: string,
+  select: string,
+): Promise<T[]> {
+  const all: T[] = [];
+  let lastId = 0;
+  while (true) {
+    const { data, error } = await sb
+      .from(table)
+      .select(select)
+      .gt("id", lastId)
+      .order("id", { ascending: true })
+      .limit(PAGE_SIZE);
+    if (error) throw new Error(`fetchAllById ${table}: ${error.message}`);
+    if (!data || data.length === 0) break;
+    all.push(...(data as unknown as T[]));
+    if (data.length < PAGE_SIZE) break;
+    lastId = (data[data.length - 1] as unknown as T).id;
+  }
+  return all;
+}
+
 export async function GET(request: NextRequest) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -53,12 +81,13 @@ export async function GET(request: NextRequest) {
   // Fetch everything in parallel
   const [devs, purchases, giftPurchases, customizations, achievements, raidTags, wallets, activeDropsResult, statsResult] =
     await Promise.all([
-      fetchAll<Record<string, any>>(
+      fetchAllById<Record<string, any> & { id: number }>(
         sb,
         "developers",
         "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, claimed_at, created_at, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, active_days_last_year, language_diversity, app_streak, rabbit_completed, district, district_chosen, xp_total, xp_level",
-        undefined,
-        "rank",
+      ).then((rows) =>
+        // Snapshot order stays rank ascending (nulls last), as before.
+        rows.sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity)),
       ),
       fetchAll<{ developer_id: number; item_id: string }>(
         sb,
