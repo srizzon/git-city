@@ -11,6 +11,7 @@ const TABS: { id: HotbarTab; label: string }[] = [
   { id: "streets", label: "Streets" },
   { id: "nature", label: "Nature" },
   { id: "plaza", label: "Plaza" },
+  { id: "stunts", label: "Stunts" },
   { id: "buildings", label: "Buildings" },
 ];
 

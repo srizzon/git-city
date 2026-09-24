@@ -2,11 +2,12 @@
 // Free-standing decorations: a world position, a footprint radius, and rules
 // mirrored from league_prop_problem (migration 128): inside the city, not on
 // a building's lot, not on asphalt (roads are ROAD_HALF*2 wide: a center
-// square plus an arm toward each road neighbor), not overlapping another prop.
+// square plus an arm toward each road neighbor; driving toys are exempt), not
+// overlapping another prop.
 
 import { LOT, maxLot, minLot } from "./grid";
 import { lotKey } from "./placement";
-import type { CityObject, ItemType } from "./types";
+import { isDriveToy, type CityObject, type ItemType } from "./types";
 
 export const ROAD_HALF = 13;
 export const SNAP = 4;
@@ -16,6 +17,12 @@ export const PROP_RADIUS: Record<Exclude<ItemType, "road" | "plaza">, number> = 
   bench: 3.5,
   fountain: 10,
   ramp: 15,
+  ramp_big: 22,
+  boost_pad: 10,
+  speed_bump: 11,
+  cone: 2,
+  crates: 6,
+  tire_wall: 9,
   tree_default: 7,
   tree_oak: 7,
   tree_fat: 7,
@@ -90,7 +97,7 @@ export function propProblem(
     const cx = o.x * LOT;
     const cz = o.z * LOT;
     if (o.kind === "building" && rectDist2(prop.px, prop.pz, cx - h, cz - h, cx + h, cz + h) < r * r) return "on_building";
-    if (o.item_type === "road") {
+    if (o.item_type === "road" && !isDriveToy(prop.item_type)) {
       for (const [x0, z0, x1, z1] of asphaltRects(isRoad, o.x, o.z)) {
         if (rectDist2(prop.px, prop.pz, x0, z0, x1, z1) < r * r) return "on_road";
       }

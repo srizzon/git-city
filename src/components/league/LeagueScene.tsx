@@ -13,7 +13,7 @@ import { InstancedDecorations } from "@/components/city/decorations";
 import type { CityBuilding, CityDecoration } from "@/lib/github";
 import { LOT, lotToWorld, maxLot, minLot, rotToRadians, terrainBounds } from "@/lib/league-city/grid";
 import type { CityObject } from "@/lib/league-city/types";
-import LeagueRamps from "./LeagueRamps";
+import LeagueToys from "./LeagueToys";
 import LeagueRoads from "./LeagueRoads";
 import LeagueTrees from "./LeagueTrees";
 import EditCamera, { type EditCameraApi, type LotEvent, type Pickable } from "./editor/EditCamera";
@@ -23,7 +23,7 @@ import type { DriveWorldProps } from "./drive/DriveWorld";
 const DriveWorld = dynamic(() => import("./drive/DriveWorld"), { ssr: false, loading: () => null });
 
 /** Props that become physics bodies in drive mode (drawn by DriveWorld instead). */
-const KNOCKABLE = new Set(["lamp", "bench", "fountain"]);
+const KNOCKABLE = new Set(["lamp", "bench", "fountain", "cone", "crates"]);
 
 // Full-screen league city: one Canvas, midnight theme, the league's lots with
 // roads, trees, decorations and member buildings (invited ones faded).
@@ -343,7 +343,7 @@ export default function LeagueScene({
       <LeagueGround size={size} />
       <LeagueRoads objects={objects} markingColor={theme.roadMarkingColor} />
       <PlazaSlabs objects={objects} />
-      <LeagueRamps objects={objects} />
+      <LeagueToys objects={objects} driving={driving} />
       <InstancedDecorations items={decorations} roadMarkingColor={theme.roadMarkingColor} sidewalkColor={theme.sidewalkColor} />
       <Suspense fallback={null}>
         <LeagueTrees objects={objects} />

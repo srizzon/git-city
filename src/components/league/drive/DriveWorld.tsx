@@ -3,6 +3,7 @@
 import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
+  CoefficientCombineRule,
   ConvexHullCollider,
   CuboidCollider,
   CylinderCollider,
@@ -12,6 +13,7 @@ import {
 } from "@react-three/rapier";
 import * as THREE from "three";
 import { Fountain, ParkBench, StreetLamp } from "@/components/city/decorations";
+import { CONE, CRATE } from "@/lib/league-city/toys";
 import type { CityBuilding } from "@/lib/github";
 import type { CityObject } from "@/lib/league-city/types";
 import { buildColliders, colliderKey, type ColliderSpec } from "@/lib/league-city/drive/colliders";
@@ -20,6 +22,7 @@ import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/te
 import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
 import Car, { type CarApi } from "./Car";
 import DriveCamera from "./DriveCamera";
+import HonkFlash from "./HonkFlash";
 import Lights from "./Lights";
 import { BoostTrail, Smoke } from "./Particles";
 import SkidMarks from "./SkidMarks";
@@ -56,6 +59,8 @@ export interface DriveWorldProps {
   name: string;
   /** Who else is driving here, for the HUD. */
   onDrivers: (drivers: DriverInfo[]) => void;
+  /** Honked at a teammate's building. */
+  onHonk: (b: CityBuilding) => void;
 }
 
 /** A bump carries this share of the hitter's relative velocity, plus a small hop (m/s). */
@@ -86,7 +91,19 @@ function Ready({ onReady }: { onReady: () => void }) {
 function SpecCollider({ spec }: { spec: ColliderSpec }) {
   const { shape, pos, rotY } = spec;
   const rotation: [number, number, number] = [0, rotY, 0];
-  if (shape.type === "cuboid") return <CuboidCollider args={shape.half} position={pos} rotation={rotation} friction={0.6} />;
+  if (shape.type === "cuboid")
+    return spec.restitution ? (
+      <CuboidCollider
+        args={shape.half}
+        position={pos}
+        rotation={rotation}
+        friction={0.2}
+        restitution={spec.restitution}
+        restitutionCombineRule={CoefficientCombineRule.Max}
+      />
+    ) : (
+      <CuboidCollider args={shape.half} position={pos} rotation={rotation} friction={0.6} />
+    );
   if (shape.type === "cylinder")
     return <CylinderCollider args={[shape.halfHeight, shape.radius]} position={pos} rotation={rotation} friction={0.6} />;
   return <ConvexHullCollider args={[shape.points]} position={pos} friction={0.8} />;
@@ -99,6 +116,20 @@ function PropVisual({ spec }: { spec: ColliderSpec }) {
   const drop = -spec.pos[1] * M_TO_UNIT;
   if (spec.prop === "lamp") return <StreetLamp position={[0, drop, 0]} />;
   if (spec.prop === "bench") return <ParkBench position={[0, drop, 0]} rotation={0} />;
+  if (spec.prop === "cone")
+    return (
+      <mesh position={[0, drop + CONE.height / 2, 0]}>
+        <coneGeometry args={[CONE.radius, CONE.height, 10]} />
+        <meshStandardMaterial color="#ff7a1a" emissive="#ff7a1a" emissiveIntensity={0.45} />
+      </mesh>
+    );
+  if (spec.prop === "crate")
+    return (
+      <mesh>
+        <boxGeometry args={[CRATE, CRATE, CRATE]} />
+        <meshStandardMaterial color="#a8743f" emissive="#5a3a1a" emissiveIntensity={0.4} roughness={0.85} />
+      </mesh>
+    );
   return <Fountain position={[0, drop, 0]} />;
 }
 
@@ -201,6 +232,7 @@ export default function DriveWorld({
   slug,
   name,
   onDrivers,
+  onHonk,
 }: DriveWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -218,6 +250,11 @@ export default function DriveWorld({
   const car = useRef<CarApi | null>(null);
   const impact = useRef({ strength: 0, at: 0 });
   const fx = useRef(new Map<string, FxSource>());
+  const [flash, setFlash] = useState<{ b: CityBuilding; at: number } | null>(null);
+  const honk = (b: CityBuilding) => {
+    setFlash({ b, at: performance.now() });
+    onHonk(b);
+  };
   // Crashes with other drivers. Whoever sees the contact tells the other one
   // how to move; a bump for a crash you already felt locally is dropped.
   const contacts = useRef(new Map<string, number>());
@@ -268,12 +305,14 @@ export default function DriveWorld({
             apiRef={car}
             color={carColor(name)}
             onRemoteHit={onRemoteHit}
+            onHonk={honk}
             impact={impact}
           >
             <Lights braking={() => !!car.current?.state.braking} />
           </Car>
           <LocalFx car={car} sources={fx} />
           <RemoteCars remotes={remotes} drivers={drivers} sources={fx} localCar={car} muted={muted || paused} />
+          {flash && <HonkFlash key={flash.at} building={flash.b} at={flash.at} />}
           <SkidMarks sources={fx} />
           <Smoke sources={fx} />
           <BoostTrail sources={fx} />

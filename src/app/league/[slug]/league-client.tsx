@@ -225,7 +225,9 @@ export default function LeagueClient({
   const buildings = useMemo(() => leagueBuildings(sceneObjects, byDevId), [sceneObjects, byDevId]);
   // Where each prop's body is, for picking it on screen in the editor.
   useEffect(() => {
-    const mid: Partial<Record<string, number>> = { lamp: 9, bench: 1.5, fountain: 4 };
+    const mid: Partial<Record<string, number>> = {
+      lamp: 9, bench: 1.5, fountain: 4, ramp: 3, ramp_big: 5, boost_pad: 0.5, speed_bump: 0.5, cone: 1.2, crates: 5, tire_wall: 2.5,
+    };
     pickables.current = [...es.objects.values()].flatMap((o) =>
       o.px !== null && o.pz !== null && o.item_type
         ? [{ id: o.id, x: o.px, y: mid[o.item_type] ?? 16, z: o.pz }]
@@ -238,7 +240,7 @@ export default function LeagueClient({
     [viewer, members],
   );
   // Mutated by the car every frame, read by the HUD; a fresh one per drive.
-  const [telemetry, setTelemetry] = useState<DriveTelemetry>(() => ({ speed: 0, boosting: false }));
+  const [telemetry, setTelemetry] = useState<DriveTelemetry>(() => ({ speed: 0, boosting: false, near: null }));
   const [driveReady, setDriveReady] = useState(false);
   const [driveCamera, setDriveCamera] = useState<DriveCameraMode>("chase");
   const [paused, setPaused] = useState(false);
@@ -262,7 +264,7 @@ export default function LeagueClient({
     setFocused(null);
     setPanel(null);
     setDriveReady(false);
-    setTelemetry({ speed: 0, boosting: false });
+    setTelemetry({ speed: 0, boosting: false, near: null });
     setPaused(false);
     try {
       setMuted(localStorage.getItem(MUTE_KEY) === "1");
@@ -287,12 +289,13 @@ export default function LeagueClient({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
+      if (focused) return; // the building card closes itself
       if (paused) exitDrive();
       else setPaused(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [driving, paused, exitDrive]);
+  }, [driving, paused, exitDrive, focused]);
 
   // Live city while driving: pick up an admin's changes (walls, buildings, props).
   useEffect(() => {
@@ -331,6 +334,7 @@ export default function LeagueClient({
             slug: league.slug,
             name: driverName,
             onDrivers: setDrivers,
+            onHonk: (b: CityBuilding) => setFocused(b),
           }
         : undefined,
     [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail, league.slug, driverName],
@@ -527,6 +531,7 @@ export default function LeagueClient({
           key={focused.loginLower}
           building={focused}
           data={data}
+          driving={driving}
           onClose={() => setFocused(null)}
         />
       )}

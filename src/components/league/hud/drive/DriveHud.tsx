@@ -44,6 +44,8 @@ export default function DriveHud({
 }) {
   const speed = useRef<HTMLSpanElement>(null);
   const boostTag = useRef<HTMLSpanElement>(null);
+  const honk = useRef<HTMLDivElement>(null);
+  const honkName = useRef<HTMLSpanElement>(null);
   const [hints, setHints] = useState(true);
 
   useEffect(() => {
@@ -57,6 +59,10 @@ export default function DriveHud({
     const tick = () => {
       if (speed.current) speed.current.textContent = String(Math.round(Math.abs(telemetry.speed) * 3.6));
       if (boostTag.current) boostTag.current.dataset.on = String(telemetry.boosting);
+      if (honk.current && honkName.current) {
+        honk.current.dataset.on = String(!!telemetry.near);
+        if (telemetry.near) honkName.current.textContent = `@${telemetry.near}`;
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -113,6 +119,17 @@ export default function DriveHud({
           <span>Exit</span>
         </button>
       </div>
+
+      {ready && (
+        <div
+          ref={honk}
+          data-on="false"
+          className={`${HUD_BOX} absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-2 px-3 py-1.5 text-[10px] text-cream opacity-0 transition-opacity data-[on=true]:opacity-100`}
+        >
+          <span className="border-2 border-lime px-1.5 text-lime">H</span>
+          Honk at <span ref={honkName} className="text-lime" />
+        </div>
+      )}
 
       {ready && (
         <div className={`${HUD_BOX} absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-4 px-4 py-2`}>

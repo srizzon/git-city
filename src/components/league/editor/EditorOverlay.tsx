@@ -9,7 +9,9 @@ import type { GhostFit } from "@/lib/league-city/editor/ghost";
 import type { CityObject, ItemType } from "@/lib/league-city/types";
 import { propRadius } from "@/lib/league-city/props";
 import { GhostRoads } from "../LeagueRoads";
-import { rampGeometry } from "../LeagueRamps";
+import { bumpGeometry, rampGeometry } from "../LeagueToys";
+import { RAMP, RAMP_BIG } from "@/lib/league-city/ramp";
+import { BOOST_PAD, CONE, CRATE, TIRE_WALL_HEIGHT, TIRE_WALL_WIDTH, TIRE } from "@/lib/league-city/toys";
 
 // Build-mode overlays inside the Canvas: lot grid, hover highlight, the
 // placement ghost (green fits, red with ✕ doesn't), the selection outline and
@@ -104,7 +106,36 @@ function ItemProxy({ item, color }: { item: ItemType; color: string }) {
         {mat}
       </mesh>
     );
-  if (item === "ramp") return <RampProxy color={color} />;
+  if (item === "ramp" || item === "ramp_big") return <RampProxy color={color} big={item === "ramp_big"} />;
+  if (item === "speed_bump") return <BumpProxy color={color} />;
+  if (item === "boost_pad")
+    return (
+      <mesh position={[0, 0.6, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[BOOST_PAD.width, BOOST_PAD.length]} />
+        {mat}
+      </mesh>
+    );
+  if (item === "cone")
+    return (
+      <mesh position={[0, CONE.height / 2, 0]}>
+        <coneGeometry args={[CONE.radius, CONE.height, 10]} />
+        {mat}
+      </mesh>
+    );
+  if (item === "crates")
+    return (
+      <mesh position={[0, CRATE * 1.5, 0]}>
+        <boxGeometry args={[CRATE * 3, CRATE * 3, CRATE]} />
+        {mat}
+      </mesh>
+    );
+  if (item === "tire_wall")
+    return (
+      <mesh position={[0, TIRE_WALL_HEIGHT / 2, 0]}>
+        <boxGeometry args={[TIRE_WALL_WIDTH, TIRE_WALL_HEIGHT, TIRE.width]} />
+        {mat}
+      </mesh>
+    );
   if (item === "plaza" || item === "road")
     return (
       <mesh position={[0, 0.8, 0]}>
@@ -120,8 +151,18 @@ function ItemProxy({ item, color }: { item: ItemType; color: string }) {
   );
 }
 
-function RampProxy({ color }: { color: string }) {
-  const geo = useMemo(() => rampGeometry(), []);
+function RampProxy({ color, big }: { color: string; big: boolean }) {
+  const geo = useMemo(() => rampGeometry(big ? RAMP_BIG : RAMP), [big]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <mesh geometry={geo}>
+      <meshBasicMaterial color={color} transparent opacity={0.55} depthWrite={false} />
+    </mesh>
+  );
+}
+
+function BumpProxy({ color }: { color: string }) {
+  const geo = useMemo(() => bumpGeometry(), []);
   useEffect(() => () => geo.dispose(), [geo]);
   return (
     <mesh geometry={geo}>

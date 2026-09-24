@@ -7,11 +7,12 @@
 
 import type { CityBuilding } from "@/lib/github";
 import { LOT, maxLot, minLot, rotToRadians } from "../grid";
-import { rampCorners } from "../ramp";
+import { RAMP, RAMP_BIG, rampCorners, type RampSize } from "../ramp";
+import { CONE, SPEED_BUMP, TIRE_WALL_HEIGHT, TIRE_WALL_WIDTH, TIRE, crateLayout, toWorld, CRATE } from "../toys";
 import { TREE_TYPES, type CityObject } from "../types";
-import { PROPS, UNIT_TO_M, WALL } from "./tuning";
+import { PROPS, TOYS, UNIT_TO_M, WALL } from "./tuning";
 
-export type DynamicProp = "lamp" | "bench" | "fountain";
+export type DynamicProp = "lamp" | "bench" | "fountain" | "cone" | "crate";
 
 export type ColliderShape =
   | { type: "cuboid"; half: [number, number, number] }
@@ -30,10 +31,63 @@ export interface ColliderSpec {
   /** Dynamic props only. */
   prop?: DynamicProp;
   mass?: number;
+  /** Bounciness; tire walls throw the car back. */
+  restitution?: number;
 }
 
 const U = UNIT_TO_M;
 const TREES = new Set<string>(TREE_TYPES);
+
+/** Points (local units, y up) turned `rot` and converted to meters, as a flat list for a hull. */
+function hull(points: [number, number, number][], rotY: number): number[] {
+  const c = Math.cos(rotY);
+  const s = Math.sin(rotY);
+  const out: number[] = [];
+  // Turn about y like three.js: x' = x cos + z sin, z' = -x sin + z cos.
+  for (const [px, py, pz] of points) out.push((px * c + pz * s) * U, py * U, (-px * s + pz * c) * U);
+  return out;
+}
+
+function rampHull(size: RampSize, rotY: number): ColliderShape {
+  return { type: "hull", points: hull(rampCorners(size), rotY) };
+}
+
+/** A low trapezoid across the road. */
+function bumpHull(rotY: number): ColliderShape {
+  const w = SPEED_BUMP.width / 2;
+  const d = SPEED_BUMP.depth / 2;
+  const h = SPEED_BUMP.height;
+  const top = d * 0.35;
+  return {
+    type: "hull",
+    points: hull(
+      [
+        [-w, 0, -d], [w, 0, -d], [w, 0, d], [-w, 0, d],
+        [-w, h, -top], [w, h, -top], [w, h, top], [-w, h, top],
+      ],
+      rotY,
+    ),
+  };
+}
+
+function propColliders(o: CityObject): ColliderSpec[] {
+  if (o.px === null || o.pz === null || !o.item_type) return [];
+  const rotY = rotToRadians(o.rot);
+  if (o.item_type === "crates") {
+    const { mass } = PROPS.crate;
+    const half = (CRATE / 2) * U;
+    return crateLayout().map(([lx, ly, lz], i) => {
+      const [wx, wz] = toWorld(o.px!, o.pz!, o.rot, lx, lz);
+      return { id: `${o.id}:${i}`, body: "dynamic", prop: "crate", mass, pos: [wx * U, ly * U, wz * U], rotY, shape: { type: "cuboid", half: [half, half, half] } };
+    });
+  }
+  if (o.item_type === "tire_wall") {
+    const half: [number, number, number] = [(TIRE_WALL_WIDTH / 2) * U, (TIRE_WALL_HEIGHT / 2) * U, (TIRE.width / 2) * U];
+    return [{ id: o.id, body: "fixed", pos: [o.px * U, half[1], o.pz * U], rotY, shape: { type: "cuboid", half }, restitution: TOYS.tireRestitution }];
+  }
+  const one = propCollider(o);
+  return one ? [one] : [];
+}
 
 function propCollider(o: CityObject): ColliderSpec | null {
   if (o.px === null || o.pz === null || !o.item_type) return null;
@@ -57,13 +111,12 @@ function propCollider(o: CityObject): ColliderSpec | null {
     const { radius, halfHeight, mass } = PROPS.fountain;
     return { id: o.id, body: "dynamic", prop: t, mass, pos: [x, halfHeight, z], rotY, shape: { type: "cylinder", radius, halfHeight } };
   }
-  if (t === "ramp") {
-    const c = Math.cos(rotY);
-    const s = Math.sin(rotY);
-    const points: number[] = [];
-    // Turn about y like three.js: x' = x cos + z sin, z' = -x sin + z cos.
-    for (const [px, py, pz] of rampCorners()) points.push((px * c + pz * s) * U, py * U, (-px * s + pz * c) * U);
-    return { id: o.id, body: "fixed", pos: [x, 0, z], rotY: 0, shape: { type: "hull", points } };
+  if (t === "ramp") return { id: o.id, body: "fixed", pos: [x, 0, z], rotY: 0, shape: rampHull(RAMP, rotY) };
+  if (t === "ramp_big") return { id: o.id, body: "fixed", pos: [x, 0, z], rotY: 0, shape: rampHull(RAMP_BIG, rotY) };
+  if (t === "speed_bump") return { id: o.id, body: "fixed", pos: [x, 0, z], rotY: 0, shape: bumpHull(rotY) };
+  if (t === "cone") {
+    const halfHeight = (CONE.height / 2) * U;
+    return { id: o.id, body: "dynamic", prop: "cone", mass: PROPS.cone.mass, pos: [x, halfHeight, z], rotY, shape: { type: "cylinder", radius: CONE.radius * 0.7 * U, halfHeight } };
   }
   return null;
 }
@@ -75,10 +128,7 @@ export function buildColliders(objects: readonly CityObject[], buildings: readon
     const half: [number, number, number] = [(b.width / 2) * U, (b.height / 2) * U, (b.depth / 2) * U];
     out.push({ id: `building:${b.loginLower}`, body: "fixed", pos: [b.position[0] * U, half[1], b.position[2] * U], rotY: 0, shape: { type: "cuboid", half } });
   }
-  for (const o of objects) {
-    const c = propCollider(o);
-    if (c) out.push(c);
-  }
+  for (const o of objects) out.push(...propColliders(o));
 
   // Ground and the four edge walls, just outside the terrain.
   const lo = (minLot(size) - 0.5) * LOT * U;

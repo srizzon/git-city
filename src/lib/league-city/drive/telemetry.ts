@@ -6,10 +6,12 @@ export interface DriveTelemetry {
   /** m/s, forward. */
   speed: number;
   boosting: boolean;
+  /** Login of the building you can honk at right now. */
+  near: string | null;
 }
 
 export function createTelemetry(): DriveTelemetry {
-  return { speed: 0, boosting: false };
+  return { speed: 0, boosting: false, near: null };
 }
 
 export type DriveCameraMode = "chase" | "top";
