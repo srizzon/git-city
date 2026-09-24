@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { CityBuilding } from "@/lib/github";
 import type { LeaguePageData } from "@/lib/leagues/queries";
@@ -9,17 +9,46 @@ import { Avatar, fmt } from "./shared";
 import { useSheet } from "./useSheet";
 
 // Same card as the home city's building profile (header, level, stats,
-// actions), plus the dev's place in this league.
+// actions), plus the dev's place in this league and a kudos button.
 
 export default function BuildingCard({
   building: b,
   data,
+  driving = false,
   onClose,
 }: {
   building: CityBuilding;
   data: LeaguePageData;
+  /** Opened by honking in drive mode: no orbit hints. */
+  driving?: boolean;
   onClose: () => void;
 }) {
+  const [kudos, setKudos] = useState<{ state: "idle" | "sending" | "sent" | "error"; message?: string }>({ state: "idle" });
+  const isSelf = data.viewer?.login.toLowerCase() === b.loginLower;
+  const giveKudos = async () => {
+    if (!data.viewer) {
+      setKudos({ state: "error", message: "Sign in to give kudos" });
+      return;
+    }
+    setKudos({ state: "sending" });
+    try {
+      const res = await fetch("/api/interactions/kudos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ receiver_login: b.login }),
+      });
+      if (res.ok) {
+        setKudos({ state: "sent" });
+        return;
+      }
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      const message =
+        res.status === 403 ? "Claim your building to give kudos" : res.status === 429 ? (body.error?.includes("Daily") ? "No kudos left today (5/day)" : "Too fast, try again") : "Couldn't send kudos";
+      setKudos({ state: "error", message });
+    } catch {
+      setKudos({ state: "error", message: "Couldn't send kudos" });
+    }
+  };
   const sheet = useSheet(onClose);
   const { close } = sheet;
 
@@ -43,7 +72,7 @@ export default function BuildingCard({
   return (
     <>
       {/* Nav hints, desktop only */}
-      <div className="pointer-events-none fixed bottom-6 right-6 z-30 hidden text-right text-[9px] leading-loose text-muted sm:block">
+      <div className={`pointer-events-none fixed bottom-6 right-6 z-30 hidden text-right text-[9px] leading-loose text-muted ${driving ? "" : "sm:block"}`}>
         <div>
           <span className="text-cream">Drag</span> orbit
         </div>
@@ -162,6 +191,23 @@ export default function BuildingCard({
               </div>
             ))}
           </div>
+
+          {/* Kudos */}
+          {!isSelf && (
+            <div className="mx-4 mb-3">
+              <button
+                type="button"
+                onClick={giveKudos}
+                disabled={kudos.state === "sending" || kudos.state === "sent"}
+                className={`btn-press w-full border-2 py-2 text-[10px] transition-colors ${
+                  kudos.state === "sent" ? "border-lime text-lime" : "border-lime/60 text-cream hover:border-lime hover:text-lime"
+                } disabled:cursor-default`}
+              >
+                {kudos.state === "sending" ? "Sending…" : kudos.state === "sent" ? `Kudos sent to @${b.login}` : `Give @${b.login} kudos`}
+              </button>
+              {kudos.state === "error" && <p className="mt-1.5 text-[9px] text-red-400 normal-case">{kudos.message}</p>}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-2 p-4 pb-5 pt-0 sm:pb-4">

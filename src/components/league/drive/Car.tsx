@@ -10,7 +10,9 @@ import type { CityObject } from "@/lib/league-city/types";
 import { nearestFreeLot, type Spawn } from "@/lib/league-city/drive/spawn";
 import { surfaceAt, surfaceIndex } from "@/lib/league-city/drive/surface";
 import type { DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import { CHASSIS, M_TO_UNIT, UNIT_TO_M, WHEEL } from "@/lib/league-city/drive/tuning";
+import { CHASSIS, M_TO_UNIT, TOYS, UNIT_TO_M, WHEEL } from "@/lib/league-city/drive/tuning";
+import { honkTarget, padKick } from "@/lib/league-city/drive/reactions";
+import { padAt } from "@/lib/league-city/toys";
 import {
   WHEELS,
   carHeading,
@@ -63,6 +65,7 @@ export default function Car({
   impact,
   color,
   onRemoteHit,
+  onHonk,
   onReset,
   children,
 }: {
@@ -79,6 +82,8 @@ export default function Car({
   color: string;
   /** You touched another driver's car (its body, for its velocity). */
   onRemoteHit?: (id: string, other: RapierRigidBody) => void;
+  /** Honked while parked in front of someone's building. */
+  onHonk?: (b: CityBuilding) => void;
   /** R, or fell out of the world: back to the spawn point. */
   onReset?: () => void;
   /** Rendered inside the visible car (lights). */
@@ -103,6 +108,12 @@ export default function Car({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+  const pads = useMemo(() => objects.filter((o) => o.item_type === "boost_pad"), [objects]);
+  const padsRef = useRef(pads);
+  padsRef.current = pads;
+  const lastPad = useRef(0);
+  const near = useRef<CityBuilding | null>(null);
+  const lastNearCheck = useRef(0);
   const spawnRef = useRef(spawn);
   spawnRef.current = spawn;
 
@@ -132,7 +143,18 @@ export default function Car({
     const body = bodyRef.current;
     if (!c || !body) return;
     stepCar(c, state.current, input.current.input, w.timestep, gripRef.current);
-    if (body.translation().y < -10) reset();
+    const p = body.translation();
+    if (p.y < -10) reset();
+
+    // Boost pads: up to pad speed along the arrow, once per pass.
+    const pad = padAt(padsRef.current, p.x * M_TO_UNIT, p.z * M_TO_UNIT);
+    const now = performance.now();
+    if (pad && p.y < 1.5 && now - lastPad.current > TOYS.padCooldown * 1000) {
+      lastPad.current = now;
+      const v = body.linvel();
+      const [dx, dz] = padKick(v.x, v.z, pad.rot);
+      body.applyImpulse({ x: dx * CHASSIS.mass, y: 0, z: dz * CHASSIS.mass }, true);
+    }
   });
 
   // A building landed on the car (admin edit in live view): push it to the nearest free lot.
@@ -174,6 +196,14 @@ export default function Car({
     });
 
     const s = state.current;
+    // The building you're parked at, a few times a second; honk opens its card.
+    const t = performance.now();
+    if (t - lastNearCheck.current > 150) {
+      lastNearCheck.current = t;
+      near.current = honkTarget(buildings, g.position.x, g.position.z, s.speed);
+    }
+    telemetry.near = near.current?.login ?? null;
+    if (input.current.pressed.horn && near.current) onHonk?.(near.current);
     telemetry.speed = s.speed;
     telemetry.boosting = s.boosting;
 
