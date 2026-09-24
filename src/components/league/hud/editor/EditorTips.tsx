@@ -47,7 +47,7 @@ export default function EditorTips() {
     setStep(TIPS.length);
   };
   return (
-    <div className="pointer-events-none fixed bottom-36 left-1/2 z-40 -translate-x-1/2 font-pixel uppercase">
+    <div className="pointer-events-none fixed bottom-[172px] left-1/2 z-40 -translate-x-1/2 font-pixel uppercase">
       <div key={step} className={`${HUD_BOX} flex animate-[fade-in_0.18s_ease-out] items-center gap-3 px-3 py-2`}>
         <span className="border-2 border-lime px-1.5 py-0.5 text-[10px] text-lime">{key}</span>
         <span className="text-[10px] text-cream normal-case">{text}</span>
