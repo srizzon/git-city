@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { PUBLIC_DEVELOPER_COLUMNS } from "@/lib/developer-columns";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
 import type { TopRepo } from "@/lib/github";
@@ -69,7 +70,7 @@ export async function GET(
 
   const { data: cached } = await sb
     .from("developers")
-    .select("*")
+    .select(PUBLIC_DEVELOPER_COLUMNS)
     .eq("github_login", username.toLowerCase())
     .single();
 
@@ -128,7 +129,7 @@ export async function GET(
             fetched_at: new Date().toISOString(),
             fetch_priority: 1,
           }, { onConflict: "github_login" })
-          .select()
+          .select(PUBLIC_DEVELOPER_COLUMNS)
           .single();
 
         if (created && !createErr) {
@@ -150,7 +151,7 @@ export async function GET(
           // Re-fetch with assigned rank
           const { data: withRank } = await sb
             .from("developers")
-            .select("*")
+            .select(PUBLIC_DEVELOPER_COLUMNS)
             .eq("id", created.id)
             .single();
 
