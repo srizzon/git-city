@@ -4,7 +4,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PixelSpinner, { Pending } from "@/components/leagues/PixelSpinner";
-import { Avatar } from "@/components/league/hud/shared";
+import { Avatar, NO_AUTOFILL } from "@/components/league/hud/shared";
 import type { League } from "@/lib/leagues/service";
 import type { LeagueMemberRow } from "@/lib/leagues/queries";
 
@@ -108,6 +108,7 @@ function NameSection({ api, name, onSaved }: { api: string; name: string; onSave
           }}
           maxLength={40}
           aria-label="League name"
+          {...NO_AUTOFILL}
           className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-lime sm:text-xs"
         />
         <button
@@ -369,6 +370,7 @@ function DeleteSection({ api, name }: { api: string; name: string }) {
           onChange={(e) => setValue(e.target.value)}
           placeholder={name}
           aria-label={`Type ${name} to confirm`}
+          {...NO_AUTOFILL}
           className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-red-500 sm:text-xs"
         />
         <button

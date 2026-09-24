@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createBrowserSupabase } from "@/lib/supabase";
 import { signInWithGitHub } from "@/lib/sign-in";
 import { Pending } from "@/components/leagues/PixelSpinner";
+import { NO_AUTOFILL } from "@/components/league/hud/shared";
 
 export default function CreateLeague({ signedIn, defaultOpen = false }: { signedIn: boolean; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -74,6 +75,7 @@ export default function CreateLeague({ signedIn, defaultOpen = false }: { signed
           disabled={busy}
           placeholder="League name"
           aria-label="League name"
+          {...NO_AUTOFILL}
           className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-lime sm:text-xs"
         />
         <button

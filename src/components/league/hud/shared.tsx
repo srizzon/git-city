@@ -48,3 +48,15 @@ export function Avatar({ src, size = 28, faded = false }: { src: string | null; 
 
 /** HUD surface: translucent, blurred, pixel border, clickable over the canvas. */
 export const HUD_BOX = "pointer-events-auto border-[3px] border-border bg-bg/75 backdrop-blur-sm";
+
+/**
+ * Keeps password managers (Bitwarden, 1Password, LastPass) and browser
+ * autofill off plain text fields like "GitHub username" or a league name.
+ */
+export const NO_AUTOFILL = {
+  autoComplete: "off",
+  "data-bwignore": "true",
+  "data-1p-ignore": "true",
+  "data-lpignore": "true",
+  "data-form-type": "other",
+} as const;

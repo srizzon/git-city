@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Pending } from "@/components/leagues/PixelSpinner";
+import { NO_AUTOFILL } from "@/components/league/hud/shared";
 
 export interface OrgState {
   login: string;
@@ -131,6 +132,7 @@ export default function VerifyClient({
             onChange={(e) => setPublicOrg(e.target.value)}
             placeholder="org name, e.g. vercel"
             aria-label="GitHub org"
+            {...NO_AUTOFILL}
             autoCapitalize="off"
             spellCheck={false}
             className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-lime sm:text-xs"
