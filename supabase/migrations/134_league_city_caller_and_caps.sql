@@ -3,7 +3,7 @@
 -- (131), but the route passes the developer id it resolved from the session
 -- (developers.claimed_by = auth user id) instead of a login, which came from
 -- user-editable auth metadata. The login version stays until the new route is
--- live, then 136 drops it.
+-- live everywhere, then a later migration drops it.
 --
 -- apply_league_city_ops (132) gains three guards:
 --   payload_too_large  a batch over 64 KB of JSON is refused
