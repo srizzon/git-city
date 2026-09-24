@@ -29,7 +29,7 @@ import type { DriveInputRef } from "./useDriveInput";
 /** Battle news for the Battle component. */
 export type BattleEvent =
   | { t: "boxes"; boxes: BoxState[] }
-  | Extract<ServerMsg, { t: "box" } | { t: "got" } | { t: "fx" } | { t: "gone" }>;
+  | Extract<ServerMsg, { t: "box" } | { t: "got" } | { t: "fx" } | { t: "gone" } | { t: "crown" }>;
 
 export interface RemoteDriver {
   id: string;
@@ -106,13 +106,14 @@ export function useDrivePresence({
         if (r && s) r.buffer.push(performance.now(), s);
         return;
       }
-      if (msg.t === "box" || msg.t === "got" || msg.t === "fx" || msg.t === "gone") {
+      if (msg.t === "box" || msg.t === "got" || msg.t === "fx" || msg.t === "gone" || msg.t === "crown") {
         onBattleRef.current(msg);
         return;
       }
       if (msg.t === "welcome") {
         selfId.current = msg.you;
         onBattleRef.current({ t: "boxes", boxes: msg.boxes ?? [] });
+        if (msg.crown) onBattleRef.current({ t: "crown", crown: msg.crown, now: msg.now });
         for (const d of msg.drivers) {
           if (d.id === msg.you) continue;
           add(d.id, d.name);

@@ -31,6 +31,8 @@ export interface CarState {
   /** Spinning out (oil, a ball hit): seconds left and which way. */
   spinLeft: number;
   spinDir: number;
+  /** Top speed multiplier (the crown holder is slower). */
+  topMul: number;
   /** Sideways speed, m/s. */
   lateral: number;
   /** Surface under the rear wheels. */
@@ -47,7 +49,7 @@ export const WHEELS: { x: number; z: number; front: boolean }[] = [
 export function newCarState(): CarState {
   return {
     speed: 0, steer: 0, boosting: false, braking: false, slip: 0,
-    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, lateral: 0, surface: "road",
+    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, topMul: 1, lateral: 0, surface: "road",
   };
 }
 
@@ -146,7 +148,7 @@ export function stepCar(
 
   // Boost: unlimited while held.
   s.boosting = input.boost;
-  const top = s.boosting ? BOOST.topSpeed : rearTop;
+  const top = (s.boosting ? BOOST.topSpeed : rearTop) * s.topMul;
 
   // Throttle, brake and reverse (boost drives even without throttle).
   const throttle = s.boosting ? 1 : input.throttle;

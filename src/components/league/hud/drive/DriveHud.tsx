@@ -8,6 +8,8 @@ import { ITEM_NAMES, isItem } from "@/lib/league-city/drive/battle";
 import { HUD_BOX } from "../shared";
 import PauseMenu, { CONTROLS } from "./PauseMenu";
 import StartScreen from "./StartScreen";
+import CrownPanel from "./CrownPanel";
+import type { CrownState } from "@/lib/league-city/drive/crown";
 
 // Drive mode HUD: speed and a boost light (bottom), camera, mute and exit (top
 // right), a controls hint that fades after 6 s, the start screen while Rapier
@@ -26,6 +28,8 @@ export default function DriveHud({
   muted,
   paused,
   drivers,
+  crown,
+  onStartCrown,
   onResume,
   onCamera,
   onMute,
@@ -38,6 +42,9 @@ export default function DriveHud({
   paused: boolean;
   /** Everyone else driving in this city right now. */
   drivers: DriverInfo[];
+  /** Crown Rush state from the drive room. */
+  crown: { crown: CrownState; offset: number; you: string | null } | null;
+  onStartCrown: () => void;
   onResume: () => void;
   onCamera: () => void;
   onMute: () => void;
@@ -47,7 +54,6 @@ export default function DriveHud({
   const boostTag = useRef<HTMLSpanElement>(null);
   const honk = useRef<HTMLDivElement>(null);
   const itemSlot = useRef<HTMLSpanElement>(null);
-  const smokeVeil = useRef<HTMLDivElement>(null);
   const honkName = useRef<HTMLSpanElement>(null);
   const [hints, setHints] = useState(true);
 
@@ -67,7 +73,6 @@ export default function DriveHud({
         itemSlot.current.textContent = held ? `F  ${ITEM_NAMES[held]}` : "No attack";
         itemSlot.current.dataset.state = !held ? "empty" : performance.now() - telemetry.gotAt < 900 ? "new" : "held";
       }
-      if (smokeVeil.current) smokeVeil.current.style.opacity = String(Math.min(0.94, telemetry.smoke * 0.94));
       if (honk.current && honkName.current) {
         honk.current.dataset.on = String(!!telemetry.near);
         if (telemetry.near) honkName.current.textContent = `@${telemetry.near}`;
@@ -80,13 +85,6 @@ export default function DriveHud({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
-      {/* Driving through someone's smoke: your view goes dark. */}
-      <div
-        ref={smokeVeil}
-        className="absolute inset-0 opacity-0"
-        style={{ background: "radial-gradient(circle at 50% 55%, rgba(20,20,26,0.75) 0%, rgba(12,12,16,1) 70%)" }}
-        aria-hidden
-      />
 
       {ready && (
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`}>
@@ -183,6 +181,8 @@ export default function DriveHud({
           <div className="normal-case">Gamepad works too</div>
         </div>
       )}
+
+      {ready && <CrownPanel crown={crown?.crown ?? null} offset={crown?.offset ?? 0} you={crown?.you ?? null} drivers={drivers} onStart={onStartCrown} />}
 
       {/* Last, so they blur and cover the rest of the HUD. */}
       <StartScreen ready={ready} />

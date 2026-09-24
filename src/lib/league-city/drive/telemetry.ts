@@ -8,14 +8,13 @@ export interface DriveTelemetry {
   boosting: boolean;
   /** Login of the building you can honk at right now. */
   near: string | null;
-  /** The attack you hold, when you got it (performance.now ms), and how deep in smoke you are (0…1). */
+  /** The attack you hold, and when you got it (performance.now ms). */
   held: string | null;
   gotAt: number;
-  smoke: number;
 }
 
 export function createTelemetry(): DriveTelemetry {
-  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, smoke: 0 };
+  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0 };
 }
 
 export type DriveCameraMode = "chase" | "top";

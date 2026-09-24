@@ -33,6 +33,7 @@ import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { SceneMode } from "@/components/league/LeagueScene";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import type { DriverInfo } from "@/lib/league-city/drive/net";
+import type { CrownApi, CrownView } from "@/components/league/drive/CrownMode";
 import { createEditorStore } from "@/lib/league-city/editor/store";
 import { keyToAction } from "@/lib/league-city/editor/shortcuts";
 import { MAX_SIZE, START_SIZE } from "@/lib/league-city/grid";
@@ -240,11 +241,13 @@ export default function LeagueClient({
     [viewer, members],
   );
   // Mutated by the car every frame, read by the HUD; a fresh one per drive.
-  const [telemetry, setTelemetry] = useState<DriveTelemetry>(() => ({ speed: 0, boosting: false, near: null, held: null, gotAt: 0, smoke: 0 }));
+  const [telemetry, setTelemetry] = useState<DriveTelemetry>(() => ({ speed: 0, boosting: false, near: null, held: null, gotAt: 0 }));
   const [driveReady, setDriveReady] = useState(false);
   const [driveCamera, setDriveCamera] = useState<DriveCameraMode>("chase");
   const [paused, setPaused] = useState(false);
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
+  const crownApi = useRef<CrownApi | null>(null);
+  const [crownView, setCrownView] = useState<CrownView | null>(null);
   // Your name in the drive room: your login, or a guest name for this visit.
   const [guest] = useState(() => `guest-${Math.random().toString(36).slice(2, 6).padEnd(4, "0")}`);
   const driverName = viewer?.login ?? guest;
@@ -264,7 +267,7 @@ export default function LeagueClient({
     setFocused(null);
     setPanel(null);
     setDriveReady(false);
-    setTelemetry({ speed: 0, boosting: false, near: null, held: null, gotAt: 0, smoke: 0 });
+    setTelemetry({ speed: 0, boosting: false, near: null, held: null, gotAt: 0 });
     setPaused(false);
     try {
       setMuted(localStorage.getItem(MUTE_KEY) === "1");
@@ -276,6 +279,7 @@ export default function LeagueClient({
   const exitDrive = useCallback(() => {
     setMode((m) => (m === "drive" ? "view" : m));
     setDrivers([]);
+    setCrownView(null);
   }, []);
   const onDriveReady = useCallback(() => setDriveReady(true), []);
   const onDriveFail = useCallback(() => {
@@ -335,6 +339,8 @@ export default function LeagueClient({
             name: driverName,
             onDrivers: setDrivers,
             onHonk: (b: CityBuilding) => setFocused(b),
+            crownApi,
+            onCrown: setCrownView,
           }
         : undefined,
     [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail, league.slug, driverName],
@@ -461,6 +467,8 @@ export default function LeagueClient({
           muted={muted}
           paused={paused}
           drivers={drivers}
+          crown={crownView}
+          onStartCrown={() => crownApi.current?.start()}
           onResume={() => setPaused(false)}
           onCamera={toggleCamera}
           onMute={toggleMute}
