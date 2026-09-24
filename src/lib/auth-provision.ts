@@ -6,6 +6,7 @@ import { sendReferralJoinedNotification } from "@/lib/notification-senders/refer
 import { fetchGitHubDeveloperData } from "@/lib/github-api";
 import { calculateGithubXp } from "@/lib/xp";
 import { earnPixels } from "@/lib/pixels";
+import { activateOnClaim } from "@/lib/leagues/joined";
 
 /**
  * Provisions / claims the developer building for a freshly authenticated user.
@@ -127,6 +128,11 @@ export async function provisionDeveloperOnLogin(
       // Cache email + update last_active_at on every login
       cacheEmailFromAuth(dev.id, authUserId).catch(() => {});
       touchLastActive(dev.id);
+
+      // Leagues: an invited member becomes active on their first claim.
+      if (claimedNow) {
+        await activateOnClaim(dev.id, githubLogin).catch((err) => console.error("League join on claim failed:", err));
+      }
 
       // Process referral (from ?ref= param forwarded by client)
       if (claimedNow && ref && ref !== githubLogin && !dev.referred_by) {

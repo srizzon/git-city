@@ -19,6 +19,7 @@ import { sanitizeSocialLinks } from "@/lib/social-links";
 import TrophyCase from "@/components/profile/TrophyCase";
 import ProfileStats from "@/components/profile/ProfileStats";
 import ProfileActions from "@/components/profile/ProfileActions";
+import { getDevLeagues } from "@/lib/leagues/queries";
 
 export const revalidate = 3600; // ISR: regenerate every 1 hour
 
@@ -121,6 +122,8 @@ export default async function DevPage({ params }: Props) {
   const pinnedIds = (showcase.featured_achievements ?? []).filter((id) =>
     ownedIds.has(id)
   );
+
+  const leagues = await getDevLeagues(dev.id).catch(() => []);
 
   // Fetch referred developers (who this dev brought to the city)
   const { data: referredDevs } = await sb
@@ -258,9 +261,26 @@ export default async function DevPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Social — invite + invited devs */}
-        {(isOwner || (referredDevs?.length ?? 0) > 0) && (
+        {/* Social — leagues + invite + invited devs */}
+        {(isOwner || (referredDevs?.length ?? 0) > 0 || leagues.length > 0) && (
           <div className="mt-5 grid gap-5 md:grid-cols-2">
+            {leagues.length > 0 && (
+              <section className="border-[3px] border-border bg-bg-raised p-4 sm:p-6 md:col-span-2">
+                <h2 className="text-sm text-cream">Leagues</h2>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {leagues.map((l) => (
+                    <Link
+                      key={l.slug}
+                      href={`/league/${l.slug}`}
+                      className="border-2 border-border px-2.5 py-1.5 text-[10px] text-muted transition-colors hover:border-border-light hover:text-cream"
+                    >
+                      {l.kind === "company" && <span style={{ color: accent }}>◆ </span>}
+                      {l.name}
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
             {isOwner && (
               <div className={referredDevs?.length ? "" : "md:col-span-2"}>
                 <ReferralCTA login={dev.github_login} accent={accent} />

@@ -13,6 +13,7 @@ interface Prefs {
   jobs_performance: boolean;
   jobs_digest: boolean;
   jobs_updates: boolean;
+  leagues: boolean;
   digest_frequency: string;
   quiet_hours_start: number | null;
   quiet_hours_end: number | null;
@@ -28,6 +29,7 @@ const DEFAULT_PREFS: Prefs = {
   jobs_performance: true,
   jobs_digest: true,
   jobs_updates: true,
+  leagues: true,
   digest_frequency: "realtime",
   quiet_hours_start: null,
   quiet_hours_end: null,
@@ -207,6 +209,13 @@ export default function NotificationSettings() {
               onChange={(v) => save({ social: v })}
               label="Social notifications"
               sublabel="Raids, kudos, achievements, gifts"
+              disabled={emailOff}
+            />
+            <Toggle
+              checked={prefs.leagues}
+              onChange={(v) => save({ leagues: v })}
+              label="Leagues"
+              sublabel="Weekly results, overtakes and teammates lighting up"
               disabled={emailOff}
             />
             <Toggle

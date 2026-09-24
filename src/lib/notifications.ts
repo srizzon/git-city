@@ -17,7 +17,8 @@ export type NotificationCategory =
   | "jobs_applications"
   | "jobs_performance"
   | "jobs_digest"
-  | "jobs_updates";
+  | "jobs_updates"
+  | "leagues";
 
 export type Priority = "high" | "normal" | "low";
 
@@ -543,6 +544,7 @@ interface NotificationPrefs {
   jobs_performance: boolean;
   jobs_digest: boolean;
   jobs_updates: boolean;
+  leagues: boolean;
   digest_frequency: "realtime" | "hourly" | "daily" | "weekly";
   quiet_hours_start: number | null;
   quiet_hours_end: number | null;
@@ -561,6 +563,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   jobs_performance: true,
   jobs_digest: true,
   jobs_updates: true,
+  leagues: true,
   digest_frequency: "realtime",
   quiet_hours_start: null,
   quiet_hours_end: null,
@@ -589,6 +592,7 @@ async function getPreferences(devId: number): Promise<NotificationPrefs> {
     jobs_performance: data.jobs_performance ?? true,
     jobs_digest: data.jobs_digest ?? true,
     jobs_updates: data.jobs_updates ?? true,
+    leagues: data.leagues ?? true,
     digest_frequency: data.digest_frequency ?? "realtime",
     quiet_hours_start: data.quiet_hours_start ?? null,
     quiet_hours_end: data.quiet_hours_end ?? null,

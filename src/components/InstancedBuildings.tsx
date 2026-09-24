@@ -21,6 +21,7 @@ const vertexShader = /* glsl */ `
   attribute float aRise;
   attribute vec4 aTint;
   attribute float aLive;
+  attribute float aInvited;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -30,6 +31,7 @@ const vertexShader = /* glsl */ `
   varying float vInstanceId;
   varying vec4 vTint;
   varying float vLive;
+  varying float vInvited;
   #include <common>
   #include <logdepthbuf_pars_vertex>
 
@@ -40,6 +42,7 @@ const vertexShader = /* glsl */ `
     vUvSide = aUvSide;
     vTint = aTint;
     vLive = aLive;
+    vInvited = aInvited;
 
     // Rise animation: modulate Y position by aRise (0 = underground, 1 = full height)
     vec3 localPos = position;
@@ -66,6 +69,7 @@ const fragmentShader = /* glsl */ `
   uniform float uDimOpacity;
   uniform float uDimEmissive;
   uniform float uCityEnergy;
+  uniform float uInvitedOpacity;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -75,6 +79,7 @@ const fragmentShader = /* glsl */ `
   varying float vInstanceId;
   varying vec4 vTint;
   varying float vLive;
+  varying float vInvited;
   #include <logdepthbuf_pars_fragment>
 
   void main() {
@@ -138,10 +143,14 @@ const fragmentShader = /* glsl */ `
     float emissiveMult = mix(1.0, mix(uDimEmissive, 1.0, isFocused), hasFocus);
     color *= emissiveMult * dimFactor;
 
-    // Screen-door transparency: discard pixels on non-focused buildings
+    // Screen-door transparency: discard pixels on non-focused buildings and on
+    // invited league members who haven't joined yet (a faded "ghost" building).
     // Uses 4x4 Bayer dithering for smooth look
     float isUnfocused = hasFocus * (1.0 - isFocused);
-    if (isUnfocused > 0.5) {
+    float opacity = 1.0;
+    if (isUnfocused > 0.5) opacity = uDimOpacity;
+    if (vInvited > 0.5) opacity = min(opacity, uInvitedOpacity);
+    if (opacity < 1.0) {
       int x = int(mod(gl_FragCoord.x, 4.0));
       int y = int(mod(gl_FragCoord.y, 4.0));
       int idx = x + y * 4;
@@ -155,7 +164,7 @@ const fragmentShader = /* glsl */ `
       else if (idx == 10) bayer = 0.0625; else if (idx == 11) bayer = 0.5625;
       else if (idx == 12) bayer = 0.9375; else if (idx == 13) bayer = 0.4375;
       else if (idx == 14) bayer = 0.8125; else bayer = 0.3125;
-      if (bayer > uDimOpacity) discard;
+      if (bayer > opacity) discard;
     }
 
     // Linear fog (reuse fogDepth from early discard)
@@ -242,6 +251,7 @@ export default memo(function InstancedBuildings({
         uDimOpacity: { value: 0.6 },
         uDimEmissive: { value: 0.5 },
         uCityEnergy: { value: 1.0 },
+        uInvitedOpacity: { value: 0.35 },
       },
       vertexShader,
       fragmentShader,
@@ -258,7 +268,8 @@ export default memo(function InstancedBuildings({
   }, [material, atlasTexture, colors.roof, colors.face]);
 
   // Per-instance attribute buffers
-  const { uvFrontData, uvSideData, riseData, tintData } = useMemo(() => {
+  const { uvFrontData, uvSideData, riseData, tintData, invitedData } = useMemo(() => {
+    const invited = new Float32Array(count);
     const uvF = new Float32Array(count * 4);
     const uvS = new Float32Array(count * 4);
     const rise = new Float32Array(count);
@@ -289,6 +300,8 @@ export default memo(function InstancedBuildings({
       // Rise starts at 0 (will animate to 1)
       rise[i] = 0;
 
+      invited[i] = b.invited ? 1 : 0;
+
       // Custom color tint (rgb = color, a = flag)
       if (b.custom_color) {
         _c.set(b.custom_color);
@@ -304,7 +317,7 @@ export default memo(function InstancedBuildings({
       }
     }
 
-    return { uvFrontData: uvF, uvSideData: uvS, riseData: rise, tintData: tint };
+    return { uvFrontData: uvF, uvSideData: uvS, riseData: rise, tintData: tint, invitedData: invited };
   }, [buildings, count]);
 
   // Live presence attribute (updated dynamically)
@@ -362,6 +375,7 @@ export default memo(function InstancedBuildings({
     const riseAttr = new THREE.InstancedBufferAttribute(riseData, 1);
     riseAttr.setUsage(THREE.DynamicDrawUsage);
     const tintAttr = new THREE.InstancedBufferAttribute(tintData, 4);
+    const invitedAttr = new THREE.InstancedBufferAttribute(invitedData, 1);
 
     const liveAttr = new THREE.InstancedBufferAttribute(liveData, 1);
     liveAttr.setUsage(THREE.DynamicDrawUsage);
@@ -371,6 +385,7 @@ export default memo(function InstancedBuildings({
     mesh.geometry.setAttribute("aRise", riseAttr);
     mesh.geometry.setAttribute("aTint", tintAttr);
     mesh.geometry.setAttribute("aLive", liveAttr);
+    mesh.geometry.setAttribute("aInvited", invitedAttr);
 
     if (hasPlayedRiseGlobal) {
       // Skip rise animation on return visits / subsequent updates
@@ -390,7 +405,7 @@ export default memo(function InstancedBuildings({
     }
 
     mesh.count = count;
-  }, [buildings, count, uvFrontData, uvSideData, riseData, tintData, liveData]);
+  }, [buildings, count, uvFrontData, uvSideData, riseData, tintData, invitedData, liveData]);
 
   // Sync fog uniforms (only when values actually change, e.g. theme switch)
   // Also smoothly lerp cityEnergy uniform toward target value

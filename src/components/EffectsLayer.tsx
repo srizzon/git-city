@@ -9,6 +9,7 @@ import { BuildingItemEffects, showsFlag } from "./Building3D";
 import { NeonOutline, ParticleAura, SpotlightEffect } from "./BuildingEffects";
 import InstancedEffects from "./InstancedEffects";
 import RaidTag3D from "./RaidTag3D";
+import LeagueCrown3D from "./LeagueCrown3D";
 
 // ─── Memoized per-building effects ────────────────────────────
 
@@ -54,6 +55,9 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
           attackerLogin={building.active_raid_tag.attacker_login}
           tagStyle={building.active_raid_tag.tag_style}
         />
+      )}
+      {building.active_league_crown && (
+        <LeagueCrown3D width={building.width} height={building.height} depth={building.depth} />
       )}
     </group>
   );
@@ -262,7 +266,7 @@ export default function EffectsLayer({
       const b = buildings[idx];
 
       // Only buildings that have something to render
-      const hasEffects = b.claimed || (b.owned_items && b.owned_items.length > 0) || (b.app_streak > 0) || !!b.active_raid_tag || b.rabbit_completed;
+      const hasEffects = b.claimed || (b.owned_items && b.owned_items.length > 0) || (b.app_streak > 0) || !!b.active_raid_tag || !!b.active_league_crown || b.rabbit_completed;
       if (!hasEffects) continue;
 
       // Distance from the LOOK TARGET (the ground point the camera is aimed at,

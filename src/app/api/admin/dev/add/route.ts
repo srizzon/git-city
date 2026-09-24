@@ -3,8 +3,8 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
-import { fetchGitHubDeveloperData, GitHubFetchError } from "@/lib/github-api";
-import { calculateGithubXp } from "@/lib/xp";
+import { GitHubFetchError } from "@/lib/github-api";
+import { createDeveloperFromGitHub } from "@/lib/create-developer";
 
 export const maxDuration = 60;
 
@@ -47,41 +47,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const data = await fetchGitHubDeveloperData(username, { allowEmpty: true });
-
-    const { data: created, error: createErr } = await sb
-      .from("developers")
-      .upsert(
-        {
-          ...data,
-          fetched_at: new Date().toISOString(),
-          claimed: false,
-        },
-        { onConflict: "github_login" },
-      )
-      .select()
-      .single();
-
-    if (createErr || !created) {
-      return NextResponse.json(
-        { error: createErr?.message ?? "Failed to create developer" },
-        { status: 500 },
-      );
-    }
-
-    await sb.rpc("assign_new_dev_rank", { dev_id: created.id });
+    const created = await createDeveloperFromGitHub(username);
     sb.rpc("recalculate_ranks").then(() => {}, () => {});
-
-    const xp = calculateGithubXp({
-      contributions: data.contributions_total ?? data.contributions,
-      total_stars: data.total_stars,
-      public_repos: data.public_repos,
-      total_prs: data.total_prs ?? 0,
-    });
-    if (xp > 0) {
-      await sb.rpc("grant_xp", { p_developer_id: created.id, p_source: "github", p_amount: xp });
-      await sb.from("developers").update({ xp_github: xp }).eq("id", created.id);
-    }
 
     const { data: withRank } = await sb
       .from("developers")
@@ -89,7 +56,7 @@ export async function POST(req: NextRequest) {
       .eq("id", created.id)
       .single();
 
-    revalidatePath(`/dev/${data.github_login}`);
+    revalidatePath(`/dev/${created.github_login}`);
     return NextResponse.json({ ...(withRank ?? created), exists: true });
   } catch (err) {
     if (err instanceof GitHubFetchError) {

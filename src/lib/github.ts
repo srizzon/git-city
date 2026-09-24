@@ -65,6 +65,16 @@ export interface DeveloperRecord {
   active_raid_tag?: { attacker_login: string; tag_style: string; expires_at: string } | null;
   active_drop?: { id: string; rarity: string; points: number; max_pulls: number; pull_count: number; expires_at: string } | null;
   rabbit_completed?: boolean;
+  // Leagues
+  invited?: boolean; // league member who hasn't joined yet: drawn faded
+  active_league_crown?: LeagueCrown | null;
+}
+
+export interface LeagueCrown {
+  league_slug: string;
+  league_name: string;
+  week_start: string;
+  expires_at: string;
 }
 
 export interface TopRepo {
@@ -107,6 +117,8 @@ export interface CityBuilding {
   rabbit_completed: boolean;
   xp_total: number;
   xp_level: number;
+  invited?: boolean;
+  active_league_crown?: LeagueCrown | null;
   district?: string;
   district_chosen?: boolean;
   position: [number, number, number];
@@ -416,6 +428,8 @@ export function generateCityLayout(devs: DeveloperRecord[], sfMap?: SFMapAsset, 
         rabbit_completed: (dev as unknown as Record<string, unknown>).rabbit_completed as boolean ?? false,
         xp_total: (dev as unknown as Record<string, unknown>).xp_total as number ?? 0,
         xp_level: (dev as unknown as Record<string, unknown>).xp_level as number ?? 1,
+        invited: dev.invited ?? false,
+        active_league_crown: dev.active_league_crown ?? null,
         district: did,
         district_chosen: (dev as unknown as Record<string, unknown>).district_chosen as boolean ?? false,
         position: [posX, 0, posZ],
