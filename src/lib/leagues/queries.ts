@@ -116,7 +116,7 @@ export interface LeaguePageData {
     status: MemberStatus | null;
     is_admin: boolean;
   } | null;
-  counts: { total: number; active: number; dark: number };
+  counts: { total: number; joined: number; invited: number };
 }
 
 export async function getLeagueMembers(leagueId: string): Promise<LeagueMemberRow[]> {
@@ -204,8 +204,8 @@ export async function getLeaguePageData(league: League, viewer: Viewer | null): 
       : null,
     counts: {
       total: members.filter((m) => m.status !== "former").length,
-      active: members.filter((m) => m.status === "active").length,
-      dark: members.filter((m) => m.status === "invited").length,
+      joined: members.filter((m) => m.status === "active").length,
+      invited: members.filter((m) => m.status === "invited").length,
     },
   };
 }
@@ -225,7 +225,7 @@ export async function getDevLeagues(devId: number): Promise<{ slug: string; name
 
 /**
  * Developer rows for the league's mini-city (active + invited members), in the
- * /api/city shape, with invited members flagged dark.
+ * /api/city shape, with invited members flagged `invited` (drawn faded).
  */
 export async function getLeagueCityDevs(members: LeagueMemberRow[]): Promise<Record<string, unknown>[]> {
   const shown = members.filter((m) => m.status !== "former");
@@ -245,7 +245,7 @@ export async function getLeagueCityDevs(members: LeagueMemberRow[]): Promise<Rec
   }
   devs.sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER));
   const extras = await loadCityExtras(sb, ids);
-  return mergeCityExtras(devs, extras).map((d) => ({ ...d, dark: status.get(d.id) === "invited" }));
+  return mergeCityExtras(devs, extras).map((d) => ({ ...d, invited: status.get(d.id) === "invited" }));
 }
 
 /**

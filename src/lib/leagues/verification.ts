@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { ghHeaders, FETCH_TIMEOUT_MS } from "@/lib/github-api";
 import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import { reassignAdmin, slugify } from "./service";
-import { notifyLitUp } from "./litup";
+import { notifyJoined } from "./joined";
 
 // ─── Company league verification ────────────────────────────
 // Membership is proven from the OAuth provider_token (read:org) in the auth
@@ -194,7 +194,7 @@ export async function joinCompanyLeague(
   if (!league.admin_id) await sb.from("leagues").update({ admin_id: devId }).eq("id", league.id);
   if (row?.status === "invited") {
     const { data: dev } = await sb.from("developers").select("github_login").eq("id", devId).single();
-    if (dev) await notifyLitUp(league.id, devId, dev.github_login, row.invited_by);
+    if (dev) await notifyJoined(league.id, devId, dev.github_login, row.invited_by);
   }
 
   const leagueId = league.id as string;
@@ -256,8 +256,8 @@ export async function isPublicOrgMember(org: string, login: string): Promise<boo
 }
 
 /**
- * Seeds a new company league with up to 100 public org members as dark
- * (invited) buildings. Missing buildings are created from GitHub data.
+ * Seeds a new company league with up to 100 public org members as invited
+ * buildings. Missing buildings are created from GitHub data.
  * Runs in after() so the login redirect doesn't wait.
  */
 export async function seedCompanyLeague(leagueId: string, org: string): Promise<number> {

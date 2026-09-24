@@ -51,7 +51,7 @@ function useCountdown(): string {
   return left;
 }
 
-function Avatar({ src, size = 28, dark = false }: { src: string | null; size?: number; dark?: boolean }) {
+function Avatar({ src, size = 28, faded = false }: { src: string | null; size?: number; faded?: boolean }) {
   if (!src) return <div className="shrink-0 bg-bg-raised" style={{ width: size, height: size }} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -61,7 +61,7 @@ function Avatar({ src, size = 28, dark = false }: { src: string | null; size?: n
       width={size}
       height={size}
       className="shrink-0"
-      style={{ width: size, height: size, imageRendering: "pixelated", filter: dark ? "grayscale(1) brightness(0.6)" : undefined }}
+      style={{ width: size, height: size, imageRendering: "pixelated", opacity: faded ? 0.45 : undefined }}
     />
   );
 }
@@ -94,7 +94,7 @@ export default function LeagueClient({
   const isMember = viewer?.status === "active";
   const invitedMember = invite ? members.find((m) => m.login.toLowerCase() === invite) : undefined;
   const showJoinCta = !isMember && (!!invite || viewer?.status === "invited");
-  const dark = members.filter((m) => m.status === "invited");
+  const invited = members.filter((m) => m.status === "invited");
 
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
@@ -120,7 +120,7 @@ export default function LeagueClient({
           </div>
           <h1 className="mt-3 text-3xl text-cream normal-case md:text-4xl">{league.name}</h1>
           <p className="mt-2 text-[11px] text-muted">
-            {fmt(counts.total)} buildings · {fmt(counts.active)} lit · {fmt(counts.dark)} dark
+            {fmt(counts.total)} buildings · {fmt(counts.joined)} joined · {fmt(counts.invited)} invited
           </p>
         </header>
 
@@ -129,7 +129,6 @@ export default function LeagueClient({
             leagueSlug={league.slug}
             leagueKind={league.kind}
             signedIn={!!viewer}
-            viewerInvited={viewer?.status === "invited"}
             invitee={invitedMember?.login ?? invite}
             refLogin={refLogin}
           />
@@ -214,17 +213,17 @@ export default function LeagueClient({
                 );
               })}
               {week.standings.length === 0 && (
-                <li className="text-[11px] text-muted normal-case">Nobody has lit up yet.</li>
+                <li className="text-[11px] text-muted normal-case">Nobody has joined yet.</li>
               )}
             </ol>
 
-            {dark.length > 0 && (
+            {invited.length > 0 && (
               <div className="mt-6">
-                <h3 className="text-[10px] text-muted">Dark · waiting to light up</h3>
+                <h3 className="text-[10px] text-muted">Invited · not joined yet</h3>
                 <ul className="mt-2 flex flex-wrap gap-1.5">
-                  {dark.map((m) => (
+                  {invited.map((m) => (
                     <li key={m.developer_id} className="flex items-center gap-1.5 border-2 border-border px-2 py-1">
-                      <Avatar src={m.avatar_url} size={16} dark />
+                      <Avatar src={m.avatar_url} size={16} faded />
                       <span className="text-[10px] text-dim normal-case">@{m.login}</span>
                     </li>
                   ))}
@@ -256,14 +255,12 @@ function JoinCta({
   leagueSlug,
   leagueKind,
   signedIn,
-  viewerInvited,
   invitee,
   refLogin,
 }: {
   leagueSlug: string;
   leagueKind: "company" | "custom";
   signedIn: boolean;
-  viewerInvited: boolean;
   invitee: string | null;
   refLogin: string | null;
 }) {
@@ -306,7 +303,7 @@ function JoinCta({
     <section className="mt-6 border-[3px] border-lime bg-bg-card p-4">
       <p className="text-sm text-cream">Your team is waiting.</p>
       <p className="mt-1 text-[11px] text-muted normal-case">
-        {invitee ? `@${invitee}'s building is dark. ` : ""}Light up your building to join the weekly race.
+        {invitee ? `@${invitee}'s building is on the skyline, waiting for you. ` : ""}Join to start scoring in the weekly race.
       </p>
       {needsVerify ? (
         <Link
@@ -323,11 +320,11 @@ function JoinCta({
           className="btn-press mt-4 w-full bg-lime px-4 py-3 text-[11px] tracking-widest text-bg disabled:opacity-50"
         >
           {busy ? (
-            <Pending label={signedIn ? "Lighting up" : "Opening GitHub"} />
+            <Pending label={signedIn ? "Joining" : "Opening GitHub"} />
           ) : signedIn ? (
-            viewerInvited ? "Light up my building" : "Join league"
+            "Join the league"
           ) : (
-            "Light up my building"
+            "Join the league"
           )}
         </button>
       )}
@@ -369,7 +366,7 @@ function HallOfFame({ members, hall }: { members: LeaguePageData["members"]; hal
           {bySize.map((m, i) => (
             <li key={m.developer_id} className="flex items-center gap-2 border-[3px] border-border bg-bg-card px-3 py-2">
               <span className="w-5 text-right text-[10px] text-muted">{i + 1}</span>
-              <Avatar src={m.avatar_url} size={20} dark={m.status === "invited"} />
+              <Avatar src={m.avatar_url} size={20} faded={m.status === "invited"} />
               <span className="min-w-0 flex-1 truncate text-[11px] text-cream normal-case">@{m.login}</span>
               {m.status === "former" && <span className="text-[8px] text-dim">ex-member</span>}
               <span className="text-[10px] text-cream tabular-nums">{fmt(m.contributions)}</span>
@@ -422,7 +419,7 @@ function InviteBox({ slug }: { slug: string }) {
         created: !!json.created_building,
       });
       setLogin("");
-      // Re-fetch the page so the new dark building shows in the city + list.
+      // Re-fetch the page so the new invited building shows in the city + list.
       startRefresh(() => router.refresh());
     } catch {
       setState({ kind: "error", message: "Network error. Try again." });
@@ -442,7 +439,7 @@ function InviteBox({ slug }: { slug: string }) {
     <section className="mt-4 border-[3px] border-border bg-bg-card p-4">
       <h2 className="text-sm text-cream">Invite a colleague</h2>
       <p className="mt-1 text-[11px] text-muted normal-case">
-        Their building joins the skyline dark. It lights up when they sign in.
+        Their building joins the skyline faded until they sign in.
       </p>
       <form onSubmit={submit} className="mt-3 flex gap-2">
         <input
@@ -477,7 +474,7 @@ function InviteBox({ slug }: { slug: string }) {
         {state.kind === "done" && (
           <div className="mt-3 border-2 border-lime/60 bg-bg-raised p-3">
             <div className="flex items-center gap-3">
-              <Avatar src={state.avatar} size={32} dark />
+              <Avatar src={state.avatar} size={32} faded />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs text-cream normal-case">@{state.login} is on the skyline</p>
                 <p className="flex items-center gap-2 text-[10px] text-muted normal-case">
@@ -486,7 +483,7 @@ function InviteBox({ slug }: { slug: string }) {
                       <PixelSpinner size={4} /> Adding their building to the city
                     </>
                   ) : (
-                    "Dark until they sign in. Send them this link."
+                    "Faded until they sign in. Send them this link."
                   )}
                 </p>
               </div>

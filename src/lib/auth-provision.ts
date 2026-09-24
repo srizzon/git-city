@@ -6,7 +6,7 @@ import { sendReferralJoinedNotification } from "@/lib/notification-senders/refer
 import { fetchGitHubDeveloperData } from "@/lib/github-api";
 import { calculateGithubXp } from "@/lib/xp";
 import { earnPixels } from "@/lib/pixels";
-import { lightUpOnClaim } from "@/lib/leagues/litup";
+import { activateOnClaim } from "@/lib/leagues/joined";
 
 /**
  * Provisions / claims the developer building for a freshly authenticated user.
@@ -129,9 +129,9 @@ export async function provisionDeveloperOnLogin(
       cacheEmailFromAuth(dev.id, authUserId).catch(() => {});
       touchLastActive(dev.id);
 
-      // Leagues: an invited (dark) building lights up on its first claim.
+      // Leagues: an invited member becomes active on their first claim.
       if (claimedNow) {
-        await lightUpOnClaim(dev.id, githubLogin).catch((err) => console.error("League light-up failed:", err));
+        await activateOnClaim(dev.id, githubLogin).catch((err) => console.error("League join on claim failed:", err));
       }
 
       // Process referral (from ?ref= param forwarded by client)

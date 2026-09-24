@@ -3,8 +3,8 @@ import { buildButton, escapeHtml } from "../email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
-/** "Pedro lit up his building" email to the colleague who invited them. */
-export function sendLeagueLitUpNotification(opts: {
+/** "Pedro joined your league" email to the colleague who invited them. */
+export function sendLeagueJoinedNotification(opts: {
   inviterId: number;
   inviteeId: number;
   inviteeLogin: string;
@@ -12,14 +12,14 @@ export function sendLeagueLitUpNotification(opts: {
   leagueName: string;
 }) {
   const url = `${BASE_URL}/league/${opts.leagueSlug}`;
-  const title = `@${opts.inviteeLogin} lit up their building`;
-  const body = `@${opts.inviteeLogin} joined ${opts.leagueName} from your invite. Their building is on and scoring this week.`;
+  const title = `@${opts.inviteeLogin} joined ${opts.leagueName}`;
+  const body = `@${opts.inviteeLogin} joined ${opts.leagueName} from your invite. Their building is on the skyline and scoring this week.`;
 
   sendNotificationAsync({
-    type: "league_litup",
+    type: "league_joined",
     category: "leagues",
     developerId: opts.inviterId,
-    dedupKey: `league_litup:${opts.inviterId}:${opts.inviteeId}`,
+    dedupKey: `league_joined:${opts.inviterId}:${opts.inviteeId}`,
     title,
     body,
     html: `

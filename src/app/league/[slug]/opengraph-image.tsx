@@ -12,7 +12,8 @@ export const contentType = "image/png";
 export const revalidate = 3600;
 
 const MAX_BUILDINGS = 12;
-const DARK = "#3a3a44";
+// Invited members who haven't joined: the accent at low opacity.
+const INVITED = "rgba(200, 230, 74, 0.28)";
 
 export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -21,7 +22,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
 
   const league = await getLeagueBySlug(slug);
   const members = league ? (await getLeagueMembers(league.id)).filter((m) => m.status !== "former") : [];
-  const darkCount = members.filter((m) => m.status === "invited").length;
+  const invitedCount = members.filter((m) => m.status === "invited").length;
 
   // Tallest buildings, laid out tallest-in-the-middle like a skyline.
   const top = [...members].sort((a, b) => b.contributions - a.contributions).slice(0, MAX_BUILDINGS);
@@ -59,7 +60,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           <div style={{ display: "flex", fontSize: 64, lineHeight: 1 }}>{league?.name ?? "League not found"}</div>
           {league && (
             <div style={{ display: "flex", fontSize: 26, color: OG.muted }}>
-              {`${members.length} buildings, ${darkCount} dark`}
+              {`${members.length} buildings, ${invitedCount} invited`}
             </div>
           )}
         </div>
@@ -71,7 +72,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
               groundY,
               height: Math.round(90 + (m.contributions / maxC) * 250),
               width: bw,
-              color: m.status === "invited" ? DARK : OG.accent,
+              color: m.status === "invited" ? INVITED : OG.accent,
             })}
           </Fragment>
         ))}

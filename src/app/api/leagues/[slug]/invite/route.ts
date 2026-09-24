@@ -6,7 +6,7 @@ import { leagueErrorResponse, readJson } from "@/lib/leagues/http";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // may create a building from GitHub data
 
-// POST { login }: add a colleague as a dark (invited) building and return
+// POST { login }: add a colleague as an invited building and return
 // their personal invite link.
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

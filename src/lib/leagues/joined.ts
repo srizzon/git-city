@@ -1,15 +1,15 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { sendLeagueLitUpNotification } from "@/lib/notification-senders/league-litup";
+import { sendLeagueJoinedNotification } from "@/lib/notification-senders/league-joined";
 import { MAX_CUSTOM_LEAGUES } from "./service";
 import { isPublicOrgMember, VERIFICATION_DAYS } from "./verification";
 
-/** Emails whoever invited `devId` into a league that the dev just lit up in. */
-export async function notifyLitUp(leagueId: string, devId: number, login: string, invitedBy: number | null) {
+/** Emails whoever invited `devId` into a league the dev just joined. */
+export async function notifyJoined(leagueId: string, devId: number, login: string, invitedBy: number | null) {
   if (!invitedBy || invitedBy === devId) return;
   const { data: league } = await getSupabaseAdmin().from("leagues").select("slug, name").eq("id", leagueId).single();
   if (!league) return;
-  sendLeagueLitUpNotification({
+  sendLeagueJoinedNotification({
     inviterId: invitedBy,
     inviteeId: devId,
     inviteeLogin: login,
@@ -19,13 +19,13 @@ export async function notifyLitUp(leagueId: string, devId: number, login: string
 }
 
 /**
- * A dev with invited (dark) league rows just claimed their building: light
- * them up. Custom leagues activate directly (up to the 5-league limit).
+ * A dev with invited league rows just claimed their building: make them
+ * active members. Custom leagues activate directly (up to the 5-league limit).
  * Company leagues still need proof of membership, so they activate only when
- * the dev is a public org member; otherwise they stay dark until the dev
+ * the dev is a public org member; otherwise they stay invited until the dev
  * verifies.
  */
-export async function lightUpOnClaim(devId: number, login: string): Promise<number> {
+export async function activateOnClaim(devId: number, login: string): Promise<number> {
   const sb = getSupabaseAdmin();
   const { data: rows } = await sb
     .from("league_members")
@@ -45,7 +45,7 @@ export async function lightUpOnClaim(devId: number, login: string): Promise<numb
   let hasCompany = (active ?? []).some((a) => a.leagues.kind === "company");
 
   const now = new Date().toISOString();
-  let lit = 0;
+  let joined = 0;
   for (const row of rows) {
     const patch: Record<string, unknown> = { status: "active", joined_at: now, left_at: null };
     if (row.leagues.kind === "custom") {
@@ -66,8 +66,8 @@ export async function lightUpOnClaim(devId: number, login: string): Promise<numb
       .eq("developer_id", devId)
       .eq("status", "invited");
     if (error) continue;
-    lit++;
-    await notifyLitUp(row.league_id, devId, login, row.invited_by);
+    joined++;
+    await notifyJoined(row.league_id, devId, login, row.invited_by);
   }
-  return lit;
+  return joined;
 }
