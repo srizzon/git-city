@@ -77,7 +77,7 @@ export function useDriveAudio({
     if (!s || !c) return;
     const st = c.state;
     const speedT = Math.min(1.4, Math.abs(st.speed) / STEER.topSpeed);
-    s.engine.rate(0.7 + speedT * 1.1 + (st.boostLeft > 0 ? 0.25 : 0));
+    s.engine.rate(0.7 + speedT * 1.1 + (st.boosting ? 0.25 : 0));
     s.skid.volume(Math.min(0.7, st.slip * 0.8));
 
     const hit = impact.current;

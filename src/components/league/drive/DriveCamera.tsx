@@ -115,7 +115,7 @@ export default function DriveCamera({
 
     // FOV widens with speed and boost.
     const speedT = Math.min(1, Math.abs(st.speed) / BOOST.topSpeed);
-    const target = mode === "chase" ? CAMERA.fov + (CAMERA.fovBoost - CAMERA.fov) * (st.boostLeft > 0 ? 1 : speedT * 0.5) : CAMERA.fov;
+    const target = mode === "chase" ? CAMERA.fov + (CAMERA.fovBoost - CAMERA.fov) * (st.boosting ? 1 : speedT * 0.5) : CAMERA.fov;
     const fov = THREE.MathUtils.lerp(s0.fov, THREE.MathUtils.lerp(camera.fov, target, 1 - Math.exp(-4 * dt)), e);
     if (Math.abs(fov - camera.fov) > 0.01) {
       camera.fov = fov;

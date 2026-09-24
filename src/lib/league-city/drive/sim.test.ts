@@ -7,7 +7,7 @@ import { LOT } from "../grid";
 import type { CityObject } from "../types";
 import { buildColliders } from "./colliders";
 import { CHASSIS, GRAVITY, SURFACE } from "./tuning";
-import { createVehicle, headingFromRot, newCarState, placeCar, stepCar } from "./vehicle";
+import { carHeading, createVehicle, headingFromRot, newCarState, placeCar, stepCar } from "./vehicle";
 
 type World = RapierContext["world"];
 const DT = 1 / 60;
@@ -89,32 +89,51 @@ describe("vehicle (headless rapier)", () => {
     expect(s.speed).toBeLessThan(-3);
   });
 
-  it("drifts on the handbrake: slides wider than grip, keeps speed, doesn't spin", () => {
-    const grip = setup();
-    const drift = setup();
-    for (const car of [grip, drift]) car.run({ throttle: 1 }, 4);
-    grip.run({ throttle: 1, steer: 0.5 }, 1.4);
-    drift.run({ throttle: 1, steer: 0.5, handbrake: true }, 0.4);
-    drift.run({ throttle: 1, steer: 0.5 }, 1);
-    expect(drift.s.drifting).toBe(true);
-    expect(drift.s.lateral).toBeGreaterThan(grip.s.lateral * 1.8);
-    expect(drift.s.slip).toBeGreaterThan(0);
-    expect(drift.s.speed).toBeGreaterThan(grip.s.speed * 0.9);
-    expect(Math.abs(drift.body.angvel().y)).toBeLessThan(2.5);
-    drift.run({ throttle: 1 }, 1.5);
-    expect(drift.s.drifting).toBe(false);
-    expect(drift.s.lateral).toBeLessThan(0.5);
+  it("drifts while Space is held: nose into the turn, speed carried, grip back on release", () => {
+    const { body, s: st, run } = setup();
+    run({ throttle: 1 }, 4);
+    const entry = st.speed;
+    run({ throttle: 1, steer: 1, handbrake: true }, 1.2);
+    expect(st.drifting).toBe(true);
+    const v = body.linvel();
+    const travel = Math.atan2(v.x, v.z);
+    const slipAngle = Math.abs(Math.atan2(Math.sin(carHeading(body) - travel), Math.cos(carHeading(body) - travel)));
+    expect(slipAngle).toBeGreaterThan(0.4); // clearly sideways (~30–40°)
+    expect(slipAngle).toBeLessThan(1.0); // never spins
+    expect(Math.hypot(v.x, v.z)).toBeGreaterThan(entry * 0.9);
+    expect(st.slip).toBeGreaterThan(0.5);
+    run({ throttle: 1 }, 1);
+    expect(st.drifting).toBe(false);
+    expect(st.lateral).toBeLessThan(1);
   });
 
-  it("boosts past the road cap, then recharges", () => {
-    const { s, run } = setup();
+  it("drifts left and right, and countersteer widens the arc", () => {
+    const turned = (steer: number, into: number) => {
+      const car = setup();
+      car.run({ throttle: 1 }, 4);
+      const h0 = carHeading(car.body);
+      car.run({ throttle: 1, steer, handbrake: true }, 0.1);
+      car.run({ throttle: 1, steer: steer * into, handbrake: true }, 1);
+      return Math.atan2(Math.sin(carHeading(car.body) - h0), Math.cos(carHeading(car.body) - h0));
+    };
+    expect(turned(1, 1)).toBeLessThan(-0.8); // right: clockwise
+    expect(turned(-1, 1)).toBeGreaterThan(0.8); // left
+    expect(Math.abs(turned(1, -1))).toBeLessThan(Math.abs(turned(1, 1)));
+  });
+
+  it("boosts while Shift is held, drains the meter, refills after release", () => {
+    const { s: st, run } = setup();
     run({ throttle: 1 }, 10);
-    const before = s.speed;
-    run({ throttle: 1, boost: true }, 1.2);
-    expect(s.speed).toBeGreaterThan(before + 3);
-    expect(s.boostCharge).toBe(0);
-    run({ throttle: 1 }, 4.2);
-    expect(s.boostCharge).toBe(1);
+    const before = st.speed;
+    run({ throttle: 1, boost: true }, 0.8);
+    expect(st.boosting).toBe(true);
+    expect(st.speed).toBeGreaterThan(before + 2);
+    expect(st.boostCharge).toBeLessThan(0.6);
+    run({ throttle: 1, boost: true }, 1);
+    expect(st.boostCharge).toBe(0);
+    expect(st.boosting).toBe(false);
+    run({ throttle: 1 }, 5);
+    expect(st.boostCharge).toBe(1);
   });
 
   it("launches off a ramp it drives up", () => {

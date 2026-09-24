@@ -104,7 +104,7 @@ export function BoostTrail({ car }: { car: React.MutableRefObject<CarApi | null>
     if (!mesh) return;
     poolRef.current ??= makePool(COUNT);
     const pool = poolRef.current;
-    if (c && c.state.boostLeft > 0) {
+    if (c && c.state.boosting) {
       acc.current += dt * 60;
       while (acc.current >= 1) {
         acc.current -= 1;

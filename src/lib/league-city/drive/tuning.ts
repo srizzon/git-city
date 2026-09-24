@@ -38,28 +38,34 @@ export const WHEEL = {
   relaxation: 2.3,
   maxForce: 20000,
   sideFriction: 1.0,
-  rearSideFrictionHandbrake: 0.35,
-  /** Rear grip (frictionSlip) multiplier while drifting: what actually breaks traction. */
-  rearGripDrift: 0.2,
 };
 
+// Hold Space while steering: the car commits to a slide. Its velocity arcs
+// around the turn at a steady rate while the nose points into it, and the
+// speed carries. Steering into the drift tightens it; countersteer widens it.
 export const DRIFT = {
-  /** The handbrake starts a drift above this speed (m/s). */
-  minSpeed: 7,
-  /** A drift holds while steering on throttle and sliding faster than this (m/s sideways). */
-  holdSlip: 1.2,
-  /** After the handbrake lets go, the drift holds at least this long (s) so a tap can start one. */
-  grace: 0.5,
-  /** Yaw rate at full steer while drifting (rad/s): steer sets the rotation, so it slides instead of spinning. */
-  maxYaw: 2.0,
-  /** How fast the yaw rate follows the steer (1/s). */
-  yawControl: 15,
-  /** Front wheel lock while drifting, as a share of normal (less scrub, the yaw control steers). */
-  frontLock: 0.4,
-  /** How fast the velocity swings back toward the heading (1/s): the slide keeps its speed. */
-  align: 1.4,
-  /** Share of engine force pushed straight into the chassis while drifting. */
-  push: 1.0,
+  /** Space starts a drift above this speed (m/s, ~18 km/h). */
+  minSpeed: 5,
+  /** Below this the drift ends by itself. */
+  endSpeed: 3,
+  /** Nose angle off the direction of travel (rad, ~35°), and the swing steering adds or takes away. */
+  angle: 0.6,
+  angleSteer: 0.2,
+  /** How fast the direction of travel turns (rad/s), and the swing steering adds or takes away. */
+  turn: 0.9,
+  turnSteer: 0.5,
+  /** How hard the nose chases its angle (1/s), and the yaw rate cap (rad/s). */
+  yawGain: 10,
+  maxYaw: 4,
+  /** Speed change while drifting (m/s²): throttle, coasting, braking. */
+  accel: 2.5,
+  drag: 0.8,
+  brake: 10,
+  /** After letting go: how fast the direction of travel swings back under the nose (1/s), and for how long (s). */
+  recover: 6,
+  recoverTime: 0.4,
+  /** Wheel side friction while sliding (the slide is steered above, not by the tires). */
+  sideFriction: 0.05,
 };
 
 export const ENGINE = {
@@ -69,7 +75,6 @@ export const ENGINE = {
   /** Engine force fades to 0 over this fraction above the top speed. */
   capFade: 0.08,
   brake: 1500 / 60,
-  handbrake: 3000 / 60,
   /** Light brake with no throttle, so the car stops rolling. */
   idleBrake: 3 / 60,
   /** Below this forward speed (m/s) the brake key reverses. */
@@ -91,13 +96,19 @@ export const SURFACE = {
   grass: { grip: 1.1, topSpeed: 14 },
 } as const;
 
+// Hold Shift: burns the meter (full to empty in `burn` s), refills after a
+// short pause when released.
 export const BOOST = {
-  engineMul: 1.8,
+  engineMul: 2.0,
   topSpeed: 35,
-  burn: 1.2,
+  burn: 1.6,
   recharge: 4,
-  /** Forward kick when a boost starts, N·s. */
-  impulse: 2500,
+  /** Pause before the meter refills (s). */
+  rechargeDelay: 0.5,
+  /** A boost needs at least this much meter to start. */
+  minToStart: 0.15,
+  /** Extra acceleration while boosting in a drift (m/s²). */
+  driftAccel: 6,
 };
 
 export const RESPAWN = {
@@ -125,5 +136,5 @@ export const CAMERA = {
   fovBoost: 75,
   /** Spring stiffness for the chase follow (higher = tighter). */
   follow: 6,
-  topDownHeight: 30,
+  topDownHeight: 110,
 };

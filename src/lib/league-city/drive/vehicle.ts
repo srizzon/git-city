@@ -1,6 +1,6 @@
 // ─── Vehicle ────────────────────────────────────────────────
 // The car's per-step logic on Rapier's DynamicRayCastVehicleController: four
-// raycast wheels, rear drive, surface grip per wheel, handbrake drift, boost
+// raycast wheels, rear drive, surface grip per wheel, a held drift, boost
 // and flip recovery. No React here, so a headless world can drive it too.
 // Chassis frame: +z forward, +y up, +x left. Wheels: 0 FL, 1 FR, 2 RL, 3 RR.
 
@@ -17,18 +17,20 @@ export interface CarState {
   /** Forward speed, m/s (negative when reversing). */
   speed: number;
   steer: number;
-  /** 0…1; boost fires at 1. */
+  /** Boost meter, 0…1. */
   boostCharge: number;
-  /** Seconds of boost burn left. */
-  boostLeft: number;
+  boosting: boolean;
+  /** Seconds before the meter starts refilling. */
+  boostWait: number;
   braking: boolean;
-  /** Rear-wheel sideways slip, 0…1 (skid marks, smoke, skid sound). */
+  /** Sideways slip, 0…1 (skid marks, smoke, skid sound). */
   slip: number;
   flippedFor: number;
-  /** Sliding on purpose: rear grip stays low until the slide ends. */
   drifting: boolean;
-  /** Seconds the drift holds regardless of slide (after a handbrake tap). */
-  driftGrace: number;
+  /** 1 drifting right, -1 left. */
+  driftDir: number;
+  /** Seconds of grip recovery left after a drift. */
+  recovering: number;
   /** Sideways speed, m/s. */
   lateral: number;
   /** Surface under the rear wheels. */
@@ -43,7 +45,10 @@ export const WHEELS: { x: number; z: number; front: boolean }[] = [
 ];
 
 export function newCarState(): CarState {
-  return { speed: 0, steer: 0, boostCharge: 1, boostLeft: 0, braking: false, slip: 0, flippedFor: 0, drifting: false, driftGrace: 0, lateral: 0, surface: "road" };
+  return {
+    speed: 0, steer: 0, boostCharge: 1, boosting: false, boostWait: 0, braking: false, slip: 0,
+    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, lateral: 0, surface: "road",
+  };
 }
 
 export function createVehicle(world: World, body: RapierRigidBody): VehicleController {
@@ -79,6 +84,8 @@ export function capFade(speed: number, top: number): number {
 
 const REVERSE_TOP = 8;
 
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
 /**
  * One physics step: reads input, sets wheel forces, grip and steering, then
  * updates the controller. Call before world.step with the same dt.
@@ -96,51 +103,51 @@ export function stepCar(
   const p = body.translation();
   const speed = c.currentVehicleSpeed();
   s.speed = speed;
+  const grounded = c.wheelIsInContact(2) || c.wheelIsInContact(3);
 
-  // Drift: the handbrake starts it; steering on throttle while still sliding keeps it.
-  s.driftGrace = Math.max(0, s.driftGrace - dt);
-  if (input.handbrake && speed > DRIFT.minSpeed) {
+  // Drift: hold Space while steering at speed; it ends when Space lets go.
+  if (!s.drifting && input.handbrake && input.steer !== 0 && speed > DRIFT.minSpeed && grounded) {
     s.drifting = true;
-    s.driftGrace = DRIFT.grace;
-  } else if (!input.handbrake && (input.steer === 0 || input.throttle === 0 || (s.driftGrace === 0 && s.lateral < DRIFT.holdSlip))) {
+    s.driftDir = Math.sign(input.steer);
+  } else if (s.drifting && (!input.handbrake || speed < DRIFT.endSpeed)) {
     s.drifting = false;
+    s.recovering = DRIFT.recoverTime;
   }
-  const loose = s.drifting || input.handbrake;
+  s.recovering = Math.max(0, s.recovering - dt);
 
   // Grip and top speed per wheel, from the surface under it.
   let rearTop = 0;
   WHEELS.forEach((w, i) => {
     const [ox, , oz] = rotate(q, [w.x, 0, w.z]);
     const g = gripAt((p.x + ox) * M_TO_UNIT, (p.z + oz) * M_TO_UNIT);
-    c.setWheelFrictionSlip(i, !w.front && loose ? g.grip * WHEEL.rearGripDrift : g.grip);
+    c.setWheelFrictionSlip(i, g.grip);
     if (!w.front) {
       rearTop += g.topSpeed / 2;
       s.surface = g.surface;
     }
   });
 
-  // Boost: fires when charged, burns, then recharges.
-  if (s.boostLeft > 0) {
-    s.boostLeft = Math.max(0, s.boostLeft - dt);
+  // Boost: hold to burn the meter; it refills after a short pause.
+  const wantBoost = input.boost && (s.boosting ? s.boostCharge > 0 : s.boostCharge >= BOOST.minToStart);
+  s.boosting = wantBoost;
+  if (s.boosting) {
+    s.boostCharge = Math.max(0, s.boostCharge - dt / BOOST.burn);
+    s.boostWait = BOOST.rechargeDelay;
+  } else if (s.boostWait > 0) {
+    s.boostWait = Math.max(0, s.boostWait - dt);
   } else {
     s.boostCharge = Math.min(1, s.boostCharge + dt / BOOST.recharge);
-    if (input.boost && s.boostCharge >= 1) {
-      s.boostCharge = 0;
-      s.boostLeft = BOOST.burn;
-      const [fx, fy, fz] = rotate(q, [0, 0, BOOST.impulse]);
-      body.applyImpulse({ x: fx, y: fy, z: fz }, true);
-    }
   }
-  const boosting = s.boostLeft > 0;
-  const top = boosting ? BOOST.topSpeed : rearTop;
+  const top = s.boosting ? BOOST.topSpeed : rearTop;
 
-  // Throttle, brake and reverse.
+  // Throttle, brake and reverse (boost drives even without throttle).
+  const throttle = s.boosting ? 1 : input.throttle;
   let engine = 0;
   let brake = 0;
-  if (input.throttle > 0 && speed < -ENGINE.reverseBelow) {
-    brake = ENGINE.brake * input.throttle;
-  } else if (input.throttle > 0) {
-    engine = ENGINE.force * input.throttle * (boosting ? BOOST.engineMul : 1) * capFade(speed, top);
+  if (throttle > 0 && speed < -ENGINE.reverseBelow) {
+    brake = ENGINE.brake * throttle;
+  } else if (throttle > 0) {
+    engine = ENGINE.force * throttle * (s.boosting ? BOOST.engineMul : 1) * capFade(speed, top);
   } else if (input.brake > 0 && speed > ENGINE.reverseBelow) {
     brake = ENGINE.brake * input.brake;
   } else if (input.brake > 0) {
@@ -148,8 +155,7 @@ export function stepCar(
   } else {
     brake = ENGINE.idleBrake;
   }
-  if (boosting && input.throttle === 0 && input.brake === 0) engine = ENGINE.force * BOOST.engineMul * capFade(speed, top);
-  s.braking = brake > ENGINE.idleBrake || (input.brake > 0 && speed > ENGINE.reverseBelow);
+  s.braking = input.brake > 0 && speed > ENGINE.reverseBelow;
 
   // Steering eases toward the input; less lock at speed.
   const t = Math.min(1, Math.abs(speed) / STEER.topSpeed);
@@ -158,44 +164,73 @@ export function stepCar(
   const step = STEER.rate * dt;
   s.steer += Math.max(-step, Math.min(step, target - s.steer));
 
+  // While sliding, the tires let go: the drift below steers the car.
+  const sliding = s.drifting && grounded;
   for (let i = 0; i < 4; i++) {
     const front = WHEELS[i].front;
-    c.setWheelSteering(i, front ? s.steer * (s.drifting ? DRIFT.frontLock : 1) : 0);
-    c.setWheelEngineForce(i, front ? 0 : engine / 2);
-    const hand = !front && input.handbrake;
-    c.setWheelBrake(i, hand ? Math.max(brake, ENGINE.handbrake) : brake);
-    c.setWheelSideFrictionStiffness(i, !front && loose ? WHEEL.rearSideFrictionHandbrake : WHEEL.sideFriction);
+    c.setWheelSteering(i, front ? s.steer : 0);
+    c.setWheelEngineForce(i, front || sliding ? 0 : engine / 2);
+    c.setWheelBrake(i, sliding ? 0 : brake);
+    c.setWheelSideFrictionStiffness(i, sliding ? DRIFT.sideFriction : WHEEL.sideFriction);
   }
 
+  // The slide and the recovery work from the velocity before the tires act,
+  // so tire friction never eats the drift's speed.
+  const v0 = body.linvel();
   c.updateVehicle(dt);
 
-  // Low rear grip also caps the engine: push the chassis so a drift keeps its speed.
-  if (s.drifting && input.throttle > 0 && speed < top) {
-    const [fx, fy, fz] = rotate(q, [0, 0, ENGINE.force * input.throttle * DRIFT.push * dt]);
-    body.applyImpulse({ x: fx, y: fy, z: fz }, true);
+  const v = body.linvel();
+  const [fx, , fz] = rotate(q, [0, 0, 1]);
+  const heading = Math.atan2(fx, fz);
+
+  if (sliding) {
+    // The direction of travel arcs around the turn; the nose leads it into the turn.
+    const into = input.steer * s.driftDir; // +1 steering into the drift, -1 countersteering
+    const turn = Math.max(0.2, DRIFT.turn + DRIFT.turnSteer * into);
+    const angle = Math.max(0.15, DRIFT.angle + DRIFT.angleSteer * into);
+    // Right is a clockwise (negative) turn about +y.
+    const th = -s.driftDir * turn * dt;
+    const cos = Math.cos(th);
+    const sin = Math.sin(th);
+    let vx = v0.x * cos + v0.z * sin;
+    let vz = -v0.x * sin + v0.z * cos;
+    let mag = Math.hypot(vx, vz);
+    if (input.brake > 0) mag -= DRIFT.brake * input.brake * dt;
+    else if (throttle > 0 && mag < top) mag += (DRIFT.accel + (s.boosting ? BOOST.driftAccel : 0)) * throttle * dt;
+    else mag -= DRIFT.drag * dt;
+    mag = Math.max(0, mag);
+    const dir = Math.hypot(vx, vz) || 1;
+    vx = (vx / dir) * mag;
+    vz = (vz / dir) * mag;
+    body.setLinvel({ x: vx, y: v.y, z: vz }, true);
+
+    const travel = Math.atan2(vx, vz);
+    const want = travel - s.driftDir * angle;
+    const w = body.angvel();
+    const yaw = Math.max(-DRIFT.maxYaw, Math.min(DRIFT.maxYaw, wrap(want - heading) * DRIFT.yawGain));
+    body.setAngvel({ x: w.x, y: yaw, z: w.z }, true);
+  } else if (s.recovering > 0 && grounded) {
+    // Out of the drift: the direction of travel swings back under the nose, speed kept.
+    const mag = Math.max(Math.hypot(v.x, v.z), Math.hypot(v0.x, v0.z));
+    const along = v0.x * fx + v0.z * fz >= 0 ? 1 : -1;
+    const k = Math.min(1, DRIFT.recover * dt);
+    const len = Math.hypot(fx, fz) || 1;
+    const tx = (along * fx * mag) / len;
+    const tz = (along * fz * mag) / len;
+    const bx = v0.x + (tx - v0.x) * k;
+    const bz = v0.z + (tz - v0.z) * k;
+    const bl = Math.hypot(bx, bz) || 1;
+    body.setLinvel({ x: (bx / bl) * mag, y: v.y, z: (bz / bl) * mag }, true);
+    const w = body.angvel();
+    body.setAngvel({ x: w.x, y: w.y * (1 - k), z: w.z }, true);
   }
 
-  // Rear slip from the chassis' sideways speed.
-  const v = body.linvel();
+  // Sideways slip for skid marks, smoke and sound.
+  const nv = body.linvel();
   const [rx, ry, rz] = rotate(q, [1, 0, 0]);
-  const lateral = Math.abs(v.x * rx + v.y * ry + v.z * rz);
-  const grounded = c.wheelIsInContact(2) || c.wheelIsInContact(3);
+  const lateral = Math.abs(nv.x * rx + nv.y * ry + nv.z * rz);
   s.lateral = lateral;
   s.slip = grounded ? Math.min(1, Math.max(0, (lateral - 1) / 4)) : 0;
-
-  // A drift slides; it doesn't spin: steer sets the yaw rate, and the velocity
-  // swings back toward the heading without losing speed.
-  if (loose && grounded) {
-    const w = body.angvel();
-    const yaw = w.y + (-input.steer * DRIFT.maxYaw - w.y) * Math.min(1, DRIFT.yawControl * dt);
-    body.setAngvel({ x: w.x, y: yaw, z: w.z }, true);
-    const [fx, , fz] = rotate(q, [0, 0, 1]);
-    const len = Math.hypot(fx, fz) || 1;
-    const mag = Math.hypot(v.x, v.z);
-    const dir = v.x * fx + v.z * fz >= 0 ? 1 : -1;
-    const k = Math.min(1, DRIFT.align * dt);
-    body.setLinvel({ x: v.x + ((dir * fx * mag) / len - v.x) * k, y: v.y, z: v.z + ((dir * fz * mag) / len - v.z) * k }, true);
-  }
 
   // Upside down for a while: put it back on its wheels.
   const [, uy] = rotate(q, [0, 1, 0]);

@@ -184,7 +184,7 @@ export default function Car({
     const s = state.current;
     telemetry.speed = s.speed;
     telemetry.boost = s.boostCharge;
-    telemetry.boosting = s.boostLeft > 0;
+    telemetry.boosting = s.boosting;
 
     apiRef.current = { group: g, body, controller: c, state: s, wheels: wheelRefs.current.filter((o): o is THREE.Object3D => !!o) };
   });
