@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeagueJoinedNotification } from "@/lib/notification-senders/league-joined";
 import { MAX_CUSTOM_LEAGUES } from "./service";
 import { isPublicOrgMember, VERIFICATION_DAYS } from "./verification";
+import { autoPlace } from "@/lib/league-city/service";
 
 /** Emails whoever invited `devId` into a league the dev just joined. */
 export async function notifyJoined(leagueId: string, devId: number, login: string, invitedBy: number | null) {
@@ -67,6 +68,7 @@ export async function activateOnClaim(devId: number, login: string): Promise<num
       .eq("status", "invited");
     if (error) continue;
     joined++;
+    await autoPlace(row.league_id, devId);
     await notifyJoined(row.league_id, devId, login, row.invited_by);
   }
   return joined;

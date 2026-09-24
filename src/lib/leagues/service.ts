@@ -6,6 +6,7 @@ import { GitHubFetchError } from "@/lib/github-api";
 import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import type { ScoringMode } from "./scoring";
 import { notifyJoined } from "./joined";
+import { autoPlace, ensureCity } from "@/lib/league-city/service";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -149,6 +150,7 @@ export async function createCustomLeague(viewer: Viewer, rawName: string): Promi
     status: "active",
     joined_at: new Date().toISOString(),
   });
+  await ensureCity(league.id).catch((err) => console.error("[league-city] starter city failed", err));
   return league as League;
 }
 
@@ -197,6 +199,7 @@ export async function joinLeague(viewer: Viewer, league: League, ref: string | n
     { onConflict: "league_id,developer_id" },
   );
   if (error) throw new LeagueError("join_failed", error.message, 500);
+  await autoPlace(league.id, viewer.id);
 
   if (existing?.status === "invited") await notifyJoined(league.id, viewer.id, viewer.github_login, invitedBy);
   if (!league.admin_id) await reassignAdmin(league.id);
@@ -265,6 +268,7 @@ export async function inviteMember(
       invited_by: viewer.id,
     });
     if (error) throw new LeagueError("invite_failed", error.message, 500);
+    await autoPlace(league.id, dev.id);
   }
 
   return {

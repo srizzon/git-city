@@ -4,6 +4,7 @@ import { ghHeaders, FETCH_TIMEOUT_MS } from "@/lib/github-api";
 import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import { reassignAdmin, slugify } from "./service";
 import { notifyJoined } from "./joined";
+import { autoPlace, removeBuilding } from "@/lib/league-city/service";
 
 // ─── Company league verification ────────────────────────────
 // Membership is proven from the OAuth provider_token (read:org) in the auth
@@ -169,6 +170,7 @@ export async function joinCompanyLeague(
       .update({ status: "former", left_at: now })
       .eq("league_id", previous)
       .eq("developer_id", devId);
+    await removeBuilding(previous, devId);
     const { data: prev } = await sb.from("leagues").select("admin_id").eq("id", previous).single();
     if (prev?.admin_id === devId) await reassignAdmin(previous);
   }
@@ -192,6 +194,7 @@ export async function joinCompanyLeague(
     { onConflict: "league_id,developer_id" },
   );
   if (!league.admin_id) await sb.from("leagues").update({ admin_id: devId }).eq("id", league.id);
+  await autoPlace(league.id, devId);
   if (row?.status === "invited") {
     const { data: dev } = await sb.from("developers").select("github_login").eq("id", devId).single();
     if (dev) await notifyJoined(league.id, devId, dev.github_login, row.invited_by);
@@ -278,5 +281,6 @@ export async function seedCompanyLeague(leagueId: string, org: string): Promise<
   const rows = [...idByLogin.values()].map((id) => ({ league_id: leagueId, developer_id: id, status: "invited" }));
   if (rows.length === 0) return 0;
   await sb.from("league_members").upsert(rows, { onConflict: "league_id,developer_id", ignoreDuplicates: true });
+  await autoPlace(leagueId, [...idByLogin.values()]);
   return rows.length;
 }

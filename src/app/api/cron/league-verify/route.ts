@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { reassignAdmin } from "@/lib/leagues/service";
+import { removeBuilding } from "@/lib/league-city/service";
 import { fetchOrgPublicMembers, VERIFICATION_DAYS } from "@/lib/leagues/verification";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
         .eq("league_id", league.id)
         .in("developer_id", leave);
       marked += leave.length;
+      await removeBuilding(league.id as string, leave);
     }
     if (!league.admin_id || leave.includes(league.admin_id as number)) {
       const before = league.admin_id;
