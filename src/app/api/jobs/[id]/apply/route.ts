@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { sendJobApplicationConfirmedNotification } from "@/lib/notification-senders/job-application-confirmed";
 import { sendJobProfileNudgeNotification } from "@/lib/notification-senders/job-profile-nudge";
 
@@ -18,11 +19,13 @@ export async function POST(
 
   const admin = getSupabaseAdmin();
 
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
     .select("id, github_login")
     .eq("claimed_by", user.id)
-    .maybeSingle();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) {
     return NextResponse.json({ error: "No developer profile" }, { status: 400 });

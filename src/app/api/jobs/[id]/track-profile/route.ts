@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 
 export async function POST(
   _req: NextRequest,
@@ -16,11 +17,13 @@ export async function POST(
 
   const admin = getSupabaseAdmin();
 
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id")
+    .select("id, github_login")
     .eq("claimed_by", user.id)
-    .maybeSingle();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   // Track event + atomic counter increment
   await Promise.all([
