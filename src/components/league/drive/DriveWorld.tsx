@@ -17,13 +17,17 @@ import type { CityObject } from "@/lib/league-city/types";
 import { buildColliders, colliderKey, type ColliderSpec } from "@/lib/league-city/drive/colliders";
 import { spawnPoint } from "@/lib/league-city/drive/spawn";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import { GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
+import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
 import Car, { type CarApi } from "./Car";
 import DriveCamera from "./DriveCamera";
 import Lights from "./Lights";
 import { BoostTrail, Smoke } from "./Particles";
 import SkidMarks from "./SkidMarks";
 import { useDriveAudio } from "./useDriveAudio";
+import { useDrivePresence } from "./useDrivePresence";
+import RemoteCars from "./RemoteCars";
+import type { FxSource, FxSources } from "./fx";
+import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { useDriveInput } from "./useDriveInput";
 
 // Drive mode's physics world. Loaded with next/dynamic only when someone
@@ -46,7 +50,19 @@ export interface DriveWorldProps {
   onReady: () => void;
   /** Rapier or the models failed to load. */
   onFail: () => void;
+  /** League slug: the drive room everyone in this city shares. */
+  slug: string;
+  /** Your name in the room (GitHub login or guest-xxxx). */
+  name: string;
+  /** Who else is driving here, for the HUD. */
+  onDrivers: (drivers: DriverInfo[]) => void;
 }
+
+/** A bump carries this share of the hitter's relative velocity, plus a small hop (m/s). */
+const BUMP_SHARE = 0.7;
+const BUMP_HOP = 1.2;
+/** A crash counts once, whichever side sees it first (ms). */
+const BUMP_DEDUPE_MS = 500;
 
 class Boundary extends Component<{ onFail: () => void; children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -145,6 +161,24 @@ function CameraKey({ input, onToggle }: { input: ReturnType<typeof useDriveInput
   return null;
 }
 
+/** Your car as an effects source (tire marks, smoke, boost trail). */
+function LocalFx({ car, sources }: { car: React.MutableRefObject<CarApi | null>; sources: FxSources }) {
+  const entry = useRef<FxSource | null>(null);
+  useFrame(() => {
+    const c = car.current;
+    if (!c) return;
+    entry.current ??= { group: c.group, rearWheels: [], slip: 0, boosting: false, grounded: true };
+    const e = entry.current;
+    e.group = c.group;
+    e.rearWheels = c.wheels.slice(2, 4);
+    e.slip = c.state.slip;
+    e.boosting = c.state.boosting;
+    e.grounded = c.controller.wheelIsInContact(2) || c.controller.wheelIsInContact(3);
+    sources.current.set("local", e);
+  });
+  return null;
+}
+
 function DriveAudio(props: Parameters<typeof useDriveAudio>[0]) {
   useDriveAudio(props);
   return null;
@@ -164,6 +198,9 @@ export default function DriveWorld({
   paused,
   onReady,
   onFail,
+  slug,
+  name,
+  onDrivers,
 }: DriveWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -180,6 +217,34 @@ export default function DriveWorld({
   const input = useDriveInput(paused);
   const car = useRef<CarApi | null>(null);
   const impact = useRef({ strength: 0, at: 0 });
+  const fx = useRef(new Map<string, FxSource>());
+  // Crashes with other drivers. Whoever sees the contact tells the other one
+  // how to move; a bump for a crash you already felt locally is dropped.
+  const contacts = useRef(new Map<string, number>());
+  const { remotes, drivers, sendBump } = useDrivePresence({
+    slug,
+    name,
+    car,
+    input,
+    onBump: (from, x, z) => {
+      const c = car.current;
+      if (!c || performance.now() - (contacts.current.get(from) ?? 0) < BUMP_DEDUPE_MS) return;
+      c.body.applyImpulse({ x: x * CHASSIS.mass, y: BUMP_HOP * CHASSIS.mass, z: z * CHASSIS.mass }, true);
+      impact.current = { strength: Math.min(1, Math.hypot(x, z) / 12), at: performance.now() };
+    },
+  });
+  const onRemoteHit = (id: string, other: RapierRigidBody) => {
+    const c = car.current;
+    const now = performance.now();
+    const last = contacts.current.get(id) ?? 0;
+    contacts.current.set(id, now);
+    if (!c || now - last < BUMP_DEDUPE_MS) return;
+    // The car you hit picks up part of your speed relative to it.
+    const mine = c.body.linvel();
+    const theirs = other.linvel();
+    sendBump(id, (mine.x - theirs.x) * BUMP_SHARE, (mine.z - theirs.z) * BUMP_SHARE);
+  };
+  useEffect(() => onDrivers(drivers), [drivers, onDrivers]);
 
   return (
     <Boundary onFail={onFail}>
@@ -201,13 +266,17 @@ export default function DriveWorld({
             input={input}
             telemetry={telemetry}
             apiRef={car}
+            color={carColor(name)}
+            onRemoteHit={onRemoteHit}
             impact={impact}
           >
-            <Lights car={car} />
+            <Lights braking={() => !!car.current?.state.braking} />
           </Car>
-          <SkidMarks car={car} />
-          <Smoke car={car} />
-          <BoostTrail car={car} />
+          <LocalFx car={car} sources={fx} />
+          <RemoteCars remotes={remotes} drivers={drivers} sources={fx} localCar={car} muted={muted || paused} />
+          <SkidMarks sources={fx} />
+          <Smoke sources={fx} />
+          <BoostTrail sources={fx} />
           <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} />
           <DriveCamera mode={camera} car={car} impact={impact} />
           <CameraKey input={input} onToggle={onCameraToggle} />

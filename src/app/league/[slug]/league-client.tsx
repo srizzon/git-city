@@ -32,6 +32,7 @@ import { useEditorController } from "@/components/league/editor/useEditorControl
 import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { SceneMode } from "@/components/league/LeagueScene";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
+import type { DriverInfo } from "@/lib/league-city/drive/net";
 import { createEditorStore } from "@/lib/league-city/editor/store";
 import { keyToAction } from "@/lib/league-city/editor/shortcuts";
 import { MAX_SIZE, START_SIZE } from "@/lib/league-city/grid";
@@ -241,6 +242,10 @@ export default function LeagueClient({
   const [driveReady, setDriveReady] = useState(false);
   const [driveCamera, setDriveCamera] = useState<DriveCameraMode>("chase");
   const [paused, setPaused] = useState(false);
+  const [drivers, setDrivers] = useState<DriverInfo[]>([]);
+  // Your name in the drive room: your login, or a guest name for this visit.
+  const [guest] = useState(() => `guest-${Math.random().toString(36).slice(2, 6).padEnd(4, "0")}`);
+  const driverName = viewer?.login ?? guest;
   const [muted, setMuted] = useState(false);
   const toggleMute = useCallback(() => {
     setMuted((m) => {
@@ -266,7 +271,10 @@ export default function LeagueClient({
     }
     setMode("drive");
   };
-  const exitDrive = useCallback(() => setMode((m) => (m === "drive" ? "view" : m)), []);
+  const exitDrive = useCallback(() => {
+    setMode((m) => (m === "drive" ? "view" : m));
+    setDrivers([]);
+  }, []);
   const onDriveReady = useCallback(() => setDriveReady(true), []);
   const onDriveFail = useCallback(() => {
     setMode((m) => (m === "drive" ? "view" : m));
@@ -320,9 +328,12 @@ export default function LeagueClient({
             paused,
             onReady: onDriveReady,
             onFail: onDriveFail,
+            slug: league.slug,
+            name: driverName,
+            onDrivers: setDrivers,
           }
         : undefined,
-    [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail],
+    [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail, league.slug, driverName],
   );
 
   const newBuildings = useMemo(
@@ -445,6 +456,7 @@ export default function LeagueClient({
           camera={driveCamera}
           muted={muted}
           paused={paused}
+          drivers={drivers}
           onResume={() => setPaused(false)}
           onCamera={toggleCamera}
           onMute={toggleMute}

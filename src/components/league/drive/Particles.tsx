@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { CarApi } from "./Car";
+import type { FxSources } from "./fx";
 
 // Fixed particle pools: tire smoke while the rear slips, and a boost trail
 // from the exhaust while boosting. No allocation per frame.
@@ -41,26 +41,26 @@ function draw(mesh: THREE.InstancedMesh, pool: Particle[], grow: boolean) {
   mesh.instanceMatrix.needsUpdate = true;
 }
 
-export function Smoke({ car }: { car: React.MutableRefObject<CarApi | null> }) {
-  const COUNT = 64;
+export function Smoke({ sources }: { sources: FxSources }) {
+  const COUNT = 128;
   const poolRef = useRef<Particle[] | null>(null);
   const ref = useRef<THREE.InstancedMesh>(null);
   const next = useRef(0);
-  const acc = useRef(0);
+  const acc = useRef(new Map<string, number>());
   const geo = useMemo(() => new THREE.IcosahedronGeometry(1, 0), []);
   useEffect(() => () => geo.dispose(), [geo]);
 
   useFrame((_, dt) => {
     const mesh = ref.current;
-    const c = car.current;
     if (!mesh) return;
     poolRef.current ??= makePool(COUNT);
     const pool = poolRef.current;
-    if (c && c.state.slip > 0.2) {
-      acc.current += dt * 18 * c.state.slip;
-      while (acc.current >= 1) {
-        acc.current -= 1;
-        const w = c.wheels[2 + (next.current % 2)];
+    for (const [key, c] of sources.current) {
+      if (c.slip <= 0.2 || !c.grounded) continue;
+      let a = (acc.current.get(key) ?? 0) + dt * 18 * c.slip;
+      while (a >= 1) {
+        a -= 1;
+        const w = c.rearWheels[next.current % 2];
         if (!w) break;
         w.getWorldPosition(_p);
         const p = pool[next.current];
@@ -72,6 +72,7 @@ export function Smoke({ car }: { car: React.MutableRefObject<CarApi | null> }) {
         p.size = 0.6 + Math.random() * 0.4;
         next.current = (next.current + 1) % COUNT;
       }
+      acc.current.set(key, a);
     }
     for (const p of pool) {
       if (p.age >= p.life) continue;
@@ -89,25 +90,25 @@ export function Smoke({ car }: { car: React.MutableRefObject<CarApi | null> }) {
   );
 }
 
-export function BoostTrail({ car }: { car: React.MutableRefObject<CarApi | null> }) {
-  const COUNT = 48;
+export function BoostTrail({ sources }: { sources: FxSources }) {
+  const COUNT = 96;
   const poolRef = useRef<Particle[] | null>(null);
   const ref = useRef<THREE.InstancedMesh>(null);
   const next = useRef(0);
-  const acc = useRef(0);
+  const acc = useRef(new Map<string, number>());
   const geo = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
   useEffect(() => () => geo.dispose(), [geo]);
 
   useFrame((_, dt) => {
     const mesh = ref.current;
-    const c = car.current;
     if (!mesh) return;
     poolRef.current ??= makePool(COUNT);
     const pool = poolRef.current;
-    if (c && c.state.boosting) {
-      acc.current += dt * 60;
-      while (acc.current >= 1) {
-        acc.current -= 1;
+    for (const [key, c] of sources.current) {
+      if (!c.boosting) continue;
+      let a = (acc.current.get(key) ?? 0) + dt * 60;
+      while (a >= 1) {
+        a -= 1;
         // Exhaust: behind the rear bumper, low.
         _p.set((Math.random() - 0.5) * 1.5, 1.4, -4.6);
         c.group.localToWorld(_p);
@@ -119,6 +120,7 @@ export function BoostTrail({ car }: { car: React.MutableRefObject<CarApi | null>
         p.size = 0.9 + Math.random() * 0.6;
         next.current = (next.current + 1) % COUNT;
       }
+      acc.current.set(key, a);
     }
     for (const p of pool) {
       if (p.age >= p.life) continue;
