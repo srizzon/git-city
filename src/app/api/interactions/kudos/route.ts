@@ -30,22 +30,17 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
   // Fetch giver (must have claimed building)
   const { data: giver } = await admin
     .from("developers")
-    .select("id, claimed, contributions, public_repos, total_stars, kudos_count, kudos_streak, last_kudos_given_date")
-    .eq("github_login", githubLogin)
+    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, kudos_streak, last_kudos_given_date")
+    .eq("claimed_by", user.id)
     .single();
 
   if (!giver || !giver.claimed) {
     return NextResponse.json({ error: "Must claim building first" }, { status: 403 });
   }
+  const githubLogin: string = giver.github_login;
 
   // Fetch receiver
   const { data: receiver } = await admin

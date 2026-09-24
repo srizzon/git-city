@@ -28,17 +28,11 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
   // Fetch visitor
   const { data: visitor } = await admin
     .from("developers")
     .select("id")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!visitor) {

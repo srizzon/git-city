@@ -13,18 +13,12 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
   const admin = getSupabaseAdmin();
 
   const { data: dev } = await admin
     .from("developers")
     .select("id, claimed, dailies_completed, dailies_streak, last_dailies_date, last_checkin_date")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed) {

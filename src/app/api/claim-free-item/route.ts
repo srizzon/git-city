@@ -13,26 +13,13 @@ export async function POST() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json(
-      { error: "No GitHub username" },
-      { status: 400 }
-    );
-  }
-
   const admin = getSupabaseAdmin();
 
   // Must have claimed their building
   const { data: dev } = await admin
     .from("developers")
     .select("id, claimed, claimed_by")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {

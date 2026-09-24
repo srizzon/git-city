@@ -17,16 +17,11 @@ export async function GET() {
   }
 
   const sb = getSupabaseAdmin();
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
 
   const { data: dev } = await sb
     .from("developers")
     .select("city_theme")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev) {
@@ -57,16 +52,11 @@ export async function PATCH(request: Request) {
   }
 
   const sb = getSupabaseAdmin();
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
 
   const { error } = await sb
     .from("developers")
     .update({ city_theme: theme })
-    .eq("github_login", githubLogin);
+    .eq("claimed_by", user.id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -34,17 +34,11 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
   // Fetch attacker
   const attackerRes = await admin
     .from("developers")
     .select("id, claimed, app_streak, github_login, avatar_url, current_week_contributions, current_week_kudos_given")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const attacker = attackerRes.data as Record<string, any> | null;

@@ -12,22 +12,12 @@ export async function POST() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json({ error: "No GitHub login" }, { status: 400 });
-  }
-
   const sb = getSupabaseAdmin();
 
   const { data: dev } = await sb
     .from("developers")
     .select("id")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev) {

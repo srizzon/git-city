@@ -82,11 +82,12 @@ export async function POST(request: Request) {
   // Killer must match the authenticated session. The token already binds
   // the killer login but we still re-verify against the cookie to prevent
   // a token being replayed by a different account.
-  const killerLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  const { data: me } = await getSupabaseAdmin()
+    .from("developers")
+    .select("github_login")
+    .eq("claimed_by", user.id)
+    .maybeSingle();
+  const killerLogin = ((me?.github_login as string | undefined) ?? "").toLowerCase();
   if (!killerLogin) return deny("no_github_login");
   if (payload.kln !== killerLogin) return deny("killer_mismatch", 403);
   if (payload.vln === payload.kln) return deny("self_kill");

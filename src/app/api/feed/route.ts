@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   // The viewer identity comes from the authenticated session — never a
   // query param — so one user can't read another's personalized feed.
   if (scope === "you" || scope === "circle") {
-    const viewer = await sessionLogin();
+    const viewer = await sessionUserId();
     if (!viewer) {
       return NextResponse.json({ events: [], has_more: false }, { headers: noStore() });
     }
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     const { data: viewerDev } = await sb
       .from("developers")
       .select("id")
-      .eq("github_login", viewer)
+      .eq("claimed_by", viewer)
       .single();
 
     if (!viewerDev) {
@@ -188,23 +188,16 @@ export async function GET(request: Request) {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-// The authenticated viewer's GitHub login, or null if not signed in. This is
+// The authenticated viewer's auth user id, or null if not signed in. This is
 // the ONLY source of identity for personalized scopes — the client can't spoof
-// another user by passing a `viewer` param.
-async function sessionLogin(): Promise<string | null> {
+// another user by passing a `viewer` param, and the building is resolved by
+// claimed_by, never by the user-editable metadata login.
+async function sessionUserId(): Promise<string | null> {
   const supabase = await createServerSupabase();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
-  const login = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  )
-    .toLowerCase()
-    .trim();
-  return login || null;
+  return user?.id ?? null;
 }
 
 function cacheable() {

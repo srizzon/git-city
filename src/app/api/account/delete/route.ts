@@ -18,7 +18,7 @@ export async function POST() {
   // Find the developer record claimed by this auth user
   const { data: dev, error: devErr } = await admin
     .from("developers")
-    .select("id")
+    .select("id, github_login")
     .eq("claimed_by", user.id)
     .single();
 
@@ -30,6 +30,7 @@ export async function POST() {
   }
 
   const devId = dev.id;
+  const githubLoginForPh: string = dev.github_login;
 
   // Delete personal data in dependency order
   await Promise.all([
@@ -61,12 +62,6 @@ export async function POST() {
 
   // Delete the developer row (removes the building from the city entirely)
   await admin.from("developers").delete().eq("id", devId);
-
-  const githubLoginForPh = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
 
   if (githubLoginForPh) {
     const phDelete = getPostHogClient();

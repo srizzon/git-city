@@ -12,22 +12,12 @@ export async function GET() {
     return NextResponse.json({ pulls: {} });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json({ pulls: {} });
-  }
-
   const admin = getSupabaseAdmin();
 
   const { data: dev } = await admin
     .from("developers")
     .select("id")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev) {

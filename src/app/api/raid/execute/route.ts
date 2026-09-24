@@ -48,19 +48,13 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
   // Fetch attacker + defender in parallel
   const raidColumns = "id, claimed, github_login, avatar_url, contributions, public_repos, total_stars, kudos_count, app_streak, raid_xp, current_week_contributions, current_week_kudos_given, current_week_kudos_received";
   const [attackerRes, defenderRes] = await Promise.all([
     admin
       .from("developers")
       .select(raidColumns)
-      .eq("github_login", githubLogin)
+      .eq("claimed_by", user.id)
       .single(),
     admin
       .from("developers")

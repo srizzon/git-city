@@ -68,12 +68,13 @@ export async function POST(request: Request) {
   if (!verify.ok) return deny(`token_${verify.reason}`, 400);
   const payload = verify.payload;
 
-  // Player must match the authenticated session.
-  const login = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  // Player must match the building the authenticated session has claimed.
+  const { data: me } = await getSupabaseAdmin()
+    .from("developers")
+    .select("github_login")
+    .eq("claimed_by", user.id)
+    .maybeSingle();
+  const login = ((me?.github_login as string | undefined) ?? "").toLowerCase();
   if (!login) return deny("no_github_login");
   if (payload.dln !== login) return deny("login_mismatch", 403);
 

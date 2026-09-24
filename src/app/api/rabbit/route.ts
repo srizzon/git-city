@@ -26,17 +26,11 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
   // Fetch developer (must have claimed building)
   const { data: dev } = await admin
     .from("developers")
     .select("id, claimed, rabbit_progress, rabbit_completed")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed) {
@@ -137,16 +131,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ progress: 0, completed: false });
     }
 
-    const githubLogin = (
-      user.user_metadata.user_name ??
-      user.user_metadata.preferred_username ??
-      ""
-    ).toLowerCase();
-
     const { data: dev } = await admin
       .from("developers")
       .select("rabbit_progress, rabbit_completed, rabbit_completed_at")
-      .eq("github_login", githubLogin)
+      .eq("claimed_by", user.id)
       .single();
 
     return NextResponse.json({

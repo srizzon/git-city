@@ -29,15 +29,13 @@ export async function getViewerCosmeticContext(): Promise<ViewerContext | null> 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const login = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-  if (!login) return null;
-
+  // The viewer's building is the one they claimed, never a user_metadata login.
   const sb = getSupabaseAdmin();
-  const { data: dev } = await sb.from("developers").select("*").eq("github_login", login).single();
+  const { data: dev } = await sb
+    .from("developers")
+    .select("id, github_login, claimed, contributions, public_repos, total_stars, streak_freezes_available")
+    .eq("claimed_by", user.id)
+    .single();
   if (!dev) return null;
 
   const [ownedItems, wallet, loadoutRow, customRows, topDev, topStars] = await Promise.all([

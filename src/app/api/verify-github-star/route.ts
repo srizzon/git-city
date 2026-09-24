@@ -54,27 +54,18 @@ export async function POST() {
     return NextResponse.json({ error: "Too fast" }, { status: 429 });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json({ error: "No GitHub login" }, { status: 400 });
-  }
-
   const sb = getSupabaseAdmin();
 
   const { data: dev } = await sb
     .from("developers")
-    .select("id, claimed")
-    .eq("github_login", githubLogin)
+    .select("id, github_login, claimed")
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed) {
     return NextResponse.json({ error: "Must claim building first" }, { status: 403 });
   }
+  const githubLogin: string = dev.github_login;
 
   // Idempotent: already owns the item
   const { data: existing } = await sb

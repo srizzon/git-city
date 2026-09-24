@@ -36,16 +36,11 @@ export async function POST(request: Request) {
   }
 
   // Fetch developer
-  const login = user.user_metadata?.user_name?.toLowerCase();
-  if (!login) {
-    return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });
-  }
-
   const admin = getSupabaseAdmin();
   const { data: dev, error: devError } = await admin
     .from("developers")
     .select("id, claimed, district, district_chosen, district_changes_count, district_changed_at")
-    .eq("github_login", login)
+    .eq("claimed_by", user.id)
     .single();
 
   if (devError || !dev) {

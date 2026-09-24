@@ -14,14 +14,11 @@ export async function GET(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ answered: false });
 
-  const login = user.user_metadata?.user_name;
-  if (!login) return NextResponse.json({ answered: false });
-
   const admin = getSupabaseAdmin();
   const { data: dev } = await admin
     .from("developers")
     .select("id")
-    .eq("github_login", login)
+    .eq("claimed_by", user.id)
     .maybeSingle();
 
   if (!dev) return NextResponse.json({ answered: false });
@@ -65,14 +62,11 @@ export async function POST(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const login = user.user_metadata?.user_name;
-  if (!login) return NextResponse.json({ error: "No GitHub login" }, { status: 400 });
-
   const admin = getSupabaseAdmin();
   const { data: dev } = await admin
     .from("developers")
     .select("id")
-    .eq("github_login", login)
+    .eq("claimed_by", user.id)
     .maybeSingle();
 
   if (!dev) return NextResponse.json({ error: "Developer not found" }, { status: 404 });

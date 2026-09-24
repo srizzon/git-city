@@ -145,28 +145,19 @@ export async function POST() {
     return NextResponse.json({ error: "Too fast" }, { status: 429 });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json({ error: "No GitHub login" }, { status: 400 });
-  }
-
   const sb = getSupabaseAdmin();
 
   // Fetch developer (must be claimed)
   const { data: dev } = await sb
     .from("developers")
-    .select("id, claimed, contributions, public_repos, total_stars, kudos_count, app_streak, streak_freeze_30d_claimed, last_checkin_date")
-    .eq("github_login", githubLogin)
+    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, app_streak, streak_freeze_30d_claimed, last_checkin_date")
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed) {
     return NextResponse.json({ error: "Must claim building first" }, { status: 403 });
   }
+  const githubLogin: string = dev.github_login;
 
   // Perform check-in via RPC
   const { data: result, error: rpcError } = await sb.rpc("perform_checkin", {

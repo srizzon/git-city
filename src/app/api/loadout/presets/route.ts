@@ -21,10 +21,8 @@ async function ownerDev(): Promise<{ id: number } | null> {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const login = (user.user_metadata?.user_name ?? user.user_metadata?.preferred_username ?? "").toLowerCase();
-  if (!login) return null;
   const admin = getSupabaseAdmin();
-  const { data: dev } = await admin.from("developers").select("id, claimed, claimed_by").eq("github_login", login).single();
+  const { data: dev } = await admin.from("developers").select("id, claimed, claimed_by").eq("claimed_by", user.id).single();
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) return null;
   return { id: dev.id };
 }

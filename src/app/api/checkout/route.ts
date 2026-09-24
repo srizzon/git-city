@@ -32,23 +32,13 @@ export async function POST(request: Request) {
   }
   lastCheckout.set(user.id, now);
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });
-  }
-
   const sb = getSupabaseAdmin();
 
   // Validate user has claimed building
   const { data: dev } = await sb
     .from("developers")
-    .select("id, claimed, claimed_by")
-    .eq("github_login", githubLogin)
+    .select("id, github_login, claimed, claimed_by")
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed) {
@@ -65,6 +55,7 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+  const githubLogin: string = dev.github_login;
 
   // Parse body
   let body: { item_id: string; provider: "stripe" | "abacatepay" | "nowpayments"; gifted_to_login?: string };

@@ -58,26 +58,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json(
-      { error: "No GitHub login found" },
-      { status: 400 }
-    );
-  }
-
   const sb = getSupabaseAdmin();
 
   // Validate developer
   const { data: dev } = await sb
     .from("developers")
     .select("id, claimed, claimed_by")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {

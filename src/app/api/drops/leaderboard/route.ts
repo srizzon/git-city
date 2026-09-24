@@ -73,22 +73,15 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const githubLogin = (
-        user.user_metadata.user_name ??
-        user.user_metadata.preferred_username ??
-        ""
-      ).toLowerCase();
-      if (githubLogin) {
-        const { data: myDev } = await sb
-          .from("developers")
-          .select("id")
-          .eq("github_login", githubLogin)
-          .single();
-        if (myDev && scores[myDev.id]) {
-          const myPoints = scores[myDev.id];
-          const myRank = sorted.findIndex((e) => e.developer_id === myDev.id) + 1;
-          my_rank = { rank: myRank, points: myPoints };
-        }
+      const { data: myDev } = await sb
+        .from("developers")
+        .select("id")
+        .eq("claimed_by", user.id)
+        .single();
+      if (myDev && scores[myDev.id]) {
+        const myPoints = scores[myDev.id];
+        const myRank = sorted.findIndex((e) => e.developer_id === myDev.id) + 1;
+        my_rank = { rank: myRank, points: myPoints };
       }
     }
   } catch {

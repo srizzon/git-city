@@ -24,22 +24,12 @@ export async function POST(request: Request) {
   }
   lastCheckout.set(user.id, now);
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });
-  }
-
   const sb = getSupabaseAdmin();
 
   const { data: dev } = await sb
     .from("developers")
-    .select("id, claimed, claimed_by, suspended")
-    .eq("github_login", githubLogin)
+    .select("id, github_login, claimed, claimed_by, suspended")
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
@@ -49,6 +39,7 @@ export async function POST(request: Request) {
   if (dev.suspended) {
     return NextResponse.json({ error: "Account suspended" }, { status: 403 });
   }
+  const githubLogin: string = dev.github_login;
 
   let body: { package_id: string; provider: "stripe" | "abacatepay" };
   try {

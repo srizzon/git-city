@@ -21,15 +21,10 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    const githubLogin = (
-      user.user_metadata.user_name ??
-      user.user_metadata.preferred_username ??
-      ""
-    ).toLowerCase();
     const { data: dev } = await admin
       .from("developers")
       .select("id")
-      .eq("github_login", githubLogin)
+      .eq("claimed_by", user.id)
       .single();
     if (dev) developerId = dev.id;
   }
@@ -66,16 +61,11 @@ export async function POST(request: Request) {
   }
 
   const admin = getSupabaseAdmin();
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
 
   const { data: dev } = await admin
     .from("developers")
     .select("id, claimed, claimed_by")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {

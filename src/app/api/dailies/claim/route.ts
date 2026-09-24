@@ -21,23 +21,18 @@ export async function POST() {
     return NextResponse.json({ error: "Too fast" }, { status: 429 });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
   const admin = getSupabaseAdmin();
 
   const { data: dev } = await admin
     .from("developers")
-    .select("id, claimed, contributions, public_repos, total_stars, kudos_count, dailies_completed, dailies_streak, last_dailies_date")
-    .eq("github_login", githubLogin)
+    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, dailies_completed, dailies_streak, last_dailies_date")
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev || !dev.claimed) {
     return NextResponse.json({ error: "Must claim building first" }, { status: 403 });
   }
+  const githubLogin: string = dev.github_login;
 
   const today = getTodayStr();
 
