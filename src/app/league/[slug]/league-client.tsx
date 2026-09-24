@@ -24,18 +24,15 @@ import BuildingCard from "@/components/league/hud/BuildingCard";
 import { HUD_BOX } from "@/components/league/hud/shared";
 import EditorTopBar from "@/components/league/hud/editor/EditorTopBar";
 import Hotbar, { toolForSlot } from "@/components/league/hud/editor/Hotbar";
-import SelectionToolbar from "@/components/league/hud/editor/SelectionToolbar";
 import EditorToasts from "@/components/league/hud/editor/EditorToasts";
 import EditorTips from "@/components/league/hud/editor/EditorTips";
 import EditorOverlay from "@/components/league/editor/EditorOverlay";
 import type { EditCameraApi } from "@/components/league/editor/EditCamera";
 import { useEditorController } from "@/components/league/editor/useEditorController";
 import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
-import SceneHtml from "@/components/league/editor/SceneHtml";
 import type { SceneMode } from "@/components/league/LeagueScene";
 import { createEditorStore } from "@/lib/league-city/editor/store";
 import { HOTBAR, initEditor, type Notice } from "@/lib/league-city/editor/state";
-import { lotToWorld } from "@/lib/league-city/grid";
 
 const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
   ssr: false,
@@ -158,9 +155,12 @@ export default function LeagueClient({
     router.refresh();
   }, [editing, missing, es.version, router]);
 
+  // While carried (and the cursor is on the city), the object only shows as
+  // the ghost under the cursor.
+  const carrying = mode === "edit" && es.held && editor.hover ? es.held : null;
   const sceneObjects = useMemo(
-    () => (editing ? [...es.objects.values()] : city.objects),
-    [editing, es.objects, city.objects],
+    () => (editing ? [...es.objects.values()].filter((o) => o.id !== carrying) : city.objects),
+    [editing, es.objects, city.objects, carrying],
   );
   const sceneSize = editing ? es.size : city.size;
   const buildings = useMemo(() => leagueBuildings(sceneObjects, byDevId), [sceneObjects, byDevId]);
@@ -168,16 +168,6 @@ export default function LeagueClient({
     () => sceneObjects.filter((o) => o.kind === "building" && o.is_new),
     [sceneObjects],
   );
-  const selected = es.selection && !es.held ? es.objects.get(es.selection) : undefined;
-  const selectedAt = useMemo<[number, number, number] | null>(() => {
-    if (!selected) return null;
-    const top =
-      selected.kind === "building" && selected.developer_id !== null
-        ? (byDevId.get(selected.developer_id)?.height ?? 30)
-        : 20;
-    const [x, z] = lotToWorld(selected.x, selected.z);
-    return [x, top + 12, z];
-  }, [selected, byDevId]);
 
   const verifyHref =
     !isMember && !showJoinCta && viewer && league.kind === "company" ? "/leagues/verify" : null;
@@ -207,19 +197,7 @@ export default function LeagueClient({
             hover={editor.hover}
             ghost={editor.ghost}
             roadPath={editor.roadPath}
-            selection={es.selection}
           />
-        )}
-        {mode === "edit" && selected && selectedAt && (
-          <SceneHtml position={selectedAt}>
-            <SelectionToolbar
-              object={selected}
-              onRotate={() => store.dispatch({ type: "rotate", id: selected.id })}
-              onMove={() => store.dispatch({ type: "pickUp", id: selected.id })}
-              onRemove={() => store.dispatch({ type: "remove", id: selected.id })}
-              onDismissNew={() => store.dispatch({ type: "dismissNew", id: selected.id })}
-            />
-          </SceneHtml>
         )}
       </LeagueScene>
 
@@ -254,6 +232,7 @@ export default function LeagueClient({
                 onSlot={editor.selectSlot}
                 onTool={(tool) => store.dispatch({ type: "setTool", tool })}
                 onPickBuilding={editor.pickBuilding}
+                hint={editor.hint}
                 onWheel={(dir) => {
                   const n =
                     es.hotbarTab === "buildings"

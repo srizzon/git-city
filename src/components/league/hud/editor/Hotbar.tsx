@@ -33,6 +33,7 @@ export default function Hotbar({
   onTool,
   onPickBuilding,
   onWheel,
+  hint,
 }: {
   tab: HotbarTab;
   slot: number;
@@ -45,12 +46,17 @@ export default function Hotbar({
   onTool: (t: Tool) => void;
   onPickBuilding: (id: string) => void;
   onWheel: (dir: 1 | -1) => void;
+  /** What a click does right now. */
+  hint: string;
 }) {
   const items = tab === "buildings" ? [] : HOTBAR[tab];
   const slotActive = tool.kind === "place" || tool.kind === "road";
 
   return (
     <div className="pointer-events-none fixed inset-x-4 bottom-4 z-40 flex flex-col items-center gap-2 font-pixel uppercase">
+      <p aria-live="polite" className="max-w-full truncate bg-bg/70 px-2 py-1 text-[9px] text-cream normal-case backdrop-blur-sm">
+        {hint}
+      </p>
       <div role="tablist" aria-label="Item groups" className={`${HUD_BOX} flex divide-x-2 divide-border`}>
         {TABS.map((t) => (
           <button
@@ -74,10 +80,10 @@ export default function Hotbar({
         }}
       >
         <div className="flex divide-x-2 divide-border border-r-2 border-border">
-          <ToolButton label="Select and move" active={tool.kind === "select"} onClick={() => onTool({ kind: "select" })}>
+          <ToolButton label="Hand: pick up and move" active={tool.kind === "select"} onClick={() => onTool({ kind: "select" })}>
             <Hand size={18} strokeWidth={2.25} aria-hidden />
           </ToolButton>
-          <ToolButton label="Bulldoze" active={tool.kind === "bulldoze"} onClick={() => onTool({ kind: "bulldoze" })}>
+          <ToolButton label="Bulldozer: delete items" active={tool.kind === "bulldoze"} onClick={() => onTool({ kind: "bulldoze" })}>
             <Pickaxe size={18} strokeWidth={2.25} aria-hidden />
           </ToolButton>
         </div>

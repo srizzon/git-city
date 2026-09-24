@@ -39,8 +39,10 @@ export interface EditorState {
   tool: Tool;
   hotbarTab: HotbarTab;
   slot: number;
-  /** Object picked up and following the cursor. */
+  /** Object picked up and following the cursor (The Sims build mode). */
   held: string | null;
+  /** Rotation of the held object; applied when it's dropped. */
+  heldRot: Rot;
   selection: string | null;
   undo: Edit[];
   redo: Edit[];
@@ -167,6 +169,7 @@ export function initEditor(city: CitySnapshot): EditorState {
     hotbarTab: "streets",
     slot: 0,
     held: null,
+    heldRot: 0,
     selection: null,
     undo: [],
     redo: [],
@@ -274,8 +277,10 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       return commit(s, ops, inverse);
     }
 
-    case "pickUp":
-      return s.objects.has(a.id) ? { ...s, held: a.id, selection: a.id } : s;
+    case "pickUp": {
+      const o = s.objects.get(a.id);
+      return o ? { ...s, held: o.id, heldRot: o.rot, selection: o.id } : s;
+    }
 
     case "cancel":
       if (s.held) return { ...s, held: null };
@@ -286,29 +291,43 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
     case "drop": {
       const h = s.held ? s.objects.get(s.held) : undefined;
       if (!h) return { ...s, held: null };
-      if (h.x === a.x && h.z === a.z) return { ...s, held: null };
+      const turn: { ops: CityOp[]; inverse: CityOp[] } =
+        s.heldRot !== h.rot
+          ? { ops: [{ op: "rotate", id: h.id, rot: s.heldRot }], inverse: [{ op: "rotate", id: h.id, rot: h.rot }] }
+          : { ops: [], inverse: [] };
+      const put = (next: EditorState) => ({ ...next, held: null, selection: null });
+      if (h.x === a.x && h.z === a.z) return put(commit(s, turn.ops, turn.inverse));
       if (!inBounds(s.size, a.x, a.z)) return notify(s, "hint", "That's outside the city.");
       const there = objectAt(s.objects, a.x, a.z);
       if (there) {
         if (h.kind === "building" && there.kind === "building") {
-          // Swap: both moves in one edit, so they share a batch.
+          // Swap: both moves (and the turn) in one edit, so they share a batch.
           const ops: CityOp[] = [
             { op: "move", id: h.id, x: a.x, z: a.z },
             { op: "move", id: there.id, x: h.x, z: h.z },
+            ...turn.ops,
           ];
           const inverse: CityOp[] = [
+            ...turn.inverse,
             { op: "move", id: h.id, x: h.x, z: h.z },
             { op: "move", id: there.id, x: there.x, z: there.z },
           ];
-          return { ...commit(s, ops, inverse), held: null, selection: h.id };
+          return put(commit(s, ops, inverse));
         }
         return notify(s, "hint", "That lot is taken.");
       }
-      const next = commit(s, [{ op: "move", id: h.id, x: a.x, z: a.z }], [{ op: "move", id: h.id, x: h.x, z: h.z }]);
-      return { ...next, held: null, selection: h.id };
+      return put(
+        commit(
+          s,
+          [{ op: "move", id: h.id, x: a.x, z: a.z }, ...turn.ops],
+          [...turn.inverse, { op: "move", id: h.id, x: h.x, z: h.z }],
+        ),
+      );
     }
 
     case "rotate": {
+      // In hand: turn the ghost; the turn lands with the drop.
+      if (a.id === s.held) return { ...s, heldRot: ((s.heldRot + 90) % 360) as Rot };
       const o = s.objects.get(a.id);
       if (!o) return s;
       const rot = ((o.rot + 90) % 360) as Rot;

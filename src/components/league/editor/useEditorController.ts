@@ -109,7 +109,7 @@ export function useEditorController({
           store.dispatch({ type: "setTool", tool: toolForSlot(tab, slot)! });
         } else {
           store.dispatch({ type: "setTool", tool: { kind: "select" } });
-          store.dispatch({ type: "select", id: o.id });
+          store.dispatch({ type: "pickUp", id: o.id });
         }
         return;
       }
@@ -139,15 +139,13 @@ export function useEditorController({
         store.dispatch({ type: "removeAt", x: e.x, z: e.z });
         return;
       }
-      // Select: drop what's held, pick up the selection, or select.
+      // Hand (The Sims): click picks up, the next click drops.
       if (s.held) {
         store.dispatch({ type: "drop", x: e.x, z: e.z });
         return;
       }
       const o = objectAt(s, e.x, e.z);
-      if (!o) store.dispatch({ type: "select", id: null });
-      else if (s.selection === o.id) store.dispatch({ type: "pickUp", id: o.id });
-      else store.dispatch({ type: "select", id: o.id });
+      if (o) store.dispatch({ type: "pickUp", id: o.id });
     },
     [active, store],
   );
@@ -159,7 +157,7 @@ export function useEditorController({
       const a = keyToAction(e);
       if (!a) return;
       const s = store.getState();
-      const target = s.held ?? s.selection;
+      const target = s.held;
       switch (a.type) {
         case "slot":
           selectSlot(a.slot);
@@ -205,14 +203,43 @@ export function useEditorController({
       if (!o) return null;
       if (o.kind === "building" && o.developer_id !== null) {
         const b = buildingByDev.get(o.developer_id);
-        return b ? { x, z, fit, thing: { kind: "building", building: b } } : null;
+        return b ? { x, z, fit, thing: { kind: "building", building: b, rot: state.heldRot } } : null;
       }
-      return o.item_type ? { x, z, fit, thing: { kind: "item", item: o.item_type, rot: o.rot } } : null;
+      return o.item_type ? { x, z, fit, thing: { kind: "item", item: o.item_type, rot: state.heldRot } } : null;
+    }
+    if (state.tool.kind === "bulldoze") {
+      const o = objectAt(state, x, z);
+      if (!o) return null;
+      return { x, z, fit: o.kind === "item" ? { ok: true } : { ok: false, reason: "lot_taken" }, thing: { kind: "bulldoze" } };
     }
     if (state.tool.kind === "road") return { x, z, fit, thing: { kind: "road" } };
     if (state.tool.kind === "place") return { x, z, fit, thing: { kind: "item", item: state.tool.item, rot: 0 } };
     return null;
   }, [active, hover, state, buildingByDev]);
 
-  return { state, onLot, ghost, hover, roadPath, grid, selectSlot, pickBuilding };
+  const hovered = active && hover ? objectAt(state, hover[0], hover[1]) : undefined;
+  const hint = editorHint(state, hovered);
+
+  return { state, onLot, ghost, hover, roadPath, grid, selectSlot, pickBuilding, hint };
+}
+
+/** One line telling the admin what a click does right now. */
+function editorHint(s: EditorState, hovered: CityObject | undefined): string {
+  if (s.held) {
+    const o = s.objects.get(s.held);
+    return o?.kind === "building"
+      ? "Click a lot to drop it · drop on a building to swap · R rotate · Esc put back"
+      : "Click a lot to drop it · R rotate · Delete remove · Esc put back";
+  }
+  switch (s.tool.kind) {
+    case "bulldoze":
+      if (hovered?.kind === "building") return "Bulldozer: buildings stay. Remove people in Settings";
+      return "Bulldozer: click an item to delete it · Esc to stop";
+    case "road":
+      return "Road: click or drag to paint · Esc to stop";
+    case "place":
+      return "Click a lot to place · keep clicking to place more · Esc to stop";
+    default:
+      return hovered ? "Click to pick it up" : "Click something to move it · 1–9 pick an item";
+  }
 }

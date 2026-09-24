@@ -22,7 +22,12 @@ export interface GhostSpec {
   z: number;
   fit: GhostFit;
   /** What follows the cursor. */
-  thing: { kind: "item"; item: ItemType; rot: number } | { kind: "building"; building: CityBuilding } | { kind: "road" } | null;
+  thing:
+    | { kind: "item"; item: ItemType; rot: number }
+    | { kind: "building"; building: CityBuilding; rot: number }
+    | { kind: "road" }
+    | { kind: "bulldoze" }
+    | null;
 }
 
 function Grid({ size }: { size: number }) {
@@ -113,8 +118,19 @@ function ItemProxy({ item, color }: { item: ItemType; color: string }) {
 function Ghost({ ghost, objects }: { ghost: GhostSpec; objects: CityObject[] }) {
   const { x, z, fit, thing } = ghost;
   const [wx, wz] = lotToWorld(x, z);
-  const color = fit.ok ? OK : BAD;
   if (!thing) return null;
+  if (thing.kind === "bulldoze") {
+    // Red means "this goes"; a building can't, so it stays grey.
+    return fit.ok ? (
+      <group>
+        <LotTile x={x} z={z} color={BAD} opacity={0.35} />
+        <Cross x={x} z={z} y={22} />
+      </group>
+    ) : (
+      <LotTile x={x} z={z} color="#9ca3af" opacity={0.18} />
+    );
+  }
+  const color = fit.ok ? OK : BAD;
   return (
     <group>
       <LotTile x={x} z={z} color={color} opacity={0.22} />
@@ -125,24 +141,13 @@ function Ghost({ ghost, objects }: { ghost: GhostSpec; objects: CityObject[] }) 
         </group>
       )}
       {thing.kind === "building" && (
-        <mesh position={[wx, thing.building.height / 2, wz]} renderOrder={7}>
+        <mesh position={[wx, thing.building.height / 2, wz]} rotation={[0, rotToRadians(thing.rot), 0]} renderOrder={7}>
           <boxGeometry args={[thing.building.width, thing.building.height, thing.building.depth]} />
           <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} />
         </mesh>
       )}
       {!fit.ok && <Cross x={x} z={z} y={thing.kind === "building" ? Math.min(thing.building.height + 20, 120) : 18} />}
     </group>
-  );
-}
-
-function Outline({ x, z, height }: { x: number; z: number; height: number }) {
-  const [wx, wz] = lotToWorld(x, z);
-  const geo = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(LOT - 3, height, LOT - 3)), [height]);
-  useEffect(() => () => geo.dispose(), [geo]);
-  return (
-    <lineSegments geometry={geo} position={[wx, height / 2 + 0.5, wz]} renderOrder={8}>
-      <lineBasicMaterial color={SELECT} depthTest={false} transparent />
-    </lineSegments>
   );
 }
 
@@ -190,7 +195,6 @@ export default function EditorOverlay({
   hover,
   ghost,
   roadPath,
-  selection,
 }: {
   size: number;
   objects: CityObject[];
@@ -200,12 +204,8 @@ export default function EditorOverlay({
   hover: [number, number] | null;
   ghost: GhostSpec | null;
   roadPath: [number, number][] | null;
-  selection: string | null;
 }) {
   const byDev = buildingByDev;
-
-  const selected = selection ? objects.find((o) => o.id === selection) : undefined;
-  const selectedHeight = selected?.kind === "building" && selected.developer_id !== null ? (byDev.get(selected.developer_id)?.height ?? 20) + 4 : 8;
 
   const newOnes = useMemo(
     () =>
@@ -224,7 +224,6 @@ export default function EditorOverlay({
       {hover && !ghost && !roadPath && <LotTile x={hover[0]} z={hover[1]} color="#ffffff" opacity={0.08} />}
       {roadPath && roadPath.length > 0 && <GhostRoads objects={objects} lots={roadPath} ok />}
       {ghost && !roadPath && <Ghost ghost={ghost} objects={objects} />}
-      {selected && <Outline x={selected.x} z={selected.z} height={selectedHeight} />}
       <NewMarkers buildings={newOnes} />
     </group>
   );

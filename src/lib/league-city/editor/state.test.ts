@@ -65,6 +65,29 @@ describe("move and rotate chain", () => {
   });
 });
 
+describe("in hand (The Sims)", () => {
+  it("turns the held object and applies the turn with the drop, as one edit", () => {
+    let s = run(start(), { type: "pickUp", id: "t" }, { type: "rotate", id: "t" }, { type: "rotate", id: "t" });
+    expect(at(s, "t")?.rot).toBe(0); // nothing sent yet
+    expect(s.heldRot).toBe(180);
+    s = run(s, { type: "drop", x: -1, z: -1 });
+    expect(at(s, "t")).toMatchObject({ x: -1, z: -1, rot: 180 });
+    expect(s.pending).toHaveLength(1);
+    expect(s.held).toBeNull();
+    s = run(s, { type: "undo" });
+    expect(at(s, "t")).toMatchObject({ x: 3, z: 3, rot: 0 });
+  });
+
+  it("drops on its own lot as a rotate only, and Esc puts it back untouched", () => {
+    let s = run(start(), { type: "pickUp", id: "t" }, { type: "rotate", id: "t" }, { type: "drop", x: 3, z: 3 });
+    expect(s.pending[0].ops).toEqual([{ op: "rotate", id: "t", rot: 90 }]);
+    s = run(start(), { type: "pickUp", id: "t" }, { type: "rotate", id: "t" }, { type: "cancel" });
+    expect(at(s, "t")?.rot).toBe(0);
+    expect(s.pending).toHaveLength(0);
+    expect(s.held).toBeNull();
+  });
+});
+
 describe("building swap", () => {
   it("swaps two buildings in one edit and one batch", () => {
     let s = run(start(), { type: "pickUp", id: "a" }, { type: "drop", x: 2, z: 0 });
