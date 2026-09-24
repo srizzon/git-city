@@ -96,7 +96,7 @@ export function useEditorController({
         setHover(null);
         return;
       }
-      const spot: Spot = { x: e.x, z: e.z, wx: e.wx, wz: e.wz, free: e.free };
+      const spot: Spot = { x: e.x, z: e.z, wx: e.wx, wz: e.wz, free: e.free, propId: e.propId };
       setHover(spot);
       const tool = s.tool;
 

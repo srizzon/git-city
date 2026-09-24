@@ -6,14 +6,18 @@ import * as THREE from "three";
 import { terrainBounds, worldToLot } from "@/lib/league-city/grid";
 import { isTypingTarget } from "@/lib/league-city/editor/shortcuts";
 
-// Build-mode camera: fixed ~55° pitch, pan with right/middle/space-drag or
-// WASD/arrows, scroll to zoom, Q/E turn 90° with a short ease. Picking
-// intersects the pointer ray with the ground plane and rounds to a lot; no
-// mesh raycasts. Runs under frameloop="demand", so it invalidates whenever
+// Build-mode camera: right-drag orbits (turn and tilt), middle-drag,
+// Space-drag or WASD/arrows pan, scroll zooms, Q/E turn 90° with a short
+// ease. Lots are picked by intersecting the pointer ray with the ground plane;
+// props are picked on screen (nearest projected prop within a few pixels),
+// since what you see of a tree is its canopy, not its base. Runs under frameloop="demand", so it invalidates whenever
 // the view changes and keeps invalidating while something animates.
 
-/** The lot under the pointer, the exact ground point, and Shift (no snap). */
-export type LotPoint = { x: number; z: number; wx: number; wz: number; free: boolean };
+/** The lot under the pointer, the exact ground point, Shift (no snap), and the prop under the pointer on screen. */
+export type LotPoint = { x: number; z: number; wx: number; wz: number; free: boolean; propId?: string };
+
+/** A prop the pointer can grab: id and a point in the middle of its body. */
+export type Pickable = { id: string; x: number; y: number; z: number };
 
 export type LotEvent =
   | ({ kind: "hover" } & LotPoint)
@@ -28,7 +32,10 @@ export interface EditCameraApi {
   lookAtLot(x: number, z: number): void;
 }
 
-const PITCH = (55 * Math.PI) / 180;
+const START_PITCH = (55 * Math.PI) / 180;
+const MIN_PITCH = (22 * Math.PI) / 180;
+const MAX_PITCH = (84 * Math.PI) / 180;
+const PICK_PX = 22;
 const START_YAW = Math.PI / 4;
 const PAN_SPEED = 0.9; // of the view distance per second
 const CLICK_SLOP = 4; // px before a press counts as a drag
@@ -37,6 +44,7 @@ const _ray = new THREE.Raycaster();
 const _ndc = new THREE.Vector2();
 const _ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const _hit = new THREE.Vector3();
+const _proj = new THREE.Vector3();
 
 const PAN_KEYS: Record<string, [number, number]> = {
   w: [0, 1], arrowup: [0, 1], s: [0, -1], arrowdown: [0, -1],
@@ -47,10 +55,12 @@ export default function EditCamera({
   size,
   onLot,
   apiRef,
+  pickables,
 }: {
   size: number;
   onLot: (e: LotEvent) => void;
   apiRef?: React.MutableRefObject<EditCameraApi | null>;
+  pickables?: React.MutableRefObject<Pickable[]>;
 }) {
   const { camera, gl, invalidate } = useThree();
   const { cx, cz, width } = terrainBounds(size);
@@ -59,6 +69,7 @@ export default function EditCamera({
     goal: new THREE.Vector3(cx, 0, cz),
     yaw: START_YAW,
     yawGoal: START_YAW,
+    pitch: START_PITCH,
     dist: width * 0.9 + 200,
   });
   const keys = useRef(new Set<string>());
@@ -82,8 +93,8 @@ export default function EditCamera({
 
   const place = () => {
     const v = view.current;
-    const flat = Math.cos(PITCH) * v.dist;
-    camera.position.set(v.center.x + Math.sin(v.yaw) * flat, Math.sin(PITCH) * v.dist, v.center.z + Math.cos(v.yaw) * flat);
+    const flat = Math.cos(v.pitch) * v.dist;
+    camera.position.set(v.center.x + Math.sin(v.yaw) * flat, Math.sin(v.pitch) * v.dist, v.center.z + Math.cos(v.yaw) * flat);
     camera.lookAt(v.center);
   };
 
@@ -106,7 +117,7 @@ export default function EditCamera({
   // Pointer: pan drags, zoom, and lot events.
   useEffect(() => {
     const el = gl.domElement;
-    let pan: { x: number; y: number; id: number } | null = null;
+    let pan: { x: number; y: number; id: number; orbit: boolean } | null = null;
     let press: { x: number; y: number; button: number; alt: boolean; moved: boolean } | null = null;
     let space = false;
 
@@ -116,7 +127,21 @@ export default function EditCamera({
       _ray.setFromCamera(_ndc, camera);
       if (!_ray.ray.intersectPlane(_ground, _hit)) return null;
       const [x, z] = worldToLot(_hit.x, _hit.z);
-      return { x, z, wx: _hit.x, wz: _hit.z, free: e.shiftKey };
+      // Nearest prop on screen, within PICK_PX.
+      let propId: string | undefined;
+      let best = PICK_PX * PICK_PX;
+      for (const p of pickables?.current ?? []) {
+        _proj.set(p.x, p.y, p.z).project(camera);
+        if (_proj.z > 1) continue;
+        const sx = ((_proj.x + 1) / 2) * r.width + r.left;
+        const sy = ((1 - _proj.y) / 2) * r.height + r.top;
+        const d = (sx - e.clientX) ** 2 + (sy - e.clientY) ** 2;
+        if (d < best) {
+          best = d;
+          propId = p.id;
+        }
+      }
+      return { x, z, wx: _hit.x, wz: _hit.z, free: e.shiftKey, propId };
     };
     const worldPerPixel = () => {
       const cam = camera as THREE.PerspectiveCamera;
@@ -124,10 +149,11 @@ export default function EditCamera({
     };
 
     const onDown = (e: PointerEvent) => {
-      const isPan = e.button === 2 || (e.button === 1 && !e.altKey) || (e.button === 0 && space);
+      const orbit = e.button === 2;
+      const isPan = orbit || (e.button === 1 && !e.altKey) || (e.button === 0 && space);
       press = { x: e.clientX, y: e.clientY, button: e.button, alt: e.altKey, moved: false };
       if (isPan) {
-        pan = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        pan = { x: e.clientX, y: e.clientY, id: e.pointerId, orbit };
         el.setPointerCapture(e.pointerId);
         el.style.cursor = "grabbing";
         return;
@@ -148,9 +174,16 @@ export default function EditCamera({
         pan.x = e.clientX;
         pan.y = e.clientY;
         const v = view.current;
+        if (pan.orbit) {
+          v.yaw -= dx * 0.006;
+          v.yawGoal = v.yaw;
+          v.pitch = THREE.MathUtils.clamp(v.pitch + dy * 0.004, MIN_PITCH, MAX_PITCH);
+          invalidate();
+          return;
+        }
         const right = new THREE.Vector3(Math.cos(v.yaw), 0, -Math.sin(v.yaw));
         const fwd = new THREE.Vector3(-Math.sin(v.yaw), 0, -Math.cos(v.yaw));
-        v.center.addScaledVector(right, -dx * k).addScaledVector(fwd, (dy * k) / Math.sin(PITCH));
+        v.center.addScaledVector(right, -dx * k).addScaledVector(fwd, (dy * k) / Math.sin(v.pitch));
         clampCenter(v.center);
         v.goal.copy(v.center);
         invalidate();
@@ -246,7 +279,7 @@ export default function EditCamera({
       el.style.cursor = "";
     };
      
-  }, [camera, gl, invalidate]);
+  }, [camera, gl, invalidate, pickables]);
 
   // All camera motion in one frame loop that re-invalidates while active.
   useFrame((_, delta) => {

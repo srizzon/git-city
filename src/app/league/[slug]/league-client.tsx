@@ -23,11 +23,11 @@ import JoinPanel from "@/components/league/hud/JoinPanel";
 import BuildingCard from "@/components/league/hud/BuildingCard";
 import { HUD_BOX } from "@/components/league/hud/shared";
 import EditorTopBar from "@/components/league/hud/editor/EditorTopBar";
-import Hotbar, { toolForSlot } from "@/components/league/hud/editor/Hotbar";
+import Hotbar, { CameraHints, toolForSlot } from "@/components/league/hud/editor/Hotbar";
 import EditorToasts from "@/components/league/hud/editor/EditorToasts";
 import EditorTips from "@/components/league/hud/editor/EditorTips";
 import EditorOverlay from "@/components/league/editor/EditorOverlay";
-import type { EditCameraApi } from "@/components/league/editor/EditCamera";
+import type { EditCameraApi, Pickable } from "@/components/league/editor/EditCamera";
 import { useEditorController } from "@/components/league/editor/useEditorController";
 import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { SceneMode } from "@/components/league/LeagueScene";
@@ -79,6 +79,7 @@ export default function LeagueClient({
   const editing = mode !== "view";
   const [store] = useState(() => createEditorStore(initEditor(city)));
   const cameraApi = useRef<EditCameraApi | null>(null);
+  const pickables = useRef<Pickable[]>([]);
   const [leaving, setLeaving] = useState(false);
   const [viewNotice, setViewNotice] = useState<Notice | null>(null);
 
@@ -179,6 +180,15 @@ export default function LeagueClient({
       store.dispatch({ type: "resync", city });
   }, [city, store]);
   const buildings = useMemo(() => leagueBuildings(sceneObjects, byDevId), [sceneObjects, byDevId]);
+  // Where each prop's body is, for picking it on screen in the editor.
+  useEffect(() => {
+    const mid: Partial<Record<string, number>> = { lamp: 9, bench: 1.5, fountain: 4 };
+    pickables.current = [...es.objects.values()].flatMap((o) =>
+      o.px !== null && o.pz !== null && o.item_type
+        ? [{ id: o.id, x: o.px, y: mid[o.item_type] ?? 16, z: o.pz }]
+        : [],
+    );
+  }, [es.objects]);
   const newBuildings = useMemo(
     () => sceneObjects.filter((o) => o.kind === "building" && o.is_new),
     [sceneObjects],
@@ -202,6 +212,7 @@ export default function LeagueClient({
         mode={mode}
         onLot={editor.onLot}
         editApiRef={cameraApi}
+        editPickables={pickables}
       >
         {mode === "edit" && (
           <EditorOverlay
@@ -262,6 +273,7 @@ export default function LeagueClient({
                 }}
               />
               <EditorTips />
+              <CameraHints />
             </>
           )}
           <EditorToasts notice={es.notice} />

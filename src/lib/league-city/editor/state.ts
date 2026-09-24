@@ -75,6 +75,8 @@ export interface Spot {
   wz: number;
   /** Shift: no 4-unit snap for props. */
   free?: boolean;
+  /** The prop under the pointer on screen, if any (beats the ground point). */
+  propId?: string;
 }
 
 export type EditorAction =
@@ -183,6 +185,7 @@ export function lotObjectAt(objects: ReadonlyMap<string, CityObject>, x: number,
 
 /** What a click at this spot grabs: a prop under the cursor first, else the lot's object. */
 export function objectAtSpot(objects: ReadonlyMap<string, CityObject>, spot: Spot): CityObject | undefined {
+  if (spot.propId && objects.has(spot.propId)) return objects.get(spot.propId);
   const p = propAt(objects.values(), spot.wx, spot.wz);
   return p ? objects.get(p.id) : lotObjectAt(objects, spot.x, spot.z);
 }

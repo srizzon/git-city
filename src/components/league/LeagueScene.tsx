@@ -14,7 +14,7 @@ import { LOT, lotToWorld, maxLot, minLot, rotToRadians, terrainBounds } from "@/
 import type { CityObject } from "@/lib/league-city/types";
 import LeagueRoads from "./LeagueRoads";
 import LeagueTrees from "./LeagueTrees";
-import EditCamera, { type EditCameraApi, type LotEvent } from "./editor/EditCamera";
+import EditCamera, { type EditCameraApi, type LotEvent, type Pickable } from "./editor/EditCamera";
 
 // Full-screen league city: one Canvas, midnight theme, the league's lots with
 // roads, trees, decorations and member buildings (invited ones faded).
@@ -226,6 +226,8 @@ export interface LeagueSceneProps {
   mode?: SceneMode;
   onLot?: (e: LotEvent) => void;
   editApiRef?: React.MutableRefObject<EditCameraApi | null>;
+  /** Props the edit camera can pick on screen. */
+  editPickables?: React.MutableRefObject<Pickable[]>;
   /** Editor overlays (grid, ghost, selection), rendered inside the Canvas. */
   children?: React.ReactNode;
 }
@@ -239,6 +241,7 @@ export default function LeagueScene({
   mode = "view",
   onLot,
   editApiRef,
+  editPickables,
   children,
 }: LeagueSceneProps) {
   const editing = mode === "edit";
@@ -284,7 +287,7 @@ export default function LeagueScene({
       <fog attach="fog" args={[theme.fogColor, theme.fogNear * 2, theme.fogFar * 1.2]} />
       <ThemeLights theme={theme} themeIndex={THEME_INDEX} />
       {editing ? (
-        <EditCamera size={size} onLot={onLot ?? (() => {})} apiRef={editApiRef} />
+        <EditCamera size={size} onLot={onLot ?? (() => {})} apiRef={editApiRef} pickables={editPickables} />
       ) : (
         <LeagueCamera size={size} focus={mode === "view" ? focusedBuilding : null} spin={mode === "view"} />
       )}

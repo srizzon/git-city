@@ -154,3 +154,21 @@ function Slot({ index, label, active, onClick, children }: { index: number; labe
     </button>
   );
 }
+
+/** Camera controls, bottom right, like the home city's nav hints. */
+export function CameraHints() {
+  const row = (k: string, v: string) => (
+    <div>
+      <span className="text-cream">{k}</span> {v}
+    </div>
+  );
+  return (
+    <div className="pointer-events-none fixed bottom-6 right-6 z-30 text-right font-pixel text-[9px] uppercase leading-loose text-muted">
+      {row("Right-drag", "orbit")}
+      {row("Middle-drag / Space", "pan")}
+      {row("Scroll", "zoom")}
+      {row("Q / E", "turn 90°")}
+      {row("G", "grid")}
+    </div>
+  );
+}
