@@ -3,7 +3,7 @@
 // on the south side and it rises to HEIGHT at the north edge, so a car
 // driving north launches off it. Shared by the renderer and the colliders.
 
-export const RAMP = { length: 28, width: 14, height: 6 } as const;
+export const RAMP = { length: 28, width: 14, height: 8 } as const;
 
 /** The wedge's 6 corners in local units (y up, centered on the footprint). */
 export function rampCorners(): [number, number, number][] {

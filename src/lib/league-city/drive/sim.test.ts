@@ -3,6 +3,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { RapierContext, RapierRigidBody } from "@react-three/rapier";
 import type { DriveInput } from "./input";
 import type { SurfaceGrip } from "./surface";
+import { LOT } from "../grid";
+import type { CityObject } from "../types";
+import { buildColliders } from "./colliders";
 import { CHASSIS, GRAVITY, SURFACE } from "./tuning";
 import { createVehicle, headingFromRot, newCarState, placeCar, stepCar } from "./vehicle";
 
@@ -14,9 +17,13 @@ beforeAll(async () => {
   await RAPIER.init();
 });
 
-function setup(surface: SurfaceGrip["surface"] = "road", rot = 0) {
+function setup(surface: SurfaceGrip["surface"] = "road", rot = 0, objects: CityObject[] = []) {
   const world = new RAPIER.World({ x: 0, y: GRAVITY, z: 0 }) as unknown as World;
   world.createCollider(RAPIER.ColliderDesc.cuboid(2000, 1, 2000).setTranslation(0, -1, 0));
+  for (const c of buildColliders(objects, [], 40)) {
+    if (c.shape.type !== "hull") continue;
+    world.createCollider(RAPIER.ColliderDesc.convexHull(new Float32Array(c.shape.points))!.setTranslation(...c.pos));
+  }
   const body = world.createRigidBody(
     RAPIER.RigidBodyDesc.dynamic().setLinearDamping(CHASSIS.linearDamping).setAngularDamping(CHASSIS.angularDamping).setCanSleep(false),
   ) as unknown as RapierRigidBody;
@@ -108,6 +115,20 @@ describe("vehicle (headless rapier)", () => {
     expect(s.boostCharge).toBe(0);
     run({ throttle: 1 }, 4.2);
     expect(s.boostCharge).toBe(1);
+  });
+
+  it("launches off a ramp it drives up", () => {
+    // A ramp facing north, 2 lots north of the car; the car faces north too.
+    const ramp: CityObject = { id: "ramp", kind: "item", item_type: "ramp", developer_id: null, x: 0, z: -2, px: 0, pz: -2 * LOT, rot: 0, is_new: false };
+    const { body, run } = setup("road", 0, [ramp]);
+    let maxY = 0;
+    for (let i = 0; i < 60 * 8; i++) {
+      run({ throttle: 1 }, 1 / 60);
+      maxY = Math.max(maxY, body.translation().y);
+    }
+    expect(maxY).toBeGreaterThan(3.5); // the deck tops out at 3.2 m; the car flies off it
+    const q = body.rotation();
+    expect(1 - 2 * (q.x * q.x + q.z * q.z)).toBeGreaterThan(0.5); // landed on its wheels
   });
 
   it("rights itself after lying upside down", () => {
