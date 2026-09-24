@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { ghHeaders, FETCH_TIMEOUT_MS } from "@/lib/github-api";
 import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import { reassignAdmin, slugify } from "./service";
+import { LeagueError } from "./errors";
+import { companyLeagueName, isReservedSlug, LOGIN_RE } from "./names";
 import { notifyJoined } from "./joined";
 import { autoPlace, removeBuilding } from "@/lib/league-city/service";
 
@@ -14,7 +16,6 @@ import { autoPlace, removeBuilding } from "@/lib/league-city/service";
 
 export const VERIFICATION_DAYS = 90;
 const SEED_LIMIT = 100;
-const LOGIN_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,38})$/;
 
 export interface VerifiedOrg {
   login: string; // lowercase
@@ -72,10 +73,10 @@ async function activeCompanyLeagueId(devId: number): Promise<string | null> {
  *
  * - Stores the org list (for /leagues/verify and later renewals).
  * - Renews the dev's active company membership when its org is still listed.
- * - Otherwise, when the dev has no company league yet, joins the first existing
- *   company league of one of their orgs.
- * - With `verify` (the explicit "Verify company" flow) and a single org that
- *   has no league yet, creates it with this dev as admin.
+ * - Only with `verify` (the explicit "Verify company" flow), when the dev has
+ *   no company league yet: joins the first existing company league of one of
+ *   their orgs, or with a single org that has no league yet, creates it with
+ *   this dev as admin. An ordinary sign-in never joins a league.
  */
 export async function syncOrgVerifications(
   devId: number,
@@ -111,16 +112,21 @@ export async function syncOrgVerifications(
     return { joined: null, created: null, seed: null };
   }
   if (currentId) return { joined: null, created: null, seed: null }; // in a company league whose org isn't listed; the cron decides
+  if (!opts.verify) return { joined: null, created: null, seed: null };
 
-  const existing = leagues?.[0];
-  if (existing) {
-    await joinCompanyLeague(devId, existing.github_org as string, "private");
-    return { joined: existing.slug as string, created: null, seed: null };
-  }
-
-  if (opts.verify && orgs.length === 1) {
-    const { slug, created, seed } = await joinCompanyLeague(devId, orgs[0].login, "private");
-    return { joined: slug, created: created ? slug : null, seed };
+  try {
+    const existing = leagues?.[0];
+    if (existing) {
+      await joinCompanyLeague(devId, existing.github_org as string, "private");
+      return { joined: existing.slug as string, created: null, seed: null };
+    }
+    if (orgs.length === 1) {
+      const { slug, created, seed } = await joinCompanyLeague(devId, orgs[0].login, "private");
+      return { joined: slug, created: created ? slug : null, seed };
+    }
+  } catch (err) {
+    // Removed by the admin: the org list is stored, the verify page explains.
+    if (!(err instanceof LeagueError)) throw err;
   }
   return { joined: null, created: null, seed: null };
 }
@@ -129,7 +135,8 @@ export async function syncOrgVerifications(
  * Makes the dev an active, verified member of the org's company league,
  * creating the league (and seeding public members) if it doesn't exist.
  * Moving to a new company marks the previous company membership former.
- * Callers must have verified membership first.
+ * Callers must have verified membership first. Throws LeagueError("removed")
+ * when the league's admin removed this dev: only a new invite lets them back.
  */
 export async function joinCompanyLeague(
   devId: number,
@@ -144,12 +151,15 @@ export async function joinCompanyLeague(
   let created = false;
   if (!league) {
     const info = await fetchOrgInfo(org);
-    const base = slugify(org);
+    const orgSlug = slugify(org);
+    const base = isReservedSlug(orgSlug) ? `${orgSlug}-league` : orgSlug;
     const { data: clash } = await sb.from("leagues").select("id").eq("slug", base).maybeSingle();
     const slug = clash ? `${base}-${Date.now().toString(36).slice(-4)}` : base;
+    // The org's display name is org-controlled text: same rules as a custom name.
+    const name = companyLeagueName(info?.name, info?.login || org);
     const { data: inserted, error } = await sb
       .from("leagues")
-      .insert({ slug, name: info?.name || info?.login || org, kind: "company", github_org: org, admin_id: devId, created_by: devId })
+      .insert({ slug, name, kind: "company", github_org: org, admin_id: devId, created_by: devId })
       .select("id, slug, admin_id")
       .single();
     if (error || !inserted) {
@@ -163,6 +173,16 @@ export async function joinCompanyLeague(
   }
   if (!league) throw new Error(`Could not create company league for ${org}`);
 
+  const { data: row } = await sb
+    .from("league_members")
+    .select("status, joined_at, invited_by, removed_by")
+    .eq("league_id", league.id)
+    .eq("developer_id", devId)
+    .maybeSingle();
+  if (row?.status === "former" && row.removed_by !== null) {
+    throw new LeagueError("removed", "The league admin removed you. Ask them for a new invite.", 403);
+  }
+
   const previous = await activeCompanyLeagueId(devId);
   if (previous && previous !== league.id) {
     await sb
@@ -175,12 +195,6 @@ export async function joinCompanyLeague(
     if (prev?.admin_id === devId) await reassignAdmin(previous);
   }
 
-  const { data: row } = await sb
-    .from("league_members")
-    .select("status, joined_at, invited_by")
-    .eq("league_id", league.id)
-    .eq("developer_id", devId)
-    .maybeSingle();
   await sb.from("league_members").upsert(
     {
       league_id: league.id,
@@ -190,6 +204,7 @@ export async function joinCompanyLeague(
       verified_until: verifiedUntil(),
       joined_at: row?.status === "active" && row.joined_at ? row.joined_at : now,
       left_at: null,
+      removed_by: null,
     },
     { onConflict: "league_id,developer_id" },
   );
@@ -222,8 +237,11 @@ async function fetchOrgInfo(org: string): Promise<{ login: string; name: string 
   }
 }
 
-/** Public members of an org (lowercase logins), or null on any GitHub error. */
-export async function fetchOrgPublicMembers(org: string, max = 1000): Promise<string[] | null> {
+/**
+ * Public members of an org (lowercase logins), or null on any GitHub error.
+ * No cap by default: a partial list would read as "left the org".
+ */
+export async function fetchOrgPublicMembers(org: string, max = Number.POSITIVE_INFINITY): Promise<string[] | null> {
   const out: string[] = [];
   for (let page = 1; out.length < max; page++) {
     try {

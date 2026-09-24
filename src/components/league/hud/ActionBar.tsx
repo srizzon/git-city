@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Car, Check, Pencil, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { Car, Check, LogOut, Pencil, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { Pending } from "@/components/leagues/PixelSpinner";
 import { HUD_BOX } from "./shared";
 
 // Segments of one bar: hover tints in place (btn-press would shift a segment
@@ -20,6 +21,7 @@ export default function ActionBar({
   onInvite,
   onEdit,
   onDrive,
+  onLeave,
 }: {
   slug: string;
   canInvite: boolean;
@@ -28,11 +30,15 @@ export default function ActionBar({
   onInvite: () => void;
   onEdit?: () => void;
   onDrive?: () => void;
+  /** Leaves the league; resolves to an error message, or null when done. */
+  onLeave?: () => Promise<string | null>;
 }) {
   const [shared, setShared] = useState(false);
   const [coarse, setCoarse] = useState(false);
   const [editHint, setEditHint] = useState(false);
   const [driveHint, setDriveHint] = useState(false);
+  const [leave, setLeave] = useState<"idle" | "confirm" | "leaving">("idle");
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   // The editor and driving need a mouse (or pad) and room for their HUD.
   const [desktop, setDesktop] = useState(false);
   useEffect(() => {
@@ -79,6 +85,15 @@ export default function ActionBar({
     } catch {
       setShared(false);
     }
+  }
+
+  async function confirmLeave() {
+    if (!onLeave) return;
+    setLeave("leaving");
+    setLeaveError(null);
+    const error = await onLeave();
+    setLeave(error ? "confirm" : "idle");
+    setLeaveError(error);
   }
 
   const editLabel = "Edit on a computer";
@@ -165,6 +180,48 @@ export default function ActionBar({
         <Link href={`/league/${slug}/settings`} aria-label="League settings" className={`${ICON_BTN} text-cream hover:text-lime`}>
           <Settings {...ICON} aria-hidden />
         </Link>
+      )}
+      {onLeave && leave === "idle" && (
+        <button
+          type="button"
+          onClick={() => setLeave("confirm")}
+          aria-label="Leave league"
+          title="Leave league"
+          className={`${ICON_BTN} text-muted hover:text-red-400`}
+        >
+          <LogOut {...ICON} aria-hidden />
+        </button>
+      )}
+      {onLeave && leave !== "idle" && (
+        <span className="relative flex divide-x-2 divide-border">
+          <button
+            type="button"
+            disabled={leave === "leaving"}
+            onClick={confirmLeave}
+            className={`${BTN} min-w-[84px] text-red-400 disabled:opacity-50`}
+          >
+            {leave === "leaving" ? <Pending label="Leaving" /> : <span>Leave?</span>}
+          </button>
+          <button
+            type="button"
+            disabled={leave === "leaving"}
+            onClick={() => {
+              setLeave("idle");
+              setLeaveError(null);
+            }}
+            className={`${BTN} text-muted hover:text-cream`}
+          >
+            <span>Stay</span>
+          </button>
+          {leaveError && (
+            <span
+              role="alert"
+              className="pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap border-2 border-border bg-bg px-2 py-1 text-[9px] text-red-400 normal-case"
+            >
+              {leaveError}
+            </span>
+          )}
+        </span>
       )}
     </div>
   );
