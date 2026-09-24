@@ -379,7 +379,22 @@ export function FocusBeacon({ height, width, depth, accentColor }: { height: num
 // cosmetics/itemRenderers.ts (buildingItemVisual), which the shop and admin
 // gallery render through. Keep the two in sync when adding an item.
 
-export const BuildingItemEffects = memo(function BuildingItemEffects({ building, accentColor, focused }: { building: CityBuilding; accentColor: string; focused?: boolean }) {
+/** True when the building's crown slot shows the free claim flag. */
+export function showsFlag(building: CityBuilding): boolean {
+  const items = building.owned_items ?? [];
+  if (!items.includes("flag")) return false;
+  const { loadout } = building;
+  const hasLoadout = loadout && (loadout.crown || loadout.roof || loadout.aura);
+  return hasLoadout ? loadout.crown === "flag" : true;
+}
+
+export const BuildingItemEffects = memo(function BuildingItemEffects({ building, accentColor, focused, skipFlag }: {
+  building: CityBuilding;
+  accentColor: string;
+  focused?: boolean;
+  /** The city draws flags instanced (InstancedEffects); previews draw them here. */
+  skipFlag?: boolean;
+}) {
   const { height, width, depth, owned_items, loadout, billboard_images } = building;
   const items = owned_items ?? [];
 
@@ -438,7 +453,7 @@ export const BuildingItemEffects = memo(function BuildingItemEffects({ building,
       {shouldRenderZone("spire") && (
         <Spire height={height} width={width} depth={depth} />
       )}
-      {shouldRenderZone("flag") && (
+      {!skipFlag && shouldRenderZone("flag") && (
         <Flag height={height} width={width} depth={depth} color={accentColor} />
       )}
 
