@@ -39,6 +39,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
+    "@react-three/rapier": "^2.2.0",
     "@reown/appkit": "^1.8.19",
     "@reown/appkit-adapter-wagmi": "^1.8.19",
     "@supabase/ssr": "^0.8.0",

@@ -75,6 +75,23 @@ const SPRITES: Record<ItemType, Sprite> = {
     ],
     palette: { b: "#5fb0f0", g: "#9a9aa6" },
   },
+  ramp: {
+    rows: [
+      "............",
+      "............",
+      "............",
+      "..........oo",
+      "........oorr",
+      "......oorrrr",
+      "....oorrrrrr",
+      "..oorrrrrrrr",
+      "oorrrrrrrrrr",
+      "RRRRRRRRRRRR",
+      "............",
+      "............",
+    ],
+    palette: { o: "#f0a030", r: "#c8703a", R: "#7a4a2a" },
+  },
   plaza: {
     rows: [
       "............",
@@ -218,6 +235,7 @@ export const ITEM_NAMES: Record<ItemType, string> = {
   bench: "Bench",
   fountain: "Fountain",
   plaza: "Plaza",
+  ramp: "Ramp",
   tree_default: "Tree",
   tree_oak: "Oak",
   tree_fat: "Bush tree",

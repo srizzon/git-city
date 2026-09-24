@@ -9,6 +9,7 @@ import type { GhostFit } from "@/lib/league-city/editor/ghost";
 import type { CityObject, ItemType } from "@/lib/league-city/types";
 import { propRadius } from "@/lib/league-city/props";
 import { GhostRoads } from "../LeagueRoads";
+import { rampGeometry } from "../LeagueRamps";
 
 // Build-mode overlays inside the Canvas: lot grid, hover highlight, the
 // placement ghost (green fits, red with ✕ doesn't), the selection outline and
@@ -103,6 +104,7 @@ function ItemProxy({ item, color }: { item: ItemType; color: string }) {
         {mat}
       </mesh>
     );
+  if (item === "ramp") return <RampProxy color={color} />;
   if (item === "plaza" || item === "road")
     return (
       <mesh position={[0, 0.8, 0]}>
@@ -114,6 +116,16 @@ function ItemProxy({ item, color }: { item: ItemType; color: string }) {
     <mesh position={[0, 15, 0]}>
       <coneGeometry args={[9, 30, 7]} />
       {mat}
+    </mesh>
+  );
+}
+
+function RampProxy({ color }: { color: string }) {
+  const geo = useMemo(() => rampGeometry(), []);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <mesh geometry={geo}>
+      <meshBasicMaterial color={color} transparent opacity={0.55} depthWrite={false} />
     </mesh>
   );
 }

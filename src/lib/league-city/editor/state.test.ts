@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LOT } from "../grid";
 import type { CityObject } from "../types";
-import { editorReducer, initEditor, type EditorAction, type EditorState, type Spot } from "./state";
+import { HOTBAR, editorReducer, initEditor, type EditorAction, type EditorState, type Spot } from "./state";
 
 const bld = (id: string, dev: number, x: number, z: number): CityObject => ({
   id, kind: "building", item_type: null, developer_id: dev, x, z, px: null, pz: null, rot: 0, is_new: false,
@@ -237,5 +237,22 @@ describe("server sync", () => {
     s = run(s, { type: "send", maxOps: 2 });
     expect(s.inflight).toHaveLength(2);
     expect(run(s, { type: "send" }).inflight).toHaveLength(2);
+  });
+});
+
+describe("ramps", () => {
+  it("is in the streets hotbar", () => {
+    expect(HOTBAR.streets).toContain("ramp");
+  });
+
+  it("places a ramp on grass, turns it 45° at a time, and keeps it off asphalt", () => {
+    const ramp: EditorAction = { type: "setTool", tool: { kind: "place", item: "ramp" } };
+    let s = run(start(), ramp, { type: "rotate" }, { type: "rotate" }, { type: "place", id: "n1", ...spot(-4 * LOT, 4 * LOT) });
+    expect(at(s, "n1")).toMatchObject({ item_type: "ramp", px: -4 * LOT, pz: 4 * LOT, rot: 90 });
+    s = run(s, { type: "select", id: "n1" }, { type: "rotate", id: "n1" });
+    expect(at(s, "n1")?.rot).toBe(135);
+    s = run(s, { type: "place", id: "n2", ...spot(0, -2 * LOT) });
+    expect(at(s, "n2")).toBeUndefined();
+    expect(s.notice?.message).toMatch(/asphalt/i);
   });
 });

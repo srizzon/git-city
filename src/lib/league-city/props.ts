@@ -15,6 +15,7 @@ export const PROP_RADIUS: Record<Exclude<ItemType, "road" | "plaza">, number> = 
   lamp: 2,
   bench: 3.5,
   fountain: 10,
+  ramp: 15,
   tree_default: 7,
   tree_oak: 7,
   tree_fat: 7,

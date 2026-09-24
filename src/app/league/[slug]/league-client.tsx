@@ -31,6 +31,7 @@ import type { EditCameraApi, Pickable } from "@/components/league/editor/EditCam
 import { useEditorController } from "@/components/league/editor/useEditorController";
 import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { SceneMode } from "@/components/league/LeagueScene";
+import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { createEditorStore } from "@/lib/league-city/editor/store";
 import { keyToAction } from "@/lib/league-city/editor/shortcuts";
 import { MAX_SIZE, START_SIZE } from "@/lib/league-city/grid";
@@ -51,6 +52,13 @@ const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
     </div>
   ),
 });
+
+// Drive mode's HUD loads with the drive world, only when someone drives.
+const DriveHud = dynamic(() => import("@/components/league/hud/drive/DriveHud"), { ssr: false });
+
+const MUTE_KEY = "gc:drive-muted";
+/** While driving, check for city changes (an admin's Done) this often. */
+const DRIVE_POLL_MS = 5000;
 
 type PanelId = "hall" | "standings" | "invite" | "join" | null;
 
@@ -84,7 +92,8 @@ export default function LeagueClient({
 
   // ─── Editor ────────────────────────────────────────────────
   const [mode, setMode] = useState<SceneMode>(startEditing && isAdmin ? "edit" : "view");
-  const editing = mode !== "view";
+  const editing = mode === "edit" || mode === "preview";
+  const driving = mode === "drive";
   const [store] = useState(() => createEditorStore(initEditor(city)));
   const cameraApi = useRef<EditCameraApi | null>(null);
   const pickables = useRef<Pickable[]>([]);
@@ -173,10 +182,10 @@ export default function LeagueClient({
   );
   const refreshedFor = useRef(0);
   useEffect(() => {
-    if (!editing || !missing || refreshedFor.current === es.version) return;
+    if ((!editing && !driving) || !missing || refreshedFor.current === es.version) return;
     refreshedFor.current = es.version;
     router.refresh();
-  }, [editing, missing, es.version, router]);
+  }, [editing, driving, missing, es.version, router]);
 
   // While carried (and the cursor is on the city), the object only shows as
   // the ghost under the cursor.
@@ -219,6 +228,100 @@ export default function LeagueClient({
         : [],
     );
   }, [es.objects]);
+  // ─── Drive ─────────────────────────────────────────────────
+  const viewerDevId = useMemo(
+    () => (viewer ? (members.find((m) => m.login.toLowerCase() === viewer.login.toLowerCase())?.developer_id ?? null) : null),
+    [viewer, members],
+  );
+  // Mutated by the car every frame, read by the HUD; a fresh one per drive.
+  const [telemetry, setTelemetry] = useState<DriveTelemetry>(() => ({ speed: 0, boosting: false }));
+  const [driveReady, setDriveReady] = useState(false);
+  const [driveCamera, setDriveCamera] = useState<DriveCameraMode>("chase");
+  const [paused, setPaused] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const toggleMute = useCallback(() => {
+    setMuted((m) => {
+      try {
+        localStorage.setItem(MUTE_KEY, m ? "0" : "1");
+      } catch {
+        // storage blocked
+      }
+      return !m;
+    });
+  }, []);
+  const toggleCamera = useCallback(() => setDriveCamera((c) => (c === "chase" ? "top" : "chase")), []);
+  const enterDrive = () => {
+    setFocused(null);
+    setPanel(null);
+    setDriveReady(false);
+    setTelemetry({ speed: 0, boosting: false });
+    setPaused(false);
+    try {
+      setMuted(localStorage.getItem(MUTE_KEY) === "1");
+    } catch {
+      // storage blocked: sound stays on
+    }
+    setMode("drive");
+  };
+  const exitDrive = useCallback(() => setMode((m) => (m === "drive" ? "view" : m)), []);
+  const onDriveReady = useCallback(() => setDriveReady(true), []);
+  const onDriveFail = useCallback(() => {
+    setMode((m) => (m === "drive" ? "view" : m));
+    setViewNotice({ kind: "error", message: "Couldn't start the car.", seq: Date.now() });
+  }, []);
+
+  // Esc pauses; Esc again on the pause menu leaves the car.
+  useEffect(() => {
+    if (!driving) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      if (paused) exitDrive();
+      else setPaused(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [driving, paused, exitDrive]);
+
+  // Live city while driving: pick up an admin's changes (walls, buildings, props).
+  useEffect(() => {
+    if (!driving) return;
+    let stop = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/leagues/${league.slug}/city`, { cache: "no-store" });
+        if (!res.ok || stop) return;
+        const next = (await res.json()) as LeagueCity;
+        const s = store.getState();
+        if (next.version > s.version && s.pending.length === 0 && !s.inflight) store.dispatch({ type: "resync", city: next });
+      } catch {
+        // offline: keep driving on what we have
+      }
+    };
+    const id = setInterval(poll, DRIVE_POLL_MS);
+    return () => {
+      stop = true;
+      clearInterval(id);
+    };
+  }, [driving, league.slug, store]);
+
+  const driveProps = useMemo(
+    () =>
+      driving
+        ? {
+            viewerDevId,
+            telemetry,
+            camera: driveCamera,
+            onCameraToggle: toggleCamera,
+            muted,
+            paused,
+            onReady: onDriveReady,
+            onFail: onDriveFail,
+          }
+        : undefined,
+    [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail],
+  );
+
   const newBuildings = useMemo(
     () => sceneObjects.filter((o) => o.kind === "building" && o.is_new),
     [sceneObjects],
@@ -243,6 +346,7 @@ export default function LeagueClient({
         onLot={editor.onLot}
         editApiRef={cameraApi}
         editPickables={pickables}
+        drive={driveProps}
       >
         {mode === "edit" && (
           <EditorOverlay
@@ -317,8 +421,22 @@ export default function LeagueClient({
       )}
       {!editing && <EditorToasts notice={viewNotice} />}
 
+      {driving && (
+        <DriveHud
+          telemetry={telemetry}
+          ready={driveReady}
+          camera={driveCamera}
+          muted={muted}
+          paused={paused}
+          onResume={() => setPaused(false)}
+          onCamera={toggleCamera}
+          onMute={toggleMute}
+          onExit={exitDrive}
+        />
+      )}
+
       {/* HUD: the wrappers ignore the pointer so the city stays draggable. */}
-      {!editing && (
+      {!editing && !driving && (
         <>
           <div className="pointer-events-none fixed left-4 top-4 z-30">
             <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} />
@@ -357,6 +475,7 @@ export default function LeagueClient({
                   setPanel("invite");
                 }}
                 onEdit={isAdmin ? enterEdit : undefined}
+                onDrive={enterDrive}
               />
             </div>
           </div>
