@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import PixelSpinner from "@/components/leagues/PixelSpinner";
 import { useTownVisit } from "@/components/towns/useTownVisit";
+import { isDesktop } from "@/components/towns/useDesktop";
+import type { TownBadges } from "@/lib/towns/milestones";
 import {
   generateCityLayout,
   type CityBuilding,
@@ -74,6 +76,8 @@ export default function LeagueClient({
   inviteToken,
   refLogin,
   startEditing = false,
+  startDriving = false,
+  badges,
 }: {
   data: LeaguePageData;
   city: LeagueCity;
@@ -86,6 +90,9 @@ export default function LeagueClient({
   inviteToken: string | null;
   refLogin: string | null;
   startEditing?: boolean;
+  /** ?drive=1 (Surprise me, Discover's Drive): straight into the car on desktop. */
+  startDriving?: boolean;
+  badges: TownBadges;
 }) {
   const { league, members, viewer } = data;
   const isMember = viewer?.status === "active";
@@ -275,6 +282,14 @@ export default function LeagueClient({
     }
     setMode("drive");
   };
+  const autoDrove = useRef(false);
+  useEffect(() => {
+    if (!startDriving || autoDrove.current) return;
+    autoDrove.current = true;
+    window.history.replaceState(null, "", `/town/${league.slug}`);
+    // After the first paint, from a callback: the scene mounts in view mode first.
+    if (isDesktop()) window.setTimeout(enterDrive, 0);
+  }, [startDriving, league.slug]);
   const exitDrive = useCallback(() => {
     setMode((m) => (m === "drive" ? "view" : m));
     setDrivers([]);
@@ -474,7 +489,7 @@ export default function LeagueClient({
       {!editing && !driving && (
         <>
           <div className="pointer-events-none fixed left-4 top-4 z-30">
-            <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} />
+            <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} badges={badges} />
           </div>
 
           <div

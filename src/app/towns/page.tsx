@@ -1,126 +1,174 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getViewer } from "@/lib/leagues/service";
-import { getDevLeagues, getGlobalRanking } from "@/lib/leagues/queries";
-import CreateLeague from "./create-league";
+import { getCityNorms, getLeagueCityDevs, getLeagueMembers } from "@/lib/leagues/queries";
+import { getCachedCity } from "@/lib/league-city/service";
+import { getDiscover, type FeaturedTown } from "@/lib/towns/discover";
+import type { RowId, TownCard as Card } from "@/lib/towns/rows";
+import DiscoverHeader from "@/components/towns/DiscoverHeader";
+import TownCard from "@/components/towns/TownCard";
+import TownHero from "@/components/towns/TownHero";
+import HeroDrive from "./hero-drive";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Towns - Git City",
-  description: "Company towns ranked by weekly score per active developer. Start a town with your team.",
+  description: "Towns are groups' own places in Git City: built together, visited and driven by anyone.",
   openGraph: {
     title: "Towns - Git City",
-    description: "Company towns ranked by weekly score per active developer.",
+    description: "Towns are groups' own places in Git City: built together, visited and driven by anyone.",
   },
 };
 
-function fmt(n: number) {
-  return n.toLocaleString("en-US");
-}
+const ROWS: { id: RowId; title: string }[] = [
+  { id: "trending", title: "🔥 Trending" },
+  { id: "new", title: "✨ New towns" },
+  { id: "updated", title: "🛠 Recently updated" },
+  { id: "companies", title: "🏢 Companies" },
+  { id: "biggest", title: "🏆 Biggest towns" },
+];
 
-export default async function LeaguesPage({ searchParams }: { searchParams: Promise<{ create?: string }> }) {
+export default async function TownsPage({ searchParams }: { searchParams: Promise<{ create?: string }> }) {
   const { create } = await searchParams;
-  const [ranking, viewer] = await Promise.all([getGlobalRanking(), getViewer()]);
-  const mine = viewer ? await getDevLeagues(viewer.id) : [];
-  const ranked = ranking.rows.filter((r) => r.rank !== null);
-  const unranked = ranking.rows.filter((r) => r.rank === null);
+  const viewer = await getViewer();
+  const discover = await getDiscover(viewer);
+  const hero = discover.featured ? await loadHero(discover.featured) : null;
 
   return (
-    <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
-      <div className="mx-auto max-w-2xl px-4 py-10">
-        <Link href="/" className="text-xs text-muted transition-colors hover:text-cream">
-          &larr; Back to City
-        </Link>
+    <main className="min-h-screen bg-bg pb-16 font-pixel uppercase text-warm">
+      <DiscoverHeader signedIn={!!viewer} startCreating={create === "1"} />
 
-        <div className="mt-6 text-center">
-          <h1 className="text-3xl text-cream md:text-4xl">
-            Lea<span className="text-lime">gues</span>
-          </h1>
-          <p className="mt-3 text-xs text-muted normal-case">
-            Your company&apos;s skyline, a weekly race and a crown for the winner. Companies rank by average score per
-            active dev.
-          </p>
-        </div>
-
-        {ranking.last_week_winner && (
-          <Link
-            href={`/town/${ranking.last_week_winner.slug}`}
-            className="mt-8 flex items-center justify-between border-[3px] border-lime bg-bg-card px-4 py-3"
-          >
-            <span className="text-[10px] text-lime">Last week&apos;s top company</span>
-            <span className="text-sm text-cream normal-case">{ranking.last_week_winner.name}</span>
-          </Link>
-        )}
-
-        <div className="mt-8 grid gap-2 sm:grid-cols-2">
-          <CreateLeague signedIn={!!viewer} defaultOpen={!!viewer && create === "1"} />
-          <Link
-            href="/towns/verify"
-            className="btn-press flex items-center justify-center border-2 border-border px-4 py-3 text-[11px] text-cream hover:border-lime"
-          >
-            Verify your company
-          </Link>
-        </div>
-
-        {mine.length > 0 && (
-          <section className="mt-10">
-            <h2 className="text-lg text-cream">Your towns</h2>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {mine.map((l) => (
+      <section className="relative h-[52vh] min-h-[320px] max-h-[620px] overflow-hidden border-y-[3px] border-border bg-bg-raised">
+        {discover.featured && hero ? (
+          <>
+            <TownHero city={hero.city} cityDevs={hero.cityDevs} cityNorms={hero.cityNorms} />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-bg via-bg/60 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 mx-auto max-w-6xl px-4 pb-6">
+              <p className="text-[10px] text-lime">&#9733; Town of the week</p>
+              <h2 className="mt-1 text-3xl leading-tight text-cream normal-case sm:text-4xl">{discover.featured.name}</h2>
+              <p className="mt-1 flex gap-3 text-[10px] text-muted">
+                {discover.featured.verified && <span className="text-lime">&#10003; Verified</span>}
+                <span>
+                  {discover.featured.totalBuildings.toLocaleString("en-US")} building
+                  {discover.featured.totalBuildings === 1 ? "" : "s"}
+                </span>
+              </p>
+              <div className="mt-4 flex gap-2">
                 <Link
-                  key={l.slug}
-                  href={`/town/${l.slug}`}
-                  className="border-2 border-border px-3 py-2 text-[11px] text-cream normal-case hover:border-lime"
+                  href={`/town/${discover.featured.slug}`}
+                  className="btn-press bg-lime px-4 py-2.5 text-[11px] tracking-widest text-bg"
                 >
-                  {l.name}
+                  &#9654; Visit
                 </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="mt-10">
-          <h2 className="text-lg text-cream">This week</h2>
-          <ol className="mt-3 space-y-1.5">
-            {ranked.map((r) => (
-              <li key={r.league_id}>
-                <Link
-                  href={`/town/${r.slug}`}
-                  className="flex items-center gap-3 border-[3px] border-border bg-bg-card px-3 py-2 hover:border-border-light"
-                >
-                  <span className={`w-6 text-right text-xs ${r.rank === 1 ? "text-lime" : "text-muted"}`}>{r.rank}</span>
-                  <span className="min-w-0 flex-1 truncate text-xs text-cream normal-case">{r.name}</span>
-                  <span className="text-[9px] text-muted">{fmt(r.active_members)} devs</span>
-                  <span className="w-14 text-right text-xs text-cream tabular-nums">{fmt(r.score ?? 0)}</span>
-                </Link>
-              </li>
-            ))}
-            {ranked.length === 0 && (
-              <li className="text-[11px] text-muted normal-case">
-                No company has 3 active devs yet. Verify yours and invite two colleagues.
-              </li>
-            )}
-          </ol>
-
-          {unranked.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-[10px] text-muted">Need 3 active devs to rank</h3>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {unranked.map((r) => (
-                  <Link
-                    key={r.league_id}
-                    href={`/town/${r.slug}`}
-                    className="border-2 border-border px-2 py-1 text-[10px] text-dim normal-case hover:text-cream"
-                  >
-                    {r.name} · {r.active_members}/3
-                  </Link>
-                ))}
+                <HeroDrive slug={discover.featured.slug} />
               </div>
             </div>
-          )}
-        </section>
+          </>
+        ) : (
+          <EmptyHero />
+        )}
+      </section>
+
+      <div className="mx-auto max-w-6xl px-4">
+        {discover.yours.length > 0 && <Row id="yours" title="Your towns" cards={discover.yours} />}
+        {ROWS.map((r) =>
+          discover.rows[r.id].length > 0 ? (
+            <Row
+              key={r.id}
+              id={r.id}
+              title={r.title}
+              cards={discover.rows[r.id]}
+              action={r.id === "companies" ? { href: "/towns/verify", label: "Verify yours" } : undefined}
+            />
+          ) : null,
+        )}
+        {Object.values(discover.rows).every((r) => r.length === 0) && discover.yours.length === 0 && (
+          <p className="mt-10 text-center text-[11px] text-muted normal-case">No towns yet. Be the first to start one.</p>
+        )}
       </div>
     </main>
+  );
+}
+
+async function loadHero(featured: FeaturedTown) {
+  try {
+    const [city, members, cityNorms] = await Promise.all([
+      getCachedCity(featured.id),
+      getLeagueMembers(featured.id),
+      getCityNorms(),
+    ]);
+    return { city, cityDevs: await getLeagueCityDevs(members), cityNorms };
+  } catch (err) {
+    console.error("[towns] hero failed:", err);
+    return null;
+  }
+}
+
+function Row({
+  id,
+  title,
+  cards,
+  action,
+}: {
+  id: string;
+  title: string;
+  cards: Card[];
+  action?: { href: string; label: string };
+}) {
+  return (
+    <section id={`row-${id}`} className="mt-10 scroll-mt-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-base text-cream">{title}</h2>
+        {action && (
+          <Link href={action.href} className="text-[10px] text-lime hover:text-cream">
+            {action.label} &rarr;
+          </Link>
+        )}
+      </div>
+      <div className="-mx-4 mt-3 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2">
+        {cards.map((c) => (
+          <TownCard key={c.slug} card={c} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// No Town of the week yet: a flat pixel skyline and the one thing to do.
+const SKYLINE = [38, 62, 46, 80, 54, 92, 58, 70, 44, 86, 50, 66, 40, 74, 56];
+
+function EmptyHero() {
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4">
+        <p className="text-[10px] text-lime">&#9733; Town of the week</p>
+        <h2 className="mt-1 text-2xl leading-tight text-cream normal-case sm:text-3xl">Could be yours.</h2>
+        <p className="mt-2 max-w-sm text-[10px] text-muted normal-case">
+          The town with the most visitors each week takes this spot for the next seven days.
+        </p>
+        <Link href="/towns?create=1" className="btn-press mt-4 self-start bg-lime px-4 py-2.5 text-[11px] tracking-widest text-bg">
+          + Create a town
+        </Link>
+      </div>
+      <div className="flex h-2/5 items-end justify-center gap-1.5 px-4" aria-hidden>
+        {SKYLINE.map((h, i) => (
+          <div key={i} className="relative w-8 bg-border sm:w-12" style={{ height: `${h}%` }}>
+            <div
+              className="absolute inset-1.5 opacity-60"
+              style={{
+                backgroundImage: "linear-gradient(var(--color-lime) 50%, transparent 50%)",
+                backgroundSize: "6px 10px",
+                maskImage: "linear-gradient(90deg, #000 40%, transparent 40%)",
+                WebkitMaskImage: "linear-gradient(90deg, #000 40%, transparent 40%)",
+                maskSize: "10px 100%",
+                WebkitMaskSize: "10px 100%",
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="h-1 bg-border" />
+    </div>
   );
 }

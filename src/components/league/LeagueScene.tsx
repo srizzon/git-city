@@ -271,6 +271,8 @@ export interface LeagueSceneProps {
   children?: React.ReactNode;
   /** Drive mode: the car and its world. */
   drive?: Omit<DriveWorldProps, "objects" | "buildings" | "size">;
+  /** Fill the parent box instead of the viewport, and ignore the pointer (Discover's hero). */
+  embedded?: boolean;
 }
 
 export default function LeagueScene({
@@ -285,6 +287,7 @@ export default function LeagueScene({
   editPickables,
   children,
   drive,
+  embedded = false,
 }: LeagueSceneProps) {
   const editing = mode === "edit";
   const driving = mode === "drive" && !!drive;
@@ -302,7 +305,7 @@ export default function LeagueScene({
 
   if (lost) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center gap-4 bg-bg font-pixel uppercase">
+      <div className={`${embedded ? "absolute" : "fixed"} inset-0 flex flex-col items-center justify-center gap-4 bg-bg font-pixel uppercase`}>
         <p className="text-xs text-muted">The city stopped drawing.</p>
         <button
           type="button"
@@ -323,7 +326,11 @@ export default function LeagueScene({
       dpr={[1, 1.5]}
       camera={{ position: initial.position.toArray(), fov: 50, near: 1, far: 12000 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
-      style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
+      style={
+        embedded
+          ? { position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }
+          : { position: "fixed", inset: 0, width: "100vw", height: "100vh" }
+      }
       onCreated={({ gl }) => {
         gl.domElement.addEventListener("webglcontextlost", (e) => {
           e.preventDefault();

@@ -26,8 +26,20 @@ async function loadCatalog(): Promise<TownEntry[]> {
   }));
 }
 
-/** Every listed town, shared by Discover, search and Surprise me. 5 minutes. */
-export const getTownCatalog = unstable_cache(loadCatalog, ["towns-catalog"], { revalidate: 300 });
+const cachedCatalog = unstable_cache(loadCatalog, ["towns-catalog"], { revalidate: 300 });
+
+/**
+ * Every listed town, shared by Discover, search and Surprise me. 5 minutes.
+ * A failed read isn't cached and shows no towns rather than an error page.
+ */
+export async function getTownCatalog(): Promise<TownEntry[]> {
+  try {
+    return await cachedCatalog();
+  } catch (err) {
+    console.error("[towns] catalog failed:", err);
+    return [];
+  }
+}
 
 const getSharedRows = unstable_cache(
   async () => {

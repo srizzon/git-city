@@ -8,12 +8,13 @@ import { LOGIN_RE } from "@/lib/leagues/names";
 import { tokenMatches } from "@/lib/leagues/invite-token";
 import LeagueClient from "./league-client";
 import { townDisplayName } from "@/lib/towns/names";
+import { getTownBadges } from "@/lib/towns/badges";
 
 export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string }>;
+  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function LeaguePage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const { invite, ref, t, edit } = await searchParams;
+  const { invite, ref, t, edit, drive } = await searchParams;
   const league = await getLeagueBySlug(slug);
   if (!league) notFound();
 
@@ -41,12 +42,13 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   const data = await getLeaguePageData(league, viewer);
   const lastWeek = weekStart(new Date());
   lastWeek.setUTCDate(lastWeek.getUTCDate() - 7);
-  const [city, cityDevs, cityNorms, globalWinner, inviteToken] = await Promise.all([
+  const [city, cityDevs, cityNorms, globalWinner, inviteToken, badges] = await Promise.all([
     getCachedCity(league.id),
     getLeagueCityDevs(data.members),
     getCityNorms(),
     league.kind === "company" ? getGlobalWinner(isoDay(lastWeek)) : Promise.resolve(null),
     t && league.kind === "custom" ? getInviteToken(league.id) : Promise.resolve(null),
+    getTownBadges(league.id).catch(() => ({ townOfWeek: false, milestones: [] })),
   ]);
 
   // Query params are attacker-written: name only an invited member, pass on
@@ -69,6 +71,8 @@ export default async function LeaguePage({ params, searchParams }: Props) {
       inviteToken={token}
       refLogin={refLogin}
       startEditing={edit === "1" && data.viewer?.is_admin === true}
+      startDriving={drive === "1"}
+      badges={badges}
     />
   );
 }
