@@ -270,18 +270,18 @@ export default function LeagueClient({
     setViewNotice({ kind: "error", message: "Couldn't start the car.", seq: Date.now() });
   }, []);
 
-  // Esc pauses (and resumes); leaving is the Exit button.
+  // Esc pauses; Esc again on the pause menu leaves the car.
   useEffect(() => {
     if (!driving) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setPaused((p) => !p);
-      }
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      if (paused) exitDrive();
+      else setPaused(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [driving]);
+  }, [driving, paused, exitDrive]);
 
   // Live city while driving: pick up an admin's changes (walls, buildings, props).
   useEffect(() => {

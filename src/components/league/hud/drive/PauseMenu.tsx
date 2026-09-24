@@ -5,7 +5,7 @@ import type { DriveCameraMode } from "@/lib/league-city/drive/telemetry";
 
 // Console-style pause: the city blurs behind a big PAUSED, a menu you walk
 // with ↑↓ / W S / the D-pad and pick with Enter, Space or A, and the controls
-// beside it. Esc (handled by the page) and B / Start resume.
+// beside it. B / Start resume; Esc again (handled by the page) exits.
 
 export const CONTROLS: [string, string][] = [
   ["W A S D", "drive"],
@@ -146,7 +146,7 @@ export default function PauseMenu({
           </dl>
         </div>
 
-        <p className="text-[9px] text-dim">↑↓ choose · Enter select · Esc back</p>
+        <p className="text-[9px] text-dim">↑↓ choose · Enter select · Esc exit</p>
       </div>
     </div>
   );
