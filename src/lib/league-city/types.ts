@@ -4,6 +4,7 @@ export const ITEM_TYPES = [
   "bench",
   "fountain",
   "plaza",
+  "ramp",
   "tree_default",
   "tree_oak",
   "tree_fat",

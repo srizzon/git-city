@@ -12,6 +12,7 @@ import { InstancedDecorations } from "@/components/city/decorations";
 import type { CityBuilding, CityDecoration } from "@/lib/github";
 import { LOT, lotToWorld, maxLot, minLot, rotToRadians, terrainBounds } from "@/lib/league-city/grid";
 import type { CityObject } from "@/lib/league-city/types";
+import LeagueRamps from "./LeagueRamps";
 import LeagueRoads from "./LeagueRoads";
 import LeagueTrees from "./LeagueTrees";
 import EditCamera, { type EditCameraApi, type LotEvent, type Pickable } from "./editor/EditCamera";
@@ -295,6 +296,7 @@ export default function LeagueScene({
       <LeagueGround size={size} />
       <LeagueRoads objects={objects} markingColor={theme.roadMarkingColor} />
       <PlazaSlabs objects={objects} />
+      <LeagueRamps objects={objects} />
       <InstancedDecorations items={decorations} roadMarkingColor={theme.roadMarkingColor} sidewalkColor={theme.sidewalkColor} />
       <Suspense fallback={null}>
         <LeagueTrees objects={objects} />

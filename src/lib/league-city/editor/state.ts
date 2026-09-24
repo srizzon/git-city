@@ -5,7 +5,7 @@
 // swap (two moves) always reaches the server together.
 //
 // Buildings, roads and plazas own lots. Props (lamps, benches, trees,
-// fountains) stand anywhere their footprint fits (see props.ts): on plazas,
+// fountains, ramps) stand anywhere their footprint fits (see props.ts): on plazas,
 // on grass, on a road's sidewalk.
 
 import { lotKey } from "../placement";
@@ -107,7 +107,7 @@ export const MAX_BATCH_OPS = 200;
 export const PROP_TURN = 45;
 
 export const HOTBAR: Record<Exclude<HotbarTab, "buildings">, ItemType[]> = {
-  streets: ["road", "lamp", "bench"],
+  streets: ["road", "lamp", "bench", "ramp"],
   nature: ["tree_default", "tree_oak", "tree_fat", "tree_detailed", "tree_palm_tall", "tree_pine_tall_a"],
   plaza: ["plaza", "fountain"],
 };
