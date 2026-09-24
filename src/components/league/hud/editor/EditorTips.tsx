@@ -9,9 +9,9 @@ import { HUD_BOX } from "../shared";
 
 const KEY = "league-editor-tips-v1";
 const TIPS: [string, string][] = [
-  ["1–9", "pick an item from the hotbar, then click a lot to place it"],
-  ["Drag", "with the road tool to paint a street"],
-  ["R", "rotates what you selected. Click it again to move it"],
+  ["Drag", "moves the camera. A click (no drag) places, picks up or drops"],
+  ["1–9", "pick an item from the hotbar. Roads: click the start, then the end"],
+  ["R", "turns what's in your hand. Esc puts it back"],
 ];
 
 function seen(): boolean {

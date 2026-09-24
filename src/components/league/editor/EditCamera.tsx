@@ -6,9 +6,9 @@ import * as THREE from "three";
 import { terrainBounds, worldToLot } from "@/lib/league-city/grid";
 import { isTypingTarget } from "@/lib/league-city/editor/shortcuts";
 
-// Build-mode camera: right-drag orbits (turn and tilt), middle-drag,
-// Space-drag or WASD/arrows pan, scroll zooms, Q/E turn 90° with a short
-// ease. Lots are picked by intersecting the pointer ray with the ground plane;
+// Build-mode camera, same feel as the view: drag orbits (turn and tilt),
+// right/middle-drag, Space-drag or WASD/arrows pan, scroll zooms, Q/E turn
+// 90° with a short ease. Only a click (no drag) acts on the city. Lots are picked by intersecting the pointer ray with the ground plane;
 // props are picked on screen (nearest projected prop within a few pixels),
 // since what you see of a tree is its canopy, not its base. Runs under frameloop="demand", so it invalidates whenever
 // the view changes and keeps invalidating while something animates.
@@ -22,9 +22,7 @@ export type Pickable = { id: string; x: number; y: number; z: number };
 export type LotEvent =
   | ({ kind: "hover" } & LotPoint)
   | { kind: "leave" }
-  | ({ kind: "down" } & LotPoint)
-  | ({ kind: "drag" } & LotPoint)
-  | ({ kind: "up" } & LotPoint)
+  | ({ kind: "click" } & LotPoint)
   | ({ kind: "pick" } & LotPoint);
 
 export interface EditCameraApi {
@@ -148,25 +146,21 @@ export default function EditCamera({
       return (2 * view.current.dist * Math.tan(((cam.fov ?? 50) * Math.PI) / 360)) / el.clientHeight;
     };
 
+    // Drag = camera, click = action. A press becomes a camera drag once it
+    // moves past CLICK_SLOP: left orbits, right/middle (or Space+left) pan.
+    // Releasing without moving is a click: left acts, Alt-left or middle picks.
     const onDown = (e: PointerEvent) => {
-      const orbit = e.button === 2;
-      const isPan = orbit || (e.button === 1 && !e.altKey) || (e.button === 0 && space);
       press = { x: e.clientX, y: e.clientY, button: e.button, alt: e.altKey, moved: false };
-      if (isPan) {
-        pan = { x: e.clientX, y: e.clientY, id: e.pointerId, orbit };
-        el.setPointerCapture(e.pointerId);
-        el.style.cursor = "grabbing";
-        return;
-      }
-      if (e.button !== 0) return;
-      const lot = lotAt(e);
-      if (!lot) return;
       el.setPointerCapture(e.pointerId);
-      if (!e.altKey) onLotRef.current({ kind: "down", ...lot });
     };
 
     const onMove = (e: PointerEvent) => {
-      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > CLICK_SLOP) press.moved = true;
+      if (press && !press.moved && Math.hypot(e.clientX - press.x, e.clientY - press.y) > CLICK_SLOP) {
+        press.moved = true;
+        pan = { x: press.x, y: press.y, id: e.pointerId, orbit: press.button === 0 && !space };
+        el.style.cursor = "grabbing";
+        onLotRef.current({ kind: "leave" });
+      }
       if (pan) {
         const k = worldPerPixel();
         const dx = e.clientX - pan.x;
@@ -189,9 +183,10 @@ export default function EditCamera({
         invalidate();
         return;
       }
+      if (press) return; // pressed but not moved yet: wait for click or drag
       const lot = lotAt(e);
       if (!lot) return onLotRef.current({ kind: "leave" });
-      onLotRef.current({ kind: press && press.button === 0 && !press.alt ? "drag" : "hover", ...lot });
+      onLotRef.current({ kind: "hover", ...lot });
     };
 
     const onUp = (e: PointerEvent) => {
@@ -201,17 +196,15 @@ export default function EditCamera({
       if (pan) {
         pan = null;
         el.style.cursor = "";
-        // A middle click that didn't move picks the item under the cursor.
-        if (p && p.button === 1 && !p.moved) {
-          const lot = lotAt(e);
-          if (lot) onLotRef.current({ kind: "pick", ...lot });
-        }
+        const lot = lotAt(e);
+        if (lot) onLotRef.current({ kind: "hover", ...lot });
         return;
       }
-      if (!p || p.button !== 0) return;
+      if (!p) return;
       const lot = lotAt(e);
       if (!lot) return;
-      onLotRef.current({ kind: p.alt ? "pick" : "up", ...lot });
+      if (p.button === 1 || (p.button === 0 && p.alt)) onLotRef.current({ kind: "pick", ...lot });
+      else if (p.button === 0) onLotRef.current({ kind: "click", ...lot });
     };
 
     const onLeave = () => {

@@ -100,6 +100,12 @@ export function useEditorController({
       setHover(spot);
       const tool = s.tool;
 
+      if (e.kind === "hover") {
+        // A road in progress follows the cursor as an L.
+        if (tool.kind === "road" && dragFrom.current) setRoadPath(lPath(dragFrom.current, [e.x, e.z], s.objects.values(), s.size));
+        return;
+      }
+
       if (e.kind === "pick") {
         // Middle/Alt-click: take the item under the cursor into the hotbar.
         const o = objectAtSpot(s.objects, spot);
@@ -118,23 +124,21 @@ export function useEditorController({
         return;
       }
 
+      // Roads: click where it starts, click where it ends (Cities: Skylines).
       if (tool.kind === "road") {
-        if (e.kind === "down") {
+        if (!dragFrom.current) {
           dragFrom.current = [e.x, e.z];
           setRoadPath(lPath([e.x, e.z], [e.x, e.z], s.objects.values(), s.size));
-        } else if (e.kind === "drag" && dragFrom.current) {
-          setRoadPath(lPath(dragFrom.current, [e.x, e.z], s.objects.values(), s.size));
-        } else if (e.kind === "up" && dragFrom.current) {
-          const lots = lPath(dragFrom.current, [e.x, e.z], s.objects.values(), s.size);
-          dragFrom.current = null;
-          setRoadPath(null);
-          if (lots.length === 0) store.dispatch({ type: "notify", kind: "hint", message: "A building is in the way." });
-          else store.dispatch({ type: "paintRoad", lots, ids: lots.map(() => uuid()) });
+          return;
         }
+        const lots = lPath(dragFrom.current, [e.x, e.z], s.objects.values(), s.size);
+        dragFrom.current = null;
+        setRoadPath(null);
+        if (lots.length === 0) store.dispatch({ type: "notify", kind: "hint", message: "A building is in the way." });
+        else store.dispatch({ type: "paintRoad", lots, ids: lots.map(() => uuid()) });
         return;
       }
 
-      if (e.kind !== "down") return;
       if (tool.kind === "place") {
         store.dispatch({ type: "place", id: uuid(), ...spot });
         return;
@@ -197,6 +201,18 @@ export function useEditorController({
     return () => window.removeEventListener("keydown", onKey);
   }, [active, store, selectSlot, onPreview]);
 
+  // A half-laid road is dropped when the tool changes.
+  useEffect(() => {
+    let kind = store.getState().tool.kind;
+    return store.subscribe(() => {
+      const next = store.getState().tool.kind;
+      if (next === kind) return;
+      kind = next;
+      dragFrom.current = null;
+      setRoadPath(null);
+    });
+  }, [store]);
+
   const hovered = active && hover ? objectAtSpot(state.objects, hover) : undefined;
 
   const ghost = useMemo<GhostSpec | null>(() => {
@@ -231,13 +247,14 @@ export function useEditorController({
     return null;
   }, [active, hover, hovered, state, buildingByDev]);
 
-  const hint = editorHint(state, hovered, ghost);
+  const shownPath = active ? roadPath : null;
+  const hint = editorHint(state, hovered, ghost, shownPath !== null);
 
-  return { state, onLot, ghost, hover, roadPath, grid, selectSlot, pickBuilding, hint };
+  return { state, onLot, ghost, hover, roadPath: shownPath, grid, selectSlot, pickBuilding, hint };
 }
 
 /** One line telling the admin what a click does right now. */
-function editorHint(s: EditorState, hovered: CityObject | undefined, ghost: GhostSpec | null): string {
+function editorHint(s: EditorState, hovered: CityObject | undefined, ghost: GhostSpec | null, roadStarted: boolean): string {
   const fit = ghost?.fit;
   const bad = fit && !fit.ok ? `${fit.reason} · ` : "";
   if (s.held) {
@@ -250,8 +267,9 @@ function editorHint(s: EditorState, hovered: CityObject | undefined, ghost: Ghos
       if (hovered?.kind === "building") return "Bulldozer: buildings stay. Remove people in Settings";
       return hovered ? `Bulldozer: click to delete ${nameOf(hovered)} · Esc to stop` : "Bulldozer: click an item to delete it · Esc to stop";
     case "road":
-      if (fit?.ok && fit.replaces) return `Road: click or drag to paint · replaces ${nameOf(fit.replaces)} · Esc to stop`;
-      return `${bad}Road: click or drag to paint · Esc to stop`;
+      if (roadStarted) return "Click where the road ends · Esc to cancel";
+      if (fit?.ok && fit.replaces) return `Road: click where it starts · replaces ${nameOf(fit.replaces)}`;
+      return `${bad}Road: click where it starts, then where it ends`;
     case "place":
       if (fit?.ok && fit.replaces) return `Click to replace ${nameOf(fit.replaces)} · Esc to stop`;
       return isSurface(s.tool.item)

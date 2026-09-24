@@ -164,9 +164,10 @@ export function CameraHints() {
   );
   return (
     <div className="pointer-events-none fixed bottom-6 right-6 z-30 text-right font-pixel text-[9px] uppercase leading-loose text-muted">
-      {row("Right-drag", "orbit")}
-      {row("Middle-drag / Space", "pan")}
+      {row("Drag", "orbit")}
+      {row("Right-drag", "pan")}
       {row("Scroll", "zoom")}
+      {row("Click", "act")}
       {row("Q / E", "turn 90°")}
       {row("G", "grid")}
     </div>
