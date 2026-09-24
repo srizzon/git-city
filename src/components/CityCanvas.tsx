@@ -1627,22 +1627,16 @@ function Waterfront({ river, dockColor }: { river: CityRiver; dockColor: string 
 
 // ─── Orbit Scene (controls + focus) ──────────────────────────
 
-function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition, isCompareCinematicPlaying, onCameraMove, homeTarget, homeCamPos, maxDistance }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null; isCompareCinematicPlaying?: boolean; onCameraMove?: (x: number, z: number, tx: number, tz: number) => void; homeTarget?: [number, number, number] | null; homeCamPos?: [number, number, number] | null; maxDistance?: number }) {
+function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition, isCompareCinematicPlaying, onCameraMove, homeTarget, maxDistance }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null; isCompareCinematicPlaying?: boolean; onCameraMove?: (x: number, z: number, tx: number, tz: number) => void; homeTarget?: [number, number, number] | null; maxDistance?: number }) {
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
   const frameCount = useRef(0);
 
   // Reset camera on mount — wide panorama from front, E.Arcade centered
-  // (or the fitted framing when the caller passes one)
   useEffect(() => {
-    if (homeCamPos && homeTarget) {
-      camera.position.set(...homeCamPos);
-      camera.lookAt(...homeTarget);
-      return;
-    }
     camera.position.set(-800, 700, -1000);
     camera.lookAt(TARGET_X, TARGET_Y, TARGET_Z);
-  }, [camera, homeCamPos, homeTarget]);
+  }, [camera]);
 
   // Report camera position ~10fps (every 6 frames), and only when it moved —
   // an idle camera used to re-render the whole page 10×/s.
@@ -1771,12 +1765,6 @@ interface Props {
   celebrationActive?: boolean;
   wallpaperMode?: boolean;
   wallpaperSpeed?: number;
-  /** Canvas container style. Defaults to fixed full-viewport. */
-  containerStyle?: React.CSSProperties;
-  /** Hide E.Arcade, the Founder Spire, the Bank and sponsored landmarks. */
-  hideLandmarks?: boolean;
-  /** Frame the camera on the buildings' bounds instead of the city center. */
-  cameraFit?: boolean;
   liveByLogin?: Map<string, LiveSession>;
   cityEnergy?: number;
   onCompareCinematicEnd?: () => void;
@@ -1947,7 +1935,7 @@ function DynamicSky() {
 // ordered near → far, so the mapping is a straight index.
 const RABBIT_PLAZA_INDICES = [0, 1, 2, 3, 4];
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, sfMap, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, perfMode = "high", onPerfDecline, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onBankClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, resolvedSponsors, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, containerStyle, hideLandmarks, cameraFit, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove, bossPreview, flyBossStateRef, flyEngageBoss, flySendBossHit, flySendBossSelfHit }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, sfMap, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, perfMode = "high", onPerfDecline, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onBankClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, resolvedSponsors, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove, bossPreview, flyBossStateRef, flyEngageBoss, flySendBossHit, flySendBossSelfHit }: Props) {
   const sponsors = resolvedSponsors ?? [];
   const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
   const prevComparePairRef = useRef<string>("");
@@ -2020,38 +2008,13 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
     };
   }, [sfMap]);
 
-  // Fitted framing (league mini-cities): target the buildings' center, back off
-  // far enough to see the whole footprint.
-  const fitHome = useMemo(() => {
-    if (!cameraFit || buildings.length === 0) return null;
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxH = 0;
-    for (const b of buildings) {
-      minX = Math.min(minX, b.position[0] - b.width / 2);
-      maxX = Math.max(maxX, b.position[0] + b.width / 2);
-      minZ = Math.min(minZ, b.position[2] - b.depth / 2);
-      maxZ = Math.max(maxZ, b.position[2] + b.depth / 2);
-      maxH = Math.max(maxH, b.height);
-    }
-    const cx = (minX + maxX) / 2;
-    const cz = (minZ + maxZ) / 2;
-    const span = Math.max(maxX - minX, maxZ - minZ, maxH, 60);
-    const dist = span * 1.4 + 80;
-    const ty = Math.min(maxH * 0.4, 120);
-    return {
-      target: [cx, ty, cz] as [number, number, number],
-      camPos: [cx - dist * 0.55, ty + dist * 0.55, cz - dist * 0.7] as [number, number, number],
-      maxDistance: Math.max(dist * 2.5, 600),
-    };
-  }, [cameraFit, buildings]);
-  const home = fitHome ?? sfHome;
-
   return (
     <Canvas
       shadows={false}
-      camera={{ position: home ? home.camPos : [-400, 450, -600], fov: 55, near: sfHome ? 6 : 0.5, far: sfHome ? 16000 : 15000 }}
+      camera={{ position: sfHome ? sfHome.camPos : [-400, 450, -600], fov: 55, near: sfHome ? 6 : 0.5, far: sfHome ? 16000 : 15000 }}
       dpr={dpr}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3, logarithmicDepthBuffer: true }}
-      style={containerStyle ?? { position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
+      style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
       {/* SunRig owns exposure in SF; CityExposure only drives the theme previews. */}
@@ -2097,7 +2060,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       ) : (
         <>
           {!introMode && !rabbitCinematic && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
-            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} isCompareCinematicPlaying={isCompareCinematicPlaying} onCameraMove={onCameraMove} homeTarget={home?.target ?? null} homeCamPos={fitHome?.camPos ?? null} maxDistance={home?.maxDistance} />
+            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} isCompareCinematicPlaying={isCompareCinematicPlaying} onCameraMove={onCameraMove} homeTarget={sfHome?.target ?? null} maxDistance={sfHome?.maxDistance} />
           )}
 
           {isCompareCinematicPlaying && focusedBuilding && focusedBuildingB && (() => {
@@ -2173,7 +2136,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       {!sfMap && <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />}
       {sfMap && <SFMapLayers sfMap={sfMap} />}
 
-      {!hideLandmarks && (() => {
+      {(() => {
         const arcade = (
           <EArcadeLandmark
             onClick={blockCityClicks ? () => { } : (onEArcadeClick ?? (() => { }))}
