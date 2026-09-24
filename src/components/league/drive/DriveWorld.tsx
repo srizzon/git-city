@@ -19,6 +19,7 @@ import { spawnPoint } from "@/lib/league-city/drive/spawn";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
 import Car, { type CarApi } from "./Car";
+import DriveCamera from "./DriveCamera";
 import { useDriveInput } from "./useDriveInput";
 
 // Drive mode's physics world. Loaded with next/dynamic only when someone
@@ -131,6 +132,13 @@ function DynamicProp({ spec }: { spec: ColliderSpec }) {
   );
 }
 
+function CameraKey({ input, onToggle }: { input: ReturnType<typeof useDriveInput>; onToggle: () => void }) {
+  useFrame(() => {
+    if (input.current.pressed.camera) onToggle();
+  });
+  return null;
+}
+
 // ─── World ───────────────────────────────────────────────────
 
 export default function DriveWorld({
@@ -139,6 +147,8 @@ export default function DriveWorld({
   size,
   viewerDevId,
   telemetry,
+  camera,
+  onCameraToggle,
   onReady,
   onFail,
 }: DriveWorldProps) {
@@ -156,6 +166,7 @@ export default function DriveWorld({
 
   const input = useDriveInput();
   const car = useRef<CarApi | null>(null);
+  const impact = useRef({ strength: 0, at: 0 });
 
   return (
     <Boundary onFail={onFail}>
@@ -177,7 +188,10 @@ export default function DriveWorld({
             input={input}
             telemetry={telemetry}
             apiRef={car}
+            impact={impact}
           />
+          <DriveCamera mode={camera} car={car} impact={impact} />
+          <CameraKey input={input} onToggle={onCameraToggle} />
           <Ready onReady={onReady} />
         </Physics>
       </Suspense>

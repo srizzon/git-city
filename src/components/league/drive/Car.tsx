@@ -42,6 +42,10 @@ const [HX, HY, HZ] = CHASSIS.half;
 const M12 = CHASSIS.mass / 12;
 const INERTIA = { x: M12 * (4 * HY * HY + 4 * HZ * HZ), y: M12 * (4 * HX * HX + 4 * HZ * HZ), z: M12 * (4 * HX * HX + 4 * HY * HY) };
 
+/** Contact force (N) that counts as a hit, and the force of a full-strength crash. */
+const IMPACT_MIN = 40000;
+const IMPACT_FULL = 400000;
+
 export interface CarApi {
   /** The visible car, city units. */
   group: THREE.Group;
@@ -65,6 +69,7 @@ export default function Car({
   input,
   telemetry,
   apiRef,
+  impact,
   onReset,
 }: {
   spawn: Spawn;
@@ -74,6 +79,8 @@ export default function Car({
   input: React.MutableRefObject<DriveInputRef>;
   telemetry: DriveTelemetry;
   apiRef: React.MutableRefObject<CarApi | null>;
+  /** Set on every hard hit: strength 0…1 and when (performance.now ms). */
+  impact: React.MutableRefObject<{ strength: number; at: number }>;
   /** R, or fell out of the world: back to the spawn point. */
   onReset?: () => void;
 }) {
@@ -196,12 +203,19 @@ export default function Car({
         angularDamping={CHASSIS.angularDamping}
         ccd
         userData={{ car: true }}
+        onContactForce={({ totalForceMagnitude }) => {
+          const strength = Math.min(1, totalForceMagnitude / IMPACT_FULL);
+          const now = performance.now();
+          // One hit per 150 ms, keeping the strongest.
+          if (now - impact.current.at > 150 || strength > impact.current.strength) impact.current = { strength, at: now };
+        }}
       >
         <object3D ref={rigidObj} />
         <CuboidCollider
           args={CHASSIS.half}
           position={[0, CHASSIS.colliderY, 0]}
           friction={0.3}
+          contactForceEventThreshold={IMPACT_MIN}
           massProperties={{
             mass: CHASSIS.mass,
             centerOfMass: { x: 0, y: CHASSIS.comY - CHASSIS.colliderY, z: 0 },
