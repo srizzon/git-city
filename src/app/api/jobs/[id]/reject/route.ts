@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 import { sendJobRejectedEmail } from "@/lib/notification-senders/job-rejected";
 
 export async function POST(
@@ -12,7 +12,7 @@ export async function POST(
 
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isAdminGithubLogin(getGithubLoginFromUser(user))) {
+  if (!user || !isAdminUser(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

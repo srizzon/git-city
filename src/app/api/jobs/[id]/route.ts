@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 import { getAdvertiserFromCookies } from "@/lib/advertiser-auth";
 
 export async function GET(
@@ -55,7 +55,7 @@ export async function GET(
     }
 
     // Check if admin
-    const isAdmin = isAdminGithubLogin(getGithubLoginFromUser(user));
+    const isAdmin = isAdminUser(user);
 
     // Check if listing owner (advertiser)
     let isOwner = false;

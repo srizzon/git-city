@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 import { sendJobCompanyWelcomeEmail } from "@/lib/notification-senders/job-company-welcome";
 
 async function requireAdmin() {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isAdminGithubLogin(getGithubLoginFromUser(user))) {
+  if (!user || !isAdminUser(user)) {
     return null;
   }
   return user;

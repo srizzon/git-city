@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { githubLoginFromIdentity, isAdminUser } from "@/lib/auth-identity";
 
 type AdminLink = {
   href: string;
@@ -75,8 +75,8 @@ export default async function AdminHomePage() {
 
   if (!user) redirect("/");
 
-  const login = getGithubLoginFromUser(user);
-  if (!isAdminGithubLogin(login)) redirect("/");
+  if (!isAdminUser(user)) redirect("/");
+  const login = githubLoginFromIdentity(user);
 
   return (
     <div className="min-h-screen bg-bg p-4 sm:p-6 lg:p-8">

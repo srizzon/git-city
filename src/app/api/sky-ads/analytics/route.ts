@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 
 // Historical baselines from Himetrica (tracking was lost in Supabase due to www origin bug).
 // These get added on top of live Supabase counts. Remove once Supabase data catches up.
@@ -20,8 +20,7 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
-  const login = getGithubLoginFromUser(user);
-  if (!isAdminGithubLogin(login)) {
+  if (!isAdminUser(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

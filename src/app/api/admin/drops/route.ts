@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { githubLoginFromIdentity, isAdminUser } from "@/lib/auth-identity";
 
 const RARITY_POINTS: Record<string, number> = {
   common: 10,
@@ -17,8 +17,8 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const login = getGithubLoginFromUser(user);
-  if (!isAdminGithubLogin(login)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdminUser(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const login = githubLoginFromIdentity(user);
 
   const body = await request.json();
   const { building_login, rarity, duration_hours, max_pulls, item_reward } = body;

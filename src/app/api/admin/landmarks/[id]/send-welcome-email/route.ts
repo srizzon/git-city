@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 import { getById } from "@/lib/landmarks/repository";
 import { sendWelcomeEmail } from "@/lib/landmarks/welcome-email";
 
 async function requireAdmin(): Promise<null | NextResponse> {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isAdminGithubLogin(getGithubLoginFromUser(user))) {
+  if (!user || !isAdminUser(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return null;

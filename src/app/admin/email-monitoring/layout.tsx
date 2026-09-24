@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 
 export default async function AdminEmailMonitoringLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabase();
@@ -8,8 +8,7 @@ export default async function AdminEmailMonitoringLayout({ children }: { childre
 
   if (!user) redirect("/");
 
-  const login = getGithubLoginFromUser(user);
-  if (!isAdminGithubLogin(login)) redirect("/");
+  if (!isAdminUser(user)) redirect("/");
 
   return <>{children}</>;
 }
