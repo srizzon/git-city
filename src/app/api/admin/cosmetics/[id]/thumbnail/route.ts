@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 
 // Bake & store a card thumbnail. The admin gallery renders the cosmetic
 // offscreen, snapshots a PNG data URL, and posts it here. We upload it to
@@ -15,7 +15,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  if (!isAdminGithubLogin(getGithubLoginFromUser(user))) {
+  if (!isAdminUser(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

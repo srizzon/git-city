@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 
 // Edit a cosmetic. The "approve → live" gate (is_active) plus all catalog
 // metadata: render strategy, set/season, tags, pricing, availability window.
@@ -16,7 +16,7 @@ async function requireAdmin() {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) };
-  if (!isAdminGithubLogin(getGithubLoginFromUser(user))) {
+  if (!isAdminUser(user)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { error: null };

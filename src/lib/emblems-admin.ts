@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 
 // Shared building blocks for the emblems admin API (gate + validators), so the
 // list/create, update/delete, and grant routes stay consistent.
@@ -34,7 +34,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  if (!isAdminGithubLogin(getGithubLoginFromUser(user))) {
+  if (!isAdminUser(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return null;

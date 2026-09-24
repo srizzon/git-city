@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { isAdminUser } from "@/lib/auth-identity";
 
 // GET /api/arcade/rooms/[slug] — get room with full map_json + track visit
 export async function GET(
@@ -50,16 +51,7 @@ export async function PUT(
   }
 
   // Admin check
-  const login = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-  const admins = (process.env.ADMIN_GITHUB_LOGINS ?? "")
-    .split(",")
-    .map((l: string) => l.trim().toLowerCase())
-    .filter(Boolean);
-  if (!admins.includes(login)) {
+  if (!isAdminUser(user)) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
 

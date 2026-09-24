@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { githubLoginFromIdentity, isAdminUser } from "@/lib/auth-identity";
 import { parseRewardsConfig, parseThemeConfig, parseBossConfig } from "@/lib/events/schema";
 
 // Admin actions on a single event:
@@ -15,9 +15,8 @@ async function requireAdmin() {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) };
-  const login = getGithubLoginFromUser(user);
-  if (!isAdminGithubLogin(login)) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  return { login };
+  if (!isAdminUser(user)) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  return { login: githubLoginFromIdentity(user) };
 }
 
 export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {

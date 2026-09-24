@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 import EmblemsAdmin from "@/components/EmblemsAdmin";
 
 export default async function AdminEmblemsPage() {
@@ -10,7 +10,7 @@ export default async function AdminEmblemsPage() {
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/");
-  if (!isAdminGithubLogin(getGithubLoginFromUser(user))) redirect("/");
+  if (!isAdminUser(user)) redirect("/");
 
   return <EmblemsAdmin />;
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getGithubLoginFromUser, isAdminGithubLogin } from "@/lib/admin";
+import { isAdminUser } from "@/lib/auth-identity";
 
 export async function GET() {
   // Admin-only: used by /admin/drops page
@@ -9,8 +9,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const login = getGithubLoginFromUser(user);
-  if (!isAdminGithubLogin(login)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdminUser(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const sb = getSupabaseAdmin();
 
