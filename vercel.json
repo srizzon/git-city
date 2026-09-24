@@ -18,6 +18,7 @@
     { "path": "/api/cron/daily-snapshot",                "schedule": "5 0 * * *" },
     { "path": "/api/cron/refresh-buildings",             "schedule": "0 */2 * * *" },
     { "path": "/api/cron/league-hourly",                 "schedule": "15 * * * *" },
-    { "path": "/api/cron/league-verify",                 "schedule": "0 3 * * *" }
+    { "path": "/api/cron/league-verify",                 "schedule": "0 3 * * *" },
+    { "path": "/api/cron/league-close",                  "schedule": "5 0 * * 1" }
   ]
 }
