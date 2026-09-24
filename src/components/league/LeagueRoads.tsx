@@ -144,3 +144,58 @@ export default function LeagueRoads({ objects, markingColor }: { objects: CityOb
     </group>
   );
 }
+
+/**
+ * Editor preview of new road lots: each piece is picked against the real
+ * roads plus the other ghost lots, so an L drag shows its corner.
+ */
+export function GhostRoads({ objects, lots, ok }: { objects: CityObject[]; lots: [number, number][]; ok: boolean }) {
+  const geos = useMemo(() => Object.fromEntries(SHAPES.map((s) => [s, shapeGeometries(BASE_MASK[s])])) as Record<RoadShape, ReturnType<typeof shapeGeometries>>, []);
+  const mats = useMemo(() => {
+    const color = ok ? "#4ade80" : "#ef4444";
+    return {
+      asphalt: new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, depthWrite: false }),
+      mark: new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.6, depthWrite: false }),
+    };
+  }, [ok]);
+  useLayoutEffect(
+    () => () => {
+      mats.asphalt.dispose();
+      mats.mark.dispose();
+    },
+    [mats],
+  );
+  useLayoutEffect(
+    () => () => {
+      for (const g of Object.values(geos)) {
+        g.asphalt.dispose();
+        g.marks?.dispose();
+      }
+    },
+    [geos],
+  );
+
+  const byShape = useMemo(() => {
+    const keys = new Set(objects.filter((o) => o.item_type === "road").map((o) => `${o.x},${o.z}`));
+    for (const [x, z] of lots) keys.add(`${x},${z}`);
+    const isRoad = (x: number, z: number) => keys.has(`${x},${z}`);
+    const out: Record<RoadShape, { x: number; z: number; rot: number }[]> = {
+      single: [], end: [], straight: [], corner: [], tee: [], cross: [],
+    };
+    for (const [x, z] of lots) {
+      const { shape, rot } = roadPiece(roadMask(isRoad, x, z));
+      out[shape].push({ x, z, rot });
+    }
+    return out;
+  }, [objects, lots]);
+
+  return (
+    <group position={[0, 0.2, 0]} renderOrder={5}>
+      {SHAPES.map((s) =>
+        byShape[s].length > 0 ? (
+          <ShapeMeshes key={s} geo={geos[s]} placements={byShape[s]} asphaltMat={mats.asphalt} markMat={mats.mark} />
+        ) : null,
+      )}
+    </group>
+  );
+}
