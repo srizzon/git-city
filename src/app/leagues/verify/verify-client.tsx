@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Pending } from "@/components/leagues/PixelSpinner";
 
 export interface OrgState {
   login: string;
@@ -37,10 +38,13 @@ export default function VerifyClient({
       const json = await res.json();
       if (!res.ok) {
         setMessage(json.error ?? "Something went wrong.");
+        setBusy(null);
         return;
       }
-      window.location.href = `/league/${json.slug}`;
-    } finally {
+      // Keep the pending state until the league page loads.
+      window.location.assign(`/league/${json.slug}`);
+    } catch {
+      setMessage("Network error. Try again.");
       setBusy(null);
     }
   }
@@ -97,7 +101,7 @@ export default function VerifyClient({
                     onClick={() => post("/api/leagues/verify/join", o.login)}
                     className="btn-press border-2 border-lime px-3 py-1.5 text-[10px] text-lime disabled:opacity-40"
                   >
-                    {busy === o.login ? "..." : o.league ? "Join" : "Start league"}
+                    {busy === o.login ? <Pending label={o.league ? "Joining" : "Starting"} /> : o.league ? "Join" : "Start league"}
                   </button>
                 )}
               </li>
@@ -136,7 +140,7 @@ export default function VerifyClient({
             disabled={busy !== null || !publicOrg.trim()}
             className="btn-press border-2 border-border px-3 py-2 text-[10px] text-cream disabled:opacity-40"
           >
-            {busy === publicOrg.trim() ? "..." : "Check"}
+            {busy === publicOrg.trim() ? <Pending label="Checking" /> : "Check"}
           </button>
         </form>
       </section>

@@ -212,12 +212,17 @@ export interface InviteResult {
   link: string;
 }
 
-export function inviteLink(slug: string, inviter: string, invitee: string): string {
-  const base = (process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com").replace(/\/$/, "");
+export function inviteLink(slug: string, inviter: string, invitee: string, origin?: string): string {
+  const base = (origin || process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com").replace(/\/$/, "");
   return `${base}/league/${slug}?ref=${encodeURIComponent(inviter)}&invite=${encodeURIComponent(invitee)}`;
 }
 
-export async function inviteMember(viewer: Viewer, league: League, rawLogin: string): Promise<InviteResult> {
+export async function inviteMember(
+  viewer: Viewer,
+  league: League,
+  rawLogin: string,
+  origin?: string,
+): Promise<InviteResult> {
   const login = rawLogin.trim().replace(/^@/, "").toLowerCase();
   if (!LOGIN_RE.test(login)) throw new LeagueError("invalid_login", "That isn't a valid GitHub username.");
 
@@ -266,7 +271,7 @@ export async function inviteMember(viewer: Viewer, league: League, rawLogin: str
     login: dev.github_login,
     status: existing?.status ?? "invited",
     created_building: createdBuilding,
-    link: inviteLink(league.slug, viewer.github_login, dev.github_login),
+    link: inviteLink(league.slug, viewer.github_login, dev.github_login, origin),
   };
 }
 

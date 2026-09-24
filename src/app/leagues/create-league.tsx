@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabase } from "@/lib/supabase";
 import { signInWithGitHub } from "@/lib/sign-in";
+import { Pending } from "@/components/leagues/PixelSpinner";
 
 export default function CreateLeague({ signedIn, defaultOpen = false }: { signedIn: boolean; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -23,10 +24,13 @@ export default function CreateLeague({ signedIn, defaultOpen = false }: { signed
       const json = await res.json();
       if (!res.ok) {
         setError(json.error ?? "Couldn't create the league.");
+        setBusy(false);
         return;
       }
+      // Keep the pending state until the league page loads.
       window.location.href = `/league/${json.league.slug}`;
-    } finally {
+    } catch {
+      setError("Network error. Try again.");
       setBusy(false);
     }
   }
@@ -35,16 +39,18 @@ export default function CreateLeague({ signedIn, defaultOpen = false }: { signed
     return (
       <button
         type="button"
+        disabled={busy}
         // Land back on the open form so creating is one step after login.
-        onClick={() =>
+        onClick={() => {
+          setBusy(true);
           signInWithGitHub(
             createBrowserSupabase(),
             `${window.location.origin}/auth/callback?next=${encodeURIComponent("/leagues?create=1")}`,
-          )
-        }
+          );
+        }}
         className="btn-press bg-lime px-4 py-3 text-[11px] tracking-widest text-bg"
       >
-        Sign in to create a league
+        {busy ? <Pending label="Opening GitHub" /> : "Sign in to create a league"}
       </button>
     );
   }
@@ -65,6 +71,7 @@ export default function CreateLeague({ signedIn, defaultOpen = false }: { signed
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={40}
+          disabled={busy}
           placeholder="League name"
           aria-label="League name"
           className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-lime sm:text-xs"
@@ -72,9 +79,9 @@ export default function CreateLeague({ signedIn, defaultOpen = false }: { signed
         <button
           type="submit"
           disabled={busy || name.trim().length < 2}
-          className="btn-press bg-lime px-4 py-2 text-[11px] text-bg disabled:opacity-40"
+          className="btn-press min-w-[104px] bg-lime px-4 py-2 text-[11px] text-bg disabled:opacity-40"
         >
-          {busy ? "..." : "Create"}
+          {busy ? <Pending label="Creating" /> : "Create"}
         </button>
       </div>
       {error && <p className="text-[11px] text-red-400 normal-case">{error}</p>}

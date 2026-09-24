@@ -1,15 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import PixelSpinner, { Pending } from "@/components/leagues/PixelSpinner";
 import { generateCityLayout, type DeveloperRecord, type LayoutNorms } from "@/lib/github";
 import { usePerfMode } from "@/lib/perfMode";
 import { createBrowserSupabase } from "@/lib/supabase";
 import { signInWithGitHub } from "@/lib/sign-in";
 import type { LeaguePageData } from "@/lib/leagues/queries";
 
-const CityCanvas = dynamic(() => import("@/components/CityCanvas"), { ssr: false });
+const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center gap-3 text-[10px] text-muted">
+      <PixelSpinner />
+      Building the skyline
+    </div>
+  ),
+});
 
 type Tab = "week" | "hall";
 
@@ -150,6 +160,8 @@ export default function LeagueClient({
           </div>
         </section>
 
+        {isMember && <InviteBox slug={league.slug} />}
+
         {/* Tabs */}
         <div className="mt-8 flex gap-2" role="tablist">
           {(
@@ -224,7 +236,6 @@ export default function LeagueClient({
           <HallOfFame members={members} hall={hall_of_fame} />
         )}
 
-        {isMember && <InviteBox slug={league.slug} />}
         {viewer?.is_admin && <AdminBox slug={league.slug} mode={week.mode} members={members} viewerLogin={viewer.login} kind={league.kind} />}
         {!isMember && !showJoinCta && viewer && league.kind === "company" && (
           <Link
@@ -279,10 +290,13 @@ function JoinCta({
       const json = await res.json();
       if (!res.ok) {
         setError(json.error ?? "Couldn't join.");
+        setBusy(false);
         return;
       }
+      // Keep the pending state until the reload replaces the page.
       window.location.reload();
-    } finally {
+    } catch {
+      setError("Couldn't join. Try again.");
       setBusy(false);
     }
   }
@@ -308,7 +322,13 @@ function JoinCta({
           onClick={signedIn ? join : signIn}
           className="btn-press mt-4 w-full bg-lime px-4 py-3 text-[11px] tracking-widest text-bg disabled:opacity-50"
         >
-          {busy ? "..." : signedIn ? (viewerInvited ? "Light up my building" : "Join league") : "Light up my building"}
+          {busy ? (
+            <Pending label={signedIn ? "Lighting up" : "Opening GitHub"} />
+          ) : signedIn ? (
+            viewerInvited ? "Light up my building" : "Join league"
+          ) : (
+            "Light up my building"
+          )}
         </button>
       )}
       {error && <p className="mt-2 text-[11px] text-red-400 normal-case">{error}</p>}
@@ -363,43 +383,66 @@ function HallOfFame({ members, hall }: { members: LeaguePageData["members"]; hal
 
 // ─── Invite box ──────────────────────────────────────────────
 
+type InviteState =
+  | { kind: "idle" }
+  | { kind: "sending"; login: string }
+  | { kind: "done"; login: string; avatar: string | null; link: string; created: boolean }
+  | { kind: "error"; message: string };
+
 function InviteBox({ slug }: { slug: string }) {
+  const router = useRouter();
   const [login, setLogin] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ login: string; link: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<InviteState>({ kind: "idle" });
   const [copied, setCopied] = useState(false);
+  const [refreshing, startRefresh] = useTransition();
+  const sending = state.kind === "sending";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!login.trim()) return;
-    setBusy(true);
-    setError(null);
-    setResult(null);
+    const target = login.trim().replace(/^@/, "");
+    if (!target || sending) return;
     setCopied(false);
+    setState({ kind: "sending", login: target });
     try {
       const res = await fetch(`/api/leagues/${slug}/invite`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login: login.trim() }),
+        body: JSON.stringify({ login: target }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error ?? "Couldn't invite.");
+        setState({ kind: "error", message: json.error ?? "Couldn't invite." });
         return;
       }
-      setResult({ login: json.login, link: json.link });
+      setState({
+        kind: "done",
+        login: json.login,
+        avatar: `https://github.com/${json.login}.png?size=64`,
+        link: json.link,
+        created: !!json.created_building,
+      });
       setLogin("");
-    } finally {
-      setBusy(false);
+      // Re-fetch the page so the new dark building shows in the city + list.
+      startRefresh(() => router.refresh());
+    } catch {
+      setState({ kind: "error", message: "Network error. Try again." });
+    }
+  }
+
+  async function copy(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      setCopied(false);
     }
   }
 
   return (
-    <section className="mt-10 border-t-2 border-border pt-6">
+    <section className="mt-4 border-[3px] border-border bg-bg-card p-4">
       <h2 className="text-sm text-cream">Invite a colleague</h2>
       <p className="mt-1 text-[11px] text-muted normal-case">
-        Their building shows up dark until they sign in. Send them the link in Slack or a DM.
+        Their building joins the skyline dark. It lights up when they sign in.
       </p>
       <form onSubmit={submit} className="mt-3 flex gap-2">
         <input
@@ -409,40 +452,64 @@ function InviteBox({ slug }: { slug: string }) {
           aria-label="GitHub username"
           autoCapitalize="off"
           spellCheck={false}
-          className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-lime sm:text-xs"
+          disabled={sending}
+          className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-lime disabled:opacity-60 sm:text-xs"
         />
         <button
           type="submit"
-          disabled={busy || !login.trim()}
-          className="btn-press border-2 border-lime px-3 py-2 text-[10px] text-lime disabled:opacity-40"
+          disabled={sending || !login.trim()}
+          className="btn-press min-w-[92px] border-2 border-lime px-3 py-2 text-[10px] text-lime disabled:opacity-40"
         >
-          {busy ? "..." : "Invite"}
+          {sending ? <Pending label="Inviting" /> : "Invite"}
         </button>
       </form>
-      {error && <p className="mt-2 text-[11px] text-red-400 normal-case">{error}</p>}
-      {result && (
-        <div className="mt-3 border-2 border-border bg-bg-card p-3">
-          <p className="text-[10px] text-muted normal-case">Link for @{result.login}</p>
-          <div className="mt-2 flex gap-2">
-            <input
-              readOnly
-              value={result.link}
-              aria-label="Invite link"
-              onFocus={(e) => e.currentTarget.select()}
-              className="min-w-0 flex-1 bg-bg-raised px-2 py-1.5 text-[11px] text-cream normal-case outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(result.link).then(() => setCopied(true), () => {});
-              }}
-              className="btn-press border-2 border-border px-3 text-[10px] text-cream"
-            >
-              {copied ? "Copied" : "Copy"}
-            </button>
+
+      <div aria-live="polite">
+        {state.kind === "sending" && (
+          <p className="mt-3 flex items-center gap-2 text-[10px] text-muted normal-case">
+            <PixelSpinner size={5} />
+            Loading @{state.login} from GitHub and raising their building. This takes a few seconds.
+          </p>
+        )}
+
+        {state.kind === "error" && <p className="mt-3 text-[11px] text-red-400 normal-case">{state.message}</p>}
+
+        {state.kind === "done" && (
+          <div className="mt-3 border-2 border-lime/60 bg-bg-raised p-3">
+            <div className="flex items-center gap-3">
+              <Avatar src={state.avatar} size={32} dark />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs text-cream normal-case">@{state.login} is on the skyline</p>
+                <p className="flex items-center gap-2 text-[10px] text-muted normal-case">
+                  {refreshing ? (
+                    <>
+                      <PixelSpinner size={4} /> Adding their building to the city
+                    </>
+                  ) : (
+                    "Dark until they sign in. Send them this link."
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <input
+                readOnly
+                value={state.link}
+                aria-label="Invite link"
+                onFocus={(e) => e.currentTarget.select()}
+                className="min-w-0 flex-1 bg-bg px-2 py-2 text-[11px] text-cream normal-case outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => copy(state.link)}
+                className={`btn-press min-w-[80px] px-3 text-[10px] ${copied ? "bg-lime text-bg" : "border-2 border-lime text-lime"}`}
+              >
+                {copied ? "Copied" : "Copy link"}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }
@@ -462,14 +529,17 @@ function AdminBox({
   viewerLogin: string;
   kind: "company" | "custom";
 }) {
-  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+  const [saving, setSaving] = useState<string | null>(null);
+  const [refreshing, startRefresh] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const busy = saving !== null || refreshing;
   const candidates = members.filter(
     (m) => m.status === "active" && m.login !== viewerLogin && (kind === "custom" || m.verification),
   );
 
   async function patch(body: Record<string, string>) {
-    setBusy(true);
+    setSaving(Object.values(body)[0] ?? "saving");
     setError(null);
     try {
       const res = await fetch(`/api/leagues/${slug}`, {
@@ -482,9 +552,11 @@ function AdminBox({
         setError(json.error ?? "Couldn't save.");
         return;
       }
-      window.location.reload();
+      startRefresh(() => router.refresh());
+    } catch {
+      setError("Network error. Try again.");
     } finally {
-      setBusy(false);
+      setSaving(null);
     }
   }
 
@@ -506,9 +578,10 @@ function AdminBox({
             onClick={() => patch({ scoring_mode: id })}
             className={`btn-press border-2 px-3 py-1.5 text-[10px] ${mode === id ? "border-lime text-lime" : "border-border text-muted hover:text-cream"}`}
           >
-            {label}
+            {saving === id ? <Pending label="Saving" /> : label}
           </button>
         ))}
+        {refreshing && saving === null && <PixelSpinner size={4} />}
       </div>
       {candidates.length > 0 && (
         <form
@@ -533,8 +606,8 @@ function AdminBox({
               </option>
             ))}
           </select>
-          <button type="submit" disabled={busy} className="btn-press border-2 border-border px-3 py-1.5 text-[10px] text-cream">
-            Transfer
+          <button type="submit" disabled={busy} className="btn-press min-w-[96px] border-2 border-border px-3 py-1.5 text-[10px] text-cream disabled:opacity-50">
+            {saving && saving !== "xp" && saving !== "contributions" ? <Pending label="Moving" /> : "Transfer"}
           </button>
         </form>
       )}

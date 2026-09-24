@@ -21,7 +21,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
   const body = await readJson(req);
   try {
-    const result = await inviteMember(viewer, league, typeof body.login === "string" ? body.login : "");
+    // Link on the same host the inviter is using (preview, local, prod).
+    const origin = (process.env.PORTLESS_URL ?? new URL(req.url).origin).replace(/\/$/, "");
+    const result = await inviteMember(viewer, league, typeof body.login === "string" ? body.login : "", origin);
     return NextResponse.json(result);
   } catch (err) {
     return leagueErrorResponse(err);
