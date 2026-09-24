@@ -3,10 +3,10 @@
 import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
-import { CuboidCollider, RigidBody, type RapierRigidBody } from "@react-three/rapier";
+import { CuboidCollider, RigidBody, useBeforePhysicsStep, type RapierRigidBody } from "@react-three/rapier";
 import { Howl, Howler } from "howler";
 import * as THREE from "three";
-import { FLAG_BOOST, FLAG_BRAKE, FLAG_HORN, INTERP_MS, emptySnapshot, type DriverInfo } from "@/lib/league-city/drive/net";
+import { FLAG_BOOST, FLAG_BRAKE, FLAG_HORN, INTERP_MS, emptySnapshot, type CarSnapshot, type DriverInfo } from "@/lib/league-city/drive/net";
 import { startHorn } from "@/lib/league-city/drive/horn";
 import { CHASSIS, M_TO_UNIT, STEER, WHEEL } from "@/lib/league-city/drive/tuning";
 import { WHEELS } from "@/lib/league-city/drive/vehicle";
@@ -16,11 +16,12 @@ import Lights from "./Lights";
 import type { FxSource, FxSources } from "./fx";
 import type { RemoteDriver } from "./useDrivePresence";
 
-// Everyone else driving in this city. Each car is drawn INTERP_MS behind
-// real time between two snapshots, carries a kinematic collider (you bump
-// into it, it doesn't bump back: each player sees their own car react), a
-// name tag in their color, lights, tire marks and smoke, and sound that fades
-// with distance.
+// Everyone else driving in this city. Each car follows its snapshots
+// (INTERP_MS behind real time) as a dynamic body with the same mass as yours,
+// steered toward where the network says it is. A crash is a real equal-mass
+// hit on your side; the other driver gets pushed on theirs by a bump message
+// (see DriveWorld). Plus a name tag in their color, lights, tire marks, smoke
+// and sound that fades with distance.
 
 const BASE = "/sounds/drive";
 
@@ -30,6 +31,22 @@ function falloff(d: number): number {
   return k * k;
 }
 
+/** How hard the body chases its network pose (1/s), and past what error (m) it just jumps there. */
+const FOLLOW = 10;
+const TURN_FOLLOW = 12;
+const SNAP_DIST = 6;
+
+const [HX, HY, HZ] = CHASSIS.half;
+const M12 = CHASSIS.mass / 12;
+const MASS = {
+  mass: CHASSIS.mass,
+  centerOfMass: { x: 0, y: CHASSIS.comY - CHASSIS.colliderY, z: 0 },
+  principalAngularInertia: { x: M12 * (4 * HY * HY + 4 * HZ * HZ), y: M12 * (4 * HX * HX + 4 * HZ * HZ), z: M12 * (4 * HX * HX + 4 * HY * HY) },
+  angularInertiaLocalFrame: { x: 0, y: 0, z: 0, w: 1 },
+};
+
+const _qa = new THREE.Quaternion();
+const _qb = new THREE.Quaternion();
 const _p = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _axisX = new THREE.Vector3(1, 0, 0);
@@ -49,6 +66,10 @@ function RemoteCar({
 }) {
   const group = useRef<THREE.Group>(null);
   const body = useRef<RapierRigidBody>(null);
+  const anchor = useRef<THREE.Object3D>(null);
+  const target = useRef<CarSnapshot>(emptySnapshot());
+  const before = useRef<CarSnapshot>(emptySnapshot());
+  const placed = useRef(false);
   const wheelRefs = useRef<(THREE.Object3D | null)[]>([]);
   const snap = useRef(emptySnapshot());
   const spin = useRef(0);
@@ -88,20 +109,51 @@ function RemoteCar({
     };
   }, []);
 
+  // Each physics step: velocity toward the network pose, so contacts in
+  // between are real equal-mass hits and it settles back on track after.
+  useBeforePhysicsStep(() => {
+    const b = body.current;
+    const now = performance.now() - INTERP_MS;
+    const t = remote.buffer.sample(now, target.current);
+    const p0 = remote.buffer.sample(now - 50, before.current);
+    if (!b || !t || !p0) return;
+    const pos = b.translation();
+    const ex = t.x - pos.x;
+    const ey = t.y - pos.y;
+    const ez = t.z - pos.z;
+    if (!placed.current || Math.hypot(ex, ey, ez) > SNAP_DIST) {
+      placed.current = true;
+      b.setTranslation({ x: t.x, y: t.y, z: t.z }, true);
+      b.setRotation({ x: t.qx, y: t.qy, z: t.qz, w: t.qw }, true);
+      b.setLinvel({ x: (t.x - p0.x) / 0.05, y: 0, z: (t.z - p0.z) / 0.05 }, true);
+      b.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      return;
+    }
+    b.setLinvel(
+      { x: (t.x - p0.x) / 0.05 + ex * FOLLOW, y: (t.y - p0.y) / 0.05 + ey * FOLLOW, z: (t.z - p0.z) / 0.05 + ez * FOLLOW },
+      true,
+    );
+    // Rotation error as an axis-angle, the short way round.
+    const r = b.rotation();
+    _qa.set(t.qx, t.qy, t.qz, t.qw).multiply(_qb.set(r.x, r.y, r.z, r.w).invert());
+    if (_qa.w < 0) _qa.set(-_qa.x, -_qa.y, -_qa.z, -_qa.w);
+    const angle = 2 * Math.acos(Math.min(1, _qa.w));
+    const sin = Math.sqrt(Math.max(1e-9, 1 - _qa.w * _qa.w));
+    const k = (angle * TURN_FOLLOW) / sin;
+    b.setAngvel({ x: _qa.x * k, y: _qa.y * k, z: _qa.z * k }, true);
+  });
+
   useFrame((_, dt) => {
     const g = group.current;
     if (!g) return;
     const s = remote.buffer.sample(performance.now() - INTERP_MS, snap.current);
-    g.visible = !!s;
-    if (!s) return;
+    // The body's own (interpolated) group, meters.
+    const src = anchor.current?.parent;
+    g.visible = !!s && placed.current;
+    if (!s || !src) return;
 
-    g.position.set(s.x * M_TO_UNIT, s.y * M_TO_UNIT, s.z * M_TO_UNIT);
-    g.quaternion.set(s.qx, s.qy, s.qz, s.qw);
-    const b = body.current;
-    if (b) {
-      b.setNextKinematicTranslation({ x: s.x, y: s.y, z: s.z });
-      b.setNextKinematicRotation({ x: s.qx, y: s.qy, z: s.qz, w: s.qw });
-    }
+    g.position.copy(src.position).multiplyScalar(M_TO_UNIT);
+    g.quaternion.copy(src.quaternion);
     flags.current = s.flags;
 
     // Wheels: steer from the snapshot, spin from speed, suspension at rest.
@@ -142,11 +194,20 @@ function RemoteCar({
     }
   });
 
-  const [hx, hy, hz] = CHASSIS.half;
   return (
     <>
-      <RigidBody ref={body} type="kinematicPosition" colliders={false} userData={{ remoteCar: remote.id }}>
-        <CuboidCollider args={[hx, hy, hz]} position={[0, CHASSIS.colliderY, 0]} friction={0.3} />
+      <RigidBody
+        ref={body}
+        type="dynamic"
+        colliders={false}
+        gravityScale={0}
+        canSleep={false}
+        ccd
+        position={[0, -50, 0]}
+        userData={{ remoteCar: remote.id }}
+      >
+        <object3D ref={anchor} />
+        <CuboidCollider args={CHASSIS.half} position={[0, CHASSIS.colliderY, 0]} friction={0.3} massProperties={MASS} />
       </RigidBody>
       <group ref={group} visible={false}>
         <CarModel color={remote.color} wheelRefs={wheelRefs}>

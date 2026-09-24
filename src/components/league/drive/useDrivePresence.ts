@@ -13,6 +13,7 @@ import {
   carColor,
   decodeState,
   encodeState,
+  validBump,
   type CarSnapshot,
   type DriverInfo,
   type ServerMsg,
@@ -46,12 +47,19 @@ export function useDrivePresence({
   name,
   car,
   input,
+  onBump,
 }: {
   slug: string;
   name: string;
   car: React.MutableRefObject<CarApi | null>;
   input: React.MutableRefObject<DriveInputRef>;
+  /** Someone hit you: apply this velocity change (m/s) to your car. */
+  onBump: (from: string, x: number, z: number) => void;
 }) {
+  const onBumpRef = useRef(onBump);
+  useEffect(() => {
+    onBumpRef.current = onBump;
+  });
   const remotes = useRef(new Map<string, RemoteDriver>());
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
   const socket = useRef<PartySocket | null>(null);
@@ -97,6 +105,9 @@ export function useDrivePresence({
       } else if (msg.t === "join") {
         add(msg.id, msg.name);
         publish();
+      } else if (msg.t === "bump") {
+        const v = validBump(msg.x, msg.z);
+        if (v && map.has(msg.from)) onBumpRef.current(msg.from, v.x, v.z);
       } else if (msg.t === "leave") {
         map.delete(msg.id);
         publish();
@@ -135,5 +146,11 @@ export function useDrivePresence({
     ws.send(JSON.stringify(["s", ...encodeState(_snap)]));
   });
 
-  return { remotes, drivers };
+  /** Tell the driver you hit how their car should move. */
+  const sendBump = (to: string, x: number, z: number) => {
+    const ws = socket.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: "bump", to, x, z }));
+  };
+
+  return { remotes, drivers, sendBump };
 }

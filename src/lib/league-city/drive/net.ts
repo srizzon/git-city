@@ -11,6 +11,10 @@ export const MAX_MESSAGE_BYTES = 512;
 /** Physics works in meters; a 40-lot city spans ±400 m. Anything past this is junk. */
 export const COORD_MAX = 1000;
 
+/** A bump is a velocity change (m/s) for the car that was hit; capped. */
+export const BUMP_MAX = 25;
+export const BUMP_MIN_MS = 100;
+
 export const FLAG_BRAKE = 1;
 export const FLAG_BOOST = 2;
 export const FLAG_DRIFT = 4;
@@ -41,13 +45,14 @@ export interface DriverInfo {
 }
 
 // Client → server
-export type ClientMsg = { t: "hello"; name: string } | ["s", ...number[]];
+export type ClientMsg = { t: "hello"; name: string } | { t: "bump"; to: string; x: number; z: number } | ["s", ...number[]];
 // Server → client
 export type ServerMsg =
   | { t: "welcome"; you: string; drivers: (DriverInfo & { s: number[] | null })[] }
   | { t: "join"; id: string; name: string }
   | { t: "leave"; id: string }
   | { t: "full" }
+  | { t: "bump"; from: string; x: number; z: number }
   | ["s", string, ...number[]];
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -68,6 +73,15 @@ export function decodeState(a: readonly unknown[]): CarSnapshot | null {
   if (Math.abs(speed) > 100 || Math.abs(steer) > 1.5 || slip < 0 || slip > 1) return null;
   if (!Number.isInteger(flags) || flags < 0 || flags > 15) return null;
   return { x, y, z, qx: qx / qn, qy: qy / qn, qz: qz / qn, qw: qw / qn, speed, steer, slip, flags };
+}
+
+/** A bump's velocity change, or null when it isn't a sane one. */
+export function validBump(x: unknown, z: unknown): { x: number; z: number } | null {
+  if (typeof x !== "number" || typeof z !== "number" || !Number.isFinite(x) || !Number.isFinite(z)) return null;
+  const m = Math.hypot(x, z);
+  if (m === 0) return null;
+  const k = m > BUMP_MAX ? BUMP_MAX / m : 1;
+  return { x: x * k, z: z * k };
 }
 
 const LOGIN_RE = /^[a-zA-Z0-9-]{1,39}$/;

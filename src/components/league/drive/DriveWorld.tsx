@@ -17,7 +17,7 @@ import type { CityObject } from "@/lib/league-city/types";
 import { buildColliders, colliderKey, type ColliderSpec } from "@/lib/league-city/drive/colliders";
 import { spawnPoint } from "@/lib/league-city/drive/spawn";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import { GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
+import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
 import Car, { type CarApi } from "./Car";
 import DriveCamera from "./DriveCamera";
 import Lights from "./Lights";
@@ -57,6 +57,12 @@ export interface DriveWorldProps {
   /** Who else is driving here, for the HUD. */
   onDrivers: (drivers: DriverInfo[]) => void;
 }
+
+/** A bump carries this share of the hitter's relative velocity, plus a small hop (m/s). */
+const BUMP_SHARE = 0.7;
+const BUMP_HOP = 1.2;
+/** A crash counts once, whichever side sees it first (ms). */
+const BUMP_DEDUPE_MS = 500;
 
 class Boundary extends Component<{ onFail: () => void; children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -212,7 +218,32 @@ export default function DriveWorld({
   const car = useRef<CarApi | null>(null);
   const impact = useRef({ strength: 0, at: 0 });
   const fx = useRef(new Map<string, FxSource>());
-  const { remotes, drivers } = useDrivePresence({ slug, name, car, input });
+  // Crashes with other drivers. Whoever sees the contact tells the other one
+  // how to move; a bump for a crash you already felt locally is dropped.
+  const contacts = useRef(new Map<string, number>());
+  const { remotes, drivers, sendBump } = useDrivePresence({
+    slug,
+    name,
+    car,
+    input,
+    onBump: (from, x, z) => {
+      const c = car.current;
+      if (!c || performance.now() - (contacts.current.get(from) ?? 0) < BUMP_DEDUPE_MS) return;
+      c.body.applyImpulse({ x: x * CHASSIS.mass, y: BUMP_HOP * CHASSIS.mass, z: z * CHASSIS.mass }, true);
+      impact.current = { strength: Math.min(1, Math.hypot(x, z) / 12), at: performance.now() };
+    },
+  });
+  const onRemoteHit = (id: string, other: RapierRigidBody) => {
+    const c = car.current;
+    const now = performance.now();
+    const last = contacts.current.get(id) ?? 0;
+    contacts.current.set(id, now);
+    if (!c || now - last < BUMP_DEDUPE_MS) return;
+    // The car you hit picks up part of your speed relative to it.
+    const mine = c.body.linvel();
+    const theirs = other.linvel();
+    sendBump(id, (mine.x - theirs.x) * BUMP_SHARE, (mine.z - theirs.z) * BUMP_SHARE);
+  };
   useEffect(() => onDrivers(drivers), [drivers, onDrivers]);
 
   return (
@@ -236,6 +267,7 @@ export default function DriveWorld({
             telemetry={telemetry}
             apiRef={car}
             color={carColor(name)}
+            onRemoteHit={onRemoteHit}
             impact={impact}
           >
             <Lights braking={() => !!car.current?.state.braking} />

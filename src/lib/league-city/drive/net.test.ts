@@ -5,6 +5,7 @@ import {
   SnapshotBuffer,
   carColor,
   decodeState,
+  validBump,
   emptySnapshot,
   encodeState,
   guestName,
@@ -78,5 +79,18 @@ describe("interpolation", () => {
     for (let i = 0; i < 100; i++) b.push(i * 66, snap({ x: i }));
     expect(b.sample(0, emptySnapshot())!.x).toBe(80);
     expect(b.latest!.x).toBe(99);
+  });
+});
+
+describe("bumps", () => {
+  it("accepts a sane velocity change and caps a huge one", () => {
+    expect(validBump(3, -4)).toEqual({ x: 3, z: -4 });
+    const big = validBump(300, 400)!;
+    expect(Math.hypot(big.x, big.z)).toBeCloseTo(25);
+  });
+  it("refuses junk", () => {
+    expect(validBump(NaN, 1)).toBeNull();
+    expect(validBump("1", 1)).toBeNull();
+    expect(validBump(0, 0)).toBeNull();
   });
 });

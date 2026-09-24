@@ -62,6 +62,7 @@ export default function Car({
   apiRef,
   impact,
   color,
+  onRemoteHit,
   onReset,
   children,
 }: {
@@ -76,6 +77,8 @@ export default function Car({
   impact: React.MutableRefObject<{ strength: number; at: number }>;
   /** Paint, the same color everyone else sees you in. */
   color: string;
+  /** You touched another driver's car (its body, for its velocity). */
+  onRemoteHit?: (id: string, other: RapierRigidBody) => void;
   /** R, or fell out of the world: back to the spawn point. */
   onReset?: () => void;
   /** Rendered inside the visible car (lights). */
@@ -194,6 +197,10 @@ export default function Car({
         angularDamping={CHASSIS.angularDamping}
         ccd
         userData={{ car: true }}
+        onCollisionEnter={({ other }) => {
+          const id = (other.rigidBodyObject?.userData as { remoteCar?: string } | undefined)?.remoteCar;
+          if (id && other.rigidBody) onRemoteHit?.(id, other.rigidBody);
+        }}
         onContactForce={({ totalForceMagnitude }) => {
           const strength = Math.min(1, totalForceMagnitude / IMPACT_FULL);
           const now = performance.now();

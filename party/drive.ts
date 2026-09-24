@@ -3,7 +3,9 @@ import {
   MAX_DRIVERS,
   MAX_MESSAGE_BYTES,
   SEND_MS,
+  BUMP_MIN_MS,
   decodeState,
+  validBump,
   encodeState,
   validName,
   type ServerMsg,
@@ -20,6 +22,7 @@ interface Driver {
   /** Last valid state, re-encoded, for late joiners. */
   state: number[] | null;
   lastState: number;
+  lastBump: number;
 }
 
 export default class DriveServer implements Party.Server {
@@ -61,13 +64,26 @@ export default class DriveServer implements Party.Server {
     }
 
     if (!msg || typeof msg !== "object") return;
-    const { t, name } = msg as { t?: unknown; name?: unknown };
+    const { t, name, to, x, z } = msg as { t?: unknown; name?: unknown; to?: unknown; x?: unknown; z?: unknown };
+
+    // A bump: sender hit `to`; forward the velocity change to that driver only.
+    if (t === "bump") {
+      const d = this.drivers.get(sender.id);
+      const now = Date.now();
+      const v = validBump(x, z);
+      if (!d || !v || typeof to !== "string" || to === sender.id || !this.drivers.has(to)) return;
+      if (now - d.lastBump < BUMP_MIN_MS) return;
+      d.lastBump = now;
+      this.room.getConnection(to)?.send(JSON.stringify({ t: "bump", from: sender.id, x: v.x, z: v.z } satisfies ServerMsg));
+      return;
+    }
+
     if (t !== "hello" || !validName(name) || this.drivers.has(sender.id)) return;
     if (this.drivers.size >= MAX_DRIVERS) {
       sender.send(JSON.stringify({ t: "full" } satisfies ServerMsg));
       return;
     }
-    this.drivers.set(sender.id, { name, state: null, lastState: 0 });
+    this.drivers.set(sender.id, { name, state: null, lastState: 0, lastBump: 0 });
     this.room.broadcast(JSON.stringify({ t: "join", id: sender.id, name } satisfies ServerMsg), [sender.id]);
   }
 
