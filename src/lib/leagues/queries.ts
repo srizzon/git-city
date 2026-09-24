@@ -1,5 +1,8 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CITY_DEV_COLUMNS, loadCityExtras, mergeCityExtras } from "@/lib/city-extras";
+import type { LayoutNorms } from "@/lib/github";
 import { isoDay, weekStart } from "./scoring";
 import { loadStandings, loadLeagueStandings, type LeagueWeekStandings } from "./standings";
 import type { League, MemberStatus, Viewer } from "./service";
@@ -217,3 +220,69 @@ export async function getDevLeagues(devId: number): Promise<{ slug: string; name
     .returns<{ leagues: { slug: string; name: string; kind: string } }[]>();
   return (data ?? []).map((r) => r.leagues).sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "company" ? -1 : 1));
 }
+
+// ─── Mini-city ──────────────────────────────────────────────
+
+/**
+ * Developer rows for the league's mini-city (active + invited members), in the
+ * /api/city shape, with invited members flagged dark.
+ */
+export async function getLeagueCityDevs(members: LeagueMemberRow[]): Promise<Record<string, unknown>[]> {
+  const shown = members.filter((m) => m.status !== "former");
+  if (shown.length === 0) return [];
+  const sb = getSupabaseAdmin();
+  const ids = shown.map((m) => m.developer_id);
+  const status = new Map(shown.map((m) => [m.developer_id, m.status]));
+
+  const devs: { id: number; rank: number | null }[] = [];
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data } = await sb
+      .from("developers")
+      .select(CITY_DEV_COLUMNS)
+      .in("id", ids.slice(i, i + 300))
+      .returns<{ id: number; rank: number | null }[]>();
+    devs.push(...(data ?? []));
+  }
+  devs.sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER));
+  const extras = await loadCityExtras(sb, ids);
+  return mergeCityExtras(devs, extras).map((d) => ({ ...d, dark: status.get(d.id) === "invited" }));
+}
+
+/**
+ * City-wide height maxima so mini-city buildings match their main-city size
+ * (the layout only reads maxContrib/maxStars/maxContribV2 for heights; the
+ * other norms fall back to the subset). Cached 1h.
+ */
+export const getCityNorms = unstable_cache(
+  async (): Promise<LayoutNorms> => {
+    const sb = getSupabaseAdmin();
+    const top = async (col: string) => {
+      const { data } = await sb
+        .from("developers")
+        .select(col)
+        .not(col, "is", null)
+        .order(col, { ascending: false })
+        .limit(1)
+        .returns<Record<string, number>[]>();
+      return Number(data?.[0]?.[col] ?? 1) || 1;
+    };
+    const [contributions, stars, contributionsTotal] = await Promise.all([
+      top("contributions"),
+      top("total_stars"),
+      top("contributions_total"),
+    ]);
+    return {
+      maxContrib: contributions,
+      maxStars: stars,
+      maxContribV2: contributionsTotal,
+      maxComposite: 1e-6,
+      maxXp: 1,
+      maxSpent: 1,
+      maxVisits: 1,
+      maxCustom: 1,
+      devCount: 0,
+    };
+  },
+  ["league-city-norms"],
+  { revalidate: 3600 },
+);
