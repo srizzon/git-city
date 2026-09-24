@@ -3,6 +3,7 @@
 import "@/lib/silenceThreeClockWarning";
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import dynamic from "next/dynamic";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -16,6 +17,13 @@ import LeagueRamps from "./LeagueRamps";
 import LeagueRoads from "./LeagueRoads";
 import LeagueTrees from "./LeagueTrees";
 import EditCamera, { type EditCameraApi, type LotEvent, type Pickable } from "./editor/EditCamera";
+import type { DriveWorldProps } from "./drive/DriveWorld";
+
+// Drive mode (Rapier, the car, its sounds) loads only when someone drives.
+const DriveWorld = dynamic(() => import("./drive/DriveWorld"), { ssr: false, loading: () => null });
+
+/** Props that become physics bodies in drive mode (drawn by DriveWorld instead). */
+const KNOCKABLE = new Set(["lamp", "bench", "fountain"]);
 
 // Full-screen league city: one Canvas, midnight theme, the league's lots with
 // roads, trees, decorations and member buildings (invited ones faded).
@@ -88,9 +96,10 @@ function PlazaSlabs({ objects }: { objects: CityObject[] }) {
   );
 }
 
-function toDecorations(objects: CityObject[]): CityDecoration[] {
+function toDecorations(objects: CityObject[], driving: boolean): CityDecoration[] {
   const out: CityDecoration[] = [];
   for (const o of objects) {
+    if (driving && o.item_type && KNOCKABLE.has(o.item_type)) continue;
     const [x, z] = o.px !== null && o.pz !== null ? [o.px, o.pz] : lotToWorld(o.x, o.z);
     const rotation = rotToRadians(o.rot);
     if (o.item_type === "lamp") out.push({ type: "streetLamp", position: [x, 0, z], rotation, variant: 0 });
@@ -118,7 +127,18 @@ const _fromLook = new THREE.Vector3();
 
 // Frames the terrain, and flies to a selected building like the home city
 // (camera outside the building, looking at its top), then back on close.
-function LeagueCamera({ size, focus, spin = true }: { size: number; focus: CityBuilding | null; spin?: boolean }) {
+function LeagueCamera({
+  size,
+  focus,
+  spin = true,
+  driving = false,
+}: {
+  size: number;
+  focus: CityBuilding | null;
+  spin?: boolean;
+  /** The drive camera owns the view; on exit this eases back to the orbit. */
+  driving?: boolean;
+}) {
   const camera = useThree((s) => s.camera);
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
   const frame = useMemo(() => cameraFrame(size, aspect), [size, aspect]);
@@ -174,10 +194,27 @@ function LeagueCamera({ size, focus, spin = true }: { size: number; focus: CityB
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus, frame]);
 
+  // Back from driving: look ahead from where the chase camera was, then fly home.
+  const wasDriving = useRef(driving);
+  useEffect(() => {
+    const was = wasDriving.current;
+    wasDriving.current = driving;
+    const c = controls.current;
+    if (driving) {
+      fly.current.t = 1;
+      setRotate(false);
+      return;
+    }
+    if (!was || !c) return;
+    c.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 60);
+    flyTo(frame.position, frame.target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driving]);
+
   useFrame((_, delta) => {
     const f = fly.current;
     const c = controls.current;
-    if (f.t >= 1 || !c) return;
+    if (driving || f.t >= 1 || !c) return;
     f.t = Math.min(1, f.t + delta * 0.9);
     const e = 1 - Math.pow(1 - f.t, 3); // ease-out cubic, as the home city
     camera.position.lerpVectors(_fromPos, f.toPos, e);
@@ -198,12 +235,13 @@ function LeagueCamera({ size, focus, spin = true }: { size: number; focus: CityB
     <OrbitControls
       ref={controls}
       makeDefault
+      enabled={!driving}
       enableDamping
       dampingFactor={0.08}
       minDistance={80}
       maxDistance={frame.max}
       maxPolarAngle={Math.PI * 0.44}
-      autoRotate={spin && rotate && !hidden && !focus}
+      autoRotate={spin && rotate && !hidden && !focus && !driving}
       autoRotateSpeed={0.35}
       onStart={() => {
         fly.current.t = 1;
@@ -215,7 +253,7 @@ function LeagueCamera({ size, focus, spin = true }: { size: number; focus: CityB
 
 // ─── Scene ───────────────────────────────────────────────────
 
-export type SceneMode = "view" | "edit" | "preview";
+export type SceneMode = "view" | "edit" | "preview" | "drive";
 
 export interface LeagueSceneProps {
   size: number;
@@ -231,6 +269,8 @@ export interface LeagueSceneProps {
   editPickables?: React.MutableRefObject<Pickable[]>;
   /** Editor overlays (grid, ghost, selection), rendered inside the Canvas. */
   children?: React.ReactNode;
+  /** Drive mode: the car and its world. */
+  drive?: Omit<DriveWorldProps, "objects" | "buildings" | "size">;
 }
 
 export default function LeagueScene({
@@ -244,15 +284,21 @@ export default function LeagueScene({
   editApiRef,
   editPickables,
   children,
+  drive,
 }: LeagueSceneProps) {
   const editing = mode === "edit";
+  const driving = mode === "drive" && !!drive;
   const focusedBuilding = useMemo(
     () => (focused ? (buildings.find((b) => b.loginLower === focused.toLowerCase()) ?? null) : null),
     [buildings, focused],
   );
   const [lost, setLost] = useState(false);
-  const decorations = useMemo(() => toDecorations(objects), [objects]);
+  const decorations = useMemo(() => toDecorations(objects, driving), [objects, driving]);
   const initial = useMemo(() => cameraFrame(size), [size]);
+  const driveRef = useRef(drive);
+  useEffect(() => {
+    driveRef.current = drive;
+  }, [drive]);
 
   if (lost) {
     return (
@@ -282,6 +328,7 @@ export default function LeagueScene({
         gl.domElement.addEventListener("webglcontextlost", (e) => {
           e.preventDefault();
           setLost(true);
+          driveRef.current?.onFail();
         });
       }}
     >
@@ -290,7 +337,7 @@ export default function LeagueScene({
       {editing ? (
         <EditCamera size={size} onLot={onLot ?? (() => {})} apiRef={editApiRef} pickables={editPickables} />
       ) : (
-        <LeagueCamera size={size} focus={mode === "view" ? focusedBuilding : null} spin={mode === "view"} />
+        <LeagueCamera size={size} focus={mode === "view" ? focusedBuilding : null} spin={mode === "view"} driving={driving} />
       )}
 
       <LeagueGround size={size} />
@@ -306,9 +353,10 @@ export default function LeagueScene({
         buildings={buildings}
         colors={theme.building}
         accentColor={theme.building.accent}
-        focusedBuilding={editing ? null : (focused ?? null)}
-        onBuildingClick={editing ? undefined : onBuildingClick}
+        focusedBuilding={editing || driving ? null : (focused ?? null)}
+        onBuildingClick={editing || driving ? undefined : onBuildingClick}
       />
+      {driving && drive && <DriveWorld objects={objects} buildings={buildings} size={size} {...drive} />}
       {children}
     </Canvas>
   );

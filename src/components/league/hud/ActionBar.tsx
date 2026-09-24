@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Pencil, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { Car, Check, Pencil, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
 import { HUD_BOX } from "./shared";
 
 // Segments of one bar: hover tints in place (btn-press would shift a segment
@@ -19,6 +19,7 @@ export default function ActionBar({
   verifyHref,
   onInvite,
   onEdit,
+  onDrive,
 }: {
   slug: string;
   canInvite: boolean;
@@ -26,11 +27,13 @@ export default function ActionBar({
   verifyHref: string | null;
   onInvite: () => void;
   onEdit?: () => void;
+  onDrive?: () => void;
 }) {
   const [shared, setShared] = useState(false);
   const [coarse, setCoarse] = useState(false);
   const [editHint, setEditHint] = useState(false);
-  // The editor needs a mouse and room for the hotbar.
+  const [driveHint, setDriveHint] = useState(false);
+  // The editor and driving need a mouse (or pad) and room for their HUD.
   const [desktop, setDesktop] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(pointer: fine) and (min-width: 1024px)");
@@ -53,6 +56,11 @@ export default function ActionBar({
     const t = setTimeout(() => setEditHint(false), 2200);
     return () => clearTimeout(t);
   }, [editHint]);
+  useEffect(() => {
+    if (!driveHint) return;
+    const t = setTimeout(() => setDriveHint(false), 2200);
+    return () => clearTimeout(t);
+  }, [driveHint]);
 
   async function share() {
     const url = `${window.location.origin}/league/${slug}`;
@@ -75,9 +83,39 @@ export default function ActionBar({
 
   const editLabel = "Edit on a computer";
   const canEdit = desktop && !!onEdit;
+  const driveLabel = "Drive on a computer";
 
   return (
     <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border`}>
+      {onDrive && desktop && (
+        <button type="button" onClick={onDrive} title="Drive through the city" className={`${BTN} text-lime hover:text-cream`}>
+          <Car {...ICON} aria-hidden />
+          <span>Drive</span>
+        </button>
+      )}
+      {onDrive && !desktop && (
+        <span className="relative flex">
+          <button
+            type="button"
+            aria-disabled="true"
+            aria-label={`Drive. ${driveLabel}`}
+            onClick={() => setDriveHint(true)}
+            onMouseEnter={() => !coarse && setDriveHint(true)}
+            onMouseLeave={() => !coarse && setDriveHint(false)}
+            className={`${ICON_BTN} cursor-not-allowed text-dim hover:bg-transparent`}
+          >
+            <Car {...ICON} aria-hidden />
+          </button>
+          {driveHint && (
+            <span
+              role="status"
+              className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 animate-[fade-in_0.15s_ease-out] whitespace-nowrap border-2 border-border bg-bg px-2 py-1 text-[9px] text-muted"
+            >
+              {driveLabel}
+            </span>
+          )}
+        </span>
+      )}
       {canInvite && (
         <button type="button" onClick={onInvite} className={`${BTN} text-lime hover:text-cream`}>
           <UserPlus {...ICON} aria-hidden />
