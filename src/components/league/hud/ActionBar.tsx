@@ -18,16 +18,27 @@ export default function ActionBar({
   isAdmin,
   verifyHref,
   onInvite,
+  onEdit,
 }: {
   slug: string;
   canInvite: boolean;
   isAdmin: boolean;
   verifyHref: string | null;
   onInvite: () => void;
+  onEdit?: () => void;
 }) {
   const [shared, setShared] = useState(false);
   const [coarse, setCoarse] = useState(false);
   const [editHint, setEditHint] = useState(false);
+  // The editor needs a mouse and room for the hotbar.
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: fine) and (min-width: 1024px)");
+    const on = () => setDesktop(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(pointer: coarse)");
@@ -62,7 +73,8 @@ export default function ActionBar({
     }
   }
 
-  const editLabel = coarse ? "Edit on a computer" : "Editor coming soon";
+  const editLabel = "Edit on a computer";
+  const canEdit = desktop && !!onEdit;
 
   return (
     <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border`}>
@@ -82,7 +94,13 @@ export default function ActionBar({
         {shared ? <Check {...ICON} aria-hidden /> : <Share2 {...ICON} aria-hidden />}
         <span>{shared ? "Copied" : "Share"}</span>
       </button>
-      {isAdmin && (
+      {isAdmin && canEdit && (
+        <button type="button" onClick={onEdit} title="Edit the city" className={`${BTN} text-cream hover:text-lime`}>
+          <Pencil {...ICON} aria-hidden />
+          <span>Edit</span>
+        </button>
+      )}
+      {isAdmin && !canEdit && (
         <span className="relative flex">
           <button
             type="button"
