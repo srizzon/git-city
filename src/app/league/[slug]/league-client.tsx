@@ -32,6 +32,7 @@ import { useEditorController } from "@/components/league/editor/useEditorControl
 import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { SceneMode } from "@/components/league/LeagueScene";
 import { createEditorStore } from "@/lib/league-city/editor/store";
+import { keyToAction } from "@/lib/league-city/editor/shortcuts";
 import { HOTBAR, initEditor, objectAtSpot, type Notice } from "@/lib/league-city/editor/state";
 
 const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
@@ -123,6 +124,20 @@ export default function LeagueClient({
     router.refresh();
   }, [league.slug, router]);
   const autosave = useCityAutosave(league.slug, store, { enabled: editing, onForbidden });
+
+  // In preview the editor's keys are off; P (and Esc) still bring you back.
+  useEffect(() => {
+    if (mode !== "preview") return;
+    const onKey = (e: KeyboardEvent) => {
+      const k = keyToAction(e);
+      if (k?.type === "preview" || k?.type === "cancel") {
+        e.preventDefault();
+        setMode("edit");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode]);
 
   const enterEdit = () => {
     setFocused(null);
