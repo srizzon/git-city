@@ -1,5 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase-server";
-import { githubLoginFromIdentity } from "@/lib/auth-identity";
+import { githubLoginFromIdentity, isAdminUser } from "@/lib/auth-identity";
 import { getActivePool } from "@/lib/landmarks/repository";
 import { chooseLandmarks, computeSeed } from "@/lib/landmarks/selection";
 import { preload } from "react-dom";
@@ -35,5 +35,5 @@ export default async function HomePage({
     forceIncludeSlug: landmarkParam,
   });
 
-  return <HomeClient assignments={assignments} />;
+  return <HomeClient assignments={assignments} isAdmin={isAdminUser(user)} />;
 }

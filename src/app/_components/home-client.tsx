@@ -519,9 +519,11 @@ function getStreakTierColor(streak: number) {
 
 interface HomeContentProps {
   resolvedSponsors: ResolvedSponsor[];
+  /** Site admin, decided on the server from the GitHub identity. */
+  serverIsAdmin: boolean;
 }
 
-function HomeContent({ resolvedSponsors }: HomeContentProps) {
+function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
   const searchParams = useSearchParams();
   const userParam = searchParams.get("user");
   const giftedParam = searchParams.get("gifted");
@@ -1130,16 +1132,15 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     return () => clearTimeout(timer);
   }, [loadStage, buildings]);
 
-  // Admin check (client-side, for UI only - real auth is on the server endpoints)
+  // Admin UI toggle. The server decides it from the GitHub identity; the
+  // endpoints enforce it again, so this only hides or shows controls.
   useEffect(() => {
-    const adminLogins = (process.env.NEXT_PUBLIC_ADMIN_GITHUB_LOGINS ?? "")
-      .split(",").map(l => l.trim().toLowerCase()).filter(Boolean);
-    const admin = !!authLogin && adminLogins.includes(authLogin);
+    const admin = serverIsAdmin && !!authLogin;
     setIsAdmin(admin);
     if (admin) {
       fetch("/api/items").then(r => r.json()).then(d => setDropPlantItems(d.items ?? [])).catch(() => { });
     }
-  }, [authLogin]);
+  }, [authLogin, serverIsAdmin]);
 
   // Pixel balance for the HUD wallet chip. Refreshed on auth change; the Bank
   // panel pushes updates back via onBalanceChange after a purchase/swap.
@@ -6794,16 +6795,17 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
 
 interface HomeClientProps {
   assignments: Assignment[];
+  isAdmin: boolean;
 }
 
-export default function HomeClient({ assignments }: HomeClientProps) {
+export default function HomeClient({ assignments, isAdmin }: HomeClientProps) {
   const resolvedSponsors: ResolvedSponsor[] = useMemo(
     () => resolveAssignmentsToSponsors(assignments),
     [assignments],
   );
   return (
     <Suspense>
-      <HomeContent resolvedSponsors={resolvedSponsors} />
+      <HomeContent resolvedSponsors={resolvedSponsors} serverIsAdmin={isAdmin} />
     </Suspense>
   );
 }

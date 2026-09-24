@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { isAdminUser } from "@/lib/auth-identity";
 
 // Hex color validation
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -49,6 +50,9 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  // Lets the arcade page show its admin-only editor controls (UI only; the
+  // room PUT checks again).
+  const isAdmin = isAdminUser(user);
   const admin = getSupabaseAdmin();
 
   // Get developer_id
@@ -70,7 +74,7 @@ export async function GET() {
     .maybeSingle();
 
   if (loadout) {
-    return NextResponse.json({ loadout }, {
+    return NextResponse.json({ loadout, is_admin: isAdmin }, {
       headers: { "Cache-Control": "private, max-age=30" },
     });
   }
@@ -107,13 +111,13 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ loadout: { developer_id: dev.id, ...newLoadout } }, {
+    return NextResponse.json({ loadout: { developer_id: dev.id, ...newLoadout }, is_admin: isAdmin }, {
       headers: { "Cache-Control": "private, max-age=30" },
     });
   }
 
   // No avatar at all — return default (UI will show avatar editor)
-  return NextResponse.json({ loadout: null }, {
+  return NextResponse.json({ loadout: null, is_admin: isAdmin }, {
     headers: { "Cache-Control": "private, max-age=30" },
   });
 }

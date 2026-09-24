@@ -539,27 +539,13 @@ export default function ArcadeRoomPage({
       tokenRef.current = token;
       localIdRef.current = session.user.id;
 
-      // Check if user is admin
-      const ghLogin = (
-        session.user.user_metadata?.user_name ??
-        session.user.user_metadata?.preferred_username ??
-        ""
-      ).toLowerCase();
-      const adminLogins = (process.env.NEXT_PUBLIC_ADMIN_GITHUB_LOGINS ?? "")
-        .split(",")
-        .map((l: string) => l.trim().toLowerCase())
-        .filter(Boolean);
-      if (adminLogins.includes(ghLogin)) {
-        setIsAdmin(true);
-      }
-
       // 1. Load map, avatar, and shop catalog in parallel
       const [mapRes, avatarRes, shopRes] = await Promise.all([
         fetch(`/api/arcade/rooms/${slug}`, { cache: "no-store" }).then((r) => {
           if (!r.ok) throw new Error("Room not found");
           return r.json();
         }) as Promise<{ room: { map_json: GameMap; portals: RoomPortal[] | null } }>,
-        fetch("/api/arcade/avatar").then((r) => r.json()) as Promise<{ loadout: AvatarLoadout | null }>,
+        fetch("/api/arcade/avatar").then((r) => r.json()) as Promise<{ loadout: AvatarLoadout | null; is_admin?: boolean }>,
         fetch("/api/arcade/shop").then((r) => r.json()).catch(() => ({ items: [] })) as Promise<{ items: Array<{ id: string; file: string | null; no_tint: boolean; default_color: string | null }> }>,
       ]);
       const map = loadMapFromData(mapRes.room.map_json);
@@ -587,6 +573,8 @@ export default function ArcadeRoomPage({
       // The default is used to render remote players whose loadout wasn't synced
       // through PartyKit — without preloading, their hair/clothes sprites are
       // missing and they appear naked.
+      // Admin editor controls: the server decides from the GitHub identity.
+      if (avatarRes.is_admin) setIsAdmin(true);
       const loadout = avatarRes.loadout ?? getDefaultLoadout();
       await Promise.all([
         preloadLoadout(loadout),
