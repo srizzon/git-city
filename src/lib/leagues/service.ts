@@ -67,7 +67,7 @@ export async function getLeagueBySlug(slug: string): Promise<League | null> {
   return (data as League | null) ?? null;
 }
 
-async function getMembership(leagueId: string, devId: number) {
+export async function getMembership(leagueId: string, devId: number) {
   const { data } = await getSupabaseAdmin()
     .from("league_members")
     .select("status, verification, verified_until, invited_by, joined_at, removed_by")

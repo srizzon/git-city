@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import PixelSpinner from "@/components/leagues/PixelSpinner";
+import { useTownVisit } from "@/components/towns/useTownVisit";
 import {
   generateCityLayout,
   type CityBuilding,
@@ -98,6 +99,7 @@ export default function LeagueClient({
   const [mode, setMode] = useState<SceneMode>(startEditing && isAdmin ? "edit" : "view");
   const editing = mode === "edit" || mode === "preview";
   const driving = mode === "drive";
+  useTownVisit(league.slug, !!viewer && viewer.status !== "active" && viewer.status !== "invited", driving);
   const [store] = useState(() => createEditorStore(initEditor(city)));
   const cameraApi = useRef<EditCameraApi | null>(null);
   const pickables = useRef<Pickable[]>([]);
