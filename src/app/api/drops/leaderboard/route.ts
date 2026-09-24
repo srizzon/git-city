@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -73,11 +74,13 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: myDev } = await sb
+      const { data: myDevRows } = await sb
         .from("developers")
-        .select("id")
+        .select("id, github_login")
         .eq("claimed_by", user.id)
-        .single();
+        .order("claimed_at", { ascending: true })
+        .limit(CLAIMED_DEVELOPER_LIMIT);
+      const myDev = pickClaimedDeveloper(myDevRows, user);
       if (myDev && scores[myDev.id]) {
         const myPoints = scores[myDev.id];
         const myRank = sorted.findIndex((e) => e.developer_id === myDev.id) + 1;

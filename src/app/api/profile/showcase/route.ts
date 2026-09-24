@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import {
   MAX_FEATURED,
   buildTitlePool,
@@ -20,11 +21,13 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id, claimed, claimed_by, xp_level")
+    .select("id, github_login, claimed, claimed_by, xp_level")
     .eq("claimed_by", user.id)
-    .single();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
     return NextResponse.json({ error: "Must own a claimed building" }, { status: 403 });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { SURVEYS } from "@/lib/surveys";
 
@@ -15,11 +16,13 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ answered: false });
 
   const admin = getSupabaseAdmin();
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id")
+    .select("id, github_login")
     .eq("claimed_by", user.id)
-    .maybeSingle();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) return NextResponse.json({ answered: false });
 
@@ -63,11 +66,13 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const admin = getSupabaseAdmin();
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id")
+    .select("id, github_login")
     .eq("claimed_by", user.id)
-    .maybeSingle();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) return NextResponse.json({ error: "Developer not found" }, { status: 404 });
 

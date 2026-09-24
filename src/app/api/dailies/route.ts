@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { getDailyMissions, getTodayStr, trackDailyMission } from "@/lib/dailies";
 
 export async function GET() {
@@ -15,11 +16,13 @@ export async function GET() {
 
   const admin = getSupabaseAdmin();
 
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id, claimed, dailies_completed, dailies_streak, last_dailies_date, last_checkin_date")
+    .select("id, github_login, claimed, dailies_completed, dailies_streak, last_dailies_date, last_checkin_date")
     .eq("claimed_by", user.id)
-    .single();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev || !dev.claimed) {
     return NextResponse.json({ error: "Must claim building first" }, { status: 403 });

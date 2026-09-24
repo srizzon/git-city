@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 
 // Named full-building loadouts (Fortnite "Loadouts" / Roblox outfits): save a
 // whole look and re-apply it in one click. Stored in developer_customizations
@@ -22,7 +23,13 @@ async function ownerDev(): Promise<{ id: number } | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const admin = getSupabaseAdmin();
-  const { data: dev } = await admin.from("developers").select("id, claimed, claimed_by").eq("claimed_by", user.id).single();
+  const { data: rows } = await admin
+    .from("developers")
+    .select("id, github_login, claimed, claimed_by")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(rows, user);
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) return null;
   return { id: dev.id };
 }

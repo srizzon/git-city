@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 
 const VALID_DISTRICTS = [
@@ -37,11 +38,13 @@ export async function POST(request: Request) {
 
   // Fetch developer
   const admin = getSupabaseAdmin();
-  const { data: dev, error: devError } = await admin
+  const { data: devRows, error: devError } = await admin
     .from("developers")
-    .select("id, claimed, district, district_chosen, district_changes_count, district_changed_at")
+    .select("id, github_login, claimed, district, district_chosen, district_changes_count, district_changed_at")
     .eq("claimed_by", user.id)
-    .single();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (devError || !dev) {
     return NextResponse.json({ error: "Developer not found" }, { status: 404 });

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { VOTABLE_ITEM_IDS } from "@/lib/roadmap-data";
 
 export async function toggleVote(itemId: string) {
@@ -24,11 +25,13 @@ export async function toggleVote(itemId: string) {
   const admin = getSupabaseAdmin();
 
   // Get developer ID
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id")
+    .select("id, github_login")
     .eq("claimed_by", user.id)
-    .single();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) {
     throw new Error("Developer not found");

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   calculateAttackScore,
@@ -39,9 +40,10 @@ export async function POST(request: Request) {
     .from("developers")
     .select("id, claimed, app_streak, github_login, avatar_url, current_week_contributions, current_week_kudos_given")
     .eq("claimed_by", user.id)
-    .single();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const attacker = attackerRes.data as Record<string, any> | null;
+  const attacker = pickClaimedDeveloper(attackerRes.data as Record<string, any>[] | null, user);
 
   if (!attacker || !attacker.claimed) {
     return NextResponse.json({ error: "Must claim building first" }, { status: 403 });

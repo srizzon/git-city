@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { verifyKillToken } from "@/lib/pvpToken";
 import { getHappyHourStatus } from "@/lib/happyHour";
@@ -82,14 +83,14 @@ export async function POST(request: Request) {
   // Killer must match the authenticated session. The token already binds
   // the killer login but we still re-verify against the cookie to prevent
   // a token being replayed by a different account.
-  const { data: me } = await getSupabaseAdmin()
+  const { data: mine } = await getSupabaseAdmin()
     .from("developers")
     .select("github_login")
     .eq("claimed_by", user.id)
-    .maybeSingle();
-  const killerLogin = ((me?.github_login as string | undefined) ?? "").toLowerCase();
-  if (!killerLogin) return deny("no_github_login");
-  if (payload.kln !== killerLogin) return deny("killer_mismatch", 403);
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const myLogins = ((mine ?? []) as { github_login: string }[]).map((r) => r.github_login.toLowerCase());
+  if (myLogins.length === 0) return deny("no_github_login");
+  if (!myLogins.includes(payload.kln)) return deny("killer_mismatch", 403);
   if (payload.vln === payload.kln) return deny("self_kill");
 
   // Happy hour is recomputed server-side. We do trust payload.hh because

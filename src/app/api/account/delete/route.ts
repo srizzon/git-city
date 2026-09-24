@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function POST() {
@@ -16,11 +17,13 @@ export async function POST() {
   const admin = getSupabaseAdmin();
 
   // Find the developer record claimed by this auth user
-  const { data: dev, error: devErr } = await admin
+  const { data: devRows, error: devErr } = await admin
     .from("developers")
     .select("id, github_login")
     .eq("claimed_by", user.id)
-    .single();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (devErr || !dev) {
     // No claimed building — just delete the auth user

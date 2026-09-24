@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { touchLastActive } from "@/lib/notification-helpers";
 import { trackDailyMission } from "@/lib/dailies";
@@ -29,11 +30,13 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdmin();
 
   // Fetch visitor
-  const { data: visitor } = await admin
+  const { data: visitorRows } = await admin
     .from("developers")
-    .select("id")
+    .select("id, github_login")
     .eq("claimed_by", user.id)
-    .single();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const visitor = pickClaimedDeveloper(visitorRows, user);
 
   if (!visitor) {
     return NextResponse.json({ error: "Not a registered developer" }, { status: 403 });

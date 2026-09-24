@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 
 const MAX_THEME = 3;
 
@@ -18,11 +19,13 @@ export async function GET() {
 
   const sb = getSupabaseAdmin();
 
-  const { data: dev } = await sb
+  const { data: devRows } = await sb
     .from("developers")
-    .select("city_theme")
+    .select("city_theme, github_login")
     .eq("claimed_by", user.id)
-    .single();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) {
     return NextResponse.json({ city_theme: 0 });

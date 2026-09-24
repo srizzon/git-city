@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { logEvent } from "@/lib/analytics";
 
@@ -41,7 +42,13 @@ export async function POST(request: Request) {
       const rl = rateLimit(`track:${user.id}`, 10, 1000);
       if (!rl.ok) return NextResponse.json({ ok: false, reason: "rate" }, { status: 429 });
       const admin = getSupabaseAdmin();
-      const { data: dev } = await admin.from("developers").select("id").eq("claimed_by", user.id).maybeSingle();
+      const { data: rows } = await admin
+        .from("developers")
+        .select("id, github_login")
+        .eq("claimed_by", user.id)
+        .order("claimed_at", { ascending: true })
+        .limit(CLAIMED_DEVELOPER_LIMIT);
+      const dev = pickClaimedDeveloper(rows, user);
       developerId = dev?.id ?? null;
     } else if (anonymousId) {
       const rl = rateLimit(`track:anon:${anonymousId}`, 10, 1000);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { isAdminUser } from "@/lib/auth-identity";
+import { CLAIMED_DEVELOPER_LIMIT, isAdminUser, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { getAdvertiserFromCookies } from "@/lib/advertiser-auth";
 
 export async function GET(
@@ -21,10 +21,11 @@ export async function GET(
   if (user) {
     const { data } = await admin
       .from("developers")
-      .select("id")
+      .select("id, github_login")
       .eq("claimed_by", user.id)
-      .maybeSingle();
-    dev = data;
+      .order("claimed_at", { ascending: true })
+      .limit(CLAIMED_DEVELOPER_LIMIT);
+    dev = pickClaimedDeveloper(data, user);
   }
 
   // First try active listing (normal case)

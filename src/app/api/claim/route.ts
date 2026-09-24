@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getAuthIdentity } from "@/lib/auth-identity";
+import { CLAIMED_DEVELOPER_LIMIT, getAuthIdentity, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { seedSocialLinksFromGithub } from "@/lib/social-links-server";
 
 export async function POST() {
@@ -23,11 +23,13 @@ export async function POST() {
   const admin = getSupabaseAdmin();
 
   // Check that the user hasn't already claimed a different building
-  const { data: alreadyClaimed } = await admin
+  const { data: alreadyClaimedRows } = await admin
     .from("developers")
     .select("github_login")
     .eq("claimed_by", user.id)
-    .maybeSingle();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const alreadyClaimed = pickClaimedDeveloper(alreadyClaimedRows, user);
 
   if (alreadyClaimed) {
     return NextResponse.json(

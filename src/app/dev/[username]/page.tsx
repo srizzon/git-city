@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { PUBLIC_DEVELOPER_COLUMNS } from "@/lib/developer-columns";
 import {
   buildTitlePool,
@@ -143,10 +144,12 @@ export default async function DevPage({ params }: Props) {
   if (user && !isOwner) {
     const sb = getSupabaseAdmin();
     sb.from("developers")
-      .select("id")
+      .select("id, github_login")
       .eq("claimed_by", user.id)
-      .single()
-      .then(({ data: viewer }) => {
+      .order("claimed_at", { ascending: true })
+      .limit(CLAIMED_DEVELOPER_LIMIT)
+      .then(({ data: rows }) => {
+        const viewer = pickClaimedDeveloper(rows, user);
         if (viewer) {
           import("@/lib/pixels").then(({ earnPixels }) => {
             const today = new Date().toISOString().slice(0, 10);
