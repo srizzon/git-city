@@ -9,6 +9,7 @@ import { HUD_BOX } from "../shared";
 import PauseMenu, { CONTROLS } from "./PauseMenu";
 import StartScreen from "./StartScreen";
 import CrownPanel from "./CrownPanel";
+import CopyLink from "./CopyLink";
 import type { CrownState } from "@/lib/league-city/drive/crown";
 
 // Drive mode HUD: speed and a boost light (bottom), camera, mute and exit (top
@@ -93,7 +94,10 @@ export default function DriveHud({
             {drivers.length + 1} driving now
           </p>
           {drivers.length === 0 ? (
-            <p className="max-w-[180px] text-dim normal-case">Share the link to race your team here.</p>
+            <div className="flex max-w-[180px] flex-col items-start gap-1.5">
+              <p className="text-dim normal-case">Share the link to race your team here.</p>
+              <CopyLink />
+            </div>
           ) : (
             <ul className="flex flex-col gap-1">
               {drivers.slice(0, 6).map((d) => (

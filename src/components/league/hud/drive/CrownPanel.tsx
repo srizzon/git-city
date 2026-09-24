@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CROWN, type CrownState } from "@/lib/league-city/drive/crown";
 import type { DriverInfo } from "@/lib/league-city/drive/net";
 import { HUD_BOX } from "../shared";
+import CopyLink from "./CopyLink";
 
 // Crown Rush HUD: a Start button when 2+ people drive here, the 3-2-1, then
 // everyone's time left (the holder's counting down live), who holds the
@@ -136,10 +137,11 @@ export default function CrownPanel({
           Start crown rush
         </button>
       ) : (
-        <p className={`${HUD_BOX} flex items-center gap-2 px-3 py-2 text-[9px] text-dim normal-case`}>
+        <div className={`${HUD_BOX} flex items-center gap-3 px-3 py-2 text-[9px] text-dim normal-case`}>
           <Crown className="h-2.5 w-[22px] opacity-50" />
-          Crown rush needs 2 drivers. Share the link.
-        </p>
+          Crown rush needs 2 drivers.
+          <CopyLink />
+        </div>
       )}
     </div>
   );
