@@ -13,14 +13,13 @@
 import { LOT } from "../grid";
 import type { CityObject } from "../types";
 
-export const BATTLE_ITEMS = ["shock", "smoke", "oil", "ball"] as const;
+export const BATTLE_ITEMS = ["shock", "bomb", "missile"] as const;
 export type BattleItem = (typeof BATTLE_ITEMS)[number];
 
 export const ITEM_NAMES: Record<BattleItem, string> = {
   shock: "Shockwave",
-  smoke: "Smoke",
-  oil: "Oil slick",
-  ball: "Bouncy ball",
+  bomb: "Bomb",
+  missile: "Missile",
 };
 
 export const BOX_COUNT = 12;
@@ -32,10 +31,16 @@ export const BOX_REACH = 3;
 export const TAKE_MIN_MS = 400;
 export const USE_MIN_MS = 400;
 
-export const SHOCK = { radius: 14, push: 16, hop: 4, life: 0.7 };
-export const SMOKE = { radius: 9, life: 7 };
-export const OIL = { radius: 3.5, life: 25, spin: 1.3 };
-export const BALL = { radius: 1.1, speed: 42, life: 2.5, hitReach: 2.4, push: 14, hop: 5, spin: 0.9 };
+/** Blast: shove (m/s, sideways) and lift (m/s, up) at the center, fading to 40% at the edge. */
+export const SHOCK = { radius: 16, push: 14, lift: 11, life: 0.8 };
+/** Dropped behind you; arms after `arm` s; whoever comes within `trigger` m goes up. */
+export const BOMB = { trigger: 4.5, arm: 0.8, life: 30, radius: 7, push: 12, lift: 12 };
+/** Fired ahead; turns toward its target at `turn` rad/s; explodes within `hitReach` m. */
+export const MISSILE = { speed: 38, turn: 2.4, life: 3.5, hitReach: 2.6, push: 13, lift: 12, range: 140, cone: 0.8 };
+/** Spin (N·m·s) a blast gives a car, so it tumbles. */
+export const TUMBLE = 2600;
+/** Your own bomb can't catch you for this long (s). */
+export const OWN_BOMB_GRACE = 2;
 
 export function isItem(v: unknown): v is BattleItem {
   return typeof v === "string" && (BATTLE_ITEMS as readonly string[]).includes(v);
@@ -83,19 +88,58 @@ export function validUse(x: unknown, z: unknown, dx: unknown, dz: unknown): { x:
   return { x: px, z: pz, dx: vx / m, dz: vz / m };
 }
 
-/** Where a thrown ball is `t` seconds after launch. */
-export function ballPosition(x: number, z: number, dx: number, dz: number, t: number): [number, number] {
-  return [x + dx * BALL.speed * t, z + dz * BALL.speed * t];
+/**
+ * Velocity change (m/s: sideways x, z and up) a blast at (bx, bz) gives a car
+ * at (x, z) within `radius`, or null when out of reach. Straight away from
+ * the blast, strongest at the center.
+ */
+export function blastKick(
+  bx: number,
+  bz: number,
+  x: number,
+  z: number,
+  blast: { radius: number; push: number; lift: number },
+): [number, number, number] | null {
+  const dx = x - bx;
+  const dz = z - bz;
+  const d = Math.hypot(dx, dz);
+  if (d > blast.radius) return null;
+  const k = 1 - (d / blast.radius) * 0.6;
+  const [ux, uz] = d < 0.01 ? [1, 0] : [dx / d, dz / d];
+  return [ux * blast.push * k, uz * blast.push * k, blast.lift * k];
 }
 
-/** Velocity change (m/s) a shockwave at (sx, sz) gives a car at (x, z), or null when out of reach. */
-export function shockKick(sx: number, sz: number, x: number, z: number): [number, number] | null {
-  const dx = x - sx;
-  const dz = z - sz;
-  const d = Math.hypot(dx, dz);
-  if (d > SHOCK.radius) return null;
-  // Stronger up close; straight away from the blast.
-  const k = SHOCK.push * (1 - (d / SHOCK.radius) * 0.6);
-  if (d < 0.01) return [k, 0];
-  return [(dx / d) * k, (dz / d) * k];
+/** The car a missile goes for: nearest within range inside the cone ahead of (x, z, dx, dz). */
+export function missileTarget<T extends { id: string; x: number; z: number }>(x: number, z: number, dx: number, dz: number, cars: readonly T[]): T | null {
+  let best: T | null = null;
+  let bestD = MISSILE.range;
+  for (const c of cars) {
+    const ox = c.x - x;
+    const oz = c.z - z;
+    const d = Math.hypot(ox, oz);
+    if (d < 0.5 || d > bestD) continue;
+    const cos = (ox * dx + oz * dz) / d;
+    if (cos < Math.cos(MISSILE.cone)) continue;
+    bestD = d;
+    best = c;
+  }
+  return best;
+}
+
+export interface MissileState {
+  x: number;
+  z: number;
+  /** Heading, radians (atan2 of dx, dz). */
+  h: number;
+}
+
+/** Move a missile one step toward (tx, tz), or straight on without a target. */
+export function stepMissile(m: MissileState, target: { x: number; z: number } | null, dt: number): MissileState {
+  let h = m.h;
+  if (target) {
+    const want = Math.atan2(target.x - m.x, target.z - m.z);
+    const diff = Math.atan2(Math.sin(want - h), Math.cos(want - h));
+    h += Math.max(-MISSILE.turn * dt, Math.min(MISSILE.turn * dt, diff));
+  }
+  return { x: m.x + Math.sin(h) * MISSILE.speed * dt, z: m.z + Math.cos(h) * MISSILE.speed * dt, h };
 }
