@@ -14,6 +14,7 @@ export const CONTROLS: [string, string][] = [
   ["H", "horn"],
   ["C", "camera"],
   ["R", "reset"],
+  ["F", "attack (from ? boxes)"],
   ["Esc", "pause"],
 ];
 
