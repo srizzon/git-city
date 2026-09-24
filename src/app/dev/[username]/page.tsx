@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { PUBLIC_DEVELOPER_COLUMNS } from "@/lib/developer-columns";
 import {
   buildTitlePool,
   resolveTitle,
@@ -31,7 +32,7 @@ const getDeveloper = cache(async (username: string) => {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("developers")
-    .select("*")
+    .select(PUBLIC_DEVELOPER_COLUMNS)
     .eq("github_login", username.toLowerCase())
     .single();
   return data;
