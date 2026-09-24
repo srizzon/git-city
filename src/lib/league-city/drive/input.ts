@@ -13,6 +13,8 @@ export interface DriveInput {
   horn: boolean;
   camera: boolean;
   reset: boolean;
+  /** Use the attack you're holding. */
+  fire: boolean;
 }
 
 export interface GamepadLike {
@@ -28,6 +30,7 @@ const A = 0;
 const B = 1;
 const X = 2;
 const Y = 3;
+const RB = 5;
 const LT = 6;
 const RT = 7;
 const START = 9;
@@ -53,6 +56,7 @@ export function readInput(keys: ReadonlySet<string>, pad: GamepadLike | null): D
     horn: keys.has("KeyH"),
     camera: keys.has("KeyC"),
     reset: keys.has("KeyR"),
+    fire: keys.has("KeyF"),
   };
   if (!pad) return kb;
 
@@ -80,5 +84,6 @@ export function readInput(keys: ReadonlySet<string>, pad: GamepadLike | null): D
     horn: kb.horn || pressed(B),
     camera: kb.camera || pressed(Y),
     reset: kb.reset || pressed(START),
+    fire: kb.fire || pressed(RB),
   };
 }

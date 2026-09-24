@@ -115,18 +115,18 @@ describe("input", () => {
     expect(readInput(new Set(["KeyW", "KeyA"]), null)).toMatchObject({ throttle: 1, brake: 0, steer: -1 });
     expect(readInput(new Set(["ArrowDown", "ArrowRight"]), null)).toMatchObject({ throttle: 0, brake: 1, steer: 1 });
     expect(readInput(new Set(["KeyA", "KeyD"]), null).steer).toBe(0);
-    expect(readInput(new Set(["Space", "ShiftLeft", "KeyH", "KeyC", "KeyR"]), null)).toMatchObject({
-      handbrake: true, boost: true, horn: true, camera: true, reset: true,
+    expect(readInput(new Set(["Space", "ShiftLeft", "KeyH", "KeyC", "KeyR", "KeyF"]), null)).toMatchObject({
+      handbrake: true, boost: true, horn: true, camera: true, reset: true, fire: true,
     });
     expect(readInput(new Set(), null)).toMatchObject({ throttle: 0, brake: 0, steer: 0, handbrake: false });
   });
 
   it("maps a standard gamepad: triggers, stick and buttons", () => {
-    const i = readInput(new Set(), pad({ 7: 1, 6: 0.5, 0: 1, 2: 1, 3: 1, 1: 1, 9: 1 }, [-1, 0]));
+    const i = readInput(new Set(), pad({ 7: 1, 6: 0.5, 0: 1, 2: 1, 3: 1, 1: 1, 9: 1, 5: 1 }, [-1, 0]));
     expect(i.throttle).toBe(1);
     expect(i.brake).toBeCloseTo(deadzone(0.5, 0.05));
     expect(i.steer).toBe(-1);
-    expect(i).toMatchObject({ handbrake: true, boost: true, camera: true, horn: true, reset: true });
+    expect(i).toMatchObject({ handbrake: true, boost: true, camera: true, horn: true, reset: true, fire: true });
   });
 
   it("ignores stick and trigger noise inside the deadzone", () => {

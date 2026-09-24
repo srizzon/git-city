@@ -7,11 +7,11 @@ import { LOT } from "../grid";
 import type { CityObject } from "../types";
 import { buildColliders } from "./colliders";
 import { CHASSIS, GRAVITY, SURFACE } from "./tuning";
-import { carHeading, createVehicle, headingFromRot, newCarState, placeCar, stepCar } from "./vehicle";
+import { carHeading, createVehicle, headingFromRot, newCarState, placeCar, spinOut, stepCar } from "./vehicle";
 
 type World = RapierContext["world"];
 const DT = 1 / 60;
-const idle: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false, boost: false, horn: false, camera: false, reset: false };
+const idle: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false, boost: false, horn: false, camera: false, reset: false, fire: false };
 
 beforeAll(async () => {
   await RAPIER.init();
@@ -141,6 +141,27 @@ describe("vehicle (headless rapier)", () => {
     expect(st.speed).toBeGreaterThan(before + 5);
     run({ throttle: 1 }, 0.1);
     expect(st.boosting).toBe(false);
+  });
+
+  it("spins out: turns in circles, slows down, then drives on", () => {
+    const { body, s: st, run } = setup();
+    run({ throttle: 1 }, 5);
+    const before = st.speed;
+    let turned = 0;
+    let h = carHeading(body);
+    spinOut(st, 1.2, 1);
+    for (let i = 0; i < 72; i++) {
+      run({ throttle: 1 }, 1 / 60);
+      const nh = carHeading(body);
+      turned += Math.abs(Math.atan2(Math.sin(nh - h), Math.cos(nh - h)));
+      h = nh;
+    }
+    expect(turned).toBeGreaterThan(Math.PI * 1.5);
+    const v = body.linvel();
+    expect(Math.hypot(v.x, v.z)).toBeLessThan(before);
+    run({ throttle: 1 }, 1.5);
+    expect(st.spinLeft).toBe(0);
+    expect(st.lateral).toBeLessThan(1);
   });
 
   it("launches off a ramp it drives up", () => {
