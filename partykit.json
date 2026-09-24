@@ -3,7 +3,8 @@
   "main": "party/arcade.ts",
   "parties": {
     "lobby": "party/lobby.ts",
-    "fly": "party/fly.ts"
+    "fly": "party/fly.ts",
+    "drive": "party/drive.ts"
   },
   "compatibilityDate": "2025-06-01"
 }
