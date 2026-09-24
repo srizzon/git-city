@@ -32,7 +32,7 @@ const _up = new THREE.Vector3(0, 1, 0);
 
 type Variant = { subs: { geo: THREE.BufferGeometry; mat: THREE.Material }[]; scale: number };
 
-function TreeType({ variant, lots }: { variant: Variant; lots: { x: number; z: number }[] }) {
+function TreeInstances({ variant, lots }: { variant: Variant; lots: { x: number; z: number }[] }) {
   const refs = useRef<(THREE.InstancedMesh | null)[]>([]);
   useLayoutEffect(() => {
     lots.forEach((l, i) => {
@@ -107,7 +107,7 @@ export default function LeagueTrees({ objects }: { objects: CityObject[] }) {
 
   return (
     <group>
-      {variants.map((v, i) => (lotsByType[i].length > 0 ? <TreeType key={i} variant={v} lots={lotsByType[i]} /> : null))}
+      {variants.map((v, i) => (lotsByType[i].length > 0 ? <TreeInstances key={i} variant={v} lots={lotsByType[i]} /> : null))}
     </group>
   );
 }

@@ -143,7 +143,7 @@ export async function autoPlace(leagueId: string, devIds: number | number[]): Pr
       const res = await rpc(
         leagueId,
         null,
-        ids.slice(i, i + MAX_OPS).map((id) => ({ op: "auto_place", developer_id: id })),
+        ids.slice(i, i + MAX_OPS).map((id): CityOp => ({ op: "auto_place", developer_id: id })),
       );
       if (res.unplaced?.length) console.warn(`[league-city] ${leagueId}: city full, ${res.unplaced.length} waiting`);
     }
@@ -163,7 +163,7 @@ export async function removeBuilding(leagueId: string, devIds: number | number[]
       await rpc(
         leagueId,
         null,
-        ids.slice(i, i + MAX_OPS).map((id) => ({ op: "remove", developer_id: id })),
+        ids.slice(i, i + MAX_OPS).map((id): CityOp => ({ op: "remove", developer_id: id })),
       );
     }
   } catch (err) {
