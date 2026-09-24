@@ -131,7 +131,7 @@ export default function Car({
     if (!body) return;
     const s = spawnRef.current;
     placeCar(body, s.x * UNIT_TO_M, s.z * UNIT_TO_M, headingFromRot(s.rot));
-    state.current = { ...newCarState(), boostCharge: state.current.boostCharge };
+    state.current = newCarState();
     onReset?.();
   };
 
@@ -183,7 +183,6 @@ export default function Car({
 
     const s = state.current;
     telemetry.speed = s.speed;
-    telemetry.boost = s.boostCharge;
     telemetry.boosting = s.boosting;
 
     apiRef.current = { group: g, body, controller: c, state: s, wheels: wheelRefs.current.filter((o): o is THREE.Object3D => !!o) };

@@ -17,11 +17,8 @@ export interface CarState {
   /** Forward speed, m/s (negative when reversing). */
   speed: number;
   steer: number;
-  /** Boost meter, 0…1. */
-  boostCharge: number;
+  /** Shift held: boost is unlimited. */
   boosting: boolean;
-  /** Seconds before the meter starts refilling. */
-  boostWait: number;
   braking: boolean;
   /** Sideways slip, 0…1 (skid marks, smoke, skid sound). */
   slip: number;
@@ -46,7 +43,7 @@ export const WHEELS: { x: number; z: number; front: boolean }[] = [
 
 export function newCarState(): CarState {
   return {
-    speed: 0, steer: 0, boostCharge: 1, boosting: false, boostWait: 0, braking: false, slip: 0,
+    speed: 0, steer: 0, boosting: false, braking: false, slip: 0,
     flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, lateral: 0, surface: "road",
   };
 }
@@ -125,17 +122,8 @@ export function stepCar(
     }
   });
 
-  // Boost: hold to burn the meter; it refills after a short pause.
-  const wantBoost = input.boost && (s.boosting ? s.boostCharge > 0 : s.boostCharge >= BOOST.minToStart);
-  s.boosting = wantBoost;
-  if (s.boosting) {
-    s.boostCharge = Math.max(0, s.boostCharge - dt / BOOST.burn);
-    s.boostWait = BOOST.rechargeDelay;
-  } else if (s.boostWait > 0) {
-    s.boostWait = Math.max(0, s.boostWait - dt);
-  } else {
-    s.boostCharge = Math.min(1, s.boostCharge + dt / BOOST.recharge);
-  }
+  // Boost: unlimited while held.
+  s.boosting = input.boost;
   const top = s.boosting ? BOOST.topSpeed : rearTop;
 
   // Throttle, brake and reverse (boost drives even without throttle).

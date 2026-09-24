@@ -121,19 +121,15 @@ describe("vehicle (headless rapier)", () => {
     expect(Math.abs(turned(1, -1))).toBeLessThan(Math.abs(turned(1, 1)));
   });
 
-  it("boosts while Shift is held, drains the meter, refills after release", () => {
+  it("boosts as long as Shift is held, past the road cap", () => {
     const { s: st, run } = setup();
     run({ throttle: 1 }, 10);
     const before = st.speed;
-    run({ throttle: 1, boost: true }, 0.8);
+    run({ throttle: 1, boost: true }, 5);
     expect(st.boosting).toBe(true);
-    expect(st.speed).toBeGreaterThan(before + 2);
-    expect(st.boostCharge).toBeLessThan(0.6);
-    run({ throttle: 1, boost: true }, 1);
-    expect(st.boostCharge).toBe(0);
+    expect(st.speed).toBeGreaterThan(before + 5);
+    run({ throttle: 1 }, 0.1);
     expect(st.boosting).toBe(false);
-    run({ throttle: 1 }, 5);
-    expect(st.boostCharge).toBe(1);
   });
 
   it("launches off a ramp it drives up", () => {

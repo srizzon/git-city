@@ -98,17 +98,10 @@ export const SURFACE = {
   grass: { grip: 1.1, topSpeed: 14 },
 } as const;
 
-// Hold Shift: burns the meter (full to empty in `burn` s), refills after a
-// short pause when released.
+// Hold Shift: unlimited boost (no race to budget it for yet).
 export const BOOST = {
-  engineMul: 2.0,
+  engineMul: 2.6,
   topSpeed: 35,
-  burn: 1.6,
-  recharge: 4,
-  /** Pause before the meter refills (s). */
-  rechargeDelay: 0.5,
-  /** A boost needs at least this much meter to start. */
-  minToStart: 0.15,
   /** Extra acceleration while boosting in a drift (m/s²). */
   driftAccel: 6,
 };

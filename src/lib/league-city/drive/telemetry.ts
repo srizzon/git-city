@@ -5,13 +5,11 @@
 export interface DriveTelemetry {
   /** m/s, forward. */
   speed: number;
-  /** 0…1; boost is ready at 1. */
-  boost: number;
   boosting: boolean;
 }
 
 export function createTelemetry(): DriveTelemetry {
-  return { speed: 0, boost: 1, boosting: false };
+  return { speed: 0, boosting: false };
 }
 
 export type DriveCameraMode = "chase" | "top";

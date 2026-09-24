@@ -7,7 +7,7 @@ import { HUD_BOX } from "../shared";
 import PauseMenu, { CONTROLS } from "./PauseMenu";
 import StartScreen from "./StartScreen";
 
-// Drive mode HUD: speed and boost meter (bottom), camera, mute and exit (top
+// Drive mode HUD: speed and a boost light (bottom), camera, mute and exit (top
 // right), a controls hint that fades after 6 s, the start screen while Rapier
 // loads, and the pause menu. Speed and boost update from the telemetry object every
 // animation frame without re-rendering.
@@ -39,7 +39,7 @@ export default function DriveHud({
   onExit: () => void;
 }) {
   const speed = useRef<HTMLSpanElement>(null);
-  const bar = useRef<HTMLDivElement>(null);
+  const boostTag = useRef<HTMLSpanElement>(null);
   const [hints, setHints] = useState(true);
 
   useEffect(() => {
@@ -52,10 +52,7 @@ export default function DriveHud({
     let raf = 0;
     const tick = () => {
       if (speed.current) speed.current.textContent = String(Math.round(Math.abs(telemetry.speed) * 3.6));
-      if (bar.current) {
-        bar.current.style.transform = `scaleX(${telemetry.boosting ? 1 : telemetry.boost})`;
-        bar.current.dataset.state = telemetry.boosting ? "burn" : telemetry.boost >= 1 ? "ready" : "charging";
-      }
+      if (boostTag.current) boostTag.current.dataset.on = String(telemetry.boosting);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -99,15 +96,12 @@ export default function DriveHud({
             </span>
             <span className="text-[9px] text-muted">km/h</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] text-muted">Boost</span>
-            <div className="h-2.5 w-24 border-2 border-border bg-bg">
-              <div
-                ref={bar}
-                className="h-full origin-left bg-lime data-[state=burn]:bg-[#7ee8ff] data-[state=charging]:bg-dim"
-              />
-            </div>
-          </div>
+          <span
+            ref={boostTag}
+            className="border-2 border-border px-2 py-0.5 text-[9px] text-dim transition-colors data-[on=true]:border-[#7ee8ff] data-[on=true]:text-[#7ee8ff]"
+          >
+            Shift boost
+          </span>
         </div>
       )}
 
