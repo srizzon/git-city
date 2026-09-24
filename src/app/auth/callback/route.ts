@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { cookies } from "next/headers";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { provisionDeveloperOnLogin } from "@/lib/auth-provision";
+import { fetchUserOrgs, syncOrgVerifications } from "@/lib/leagues/verification";
 
 // Extend timeout for GitHub API calls during login
 export const maxDuration = 60;
@@ -40,6 +41,30 @@ export async function GET(request: Request) {
   const ref = searchParams.get("ref") ?? cookieStore.get("gc_ref")?.value ?? null;
   await provisionDeveloperOnLogin(githubLogin, data.user.id, ref);
   cookieStore.delete("gc_ref");
+
+  // Company leagues: provider_token only exists right now. When it carries
+  // read:org (the "Verify company" flow, and every later login since GitHub
+  // keeps granted scopes), list the orgs and renew/join. Never stored, and a
+  // failure here never breaks login.
+  const providerToken = data.session?.provider_token;
+  if (providerToken && githubLogin) {
+    try {
+      const orgs = await fetchUserOrgs(providerToken);
+      if (orgs) {
+        const { data: dev } = await getSupabaseAdmin()
+          .from("developers")
+          .select("id")
+          .eq("github_login", githubLogin)
+          .maybeSingle();
+        if (dev) {
+          const { seed } = await syncOrgVerifications(dev.id, orgs, { verify: searchParams.get("verify") === "org" });
+          if (seed) after(() => seed().then(() => {}));
+        }
+      }
+    } catch (err) {
+      console.error("[auth:callback] org verification failed:", err);
+    }
+  }
 
   // Support ?next= param for post-login redirect
   const next = searchParams.get("next");
