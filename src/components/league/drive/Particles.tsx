@@ -57,7 +57,7 @@ export function Smoke({ car }: { car: React.MutableRefObject<CarApi | null> }) {
     poolRef.current ??= makePool(COUNT);
     const pool = poolRef.current;
     if (c && c.state.slip > 0.2) {
-      acc.current += dt * 30 * c.state.slip;
+      acc.current += dt * 18 * c.state.slip;
       while (acc.current >= 1) {
         acc.current -= 1;
         const w = c.wheels[2 + (next.current % 2)];
@@ -69,7 +69,7 @@ export function Smoke({ car }: { car: React.MutableRefObject<CarApi | null> }) {
         p.vel.set((Math.random() - 0.5) * 3, 2 + Math.random() * 2, (Math.random() - 0.5) * 3);
         p.age = 0;
         p.life = 0.9 + Math.random() * 0.5;
-        p.size = 1.2 + Math.random() * 0.8;
+        p.size = 0.6 + Math.random() * 0.4;
         next.current = (next.current + 1) % COUNT;
       }
     }
@@ -84,7 +84,7 @@ export function Smoke({ car }: { car: React.MutableRefObject<CarApi | null> }) {
 
   return (
     <instancedMesh ref={ref} args={[geo, undefined, COUNT]} frustumCulled={false}>
-      <meshStandardMaterial color="#c8c8d0" emissive="#50505a" transparent opacity={0.4} depthWrite={false} roughness={1} />
+      <meshStandardMaterial color="#c8c8d0" emissive="#50505a" transparent opacity={0.28} depthWrite={false} roughness={1} />
     </instancedMesh>
   );
 }

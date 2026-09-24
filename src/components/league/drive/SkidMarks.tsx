@@ -15,7 +15,7 @@ const STEP = 1.6; // city units between marks
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _p = new THREE.Vector3();
-const _s = new THREE.Vector3(1.1, 1, 2.2);
+const _s = new THREE.Vector3(0.8, 1, 2.2);
 const _flat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 const _hidden = new THREE.Matrix4().makeScale(0, 0, 0);
 

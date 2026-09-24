@@ -125,5 +125,5 @@ export const CAMERA = {
   fovBoost: 75,
   /** Spring stiffness for the chase follow (higher = tighter). */
   follow: 6,
-  topDownHeight: 40,
+  topDownHeight: 30,
 };
