@@ -214,7 +214,7 @@ export default function NotificationSettings() {
             <Toggle
               checked={prefs.leagues}
               onChange={(v) => save({ leagues: v })}
-              label="Leagues"
+              label="Towns"
               sublabel="Weekly results, overtakes and teammates lighting up"
               disabled={emailOff}
             />

@@ -37,7 +37,7 @@ export default function JoinPanel({
     if (inviteToken) back.set("t", inviteToken);
     if (invitee) back.set("invite", invitee);
     const query = back.toString();
-    params.set("next", `/league/${leagueSlug}${query ? `?${query}` : ""}`);
+    params.set("next", `/town/${leagueSlug}${query ? `?${query}` : ""}`);
     await signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?${params.toString()}`);
   }
 
@@ -71,7 +71,7 @@ export default function JoinPanel({
         {invitee ? `@${invitee}'s building is in the city, waiting for you. ` : ""}Join to start scoring in the weekly race.
       </p>
       {needsVerify ? (
-        <Link href="/leagues/verify" className="btn-press mt-4 block bg-lime px-4 py-3 text-center text-[11px] tracking-widest text-bg">
+        <Link href="/towns/verify" className="btn-press mt-4 block bg-lime px-4 py-3 text-center text-[11px] tracking-widest text-bg">
           Verify your company
         </Link>
       ) : (
@@ -81,7 +81,7 @@ export default function JoinPanel({
           onClick={signedIn ? join : signIn}
           className="btn-press mt-4 w-full bg-lime px-4 py-3 text-[11px] tracking-widest text-bg disabled:opacity-50"
         >
-          {busy ? <Pending label={signedIn ? "Joining" : "Opening GitHub"} /> : "Join the league"}
+          {busy ? <Pending label={signedIn ? "Joining" : "Opening GitHub"} /> : "Join the town"}
         </button>
       )}
       {error && <p className="mt-2 text-[11px] text-red-400 normal-case">{error}</p>}

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getLeagueBySlug, getOrCreateInviteToken, getViewer, openInviteLink } from "@/lib/leagues/service";
 import { getLeagueMembers } from "@/lib/leagues/queries";
 import SettingsClient from "./settings-client";
+import { townDisplayName } from "@/lib/towns/names";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const league = await getLeagueBySlug(slug);
-  return { title: league ? `${league.name} settings - Git City` : "League not found - Git City", robots: { index: false } };
+  return { title: league ? `${townDisplayName(league.name)} settings - Git City` : "Town not found - Git City", robots: { index: false } };
 }
 
 export default async function LeagueSettingsPage({ params }: Props) {
@@ -20,7 +21,7 @@ export default async function LeagueSettingsPage({ params }: Props) {
   const league = await getLeagueBySlug(slug);
   if (!league) notFound();
   const viewer = await getViewer();
-  if (!viewer || league.admin_id !== viewer.id) redirect(`/league/${league.slug}`);
+  if (!viewer || league.admin_id !== viewer.id) redirect(`/town/${league.slug}`);
 
   const members = (await getLeagueMembers(league.id)).filter((m) => m.status !== "former");
   // Older leagues get their token on this first admin visit.

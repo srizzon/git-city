@@ -12,7 +12,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ slug:
   const viewer = await getViewer();
   if (!viewer) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   const league = await getLeagueBySlug(slug);
-  if (!league) return NextResponse.json({ error: "League not found." }, { status: 404 });
+  if (!league) return NextResponse.json({ error: "Town not found." }, { status: 404 });
 
   try {
     // Next already decoded the segment; decoding again throws on a stray "%".

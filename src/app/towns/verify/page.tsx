@@ -54,14 +54,14 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   return (
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
       <div className="mx-auto max-w-xl px-4 py-10">
-        <Link href="/leagues" className="text-xs text-muted transition-colors hover:text-cream">
-          &larr; Leagues
+        <Link href="/towns" className="text-xs text-muted transition-colors hover:text-cream">
+          &larr; Towns
         </Link>
         <h1 className="mt-6 text-2xl text-cream md:text-3xl">
           Verify your <span className="text-lime">company</span>
         </h1>
         <p className="mt-3 text-[11px] leading-relaxed text-muted normal-case">
-          Join your company&apos;s league by proving you&apos;re in its GitHub org. We read your org list once and
+          Join your company&apos;s town by proving you&apos;re in its GitHub org. We read your org list once and
           never store your GitHub token.
         </p>
 

@@ -71,7 +71,7 @@ export default function InvitePanel({
 
   // Same personal link the invite returned: ref = whoever is sharing it now.
   async function copyPending(login: string) {
-    const link = `${window.location.origin}/league/${slug}?ref=${encodeURIComponent(viewerLogin)}&invite=${encodeURIComponent(login)}`;
+    const link = `${window.location.origin}/town/${slug}?ref=${encodeURIComponent(viewerLogin)}&invite=${encodeURIComponent(login)}`;
     try {
       await navigator.clipboard.writeText(link);
       setCopiedLogin(login);

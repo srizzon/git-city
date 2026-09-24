@@ -135,7 +135,7 @@ export default function LeagueClient({
 
   const onForbidden = useCallback(() => {
     setMode("view");
-    window.history.replaceState(null, "", `/league/${league.slug}`);
+    window.history.replaceState(null, "", `/town/${league.slug}`);
     setViewNotice({
       kind: "error",
       message: "You're no longer the admin, so the editor closed.",
@@ -164,14 +164,14 @@ export default function LeagueClient({
     setPanel(null);
     if (city.version > store.getState().version) store.dispatch({ type: "resync", city });
     setMode("edit");
-    window.history.replaceState(null, "", `/league/${league.slug}?edit=1`);
+    window.history.replaceState(null, "", `/town/${league.slug}?edit=1`);
   };
   const done = async () => {
     setLeaving(true);
     await autosave.drain();
     setLeaving(false);
     setMode("view");
-    window.history.replaceState(null, "", `/league/${league.slug}`);
+    window.history.replaceState(null, "", `/town/${league.slug}`);
     router.refresh();
   };
 
@@ -360,7 +360,7 @@ export default function LeagueClient({
   };
 
   const verifyHref =
-    !isMember && !showJoinCta && viewer && league.kind === "company" ? "/leagues/verify" : null;
+    !isMember && !showJoinCta && viewer && league.kind === "company" ? "/towns/verify" : null;
   const close = () => setPanel(null);
 
   return (

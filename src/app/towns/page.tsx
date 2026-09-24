@@ -7,11 +7,11 @@ import CreateLeague from "./create-league";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Leagues - Git City",
-  description: "Company leagues ranked by weekly score per active developer. Start a league with your team.",
+  title: "Towns - Git City",
+  description: "Company towns ranked by weekly score per active developer. Start a town with your team.",
   openGraph: {
-    title: "Leagues - Git City",
-    description: "Company leagues ranked by weekly score per active developer.",
+    title: "Towns - Git City",
+    description: "Company towns ranked by weekly score per active developer.",
   },
 };
 
@@ -45,7 +45,7 @@ export default async function LeaguesPage({ searchParams }: { searchParams: Prom
 
         {ranking.last_week_winner && (
           <Link
-            href={`/league/${ranking.last_week_winner.slug}`}
+            href={`/town/${ranking.last_week_winner.slug}`}
             className="mt-8 flex items-center justify-between border-[3px] border-lime bg-bg-card px-4 py-3"
           >
             <span className="text-[10px] text-lime">Last week&apos;s top company</span>
@@ -56,7 +56,7 @@ export default async function LeaguesPage({ searchParams }: { searchParams: Prom
         <div className="mt-8 grid gap-2 sm:grid-cols-2">
           <CreateLeague signedIn={!!viewer} defaultOpen={!!viewer && create === "1"} />
           <Link
-            href="/leagues/verify"
+            href="/towns/verify"
             className="btn-press flex items-center justify-center border-2 border-border px-4 py-3 text-[11px] text-cream hover:border-lime"
           >
             Verify your company
@@ -65,12 +65,12 @@ export default async function LeaguesPage({ searchParams }: { searchParams: Prom
 
         {mine.length > 0 && (
           <section className="mt-10">
-            <h2 className="text-lg text-cream">Your leagues</h2>
+            <h2 className="text-lg text-cream">Your towns</h2>
             <div className="mt-3 flex flex-wrap gap-2">
               {mine.map((l) => (
                 <Link
                   key={l.slug}
-                  href={`/league/${l.slug}`}
+                  href={`/town/${l.slug}`}
                   className="border-2 border-border px-3 py-2 text-[11px] text-cream normal-case hover:border-lime"
                 >
                   {l.name}
@@ -86,7 +86,7 @@ export default async function LeaguesPage({ searchParams }: { searchParams: Prom
             {ranked.map((r) => (
               <li key={r.league_id}>
                 <Link
-                  href={`/league/${r.slug}`}
+                  href={`/town/${r.slug}`}
                   className="flex items-center gap-3 border-[3px] border-border bg-bg-card px-3 py-2 hover:border-border-light"
                 >
                   <span className={`w-6 text-right text-xs ${r.rank === 1 ? "text-lime" : "text-muted"}`}>{r.rank}</span>
@@ -110,7 +110,7 @@ export default async function LeaguesPage({ searchParams }: { searchParams: Prom
                 {unranked.map((r) => (
                   <Link
                     key={r.league_id}
-                    href={`/league/${r.slug}`}
+                    href={`/town/${r.slug}`}
                     className="border-2 border-border px-2 py-1 text-[10px] text-dim normal-case hover:text-cream"
                   >
                     {r.name} · {r.active_members}/3

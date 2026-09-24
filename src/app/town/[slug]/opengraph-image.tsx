@@ -5,8 +5,9 @@ import { join } from "node:path";
 import { OG, building } from "@/lib/og/devHero";
 import { getLeagueBySlug } from "@/lib/leagues/service";
 import { getLeagueMembers } from "@/lib/leagues/queries";
+import { townDisplayName } from "@/lib/towns/names";
 
-export const alt = "League skyline - Git City";
+export const alt = "Town skyline - Git City";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const revalidate = 3600;
@@ -55,9 +56,9 @@ export default async function Image({ params }: { params: Promise<{ slug: string
       >
         <div style={{ position: "absolute", left: 60, top: 48, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", fontSize: 22, color: OG.accent, letterSpacing: 2 }}>
-            {league?.kind === "company" ? "COMPANY LEAGUE" : "LEAGUE"}
+            {league?.kind === "company" ? "COMPANY TOWN" : "TOWN"}
           </div>
-          <div style={{ display: "flex", fontSize: 64, lineHeight: 1 }}>{league?.name ?? "League not found"}</div>
+          <div style={{ display: "flex", fontSize: 64, lineHeight: 1 }}>{league ? townDisplayName(league.name) : "Town not found"}</div>
           {league && (
             <div style={{ display: "flex", fontSize: 26, color: OG.muted }}>
               {`${members.length} buildings, ${invitedCount} invited`}

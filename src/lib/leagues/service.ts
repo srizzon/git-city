@@ -111,7 +111,7 @@ export function slugify(name: string): string {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 40) || "league"
+      .slice(0, 40) || "town"
   );
 }
 
@@ -152,7 +152,7 @@ export async function createCustomLeague(viewer: Viewer, rawName: string): Promi
   // /league/<org> stays reserved for the org's company league, and app paths
   // stay reserved for the app.
   const base = slugify(name);
-  const slug = await uniqueSlug(isReservedSlug(base) || (await isGithubOrg(base)) ? `${base}-league` : base);
+  const slug = await uniqueSlug(isReservedSlug(base) || (await isGithubOrg(base)) ? `${base}-town` : base);
 
   // Limits and inserts in one locked call, so parallel creates can't slip past.
   const sb = getSupabaseAdmin();
@@ -164,16 +164,16 @@ export async function createCustomLeague(viewer: Viewer, rawName: string): Promi
     p_max_memberships: MAX_CUSTOM_LEAGUES,
   });
   if (error) {
-    if (error.message === "limit") throw new LeagueError("limit", `You can be in up to ${MAX_CUSTOM_LEAGUES} custom leagues.`, 403);
+    if (error.message === "limit") throw new LeagueError("limit", `You can be in up to ${MAX_CUSTOM_LEAGUES} custom towns.`, 403);
     if (error.message === "create_limit") {
-      throw new LeagueError("create_limit", `You can create ${MAX_LEAGUES_CREATED_PER_DAY} leagues a day. Try again tomorrow.`, 429);
+      throw new LeagueError("create_limit", `You can create ${MAX_LEAGUES_CREATED_PER_DAY} towns a day. Try again tomorrow.`, 429);
     }
     if (error.code === "23505") throw new LeagueError("slug_taken", "That name was just taken. Try again.", 409);
-    throw dbError("create_failed", error, "Could not create league.");
+    throw dbError("create_failed", error, "Could not create town.");
   }
 
   const { data: league } = await sb.from("leagues").select(LEAGUE_COLUMNS).eq("id", id as string).single();
-  if (!league) throw new LeagueError("create_failed", "Could not create league.", 500);
+  if (!league) throw new LeagueError("create_failed", "Could not create town.", 500);
   await ensureCity(league.id).catch((err) => console.error("[league-city] starter city failed", err));
   return league as unknown as League;
 }
@@ -191,7 +191,7 @@ export async function joinLeague(
   token: string | null,
 ): Promise<MemberStatus> {
   if (league.kind === "company") {
-    throw new LeagueError("needs_verification", "Verify your GitHub org membership to join this league.", 403);
+    throw new LeagueError("needs_verification", "Verify your GitHub org membership to join this town.", 403);
   }
 
   const sb = getSupabaseAdmin();
@@ -201,12 +201,12 @@ export async function joinLeague(
   const decision = customJoinDecision(existing, tokenOk);
   if (decision === "active") return "active";
   if (decision === "removed") {
-    throw new LeagueError("removed", "The admin removed you from this league. Ask them for a new invite.", 403);
+    throw new LeagueError("removed", "The admin removed you from this town. Ask them for a new invite.", 403);
   }
   if (decision === "needs_invite") {
     throw new LeagueError(
       "needs_invite",
-      token ? "This invite link is no longer valid." : "You need an invite link to join this league.",
+      token ? "This invite link is no longer valid." : "You need an invite link to join this town.",
       403,
     );
   }
@@ -223,7 +223,7 @@ export async function joinLeague(
   // The count is locked, but the upsert below runs after the lock is gone, so
   // two joins at the same instant could go one league over. Harmless.
   if (!(await takeQuota(viewer.id, "membership", MAX_CUSTOM_LEAGUES))) {
-    throw new LeagueError("limit", `You can be in up to ${MAX_CUSTOM_LEAGUES} custom leagues.`, 403);
+    throw new LeagueError("limit", `You can be in up to ${MAX_CUSTOM_LEAGUES} custom towns.`, 403);
   }
 
   const { error } = await sb.from("league_members").upsert(
@@ -250,7 +250,7 @@ export async function joinLeague(
 /** Active member leaves: former (kept in the hall of fame), building out of the city. */
 export async function leaveLeague(viewer: Viewer, league: League): Promise<void> {
   const m = await getMembership(league.id, viewer.id);
-  if (m?.status !== "active") throw new LeagueError("not_member", "You aren't in this league.", 404);
+  if (m?.status !== "active") throw new LeagueError("not_member", "You aren't in this town.", 404);
 
   const { error } = await getSupabaseAdmin()
     .from("league_members")
@@ -278,12 +278,12 @@ function appBase(origin?: string): string {
 
 /** A personal link: the invitee has an `invited` row, so it needs no token. */
 export function inviteLink(slug: string, inviter: string, invitee: string, origin?: string): string {
-  return `${appBase(origin)}/league/${slug}?ref=${encodeURIComponent(inviter)}&invite=${encodeURIComponent(invitee)}`;
+  return `${appBase(origin)}/town/${slug}?ref=${encodeURIComponent(inviter)}&invite=${encodeURIComponent(invitee)}`;
 }
 
 /** The admin's open link: anyone holding it can join until it's rotated. */
 export function openInviteLink(slug: string, inviter: string, token: string, origin?: string): string {
-  return `${appBase(origin)}/league/${slug}?ref=${encodeURIComponent(inviter)}&t=${encodeURIComponent(token)}`;
+  return `${appBase(origin)}/town/${slug}?ref=${encodeURIComponent(inviter)}&t=${encodeURIComponent(token)}`;
 }
 
 /** The league's stored invite token (server only), or null. */
@@ -298,7 +298,7 @@ export async function getInviteToken(leagueId: string): Promise<string | null> {
  */
 export async function getOrCreateInviteToken(viewer: Viewer, league: League): Promise<string> {
   requireAdmin(viewer, league);
-  if (league.kind !== "custom") throw new LeagueError("company_league", "Company leagues are joined by verifying.", 400);
+  if (league.kind !== "custom") throw new LeagueError("company_league", "Company towns are joined by verifying.", 400);
   const current = await getInviteToken(league.id);
   if (current) return current;
   const { error } = await getSupabaseAdmin()
@@ -315,7 +315,7 @@ export async function getOrCreateInviteToken(viewer: Viewer, league: League): Pr
 /** New token: every open link shared so far stops working. */
 export async function rotateInviteToken(viewer: Viewer, league: League): Promise<string> {
   requireAdmin(viewer, league);
-  if (league.kind !== "custom") throw new LeagueError("company_league", "Company leagues are joined by verifying.", 400);
+  if (league.kind !== "custom") throw new LeagueError("company_league", "Company towns are joined by verifying.", 400);
   const token = newInviteToken();
   const { error } = await getSupabaseAdmin().from("leagues").update({ invite_token: token }).eq("id", league.id);
   if (error) throw dbError("token_failed", error);
@@ -333,7 +333,7 @@ export async function inviteMember(
 
   const sb = getSupabaseAdmin();
   const me = await getMembership(league.id, viewer.id);
-  if (me?.status !== "active") throw new LeagueError("not_member", "Only league members can invite.", 403);
+  if (me?.status !== "active") throw new LeagueError("not_member", "Only town members can invite.", 403);
 
   // Counted before the GitHub lookup, whatever the outcome.
   if (!(await takeQuota(viewer.id, "invite", MAX_INVITES_PER_DAY))) {
@@ -394,7 +394,7 @@ export async function inviteMember(
 // ─── Admin ──────────────────────────────────────────────────
 
 function requireAdmin(viewer: Viewer, league: League) {
-  if (league.admin_id !== viewer.id) throw new LeagueError("not_admin", "Only the league admin can do that.", 403);
+  if (league.admin_id !== viewer.id) throw new LeagueError("not_admin", "Only the town admin can do that.", 403);
 }
 
 export async function setScoringMode(viewer: Viewer, league: League, mode: ScoringMode): Promise<void> {
@@ -408,7 +408,7 @@ export async function setScoringMode(viewer: Viewer, league: League, mode: Scori
 export async function renameLeague(viewer: Viewer, league: League, rawName: string): Promise<void> {
   requireAdmin(viewer, league);
   // A company league carries its GitHub org's name.
-  if (league.kind === "company") throw new LeagueError("company_league", "Company leagues keep their org's name.", 403);
+  if (league.kind === "company") throw new LeagueError("company_league", "Company towns keep their org's name.", 403);
   const name = cleanLeagueName(rawName);
   const { error } = await getSupabaseAdmin().from("leagues").update({ name }).eq("id", league.id);
   if (error) throw dbError("update_failed", error);
@@ -417,9 +417,9 @@ export async function renameLeague(viewer: Viewer, league: League, rawName: stri
 /** Deletes a custom league and everything in it. `confirm` must be the league name. */
 export async function deleteLeague(viewer: Viewer, league: League, confirm: string): Promise<void> {
   requireAdmin(viewer, league);
-  if (league.kind !== "custom") throw new LeagueError("company_league", "Company leagues can't be deleted.", 403);
+  if (league.kind !== "custom") throw new LeagueError("company_league", "Company towns can't be deleted.", 403);
   if (confirm.trim().toLowerCase() !== league.name.trim().toLowerCase()) {
-    throw new LeagueError("confirm_mismatch", "Type the league name to confirm.");
+    throw new LeagueError("confirm_mismatch", "Type the town name to confirm.");
   }
   const { error } = await getSupabaseAdmin().from("leagues").delete().eq("id", league.id);
   if (error) throw dbError("delete_failed", error);
@@ -438,9 +438,9 @@ export async function removeMember(viewer: Viewer, league: League, rawLogin: str
     .select("id")
     .eq("github_login", rawLogin.trim().replace(/^@/, "").toLowerCase())
     .maybeSingle();
-  if (target?.id === viewer.id) throw new LeagueError("self_remove", "Transfer admin before leaving the league.");
+  if (target?.id === viewer.id) throw new LeagueError("self_remove", "Transfer admin before leaving the town.");
   const m = target ? await getMembership(league.id, target.id) : null;
-  if (!target || !m || m.status === "former") throw new LeagueError("not_member", "That developer isn't in this league.", 404);
+  if (!target || !m || m.status === "former") throw new LeagueError("not_member", "That developer isn't in this town.", 404);
 
   const { error } = await sb
     .from("league_members")

@@ -7,6 +7,7 @@ import { getCachedCity } from "@/lib/league-city/service";
 import { LOGIN_RE } from "@/lib/leagues/names";
 import { tokenMatches } from "@/lib/leagues/invite-token";
 import LeagueClient from "./league-client";
+import { townDisplayName } from "@/lib/towns/names";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,9 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const league = await getLeagueBySlug(slug);
-  if (!league) return { title: "League not found - Git City" };
-  const title = `${league.name} league - Git City`;
-  const description = `${league.name}'s skyline in Git City: a weekly race, a hall of fame and a crown for the winner.`;
+  if (!league) return { title: "Town not found - Git City" };
+  const title = `${townDisplayName(league.name)} - Git City`;
+  const description = `${townDisplayName(league.name)} in Git City: a skyline built together, a weekly race and a crown for the winner.`;
   return {
     title,
     description,
