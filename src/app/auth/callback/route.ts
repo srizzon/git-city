@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { provisionDeveloperOnLogin } from "@/lib/auth-provision";
+import { githubLoginFromIdentity } from "@/lib/auth-identity";
 import { fetchUserOrgs, syncOrgVerifications } from "@/lib/leagues/verification";
 
 // Extend timeout for GitHub API calls during login
@@ -28,11 +29,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/?error=auth_failed`);
   }
 
-  const githubLogin = (
-    data.user.user_metadata.user_name ??
-    data.user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  // From the GitHub identity GoTrue wrote, never user_metadata (user-editable).
+  const githubLogin = githubLoginFromIdentity(data.user);
 
   // Create/claim the building + XP + rank + feed + achievements + referral.
   // Shared with the local dev-login route (src/app/api/dev/login).
@@ -44,8 +42,8 @@ export async function GET(request: Request) {
 
   // Company leagues: provider_token only exists right now. When it carries
   // read:org (the "Verify company" flow, and every later login since GitHub
-  // keeps granted scopes), list the orgs and renew/join. Never stored, and a
-  // failure here never breaks login.
+  // keeps granted scopes), list the orgs and renew. Joining happens only in
+  // the verify flow. Never stored, and a failure here never breaks login.
   const providerToken = data.session?.provider_token;
   if (providerToken && githubLogin) {
     try {
@@ -55,6 +53,7 @@ export async function GET(request: Request) {
           .from("developers")
           .select("id")
           .eq("github_login", githubLogin)
+          .eq("claimed_by", data.user.id)
           .maybeSingle();
         if (dev) {
           const { seed } = await syncOrgVerifications(dev.id, orgs, { verify: searchParams.get("verify") === "org" });
@@ -79,10 +78,10 @@ export async function GET(request: Request) {
         .single();
 
       if (!dev) {
-        return NextResponse.redirect(`${origin}/?user=${githubLogin}`);
+        return NextResponse.redirect(`${origin}/?user=${encodeURIComponent(githubLogin)}`);
       }
 
-      return NextResponse.redirect(`${origin}/shop/${githubLogin}`);
+      return NextResponse.redirect(`${origin}/shop/${encodeURIComponent(githubLogin)}`);
     }
 
     // General redirect: only allow relative paths.
@@ -93,5 +92,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/?user=${githubLogin}`);
+  return NextResponse.redirect(`${origin}/?user=${encodeURIComponent(githubLogin)}`);
 }
