@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getLeagueBySlug, getViewer } from "@/lib/leagues/service";
 import { getCityNorms, getGlobalWinner, getLeagueCityDevs, getLeaguePageData } from "@/lib/leagues/queries";
 import { isoDay, weekStart } from "@/lib/leagues/scoring";
+import { getCity } from "@/lib/league-city/service";
 import LeagueClient from "./league-client";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,8 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   const data = await getLeaguePageData(league, viewer);
   const lastWeek = weekStart(new Date());
   lastWeek.setUTCDate(lastWeek.getUTCDate() - 7);
-  const [cityDevs, cityNorms, globalWinner] = await Promise.all([
+  const [city, cityDevs, cityNorms, globalWinner] = await Promise.all([
+    getCity(league.id),
     getLeagueCityDevs(data.members),
     getCityNorms(),
     league.kind === "company" ? getGlobalWinner(isoDay(lastWeek)) : Promise.resolve(null),
@@ -40,6 +42,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   return (
     <LeagueClient
       data={data}
+      city={city}
       cityDevs={cityDevs}
       cityNorms={cityNorms}
       topCompanyLastWeek={globalWinner?.slug === league.slug}

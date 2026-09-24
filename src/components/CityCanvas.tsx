@@ -1,7 +1,7 @@
 "use client";
 
 import "@/lib/silenceThreeClockWarning";
-import { useRef, useEffect, useEffectEvent, useState, useMemo, useCallback } from "react";
+import { useRef, useEffect, useEffectEvent, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/drei";
 import { EffectComposer, Bloom, SMAA } from "@react-three/postprocessing";
@@ -39,180 +39,11 @@ import type { RemotePilot, ActiveProjectile, SelfPvpState, PendingRespawn } from
 import ProjectileSwarm from "./ProjectileSwarm";
 import BossPreview, { type BossVariant, type Phase as BossPhase } from "./BossPreview";
 import BossEvent from "./BossEvent";
+import { THEMES, CityExposure, ThemeLights } from "./city/theme";
+import { StreetLamp, ParkBench, Fountain, InstancedDecorations, _dBox, _dPlane } from "./city/decorations";
 
-// ─── Theme Definitions ───────────────────────────────────────
-
-export const THEME_NAMES = [
-  "Midnight",
-  "Sunset",
-  "Neon",
-  "Emerald",
-] as const;
-
-export interface BuildingColors {
-  windowLit: string[];
-  windowOff: string;
-  face: string;
-  roof: string;
-  accent: string;
-}
-
-interface CityTheme {
-  sky: [number, string][];
-  fogColor: string;
-  fogNear: number;
-  fogFar: number;
-  ambientColor: string;
-  ambientIntensity: number;
-  sunColor: string;
-  sunIntensity: number;
-  sunPos: [number, number, number];
-  fillColor: string;
-  fillIntensity: number;
-  fillPos: [number, number, number];
-  hemiSky: string;
-  hemiGround: string;
-  hemiIntensity: number;
-  groundColor: string;
-  grid1: string;
-  grid2: string;
-  roadMarkingColor: string;
-  sidewalkColor: string;
-  building: BuildingColors;
-  waterColor: string;
-  waterEmissive: string;
-  dockColor: string;
-}
-
-const THEMES: CityTheme[] = [
-  // 0 – Emerald
-  {
-    sky: [
-      [0, "#000804"], [0.15, "#001408"], [0.30, "#002810"], [0.42, "#003c1c"],
-      [0.52, "#004828"], [0.60, "#003820"], [0.75, "#002014"], [0.90, "#001008"],
-      [1, "#000604"],
-    ],
-    fogColor: "#0a2014", fogNear: 400, fogFar: 3500,
-    ambientColor: "#40a060", ambientIntensity: 0.55,
-    sunColor: "#70d090", sunIntensity: 0.75, sunPos: [300, 100, -250],
-    fillColor: "#20a080", fillIntensity: 0.35, fillPos: [-200, 60, 200],
-    hemiSky: "#50b068", hemiGround: "#183020", hemiIntensity: 0.5,
-    groundColor: "#1e3020", grid1: "#2c4838", grid2: "#243828",
-    roadMarkingColor: "#60c080",
-    sidewalkColor: "#404848",
-    building: {
-      windowLit: ["#0e4429", "#006d32", "#26a641", "#39d353", "#c8e64a"],
-      windowOff: "#060e08", face: "#0c1810", roof: "#1e4028",
-      accent: "#f0c060",
-    },
-    waterColor: "#082018", waterEmissive: "#0a3020", dockColor: "#3a2818",
-  },
-  // 1 – Midnight
-  {
-    sky: [
-      [0, "#000206"], [0.15, "#020814"], [0.30, "#061428"], [0.45, "#0c2040"],
-      [0.55, "#102850"], [0.65, "#0c2040"], [0.80, "#061020"], [1, "#020608"],
-    ],
-    fogColor: "#0a1428", fogNear: 400, fogFar: 3500,
-    ambientColor: "#4060b0", ambientIntensity: 0.55,
-    sunColor: "#7090d0", sunIntensity: 0.75, sunPos: [300, 120, -200],
-    fillColor: "#304080", fillIntensity: 0.3, fillPos: [-200, 60, 200],
-    hemiSky: "#5080a0", hemiGround: "#202830", hemiIntensity: 0.5,
-    groundColor: "#242c38", grid1: "#344050", grid2: "#2c3848",
-    roadMarkingColor: "#8090a0",
-    sidewalkColor: "#484c58",
-    building: {
-      windowLit: ["#a0c0f0", "#80a0e0", "#6080c8", "#c0d8f8", "#e0e8ff"],
-      windowOff: "#0c0e18", face: "#101828", roof: "#2a3858",
-      accent: "#6090e0",
-    },
-    waterColor: "#0a1830", waterEmissive: "#0a2050", dockColor: "#3a2818",
-  },
-  // 2 – Sunset
-  {
-    sky: [
-      [0, "#0c0614"], [0.15, "#1c0e30"], [0.28, "#3a1850"], [0.38, "#6a3060"],
-      [0.46, "#a05068"], [0.52, "#d07060"], [0.57, "#e89060"], [0.62, "#f0b070"],
-      [0.68, "#f0c888"], [0.75, "#c08060"], [0.85, "#603030"], [1, "#180c10"],
-    ],
-    fogColor: "#80405a", fogNear: 400, fogFar: 3500,
-    ambientColor: "#e0a080", ambientIntensity: 0.7,
-    sunColor: "#f0b070", sunIntensity: 1.0, sunPos: [400, 120, -300],
-    fillColor: "#6050a0", fillIntensity: 0.35, fillPos: [-200, 80, 200],
-    hemiSky: "#d09080", hemiGround: "#4a2828", hemiIntensity: 0.55,
-    groundColor: "#3a3038", grid1: "#504048", grid2: "#443838",
-    roadMarkingColor: "#d0a840",
-    sidewalkColor: "#585058",
-    building: {
-      windowLit: ["#f8d880", "#f0b860", "#e89840", "#d07830", "#f0c060"],
-      windowOff: "#1a1018", face: "#281828", roof: "#604050",
-      accent: "#c8e64a",
-    },
-    waterColor: "#1a2040", waterEmissive: "#102060", dockColor: "#4a3020",
-  },
-  // 3 – Neon
-  {
-    sky: [
-      [0, "#06001a"], [0.15, "#100028"], [0.30, "#200440"], [0.42, "#380650"],
-      [0.52, "#500860"], [0.60, "#380648"], [0.75, "#180230"], [0.90, "#0c0118"],
-      [1, "#06000c"],
-    ],
-    fogColor: "#1a0830", fogNear: 400, fogFar: 3500,
-    ambientColor: "#8040c0", ambientIntensity: 0.6,
-    sunColor: "#c050e0", sunIntensity: 0.85, sunPos: [300, 100, -200],
-    fillColor: "#00c0d0", fillIntensity: 0.4, fillPos: [-250, 60, 200],
-    hemiSky: "#9040d0", hemiGround: "#201028", hemiIntensity: 0.5,
-    groundColor: "#2c2038", grid1: "#3c2c50", grid2: "#342440",
-    roadMarkingColor: "#c060e0",
-    sidewalkColor: "#484058",
-    building: {
-      windowLit: ["#ff40c0", "#c040ff", "#00e0ff", "#40ff80", "#ff8040"],
-      windowOff: "#0a0814", face: "#180830", roof: "#3c1858",
-      accent: "#e040c0",
-    },
-    waterColor: "#0c0830", waterEmissive: "#1008a0", dockColor: "#2a1838",
-  },
-];
-
-// ─── Sky Dome ────────────────────────────────────────────────
-
-function SkyDome({ stops }: { stops: [number, string][] }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const mat = useMemo(() => {
-    const c = document.createElement("canvas");
-    c.width = 4;
-    c.height = 512;
-    const ctx = c.getContext("2d")!;
-    const g = ctx.createLinearGradient(0, 0, 0, 512);
-    for (const [stop, color] of stops) g.addColorStop(stop, color);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 4, 512);
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false });
-  }, [stops]);
-
-  useEffect(() => {
-    return () => {
-      mat.map?.dispose();
-      mat.dispose();
-    };
-  }, [mat]);
-
-  // Center sky dome on whichever camera is currently rendering
-  // (works with split-screen virtual cameras, not just the default one)
-  const onBeforeRender = useCallback((_renderer: THREE.WebGLRenderer, _scene: THREE.Scene, camera: THREE.Camera) => {
-    if (meshRef.current) {
-      meshRef.current.position.copy(camera.position);
-    }
-  }, []);
-
-  return (
-    <mesh ref={meshRef} material={mat} renderOrder={-1} onBeforeRender={onBeforeRender}>
-      <sphereGeometry args={[3500, 32, 48]} />
-    </mesh>
-  );
-}
+export { THEME_NAMES } from "./city/theme";
+export type { BuildingColors } from "./city/theme";
 
 // ─── Paper Plane (GLB model) ─────────────────────────────────
 
@@ -1526,23 +1357,6 @@ function Tree3D({ position, variant }: { position: [number, number, number]; var
   );
 }
 
-// ─── Street Lamp ──────────────────────────────────────────────
-
-function StreetLamp({ position }: { position: [number, number, number] }) {
-  return (
-    <group position={position}>
-      <mesh position={[0, 9, 0]}>
-        <cylinderGeometry args={[0.3, 0.45, 18, 6]} />
-        <meshStandardMaterial color="#4a4a4a" emissive="#4a4a4a" emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[0, 18.5, 0]}>
-        <boxGeometry args={[1.5, 0.8, 1.5]} />
-        <meshStandardMaterial color="#f0d870" emissive="#f0d870" emissiveIntensity={2.0} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
-
 // ─── Parked Car ───────────────────────────────────────────────
 
 function ParkedCar({ position, rotation, variant }: { position: [number, number, number]; rotation: number; variant: number }) {
@@ -1557,55 +1371,6 @@ function ParkedCar({ position, rotation, variant }: { position: [number, number,
       <mesh position={[0, 3.1, 0]}>
         <boxGeometry args={[5, 2, 3.2]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.25} />
-      </mesh>
-    </group>
-  );
-}
-
-// ─── Park Bench ───────────────────────────────────────────────
-
-const _dBox = /* @__PURE__ */ new THREE.BoxGeometry(1, 1, 1);
-const _dPlane = /* @__PURE__ */ new THREE.PlaneGeometry(1, 1);
-
-function ParkBench({ position, rotation }: { position: [number, number, number]; rotation: number }) {
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      <mesh position={[0, 0.9, 0]} geometry={_dBox} scale={[5, 0.3, 1.5]}>
-        <meshStandardMaterial color="#6b4226" emissive="#6b4226" emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[0, 1.7, -0.65]} rotation={[0.15, 0, 0]} geometry={_dBox} scale={[5, 1.3, 0.2]}>
-        <meshStandardMaterial color="#6b4226" emissive="#6b4226" emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[-2, 0.45, 0]} geometry={_dBox} scale={[0.3, 0.9, 1.2]}>
-        <meshStandardMaterial color="#3a3a3a" emissive="#3a3a3a" emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[2, 0.45, 0]} geometry={_dBox} scale={[0.3, 0.9, 1.2]}>
-        <meshStandardMaterial color="#3a3a3a" emissive="#3a3a3a" emissiveIntensity={0.3} />
-      </mesh>
-    </group>
-  );
-}
-
-// ─── Fountain ─────────────────────────────────────────────────
-
-function Fountain({ position }: { position: [number, number, number] }) {
-  return (
-    <group position={position}>
-      <mesh position={[0, 1.2, 0]}>
-        <cylinderGeometry args={[8, 8.5, 2.4, 16]} />
-        <meshStandardMaterial color="#707070" emissive="#707070" emissiveIntensity={0.25} />
-      </mesh>
-      <mesh position={[0, 3.4, 0]}>
-        <cylinderGeometry args={[5, 5.5, 2, 12]} />
-        <meshStandardMaterial color="#808080" emissive="#808080" emissiveIntensity={0.25} />
-      </mesh>
-      <mesh position={[0, 5.6, 0]}>
-        <cylinderGeometry args={[2.5, 3.2, 2, 10]} />
-        <meshStandardMaterial color="#909090" emissive="#909090" emissiveIntensity={0.25} />
-      </mesh>
-      <mesh position={[0, 7.2, 0]}>
-        <cylinderGeometry args={[1.8, 2, 1.2, 10]} />
-        <meshStandardMaterial color="#4090d0" emissive="#2060a0" emissiveIntensity={2.0} toneMapped={false} transparent opacity={0.7} />
       </mesh>
     </group>
   );
@@ -1638,339 +1403,6 @@ function Decorations({ items }: { items: CityDecoration[] }) {
           default: return null;
         }
       })}
-    </>
-  );
-}
-
-// ─── Instanced Decorations (single draw call per type) ───────
-
-const _dMatrix = new THREE.Matrix4();
-const _dPos = new THREE.Vector3();
-const _dQuat = new THREE.Quaternion();
-const _dScale = new THREE.Vector3();
-const _dEuler = new THREE.Euler();
-const _dLocalPos = new THREE.Vector3();
-const _dPartQuat = new THREE.Quaternion();
-
-function InstancedDecorations({ items, roadMarkingColor, sidewalkColor }: { items: CityDecoration[]; roadMarkingColor: string; sidewalkColor: string }) {
-  const trees = useMemo(() => items.filter(d => d.type === 'tree'), [items]);
-  const lamps = useMemo(() => items.filter(d => d.type === 'streetLamp'), [items]);
-  const cars = useMemo(() => items.filter(d => d.type === 'car'), [items]);
-  const roadMarkings = useMemo(() => items.filter(d => d.type === 'roadMarking'), [items]);
-  const benches = useMemo(() => items.filter(d => d.type === 'bench'), [items]);
-  const fountains = useMemo(() => items.filter(d => d.type === 'fountain'), [items]);
-  const sidewalks = useMemo(() => items.filter(d => d.type === 'sidewalk'), [items]);
-
-  const treeTrunkRef = useRef<THREE.InstancedMesh>(null);
-  const treeCanopyRef = useRef<THREE.InstancedMesh>(null);
-  const lampPoleRef = useRef<THREE.InstancedMesh>(null);
-  const lampLightRef = useRef<THREE.InstancedMesh>(null);
-  const carBodyRef = useRef<THREE.InstancedMesh>(null);
-  const carCabinRef = useRef<THREE.InstancedMesh>(null);
-  const roadMarkingRef = useRef<THREE.InstancedMesh>(null);
-  const benchSeatRef = useRef<THREE.InstancedMesh>(null);
-  const benchBackRef = useRef<THREE.InstancedMesh>(null);
-  const benchLegLRef = useRef<THREE.InstancedMesh>(null);
-  const benchLegRRef = useRef<THREE.InstancedMesh>(null);
-  const fountainBasinRef = useRef<THREE.InstancedMesh>(null);
-  const fountainMidRef = useRef<THREE.InstancedMesh>(null);
-  const fountainUpperRef = useRef<THREE.InstancedMesh>(null);
-  const fountainWaterRef = useRef<THREE.InstancedMesh>(null);
-  const sidewalkRef = useRef<THREE.InstancedMesh>(null);
-
-  // Shared geometries
-  const geos = useMemo(() => ({
-    treeTrunk: new THREE.CylinderGeometry(1, 1.3, 1, 6),
-    treeCanopy: new THREE.ConeGeometry(1, 1, 8),
-    lampPole: new THREE.CylinderGeometry(0.3, 0.45, 18, 6),
-    lampLight: new THREE.BoxGeometry(1.5, 0.8, 1.5),
-    carBody: new THREE.BoxGeometry(8, 2.5, 3.5),
-    carCabin: new THREE.BoxGeometry(5, 2, 3.2),
-    roadMarking: new THREE.PlaneGeometry(1, 1),
-    fountainBasin: new THREE.CylinderGeometry(8, 8.5, 2.4, 16),
-    fountainMid: new THREE.CylinderGeometry(5, 5.5, 2, 12),
-    fountainUpper: new THREE.CylinderGeometry(2.5, 3.2, 2, 10),
-    fountainWater: new THREE.CylinderGeometry(1.8, 2, 1.2, 10),
-  }), []);
-
-  // Shared materials
-  const mats = useMemo(() => ({
-    treeTrunk: new THREE.MeshStandardMaterial({ color: "#5a3a1e", emissive: "#5a3a1e", emissiveIntensity: 0.35 }),
-    treeCanopy: new THREE.MeshStandardMaterial({ color: "#2d5a1e", emissive: "#2d5a1e", emissiveIntensity: 0.45 }),
-    lampPole: new THREE.MeshStandardMaterial({ color: "#4a4a4a", emissive: "#4a4a4a", emissiveIntensity: 0.3 }),
-    lampLight: new THREE.MeshStandardMaterial({
-      color: "#f0d870", emissive: "#f0d870", emissiveIntensity: 2.0, toneMapped: false,
-    }),
-    carBody: new THREE.MeshStandardMaterial({ color: "#808080", emissive: "#808080", emissiveIntensity: 0.2 }),
-    carCabin: new THREE.MeshStandardMaterial({ color: "#808080", emissive: "#808080", emissiveIntensity: 0.2 }),
-    roadMarking: new THREE.MeshStandardMaterial({
-      color: roadMarkingColor, emissive: roadMarkingColor, emissiveIntensity: 0.8,
-    }),
-    benchWood: new THREE.MeshStandardMaterial({ color: "#6b4226", emissive: "#6b4226", emissiveIntensity: 0.3 }),
-    benchMetal: new THREE.MeshStandardMaterial({ color: "#3a3a3a", emissive: "#3a3a3a", emissiveIntensity: 0.3 }),
-    fountainStone1: new THREE.MeshStandardMaterial({ color: "#707070", emissive: "#707070", emissiveIntensity: 0.25 }),
-    fountainStone2: new THREE.MeshStandardMaterial({ color: "#808080", emissive: "#808080", emissiveIntensity: 0.25 }),
-    fountainStone3: new THREE.MeshStandardMaterial({ color: "#909090", emissive: "#909090", emissiveIntensity: 0.25 }),
-    fountainWater: new THREE.MeshStandardMaterial({ color: "#4090d0", emissive: "#2060a0", emissiveIntensity: 2.0, toneMapped: false, transparent: true, opacity: 0.7 }),
-    sidewalk: new THREE.MeshStandardMaterial({ color: sidewalkColor, emissive: sidewalkColor, emissiveIntensity: 0.2, roughness: 0.85 }),
-  }), [roadMarkingColor, sidewalkColor]);
-
-  // Set up tree instances
-  useEffect(() => {
-    if (!treeTrunkRef.current || !treeCanopyRef.current || trees.length === 0) return;
-    const greens = [new THREE.Color('#2d5a1e'), new THREE.Color('#1e6b2e'), new THREE.Color('#3a7a2a')];
-
-    for (let i = 0; i < trees.length; i++) {
-      const d = trees[i];
-      const trunkH = 8 + d.variant * 1.5;
-      const canopyH = 10 + d.variant * 2;
-      const canopyR = 6 + d.variant * 0.8;
-
-      _dQuat.identity();
-      _dPos.set(d.position[0], d.position[1] + trunkH / 2, d.position[2]);
-      _dScale.set(1, trunkH, 1);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      treeTrunkRef.current.setMatrixAt(i, _dMatrix);
-
-      _dPos.set(d.position[0], d.position[1] + trunkH + canopyH / 2 - 1, d.position[2]);
-      _dScale.set(canopyR, canopyH, canopyR);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      treeCanopyRef.current.setMatrixAt(i, _dMatrix);
-      treeCanopyRef.current.setColorAt(i, greens[d.variant % greens.length]);
-    }
-
-    treeTrunkRef.current.instanceMatrix.needsUpdate = true;
-    treeCanopyRef.current.instanceMatrix.needsUpdate = true;
-    if (treeCanopyRef.current.instanceColor) treeCanopyRef.current.instanceColor.needsUpdate = true;
-  }, [trees]);
-
-  // Set up lamp instances
-  useEffect(() => {
-    if (!lampPoleRef.current || !lampLightRef.current || lamps.length === 0) return;
-    _dQuat.identity();
-    _dScale.set(1, 1, 1);
-
-    for (let i = 0; i < lamps.length; i++) {
-      const d = lamps[i];
-      _dPos.set(d.position[0], d.position[1] + 9, d.position[2]);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      lampPoleRef.current.setMatrixAt(i, _dMatrix);
-
-      _dPos.set(d.position[0], d.position[1] + 18.5, d.position[2]);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      lampLightRef.current.setMatrixAt(i, _dMatrix);
-    }
-
-    lampPoleRef.current.instanceMatrix.needsUpdate = true;
-    lampLightRef.current.instanceMatrix.needsUpdate = true;
-  }, [lamps]);
-
-  // Set up car instances
-  useEffect(() => {
-    if (!carBodyRef.current || !carCabinRef.current || cars.length === 0) return;
-    const carColors = [
-      new THREE.Color('#c03030'), new THREE.Color('#3050a0'),
-      new THREE.Color('#d0d0d0'), new THREE.Color('#2a2a2a'),
-    ];
-
-    for (let i = 0; i < cars.length; i++) {
-      const d = cars[i];
-      _dEuler.set(0, d.rotation, 0);
-      _dQuat.setFromEuler(_dEuler);
-      _dScale.set(1, 1, 1);
-
-      _dPos.set(d.position[0], d.position[1] + 1.25, d.position[2]);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      carBodyRef.current.setMatrixAt(i, _dMatrix);
-      carBodyRef.current.setColorAt(i, carColors[d.variant % carColors.length]);
-
-      _dPos.set(d.position[0], d.position[1] + 3.1, d.position[2]);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      carCabinRef.current.setMatrixAt(i, _dMatrix);
-      carCabinRef.current.setColorAt(i, carColors[d.variant % carColors.length]);
-    }
-
-    carBodyRef.current.instanceMatrix.needsUpdate = true;
-    carCabinRef.current.instanceMatrix.needsUpdate = true;
-    if (carBodyRef.current.instanceColor) carBodyRef.current.instanceColor.needsUpdate = true;
-    if (carCabinRef.current.instanceColor) carCabinRef.current.instanceColor.needsUpdate = true;
-  }, [cars]);
-
-  // Set up road marking instances
-  useEffect(() => {
-    if (!roadMarkingRef.current || roadMarkings.length === 0) return;
-
-    for (let i = 0; i < roadMarkings.length; i++) {
-      const d = roadMarkings[i];
-      const w = d.size?.[0] ?? 2;
-      const h = d.size?.[1] ?? 6;
-
-      _dEuler.set(-Math.PI / 2, d.rotation, 0);
-      _dQuat.setFromEuler(_dEuler);
-      _dPos.set(d.position[0], d.position[1], d.position[2]);
-      _dScale.set(w, h, 1);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      roadMarkingRef.current.setMatrixAt(i, _dMatrix);
-    }
-
-    roadMarkingRef.current.instanceMatrix.needsUpdate = true;
-  }, [roadMarkings]);
-
-  // Set up bench instances
-  useEffect(() => {
-    if (!benchSeatRef.current || !benchBackRef.current || !benchLegLRef.current || !benchLegRRef.current || benches.length === 0) return;
-
-    for (let i = 0; i < benches.length; i++) {
-      const d = benches[i];
-      _dEuler.set(0, d.rotation, 0);
-      _dQuat.setFromEuler(_dEuler);
-
-      // Seat: local [0, 0.9, 0], scale [5, 0.3, 1.5]
-      _dLocalPos.set(0, 0.9, 0).applyQuaternion(_dQuat);
-      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
-      _dScale.set(5, 0.3, 1.5);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      benchSeatRef.current.setMatrixAt(i, _dMatrix);
-
-      // Backrest: local [0, 1.7, -0.65], rot [0.15, 0, 0], scale [5, 1.3, 0.2]
-      _dLocalPos.set(0, 1.7, -0.65).applyQuaternion(_dQuat);
-      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
-      _dEuler.set(0.15, 0, 0);
-      _dPartQuat.setFromEuler(_dEuler);
-      _dPartQuat.premultiply(_dQuat);
-      _dScale.set(5, 1.3, 0.2);
-      _dMatrix.compose(_dPos, _dPartQuat, _dScale);
-      benchBackRef.current.setMatrixAt(i, _dMatrix);
-
-      // Leg L: local [-2, 0.45, 0], scale [0.3, 0.9, 1.2]
-      _dEuler.set(0, d.rotation, 0);
-      _dQuat.setFromEuler(_dEuler);
-      _dLocalPos.set(-2, 0.45, 0).applyQuaternion(_dQuat);
-      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
-      _dScale.set(0.3, 0.9, 1.2);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      benchLegLRef.current.setMatrixAt(i, _dMatrix);
-
-      // Leg R: local [2, 0.45, 0], scale [0.3, 0.9, 1.2]
-      _dLocalPos.set(2, 0.45, 0).applyQuaternion(_dQuat);
-      _dPos.set(d.position[0] + _dLocalPos.x, d.position[1] + _dLocalPos.y, d.position[2] + _dLocalPos.z);
-      _dScale.set(0.3, 0.9, 1.2);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      benchLegRRef.current.setMatrixAt(i, _dMatrix);
-    }
-
-    benchSeatRef.current.instanceMatrix.needsUpdate = true;
-    benchBackRef.current.instanceMatrix.needsUpdate = true;
-    benchLegLRef.current.instanceMatrix.needsUpdate = true;
-    benchLegRRef.current.instanceMatrix.needsUpdate = true;
-  }, [benches]);
-
-  // Set up fountain instances
-  useEffect(() => {
-    if (!fountainBasinRef.current || !fountainMidRef.current || !fountainUpperRef.current || !fountainWaterRef.current || fountains.length === 0) return;
-    _dQuat.identity();
-    _dScale.set(1, 1, 1);
-
-    for (let i = 0; i < fountains.length; i++) {
-      const d = fountains[i];
-
-      // Basin: y+1.2
-      _dPos.set(d.position[0], d.position[1] + 1.2, d.position[2]);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      fountainBasinRef.current.setMatrixAt(i, _dMatrix);
-
-      // Mid: y+3.4
-      _dPos.set(d.position[0], d.position[1] + 3.4, d.position[2]);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      fountainMidRef.current.setMatrixAt(i, _dMatrix);
-
-      // Upper: y+5.6
-      _dPos.set(d.position[0], d.position[1] + 5.6, d.position[2]);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      fountainUpperRef.current.setMatrixAt(i, _dMatrix);
-
-      // Water: y+7.2
-      _dPos.set(d.position[0], d.position[1] + 7.2, d.position[2]);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      fountainWaterRef.current.setMatrixAt(i, _dMatrix);
-    }
-
-    fountainBasinRef.current.instanceMatrix.needsUpdate = true;
-    fountainMidRef.current.instanceMatrix.needsUpdate = true;
-    fountainUpperRef.current.instanceMatrix.needsUpdate = true;
-    fountainWaterRef.current.instanceMatrix.needsUpdate = true;
-  }, [fountains]);
-
-  // Set up sidewalk instances
-  useEffect(() => {
-    if (!sidewalkRef.current || sidewalks.length === 0) return;
-
-    for (let i = 0; i < sidewalks.length; i++) {
-      const d = sidewalks[i];
-      const w = d.size?.[0] ?? 1;
-      const h = d.size?.[1] ?? 1;
-
-      _dEuler.set(-Math.PI / 2, 0, 0);
-      _dQuat.setFromEuler(_dEuler);
-      _dPos.set(d.position[0], d.position[1], d.position[2]);
-      _dScale.set(w, h, 1);
-      _dMatrix.compose(_dPos, _dQuat, _dScale);
-      sidewalkRef.current.setMatrixAt(i, _dMatrix);
-    }
-
-    sidewalkRef.current.instanceMatrix.needsUpdate = true;
-  }, [sidewalks]);
-
-  // Dispose
-  useEffect(() => {
-    return () => {
-      Object.values(geos).forEach(g => g.dispose());
-      Object.values(mats).forEach(m => m.dispose());
-    };
-  }, [geos, mats]);
-
-  return (
-    <>
-      {trees.length > 0 && (
-        <>
-          <instancedMesh ref={treeTrunkRef} args={[geos.treeTrunk, mats.treeTrunk, trees.length]} />
-          <instancedMesh ref={treeCanopyRef} args={[geos.treeCanopy, mats.treeCanopy, trees.length]} />
-        </>
-      )}
-      {lamps.length > 0 && (
-        <>
-          <instancedMesh ref={lampPoleRef} args={[geos.lampPole, mats.lampPole, lamps.length]} />
-          <instancedMesh ref={lampLightRef} args={[geos.lampLight, mats.lampLight, lamps.length]} />
-        </>
-      )}
-      {cars.length > 0 && (
-        <>
-          <instancedMesh ref={carBodyRef} args={[geos.carBody, mats.carBody, cars.length]} />
-          <instancedMesh ref={carCabinRef} args={[geos.carCabin, mats.carCabin, cars.length]} />
-        </>
-      )}
-      {roadMarkings.length > 0 && (
-        <instancedMesh ref={roadMarkingRef} args={[geos.roadMarking, mats.roadMarking, roadMarkings.length]} />
-      )}
-      {benches.length > 0 && (
-        <>
-          <instancedMesh ref={benchSeatRef} args={[_dBox, mats.benchWood, benches.length]} />
-          <instancedMesh ref={benchBackRef} args={[_dBox, mats.benchWood, benches.length]} />
-          <instancedMesh ref={benchLegLRef} args={[_dBox, mats.benchMetal, benches.length]} />
-          <instancedMesh ref={benchLegRRef} args={[_dBox, mats.benchMetal, benches.length]} />
-        </>
-      )}
-      {fountains.length > 0 && (
-        <>
-          <instancedMesh ref={fountainBasinRef} args={[geos.fountainBasin, mats.fountainStone1, fountains.length]} />
-          <instancedMesh ref={fountainMidRef} args={[geos.fountainMid, mats.fountainStone2, fountains.length]} />
-          <instancedMesh ref={fountainUpperRef} args={[geos.fountainUpper, mats.fountainStone3, fountains.length]} />
-          <instancedMesh ref={fountainWaterRef} args={[geos.fountainWater, mats.fountainWater, fountains.length]} />
-        </>
-      )}
-      {sidewalks.length > 0 && (
-        <instancedMesh ref={sidewalkRef} args={[_dPlane, mats.sidewalk, sidewalks.length]} />
-      )}
     </>
   );
 }
@@ -2195,22 +1627,16 @@ function Waterfront({ river, dockColor }: { river: CityRiver; dockColor: string 
 
 // ─── Orbit Scene (controls + focus) ──────────────────────────
 
-function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition, isCompareCinematicPlaying, onCameraMove, homeTarget, homeCamPos, maxDistance }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null; isCompareCinematicPlaying?: boolean; onCameraMove?: (x: number, z: number, tx: number, tz: number) => void; homeTarget?: [number, number, number] | null; homeCamPos?: [number, number, number] | null; maxDistance?: number }) {
+function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPosition, isCompareCinematicPlaying, onCameraMove, homeTarget, maxDistance }: { buildings: CityBuilding[]; focusedBuilding: string | null; focusedBuildingB?: string | null; focusPosition?: [number, number, number] | null; isCompareCinematicPlaying?: boolean; onCameraMove?: (x: number, z: number, tx: number, tz: number) => void; homeTarget?: [number, number, number] | null; maxDistance?: number }) {
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
   const frameCount = useRef(0);
 
   // Reset camera on mount — wide panorama from front, E.Arcade centered
-  // (or the fitted framing when the caller passes one)
   useEffect(() => {
-    if (homeCamPos && homeTarget) {
-      camera.position.set(...homeCamPos);
-      camera.lookAt(...homeTarget);
-      return;
-    }
     camera.position.set(-800, 700, -1000);
     camera.lookAt(TARGET_X, TARGET_Y, TARGET_Z);
-  }, [camera, homeCamPos, homeTarget]);
+  }, [camera]);
 
   // Report camera position ~10fps (every 6 frames), and only when it moved —
   // an idle camera used to re-render the whole page 10×/s.
@@ -2339,12 +1765,6 @@ interface Props {
   celebrationActive?: boolean;
   wallpaperMode?: boolean;
   wallpaperSpeed?: number;
-  /** Canvas container style. Defaults to fixed full-viewport. */
-  containerStyle?: React.CSSProperties;
-  /** Hide E.Arcade, the Founder Spire, the Bank and sponsored landmarks. */
-  hideLandmarks?: boolean;
-  /** Frame the camera on the buildings' bounds instead of the city center. */
-  cameraFit?: boolean;
   liveByLogin?: Map<string, LiveSession>;
   cityEnergy?: number;
   onCompareCinematicEnd?: () => void;
@@ -2366,23 +1786,6 @@ interface Props {
   flyEngageBoss?: (maxHp: number) => void;
   flySendBossHit?: (kind: "boss" | "minion") => void;
   flySendBossSelfHit?: () => void;
-}
-
-// Dynamically adjust scene exposure based on city energy (devs coding)
-function CityExposure({ cityEnergy }: { cityEnergy: number }) {
-  const gl = useThree((s) => s.gl);
-  const targetRef = useRef(1.3);
-  targetRef.current = 0.4 + 0.9 * Math.min(1, cityEnergy); // 0.4 at sleep, 1.3 at full
-
-  useFrame(() => {
-    const current = gl.toneMappingExposure;
-    const target = targetRef.current;
-    if (Math.abs(current - target) > 0.001) {
-      gl.toneMappingExposure += (target - current) * 0.02;
-    }
-  });
-
-  return null;
 }
 
 const _SRGB = THREE.SRGBColorSpace;
@@ -2532,7 +1935,7 @@ function DynamicSky() {
 // ordered near → far, so the mapping is a straight index.
 const RABBIT_PLAZA_INDICES = [0, 1, 2, 3, 4];
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, sfMap, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, perfMode = "high", onPerfDecline, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onBankClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, resolvedSponsors, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, containerStyle, hideLandmarks, cameraFit, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove, bossPreview, flyBossStateRef, flyEngageBoss, flySendBossHit, flySendBossSelfHit }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, sfMap, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, perfMode = "high", onPerfDecline, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onBankClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, resolvedSponsors, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove, bossPreview, flyBossStateRef, flyEngageBoss, flySendBossHit, flySendBossSelfHit }: Props) {
   const sponsors = resolvedSponsors ?? [];
   const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
   const prevComparePairRef = useRef<string>("");
@@ -2605,38 +2008,13 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
     };
   }, [sfMap]);
 
-  // Fitted framing (league mini-cities): target the buildings' center, back off
-  // far enough to see the whole footprint.
-  const fitHome = useMemo(() => {
-    if (!cameraFit || buildings.length === 0) return null;
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxH = 0;
-    for (const b of buildings) {
-      minX = Math.min(minX, b.position[0] - b.width / 2);
-      maxX = Math.max(maxX, b.position[0] + b.width / 2);
-      minZ = Math.min(minZ, b.position[2] - b.depth / 2);
-      maxZ = Math.max(maxZ, b.position[2] + b.depth / 2);
-      maxH = Math.max(maxH, b.height);
-    }
-    const cx = (minX + maxX) / 2;
-    const cz = (minZ + maxZ) / 2;
-    const span = Math.max(maxX - minX, maxZ - minZ, maxH, 60);
-    const dist = span * 1.4 + 80;
-    const ty = Math.min(maxH * 0.4, 120);
-    return {
-      target: [cx, ty, cz] as [number, number, number],
-      camPos: [cx - dist * 0.55, ty + dist * 0.55, cz - dist * 0.7] as [number, number, number],
-      maxDistance: Math.max(dist * 2.5, 600),
-    };
-  }, [cameraFit, buildings]);
-  const home = fitHome ?? sfHome;
-
   return (
     <Canvas
       shadows={false}
-      camera={{ position: home ? home.camPos : [-400, 450, -600], fov: 55, near: sfHome ? 6 : 0.5, far: sfHome ? 16000 : 15000 }}
+      camera={{ position: sfHome ? sfHome.camPos : [-400, 450, -600], fov: 55, near: sfHome ? 6 : 0.5, far: sfHome ? 16000 : 15000 }}
       dpr={dpr}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3, logarithmicDepthBuffer: true }}
-      style={containerStyle ?? { position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
+      style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
       {/* SunRig owns exposure in SF; CityExposure only drives the theme previews. */}
@@ -2653,11 +2031,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       {/* Theme lighting (non-SF) */}
       {!sfHome && (
         <>
-          <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
-          <directionalLight position={t.sunPos} intensity={t.sunIntensity * 3.5} color={t.sunColor} />
-          <directionalLight position={t.fillPos} intensity={t.fillIntensity * 3} color={t.fillColor} />
-          <hemisphereLight args={[t.hemiSky, t.hemiGround, t.hemiIntensity * 3.5]} key={`hemi-${themeIndex}`} />
-          <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
+          <ThemeLights theme={t} themeIndex={themeIndex} />
         </>
       )}
 
@@ -2686,7 +2060,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       ) : (
         <>
           {!introMode && !rabbitCinematic && !flyMode && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
-            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} isCompareCinematicPlaying={isCompareCinematicPlaying} onCameraMove={onCameraMove} homeTarget={home?.target ?? null} homeCamPos={fitHome?.camPos ?? null} maxDistance={home?.maxDistance} />
+            <OrbitScene buildings={buildings} focusedBuilding={focusedBuilding ?? null} focusedBuildingB={focusedBuildingB} focusPosition={sponsorFocusPos} isCompareCinematicPlaying={isCompareCinematicPlaying} onCameraMove={onCameraMove} homeTarget={sfHome?.target ?? null} maxDistance={sfHome?.maxDistance} />
           )}
 
           {isCompareCinematicPlaying && focusedBuilding && focusedBuildingB && (() => {
@@ -2762,7 +2136,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       {!sfMap && <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />}
       {sfMap && <SFMapLayers sfMap={sfMap} />}
 
-      {!hideLandmarks && (() => {
+      {(() => {
         const arcade = (
           <EArcadeLandmark
             onClick={blockCityClicks ? () => { } : (onEArcadeClick ?? (() => { }))}

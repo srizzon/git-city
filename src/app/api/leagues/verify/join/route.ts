@@ -2,7 +2,7 @@ import { NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getViewer } from "@/lib/leagues/service";
 import { joinCompanyLeague, VERIFICATION_DAYS } from "@/lib/leagues/verification";
-import { readJson } from "@/lib/leagues/http";
+import { assertSameOrigin, readJson } from "@/lib/leagues/http";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,6 +10,8 @@ export const maxDuration = 60;
 // POST { org }: join (or create) the company league of an org the dev proved
 // membership of through the read:org OAuth.
 export async function POST(req: Request) {
+  const bad = assertSameOrigin(req);
+  if (bad) return bad;
   const viewer = await getViewer();
   if (!viewer) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 

@@ -19,3 +19,23 @@ export async function readJson(req: Request): Promise<Record<string, unknown>> {
     return {};
   }
 }
+
+/**
+ * CSRF guard for league mutations: the browser's Origin must be this host (or
+ * the worktree's PORTLESS_URL locally). Returns a 403 response, or null when
+ * the request may proceed.
+ */
+export function assertSameOrigin(req: Request): NextResponse | null {
+  const origin = req.headers.get("origin");
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  let ok = false;
+  if (origin) {
+    try {
+      const o = new URL(origin);
+      ok = o.host === host || (!!process.env.PORTLESS_URL && o.origin === new URL(process.env.PORTLESS_URL).origin);
+    } catch {
+      ok = false;
+    }
+  }
+  return ok ? null : NextResponse.json({ error: "Bad origin." }, { status: 403 });
+}

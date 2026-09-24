@@ -2,7 +2,7 @@ import { NextResponse, after } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { getViewer } from "@/lib/leagues/service";
 import { isPublicOrgMember, joinCompanyLeague } from "@/lib/leagues/verification";
-import { readJson } from "@/lib/leagues/http";
+import { assertSameOrigin, readJson } from "@/lib/leagues/http";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,6 +10,8 @@ export const maxDuration = 60;
 // POST { org }: fallback for orgs that restrict OAuth app access. The dev makes
 // their membership public on GitHub, then we check the public API.
 export async function POST(req: Request) {
+  const bad = assertSameOrigin(req);
+  if (bad) return bad;
   const viewer = await getViewer();
   if (!viewer) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 

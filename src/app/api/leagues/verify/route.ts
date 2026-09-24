@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { isLocalSupabase } from "@/lib/sign-in";
 import { getViewer } from "@/lib/leagues/service";
 import { mockOrgs, syncOrgVerifications } from "@/lib/leagues/verification";
+import { assertSameOrigin } from "@/lib/leagues/http";
 
 export const dynamic = "force-dynamic";
 
@@ -37,4 +38,6 @@ async function start(request: Request) {
 }
 
 export const GET = start;
-export const POST = start;
+export async function POST(request: Request) {
+  return assertSameOrigin(request) ?? start(request);
+}

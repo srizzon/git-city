@@ -286,3 +286,30 @@ button:not(:disabled) {
     gift-bounce 2.5s ease-in-out infinite,
     gift-shimmer 3s linear infinite;
 }
+
+/* ─── League HUD sheets ─── */
+@keyframes sheet-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes sheet-out-right {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(24px); }
+}
+@keyframes sheet-in-up {
+  from { opacity: 0; transform: translateY(32px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes sheet-out-down {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(32px); }
+}
+.sheet-in { animation: sheet-in-up 220ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.sheet-out { animation: sheet-out-down 150ms cubic-bezier(0.4, 0, 1, 1) both; }
+@media (min-width: 640px) {
+  .sheet-in { animation-name: sheet-in-right; }
+  .sheet-out { animation-name: sheet-out-right; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in, .sheet-out { animation-duration: 1ms; }
+}
