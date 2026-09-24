@@ -39,6 +39,27 @@ export const WHEEL = {
   maxForce: 20000,
   sideFriction: 1.0,
   rearSideFrictionHandbrake: 0.35,
+  /** Rear grip (frictionSlip) multiplier while drifting: what actually breaks traction. */
+  rearGripDrift: 0.2,
+};
+
+export const DRIFT = {
+  /** The handbrake starts a drift above this speed (m/s). */
+  minSpeed: 7,
+  /** A drift holds while steering on throttle and sliding faster than this (m/s sideways). */
+  holdSlip: 1.2,
+  /** After the handbrake lets go, the drift holds at least this long (s) so a tap can start one. */
+  grace: 0.5,
+  /** Yaw rate at full steer while drifting (rad/s): steer sets the rotation, so it slides instead of spinning. */
+  maxYaw: 2.0,
+  /** How fast the yaw rate follows the steer (1/s). */
+  yawControl: 15,
+  /** Front wheel lock while drifting, as a share of normal (less scrub, the yaw control steers). */
+  frontLock: 0.4,
+  /** How fast the velocity swings back toward the heading (1/s): the slide keeps its speed. */
+  align: 1.4,
+  /** Share of engine force pushed straight into the chassis while drifting. */
+  push: 1.0,
 };
 
 export const ENGINE = {
