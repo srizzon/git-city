@@ -3,8 +3,9 @@
 -- a crate stack and a tire wall. Like the ramp (132) they may stand on
 -- asphalt; lamps, benches, trees and fountains still can't. Changes the item
 -- lists (item_type check, prop shape check, apply_league_city_ops), the prop
--- radii and league_prop_problem's road rule. Numbered 140 to stay clear of
--- the security migrations in flight (134, 135).
+-- radii and league_prop_problem's road rule. apply_league_city_ops is copied
+-- from prod as 134/135 left it (payload and object caps, sanitized op log).
+-- Numbered 140 to stay clear of the security migrations in flight.
 
 BEGIN;
 
@@ -149,6 +150,8 @@ DECLARE
   c_start   constant int := 12;
   c_max     constant int := 40;
   c_max_ops constant int := 200;
+  c_max_bytes   constant int := 65536;
+  c_max_objects constant int := 4000;
   c_grow_at constant numeric := 0.7;
   c_lot     constant double precision := 48;
   c_items   constant text[] := ARRAY[
@@ -187,6 +190,9 @@ BEGIN
   v_n := jsonb_array_length(p_ops);
   IF v_n > c_max_ops THEN
     RAISE EXCEPTION 'too_many_ops';
+  END IF;
+  IF octet_length(p_ops::text) > c_max_bytes THEN
+    RAISE EXCEPTION 'payload_too_large';
   END IF;
 
   PERFORM pg_advisory_xact_lock(hashtextextended('league_city:' || p_league_id::text, 0));
@@ -515,6 +521,10 @@ BEGIN
     END LOOP;
   END IF;
 
+  IF (SELECT count(*) FROM public.league_objects o WHERE o.league_id = p_league_id) > c_max_objects THEN
+    RAISE EXCEPTION 'city_full';
+  END IF;
+
   SELECT count(*) INTO v_count FROM public.league_objects o WHERE o.league_id = p_league_id AND o.px IS NULL;
   WHILE v_count > c_grow_at * v_size * v_size AND v_size < c_max LOOP
     v_size := v_size + 2;
@@ -526,7 +536,14 @@ BEGIN
   WHERE league_id = p_league_id;
 
   INSERT INTO public.league_city_ops (league_id, version, actor_id, ops)
-  VALUES (p_league_id, v_version, p_actor_id, p_ops);
+  VALUES (p_league_id, v_version, p_actor_id, (
+    SELECT COALESCE(jsonb_agg(
+      (SELECT COALESCE(jsonb_object_agg(k, e -> k), '{}'::jsonb)
+       FROM unnest(ARRAY['op', 'kind', 'item_type', 'developer_id', 'id', 'x', 'z', 'px', 'pz', 'rot', 'size']) AS k
+       WHERE e ? k)
+      ORDER BY i), '[]'::jsonb)
+    FROM jsonb_array_elements(p_ops) WITH ORDINALITY AS t(e, i)
+  ));
 
   RETURN jsonb_build_object(
     'version', v_version,
