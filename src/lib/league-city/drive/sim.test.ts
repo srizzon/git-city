@@ -94,6 +94,27 @@ describe("vehicle (headless rapier)", () => {
     expect(st.lateral).toBeLessThan(2); // gripping, not sliding
   });
 
+  it("gets back up to speed fast: off the line, and from reversing to forward", () => {
+    const off = setup();
+    off.run({}, 1);
+    let t = 0;
+    while (off.s.speed < 15 && t < 5) {
+      off.run({ throttle: 1 }, 1 / 60);
+      t += 1 / 60;
+    }
+    expect(t).toBeLessThan(2.2);
+
+    const back = setup();
+    back.run({ brake: 1 }, 3);
+    expect(back.s.speed).toBeLessThan(-6);
+    t = 0;
+    while (back.s.speed < 10 && t < 5) {
+      back.run({ throttle: 1 }, 1 / 60);
+      t += 1 / 60;
+    }
+    expect(t).toBeLessThan(1.6);
+  });
+
   it("reverses with the brake from rest", () => {
     const { s, run } = setup();
     run({ brake: 1 }, 3);
@@ -182,7 +203,7 @@ describe("vehicle (headless rapier)", () => {
     const { body, run } = setup();
     body.setTranslation({ x: 0, y: 2, z: 0 }, true);
     body.setRotation({ x: 0, y: 0, z: 1, w: 0 }, true); // 180° about z
-    run({}, 4);
+    run({}, 1.6);
     const q = body.rotation();
     const upY = 1 - 2 * (q.x * q.x + q.z * q.z);
     expect(upY).toBeGreaterThan(0.9);

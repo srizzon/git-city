@@ -153,9 +153,11 @@ export function stepCar(
   let engine = 0;
   let brake = 0;
   if (throttle > 0 && speed < -ENGINE.reverseBelow) {
-    brake = ENGINE.brake * throttle;
+    brake = ENGINE.switchBrake * throttle;
   } else if (throttle > 0) {
-    engine = ENGINE.force * throttle * (s.boosting ? BOOST.engineMul : 1) * capFade(speed, top);
+    // Pulls hard off the line (after a crash, a flip, a stop), easing out with speed.
+    const launch = 1 + ENGINE.launch * Math.max(0, 1 - Math.max(0, speed) / ENGINE.launchUntil);
+    engine = ENGINE.force * throttle * launch * (s.boosting ? BOOST.engineMul : 1) * capFade(speed, top);
   } else if (input.brake > 0 && speed > ENGINE.reverseBelow) {
     brake = ENGINE.brake * input.brake;
   } else if (input.brake > 0) {
