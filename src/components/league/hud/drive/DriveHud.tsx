@@ -5,6 +5,7 @@ import { Camera, Volume2, VolumeX, X } from "lucide-react";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import PixelSpinner from "@/components/leagues/PixelSpinner";
 import { HUD_BOX } from "../shared";
+import PauseMenu, { CONTROLS } from "./PauseMenu";
 
 // Drive mode HUD: speed and boost meter (bottom), camera, mute and exit (top
 // right), a controls hint that fades after 6 s, and "Starting engine…" while
@@ -15,15 +16,6 @@ const SEG = "flex items-center transition-colors hover:bg-white/5 [&>*]:transiti
 const ICON_BTN = `${SEG} w-10 justify-center py-2 text-cream hover:text-lime`;
 const ICON = { size: 14, strokeWidth: 2.5 } as const;
 
-const HINTS: [string, string][] = [
-  ["W A S D", "drive"],
-  ["Hold Space + steer", "drift"],
-  ["Hold Shift", "boost"],
-  ["H", "horn"],
-  ["C", "camera"],
-  ["R", "reset"],
-  ["Esc", "pause"],
-];
 
 export default function DriveHud({
   telemetry,
@@ -72,22 +64,6 @@ export default function DriveHud({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
-      {paused && ready && (
-        <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-bg/50">
-          <div className={`${HUD_BOX} flex flex-col items-center gap-4 px-8 py-6`}>
-            <p className="text-sm text-cream">Paused</p>
-            <div className="flex gap-2">
-              <button type="button" autoFocus onClick={onResume} className="btn-press border-2 border-lime px-4 py-2 text-[10px] text-lime">
-                Resume (Esc)
-              </button>
-              <button type="button" onClick={onExit} className="btn-press border-2 border-border px-4 py-2 text-[10px] text-cream hover:text-lime">
-                Exit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center gap-3 text-[10px] text-cream">
           <PixelSpinner />
@@ -145,13 +121,18 @@ export default function DriveHud({
         <div
           className={`absolute bottom-6 right-6 text-right text-[9px] leading-loose text-muted transition-opacity duration-700 ${hints ? "opacity-100" : "opacity-0"}`}
         >
-          {HINTS.map(([k, v]) => (
+          {CONTROLS.map(([k, v]) => (
             <div key={k}>
               <span className="text-cream">{k}</span> {v}
             </div>
           ))}
           <div className="normal-case">Gamepad works too</div>
         </div>
+      )}
+
+      {/* Last, so it blurs and covers the rest of the HUD. */}
+      {paused && ready && (
+        <PauseMenu camera={camera} muted={muted} onResume={onResume} onCamera={onCamera} onMute={onMute} onExit={onExit} />
       )}
     </div>
   );
