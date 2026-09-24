@@ -24,6 +24,10 @@ import Lights from "./Lights";
 import { BoostTrail, Smoke } from "./Particles";
 import SkidMarks from "./SkidMarks";
 import { useDriveAudio } from "./useDriveAudio";
+import { useDrivePresence } from "./useDrivePresence";
+import RemoteCars from "./RemoteCars";
+import type { FxSource, FxSources } from "./fx";
+import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { useDriveInput } from "./useDriveInput";
 
 // Drive mode's physics world. Loaded with next/dynamic only when someone
@@ -46,6 +50,12 @@ export interface DriveWorldProps {
   onReady: () => void;
   /** Rapier or the models failed to load. */
   onFail: () => void;
+  /** League slug: the drive room everyone in this city shares. */
+  slug: string;
+  /** Your name in the room (GitHub login or guest-xxxx). */
+  name: string;
+  /** Who else is driving here, for the HUD. */
+  onDrivers: (drivers: DriverInfo[]) => void;
 }
 
 class Boundary extends Component<{ onFail: () => void; children: ReactNode }, { failed: boolean }> {
@@ -145,6 +155,24 @@ function CameraKey({ input, onToggle }: { input: ReturnType<typeof useDriveInput
   return null;
 }
 
+/** Your car as an effects source (tire marks, smoke, boost trail). */
+function LocalFx({ car, sources }: { car: React.MutableRefObject<CarApi | null>; sources: FxSources }) {
+  const entry = useRef<FxSource | null>(null);
+  useFrame(() => {
+    const c = car.current;
+    if (!c) return;
+    entry.current ??= { group: c.group, rearWheels: [], slip: 0, boosting: false, grounded: true };
+    const e = entry.current;
+    e.group = c.group;
+    e.rearWheels = c.wheels.slice(2, 4);
+    e.slip = c.state.slip;
+    e.boosting = c.state.boosting;
+    e.grounded = c.controller.wheelIsInContact(2) || c.controller.wheelIsInContact(3);
+    sources.current.set("local", e);
+  });
+  return null;
+}
+
 function DriveAudio(props: Parameters<typeof useDriveAudio>[0]) {
   useDriveAudio(props);
   return null;
@@ -164,6 +192,9 @@ export default function DriveWorld({
   paused,
   onReady,
   onFail,
+  slug,
+  name,
+  onDrivers,
 }: DriveWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -180,6 +211,9 @@ export default function DriveWorld({
   const input = useDriveInput(paused);
   const car = useRef<CarApi | null>(null);
   const impact = useRef({ strength: 0, at: 0 });
+  const fx = useRef(new Map<string, FxSource>());
+  const { remotes, drivers } = useDrivePresence({ slug, name, car, input });
+  useEffect(() => onDrivers(drivers), [drivers, onDrivers]);
 
   return (
     <Boundary onFail={onFail}>
@@ -201,13 +235,16 @@ export default function DriveWorld({
             input={input}
             telemetry={telemetry}
             apiRef={car}
+            color={carColor(name)}
             impact={impact}
           >
-            <Lights car={car} />
+            <Lights braking={() => !!car.current?.state.braking} />
           </Car>
-          <SkidMarks car={car} />
-          <Smoke car={car} />
-          <BoostTrail car={car} />
+          <LocalFx car={car} sources={fx} />
+          <RemoteCars remotes={remotes} drivers={drivers} sources={fx} localCar={car} muted={muted || paused} />
+          <SkidMarks sources={fx} />
+          <Smoke sources={fx} />
+          <BoostTrail sources={fx} />
           <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} />
           <DriveCamera mode={camera} car={car} impact={impact} />
           <CameraKey input={input} onToggle={onCameraToggle} />
