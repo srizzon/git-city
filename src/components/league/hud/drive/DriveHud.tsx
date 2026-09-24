@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Volume2, VolumeX, X } from "lucide-react";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
+import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { HUD_BOX } from "../shared";
 import PauseMenu, { CONTROLS } from "./PauseMenu";
 import StartScreen from "./StartScreen";
@@ -23,6 +24,7 @@ export default function DriveHud({
   camera,
   muted,
   paused,
+  drivers,
   onResume,
   onCamera,
   onMute,
@@ -33,6 +35,8 @@ export default function DriveHud({
   camera: DriveCameraMode;
   muted: boolean;
   paused: boolean;
+  /** Everyone else driving in this city right now. */
+  drivers: DriverInfo[];
   onResume: () => void;
   onCamera: () => void;
   onMute: () => void;
@@ -61,6 +65,28 @@ export default function DriveHud({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
+
+      {ready && (
+        <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`}>
+          <p className="flex items-center gap-2 text-cream">
+            <span className="h-1.5 w-1.5 animate-pulse bg-lime" aria-hidden />
+            {drivers.length + 1} driving now
+          </p>
+          {drivers.length === 0 ? (
+            <p className="max-w-[180px] text-dim normal-case">Share the link to race your team here.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {drivers.slice(0, 6).map((d) => (
+                <li key={d.id} className="flex items-center gap-1.5 text-muted">
+                  <span className="h-2 w-2" style={{ background: carColor(d.name) }} aria-hidden />
+                  {d.name.startsWith("guest-") ? "guest" : `@${d.name}`}
+                </li>
+              ))}
+              {drivers.length > 6 && <li className="text-dim">+{drivers.length - 6} more</li>}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className={`${HUD_BOX} absolute right-4 top-4 flex items-stretch divide-x-2 divide-border`}>
         <button
