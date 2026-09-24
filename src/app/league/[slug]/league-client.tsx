@@ -240,7 +240,7 @@ export default function LeagueClient({
     [viewer, members],
   );
   // Mutated by the car every frame, read by the HUD; a fresh one per drive.
-  const [telemetry, setTelemetry] = useState<DriveTelemetry>(() => ({ speed: 0, boosting: false, near: null }));
+  const [telemetry, setTelemetry] = useState<DriveTelemetry>(() => ({ speed: 0, boosting: false, near: null, held: null, gotAt: 0, smoke: 0 }));
   const [driveReady, setDriveReady] = useState(false);
   const [driveCamera, setDriveCamera] = useState<DriveCameraMode>("chase");
   const [paused, setPaused] = useState(false);
@@ -264,7 +264,7 @@ export default function LeagueClient({
     setFocused(null);
     setPanel(null);
     setDriveReady(false);
-    setTelemetry({ speed: 0, boosting: false, near: null });
+    setTelemetry({ speed: 0, boosting: false, near: null, held: null, gotAt: 0, smoke: 0 });
     setPaused(false);
     try {
       setMuted(localStorage.getItem(MUTE_KEY) === "1");

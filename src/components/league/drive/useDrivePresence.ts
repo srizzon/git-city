@@ -14,7 +14,9 @@ import {
   decodeState,
   encodeState,
   validBump,
+  type BoxState,
   type CarSnapshot,
+  type ClientMsg,
   type DriverInfo,
   type ServerMsg,
 } from "@/lib/league-city/drive/net";
@@ -23,6 +25,11 @@ import type { DriveInputRef } from "./useDriveInput";
 
 // Joins the league city's drive room: says hello, streams your car ~15 times
 // a second, and keeps a snapshot buffer per remote car for RemoteCars to draw.
+
+/** Battle news for the Battle component. */
+export type BattleEvent =
+  | { t: "boxes"; boxes: BoxState[] }
+  | Extract<ServerMsg, { t: "box" } | { t: "got" } | { t: "fx" } | { t: "gone" }>;
 
 export interface RemoteDriver {
   id: string;
@@ -48,6 +55,7 @@ export function useDrivePresence({
   car,
   input,
   onBump,
+  onBattle,
 }: {
   slug: string;
   name: string;
@@ -55,10 +63,14 @@ export function useDrivePresence({
   input: React.MutableRefObject<DriveInputRef>;
   /** Someone hit you: apply this velocity change (m/s) to your car. */
   onBump: (from: string, x: number, z: number) => void;
+  onBattle: (e: BattleEvent) => void;
 }) {
   const onBumpRef = useRef(onBump);
+  const onBattleRef = useRef(onBattle);
+  const selfId = useRef<string | null>(null);
   useEffect(() => {
     onBumpRef.current = onBump;
+    onBattleRef.current = onBattle;
   });
   const remotes = useRef(new Map<string, RemoteDriver>());
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
@@ -94,7 +106,13 @@ export function useDrivePresence({
         if (r && s) r.buffer.push(performance.now(), s);
         return;
       }
+      if (msg.t === "box" || msg.t === "got" || msg.t === "fx" || msg.t === "gone") {
+        onBattleRef.current(msg);
+        return;
+      }
       if (msg.t === "welcome") {
+        selfId.current = msg.you;
+        onBattleRef.current({ t: "boxes", boxes: msg.boxes ?? [] });
         for (const d of msg.drivers) {
           if (d.id === msg.you) continue;
           add(d.id, d.name);
@@ -152,5 +170,10 @@ export function useDrivePresence({
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: "bump", to, x, z }));
   };
 
-  return { remotes, drivers, sendBump };
+  const send = (msg: ClientMsg) => {
+    const ws = socket.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+  };
+
+  return { remotes, drivers, sendBump, send, selfId };
 }

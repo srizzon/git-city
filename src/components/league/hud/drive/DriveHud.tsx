@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Volume2, VolumeX, X } from "lucide-react";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
+import { ITEM_NAMES, isItem } from "@/lib/league-city/drive/battle";
 import { HUD_BOX } from "../shared";
 import PauseMenu, { CONTROLS } from "./PauseMenu";
 import StartScreen from "./StartScreen";
@@ -45,6 +46,8 @@ export default function DriveHud({
   const speed = useRef<HTMLSpanElement>(null);
   const boostTag = useRef<HTMLSpanElement>(null);
   const honk = useRef<HTMLDivElement>(null);
+  const itemSlot = useRef<HTMLSpanElement>(null);
+  const smokeVeil = useRef<HTMLDivElement>(null);
   const honkName = useRef<HTMLSpanElement>(null);
   const [hints, setHints] = useState(true);
 
@@ -59,6 +62,12 @@ export default function DriveHud({
     const tick = () => {
       if (speed.current) speed.current.textContent = String(Math.round(Math.abs(telemetry.speed) * 3.6));
       if (boostTag.current) boostTag.current.dataset.on = String(telemetry.boosting);
+      if (itemSlot.current) {
+        const held = isItem(telemetry.held) ? telemetry.held : null;
+        itemSlot.current.textContent = held ? `F  ${ITEM_NAMES[held]}` : "No attack";
+        itemSlot.current.dataset.state = !held ? "empty" : performance.now() - telemetry.gotAt < 900 ? "new" : "held";
+      }
+      if (smokeVeil.current) smokeVeil.current.style.opacity = String(Math.min(0.94, telemetry.smoke * 0.94));
       if (honk.current && honkName.current) {
         honk.current.dataset.on = String(!!telemetry.near);
         if (telemetry.near) honkName.current.textContent = `@${telemetry.near}`;
@@ -71,6 +80,13 @@ export default function DriveHud({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
+      {/* Driving through someone's smoke: your view goes dark. */}
+      <div
+        ref={smokeVeil}
+        className="absolute inset-0 opacity-0"
+        style={{ background: "radial-gradient(circle at 50% 55%, rgba(20,20,26,0.75) 0%, rgba(12,12,16,1) 70%)" }}
+        aria-hidden
+      />
 
       {ready && (
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`}>
@@ -144,6 +160,13 @@ export default function DriveHud({
             className="border-2 border-border px-2 py-0.5 text-[9px] text-dim transition-colors data-[on=true]:border-[#7ee8ff] data-[on=true]:text-[#7ee8ff]"
           >
             Shift boost
+          </span>
+          <span
+            ref={itemSlot}
+            data-state="empty"
+            className="min-w-[128px] whitespace-pre border-2 border-border px-2 py-0.5 text-center text-[9px] text-dim transition-colors data-[state=held]:border-[#ff5ad8] data-[state=held]:text-[#ff9be8] data-[state=new]:border-[#ff5ad8] data-[state=new]:bg-[#ff5ad8] data-[state=new]:text-bg"
+          >
+            No attack
           </span>
         </div>
       )}
