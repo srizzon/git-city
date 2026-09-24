@@ -4,8 +4,8 @@ import { useState } from "react";
 import { createBrowserSupabase } from "@/lib/supabase";
 import { signInWithGitHub } from "@/lib/sign-in";
 
-export default function CreateLeague({ signedIn }: { signedIn: boolean }) {
-  const [open, setOpen] = useState(false);
+export default function CreateLeague({ signedIn, defaultOpen = false }: { signedIn: boolean; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +35,13 @@ export default function CreateLeague({ signedIn }: { signedIn: boolean }) {
     return (
       <button
         type="button"
-        onClick={() => signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=/leagues`)}
+        // Land back on the open form so creating is one step after login.
+        onClick={() =>
+          signInWithGitHub(
+            createBrowserSupabase(),
+            `${window.location.origin}/auth/callback?next=${encodeURIComponent("/leagues?create=1")}`,
+          )
+        }
         className="btn-press bg-lime px-4 py-3 text-[11px] tracking-widest text-bg"
       >
         Sign in to create a league

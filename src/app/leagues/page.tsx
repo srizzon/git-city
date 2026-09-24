@@ -19,7 +19,8 @@ function fmt(n: number) {
   return n.toLocaleString("en-US");
 }
 
-export default async function LeaguesPage() {
+export default async function LeaguesPage({ searchParams }: { searchParams: Promise<{ create?: string }> }) {
+  const { create } = await searchParams;
   const [ranking, viewer] = await Promise.all([getGlobalRanking(), getViewer()]);
   const mine = viewer ? await getDevLeagues(viewer.id) : [];
   const ranked = ranking.rows.filter((r) => r.rank !== null);
@@ -53,7 +54,7 @@ export default async function LeaguesPage() {
         )}
 
         <div className="mt-8 grid gap-2 sm:grid-cols-2">
-          <CreateLeague signedIn={!!viewer} />
+          <CreateLeague signedIn={!!viewer} defaultOpen={!!viewer && create === "1"} />
           <Link
             href="/leagues/verify"
             className="btn-press flex items-center justify-center border-2 border-border px-4 py-3 text-[11px] text-cream hover:border-lime"
