@@ -83,10 +83,10 @@ export default function Hotbar({
         }}
       >
         <div className="flex divide-x-2 divide-border border-r-2 border-border">
-          <ToolButton label="Hand: pick up and move" active={tool.kind === "select"} onClick={() => onTool({ kind: "select" })}>
+          <ToolButton label="Hand: pick up and move (H)" shortcut="H" active={tool.kind === "select"} onClick={() => onTool({ kind: "select" })}>
             <Hand size={18} strokeWidth={2.25} aria-hidden />
           </ToolButton>
-          <ToolButton label="Delete (hold X, or right-click)" active={tool.kind === "bulldoze" || erasing} danger onClick={() => onTool({ kind: "bulldoze" })}>
+          <ToolButton label="Delete (B, hold X, or right-click)" shortcut="B" active={tool.kind === "bulldoze" || erasing} danger onClick={() => onTool({ kind: "bulldoze" })}>
             <Trash2 size={18} strokeWidth={2.25} aria-hidden />
           </ToolButton>
         </div>
@@ -127,12 +127,14 @@ export default function Hotbar({
 
 function ToolButton({
   label,
+  shortcut,
   active,
   danger = false,
   onClick,
   children,
 }: {
   label: string;
+  shortcut: string;
   active: boolean;
   danger?: boolean;
   onClick: () => void;
@@ -145,9 +147,10 @@ function ToolButton({
       aria-pressed={active}
       title={label}
       onClick={onClick}
-      className={`flex w-12 items-center justify-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px ${active ? (danger ? "bg-red-500/15 text-red-400" : "bg-lime/10 text-lime") : "text-muted"}`}
+      className={`relative flex w-12 items-center justify-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px ${active ? (danger ? "bg-red-500/15 text-red-400" : "bg-lime/10 text-lime") : "text-muted"}`}
     >
       {children}
+      <span className={`absolute left-1 top-0.5 text-[8px] ${active ? "" : "text-dim"}`}>{shortcut}</span>
     </button>
   );
 }
@@ -184,6 +187,7 @@ export function CameraHints() {
       {row("Scroll", "zoom")}
       {row("Click", "act")}
       {row("Right-click / hold X", "delete")}
+      {row("H / B", "hand / delete tool")}
       {row("Q / E", "turn 90°")}
       {row("G", "grid")}
     </div>

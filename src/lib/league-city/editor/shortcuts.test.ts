@@ -12,6 +12,8 @@ describe("keyToAction", () => {
     expect(keyToAction({ key: "q" })).toEqual({ type: "camRotate", dir: -1 });
     expect(keyToAction({ key: "e" })).toEqual({ type: "camRotate", dir: 1 });
     expect(keyToAction({ key: "p" })).toEqual({ type: "preview" });
+    expect(keyToAction({ key: "h" })).toEqual({ type: "hand" });
+    expect(keyToAction({ key: "B" })).toEqual({ type: "bulldoze" });
     expect(keyToAction({ key: "w" })).toEqual({ type: "pan", dx: 0, dz: -1 });
     expect(keyToAction({ key: "ArrowLeft" })).toEqual({ type: "pan", dx: -1, dz: 0 });
   });

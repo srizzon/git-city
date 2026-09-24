@@ -225,6 +225,12 @@ export function useEditorController({
         case "preview":
           onPreview();
           break;
+        case "hand":
+          store.dispatch({ type: "setTool", tool: { kind: "select" } });
+          break;
+        case "bulldoze":
+          store.dispatch({ type: "setTool", tool: { kind: "bulldoze" } });
+          break;
         default:
           return;
       }
