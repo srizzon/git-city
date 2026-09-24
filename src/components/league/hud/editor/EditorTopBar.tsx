@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CloudOff, Eye, EyeOff, Pencil, Redo2, TriangleAlert, Undo2 } from "lucide-react";
+import { Check, CloudOff, Expand, Eye, EyeOff, Pencil, Redo2, TriangleAlert, Undo2 } from "lucide-react";
 import PixelSpinner from "@/components/leagues/PixelSpinner";
 import type { SaveStatus } from "@/lib/league-city/editor/queue";
 import { HUD_BOX } from "../shared";
@@ -47,6 +47,9 @@ export default function EditorTopBar({
   onRedo,
   onPreview,
   onDone,
+  size,
+  maxSize,
+  onExpand,
 }: {
   name: string;
   status: SaveStatus;
@@ -58,14 +61,31 @@ export default function EditorTopBar({
   onRedo: () => void;
   onPreview: () => void;
   onDone: () => void;
+  size: number;
+  maxSize: number;
+  onExpand: () => void;
 }) {
   return (
     <div className="pointer-events-none fixed inset-x-4 top-4 z-40 flex items-start justify-between gap-3 font-pixel uppercase">
-      <div className={`${HUD_BOX} flex items-center gap-3 px-4 py-2.5`}>
-        <Pencil {...ICON} className="text-lime" aria-hidden />
-        <span className="max-w-[40vw] truncate text-[11px] text-cream">
-          Editing <span className="normal-case">{name}</span>
-        </span>
+      <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border`}>
+        <div className="flex items-center gap-3 px-4 py-2.5">
+          <Pencil {...ICON} className="text-lime" aria-hidden />
+          <span className="max-w-[32vw] truncate text-[11px] text-cream">
+            Editing <span className="normal-case">{name}</span>
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onExpand}
+          disabled={size >= maxSize}
+          title={size >= maxSize ? "The city is at its biggest size" : "Add a ring of lots around the city"}
+          className={`${SEG} text-cream`}
+        >
+          <Expand {...ICON} aria-hidden />
+          <span>
+            Expand <span className="text-dim">{size}×{size}</span>
+          </span>
+        </button>
       </div>
 
       <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border`}>

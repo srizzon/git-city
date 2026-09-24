@@ -9,7 +9,7 @@
 // on grass, on a road's sidewalk.
 
 import { lotKey } from "../placement";
-import { inBounds } from "../grid";
+import { MAX_SIZE, inBounds } from "../grid";
 import { PROP_PROBLEM_TEXT, lotOf, propAt, propProblem, snap } from "../props";
 import { isSurface, type CityObject, type CityOp, type ItemType, type PropType } from "../types";
 
@@ -93,6 +93,7 @@ export type EditorAction =
   | { type: "remove"; id: string }
   | ({ type: "removeAt" } & Spot)
   | { type: "dismissNew"; id: string }
+  | { type: "expand" }
   | { type: "undo" }
   | { type: "redo" }
   | { type: "send"; maxOps?: number }
@@ -481,6 +482,13 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       const o = s.objects.get(a.id);
       if (!o || !o.is_new) return s;
       return commit(s, [{ op: "dismiss_new", id: o.id }], [], false);
+    }
+
+    case "expand": {
+      // One more ring of lots. Not undoable: lots may be used right away.
+      if (s.size >= MAX_SIZE) return notify(s, "hint", "The city is at its biggest size.");
+      const next = commit(s, [{ op: "expand" }], [], false);
+      return { ...next, size: Math.min(MAX_SIZE, s.size + 2) };
     }
 
     case "undo":

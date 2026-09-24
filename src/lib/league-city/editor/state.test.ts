@@ -140,6 +140,20 @@ describe("bulldozer", () => {
   });
 });
 
+describe("expand", () => {
+  it("adds a ring right away, queues one expand op, caps at 40", () => {
+    let s = run(start(), { type: "expand" });
+    expect(s.size).toBe(14);
+    expect(s.pending.at(-1)?.ops).toEqual([{ op: "expand" }]);
+    expect(s.undo).toHaveLength(0);
+    s = run(s, tool("bench"), { type: "place", id: "n1", ...spot(6 * LOT, 3 * LOT) }); // lot (6, 3): only exists in the new ring
+    expect(at(s, "n1")).toBeDefined();
+    s = run({ ...s, size: 40 }, { type: "expand" });
+    expect(s.size).toBe(40);
+    expect(s.notice?.message).toMatch(/biggest/);
+  });
+});
+
 describe("server sync", () => {
   it("skips an undo whose object the server removed", () => {
     let s = run(start(), { type: "pickUp", id: "t" }, { type: "drop", ...spot(-4 * LOT, -4 * LOT) });

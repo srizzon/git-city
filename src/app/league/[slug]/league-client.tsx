@@ -33,6 +33,7 @@ import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { SceneMode } from "@/components/league/LeagueScene";
 import { createEditorStore } from "@/lib/league-city/editor/store";
 import { keyToAction } from "@/lib/league-city/editor/shortcuts";
+import { MAX_SIZE } from "@/lib/league-city/grid";
 import { HOTBAR, initEditor, objectAtSpot, type Notice } from "@/lib/league-city/editor/state";
 
 const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
@@ -260,6 +261,9 @@ export default function LeagueClient({
             onRedo={() => store.dispatch({ type: "redo" })}
             onPreview={togglePreview}
             onDone={done}
+            size={es.size}
+            maxSize={MAX_SIZE}
+            onExpand={() => store.dispatch({ type: "expand" })}
           />
           {mode === "edit" && (
             <>

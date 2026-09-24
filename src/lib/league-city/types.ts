@@ -60,4 +60,5 @@ export type CityOp =
   | { op: "remove"; id: string }
   | { op: "remove"; developer_id: number }
   | { op: "dismiss_new"; id: string }
-  | { op: "auto_place"; developer_id: number };
+  | { op: "auto_place"; developer_id: number }
+  | { op: "expand" };
