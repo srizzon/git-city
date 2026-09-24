@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { provisionDeveloperOnLogin } from "@/lib/auth-provision";
@@ -34,7 +35,11 @@ export async function GET(request: Request) {
 
   // Create/claim the building + XP + rank + feed + achievements + referral.
   // Shared with the local dev-login route (src/app/api/dev/login).
-  await provisionDeveloperOnLogin(githubLogin, data.user.id, searchParams.get("ref"));
+  // ?ref= from the login URL, else the gc_ref cookie set by the proxy on any page.
+  const cookieStore = await cookies();
+  const ref = searchParams.get("ref") ?? cookieStore.get("gc_ref")?.value ?? null;
+  await provisionDeveloperOnLogin(githubLogin, data.user.id, ref);
+  cookieStore.delete("gc_ref");
 
   // Support ?next= param for post-login redirect
   const next = searchParams.get("next");

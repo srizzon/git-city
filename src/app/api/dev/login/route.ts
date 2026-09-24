@@ -130,11 +130,14 @@ export async function GET(request: NextRequest) {
   }
 
   // Same provisioning as the real GitHub OAuth callback.
-  await provisionDeveloperOnLogin(login, linkData.user.id, searchParams.get("ref"));
+  const ref = searchParams.get("ref") ?? request.cookies.get("gc_ref")?.value ?? null;
+  await provisionDeveloperOnLogin(login, linkData.user.id, ref);
 
   const next = searchParams.get("next");
   const isSafeNext =
     !!next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\");
   const dest = isSafeNext ? next : `/?user=${login}`;
-  return NextResponse.redirect(`${origin}${dest}`);
+  const res = NextResponse.redirect(`${origin}${dest}`);
+  res.cookies.delete("gc_ref");
+  return res;
 }

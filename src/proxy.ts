@@ -53,6 +53,9 @@ const AUTH_SKIP_PREFIXES = [
   "/live",
 ];
 
+const REF_COOKIE = "gc_ref";
+const REF_RE = /^[a-z0-9-]{1,39}$/i;
+
 const DEFAULT_API: [number, number] = [60, 60_000];
 const DEFAULT_PAGE: [number, number] = [120, 60_000];
 
@@ -193,6 +196,20 @@ export async function proxy(request: NextRequest) {
   supabaseResponse.headers.set("X-Content-Type-Options", "nosniff");
   supabaseResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   supabaseResponse.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+  // ── 3b. Referral capture ────────────────────────────────────────────
+  // Persist ?ref= from any page so the auth callback can read it no matter
+  // where the visitor signs in.
+  const ref = request.nextUrl.searchParams.get("ref");
+  if (ref && REF_RE.test(ref)) {
+    supabaseResponse.cookies.set(REF_COOKIE, ref.toLowerCase(), {
+      maxAge: 60 * 60 * 24 * 7,
+      sameSite: "lax",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+  }
 
   // ── 4. Attach rate-limit headers so clients can self-throttle ────────
   supabaseResponse.headers.set("X-RateLimit-Limit", String(limit));
