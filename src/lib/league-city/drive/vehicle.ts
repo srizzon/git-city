@@ -82,8 +82,6 @@ export function capFade(speed: number, top: number): number {
   return Math.max(0, 1 - (speed - top) / (top * ENGINE.capFade));
 }
 
-const REVERSE_TOP = 8;
-
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /**
@@ -151,7 +149,7 @@ export function stepCar(
   } else if (input.brake > 0 && speed > ENGINE.reverseBelow) {
     brake = ENGINE.brake * input.brake;
   } else if (input.brake > 0) {
-    engine = -ENGINE.reverseForce * input.brake * capFade(-speed, REVERSE_TOP);
+    engine = -ENGINE.reverseForce * input.brake * capFade(-speed, ENGINE.reverseTop);
   } else {
     brake = ENGINE.idleBrake;
   }

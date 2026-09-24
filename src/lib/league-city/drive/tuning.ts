@@ -71,7 +71,9 @@ export const DRIFT = {
 export const ENGINE = {
   /** Total force at the rear wheels, split between the two. */
   force: 4000,
-  reverseForce: 2200,
+  reverseForce: 3800,
+  /** Reverse top speed, m/s (~50 km/h). */
+  reverseTop: 14,
   /** Engine force fades to 0 over this fraction above the top speed. */
   capFade: 0.08,
   brake: 1500 / 60,

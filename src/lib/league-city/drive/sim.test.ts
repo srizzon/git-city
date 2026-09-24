@@ -86,7 +86,7 @@ describe("vehicle (headless rapier)", () => {
   it("reverses with the brake from rest", () => {
     const { s, run } = setup();
     run({ brake: 1 }, 3);
-    expect(s.speed).toBeLessThan(-3);
+    expect(s.speed).toBeLessThan(-8);
   });
 
   it("drifts while Space is held: nose into the turn, speed carried, grip back on release", () => {
