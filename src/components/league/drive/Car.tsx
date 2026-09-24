@@ -218,7 +218,7 @@ export default function Car({
           args={CHASSIS.half}
           position={[0, CHASSIS.colliderY, 0]}
           friction={0.3}
-          contactForceEventThreshold={IMPACT_MIN}
+          ref={(col) => col?.setContactForceEventThreshold(IMPACT_MIN)}
           massProperties={{
             mass: CHASSIS.mass,
             centerOfMass: { x: 0, y: CHASSIS.comY - CHASSIS.colliderY, z: 0 },
