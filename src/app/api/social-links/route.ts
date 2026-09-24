@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import {
   SOCIAL_PLATFORMS,
   normalizeSocialUrl,
@@ -74,17 +75,14 @@ export async function POST(request: Request) {
   }
 
   const admin = getSupabaseAdmin();
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
 
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id, claimed, claimed_by")
-    .eq("github_login", githubLogin)
-    .single();
+    .select("id, github_login, claimed, claimed_by")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
     return NextResponse.json({ error: "Must own a claimed building" }, { status: 403 });
   }
@@ -135,7 +133,7 @@ export async function POST(request: Request) {
   }
 
   // Refresh the ISR-cached profile page so other viewers see the change.
-  revalidatePath(`/dev/${githubLogin}`);
+  revalidatePath(`/dev/${dev.github_login}`);
 
   return NextResponse.json({ ok: true, links: config });
 }

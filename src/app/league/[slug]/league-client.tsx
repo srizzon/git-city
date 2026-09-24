@@ -70,6 +70,7 @@ export default function LeagueClient({
   cityNorms,
   topCompanyLastWeek,
   invite,
+  inviteToken,
   refLogin,
   startEditing = false,
 }: {
@@ -78,14 +79,16 @@ export default function LeagueClient({
   cityDevs: Record<string, unknown>[];
   cityNorms: LayoutNorms;
   topCompanyLastWeek: boolean;
+  /** An invited member's login from ?invite=, checked on the server. */
   invite: string | null;
+  /** ?t= when it matches the league's invite token. */
+  inviteToken: string | null;
   refLogin: string | null;
   startEditing?: boolean;
 }) {
   const { league, members, viewer } = data;
   const isMember = viewer?.status === "active";
-  const invitedMember = invite ? members.find((m) => m.login.toLowerCase() === invite) : undefined;
-  const showJoinCta = !isMember && (!!invite || viewer?.status === "invited");
+  const showJoinCta = !isMember && (!!invite || !!inviteToken || viewer?.status === "invited");
   const [panel, setPanel] = useState<PanelId>(showJoinCta ? "join" : null);
   const [focused, setFocused] = useState<CityBuilding | null>(null);
   const router = useRouter();
@@ -338,6 +341,20 @@ export default function LeagueClient({
     [sceneObjects],
   );
 
+  const leave = async (): Promise<string | null> => {
+    try {
+      const res = await fetch(`/api/leagues/${league.slug}/leave`, { method: "POST" });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        return json.error ?? "Couldn't leave. Try again.";
+      }
+      router.refresh();
+      return null;
+    } catch {
+      return "Network error. Try again.";
+    }
+  };
+
   const verifyHref =
     !isMember && !showJoinCta && viewer && league.kind === "company" ? "/leagues/verify" : null;
   const close = () => setPanel(null);
@@ -488,6 +505,7 @@ export default function LeagueClient({
                 }}
                 onEdit={isAdmin ? enterEdit : undefined}
                 onDrive={enterDrive}
+                onLeave={isMember ? leave : undefined}
               />
             </div>
           </div>
@@ -517,8 +535,9 @@ export default function LeagueClient({
           leagueSlug={league.slug}
           leagueKind={league.kind}
           signedIn={!!viewer}
-          invitee={invitedMember?.login ?? invite}
+          invitee={invite}
           refLogin={refLogin}
+          inviteToken={inviteToken}
           onClose={close}
         />
       )}

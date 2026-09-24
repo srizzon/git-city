@@ -36,7 +36,7 @@ const getPortfolio = cache(async (username: string) => {
   const { data: dev } = await admin
     .from("developers")
     .select(
-      "id, github_login, name, avatar_url, bio, contributions, contributions_total, public_repos, total_stars, current_streak, longest_streak, active_days_last_year, primary_language, followers, xp_level, xp_total, top_repos, created_at"
+      "id, github_login, name, avatar_url, bio, contributions, contributions_total, public_repos, total_stars, current_streak, longest_streak, active_days_last_year, primary_language, followers, xp_level, xp_total, top_repos, created_at, claimed_by"
     )
     .ilike("github_login", username)
     .single();
@@ -98,8 +98,7 @@ export default async function PortfolioPage({ params }: Props) {
   // Owner detection
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
-  const viewerLogin = (user?.user_metadata?.user_name ?? user?.user_metadata?.preferred_username ?? "").toLowerCase();
-  const isOwner = viewerLogin === dev.github_login.toLowerCase();
+  const isOwner = !!user && dev.claimed_by === user.id;
 
   // XP
   const level = dev.xp_level ?? 1;

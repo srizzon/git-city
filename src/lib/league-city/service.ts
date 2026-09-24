@@ -1,5 +1,7 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { invalidateLeague, leagueTag } from "@/lib/leagues/cache";
 import { START_SIZE } from "./grid";
 import { starterOps } from "./starter";
 import type { CityObject, CityOp } from "./types";
@@ -36,6 +38,8 @@ const MESSAGES: Record<string, [string, number]> = {
   on_building: ["That's on a building's lot.", 409],
   on_road: ["Keep it on the sidewalk, off the asphalt.", 409],
   prop_overlap: ["Too close to something else.", 409],
+  city_full: ["The city is full.", 409],
+  payload_too_large: ["Too many edits in one save.", 413],
 };
 
 export class CityOpError extends Error {
@@ -59,6 +63,7 @@ async function rpc(leagueId: string, actorId: number | null, ops: CityOp[]): Pro
     if (!(error.message in MESSAGES)) console.error("[league-city]", error);
     throw new CityOpError(error.message);
   }
+  if (!(data as OpsResult).skipped) invalidateLeague(leagueId);
   return data as OpsResult;
 }
 
@@ -96,6 +101,17 @@ export async function getCity(leagueId: string): Promise<LeagueCity> {
   if (city) return city;
   await ensureCity(leagueId);
   return (await loadCity(leagueId)) ?? { size: START_SIZE, version: 0, objects: [] };
+}
+
+/**
+ * getCity for anonymous reads (the league page, drivers polling), cached 60s
+ * per league. Every city write expires it; the editor reads getCity.
+ */
+export function getCachedCity(leagueId: string): Promise<LeagueCity> {
+  return unstable_cache(() => getCity(leagueId), ["league-city", leagueId], {
+    revalidate: 60,
+    tags: [leagueTag(leagueId)],
+  })();
 }
 
 // ─── System writes ──────────────────────────────────────────

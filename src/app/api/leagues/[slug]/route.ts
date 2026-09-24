@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
-import { deleteLeague, getLeagueBySlug, getViewer, renameLeague, setScoringMode, transferAdmin } from "@/lib/leagues/service";
+import {
+  deleteLeague,
+  getLeagueBySlug,
+  getViewer,
+  openInviteLink,
+  renameLeague,
+  rotateInviteToken,
+  setScoringMode,
+  transferAdmin,
+} from "@/lib/leagues/service";
 import { getLeaguePageData } from "@/lib/leagues/queries";
 import { assertSameOrigin, leagueErrorResponse, readJson } from "@/lib/leagues/http";
 import type { ScoringMode } from "@/lib/leagues/scoring";
@@ -21,7 +30,8 @@ export async function GET(_req: Request, { params }: Ctx) {
   }
 }
 
-// PATCH: admin settings { name?, scoring_mode?, admin_login? }.
+// PATCH: admin settings { name?, scoring_mode?, admin_login?, rotate_invite? }.
+// rotate_invite returns the new open invite link.
 export async function PATCH(req: Request, { params }: Ctx) {
   const bad = assertSameOrigin(req);
   if (bad) return bad;
@@ -35,8 +45,15 @@ export async function PATCH(req: Request, { params }: Ctx) {
   try {
     if (typeof body.name === "string") await renameLeague(viewer, league, body.name);
     if (typeof body.scoring_mode === "string") await setScoringMode(viewer, league, body.scoring_mode as ScoringMode);
+    let inviteLink: string | undefined;
+    if (body.rotate_invite === true) {
+      const token = await rotateInviteToken(viewer, league);
+      const origin = (process.env.PORTLESS_URL ?? new URL(req.url).origin).replace(/\/$/, "");
+      inviteLink = openInviteLink(league.slug, viewer.github_login, token, origin);
+    }
+    // Last: after a transfer the viewer is no longer admin.
     if (typeof body.admin_login === "string") await transferAdmin(viewer, league, body.admin_login);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(inviteLink ? { ok: true, invite_link: inviteLink } : { ok: true });
   } catch (err) {
     return leagueErrorResponse(err);
   }

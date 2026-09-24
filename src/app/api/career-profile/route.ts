@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import type { JobSeniority, JobWeb, JobContract } from "@/lib/jobs/types";
 import { isValidUrl } from "@/lib/jobs/validation";
 
@@ -15,11 +16,13 @@ async function getAuthenticatedDeveloper() {
   if (!user) return null;
 
   const admin = getSupabaseAdmin();
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
     .select("id, github_login")
     .eq("claimed_by", user.id)
-    .maybeSingle();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) return null;
   return { userId: user.id, developerId: dev.id as number, githubLogin: dev.github_login as string };

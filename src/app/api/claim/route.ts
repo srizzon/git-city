@@ -1,23 +1,17 @@
 import { NextResponse, after } from "next/server";
-import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, getAuthIdentity, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { seedSocialLinksFromGithub } from "@/lib/social-links-server";
 
 export async function POST() {
-  const supabase = await createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const identity = await getAuthIdentity();
+  if (!identity) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  // The login comes from the GitHub identity GoTrue wrote, not user_metadata,
+  // so a user can't claim someone else's building by renaming themselves.
+  const { user, login: githubLogin } = identity;
 
   if (!githubLogin) {
     return NextResponse.json(
@@ -29,11 +23,13 @@ export async function POST() {
   const admin = getSupabaseAdmin();
 
   // Check that the user hasn't already claimed a different building
-  const { data: alreadyClaimed } = await admin
+  const { data: alreadyClaimedRows } = await admin
     .from("developers")
     .select("github_login")
     .eq("claimed_by", user.id)
-    .maybeSingle();
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const alreadyClaimed = pickClaimedDeveloper(alreadyClaimedRows, user);
 
   if (alreadyClaimed) {
     return NextResponse.json(

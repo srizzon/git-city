@@ -57,6 +57,28 @@ export async function getAuthIdentity(supabase?: SupabaseClient): Promise<{ user
 }
 
 /**
+ * Most claimed buildings a single user is expected to own (linked GitHub
+ * accounts). Queries that list a user's rows cap at this.
+ */
+export const CLAIMED_DEVELOPER_LIMIT = 5;
+
+/**
+ * Picks one building from the rows claimed by `user` (query them with
+ * .eq("claimed_by", user.id).order("claimed_at", { ascending: true })
+ * .limit(CLAIMED_DEVELOPER_LIMIT) and include github_login in the select).
+ * Prefers the row for the GitHub login they signed in with, else the oldest
+ * claim. Never errors on several rows the way .single() does.
+ */
+export function pickClaimedDeveloper<T extends { github_login?: unknown }>(
+  rows: T[] | null | undefined,
+  user: User | null | undefined,
+): T | null {
+  if (!rows || rows.length === 0) return null;
+  const login = githubLoginFromIdentity(user);
+  return rows.find((r) => typeof r.github_login === "string" && r.github_login.toLowerCase() === login) ?? rows[0];
+}
+
+/**
  * The developer row the signed-in user has claimed (developers.claimed_by =
  * auth user id), or null. `columns` is passed to select().
  */
@@ -68,15 +90,15 @@ export async function getAuthedDeveloper<T extends { id: number } = { id: number
   if (!identity) return null;
   // A user with two linked GitHub accounts can own two buildings; prefer the
   // one matching the login they signed in with.
+  const cols = /\bgithub_login\b/.test(columns) ? columns : `${columns}, github_login`;
   const { data } = await getSupabaseAdmin()
     .from("developers")
-    .select(columns)
+    .select(cols)
     .eq("claimed_by", identity.user.id)
     .order("claimed_at", { ascending: true })
-    .limit(5);
-  const rows = (data ?? []) as unknown as (T & { github_login?: string })[];
-  if (rows.length === 0) return null;
-  const dev = rows.find((r) => r.github_login?.toLowerCase() === identity.login) ?? rows[0];
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper((data ?? []) as unknown as (T & { github_login?: string })[], identity.user);
+  if (!dev) return null;
   return { ...identity, dev };
 }
 

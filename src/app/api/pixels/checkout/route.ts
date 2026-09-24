@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { createPixelCheckoutSession } from "@/lib/stripe";
 import { createPixQrCodeForPackage } from "@/lib/abacatepay";
 
@@ -24,23 +25,15 @@ export async function POST(request: Request) {
   }
   lastCheckout.set(user.id, now);
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });
-  }
-
   const sb = getSupabaseAdmin();
 
-  const { data: dev } = await sb
+  const { data: devRows } = await sb
     .from("developers")
-    .select("id, claimed, claimed_by, suspended")
-    .eq("github_login", githubLogin)
-    .single();
+    .select("id, github_login, claimed, claimed_by, suspended")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
     return NextResponse.json({ error: "You must claim your building first" }, { status: 403 });
@@ -49,6 +42,7 @@ export async function POST(request: Request) {
   if (dev.suspended) {
     return NextResponse.json({ error: "Account suspended" }, { status: 403 });
   }
+  const githubLogin: string = dev.github_login;
 
   let body: { package_id: string; provider: "stripe" | "abacatepay" };
   try {

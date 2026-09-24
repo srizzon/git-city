@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { CLAIMED_DEVELOPER_LIMIT, githubLoginFromIdentity, pickClaimedDeveloper } from "@/lib/auth-identity";
 import RoadmapClient from "./RoadmapClient";
 
 export const revalidate = 300;
@@ -42,20 +43,17 @@ export default async function RoadmapPage() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      userLogin =
-        (
-          user.user_metadata.user_name ??
-          user.user_metadata.preferred_username ??
-          ""
-        ).toLowerCase() || null;
+      userLogin = githubLoginFromIdentity(user) || null;
 
       if (userLogin) {
         // Get developer ID
-        const { data: dev } = await admin
+        const { data: devRows } = await admin
           .from("developers")
-          .select("id")
-          .eq("github_login", userLogin)
-          .single();
+          .select("id, github_login")
+          .eq("claimed_by", user.id)
+          .order("claimed_at", { ascending: true })
+          .limit(CLAIMED_DEVELOPER_LIMIT);
+        const dev = pickClaimedDeveloper(devRows, user);
 
         if (dev) {
           const { data: votes } = await admin

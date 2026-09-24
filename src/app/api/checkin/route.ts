@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { evaluateEmblems } from "@/lib/emblems";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -145,28 +146,21 @@ export async function POST() {
     return NextResponse.json({ error: "Too fast" }, { status: 429 });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json({ error: "No GitHub login" }, { status: 400 });
-  }
-
   const sb = getSupabaseAdmin();
 
   // Fetch developer (must be claimed)
-  const { data: dev } = await sb
+  const { data: devRows } = await sb
     .from("developers")
-    .select("id, claimed, contributions, public_repos, total_stars, kudos_count, app_streak, streak_freeze_30d_claimed, last_checkin_date")
-    .eq("github_login", githubLogin)
-    .single();
+    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, app_streak, streak_freeze_30d_claimed, last_checkin_date")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev || !dev.claimed) {
     return NextResponse.json({ error: "Must claim building first" }, { status: 403 });
   }
+  const githubLogin: string = dev.github_login;
 
   // Perform check-in via RPC
   const { data: result, error: rpcError } = await sb.rpc("perform_checkin", {

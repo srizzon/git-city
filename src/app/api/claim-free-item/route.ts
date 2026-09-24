@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { FREE_CLAIM_ITEM, grantFreeClaimItem } from "@/lib/items";
 
 export async function POST() {
@@ -13,27 +14,16 @@ export async function POST() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json(
-      { error: "No GitHub username" },
-      { status: 400 }
-    );
-  }
-
   const admin = getSupabaseAdmin();
 
   // Must have claimed their building
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id, claimed, claimed_by")
-    .eq("github_login", githubLogin)
-    .single();
+    .select("id, github_login, claimed, claimed_by")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
     return NextResponse.json(

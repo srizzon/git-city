@@ -17,7 +17,7 @@ export interface Autosave {
 
 async function loadCity(slug: string): Promise<CitySnapshot | null> {
   try {
-    const res = await fetch(`/api/leagues/${slug}/city`, { cache: "no-store" });
+    const res = await fetch(`/api/leagues/${slug}/city?fresh=1`, { cache: "no-store" });
     return res.ok ? ((await res.json()) as CitySnapshot) : null;
   } catch {
     return null;

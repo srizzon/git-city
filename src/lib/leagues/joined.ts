@@ -1,7 +1,6 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeagueJoinedNotification } from "@/lib/notification-senders/league-joined";
-import { MAX_CUSTOM_LEAGUES } from "./service";
 import { isPublicOrgMember, VERIFICATION_DAYS } from "./verification";
 import { autoPlace } from "@/lib/league-city/service";
 
@@ -20,11 +19,11 @@ export async function notifyJoined(leagueId: string, devId: number, login: strin
 }
 
 /**
- * A dev with invited league rows just claimed their building: make them
- * active members. Custom leagues activate directly (up to the 5-league limit).
- * Company leagues still need proof of membership, so they activate only when
- * the dev is a public org member; otherwise they stay invited until the dev
- * verifies.
+ * A dev with invited company league rows just claimed their building: make
+ * them active when GitHub shows them as a public org member (that's the
+ * proof); otherwise they stay invited until they verify. Custom league
+ * invites stay invited until the dev clicks Join: an invite is an offer, not
+ * a membership.
  */
 export async function activateOnClaim(devId: number, login: string): Promise<number> {
   const sb = getSupabaseAdmin();
@@ -33,6 +32,7 @@ export async function activateOnClaim(devId: number, login: string): Promise<num
     .select("league_id, invited_by, leagues!inner(kind, github_org)")
     .eq("developer_id", devId)
     .eq("status", "invited")
+    .eq("leagues.kind", "company")
     .returns<{ league_id: string; invited_by: number | null; leagues: { kind: string; github_org: string | null } }[]>();
   if (!rows || rows.length === 0) return 0;
 
@@ -41,25 +41,24 @@ export async function activateOnClaim(devId: number, login: string): Promise<num
     .select("leagues!inner(kind)")
     .eq("developer_id", devId)
     .eq("status", "active")
-    .returns<{ leagues: { kind: string } }[]>();
-  let customCount = (active ?? []).filter((a) => a.leagues.kind === "custom").length;
-  let hasCompany = (active ?? []).some((a) => a.leagues.kind === "company");
+    .eq("leagues.kind", "company")
+    .limit(1);
+  let hasCompany = (active ?? []).length > 0;
 
   const now = new Date().toISOString();
   let joined = 0;
   for (const row of rows) {
-    const patch: Record<string, unknown> = { status: "active", joined_at: now, left_at: null };
-    if (row.leagues.kind === "custom") {
-      if (customCount >= MAX_CUSTOM_LEAGUES) continue;
-      customCount++;
-    } else {
-      if (hasCompany || !row.leagues.github_org) continue;
-      const member = await isPublicOrgMember(row.leagues.github_org, login);
-      if (!member) continue;
-      patch.verification = "public";
-      patch.verified_until = new Date(Date.now() + VERIFICATION_DAYS * 86_400_000).toISOString();
-      hasCompany = true;
-    }
+    if (hasCompany || !row.leagues.github_org) continue;
+    const member = await isPublicOrgMember(row.leagues.github_org, login);
+    if (!member) continue;
+    const patch = {
+      status: "active",
+      joined_at: now,
+      left_at: null,
+      verification: "public",
+      verified_until: new Date(Date.now() + VERIFICATION_DAYS * 86_400_000).toISOString(),
+    };
+    hasCompany = true;
     const { error } = await sb
       .from("league_members")
       .update(patch)

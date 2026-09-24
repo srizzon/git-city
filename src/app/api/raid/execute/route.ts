@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { evaluateEmblems } from "@/lib/emblems";
 import { touchLastActive } from "@/lib/notification-helpers";
@@ -48,20 +49,15 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
   // Fetch attacker + defender in parallel
   const raidColumns = "id, claimed, github_login, avatar_url, contributions, public_repos, total_stars, kudos_count, app_streak, raid_xp, current_week_contributions, current_week_kudos_given, current_week_kudos_received";
   const [attackerRes, defenderRes] = await Promise.all([
     admin
       .from("developers")
       .select(raidColumns)
-      .eq("github_login", githubLogin)
-      .single(),
+      .eq("claimed_by", user.id)
+      .order("claimed_at", { ascending: true })
+      .limit(CLAIMED_DEVELOPER_LIMIT),
     admin
       .from("developers")
       .select(raidColumns)
@@ -70,7 +66,7 @@ export async function POST(request: Request) {
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const attacker = attackerRes.data as Record<string, any> | null;
+  const attacker = pickClaimedDeveloper(attackerRes.data as Record<string, any>[] | null, user);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const defender = defenderRes.data as Record<string, any> | null;
 

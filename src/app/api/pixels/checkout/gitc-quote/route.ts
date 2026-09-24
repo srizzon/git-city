@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAddress } from "viem";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { quoteGitcWeiForUsdCents, getCurrentBaseBlock } from "@/lib/gitc-server";
 import { GITC_QUOTE_TTL_SECONDS, GITC_TREASURY_ADDRESS, isGitcEnabled } from "@/lib/gitc";
@@ -25,6 +26,7 @@ interface PackageRow {
 
 interface DevRow {
   id: number;
+  github_login: string;
   claimed: boolean;
   claimed_by: string | null;
   suspended: boolean;
@@ -65,23 +67,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Connect a wallet first" }, { status: 400 });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });
-  }
-
   const sb = getSupabaseAdmin();
 
-  const { data: dev } = await sb
+  const { data: devRows } = await sb
     .from("developers")
-    .select("id, claimed, claimed_by, suspended")
-    .eq("github_login", githubLogin)
-    .single<DevRow>();
+    .select("id, github_login, claimed, claimed_by, suspended")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT)
+    .returns<DevRow[]>();
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
     return NextResponse.json({ error: "You must claim your building first" }, { status: 403 });

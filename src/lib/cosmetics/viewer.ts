@@ -1,5 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { getOwnedItems } from "@/lib/items";
 import { getBalance } from "@/lib/pixels";
 import { calcBuildingDims } from "@/lib/github";
@@ -29,15 +30,15 @@ export async function getViewerCosmeticContext(): Promise<ViewerContext | null> 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const login = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-  if (!login) return null;
-
+  // The viewer's building is the one they claimed, never a user_metadata login.
   const sb = getSupabaseAdmin();
-  const { data: dev } = await sb.from("developers").select("*").eq("github_login", login).single();
+  const { data: devRows } = await sb
+    .from("developers")
+    .select("id, github_login, claimed, contributions, public_repos, total_stars, streak_freezes_available")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
   if (!dev) return null;
 
   const [ownedItems, wallet, loadoutRow, customRows, topDev, topStars] = await Promise.all([

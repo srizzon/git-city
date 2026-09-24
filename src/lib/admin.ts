@@ -7,6 +7,7 @@ type UserLike = {
   };
 } | null | undefined;
 
+/** @deprecated user_metadata is user-editable (auth.updateUser); use githubLoginFromIdentity / isAdminUser from @/lib/auth-identity. */
 export function getGithubLoginFromUser(user: UserLike): string {
   return (
     user?.user_metadata?.user_name ??

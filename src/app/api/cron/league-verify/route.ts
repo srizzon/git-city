@@ -10,7 +10,10 @@ export const maxDuration = 300;
 // ─── Daily company membership re-check ───────────────────────────────────────
 // - Public-verified members missing from the org's public list → former.
 // - Private-verified members past verified_until → former (logins renew it).
-// - Private members found in the public list are renewed for free.
+// - Members found in the public list are renewed for free (private stays
+//   private: public would drop them the day they hide their membership).
+// - The public list is read in full, never capped: a missing page would read
+//   as "left the org".
 // - Admin reassigned when the admin left.
 // A GitHub error skips the league without touching anyone.
 
@@ -33,13 +36,22 @@ export async function GET(request: NextRequest) {
   let reassigned = 0;
 
   for (const league of leagues ?? []) {
-    const { data: members } = await sb
-      .from("league_members")
-      .select("developer_id, verification, verified_until, developers!league_members_developer_id_fkey(github_login)")
-      .eq("league_id", league.id)
-      .eq("status", "active")
-      .returns<{ developer_id: number; verification: string | null; verified_until: string | null; developers: { github_login: string } | null }[]>();
-    if (!members || members.length === 0) continue;
+    type Member = { developer_id: number; verification: string | null; verified_until: string | null; developers: { github_login: string } | null };
+    const members: Member[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data } = await sb
+        .from("league_members")
+        .select("developer_id, verification, verified_until, developers!league_members_developer_id_fkey(github_login)")
+        .eq("league_id", league.id)
+        .eq("status", "active")
+        .order("developer_id")
+        .range(from, from + 999)
+        .returns<Member[]>();
+      if (!data || data.length === 0) break;
+      members.push(...data);
+      if (data.length < 1000) break;
+    }
+    if (members.length === 0) continue;
 
     const publicList = await fetchOrgPublicMembers(league.github_org as string);
     if (!publicList) {
@@ -63,20 +75,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (renew.length) {
+    // Chunked: thousands of ids in one .in() overflow the request URL.
+    for (let i = 0; i < renew.length; i += 300) {
       await sb
         .from("league_members")
-        .update({ verification: "public", verified_until: renewTo })
+        .update({ verified_until: renewTo })
         .eq("league_id", league.id)
-        .in("developer_id", renew);
-      renewed += renew.length;
+        .in("developer_id", renew.slice(i, i + 300));
     }
+    renewed += renew.length;
     if (leave.length) {
-      await sb
-        .from("league_members")
-        .update({ status: "former", left_at: now.toISOString() })
-        .eq("league_id", league.id)
-        .in("developer_id", leave);
+      for (let i = 0; i < leave.length; i += 300) {
+        await sb
+          .from("league_members")
+          .update({ status: "former", left_at: now.toISOString() })
+          .eq("league_id", league.id)
+          .in("developer_id", leave.slice(i, i + 300));
+      }
       marked += leave.length;
       await removeBuilding(league.id as string, leave);
     }

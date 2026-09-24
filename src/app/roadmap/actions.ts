@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { VOTABLE_ITEM_IDS } from "@/lib/roadmap-data";
 
 export async function toggleVote(itemId: string) {
@@ -21,24 +22,16 @@ export async function toggleVote(itemId: string) {
     throw new Error("Not authenticated");
   }
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    throw new Error("No GitHub login found");
-  }
-
   const admin = getSupabaseAdmin();
 
   // Get developer ID
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id")
-    .eq("github_login", githubLogin)
-    .single();
+    .select("id, github_login")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) {
     throw new Error("Developer not found");

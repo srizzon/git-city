@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { CLAIMED_DEVELOPER_LIMIT, githubLoginFromIdentity, pickClaimedDeveloper } from "@/lib/auth-identity";
 import JobBoardClient from "./JobBoardClient";
 
 export const metadata: Metadata = {
@@ -17,16 +18,18 @@ export default async function JobsPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const username = user
-    ? (user.user_metadata?.user_name ?? user.user_metadata?.preferred_username ?? "") as string
+    ? githubLoginFromIdentity(user)
     : null;
 
   let hasProfile = false;
   if (user) {
-    const { data: dev } = await supabase
+    const { data: devRows } = await supabase
       .from("developers")
-      .select("id")
+      .select("id, github_login")
       .eq("claimed_by", user.id)
-      .maybeSingle();
+      .order("claimed_at", { ascending: true })
+      .limit(CLAIMED_DEVELOPER_LIMIT);
+    const dev = pickClaimedDeveloper(devRows, user);
     if (dev) {
       const { count } = await supabase
         .from("career_profiles")

@@ -13,6 +13,7 @@ export default function JoinPanel({
   signedIn,
   invitee,
   refLogin,
+  inviteToken,
   onClose,
 }: {
   leagueSlug: string;
@@ -20,6 +21,7 @@ export default function JoinPanel({
   signedIn: boolean;
   invitee: string | null;
   refLogin: string | null;
+  inviteToken: string | null;
   onClose: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -29,7 +31,13 @@ export default function JoinPanel({
     setBusy(true);
     const params = new URLSearchParams();
     if (refLogin) params.set("ref", refLogin);
-    params.set("next", `/league/${leagueSlug}`);
+    // Come back to the same link, token included, to finish joining.
+    const back = new URLSearchParams();
+    if (refLogin) back.set("ref", refLogin);
+    if (inviteToken) back.set("t", inviteToken);
+    if (invitee) back.set("invite", invitee);
+    const query = back.toString();
+    params.set("next", `/league/${leagueSlug}${query ? `?${query}` : ""}`);
     await signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?${params.toString()}`);
   }
 
@@ -40,7 +48,7 @@ export default function JoinPanel({
       const res = await fetch(`/api/leagues/${leagueSlug}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ref: refLogin }),
+        body: JSON.stringify({ ref: refLogin, t: inviteToken }),
       });
       const json = await res.json();
       if (!res.ok) {

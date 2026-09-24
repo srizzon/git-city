@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { getBalance } from "@/lib/pixels";
 import PixelsStoreClient from "./PixelsStoreClient";
 
@@ -21,12 +22,6 @@ export default async function PixelsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const authLogin = (
-    user?.user_metadata?.user_name ??
-    user?.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
   const sb = getSupabaseAdmin();
 
   // Get developer + wallet
@@ -34,12 +29,14 @@ export default async function PixelsPage() {
   let balance = 0;
   let githubLogin = "";
 
-  if (user && authLogin) {
-    const { data: dev } = await sb
+  if (user) {
+    const { data: devRows } = await sb
       .from("developers")
       .select("id, github_login")
-      .eq("github_login", authLogin)
-      .single();
+      .eq("claimed_by", user.id)
+      .order("claimed_at", { ascending: true })
+      .limit(CLAIMED_DEVELOPER_LIMIT);
+    const dev = pickClaimedDeveloper(devRows, user);
 
     if (dev) {
       devId = dev.id;

@@ -1,4 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase-server";
+import { githubLoginFromIdentity, isAdminUser } from "@/lib/auth-identity";
 import { getActivePool } from "@/lib/landmarks/repository";
 import { chooseLandmarks, computeSeed } from "@/lib/landmarks/selection";
 import { preload } from "react-dom";
@@ -25,10 +26,7 @@ export default async function HomePage({
   ]);
 
   const { data: { user } } = await sb.auth.getUser();
-  const login =
-    (user?.user_metadata?.user_name as string | undefined)?.toLowerCase() ??
-    (user?.user_metadata?.preferred_username as string | undefined)?.toLowerCase() ??
-    null;
+  const login = githubLoginFromIdentity(user) || null;
 
   const landmarkParam = Array.isArray(sp.landmark) ? sp.landmark[0] : sp.landmark;
 
@@ -37,5 +35,5 @@ export default async function HomePage({
     forceIncludeSlug: landmarkParam,
   });
 
-  return <HomeClient assignments={assignments} />;
+  return <HomeClient assignments={assignments} isAdmin={isAdminUser(user)} />;
 }

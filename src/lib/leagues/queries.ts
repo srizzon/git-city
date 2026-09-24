@@ -3,7 +3,8 @@ import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { CITY_DEV_COLUMNS, loadCityExtras, mergeCityExtras } from "@/lib/city-extras";
 import type { LayoutNorms } from "@/lib/github";
-import { isoDay, weekStart } from "./scoring";
+import { isoDay, weekStart, type ScoringMode } from "./scoring";
+import { leagueTag } from "./cache";
 import { loadStandings, loadLeagueStandings, type LeagueWeekStandings } from "./standings";
 import type { League, MemberStatus, Viewer } from "./service";
 
@@ -161,24 +162,49 @@ export async function getLeagueMembers(leagueId: string): Promise<LeagueMemberRo
   return out;
 }
 
+interface FrozenWeek {
+  week_start: string;
+  winner_id: number | null;
+  /** standings[0] of the frozen week: the leader, who is the winner when there is one. */
+  top: { developer_id: number; login: string; avatar_url: string | null; total: number } | null;
+  global_winner: unknown;
+}
+
+/**
+ * The viewer-independent part of the page: this week's standings and the last
+ * 52 closed weeks (only each week's leader, not the whole frozen table).
+ * Cached 60s per league; joins, leaves and city writes expire it.
+ */
+function getLeagueBoard(leagueId: string, scoringMode: ScoringMode) {
+  return unstable_cache(
+    async () => {
+      const sb = getSupabaseAdmin();
+      const [week, weeksRes] = await Promise.all([
+        loadLeagueStandings({ id: leagueId, scoring_mode: scoringMode }, weekStart(new Date()), sb),
+        sb
+          .from("league_weeks")
+          .select("week_start, winner_id, top:standings->standings->0, global_winner:standings->global_winner")
+          .eq("league_id", leagueId)
+          .order("week_start", { ascending: false })
+          .limit(52)
+          .returns<FrozenWeek[]>(),
+      ]);
+      return { week, weeks: weeksRes.data ?? [] };
+    },
+    ["league-board", leagueId, scoringMode],
+    { revalidate: 60, tags: [leagueTag(leagueId)] },
+  )();
+}
+
 export async function getLeaguePageData(league: League, viewer: Viewer | null): Promise<LeaguePageData> {
-  const sb = getSupabaseAdmin();
-  const [members, week, weeksRes] = await Promise.all([
+  const [members, { week, weeks }] = await Promise.all([
     getLeagueMembers(league.id),
-    loadLeagueStandings(league, weekStart(new Date()), sb),
-    sb
-      .from("league_weeks")
-      .select("week_start, winner_id, standings")
-      .eq("league_id", league.id)
-      .order("week_start", { ascending: false })
-      .limit(52),
+    getLeagueBoard(league.id, league.scoring_mode),
   ]);
 
   const byId = new Map(members.map((m) => [m.developer_id, m]));
-  type Frozen = { standings?: { developer_id: number; login: string; avatar_url: string | null; total: number }[]; global_winner?: unknown };
-  const hall: HallOfFameWeek[] = (weeksRes.data ?? []).map((w) => {
-    const frozen = (w.standings ?? {}) as Frozen;
-    const top = frozen.standings?.find((s) => s.developer_id === w.winner_id);
+  const hall: HallOfFameWeek[] = weeks.map((w) => {
+    const top = w.top && w.top.developer_id === w.winner_id ? w.top : null;
     const member = w.winner_id ? byId.get(w.winner_id) : undefined;
     return {
       week_start: w.week_start,
@@ -190,7 +216,7 @@ export async function getLeaguePageData(league: League, viewer: Viewer | null): 
             ex_member: member?.status !== "active",
           }
         : null,
-      global_winner: !!frozen.global_winner,
+      global_winner: !!w.global_winner,
     };
   });
 

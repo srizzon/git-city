@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 
 const UPDATABLE_FIELDS = [
   "email_enabled",
@@ -33,17 +34,14 @@ export async function GET() {
   }
 
   const sb = getSupabaseAdmin();
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
 
-  const { data: dev } = await sb
+  const { data: devRows } = await sb
     .from("developers")
-    .select("id")
-    .eq("github_login", githubLogin)
-    .single();
+    .select("id, github_login")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) {
     return NextResponse.json({ error: "Developer not found" }, { status: 404 });
@@ -95,17 +93,14 @@ export async function PATCH(request: Request) {
 
   const body = await request.json();
   const sb = getSupabaseAdmin();
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
 
-  const { data: dev } = await sb
+  const { data: devRows } = await sb
     .from("developers")
-    .select("id")
-    .eq("github_login", githubLogin)
-    .single();
+    .select("id, github_login")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) {
     return NextResponse.json({ error: "Developer not found" }, { status: 404 });

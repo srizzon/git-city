@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
+import type { User } from "@supabase/supabase-js";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 
 const MIN_EVENTS = 8;
 const FEED_COLUMNS = "id, event_type, actor_id, target_id, metadata, created_at";
@@ -43,16 +45,18 @@ export async function GET(request: Request) {
   // The viewer identity comes from the authenticated session — never a
   // query param — so one user can't read another's personalized feed.
   if (scope === "you" || scope === "circle") {
-    const viewer = await sessionLogin();
+    const viewer = await sessionUser();
     if (!viewer) {
       return NextResponse.json({ events: [], has_more: false }, { headers: noStore() });
     }
 
-    const { data: viewerDev } = await sb
+    const { data: viewerRows } = await sb
       .from("developers")
-      .select("id")
-      .eq("github_login", viewer)
-      .single();
+      .select("id, github_login")
+      .eq("claimed_by", viewer.id)
+      .order("claimed_at", { ascending: true })
+      .limit(CLAIMED_DEVELOPER_LIMIT);
+    const viewerDev = pickClaimedDeveloper(viewerRows, viewer);
 
     if (!viewerDev) {
       return NextResponse.json({ events: [], has_more: false }, { headers: noStore() });
@@ -188,23 +192,16 @@ export async function GET(request: Request) {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-// The authenticated viewer's GitHub login, or null if not signed in. This is
+// The authenticated viewer (auth user), or null if not signed in. This is
 // the ONLY source of identity for personalized scopes — the client can't spoof
-// another user by passing a `viewer` param.
-async function sessionLogin(): Promise<string | null> {
+// another user by passing a `viewer` param, and the building is resolved by
+// claimed_by, never by the user-editable metadata login.
+async function sessionUser(): Promise<User | null> {
   const supabase = await createServerSupabase();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
-  const login = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  )
-    .toLowerCase()
-    .trim();
-  return login || null;
+  return user ?? null;
 }
 
 function cacheable() {

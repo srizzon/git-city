@@ -10,7 +10,7 @@ import type { LeagueMemberRow } from "@/lib/leagues/queries";
 
 type Result = { ok: true } | { ok: false; error: string };
 
-async function send(url: string, method: "PATCH" | "DELETE", body?: Record<string, string>): Promise<Result> {
+async function send(url: string, method: "PATCH" | "DELETE", body?: Record<string, string | boolean>): Promise<Result> {
   try {
     const res = await fetch(url, {
       method,
@@ -42,10 +42,13 @@ export default function SettingsClient({
   league,
   members,
   viewerLogin,
+  inviteLink,
 }: {
   league: League;
   members: LeagueMemberRow[];
   viewerLogin: string;
+  /** Custom leagues: the open invite link (carries the invite token). */
+  inviteLink: string | null;
 }) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
@@ -65,7 +68,8 @@ export default function SettingsClient({
         <p className="mt-1 text-[11px] text-muted">League settings</p>
 
         <div className="mt-6 space-y-4">
-          <NameSection api={api} name={league.name} onSaved={refresh} />
+          {league.kind === "custom" && <NameSection api={api} name={league.name} onSaved={refresh} />}
+          {inviteLink && <InviteLinkSection api={api} link={inviteLink} onRotated={refresh} />}
           <ScoringSection api={api} mode={league.scoring_mode} onSaved={refresh} />
           <MembersSection league={league} members={members} viewerLogin={viewerLogin} onChanged={refresh} />
           <TransferSection api={api} league={league} members={members} viewerLogin={viewerLogin} />
@@ -119,6 +123,79 @@ function NameSection({ api, name, onSaved }: { api: string; name: string; onSave
           {saving ? <Pending label="Saving" /> : saved && !dirty ? "Saved" : "Save"}
         </button>
       </form>
+      <ErrorLine error={error} />
+    </Section>
+  );
+}
+
+// ─── Invite link ─────────────────────────────────────────────
+
+function InviteLinkSection({ api, link, onRotated }: { api: string; link: string; onRotated: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setError("Couldn't copy. Select the link and copy it.");
+    }
+  }
+
+  async function rotate() {
+    setRotating(true);
+    setError(null);
+    const r = await send(api, "PATCH", { rotate_invite: true });
+    setRotating(false);
+    setConfirming(false);
+    if (!r.ok) return setError(r.error);
+    onRotated();
+  }
+
+  return (
+    <Section title="Invite link" hint="Anyone with this link can join. Make a new one to turn the old link off.">
+      <div className="flex gap-2">
+        <input
+          readOnly
+          value={link}
+          aria-label="Invite link"
+          onFocus={(e) => e.currentTarget.select()}
+          className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-[11px] text-cream normal-case outline-none"
+        />
+        <button
+          type="button"
+          onClick={copy}
+          className={`btn-press min-w-[80px] px-3 text-[10px] ${copied ? "bg-lime text-bg" : "border-2 border-lime text-lime"}`}
+        >
+          {copied ? "Copied" : "Copy link"}
+        </button>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        {confirming ? (
+          <>
+            <span className="text-[9px] text-muted">The old link stops working.</span>
+            <button
+              type="button"
+              disabled={rotating}
+              onClick={rotate}
+              className="btn-press min-w-[96px] border-2 border-red-500 px-2 py-1 text-[9px] text-red-400 disabled:opacity-50"
+            >
+              {rotating ? <Pending label="Making" /> : "New link"}
+            </button>
+            <button type="button" onClick={() => setConfirming(false)} className="px-1 text-[9px] text-muted hover:text-cream">
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={() => setConfirming(true)} className="btn-press px-0 py-1 text-[9px] text-muted hover:text-cream">
+            Make a new link
+          </button>
+        )}
+      </div>
       <ErrorLine error={error} />
     </Section>
   );
@@ -209,9 +286,7 @@ function MembersSection({
     <Section
       title={`Members · ${members.length}`}
       hint={
-        league.kind === "company"
-          ? "Removed members leave the city. They can come back by verifying again."
-          : "Removed members leave the city. They need a new invite to come back."
+        "Removed members leave the city. Only a new invite from you brings them back."
       }
     >
       <ul className="max-h-[420px] divide-y-2 divide-border overflow-y-auto border-2 border-border">

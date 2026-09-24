@@ -2,7 +2,8 @@ import { NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getViewer } from "@/lib/leagues/service";
 import { joinCompanyLeague, VERIFICATION_DAYS } from "@/lib/leagues/verification";
-import { assertSameOrigin, readJson } from "@/lib/leagues/http";
+import { assertSameOrigin, leagueErrorResponse, readJson } from "@/lib/leagues/http";
+import { LeagueError } from "@/lib/leagues/service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
     if (seed) after(() => seed().then(() => {}));
     return NextResponse.json({ slug });
   } catch (err) {
+    if (err instanceof LeagueError) return leagueErrorResponse(err);
     console.error("[leagues:verify:join]", err);
     return NextResponse.json({ error: "Couldn't join that league. Try again." }, { status: 500 });
   }

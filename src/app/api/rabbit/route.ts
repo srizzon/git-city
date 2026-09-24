@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 
 // POST - Record rabbit sighting encounter
@@ -26,18 +27,14 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
   // Fetch developer (must have claimed building)
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id, claimed, rabbit_progress, rabbit_completed")
-    .eq("github_login", githubLogin)
-    .single();
+    .select("id, github_login, claimed, rabbit_progress, rabbit_completed")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev || !dev.claimed) {
     return NextResponse.json({ error: "Must claim building first" }, { status: 403 });
@@ -137,17 +134,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ progress: 0, completed: false });
     }
 
-    const githubLogin = (
-      user.user_metadata.user_name ??
-      user.user_metadata.preferred_username ??
-      ""
-    ).toLowerCase();
-
-    const { data: dev } = await admin
+    const { data: devRows } = await admin
       .from("developers")
-      .select("rabbit_progress, rabbit_completed, rabbit_completed_at")
-      .eq("github_login", githubLogin)
-      .single();
+      .select("rabbit_progress, rabbit_completed, rabbit_completed_at, github_login")
+      .eq("claimed_by", user.id)
+      .order("claimed_at", { ascending: true })
+      .limit(CLAIMED_DEVELOPER_LIMIT);
+    const dev = pickClaimedDeveloper(devRows, user);
 
     return NextResponse.json({
       progress: dev?.rabbit_progress ?? 0,

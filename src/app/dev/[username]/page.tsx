@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { PUBLIC_DEVELOPER_COLUMNS } from "@/lib/developer-columns";
 import {
   buildTitlePool,
@@ -137,21 +138,18 @@ export default async function DevPage({ params }: Props) {
   // Check if the logged-in user owns this building
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
-  const authLogin = (
-    user?.user_metadata?.user_name ??
-    user?.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-  const isOwner = !!user && authLogin === dev.github_login.toLowerCase() && dev.claimed;
+  const isOwner = !!user && dev.claimed_by === user.id && dev.claimed;
 
   // Fire-and-forget: earn PX for visiting another dev's profile
-  if (user && authLogin && !isOwner) {
+  if (user && !isOwner) {
     const sb = getSupabaseAdmin();
     sb.from("developers")
-      .select("id")
-      .eq("github_login", authLogin)
-      .single()
-      .then(({ data: viewer }) => {
+      .select("id, github_login")
+      .eq("claimed_by", user.id)
+      .order("claimed_at", { ascending: true })
+      .limit(CLAIMED_DEVELOPER_LIMIT)
+      .then(({ data: rows }) => {
+        const viewer = pickClaimedDeveloper(rows, user);
         if (viewer) {
           import("@/lib/pixels").then(({ earnPixels }) => {
             const today = new Date().toISOString().slice(0, 10);

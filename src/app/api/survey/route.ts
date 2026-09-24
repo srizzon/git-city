@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { SURVEYS } from "@/lib/surveys";
 
@@ -14,15 +15,14 @@ export async function GET(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ answered: false });
 
-  const login = user.user_metadata?.user_name;
-  if (!login) return NextResponse.json({ answered: false });
-
   const admin = getSupabaseAdmin();
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id")
-    .eq("github_login", login)
-    .maybeSingle();
+    .select("id, github_login")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) return NextResponse.json({ answered: false });
 
@@ -65,15 +65,14 @@ export async function POST(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const login = user.user_metadata?.user_name;
-  if (!login) return NextResponse.json({ error: "No GitHub login" }, { status: 400 });
-
   const admin = getSupabaseAdmin();
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id")
-    .eq("github_login", login)
-    .maybeSingle();
+    .select("id, github_login")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev) return NextResponse.json({ error: "Developer not found" }, { status: 404 });
 

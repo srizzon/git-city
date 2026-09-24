@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { MAX_EXPERIENCES } from "@/lib/portfolio/constants";
 
 export async function GET() {
@@ -9,7 +10,13 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const admin = getSupabaseAdmin();
-  const { data: dev } = await admin.from("developers").select("id").eq("claimed_by", user.id).single();
+  const { data: devRows } = await admin
+    .from("developers")
+    .select("id, github_login")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
   if (!dev) return NextResponse.json({ error: "No developer profile" }, { status: 404 });
 
   const { data } = await admin.from("portfolio_experiences").select("*").eq("developer_id", dev.id).order("sort_order");
@@ -22,7 +29,13 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const admin = getSupabaseAdmin();
-  const { data: dev } = await admin.from("developers").select("id").eq("claimed_by", user.id).single();
+  const { data: devRows } = await admin
+    .from("developers")
+    .select("id, github_login")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
   if (!dev) return NextResponse.json({ error: "No developer profile" }, { status: 404 });
 
   const { count } = await admin

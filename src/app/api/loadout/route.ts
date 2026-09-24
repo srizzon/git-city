@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { CLAIMED_DEVELOPER_LIMIT, pickClaimedDeveloper } from "@/lib/auth-identity";
 import { ZONE_ITEMS } from "@/lib/zones";
 
 export async function GET(request: Request) {
@@ -37,17 +38,14 @@ export async function POST(request: Request) {
   }
 
   const admin = getSupabaseAdmin();
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
 
-  const { data: dev } = await admin
+  const { data: devRows } = await admin
     .from("developers")
-    .select("id, claimed, claimed_by")
-    .eq("github_login", githubLogin)
-    .single();
+    .select("id, github_login, claimed, claimed_by")
+    .eq("claimed_by", user.id)
+    .order("claimed_at", { ascending: true })
+    .limit(CLAIMED_DEVELOPER_LIMIT);
+  const dev = pickClaimedDeveloper(devRows, user);
 
   if (!dev || !dev.claimed || dev.claimed_by !== user.id) {
     return NextResponse.json({ error: "Must own a claimed building" }, { status: 403 });
@@ -135,7 +133,7 @@ export async function POST(request: Request) {
       await admin.from("activity_feed").insert({
         event_type: "item_equipped",
         actor_id: dev.id,
-        metadata: { login: githubLogin, item_id: config[zone], zone },
+        metadata: { login: dev.github_login, item_id: config[zone], zone },
       });
       break; // One event per save to avoid spam
     }
