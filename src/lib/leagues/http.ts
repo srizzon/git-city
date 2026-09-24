@@ -1,6 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { LeagueError } from "./service";
+import { LeagueError } from "./errors";
 
 /** Maps LeagueError (and unexpected errors) to JSON responses. */
 export function leagueErrorResponse(err: unknown): NextResponse {
