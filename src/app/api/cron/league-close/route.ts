@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { weekStart } from "@/lib/leagues/scoring";
 import { closeWeek } from "@/lib/leagues/close";
+import { getSupabaseAdmin } from "@/lib/supabase";
+import { sendLeagueWeeklyResults } from "@/lib/notification-senders/league-weekly";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -27,12 +29,32 @@ export async function GET(request: NextRequest) {
 
   try {
     const { closed, errors } = await closeWeek(start);
+
+    // Results emails (awaited). Previous global rank shows the move.
+    const prevWeek = new Date(start);
+    prevWeek.setUTCDate(prevWeek.getUTCDate() - 7);
+    const { data: prevRows } = await getSupabaseAdmin()
+      .from("league_weeks")
+      .select("league_id, standings")
+      .eq("week_start", prevWeek.toISOString().slice(0, 10));
+    const prevRank = new Map(
+      (prevRows ?? []).map((r) => [r.league_id as string, ((r.standings as { global_rank?: number | null })?.global_rank ?? null)]),
+    );
+    let emailed = 0;
+    for (const c of closed) {
+      try {
+        emailed += await sendLeagueWeeklyResults(c, prevRank.get(c.league.id) ?? null);
+      } catch (err) {
+        console.error(`[league-close] emails for ${c.league.slug}:`, err);
+      }
+    }
     return NextResponse.json({
       ok: true,
       week_start: start.toISOString().slice(0, 10),
       closed: closed.length,
       winners: closed.filter((c) => c.winnerId).length,
       errors,
+      emailed,
     });
   } catch (err) {
     console.error("[league-close]", err);

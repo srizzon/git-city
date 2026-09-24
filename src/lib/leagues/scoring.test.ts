@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   codePoints,
+  detectOvertakes,
   gameXp,
   globalScore,
   isoDay,
@@ -150,5 +151,35 @@ describe("rankStandings", () => {
   it("puts a missing joined_at last on a full tie", () => {
     const r = rankStandings([entry(1, 5, 5, null), entry(2, 5, 5, "2026-01-01T00:00:00Z")]);
     expect(r.map((e) => e.developer_id)).toEqual([2, 1]);
+  });
+});
+
+describe("detectOvertakes", () => {
+  const snap = (rows: [number, number][]) =>
+    rankStandings(
+      rows.map(([id, total]) => ({ developer_id: id, total, codePoints: total, gameXp: 0, joined_at: null, login: `u${id}` })),
+    );
+
+  it("reports who passed you", () => {
+    const o = detectOvertakes(snap([[1, 100], [2, 50]]), snap([[1, 100], [2, 140]]));
+    expect(o).toEqual([{ developerId: 1, overtakerLogin: "u2", gap: 40, newRank: 2 }]);
+  });
+
+  it("stays quiet when nothing changed", () => {
+    expect(detectOvertakes(snap([[1, 100], [2, 50]]), snap([[1, 110], [2, 60]]))).toEqual([]);
+  });
+
+  it("ignores passes below the top 5 when you kept your rank", () => {
+    const base: [number, number][] = [[1, 900], [2, 800], [3, 700], [4, 600], [5, 500], [6, 400], [7, 300], [8, 200]];
+    const prev = snap(base);
+    // 8 jumps over 7 and 6; 6 drops to 7th, 7 drops to 8th.
+    const next = snap([...base.slice(0, 7), [8, 450]]);
+    const ids = detectOvertakes(prev, next).map((o) => o.developerId);
+    expect(ids).toEqual([6, 7]);
+  });
+
+  it("names the closest passer", () => {
+    const o = detectOvertakes(snap([[1, 100], [2, 50], [3, 40]]), snap([[1, 100], [2, 300], [3, 200]]));
+    expect(o.find((x) => x.developerId === 1)?.overtakerLogin).toBe("u3");
   });
 });

@@ -5,6 +5,7 @@ import { getGithubLoginFromUser } from "@/lib/admin";
 import { GitHubFetchError } from "@/lib/github-api";
 import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import type { ScoringMode } from "./scoring";
+import { notifyLitUp } from "./litup";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -197,6 +198,7 @@ export async function joinLeague(viewer: Viewer, league: League, ref: string | n
   );
   if (error) throw new LeagueError("join_failed", error.message, 500);
 
+  if (existing?.status === "invited") await notifyLitUp(league.id, viewer.id, viewer.github_login, invitedBy);
   if (!league.admin_id) await reassignAdmin(league.id);
   return "active";
 }

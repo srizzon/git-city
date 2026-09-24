@@ -148,3 +148,35 @@ export function rankStandings<T extends StandingInput>(entries: T[]): Standing<T
     )
     .map((e, i) => ({ ...e, rank: i + 1 }));
 }
+
+// ─── Overtakes ──────────────────────────────────────────────
+
+export interface Overtake {
+  developerId: number;
+  overtakerLogin: string;
+  gap: number;
+  newRank: number;
+}
+
+/**
+ * Members someone passed between two standings snapshots. Only reported when
+ * the member was in the top 5 or actually dropped a rank. The overtaker is
+ * the closest passer above them.
+ */
+export function detectOvertakes<T extends Standing & { login: string }>(prev: T[], next: T[]): Overtake[] {
+  const prevRank = new Map(prev.map((s) => [s.developer_id, s.rank]));
+  const out: Overtake[] = [];
+  for (const me of next) {
+    const was = prevRank.get(me.developer_id);
+    if (!was) continue;
+    if (!(was <= 5 || me.rank > was)) continue;
+    const passers = next.filter((o) => {
+      const oWas = prevRank.get(o.developer_id);
+      return o.rank < me.rank && oWas !== undefined && oWas > was && o.total > me.total;
+    });
+    const closest = passers[passers.length - 1];
+    if (!closest) continue;
+    out.push({ developerId: me.developer_id, overtakerLogin: closest.login, gap: closest.total - me.total, newRank: me.rank });
+  }
+  return out;
+}

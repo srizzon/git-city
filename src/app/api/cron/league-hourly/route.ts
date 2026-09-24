@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { fetchWeekContributionDays } from "@/lib/github-api";
-import { isoDay, weekDays, weekStart } from "@/lib/leagues/scoring";
+import { detectOvertakes, isoDay, weekDays, weekStart } from "@/lib/leagues/scoring";
+import { loadStandings } from "@/lib/leagues/standings";
+import { sendLeagueOvertakenNotification } from "@/lib/notification-senders/league-overtaken";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -60,6 +62,16 @@ export async function GET(request: NextRequest) {
   }
   const queue = ids.sort((a, b) => (lastFetched.get(a) ?? 0) - (lastFetched.get(b) ?? 0));
 
+  // Standings before the fetch, to detect overtakes afterwards.
+  const { data: leagueRows } = await sb.from("leagues").select("id, slug, name, scoring_mode");
+  const leagues = (leagueRows ?? []).map((l) => ({
+    id: l.id as string,
+    slug: l.slug as string,
+    name: l.name as string,
+    scoring_mode: l.scoring_mode,
+  }));
+  const before = await loadStandings(leagues, start, sb);
+
   const idByLogin = new Map([...devs].map(([id, login]) => [login.toLowerCase(), id]));
   let fetched = 0;
   let failedBatches = 0;
@@ -97,9 +109,24 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  let overtakes = 0;
+  if (fetched > 0) {
+    const after = await loadStandings(leagues, start, sb);
+    for (const league of leagues) {
+      const prev = before.get(league.id);
+      const next = after.get(league.id);
+      if (!prev || !next || next.standings.length < 2) continue;
+      for (const o of detectOvertakes(prev.standings, next.standings)) {
+        sendLeagueOvertakenNotification({ ...o, leagueSlug: league.slug, leagueName: league.name });
+        overtakes++;
+      }
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     week_start: startDay,
+    overtakes,
     members: queue.length,
     fetched,
     failed_batches: failedBatches,
@@ -107,3 +134,4 @@ export async function GET(request: NextRequest) {
     stopped: stoppedReason,
   });
 }
+
