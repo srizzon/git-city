@@ -90,6 +90,17 @@ export const STEER = {
   topSpeed: 25,
   /** How fast the wheels turn toward the input (rad/s). */
   rate: 3.5,
+  // Arcade assist: the tires alone can't turn a car hard at speed, so steering
+  // sets a target turn rate and the direction of travel follows the nose.
+  /** Turn radius at full lock (m): turn rate = speed / radius, up to the caps below. */
+  radius: 6,
+  /** Turn rate cap (rad/s) at low speed, easing to `maxYawTop` at boost speed. */
+  maxYaw: 2.2,
+  maxYawTop: 1.4,
+  /** How hard the turn rate chases its target (1/s). */
+  yawGain: 10,
+  /** How fast the direction of travel follows the nose on road (1/s); scaled down by surface grip. */
+  follow: 8,
 };
 
 export const SURFACE = {

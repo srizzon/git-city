@@ -8,7 +8,7 @@ import type { RapierContext, RapierRigidBody } from "@react-three/rapier";
 import type { DriveInput } from "./input";
 import { isFlipped } from "./spawn";
 import type { SurfaceGrip } from "./surface";
-import { BOOST, DRIFT, ENGINE, M_TO_UNIT, RESPAWN, STEER, WHEEL } from "./tuning";
+import { BOOST, DRIFT, ENGINE, M_TO_UNIT, RESPAWN, STEER, SURFACE, WHEEL } from "./tuning";
 
 type World = RapierContext["world"];
 export type VehicleController = ReturnType<World["createVehicleController"]>;
@@ -112,12 +112,14 @@ export function stepCar(
 
   // Grip and top speed per wheel, from the surface under it.
   let rearTop = 0;
+  let rearGrip = 0;
   WHEELS.forEach((w, i) => {
     const [ox, , oz] = rotate(q, [w.x, 0, w.z]);
     const g = gripAt((p.x + ox) * M_TO_UNIT, (p.z + oz) * M_TO_UNIT);
     c.setWheelFrictionSlip(i, g.grip);
     if (!w.front) {
       rearTop += g.topSpeed / 2;
+      rearGrip += g.grip / 2;
       s.surface = g.surface;
     }
   });
@@ -195,6 +197,26 @@ export function stepCar(
     const w = body.angvel();
     const yaw = Math.max(-DRIFT.maxYaw, Math.min(DRIFT.maxYaw, wrap(want - heading) * DRIFT.yawGain));
     body.setAngvel({ x: w.x, y: yaw, z: w.z }, true);
+  } else if (grounded && s.recovering === 0 && Math.abs(speed) > 0.5) {
+    // Arcade steering: the turn rate follows the (eased) steer, the direction
+    // of travel follows the nose. Less grip (grass) follows less, so it slides.
+    const amount = lock > 0 ? -s.steer / lock : 0; // -1…1, eased like the wheels
+    const fast = Math.min(1, Math.max(0, (Math.abs(speed) - 12) / (BOOST.topSpeed - 12)));
+    const cap = STEER.maxYaw + (STEER.maxYawTop - STEER.maxYaw) * fast;
+    const rate = Math.min(cap, Math.abs(speed) / STEER.radius);
+    const wantYaw = -amount * rate * Math.sign(speed);
+    const w = body.angvel();
+    const yaw = w.y + (wantYaw - w.y) * Math.min(1, STEER.yawGain * dt);
+    body.setAngvel({ x: w.x, y: yaw, z: w.z }, true);
+
+    const mag = Math.hypot(v.x, v.z);
+    const along = v.x * fx + v.z * fz >= 0 ? 1 : -1;
+    const len = Math.hypot(fx, fz) || 1;
+    const k = Math.min(1, STEER.follow * (rearGrip / SURFACE.road.grip) ** 2 * dt);
+    const bx = v.x + ((along * fx * mag) / len - v.x) * k;
+    const bz = v.z + ((along * fz * mag) / len - v.z) * k;
+    const bl = Math.hypot(bx, bz) || 1;
+    body.setLinvel({ x: (bx / bl) * mag, y: v.y, z: (bz / bl) * mag }, true);
   } else if (s.recovering > 0 && grounded) {
     // Out of the drift: the direction of travel swings back under the nose, speed kept.
     const mag = Math.max(Math.hypot(v.x, v.z), Math.hypot(v0.x, v0.z));

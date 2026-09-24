@@ -83,6 +83,17 @@ describe("vehicle (headless rapier)", () => {
     expect(body.translation().x).toBeGreaterThan(1); // north-facing car turning right heads east (+x)
   });
 
+  it("turns hard at speed without drifting (arcade steering)", () => {
+    const { body, s: st, run } = setup();
+    run({ throttle: 1 }, 12);
+    expect(st.speed).toBeGreaterThan(20);
+    const h0 = carHeading(body);
+    run({ throttle: 1, steer: 1 }, 1);
+    const turned = Math.atan2(Math.sin(carHeading(body) - h0), Math.cos(carHeading(body) - h0));
+    expect(turned).toBeLessThan(-1.2); // > ~70° in a second, to the right
+    expect(st.lateral).toBeLessThan(2); // gripping, not sliding
+  });
+
   it("reverses with the brake from rest", () => {
     const { s, run } = setup();
     run({ brake: 1 }, 3);
