@@ -44,11 +44,27 @@ export interface DriverInfo {
   name: string;
 }
 
+/** A box slot's generation and how long until it's back (ms, 0 = there now). */
+export interface BoxState {
+  gen: number;
+  wait: number;
+}
+
 // Client → server
-export type ClientMsg = { t: "hello"; name: string } | { t: "bump"; to: string; x: number; z: number } | ["s", ...number[]];
+export type ClientMsg =
+  | { t: "hello"; name: string }
+  | { t: "bump"; to: string; x: number; z: number }
+  | { t: "take"; box: number; gen: number }
+  | { t: "use"; item: string; x: number; z: number; dx: number; dz: number }
+  | { t: "hit"; id: number }
+  | ["s", ...number[]];
 // Server → client
 export type ServerMsg =
-  | { t: "welcome"; you: string; drivers: (DriverInfo & { s: number[] | null })[] }
+  | { t: "welcome"; you: string; drivers: (DriverInfo & { s: number[] | null })[]; boxes: BoxState[] }
+  | { t: "box"; box: number; gen: number; wait: number }
+  | { t: "got"; item: string }
+  | { t: "fx"; id: number; from: string; item: string; x: number; z: number; dx: number; dz: number }
+  | { t: "gone"; id: number }
   | { t: "join"; id: string; name: string }
   | { t: "leave"; id: string }
   | { t: "full" }
