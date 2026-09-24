@@ -2206,12 +2206,18 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPositio
     camera.lookAt(TARGET_X, TARGET_Y, TARGET_Z);
   }, [camera]);
 
-  // Report camera position ~10fps (every 6 frames) to avoid flooding React state
+  // Report camera position ~10fps (every 6 frames), and only when it moved —
+  // an idle camera used to re-render the whole page 10×/s.
+  const lastReported = useRef<[number, number, number, number]>([NaN, NaN, NaN, NaN]);
   useFrame(() => {
     frameCount.current++;
     if (frameCount.current % 6 !== 0 || !onCameraMove) return;
     const t = controlsRef.current?.target;
-    onCameraMove(camera.position.x, camera.position.z, t?.x ?? 0, t?.z ?? 0);
+    const x = camera.position.x, z = camera.position.z, tx = t?.x ?? 0, tz = t?.z ?? 0;
+    const l = lastReported.current;
+    if (Math.abs(x - l[0]) + Math.abs(z - l[1]) + Math.abs(tx - l[2]) + Math.abs(tz - l[3]) < 0.5) return;
+    lastReported.current = [x, z, tx, tz];
+    onCameraMove(x, z, tx, tz);
   });
 
   return (
