@@ -34,6 +34,9 @@ export async function provisionDeveloperOnLogin(
     .eq("github_login", githubLogin)
     .maybeSingle();
 
+  // Referral credit only goes to a first-time claim, never to a returning user.
+  const claimedNow = !existingDev || !existingDev.claimed;
+
   if (!existingDev) {
     // ─── New dev: create building from GitHub data on login ───
     try {
@@ -126,7 +129,7 @@ export async function provisionDeveloperOnLogin(
       touchLastActive(dev.id);
 
       // Process referral (from ?ref= param forwarded by client)
-      if (ref && ref !== githubLogin && !dev.referred_by) {
+      if (claimedNow && ref && ref !== githubLogin && !dev.referred_by) {
         const { data: referrer } = await admin
           .from("developers")
           .select("id, github_login")
