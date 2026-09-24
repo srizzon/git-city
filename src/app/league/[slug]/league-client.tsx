@@ -279,6 +279,7 @@ export default function LeagueClient({
                 onTool={(tool) => store.dispatch({ type: "setTool", tool })}
                 onPickBuilding={editor.pickBuilding}
                 hint={editor.hint}
+                erasing={editor.erasing}
                 onWheel={(dir) => {
                   const n =
                     es.hotbarTab === "buildings"

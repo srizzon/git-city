@@ -23,7 +23,8 @@ export type LotEvent =
   | ({ kind: "hover" } & LotPoint)
   | { kind: "leave" }
   | ({ kind: "click" } & LotPoint)
-  | ({ kind: "pick" } & LotPoint);
+  | ({ kind: "pick" } & LotPoint)
+  | ({ kind: "erase" } & LotPoint);
 
 export interface EditCameraApi {
   /** Eases the camera to look at a lot. */
@@ -148,7 +149,8 @@ export default function EditCamera({
 
     // Drag = camera, click = action. A press becomes a camera drag once it
     // moves past CLICK_SLOP: left orbits, right/middle (or Space+left) pan.
-    // Releasing without moving is a click: left acts, Alt-left or middle picks.
+    // Releasing without moving is a click: left acts, right deletes, Alt-left or
+// middle picks.
     const onDown = (e: PointerEvent) => {
       press = { x: e.clientX, y: e.clientY, button: e.button, alt: e.altKey, moved: false };
       el.setPointerCapture(e.pointerId);
@@ -204,6 +206,7 @@ export default function EditCamera({
       const lot = lotAt(e);
       if (!lot) return;
       if (p.button === 1 || (p.button === 0 && p.alt)) onLotRef.current({ kind: "pick", ...lot });
+      else if (p.button === 2) onLotRef.current({ kind: "erase", ...lot });
       else if (p.button === 0) onLotRef.current({ kind: "click", ...lot });
     };
 

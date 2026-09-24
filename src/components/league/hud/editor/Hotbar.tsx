@@ -1,6 +1,6 @@
 "use client";
 
-import { Hand, Pickaxe } from "lucide-react";
+import { Hand, Trash2 } from "lucide-react";
 import type { CityBuilding } from "@/lib/github";
 import { HOTBAR, type HotbarTab, type Tool } from "@/lib/league-city/editor/state";
 import type { CityObject, ItemType } from "@/lib/league-city/types";
@@ -34,6 +34,7 @@ export default function Hotbar({
   onPickBuilding,
   onWheel,
   hint,
+  erasing = false,
 }: {
   tab: HotbarTab;
   slot: number;
@@ -48,6 +49,8 @@ export default function Hotbar({
   onWheel: (dir: 1 | -1) => void;
   /** What a click does right now. */
   hint: string;
+  /** X is held: delete mode for now. */
+  erasing?: boolean;
 }) {
   const items = tab === "buildings" ? [] : HOTBAR[tab];
   const slotActive = tool.kind === "place" || tool.kind === "road";
@@ -83,8 +86,8 @@ export default function Hotbar({
           <ToolButton label="Hand: pick up and move" active={tool.kind === "select"} onClick={() => onTool({ kind: "select" })}>
             <Hand size={18} strokeWidth={2.25} aria-hidden />
           </ToolButton>
-          <ToolButton label="Bulldozer: delete items" active={tool.kind === "bulldoze"} onClick={() => onTool({ kind: "bulldoze" })}>
-            <Pickaxe size={18} strokeWidth={2.25} aria-hidden />
+          <ToolButton label="Delete (hold X, or right-click)" active={tool.kind === "bulldoze" || erasing} danger onClick={() => onTool({ kind: "bulldoze" })}>
+            <Trash2 size={18} strokeWidth={2.25} aria-hidden />
           </ToolButton>
         </div>
 
@@ -122,7 +125,19 @@ export default function Hotbar({
   );
 }
 
-function ToolButton({ label, active, onClick, children }: { label: string; active: boolean; onClick: () => void; children: React.ReactNode }) {
+function ToolButton({
+  label,
+  active,
+  danger = false,
+  onClick,
+  children,
+}: {
+  label: string;
+  active: boolean;
+  danger?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -130,7 +145,7 @@ function ToolButton({ label, active, onClick, children }: { label: string; activ
       aria-pressed={active}
       title={label}
       onClick={onClick}
-      className={`flex w-12 items-center justify-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px ${active ? "bg-lime/10 text-lime" : "text-muted"}`}
+      className={`flex w-12 items-center justify-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px ${active ? (danger ? "bg-red-500/15 text-red-400" : "bg-lime/10 text-lime") : "text-muted"}`}
     >
       {children}
     </button>
@@ -168,6 +183,7 @@ export function CameraHints() {
       {row("Right-drag", "pan")}
       {row("Scroll", "zoom")}
       {row("Click", "act")}
+      {row("Right-click / hold X", "delete")}
       {row("Q / E", "turn 90°")}
       {row("G", "grid")}
     </div>
