@@ -24,6 +24,8 @@ export interface League {
   admin_id: number | null;
   created_by: number | null;
   created_at: string;
+  /** Test leagues: reachable by URL, left out of every listing. */
+  hidden?: boolean;
 }
 
 export interface Viewer {

@@ -36,7 +36,8 @@ export async function getGlobalRanking(): Promise<GlobalRanking> {
   const { data: leagues } = await sb
     .from("leagues")
     .select("id, slug, name, github_org, scoring_mode")
-    .eq("kind", "company");
+    .eq("kind", "company")
+    .eq("hidden", false);
 
   const standings = await loadStandings(
     // Global always scores in XP mode.
@@ -217,6 +218,7 @@ export async function getDevLeagues(devId: number): Promise<{ slug: string; name
     .select("leagues!inner(slug, name, kind)")
     .eq("developer_id", devId)
     .eq("status", "active")
+    .eq("leagues.hidden", false)
     .returns<{ leagues: { slug: string; name: string; kind: string } }[]>();
   return (data ?? []).map((r) => r.leagues).sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "company" ? -1 : 1));
 }

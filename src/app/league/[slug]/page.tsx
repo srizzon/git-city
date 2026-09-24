@@ -19,7 +19,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!league) return { title: "League not found - Git City" };
   const title = `${league.name} league - Git City`;
   const description = `${league.name}'s skyline in Git City: a weekly race, a hall of fame and a crown for the winner.`;
-  return { title, description, openGraph: { title, description }, twitter: { card: "summary_large_image", title, description } };
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+    twitter: { card: "summary_large_image", title, description },
+    ...(league.hidden ? { robots: { index: false, follow: false } } : {}),
+  };
 }
 
 export default async function LeaguePage({ params, searchParams }: Props) {
