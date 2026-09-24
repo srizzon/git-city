@@ -537,10 +537,8 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       const { blocked, removes, restores } = ringContents(s);
       if (blocked) return notify(s, "hint", "Move the buildings off the edge first.");
       const smaller = s.size - 2;
-      const lots = [...s.objects.values()].filter((o) => o.px === null).length - removes.filter((r) => {
-        const o = "id" in r ? s.objects.get(r.id) : undefined;
-        return o?.px === null;
-      }).length;
+      const gone = new Set(removes.flatMap((r) => (r.op === "remove" && "id" in r ? [r.id] : [])));
+      const lots = [...s.objects.values()].filter((o) => o.px === null && !gone.has(o.id)).length;
       if (lots > 0.7 * smaller * smaller) return notify(s, "hint", "The city is too full to shrink.");
       const next = commit(s, [...removes, { op: "shrink" }], [{ op: "expand" }, ...restores]);
       return removes.length > 0
