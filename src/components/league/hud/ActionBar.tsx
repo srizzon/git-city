@@ -5,6 +5,7 @@ import Link from "next/link";
 import { HUD_BOX } from "./shared";
 
 const BTN = "btn-press px-3 py-2 text-[10px] transition-colors sm:px-4";
+const ICON = "font-sans text-base leading-none";
 
 export default function ActionBar({
   slug,
@@ -76,7 +77,7 @@ export default function ActionBar({
             title={editLabel}
             onClick={() => setEditHint((v) => !v)}
             onBlur={() => setEditHint(false)}
-            className={`${BTN} cursor-not-allowed text-dim`}
+            className={`${BTN} ${ICON} cursor-not-allowed text-dim`}
           >
             ✎
           </button>
@@ -88,7 +89,7 @@ export default function ActionBar({
         </span>
       )}
       {isAdmin && (
-        <Link href={`/league/${slug}/settings`} aria-label="League settings" title="Settings" className={`${BTN} text-cream hover:text-lime`}>
+        <Link href={`/league/${slug}/settings`} aria-label="League settings" title="Settings" className={`${BTN} ${ICON} text-cream hover:text-lime`}>
           ⚙
         </Link>
       )}
