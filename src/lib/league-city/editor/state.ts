@@ -9,7 +9,7 @@
 // on grass, on a road's sidewalk.
 
 import { lotKey } from "../placement";
-import { MAX_SIZE, inBounds } from "../grid";
+import { MAX_SIZE, START_SIZE, inBounds, maxLot, minLot } from "../grid";
 import { PROP_PROBLEM_TEXT, lotOf, propAt, propProblem, snap } from "../props";
 import { isSurface, type CityObject, type CityOp, type ItemType, type PropType } from "../types";
 
@@ -94,6 +94,7 @@ export type EditorAction =
   | ({ type: "removeAt" } & Spot)
   | { type: "dismissNew"; id: string }
   | { type: "expand" }
+  | { type: "shrink" }
   | { type: "undo" }
   | { type: "redo" }
   | { type: "send"; maxOps?: number }
@@ -230,6 +231,43 @@ function propsOnLot(objects: ReadonlyMap<string, CityObject>, x: number, z: numb
 
 // ─── Reducer helpers ────────────────────────────────────────
 
+/** What stands on the outer ring: buildings block a shrink, the rest goes with it. */
+export function ringContents(s: Pick<EditorState, "objects" | "size">): { blocked: boolean; removes: CityOp[]; restores: CityOp[] } {
+  const lo = minLot(s.size);
+  const hi = maxLot(s.size);
+  const smaller = s.size - 2;
+  const removes: CityOp[] = [];
+  const restores: CityOp[] = [];
+  let blocked = false;
+  for (const o of s.objects.values()) {
+    const onRing =
+      o.px === null
+        ? o.x === lo || o.x === hi || o.z === lo || o.z === hi
+        : o.item_type !== null && propProblem([], smaller, { item_type: o.item_type, px: o.px, pz: o.pz ?? 0 }) === "out_of_bounds";
+    if (!onRing) continue;
+    if (o.kind === "building") blocked = true;
+    else {
+      removes.push({ op: "remove", id: o.id });
+      restores.push(placeOp(o));
+    }
+  }
+  return { blocked, removes, restores };
+}
+
+/** How much a list of ops changes the city's size (expand +2, shrink −2). */
+export function sizeDelta(ops: readonly CityOp[]): number {
+  let d = 0;
+  for (const op of ops) {
+    if (op.op === "expand") d += 2;
+    else if (op.op === "shrink") d -= 2;
+  }
+  return d;
+}
+
+function resized(size: number, ops: readonly CityOp[]): number {
+  return Math.min(MAX_SIZE, Math.max(START_SIZE, size + sizeDelta(ops)));
+}
+
 function normalize(o: CityObject): CityObject {
   return { ...o, px: o.px ?? null, pz: o.pz ?? null };
 }
@@ -267,6 +305,7 @@ function commit(s: EditorState, ops: CityOp[], inverse: CityOp[], undoable = tru
     ...s,
     seq: s.seq + 1,
     objects: applyLocal(s.objects, ops),
+    size: resized(s.size, ops),
     pending: [...s.pending, edit],
     undo: undoable ? [...s.undo, edit] : s.undo,
     redo: undoable ? [] : s.redo,
@@ -291,6 +330,7 @@ function replay(s: EditorState, from: "undo" | "redo"): EditorState {
     ...s,
     seq: s.seq + 1,
     objects: applyLocal(s.objects, ops),
+    size: resized(s.size, ops),
     pending: [...s.pending, edit],
     [from]: rest,
   };
@@ -300,17 +340,18 @@ function replay(s: EditorState, from: "undo" | "redo"): EditorState {
 /** True when lot objects don't collide and the props an op touches still stand. */
 function fits(s: EditorState, ops: readonly CityOp[]): boolean {
   const after = applyLocal(s.objects, ops);
+  const size = resized(s.size, ops);
   const seen = new Set<string>();
   for (const o of after.values()) {
     if (o.px !== null) continue;
     const k = lotKey(o.x, o.z);
-    if (seen.has(k) || !inBounds(s.size, o.x, o.z)) return false;
+    if (seen.has(k) || !inBounds(size, o.x, o.z)) return false;
     seen.add(k);
   }
   const touched = new Set(ops.flatMap((op) => ("id" in op && op.id ? [op.id] : [])));
   for (const o of after.values()) {
     if (o.px === null || o.pz === null || !o.item_type || !touched.has(o.id)) continue;
-    if (propProblem(after.values(), s.size, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id })) return false;
+    if (propProblem(after.values(), size, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id })) return false;
   }
   return true;
 }
@@ -484,11 +525,27 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       return commit(s, [{ op: "dismiss_new", id: o.id }], [], false);
     }
 
-    case "expand": {
+    case "expand":
       // One more ring of lots. Not undoable: lots may be used right away.
       if (s.size >= MAX_SIZE) return notify(s, "hint", "The city is at its biggest size.");
-      const next = commit(s, [{ op: "expand" }], [], false);
-      return { ...next, size: Math.min(MAX_SIZE, s.size + 2) };
+      return commit(s, [{ op: "expand" }], [], false);
+
+    case "shrink": {
+      // Drop the outer ring. Buildings there block it; everything else on the
+      // ring goes in the same edit, and undo brings the ring and them back.
+      if (s.size <= START_SIZE) return notify(s, "hint", "The city is at its smallest size.");
+      const { blocked, removes, restores } = ringContents(s);
+      if (blocked) return notify(s, "hint", "Move the buildings off the edge first.");
+      const smaller = s.size - 2;
+      const lots = [...s.objects.values()].filter((o) => o.px === null).length - removes.filter((r) => {
+        const o = "id" in r ? s.objects.get(r.id) : undefined;
+        return o?.px === null;
+      }).length;
+      if (lots > 0.7 * smaller * smaller) return notify(s, "hint", "The city is too full to shrink.");
+      const next = commit(s, [...removes, { op: "shrink" }], [{ op: "expand" }, ...restores]);
+      return removes.length > 0
+        ? notify(next, "info", `Removed ${removes.length} item${removes.length === 1 ? "" : "s"} from the edge. ⌘Z brings them back.`)
+        : next;
     }
 
     case "undo":
@@ -518,11 +575,16 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       // it), newest first, and forget their undo/redo entries.
       const rolled = [...(s.inflight ?? []), ...s.pending];
       let objects: Map<string, CityObject> = s.objects;
-      for (let i = rolled.length - 1; i >= 0; i--) objects = applyLocal(objects, rolled[i].inverse);
+      let size = s.size;
+      for (let i = rolled.length - 1; i >= 0; i--) {
+        objects = applyLocal(objects, rolled[i].inverse);
+        size -= sizeDelta(rolled[i].ops);
+      }
       const ids = new Set(rolled.map((e) => e.id));
       const next: EditorState = {
         ...s,
         objects,
+        size: Math.min(MAX_SIZE, Math.max(START_SIZE, size)),
         inflight: null,
         pending: [],
         undo: dropEntries(s.undo, ids),
@@ -536,10 +598,12 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
     case "resync": {
       // Server truth, with our unsent edits replayed on top where they still apply.
       let objects = new Map(a.city.objects.map((o) => [o.id, normalize(o)]));
+      let size = a.city.size;
       const pending: Edit[] = [];
       for (const e of s.pending) {
         if (!canApply(objects, e.ops)) continue;
         objects = applyLocal(objects, e.ops);
+        size = resized(size, e.ops);
         pending.push(e);
       }
       const undo = s.undo.filter((e) => canApply(objects, e.inverse));
@@ -547,7 +611,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       return {
         ...s,
         objects,
-        size: a.city.size,
+        size,
         version: a.city.version,
         pending,
         undo,

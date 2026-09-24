@@ -154,6 +154,42 @@ describe("expand", () => {
   });
 });
 
+describe("shrink", () => {
+  it("drops the outer ring with what's on it, and undo brings both back", () => {
+    // Size 14: a lamp and a road on the outer ring (6), a tree inside.
+    let s = initEditor({
+      size: 14,
+      version: 1,
+      objects: [bld("a", 1, 1, 0), surface("edge", "road", 6, 0), prop("e", "lamp", -7 * LOT, 0), prop("t", "tree_oak", 0, 3 * LOT)],
+    });
+    s = run(s, { type: "shrink" });
+    expect(s.size).toBe(12);
+    expect(at(s, "edge")).toBeUndefined();
+    expect(at(s, "e")).toBeUndefined();
+    expect(at(s, "t")).toBeDefined();
+    expect(s.pending.at(-1)?.ops.at(-1)).toEqual({ op: "shrink" });
+    expect(s.notice?.message).toMatch(/Removed 2 items/);
+    s = run(s, { type: "undo" });
+    expect(s.size).toBe(14);
+    expect(at(s, "edge")).toBeDefined();
+    expect(at(s, "e")).toBeDefined();
+  });
+
+  it("is blocked by a building on the edge and stops at 12", () => {
+    let s = initEditor({ size: 14, version: 1, objects: [bld("a", 1, 6, 0)] });
+    s = run(s, { type: "shrink" });
+    expect(s.size).toBe(14);
+    expect(s.notice?.message).toMatch(/buildings off the edge/);
+    expect(run(start(), { type: "shrink" }).notice?.message).toMatch(/smallest/);
+  });
+
+  it("restores the size when the server rejects it", () => {
+    let s = initEditor({ size: 14, version: 1, objects: [] });
+    s = run(s, { type: "shrink" }, { type: "send" }, { type: "reject", message: "no" });
+    expect(s.size).toBe(14);
+  });
+});
+
 describe("server sync", () => {
   it("skips an undo whose object the server removed", () => {
     let s = run(start(), { type: "pickUp", id: "t" }, { type: "drop", ...spot(-4 * LOT, -4 * LOT) });

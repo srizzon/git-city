@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CloudOff, Expand, Eye, EyeOff, Pencil, Redo2, TriangleAlert, Undo2 } from "lucide-react";
+import { Check, CloudOff, Expand, Eye, EyeOff, Pencil, Redo2, Shrink, TriangleAlert, Undo2 } from "lucide-react";
 import PixelSpinner from "@/components/leagues/PixelSpinner";
 import type { SaveStatus } from "@/lib/league-city/editor/queue";
 import { HUD_BOX } from "../shared";
@@ -49,7 +49,10 @@ export default function EditorTopBar({
   onDone,
   size,
   maxSize,
+  minSize,
+  shrinkNote,
   onExpand,
+  onShrink,
 }: {
   name: string;
   status: SaveStatus;
@@ -63,7 +66,11 @@ export default function EditorTopBar({
   onDone: () => void;
   size: number;
   maxSize: number;
+  minSize: number;
+  /** What shrinking would do right now (tooltip). */
+  shrinkNote: string;
   onExpand: () => void;
+  onShrink: () => void;
 }) {
   return (
     <div className="pointer-events-none fixed inset-x-4 top-4 z-40 flex items-start justify-between gap-3 font-pixel uppercase">
@@ -85,6 +92,16 @@ export default function EditorTopBar({
           <span>
             Expand <span className="text-dim">{size}×{size}</span>
           </span>
+        </button>
+        <button
+          type="button"
+          onClick={onShrink}
+          disabled={size <= minSize}
+          aria-label="Shrink the city"
+          title={size <= minSize ? "The city is at its smallest size" : shrinkNote}
+          className={`${SEG} text-cream`}
+        >
+          <Shrink {...ICON} aria-hidden />
         </button>
       </div>
 

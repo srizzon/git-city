@@ -33,8 +33,14 @@ import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { SceneMode } from "@/components/league/LeagueScene";
 import { createEditorStore } from "@/lib/league-city/editor/store";
 import { keyToAction } from "@/lib/league-city/editor/shortcuts";
-import { MAX_SIZE } from "@/lib/league-city/grid";
-import { HOTBAR, initEditor, objectAtSpot, type Notice } from "@/lib/league-city/editor/state";
+import { MAX_SIZE, START_SIZE } from "@/lib/league-city/grid";
+import {
+  HOTBAR,
+  initEditor,
+  objectAtSpot,
+  ringContents,
+  type Notice,
+} from "@/lib/league-city/editor/state";
 
 const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
   ssr: false,
@@ -185,6 +191,14 @@ export default function LeagueClient({
   );
 
   const sceneSize = es.size;
+  const shrinkNote = useMemo(() => {
+    if (!editing) return "";
+    const ring = ringContents(es);
+    if (ring.blocked) return "Move the buildings off the edge first";
+    return ring.removes.length > 0
+      ? `Remove the outer ring and the ${ring.removes.length} item${ring.removes.length === 1 ? "" : "s"} on it`
+      : "Remove the outer ring of lots";
+  }, [editing, es]);
 
   // Server data changed (refresh after Done, an invite): take it if it's not older.
   const lastCity = useRef(city);
@@ -264,6 +278,9 @@ export default function LeagueClient({
             size={es.size}
             maxSize={MAX_SIZE}
             onExpand={() => store.dispatch({ type: "expand" })}
+            minSize={START_SIZE}
+            shrinkNote={shrinkNote}
+            onShrink={() => store.dispatch({ type: "shrink" })}
           />
           {mode === "edit" && (
             <>
