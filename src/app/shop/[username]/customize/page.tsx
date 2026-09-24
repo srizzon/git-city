@@ -24,13 +24,12 @@ export default async function CustomizePage({ params }: Props) {
   const { username } = await params;
 
   const sb = getSupabaseAdmin();
-  const { data: dev } = await sb.from("developers").select("github_login, claimed").eq("github_login", username.toLowerCase()).single();
+  const { data: dev } = await sb.from("developers").select("github_login, claimed, claimed_by").eq("github_login", username.toLowerCase()).single();
   if (!dev) notFound();
 
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
-  const authLogin = (user?.user_metadata?.user_name ?? user?.user_metadata?.preferred_username ?? "").toLowerCase();
-  const isOwner = !!user && authLogin === dev.github_login.toLowerCase();
+  const isOwner = !!user && dev.claimed_by === user.id;
 
   if (!dev.claimed || !isOwner) {
     return (

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { githubLoginFromIdentity } from "@/lib/auth-identity";
 import JobBoardClient from "../../JobBoardClient";
 import {
   ROLE_TYPE_LABELS,
@@ -103,7 +104,7 @@ export default async function TagJobsPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser();
 
   const username = user
-    ? (user.user_metadata?.user_name ?? user.user_metadata?.preferred_username ?? "") as string
+    ? githubLoginFromIdentity(user)
     : null;
 
   // Build initial filter params from the tag definition

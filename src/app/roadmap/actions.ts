@@ -21,23 +21,13 @@ export async function toggleVote(itemId: string) {
     throw new Error("Not authenticated");
   }
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
-
-  if (!githubLogin) {
-    throw new Error("No GitHub login found");
-  }
-
   const admin = getSupabaseAdmin();
 
   // Get developer ID
   const { data: dev } = await admin
     .from("developers")
     .select("id")
-    .eq("github_login", githubLogin)
+    .eq("claimed_by", user.id)
     .single();
 
   if (!dev) {

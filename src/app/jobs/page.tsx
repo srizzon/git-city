@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { githubLoginFromIdentity } from "@/lib/auth-identity";
 import JobBoardClient from "./JobBoardClient";
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export default async function JobsPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const username = user
-    ? (user.user_metadata?.user_name ?? user.user_metadata?.preferred_username ?? "") as string
+    ? githubLoginFromIdentity(user)
     : null;
 
   let hasProfile = false;

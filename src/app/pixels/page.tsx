@@ -21,12 +21,6 @@ export default async function PixelsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const authLogin = (
-    user?.user_metadata?.user_name ??
-    user?.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
-
   const sb = getSupabaseAdmin();
 
   // Get developer + wallet
@@ -34,11 +28,11 @@ export default async function PixelsPage() {
   let balance = 0;
   let githubLogin = "";
 
-  if (user && authLogin) {
+  if (user) {
     const { data: dev } = await sb
       .from("developers")
       .select("id, github_login")
-      .eq("github_login", authLogin)
+      .eq("claimed_by", user.id)
       .single();
 
     if (dev) {
