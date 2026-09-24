@@ -25,6 +25,7 @@ const DAY_MS = 86_400_000;
 
 type Loadout = { crown: string | null; roof: string | null; aura: string | null };
 type RaidTag = { attacker_login: string; tag_style: string; expires_at: string };
+type LeagueCrown = { league_slug: string; league_name: string; week_start: string; expires_at: string };
 
 export interface SnapshotV2 {
   v: 2;
@@ -74,6 +75,8 @@ export interface SnapshotV2 {
     loadout: (Loadout | null)[];
     active_raid_tag: (RaidTag | null)[];
     pixels_spent: number[];
+    /** Optional: snapshots written before leagues don't have it. */
+    active_league_crown?: (LeagueCrown | null)[];
   };
 }
 
@@ -101,7 +104,7 @@ export function encodeSnapshotV2(
     "followers", "following", "organizations_count", "account_created_at", "current_streak",
     "active_days_last_year", "language_diversity", "app_streak", "rabbit_completed", "district",
     "district_chosen", "xp_total", "xp_level", "owned_items", "custom_color", "billboard_images",
-    "achievements", "loadout", "active_raid_tag", "pixels_spent",
+    "achievements", "loadout", "active_raid_tag", "pixels_spent", "active_league_crown",
   ] as const) {
     (c as Record<string, unknown[]>)[k] = [];
   }
@@ -148,6 +151,7 @@ export function encodeSnapshotV2(
     c.loadout.push(d.loadout ?? null);
     c.active_raid_tag.push(d.active_raid_tag ?? null);
     c.pixels_spent.push(num(d.pixels_spent));
+    c.active_league_crown!.push((d.active_league_crown as LeagueCrown | null | undefined) ?? null);
   }
 
   return { v: 2, n: devs.length, c, ...meta } as SnapshotV2;
@@ -207,6 +211,7 @@ export function decodeSnapshotV2(s: SnapshotV2) {
       current_week_kudos_received: 0,
       active_raid_tag: c.active_raid_tag[i],
       pixels_spent: c.pixels_spent[i],
+      active_league_crown: c.active_league_crown?.[i] ?? null,
     };
   }
   return { developers, stats: s.stats, _d: s._d, norms: s.norms, generated_at: s.generated_at };

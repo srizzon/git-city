@@ -21,6 +21,7 @@ const vertexShader = /* glsl */ `
   attribute float aRise;
   attribute vec4 aTint;
   attribute float aLive;
+  attribute float aDark;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -30,6 +31,7 @@ const vertexShader = /* glsl */ `
   varying float vInstanceId;
   varying vec4 vTint;
   varying float vLive;
+  varying float vDark;
   #include <common>
   #include <logdepthbuf_pars_vertex>
 
@@ -40,6 +42,7 @@ const vertexShader = /* glsl */ `
     vUvSide = aUvSide;
     vTint = aTint;
     vLive = aLive;
+    vDark = aDark;
 
     // Rise animation: modulate Y position by aRise (0 = underground, 1 = full height)
     vec3 localPos = position;
@@ -66,6 +69,7 @@ const fragmentShader = /* glsl */ `
   uniform float uDimOpacity;
   uniform float uDimEmissive;
   uniform float uCityEnergy;
+  uniform vec3 uWindowOff;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -75,6 +79,7 @@ const fragmentShader = /* glsl */ `
   varying float vInstanceId;
   varying vec4 vTint;
   varying float vLive;
+  varying float vDark;
   #include <logdepthbuf_pars_fragment>
 
   void main() {
@@ -106,18 +111,26 @@ const fragmentShader = /* glsl */ `
       wallColor = mix(wallColor, blendedTint, isFacePixel);
     }
 
+    // Dark building (invited league member who hasn't joined): every window
+    // pixel becomes the "off" colour. The atlas has no 0% lit band.
+    if (vDark > 0.5) {
+      float isFace = step(length(wallColor - uFaceColor), 0.08);
+      wallColor = mix(uWindowOff, wallColor, isFace);
+    }
+
     // Emissive glow for lit windows, scaled by city energy
-    // Both ambient and emissive dim when city sleeps
-    float ambientBase = 0.08 + 0.22 * uCityEnergy;
-    vec3 emissive = wallColor * 1.8 * uCityEnergy;
+    // Both ambient and emissive dim when city sleeps. Dark buildings get no
+    // emission, just enough ambient to read as a silhouette.
+    float ambientBase = mix(0.08 + 0.22 * uCityEnergy, 0.55, vDark);
+    vec3 emissive = wallColor * 1.8 * uCityEnergy * (1.0 - vDark);
     vec3 wallFinal = wallColor * ambientBase + emissive;
 
     // Live building boost: pushes windows past bloom threshold
     vec3 liveBoost = vec3(1.4, 1.35, 1.2);
-    wallFinal = mix(wallFinal, wallFinal * liveBoost, vLive);
+    wallFinal = mix(wallFinal, wallFinal * liveBoost, vLive * (1.0 - vDark));
 
     // Roof: solid color with emissive, also scaled by city energy
-    vec3 roofFinal = uRoofColor * (0.4 + 1.4 * uCityEnergy);
+    vec3 roofFinal = mix(uRoofColor * (0.4 + 1.4 * uCityEnergy), uRoofColor * 0.35, vDark);
 
     vec3 color = mix(wallFinal, roofFinal, isRoof);
 
@@ -242,6 +255,7 @@ export default memo(function InstancedBuildings({
         uDimOpacity: { value: 0.6 },
         uDimEmissive: { value: 0.5 },
         uCityEnergy: { value: 1.0 },
+        uWindowOff: { value: new THREE.Color(colors.windowOff) },
       },
       vertexShader,
       fragmentShader,
@@ -254,11 +268,13 @@ export default memo(function InstancedBuildings({
     material.uniforms.uAtlas.value = atlasTexture;
     material.uniforms.uRoofColor.value.set(colors.roof);
     material.uniforms.uFaceColor.value.set(colors.face);
+    material.uniforms.uWindowOff.value.set(colors.windowOff);
     material.needsUpdate = true;
-  }, [material, atlasTexture, colors.roof, colors.face]);
+  }, [material, atlasTexture, colors.roof, colors.face, colors.windowOff]);
 
   // Per-instance attribute buffers
-  const { uvFrontData, uvSideData, riseData, tintData } = useMemo(() => {
+  const { uvFrontData, uvSideData, riseData, tintData, darkData } = useMemo(() => {
+    const dark = new Float32Array(count);
     const uvF = new Float32Array(count * 4);
     const uvS = new Float32Array(count * 4);
     const rise = new Float32Array(count);
@@ -289,6 +305,8 @@ export default memo(function InstancedBuildings({
       // Rise starts at 0 (will animate to 1)
       rise[i] = 0;
 
+      dark[i] = b.dark ? 1 : 0;
+
       // Custom color tint (rgb = color, a = flag)
       if (b.custom_color) {
         _c.set(b.custom_color);
@@ -304,7 +322,7 @@ export default memo(function InstancedBuildings({
       }
     }
 
-    return { uvFrontData: uvF, uvSideData: uvS, riseData: rise, tintData: tint };
+    return { uvFrontData: uvF, uvSideData: uvS, riseData: rise, tintData: tint, darkData: dark };
   }, [buildings, count]);
 
   // Live presence attribute (updated dynamically)
@@ -362,6 +380,7 @@ export default memo(function InstancedBuildings({
     const riseAttr = new THREE.InstancedBufferAttribute(riseData, 1);
     riseAttr.setUsage(THREE.DynamicDrawUsage);
     const tintAttr = new THREE.InstancedBufferAttribute(tintData, 4);
+    const darkAttr = new THREE.InstancedBufferAttribute(darkData, 1);
 
     const liveAttr = new THREE.InstancedBufferAttribute(liveData, 1);
     liveAttr.setUsage(THREE.DynamicDrawUsage);
@@ -371,6 +390,7 @@ export default memo(function InstancedBuildings({
     mesh.geometry.setAttribute("aRise", riseAttr);
     mesh.geometry.setAttribute("aTint", tintAttr);
     mesh.geometry.setAttribute("aLive", liveAttr);
+    mesh.geometry.setAttribute("aDark", darkAttr);
 
     if (hasPlayedRiseGlobal) {
       // Skip rise animation on return visits / subsequent updates
@@ -390,7 +410,7 @@ export default memo(function InstancedBuildings({
     }
 
     mesh.count = count;
-  }, [buildings, count, uvFrontData, uvSideData, riseData, tintData, liveData]);
+  }, [buildings, count, uvFrontData, uvSideData, riseData, tintData, darkData, liveData]);
 
   // Sync fog uniforms (only when values actually change, e.g. theme switch)
   // Also smoothly lerp cityEnergy uniform toward target value
