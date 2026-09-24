@@ -20,6 +20,13 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains; preload",
   },
+  // CSP, the directives that can't break the app: no framing, no plugins, no
+  // <base> hijack (HSTS already forces HTTPS). Script/connect sources come later, once a
+  // report-only run lists every third party the pages load.
+  {
+    key: "Content-Security-Policy",
+    value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+  },
 ];
 
 const nextConfig: NextConfig = {
