@@ -458,6 +458,8 @@ function sampleTrees(sfMap: SFRenderMap): Float32Array {
   return new Float32Array(out);
 }
 
+const _treeFwd = new THREE.Vector3();
+
 // Real low-poly tree models (Kenney Nature Kit, CC0), instanced for variety.
 const TREE_URLS = [
   "/models/trees/tree_default.glb",
@@ -507,11 +509,13 @@ function Trees({ sfMap }: { sfMap: SFRenderMap }) {
     return c;
   }, [count, variants, V]);
 
-  const refs = useRef<Record<string, THREE.InstancedMesh | null>>({});
-  useEffect(() => {
-    if (count === 0 || V === 0) return;
+  // Every tree's matrix, grouped by variant. The instanced meshes only hold the
+  // trees currently worth drawing (see the cull below), packed at the front.
+  const all = useMemo(() => {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3();
     const up = new THREE.Vector3(0, 1, 0);
+    const mats = counts.map((n) => new Float32Array(n * 16));
+    const pos = counts.map((n) => new Float32Array(n * 2));
     const cursor = variants.map(() => 0);
     for (let i = 0; i < count; i++) {
       const v = i % V;
@@ -520,13 +524,65 @@ function Trees({ sfMap }: { sfMap: SFRenderMap }) {
       q.setFromAxisAngle(up, (x * 13.7 + z * 7.1) % 6.283);
       p.set(x, 0, z); s.set(sc, sc, sc); m.compose(p, q, s);
       const ci = cursor[v]++;
+      m.toArray(mats[v], ci * 16);
+      pos[v][ci * 2] = x; pos[v][ci * 2 + 1] = z;
+    }
+    return { mats, pos };
+  }, [data, count, variants, V, counts]);
+
+  const refs = useRef<Record<string, THREE.InstancedMesh | null>>({});
+  const cull = useRef({ t: -1, x: NaN, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, dirty: true });
+  useEffect(() => { cull.current.dirty = true; }, [all]);
+
+  // Only ~5-10% of the ~7k trees are on screen and inside the fog at a time;
+  // drawing all of them was ~1M triangles a frame. Re-pack the visible ones
+  // when the camera actually moves or turns (≤10 Hz). Generous margins — a
+  // wider cone, fog + 400 m, and everything within 400 m — keep trees from
+  // popping in between refreshes.
+  useFrame(({ camera, scene, clock }) => {
+    const c = cull.current, cp = camera.position, cq = camera.quaternion;
+    const t = clock.elapsedTime;
+    if (!c.dirty && t - c.t < 0.1) return;
+    const moved = Math.hypot(cp.x - c.x, cp.y - c.y, cp.z - c.z);
+    const turned = 1 - Math.abs(cq.x * c.qx + cq.y * c.qy + cq.z * c.qz + cq.w * c.qw);
+    if (!c.dirty && moved < 60 && turned < 0.0015) return;
+    c.t = t; c.x = cp.x; c.y = cp.y; c.z = cp.z; c.qx = cq.x; c.qy = cq.y; c.qz = cq.z; c.qw = cq.w; c.dirty = false;
+
+    const fog = scene.fog as THREE.Fog | null;
+    const far = (fog && "far" in fog ? fog.far : 16000) + 400;
+    const far2 = far * far, near2 = 400 * 400;
+    camera.getWorldDirection(_treeFwd);
+    const cam = camera as THREE.PerspectiveCamera;
+    // Half-angle of the view's diagonal, widened so turns don't reveal gaps.
+    const halfV = ((cam.fov ?? 55) * Math.PI) / 360;
+    const halfDiag = Math.atan(Math.tan(halfV) * Math.hypot(1, cam.aspect ?? 1.8)) + 0.35;
+    const minCos = Math.cos(Math.min(Math.PI, halfDiag));
+
+    for (let v = 0; v < V; v++) {
+      const src = all.mats[v], pos = all.pos[v], n = pos.length / 2;
+      const meshes: THREE.InstancedMesh[] = [];
       for (let si = 0; si < variants[v].subs.length; si++) {
         const mesh = refs.current[`${v}_${si}`];
-        if (mesh) mesh.setMatrixAt(ci, m);
+        if (mesh) meshes.push(mesh);
+      }
+      if (meshes.length === 0) continue;
+      let k = 0;
+      for (let i = 0; i < n; i++) {
+        const dx = pos[i * 2] - cp.x, dy = 5 - cp.y, dz = pos[i * 2 + 1] - cp.z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 > far2) continue;
+        if (d2 > near2 && (dx * _treeFwd.x + dy * _treeFwd.y + dz * _treeFwd.z) < minCos * Math.sqrt(d2)) continue;
+        for (const mesh of meshes) (mesh.instanceMatrix.array as Float32Array).set(src.subarray(i * 16, i * 16 + 16), k * 16);
+        k++;
+      }
+      for (const mesh of meshes) {
+        mesh.count = k;
+        mesh.instanceMatrix.clearUpdateRanges();
+        mesh.instanceMatrix.addUpdateRange(0, k * 16);
+        mesh.instanceMatrix.needsUpdate = true;
       }
     }
-    for (const k in refs.current) { const mesh = refs.current[k]; if (mesh) mesh.instanceMatrix.needsUpdate = true; }
-  }, [data, count, variants, V]);
+  });
 
   if (count === 0 || V === 0) return null;
   return (
@@ -536,6 +592,7 @@ function Trees({ sfMap }: { sfMap: SFRenderMap }) {
           key={`${v}_${si}`}
           ref={(el) => { refs.current[`${v}_${si}`] = el; }}
           args={[sub.geo, sub.mat, Math.max(1, counts[v])]}
+          count={0}
           frustumCulled={false}
           castShadow
           receiveShadow

@@ -15,7 +15,7 @@ interface Props {
 
 // ─── Style Definitions ───────────────────────────────────────
 
-interface TagTheme {
+export interface TagTheme {
   color: string;
   bg: string;
   frameColor: string;
@@ -23,7 +23,7 @@ interface TagTheme {
   intensity: number;
 }
 
-const TAG_THEMES: Record<string, TagTheme> = {
+export const TAG_THEMES: Record<string, TagTheme> = {
   default: {
     color: "#ff30d0",
     bg: "#120818",
@@ -53,6 +53,19 @@ const TAG_THEMES: Record<string, TagTheme> = {
     intensity: 1.8,
   },
 };
+
+/** Panel sizing on the building face (shared with the instanced far LOD). */
+export function raidTagLayout(width: number, height: number, depth: number) {
+  const panelW = Math.max(10, width * 0.9);
+  return {
+    panelW,
+    panelH: Math.max(3, panelW * 0.2),
+    frameT: 0.35,
+    yPos: height * 0.82,
+    zFront: depth / 2 + 0.2,
+    zBack: -(depth / 2 + 0.2),
+  };
+}
 
 // ─── Component ───────────────────────────────────────────────
 
@@ -89,13 +102,7 @@ export default function RaidTag3D({ width, height, depth, attackerLogin, tagStyl
     }
   });
 
-  // Sizing: wide panel on the building face
-  const panelW = Math.max(10, width * 0.9);
-  const panelH = Math.max(3, panelW * 0.2);
-  const frameT = 0.35;
-  const yPos = height * 0.82;
-  const zFront = depth / 2 + 0.2;
-  const zBack = -(depth / 2 + 0.2);
+  const { panelW, panelH, frameT, yPos, zFront, zBack } = raidTagLayout(width, height, depth);
 
   return (
     <group>

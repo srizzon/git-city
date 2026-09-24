@@ -5,9 +5,9 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
-import { ClaimedGlow, BuildingItemEffects } from "./Building3D";
-import { StreakFlame, NeonOutline, ParticleAura, SpotlightEffect } from "./BuildingEffects";
-import { tierFromLevel } from "@/lib/xp";
+import { BuildingItemEffects, showsFlag } from "./Building3D";
+import { NeonOutline, ParticleAura, SpotlightEffect } from "./BuildingEffects";
+import InstancedEffects from "./InstancedEffects";
 import RaidTag3D from "./RaidTag3D";
 
 // ─── Memoized per-building effects ────────────────────────────
@@ -19,6 +19,7 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
   isDimmed,
   isGhostTarget,
   ghostEffectId,
+  tagAsPanel,
 }: {
   building: CityBuilding;
   accentColor: string;
@@ -26,21 +27,17 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
   isDimmed: boolean;
   isGhostTarget: boolean;
   ghostEffectId: number;
+  /** Raid tag drawn as an instanced far panel instead of the LED text. */
+  tagAsPanel: boolean;
 }) {
   return (
     <group position={[building.position[0], 0, building.position[2]]} visible={!isDimmed}>
-      {building.claimed && (
-        <ClaimedGlow
-          height={building.height}
-          width={building.width}
-          depth={building.depth}
-          color={tierFromLevel(building.xp_level ?? 1).color}
-        />
-      )}
+      {/* Claimed trim, streak strips and the flag are drawn by InstancedEffects. */}
       <BuildingItemEffects
         building={building}
         accentColor={accentColor}
         focused={isFocused}
+        skipFlag
       />
       {isGhostTarget && (
         ghostEffectId === 0
@@ -49,10 +46,7 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
           ? <ParticleAura width={building.width} height={building.height} depth={building.depth} color={accentColor} />
           : <SpotlightEffect height={building.height} width={building.width} depth={building.depth} color={accentColor} />
       )}
-      {building.app_streak > 0 && (
-        <StreakFlame height={building.height} width={building.width} depth={building.depth} streakDays={building.app_streak} color={accentColor} />
-      )}
-      {building.active_raid_tag && (
+      {building.active_raid_tag && !tagAsPanel && (
         <RaidTag3D
           width={building.width}
           height={building.height}
@@ -85,6 +79,7 @@ const _sphere = new THREE.Sphere();
 // Per-frame distance² from the look target per candidate, used to rank the
 // budget (nearest to where you're looking wins). Reused to avoid allocation.
 const _scoreByIdx = new Map<number, number>();
+const _pxByIdx = new Map<number, number>();
 
 function querySpatialGrid(grid: GridIndex, x: number, z: number, radius: number): number[] {
   const result = _gridResultPool;
@@ -125,6 +120,15 @@ const EFFECTS_MAX_RADIUS = 9000;
 // (MAX_ACTIVE_EFFECTS), which keeps the buildings NEAREST the camera when more
 // than the cap are on screen at once.
 
+// Screen-size LOD: a building whose footprint spans fewer CSS pixels than this
+// renders its cosmetics as a speck (1-3 px) while costing the same ~10 draw
+// calls as one up close. Sized by footprint only (height just locates the
+// roof), so a short building's crown shows exactly like a tower's up close.
+const MIN_EFFECT_FOOTPRINT_PX = 6;
+// Raid tag text is legible only up close; below this footprint the LED panel
+// draws as a solid glow of its average color (instanced, InstancedEffects).
+const RAID_TEXT_MIN_PX = 60;
+
 // Low-perf preset: smaller bubble, fewer active components per frame.
 const LOW_PERF_RADIUS = 120;
 const LOW_PERF_MAX_ACTIVE = 40;
@@ -163,6 +167,8 @@ export default function EffectsLayer({
   const lastUpdate = useRef(-1);
   const activeSetRef = useRef(new Set<number>());
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
+  const farTagsRef = useRef(new Set<number>());
+  const [farTags, setFarTags] = useState<Set<number>>(() => new Set());
   // Camera velocity tracking (fly mode look-ahead, so effects preload ahead).
   const prevCamPos = useRef<[number, number]>([0, 0]);
   const prevCamTime = useRef(0);
@@ -179,7 +185,7 @@ export default function EffectsLayer({
     return map;
   }, [buildings]);
 
-  useFrame(({ camera, clock }) => {
+  useFrame(({ camera, clock, size }) => {
     if (introMode) return; // Skip effects during intro
 
     const elapsed = clock.elapsedTime;
@@ -240,10 +246,16 @@ export default function EffectsLayer({
       _frustum.setFromProjectionMatrix(_projScreen);
     }
 
+    // px per world unit at distance 1 — footprint px = width * pxPerUnit / dist.
+    const fov = (camera as THREE.PerspectiveCamera).fov ?? 55;
+    const pxPerUnit = size.height / (2 * Math.tan((fov * Math.PI) / 360));
+    const minPxSq = MIN_EFFECT_FOOTPRINT_PX * MIN_EFFECT_FOOTPRINT_PX;
+
     const candidates = querySpatialGrid(grid, cx, cz, keepRadius);
     const farSq = keepRadius * keepRadius;
     const newSet = new Set<number>();
     _scoreByIdx.clear();
+    _pxByIdx.clear();
 
     for (let c = 0; c < candidates.length; c++) {
       const idx = candidates[c];
@@ -275,6 +287,11 @@ export default function EffectsLayer({
         qualifies = _frustum.intersectsSphere(_sphere);
       }
       if (qualifies) {
+        const ex = b.position[0] - camX, ey = b.height - camY, ez = b.position[2] - camZ;
+        const foot = Math.max(b.width, b.depth) * pxPerUnit;
+        const d2 = ex * ex + ey * ey + ez * ez;
+        if (foot * foot < minPxSq * d2) continue;
+        _pxByIdx.set(idx, foot / Math.sqrt(d2));
         newSet.add(idx);
         _scoreByIdx.set(idx, distSq);
       }
@@ -328,6 +345,19 @@ export default function EffectsLayer({
       activeSetRef.current = newSet;
       setActiveIndices(Array.from(newSet));
     }
+
+    // Raid tags too small on screen to read → solid far panel.
+    const far = new Set<number>();
+    for (const idx of newSet) {
+      if (buildings[idx]?.active_raid_tag && (_pxByIdx.get(idx) ?? Infinity) < RAID_TEXT_MIN_PX) far.add(idx);
+    }
+    const prevFar = farTagsRef.current;
+    let farChanged = far.size !== prevFar.size;
+    if (!farChanged) for (const idx of far) if (!prevFar.has(idx)) { farChanged = true; break; }
+    if (farChanged) {
+      farTagsRef.current = far;
+      setFarTags(far);
+    }
   });
 
   // A8: Ghost preview — pick a random aura effect based on login hash
@@ -341,10 +371,30 @@ export default function EffectsLayer({
     return Math.abs(h) % 3; // 0=NeonOutline, 1=ParticleAura, 2=Spotlight
   }, [ghostLower]);
 
+  // Buildings whose effects are visible this frame: same filter as the
+  // per-building render below (hidden target and dimmed ones drop out).
+  const visibleActive = useMemo(() => {
+    const out: CityBuilding[] = [];
+    for (const idx of activeIndices) {
+      const b = buildings[idx];
+      if (!b || b.loginLower === hideLower) continue;
+      const isFocused = focusedLower === b.loginLower || focusedBLower === b.loginLower;
+      if (focusedLower && !isFocused) continue;
+      out.push(b);
+    }
+    return out;
+  }, [activeIndices, buildings, hideLower, focusedLower, focusedBLower]);
+  const flagBuildings = useMemo(() => visibleActive.filter(showsFlag), [visibleActive]);
+  const farTagBuildings = useMemo(
+    () => visibleActive.filter((b) => b.active_raid_tag && farTags.has(loginToIdx.get(b.loginLower) ?? -1)),
+    [visibleActive, farTags, loginToIdx],
+  );
+
   if (introMode) return null;
 
   return (
     <>
+      <InstancedEffects buildings={visibleActive} flagBuildings={flagBuildings} farTagBuildings={farTagBuildings} accentColor={accentColor} />
       {activeIndices.map((idx) => {
         const b = buildings[idx];
         if (!b) return null;
@@ -362,6 +412,7 @@ export default function EffectsLayer({
             isDimmed={isDimmed}
             isGhostTarget={isGhostTarget}
             ghostEffectId={ghostEffectId}
+            tagAsPanel={farTags.has(idx)}
           />
         );
       })}

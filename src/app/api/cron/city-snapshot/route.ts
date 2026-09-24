@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { gzipSync } from "zlib";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { selectPlacedDevelopers, type DeveloperRecord, type SFMapAsset } from "@/lib/github";
+import { encodeSnapshotV2, SNAPSHOT_V2_PATH } from "@/lib/city-snapshot-format";
+import sfMapJson from "../../../../../public/maps/sf.json";
 
 export const maxDuration = 300;
 
@@ -190,12 +193,30 @@ export async function GET(request: NextRequest) {
     pixels_spent: walletSpentMap[dev.id] ?? 0,
   }));
 
-  const snapshot = JSON.stringify({
-    developers,
-    _d,
-    stats: statsResult.data ?? { total_developers: 0, total_contributions: 0 },
-    generated_at: new Date().toISOString(),
-  });
+  const stats = statsResult.data ?? { total_developers: 0, total_contributions: 0 };
+  const generatedAt = new Date().toISOString();
+  const snapshot = JSON.stringify({ developers, _d, stats, generated_at: generatedAt });
+
+  // v2: only the developers the SF layout places, column-encoded (~1 MB gz vs
+  // ~9 MB). The home page reads this; v1 stays for the wallpaper page and for
+  // clients still running the previous bundle.
+  const placed = selectPlacedDevelopers(
+    developers as unknown as DeveloperRecord[],
+    sfMapJson as unknown as SFMapAsset,
+  );
+  const compressedV2 = gzipSync(
+    Buffer.from(
+      JSON.stringify(
+        encodeSnapshotV2(placed.devs as unknown as Record<string, unknown>[], {
+          norms: placed.norms,
+          stats,
+          _d,
+          generated_at: generatedAt,
+        }),
+      ),
+    ),
+    { level: 9 },
+  );
 
   const compressed = gzipSync(Buffer.from(snapshot));
 
@@ -213,11 +234,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
+  // Clients key the URL by 5-minute bucket, so a 5-minute browser/CDN cache is
+  // safe and lets reloads within the window skip the download entirely.
+  const { error: uploadErrorV2 } = await sb.storage
+    .from(STORAGE_BUCKET)
+    .upload(SNAPSHOT_V2_PATH, compressedV2, {
+      contentType: "application/gzip",
+      upsert: true,
+      cacheControl: "300",
+    });
+
+  if (uploadErrorV2) {
+    return NextResponse.json({ error: uploadErrorV2.message }, { status: 500 });
+  }
+
   return NextResponse.json({
     ok: true,
     developers: developers.length,
     size_kb: Math.round(compressed.length / 1024),
     uncompressed_kb: Math.round(snapshot.length / 1024),
+    v2_developers: placed.devs.length,
+    v2_size_kb: Math.round(compressedV2.length / 1024),
     duration_ms: Date.now() - started,
   });
 }

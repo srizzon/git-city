@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, useSyncExternalStore, Suspense, type ComponentProps } from "react";
 import { Menu, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -20,6 +20,7 @@ import {
   type DeveloperRecord,
   type SFMapAsset,
   type SFRenderMap,
+  type LayoutNorms,
 } from "@/lib/github";
 import { gridToWorldPos } from "@/lib/sponsors/registry";
 import { SF_PLAZA_SCALE, sfSponsorLocalPos } from "@/lib/sponsors/sfPlaza";
@@ -52,7 +53,8 @@ import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/x
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
 import RadarMap from "@/components/RadarMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
-import { fetchCitySnapshot } from "@/lib/city-snapshot-client";
+import { loadHomeSnapshot, loadSFMap, type HomeSnapshot } from "@/lib/city-snapshot-client";
+import { sfRenderMap } from "@/lib/city-sf-layout";
 import { usePerfMode } from "@/lib/perfMode";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
@@ -77,21 +79,61 @@ import {
 } from "@/lib/himetrica";
 import posthog from "posthog-js";
 
-// San Francisco map asset (baked from OSM). Fetched once, shared by every
-// layout recompute. Falls back to undefined (procedural layout) if missing.
-let _sfMapPromise: Promise<SFMapAsset | undefined> | null = null;
-function loadSFMap(): Promise<SFMapAsset | undefined> {
-  if (!_sfMapPromise) {
-    _sfMapPromise = fetch("/maps/sf.json")
-      .then((r) => (r.ok ? r.json() : undefined))
-      .catch(() => undefined);
-  }
-  return _sfMapPromise;
-}
-
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
   ssr: false,
 });
+
+// Orbit camera position for the radar map. Lives outside React state: as
+// state, every camera report re-rendered this whole page and the 3D scene
+// ~10×/s. Only the radar subscribes.
+type CameraPos = { x: number; z: number; tx: number; tz: number };
+let cameraPos: CameraPos = { x: 800, z: 1000, tx: 0, tz: 0 };
+const cameraSubs = new Set<() => void>();
+const cameraStore = {
+  get: () => cameraPos,
+  set: (x: number, z: number, tx: number, tz: number) => {
+    cameraPos = { x, z, tx, tz };
+    cameraSubs.forEach((f) => f());
+  },
+  subscribe: (f: () => void) => {
+    cameraSubs.add(f);
+    return () => { cameraSubs.delete(f); };
+  },
+};
+
+// Fly HUD (speed + radar player marker), same reasoning: reported 4×/s while
+// flying, so it stays out of this component's state.
+type FlyHud = { speed: number; x: number; z: number; yaw: number };
+let flyHud: FlyHud = { speed: 0, x: 0, z: 0, yaw: 0 };
+const flyHudSubs = new Set<() => void>();
+const flyHudStore = {
+  get: () => flyHud,
+  set: (next: FlyHud) => {
+    flyHud = next;
+    flyHudSubs.forEach((f) => f());
+  },
+  subscribe: (f: () => void) => {
+    flyHudSubs.add(f);
+    return () => { flyHudSubs.delete(f); };
+  },
+};
+
+function LiveRadarMap(props: Omit<ComponentProps<typeof RadarMap>, "cameraX" | "cameraZ" | "cameraTargetX" | "cameraTargetZ" | "playerX" | "playerZ" | "playerYaw">) {
+  const cam = useSyncExternalStore(cameraStore.subscribe, cameraStore.get, cameraStore.get);
+  const fly = useSyncExternalStore(flyHudStore.subscribe, flyHudStore.get, flyHudStore.get);
+  return (
+    <RadarMap
+      {...props}
+      cameraX={cam.x} cameraZ={cam.z} cameraTargetX={cam.tx} cameraTargetZ={cam.tz}
+      playerX={fly.x} playerZ={fly.z} playerYaw={fly.yaw}
+    />
+  );
+}
+
+function FlySpeed() {
+  const fly = useSyncExternalStore(flyHudStore.subscribe, flyHudStore.get, flyHudStore.get);
+  return <>{Math.round(fly.speed)}</>;
+}
 
 const BossEventHUD = dynamic(() => import("@/components/BossEventHUD"), { ssr: false });
 const BossInvasionCard = dynamic(() => import("@/components/BossInvasionCard"), { ssr: false });
@@ -408,10 +450,12 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
   }, []);
 
   const cat = LEADERBOARD_CATEGORIES[catIndex];
-  const sorted = buildings
-    .slice()
-    .sort((a, b) => (b[cat.key] as number) - (a[cat.key] as number))
-    .slice(0, 5);
+  // The parent re-renders on camera/HUD updates; sorting 35k buildings each
+  // time cost ~4% of every frame. Only recompute when the data or tab changes.
+  const sorted = useMemo(
+    () => buildings.slice().sort((a, b) => (b[cat.key] as number) - (a[cat.key] as number)).slice(0, 5),
+    [buildings, cat.key],
+  );
 
   return (
     <div className="hidden w-50 sm:block">
@@ -562,6 +606,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const [buildings, setBuildings] = useState<CityBuilding[]>([]);
   // Keep raw dev records so we can inject new devs and regenerate layout locally
   const rawDevsRef = useRef<DeveloperRecord[]>([]);
+  // City-wide layout maxima from the v2 snapshot (which only ships placed devs).
+  const layoutNormsRef = useRef<LayoutNorms | undefined>(undefined);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dropsPayloadRef = useRef<any[]>([]);
   const [plazas, setPlazas] = useState<CityPlaza[]>([]);
@@ -620,6 +666,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
   const loadStageRef = useRef<LoadingStage>("init");
   useEffect(() => {
     loadStageRef.current = loadStage;
+    // Timeline marks for profiling the load (visible in DevTools > Performance).
+    performance.mark(`city:${loadStage}`);
   }, [loadStage]);
   const handlePerfDecline = useCallback(() => {
     perfDeclines.current += 1;
@@ -657,8 +705,6 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     }
   }, []);
 
-  const [hud, setHud] = useState({ speed: 0, altitude: 0 });
-  const [playerPos, setPlayerPos] = useState<{ x: number; z: number }>({ x: 0, z: 0 });
   // Ref-mirrored pos/yaw for the PvP HUD damage-direction indicator. We keep
   // refs in parallel with the state so polling the HUD never causes the
   // main scene to re-render.
@@ -678,8 +724,6 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
 
   // HP state — populated by an effect after useFlyPresence runs (see below).
   const [flySelfHp, setFlySelfHp] = useState(3);
-  const [playerYaw, setPlayerYaw] = useState(0);
-  const [cameraPos, setCameraPos] = useState<{ x: number; z: number; tx: number; tz: number }>({ x: 800, z: 1000, tx: 0, tz: 0 });
   const [flyPaused, setFlyPaused] = useState(false);
   const [flyPauseSignal, setFlyPauseSignal] = useState(0);
   const [flyJoystickState, setFlyJoystickState] = useState<{ baseX: number; baseY: number; dx: number; dy: number } | null>(null);
@@ -1613,12 +1657,15 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     let dropsPayload: any[] = [];
 
     // Skip snapshot when busting cache — go straight to DB for fresh data
+    let prebuilt: HomeSnapshot["layout"];
     if (!bustCache) {
-      const snapshot = await fetchCitySnapshot();
+      const snapshot = await loadHomeSnapshot();
       if (snapshot) {
         allDevs = snapshot.developers;
         cityStats = snapshot.stats;
         dropsPayload = snapshot._d ?? [];
+        layoutNormsRef.current = snapshot.norms;
+        prebuilt = snapshot.layout;
       }
     }
 
@@ -1659,7 +1706,9 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     setStats(cityStats);
     const sf = await loadSFMap();
     sfMapRef.current = sf;
-    const layout = generateCityLayout(allDevs, sf);
+    const layout = prebuilt && sf
+      ? { ...prebuilt, sfMap: sfRenderMap(sf) }
+      : generateCityLayout(allDevs, sf, layoutNormsRef.current);
     mergeDrops(layout.buildings);
 
     setBuildings(layout.buildings);
@@ -1669,7 +1718,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     setBridges(layout.bridges);
     setDistrictZones(layout.districtZones);
     setSfMap(layout.sfMap ?? null);
-    setCityCache({ ...layout, stats: cityStats, rawDevs: rawDevsRef.current });
+    setCityCache({ ...layout, stats: cityStats, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
     return layout.buildings;
   }, []);
 
@@ -1699,6 +1748,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     const cached = getCityCache();
     if (cached) {
       rawDevsRef.current = cached.rawDevs ?? [];
+      layoutNormsRef.current = cached.norms;
       setBuildings(cached.buildings);
       setPlazas(cached.plazas);
       setDecorations(cached.decorations);
@@ -1741,11 +1791,13 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
 
         // Try pre-computed snapshot first (single file from Supabase CDN).
         // Self-heals on a fresh environment: builds the snapshot, then retries.
-        const snapshot = await fetchCitySnapshot();
+        const snapshot = await loadHomeSnapshot();
+        const prebuilt = snapshot?.layout;
         if (snapshot) {
           allDevs = snapshot.developers;
           cityStats = snapshot.stats;
           dropsPayload = snapshot._d ?? [];
+          layoutNormsRef.current = snapshot.norms;
         }
 
         // Local dev has no storage snapshot — read straight from the DB so the
@@ -1763,6 +1815,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         }
 
         setLoadProgress(30);
+        performance.mark("city:data");
 
         if (!allDevs || allDevs.length === 0) {
           setLoadProgress(100);
@@ -1796,8 +1849,12 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setStats(cityStats);
         const sfInit = await loadSFMap();
         sfMapRef.current = sfInit;
-        const finalLayout = generateCityLayout(allDevs, sfInit);
+        // v2 snapshots arrive already laid out by the worker.
+        const finalLayout = prebuilt && sfInit
+          ? { ...prebuilt, sfMap: sfRenderMap(sfInit) }
+          : generateCityLayout(allDevs, sfInit, layoutNormsRef.current);
         mergeDrops(finalLayout.buildings);
+        performance.mark("city:layout");
 
         setBuildings(finalLayout.buildings);
         setPlazas(finalLayout.plazas);
@@ -1829,7 +1886,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setLoadProgress(80);
 
         // Save to cache for return visits
-        setCityCache({ ...finalLayout, stats: cityStats, rawDevs: rawDevsRef.current });
+        setCityCache({ ...finalLayout, stats: cityStats, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
         setLoadProgress(95);
 
         // Enforce minimum 800ms display time to avoid flash
@@ -1940,7 +1997,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
             xp_level: devData.xp_level ?? 1,
           };
           rawDevsRef.current = [...rawDevsRef.current, newDev];
-          const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
+          const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
           mergeDrops(layout.buildings);
           setBuildings(layout.buildings);
           setPlazas(layout.plazas);
@@ -1948,7 +2005,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           setRiver(layout.river);
           setBridges(layout.bridges);
           setDistrictZones(layout.districtZones);
-          setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+          setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
 
           // Focus immediately after injection instead of waiting for re-run
           const injected = layout.buildings.find(
@@ -2063,7 +2120,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           xp_level: devData.xp_level ?? 1,
         };
         rawDevsRef.current = [...rawDevsRef.current, newDev];
-        const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
+        const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
         mergeDrops(layout.buildings);
         setBuildings(layout.buildings);
         setPlazas(layout.plazas);
@@ -2071,7 +2128,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         setRiver(layout.river);
         setBridges(layout.bridges);
         setDistrictZones(layout.districtZones);
-        setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+        setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
       } catch {
         // Allow retry on next dep change (e.g. transient network error)
         ensuringAuthBuilding.current = null;
@@ -2255,7 +2312,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         )
         : [...rawDevsRef.current, syncedDev];
 
-      const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
+      const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
       mergeDrops(layout.buildings);
       setBuildings(layout.buildings);
       setPlazas(layout.plazas);
@@ -2263,7 +2320,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       setRiver(layout.river);
       setBridges(layout.bridges);
       setDistrictZones(layout.districtZones);
-      setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+      setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
       updatedBuildings = layout.buildings;
 
       // Focus camera on the searched building
@@ -2420,7 +2477,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       )
       : [...rawDevsRef.current, syncedDev];
 
-    const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current);
+    const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
     mergeDrops(layout.buildings);
     setBuildings(layout.buildings);
     setPlazas(layout.plazas);
@@ -2428,7 +2485,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
     setRiver(layout.river);
     setBridges(layout.bridges);
     setDistrictZones(layout.districtZones);
-    setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current });
+    setCityCache({ ...layout, stats: stats ?? { total_developers: 0, total_contributions: 0 }, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
 
     setInvitePreview(null);
     setFocusedBuilding(devData.github_login);
@@ -2745,17 +2802,13 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
           }
         }}
         themeIndex={themeIndex}
-        onHud={(s, a, x, z, yaw) => {
-          setHud({ speed: s, altitude: a });
-          setPlayerYaw(yaw);
+        onHud={(s, _a, x, z, yaw) => {
           // Update refs every tick (no re-render cost)
           flyPlayerPosRef.current.x = x;
           flyPlayerPosRef.current.z = z;
           flyPlayerYawRef.current = yaw;
           // Look-ahead: ~40u ahead of vehicle = center of screen
-          const mapX = x - Math.sin(yaw) * 40;
-          const mapZ = z - Math.cos(yaw) * 40;
-          setPlayerPos({ x: mapX, z: mapZ });
+          flyHudStore.set({ speed: s, x: x - Math.sin(yaw) * 40, z: z - Math.cos(yaw) * 40, yaw });
         }}
         onPause={(p) => {
           if (p) {
@@ -2780,7 +2833,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
         flyStartPaused={false}
         holdRise={loadStage !== "done"}
         celebrationActive={celebrationActive}
-        onCameraMove={(x, z, tx, tz) => setCameraPos({ x, z, tx, tz })}
+        onCameraMove={cameraStore.set}
         skyAds={skyAds}
         onAdClick={(ad) => {
           trackSkyAdClick(ad.id, ad.vehicle, ad.link);
@@ -3158,7 +3211,7 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
                   <span className="mx-1 text-border">|</span>
                   <span className="text-[10px] uppercase text-muted tracking-wider">SPD</span>
                   <span className="text-[10px]" style={{ color: theme.accent }}>
-                    {Math.round(hud.speed)}
+                    <FlySpeed />
                   </span>
 
                   {/* Force Push toggle (inline) */}
@@ -3348,15 +3401,8 @@ function HomeContent({ resolvedSponsors }: HomeContentProps) {
       )}
 
       {/* ─── Radar Map ─── */}
-      <RadarMap
+      <LiveRadarMap
         buildings={buildings}
-        playerX={playerPos.x}
-        playerZ={playerPos.z}
-        playerYaw={playerYaw}
-        cameraX={cameraPos.x}
-        cameraZ={cameraPos.z}
-        cameraTargetX={cameraPos.tx}
-        cameraTargetZ={cameraPos.tz}
         visible={loadStage === "done" && !introMode && !rabbitCinematic && (exploreMode || flyMode)}
         flyMode={flyMode}
         districtZones={districtZones}

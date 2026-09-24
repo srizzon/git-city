@@ -77,6 +77,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Baked map data: unhashed URL, so revalidate hourly rather than immutable.
+        source: "/maps/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=86400" },
+        ],
+      },
+      {
         source: "/audio/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
