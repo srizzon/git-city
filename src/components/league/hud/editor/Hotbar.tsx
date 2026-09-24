@@ -34,7 +34,6 @@ export default function Hotbar({
   onPickBuilding,
   onWheel,
   hint,
-  erasing = false,
 }: {
   tab: HotbarTab;
   slot: number;
@@ -49,8 +48,6 @@ export default function Hotbar({
   onWheel: (dir: 1 | -1) => void;
   /** What a click does right now. */
   hint: string;
-  /** X is held: delete mode for now. */
-  erasing?: boolean;
 }) {
   const items = tab === "buildings" ? [] : HOTBAR[tab];
   const slotActive = tool.kind === "place" || tool.kind === "road";
@@ -86,7 +83,7 @@ export default function Hotbar({
           <ToolButton label="Hand: pick up and move (H)" shortcut="H" active={tool.kind === "select"} onClick={() => onTool({ kind: "select" })}>
             <Hand size={18} strokeWidth={2.25} aria-hidden />
           </ToolButton>
-          <ToolButton label="Delete (B, hold X, or right-click)" shortcut="B" active={tool.kind === "bulldoze" || erasing} danger onClick={() => onTool({ kind: "bulldoze" })}>
+          <ToolButton label="Delete (Del, or right-click)" shortcut="Del" active={tool.kind === "bulldoze"} danger onClick={() => onTool({ kind: "bulldoze" })}>
             <Trash2 size={18} strokeWidth={2.25} aria-hidden />
           </ToolButton>
         </div>
@@ -186,8 +183,8 @@ export function CameraHints() {
       {row("Right-drag", "pan")}
       {row("Scroll", "zoom")}
       {row("Click", "act")}
-      {row("Right-click / hold X", "delete")}
-      {row("H / B", "hand / delete tool")}
+      {row("Right-click", "delete")}
+      {row("H / Del", "hand / delete tool")}
       {row("Q / E", "turn 90°")}
       {row("G", "grid")}
     </div>

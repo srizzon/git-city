@@ -13,8 +13,7 @@ export type ShortcutAction =
   | { type: "camRotate"; dir: -1 | 1 }
   | { type: "pan"; dx: -1 | 0 | 1; dz: -1 | 0 | 1 }
   | { type: "preview" }
-  | { type: "hand" }
-  | { type: "bulldoze" };
+  | { type: "hand" };
 
 export interface KeyLike {
   key: string;
@@ -66,7 +65,6 @@ export function keyToAction(e: KeyLike): ShortcutAction | null {
   if (key === "e") return { type: "camRotate", dir: 1 };
   if (key === "p") return { type: "preview" };
   if (key === "h") return { type: "hand" };
-  if (key === "b") return { type: "bulldoze" };
   const pan = PAN[key];
   if (pan) return { type: "pan", dx: pan[0], dz: pan[1] };
   return null;

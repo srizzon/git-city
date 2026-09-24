@@ -6,7 +6,7 @@ import { maxLot, minLot } from "@/lib/league-city/grid";
 import { freeLotsInOrder, lotKey } from "@/lib/league-city/placement";
 import { ghostFit, type GhostFit } from "@/lib/league-city/editor/ghost";
 import { lPath } from "@/lib/league-city/editor/paint";
-import { isTypingTarget, keyToAction } from "@/lib/league-city/editor/shortcuts";
+import { keyToAction } from "@/lib/league-city/editor/shortcuts";
 import { HOTBAR, objectAtSpot, type EditorState, type HotbarTab, type Spot } from "@/lib/league-city/editor/state";
 import type { EditorStore } from "@/lib/league-city/editor/store";
 import { isSurface, type CityObject, type ItemType } from "@/lib/league-city/types";
@@ -55,34 +55,6 @@ export function useEditorController({
   const [hover, setHover] = useState<Spot | null>(null);
   const [roadPath, setRoadPath] = useState<[number, number][] | null>(null);
   const [grid, setGrid] = useState(true);
-  // Holding X turns any tool into delete until it's released.
-  const [erasing, setErasing] = useState(false);
-  const erasingRef = useRef(false);
-  useEffect(() => {
-    if (!active) return;
-    const down = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== "x" || e.repeat || e.metaKey || e.ctrlKey || isTypingTarget(e.target)) return;
-      erasingRef.current = true;
-      setErasing(true);
-    };
-    const up = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== "x") return;
-      erasingRef.current = false;
-      setErasing(false);
-    };
-    const blur = () => {
-      erasingRef.current = false;
-      setErasing(false);
-    };
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    window.addEventListener("blur", blur);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", blur);
-    };
-  }, [active]);
   const dragFrom = useRef<[number, number] | null>(null);
 
   /** Picks a building up and eases the camera to the free lot nearest the center. */
@@ -126,7 +98,7 @@ export function useEditorController({
       }
       const spot: Spot = { x: e.x, z: e.z, wx: e.wx, wz: e.wz, free: e.free, propId: e.propId };
       setHover(spot);
-      const tool = erasingRef.current && !s.held ? ({ kind: "bulldoze" } as const) : s.tool;
+      const tool = s.tool;
 
       if (e.kind === "erase") {
         if (!s.held) store.dispatch({ type: "removeAt", ...spot });
@@ -206,7 +178,9 @@ export function useEditorController({
           store.dispatch({ type: "rotate" });
           break;
         case "remove":
+          // Delete: removes what's in hand, else toggles the delete tool.
           if (s.held) store.dispatch({ type: "remove", id: s.held });
+          else store.dispatch({ type: "setTool", tool: s.tool.kind === "bulldoze" ? { kind: "select" } : { kind: "bulldoze" } });
           break;
         case "cancel":
           dragFrom.current = null;
@@ -228,9 +202,7 @@ export function useEditorController({
         case "hand":
           store.dispatch({ type: "setTool", tool: { kind: "select" } });
           break;
-        case "bulldoze":
-          store.dispatch({ type: "setTool", tool: { kind: "bulldoze" } });
-          break;
+
         default:
           return;
       }
@@ -257,7 +229,7 @@ export function useEditorController({
   const ghost = useMemo<GhostSpec | null>(() => {
     if (!active || !hover) return null;
     const { x, z } = hover;
-    if (state.tool.kind === "bulldoze" || (erasing && !state.held)) {
+    if (state.tool.kind === "bulldoze") {
       if (!hovered) return null;
       const fit: GhostFit = hovered.kind === "item" ? { ok: true } : { ok: false, reason: "Buildings stay." };
       return { x, z, fit, thing: { kind: "bulldoze", target: hovered } };
@@ -284,12 +256,12 @@ export function useEditorController({
         : { x, z, fit, thing: { kind: "prop", item, rot: state.placeRot } };
     }
     return null;
-  }, [active, hover, hovered, state, buildingByDev, erasing]);
+  }, [active, hover, hovered, state, buildingByDev]);
 
   const shownPath = active ? roadPath : null;
-  const hint = editorHint(erasing && !state.held ? { ...state, tool: { kind: "bulldoze" } } : state, hovered, ghost, shownPath !== null);
+  const hint = editorHint(state, hovered, ghost, shownPath !== null);
 
-  return { state, onLot, ghost, hover, roadPath: shownPath, grid, selectSlot, pickBuilding, hint, erasing };
+  return { state, onLot, ghost, hover, roadPath: shownPath, grid, selectSlot, pickBuilding, hint };
 }
 
 /** One line telling the admin what a click does right now. */
@@ -304,7 +276,7 @@ function editorHint(s: EditorState, hovered: CityObject | undefined, ghost: Ghos
   switch (s.tool.kind) {
     case "bulldoze":
       if (hovered?.kind === "building") return "Delete: buildings stay. Remove people in Settings";
-      return hovered ? `Click to delete ${nameOf(hovered)}` : "Delete: click an item to remove it";
+      return hovered ? `Click to delete ${nameOf(hovered)} · Del to stop` : "Delete: click an item to remove it · Del to stop";
     case "road":
       if (roadStarted) return "Click where the road ends · Esc to cancel";
       if (fit?.ok && fit.replaces) return `Road: click where it starts · replaces ${nameOf(fit.replaces)}`;
@@ -316,7 +288,7 @@ function editorHint(s: EditorState, hovered: CityObject | undefined, ghost: Ghos
         : `${bad}Click to place · R rotate · Shift no snap · Esc to stop`;
     default:
       return hovered
-        ? `Click to pick up ${nameOf(hovered)} · right-click or hold X to delete`
+        ? `Click to pick up ${nameOf(hovered)} · right-click to delete`
         : "Click something to move it · 1–9 pick an item";
   }
 }
