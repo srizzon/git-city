@@ -4,7 +4,7 @@ import { useLayoutEffect, useMemo, useRef } from "react";
 import { useGLTF } from "@react-three/drei";
 import { mergeBufferGeometries } from "three-stdlib";
 import * as THREE from "three";
-import { lotToWorld } from "@/lib/league-city/grid";
+import { lotToWorld, rotToRadians } from "@/lib/league-city/grid";
 import { TREE_TYPES, type CityObject, type TreeType } from "@/lib/league-city/types";
 
 // The 6 Kenney Nature Kit trees (CC0), loaded once and instanced per type.
@@ -32,14 +32,15 @@ const _up = new THREE.Vector3(0, 1, 0);
 
 type Variant = { subs: { geo: THREE.BufferGeometry; mat: THREE.Material }[]; scale: number };
 
-function TreeInstances({ variant, lots }: { variant: Variant; lots: { x: number; z: number }[] }) {
+type TreeSpot = { wx: number; wz: number; rot: number };
+
+function TreeInstances({ variant, lots }: { variant: Variant; lots: TreeSpot[] }) {
   const refs = useRef<(THREE.InstancedMesh | null)[]>([]);
   useLayoutEffect(() => {
     lots.forEach((l, i) => {
-      const [wx, wz] = lotToWorld(l.x, l.z);
-      const jitter = 0.85 + (Math.abs((l.x * 31 + l.z * 17) % 7) / 7) * 0.3;
-      _q.setFromAxisAngle(_up, (l.x * 13.7 + l.z * 7.1) % 6.283);
-      _p.set(wx, 0, wz);
+      const jitter = 0.85 + (Math.abs(Math.round(l.wx * 31 + l.wz * 17) % 7) / 7) * 0.3;
+      _q.setFromAxisAngle(_up, rotToRadians(l.rot));
+      _p.set(l.wx, 0, l.wz);
       _s.setScalar(variant.scale * jitter);
       _m.compose(_p, _q, _s);
       for (const r of refs.current) r?.setMatrixAt(i, _m);
@@ -97,10 +98,12 @@ export default function LeagueTrees({ objects }: { objects: CityObject[] }) {
   useLayoutEffect(() => () => variants.forEach((v) => v.subs.forEach((s) => s.geo.dispose())), [variants]);
 
   const lotsByType = useMemo(() => {
-    const out = TREE_TYPES.map(() => [] as { x: number; z: number }[]);
+    const out = TREE_TYPES.map(() => [] as TreeSpot[]);
     for (const o of objects) {
       const i = TREE_TYPES.indexOf(o.item_type as TreeType);
-      if (i >= 0) out[i].push({ x: o.x, z: o.z });
+      if (i < 0) continue;
+      const [wx, wz] = o.px !== null && o.pz !== null ? [o.px, o.pz] : lotToWorld(o.x, o.z);
+      out[i].push({ wx, wz, rot: o.rot });
     }
     return out;
   }, [objects]);

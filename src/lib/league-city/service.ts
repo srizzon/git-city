@@ -33,6 +33,9 @@ const MESSAGES: Record<string, [string, number]> = {
   forbidden: ["Buildings can't be removed from the city.", 403],
   not_found: ["That object is gone. Reload the city.", 409],
   invalid_op: ["That change isn't valid.", 400],
+  on_building: ["That's on a building's lot.", 409],
+  on_road: ["Keep it on the sidewalk, off the asphalt.", 409],
+  prop_overlap: ["Too close to something else.", 409],
 };
 
 export class CityOpError extends Error {
@@ -75,7 +78,7 @@ async function loadCity(leagueId: string): Promise<LeagueCity | null> {
   for (let from = 0; ; from += 1000) {
     const { data } = await sb
       .from("league_objects")
-      .select("id, kind, item_type, developer_id, x, z, rot, is_new")
+      .select("id, kind, item_type, developer_id, x, z, px, pz, rot, is_new")
       .eq("league_id", leagueId)
       .order("id")
       .range(from, from + 999)
@@ -122,7 +125,12 @@ export async function ensureCity(leagueId: string): Promise<void> {
     if (data.length < 1000) break;
   }
 
-  const { ops, unplaced } = starterOps(members);
+  const starter = starterOps(members);
+  // The starter lays out existing members; only later arrivals are NEW.
+  const ops: CityOp[] = starter.ops.map((op) => (op.op === "place" && op.kind === "building" ? { ...op, id: crypto.randomUUID() } : op));
+  const dismiss: CityOp[] = ops.flatMap((op) => (op.op === "place" && op.kind === "building" && op.id ? [{ op: "dismiss_new", id: op.id }] : []));
+  ops.push(...dismiss);
+  const unplaced = starter.unplaced;
   const first = await rpc(leagueId, null, ops.slice(0, MAX_OPS));
   if (first.skipped) return;
   for (let i = MAX_OPS; i < ops.length; i += MAX_OPS) await rpc(leagueId, null, ops.slice(i, i + MAX_OPS));

@@ -23,8 +23,8 @@ describe("starterOps", () => {
     expect(roads).toHaveLength(2 * START_SIZE - 1);
     expect(roads.every((o) => o.x === 0 || o.z === 0)).toBe(true);
     const fountain = places.find((o) => o.kind === "item" && o.item_type === "fountain");
-    expect(fountain && [Math.abs(fountain.x), Math.abs(fountain.z)]).toEqual([1, 1]);
-    expect(places.filter((o) => o.kind === "item" && o.item_type === "plaza")).toHaveLength(3);
+    expect(fountain && "px" in fountain && [fountain.px, fountain.pz]).toEqual([48, 48]);
+    expect(places.filter((o) => o.kind === "item" && o.item_type === "plaza")).toHaveLength(4);
   });
 
   it("puts the biggest building nearest the center, facing a road", () => {
@@ -39,10 +39,11 @@ describe("starterOps", () => {
     const { city, places } = placed(100);
     expect(city.unplaced).toEqual([]);
     expect(places.filter((o) => o.kind === "building")).toHaveLength(100);
-    const keys = places.map((o) => `${o.x},${o.z}`);
+    const lots = places.filter((o) => "x" in o);
+    const keys = lots.map((o) => ("x" in o ? `${o.x},${o.z}` : ""));
     expect(new Set(keys).size).toBe(keys.length);
-    expect(places.every((o) => inBounds(city.size, o.x, o.z))).toBe(true);
-    expect(places.length).toBeLessThanOrEqual(GROW_AT * city.size * city.size);
+    expect(lots.every((o) => "x" in o && inBounds(city.size, o.x, o.z))).toBe(true);
+    expect(lots.length).toBeLessThanOrEqual(GROW_AT * city.size * city.size); // props don't count toward growth
     expect(city.ops.length).toBeLessThanOrEqual(200);
   });
 
@@ -50,8 +51,8 @@ describe("starterOps", () => {
     const { city, places } = placed(3);
     const trees = places.filter((o) => o.kind === "item" && o.item_type.startsWith("tree_"));
     expect(trees.length).toBeGreaterThan(0);
-    const lo = -city.size / 2;
-    const hi = city.size / 2 - 1;
-    expect(trees.every((o) => [lo, hi].includes(o.x) || [lo, hi].includes(o.z))).toBe(true);
+    const lo = (-city.size / 2) * 48;
+    const hi = (city.size / 2 - 1) * 48;
+    expect(trees.every((o) => "px" in o && ([lo, hi].includes(o.px) || [lo, hi].includes(o.pz)))).toBe(true);
   });
 });

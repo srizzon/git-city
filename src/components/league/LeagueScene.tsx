@@ -14,6 +14,7 @@ import { LOT, lotToWorld, maxLot, minLot, rotToRadians, terrainBounds } from "@/
 import type { CityObject } from "@/lib/league-city/types";
 import LeagueRoads from "./LeagueRoads";
 import LeagueTrees from "./LeagueTrees";
+import EditCamera, { type EditCameraApi, type LotEvent, type Pickable } from "./editor/EditCamera";
 
 // Full-screen league city: one Canvas, midnight theme, the league's lots with
 // roads, trees, decorations and member buildings (invited ones faded).
@@ -64,7 +65,7 @@ function LeagueGround({ size }: { size: number }) {
 const _m = new THREE.Matrix4();
 
 function PlazaSlabs({ objects }: { objects: CityObject[] }) {
-  const lots = useMemo(() => objects.filter((o) => o.item_type === "plaza" || o.item_type === "fountain"), [objects]);
+  const lots = useMemo(() => objects.filter((o) => o.item_type === "plaza" && o.px === null), [objects]);
   const ref = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
     lots.forEach((o, i) => {
@@ -89,7 +90,7 @@ function PlazaSlabs({ objects }: { objects: CityObject[] }) {
 function toDecorations(objects: CityObject[]): CityDecoration[] {
   const out: CityDecoration[] = [];
   for (const o of objects) {
-    const [x, z] = lotToWorld(o.x, o.z);
+    const [x, z] = o.px !== null && o.pz !== null ? [o.px, o.pz] : lotToWorld(o.x, o.z);
     const rotation = rotToRadians(o.rot);
     if (o.item_type === "lamp") out.push({ type: "streetLamp", position: [x, 0, z], rotation, variant: 0 });
     else if (o.item_type === "bench") out.push({ type: "bench", position: [x, 0, z], rotation, variant: 0 });
@@ -116,7 +117,7 @@ const _fromLook = new THREE.Vector3();
 
 // Frames the terrain, and flies to a selected building like the home city
 // (camera outside the building, looking at its top), then back on close.
-function LeagueCamera({ size, focus }: { size: number; focus: CityBuilding | null }) {
+function LeagueCamera({ size, focus, spin = true }: { size: number; focus: CityBuilding | null; spin?: boolean }) {
   const camera = useThree((s) => s.camera);
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
   const frame = useMemo(() => cameraFrame(size, aspect), [size, aspect]);
@@ -201,7 +202,7 @@ function LeagueCamera({ size, focus }: { size: number; focus: CityBuilding | nul
       minDistance={80}
       maxDistance={frame.max}
       maxPolarAngle={Math.PI * 0.44}
-      autoRotate={rotate && !hidden && !focus}
+      autoRotate={spin && rotate && !hidden && !focus}
       autoRotateSpeed={0.35}
       onStart={() => {
         fly.current.t = 1;
@@ -213,15 +214,37 @@ function LeagueCamera({ size, focus }: { size: number; focus: CityBuilding | nul
 
 // ─── Scene ───────────────────────────────────────────────────
 
+export type SceneMode = "view" | "edit" | "preview";
+
 export interface LeagueSceneProps {
   size: number;
   objects: CityObject[];
   buildings: CityBuilding[];
   focused?: string | null;
   onBuildingClick?: (b: CityBuilding) => void;
+  /** view: orbit + auto-rotate. edit: build camera + lot picking. preview: orbit, still. */
+  mode?: SceneMode;
+  onLot?: (e: LotEvent) => void;
+  editApiRef?: React.MutableRefObject<EditCameraApi | null>;
+  /** Props the edit camera can pick on screen. */
+  editPickables?: React.MutableRefObject<Pickable[]>;
+  /** Editor overlays (grid, ghost, selection), rendered inside the Canvas. */
+  children?: React.ReactNode;
 }
 
-export default function LeagueScene({ size, objects, buildings, focused, onBuildingClick }: LeagueSceneProps) {
+export default function LeagueScene({
+  size,
+  objects,
+  buildings,
+  focused,
+  onBuildingClick,
+  mode = "view",
+  onLot,
+  editApiRef,
+  editPickables,
+  children,
+}: LeagueSceneProps) {
+  const editing = mode === "edit";
   const focusedBuilding = useMemo(
     () => (focused ? (buildings.find((b) => b.loginLower === focused.toLowerCase()) ?? null) : null),
     [buildings, focused],
@@ -248,7 +271,8 @@ export default function LeagueScene({ size, objects, buildings, focused, onBuild
   return (
     <Canvas
       shadows={false}
-      frameloop="always"
+      // One Canvas for every mode: remounting leaks WebGL contexts.
+      frameloop={editing ? "demand" : "always"}
       dpr={[1, 1.5]}
       camera={{ position: initial.position.toArray(), fov: 50, near: 1, far: 12000 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
@@ -262,7 +286,11 @@ export default function LeagueScene({ size, objects, buildings, focused, onBuild
     >
       <fog attach="fog" args={[theme.fogColor, theme.fogNear * 2, theme.fogFar * 1.2]} />
       <ThemeLights theme={theme} themeIndex={THEME_INDEX} />
-      <LeagueCamera size={size} focus={focusedBuilding} />
+      {editing ? (
+        <EditCamera size={size} onLot={onLot ?? (() => {})} apiRef={editApiRef} pickables={editPickables} />
+      ) : (
+        <LeagueCamera size={size} focus={mode === "view" ? focusedBuilding : null} spin={mode === "view"} />
+      )}
 
       <LeagueGround size={size} />
       <LeagueRoads objects={objects} markingColor={theme.roadMarkingColor} />
@@ -276,9 +304,10 @@ export default function LeagueScene({ size, objects, buildings, focused, onBuild
         buildings={buildings}
         colors={theme.building}
         accentColor={theme.building.accent}
-        focusedBuilding={focused ?? null}
-        onBuildingClick={onBuildingClick}
+        focusedBuilding={editing ? null : (focused ?? null)}
+        onBuildingClick={editing ? undefined : onBuildingClick}
       />
+      {children}
     </Canvas>
   );
 }

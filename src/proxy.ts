@@ -165,7 +165,8 @@ export async function proxy(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request });
 
-  const skipAuth = AUTH_SKIP_PREFIXES.some((p) => pathname.startsWith(p));
+  // The city editor's save verifies the session itself (getClaims, local JWT).
+  const skipAuth = AUTH_SKIP_PREFIXES.some((p) => pathname.startsWith(p)) || pathname.endsWith("/city/ops");
   if (hasSession && !skipAuth) {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
