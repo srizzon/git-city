@@ -60,13 +60,16 @@ const KEEPALIVE = [
   "remote: almost there...",
 ];
 
-// Script plays at this relaxed pace while the city loads. Once the real load
-// finishes (stage === "ready") every remaining sleep is skipped and the script
-// dumps its last lines at once — the city is waiting, so is the user. (A
-// time-scaled fast-forward still needs dozens of timer ticks, and those starve
-// behind the renderer's first-frame work on slow devices: 5s+ of pure delay.)
+// Script plays at this relaxed pace while the city loads, and always for at
+// least MIN_PLAY_MS so the intro reads as a transition, not a flash. Once the
+// city is ready it fast-forwards at READY_BOOST. On slow devices the renderer's
+// first-frame work starves the timer ticks, so after FAST_FORWARD_CAP_MS the
+// remaining lines land at once instead of stretching the wait.
 const TICK_MS = 40;
-const READY_HOLD_MS = 250; // brief beat on the welcome line before the exit flash
+const MIN_PLAY_MS = 2500;
+const READY_BOOST = 8;
+const FAST_FORWARD_CAP_MS = 1200;
+const READY_HOLD_MS = 400; // beat on the welcome line before the exit flash
 const FLASH_LEAD_MS = 120; // flash peaks before the fade starts
 
 const fmt = (n: number) => Math.floor(n).toLocaleString("en-US");
@@ -92,9 +95,12 @@ export default function LoadingScreen({
 
   const isError = stage === "error";
 
+  const readyAtRef = useRef<number | null>(null);
+
   useEffect(() => {
     stageRef.current = stage;
     statsRef.current = stats;
+    readyAtRef.current = stage === "ready" ? (readyAtRef.current ?? performance.now()) : null;
   }, [stage, stats]);
 
   // ── Line helpers ──────────────────────────────────────────────
@@ -115,12 +121,23 @@ export default function LoadingScreen({
     let aborted = false;
     const alive = () => !aborted && stageRef.current !== "error";
 
-    // Sleeps `virtualMs` of script time, or not at all once the city is ready.
-    // Ticks overshoot small sleeps (e.g. per-character typing), so the surplus
-    // carries over as credit instead of costing a full tick each.
+    // Script clock: 1× until the city is ready and MIN_PLAY_MS has passed,
+    // then READY_BOOST×, then instant once the fast-forward cap runs out.
+    const startedAt = performance.now();
+    const speed = () => {
+      const readyAt = readyAtRef.current;
+      if (readyAt == null) return 1;
+      const now = performance.now();
+      const boostFrom = Math.max(readyAt, startedAt + MIN_PLAY_MS);
+      if (now < boostFrom) return 1;
+      return now - boostFrom > FAST_FORWARD_CAP_MS ? Infinity : READY_BOOST;
+    };
+
+    // Sleeps `virtualMs` of script time. Boosted ticks overshoot small sleeps
+    // (e.g. per-character typing), so the surplus carries over as credit.
     let credit = 0;
     const vsleep = async (virtualMs: number) => {
-      if (stageRef.current === "ready") return;
+      if (speed() === Infinity) return;
       if (credit >= virtualMs) {
         credit -= virtualMs;
         return;
@@ -129,9 +146,10 @@ export default function LoadingScreen({
       credit = 0;
       while (remaining > 0) {
         if (!alive()) throw new Error("aborted");
-        if (stageRef.current === "ready") return;
         await new Promise((r) => setTimeout(r, TICK_MS));
-        remaining -= TICK_MS;
+        const sp = speed();
+        if (sp === Infinity) return;
+        remaining -= TICK_MS * sp;
       }
       credit = -remaining;
     };
