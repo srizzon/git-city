@@ -71,6 +71,15 @@ describe("boost pads", () => {
     expect(dx).toBeCloseTo(0);
     expect(dz).toBeCloseTo(-(TOYS.padSpeed + TOYS.padKick));
   });
+  it("fires the way you're going, from either end of the strip", () => {
+    const [, north] = padKick(0, -10, 0);
+    const [, south] = padKick(0, 10, 0);
+    expect(north).toBeLessThan(0);
+    expect(south).toBeGreaterThan(0);
+    const [, fromRest] = padKick(0, 0, 0, 0, 1); // parked facing south
+    expect(fromRest).toBeGreaterThan(0);
+  });
+
   it("only kicks when you're already faster than pad speed", () => {
     const [, dz] = padKick(0, -40, 0);
     expect(dz).toBeCloseTo(-TOYS.padKick);

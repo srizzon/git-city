@@ -152,7 +152,8 @@ export default function Car({
     if (pad && p.y < 1.5 && now - lastPad.current > TOYS.padCooldown * 1000) {
       lastPad.current = now;
       const v = body.linvel();
-      const [dx, dz] = padKick(v.x, v.z, pad.rot);
+      const h = carHeading(body);
+      const [dx, dz] = padKick(v.x, v.z, pad.rot, Math.sin(h), Math.cos(h));
       body.applyImpulse({ x: dx * CHASSIS.mass, y: 0, z: dz * CHASSIS.mass }, true);
     }
   });

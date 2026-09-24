@@ -6,9 +6,18 @@ import type { CityBuilding } from "@/lib/github";
 import { padDirection } from "../toys";
 import { TOYS } from "./tuning";
 
-/** Velocity change (m/s, world x/z) a pad turned `rot` gives a car moving at (vx, vz). */
-export function padKick(vx: number, vz: number, rot: number): [number, number] {
-  const [dx, dz] = padDirection(rot);
+/**
+ * Velocity change (m/s, world x/z) a pad turned `rot` gives a car moving at
+ * (vx, vz). The strip has no arrow, so it fires along its length in the way
+ * you're already going (your heading `hx, hz` when you're barely moving).
+ */
+export function padKick(vx: number, vz: number, rot: number, hx = 0, hz = 0): [number, number] {
+  let [dx, dz] = padDirection(rot);
+  const going = Math.hypot(vx, vz) > 1 ? vx * dx + vz * dz : hx * dx + hz * dz;
+  if (going < 0) {
+    dx = -dx;
+    dz = -dz;
+  }
   const along = vx * dx + vz * dz;
   const add = Math.max(0, TOYS.padSpeed - along) + TOYS.padKick;
   return [dx * add, dz * add];
