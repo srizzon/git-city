@@ -5,7 +5,7 @@ import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import { reassignAdmin, slugify } from "./service";
 import { LeagueError } from "./errors";
 import { companyLeagueName, isReservedSlug, LOGIN_RE } from "./names";
-import { notifyJoined } from "./joined";
+import { inviteJoined } from "./joined";
 import { autoPlace, removeBuilding } from "@/lib/league-city/service";
 
 // ─── Company league verification ────────────────────────────
@@ -212,7 +212,7 @@ export async function joinCompanyLeague(
   await autoPlace(league.id, devId);
   if (row?.status === "invited") {
     const { data: dev } = await sb.from("developers").select("github_login").eq("id", devId).single();
-    if (dev) await notifyJoined(league.id, devId, dev.github_login, row.invited_by);
+    if (dev) await inviteJoined(league.id, devId, dev.github_login, row.invited_by);
   }
 
   const leagueId = league.id as string;

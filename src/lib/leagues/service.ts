@@ -4,7 +4,7 @@ import { getAuthedDeveloper } from "@/lib/auth-identity";
 import { FETCH_TIMEOUT_MS, GitHubFetchError, ghHeaders } from "@/lib/github-api";
 import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import type { ScoringMode } from "./scoring";
-import { notifyJoined } from "./joined";
+import { inviteJoined } from "./joined";
 import { autoPlace, ensureCity, removeBuilding } from "@/lib/league-city/service";
 import { cleanLeagueName, isReservedSlug, LOGIN_RE } from "./names";
 import { LeagueError, dbError } from "./errors";
@@ -241,7 +241,10 @@ export async function joinLeague(
   if (error) throw dbError("join_failed", error);
   await autoPlace(league.id, viewer.id);
 
-  if (existing?.status === "invited") await notifyJoined(league.id, viewer.id, viewer.github_login, invitedBy);
+  // A personal invite, or the open link shared by a member (ref).
+  if (existing?.status === "invited" || decision === "token") {
+    await inviteJoined(league.id, viewer.id, viewer.github_login, invitedBy);
+  }
   if (!league.admin_id) await reassignAdmin(league.id);
   invalidateLeague(league.id);
   return "active";
@@ -364,6 +367,7 @@ export async function inviteMember(
       developer_id: dev.id,
       status: "invited",
       invited_by: viewer.id,
+      created_building: createdBuilding,
     });
     if (error) throw dbError("invite_failed", error);
     await autoPlace(league.id, dev.id);
