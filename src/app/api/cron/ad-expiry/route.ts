@@ -18,25 +18,27 @@ export async function GET(request: NextRequest) {
   const sb = getSupabaseAdmin();
   const results = { expiring: 0, expired: 0, followup_7d: 0, followup_30d: 0, errors: 0 };
 
-  // Helper: get ad stats (impressions, clicks, unique countries)
+  // Helper: get ad stats (impressions, clicks, link clicks, unique countries).
+  // CTR is link clicks over impressions, the same as the advertiser dashboard.
   async function getAdStats(adId: string): Promise<AdStats> {
-    const [impRes, clickRes, countryRes] = await Promise.all([
+    const countEvents = (eventType: string) =>
       sb
         .from("sky_ad_events")
         .select("id", { count: "exact", head: true })
         .eq("ad_id", adId)
-        .eq("event_type", "impression"),
-      sb
-        .from("sky_ad_events")
-        .select("id", { count: "exact", head: true })
-        .eq("ad_id", adId)
-        .in("event_type", ["click", "cta_click"]),
+        .eq("event_type", eventType);
+
+    const [impRes, clickRes, linkRes, countryRes] = await Promise.all([
+      countEvents("impression"),
+      countEvents("click"),
+      countEvents("cta_click"),
       sb.rpc("count_ad_countries", { p_ad_id: adId }),
     ]);
 
     return {
       impressions: impRes.count ?? 0,
       clicks: clickRes.count ?? 0,
+      linkClicks: linkRes.count ?? 0,
       countries: typeof countryRes.data === "number" ? countryRes.data : undefined,
     };
   }
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     const { data: expiringAds } = await sb
       .from("sky_ads")
-      .select("id, brand, purchaser_email, tracking_token, ends_at, expiry_notified")
+      .select("id, brand, purchaser_email, ends_at, expiry_notified")
       .eq("active", true)
       .not("ends_at", "is", null)
       .not("purchaser_email", "is", null)
@@ -79,17 +81,9 @@ export async function GET(request: NextRequest) {
         try {
           const endsAt = new Date(ad.ends_at);
           const daysLeft = Math.max(1, Math.ceil((endsAt.getTime() - now.getTime()) / 86_400_000));
-          const trackingUrl = `https://thegitcity.com/advertise/track/${ad.tracking_token}`;
-
           const stats = await getAdStats(ad.id);
 
-          await sendAdExpiringEmail(
-            ad.purchaser_email,
-            ad.brand ?? "Your Ad",
-            daysLeft,
-            trackingUrl,
-            stats,
-          );
+          await sendAdExpiringEmail(ad.purchaser_email, ad.brand ?? null, daysLeft, stats);
 
           await sb
             .from("sky_ads")
@@ -131,12 +125,7 @@ export async function GET(request: NextRequest) {
         try {
           const stats = await getAdStats(ad.id);
 
-          await sendAdExpiredEmail(
-            ad.purchaser_email,
-            ad.brand ?? "Your Ad",
-            stats,
-            "https://thegitcity.com/advertise",
-          );
+          await sendAdExpiredEmail(ad.purchaser_email, ad.brand ?? null, stats);
 
           await sb
             .from("sky_ads")
@@ -178,7 +167,7 @@ export async function GET(request: NextRequest) {
 
           await sendAdFollowup7dEmail(
             ad.purchaser_email,
-            ad.brand ?? "Your Ad",
+            ad.brand ?? null,
             stats,
             cityDevs,
           );
@@ -224,7 +213,7 @@ export async function GET(request: NextRequest) {
 
           await sendAdFollowup30dEmail(
             ad.purchaser_email,
-            ad.brand ?? "Your Ad",
+            ad.brand ?? null,
             stats,
             cityDevs,
             cityDevsWhenEnded,
