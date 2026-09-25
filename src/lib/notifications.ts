@@ -206,13 +206,14 @@ async function processChannel(
     }
   }
 
-  // 3. Dedup check
+  // 3. Dedup check (a failed attempt doesn't count, so it can be retried)
   if (payload.dedupKey) {
     const { data: existing } = await sb
       .from("notification_log")
       .select("id")
       .eq("dedup_key", payload.dedupKey)
       .eq("channel", channel)
+      .neq("status", "failed")
       .maybeSingle();
 
     if (existing) {
@@ -444,8 +445,9 @@ async function dispatchEmail(
   const status = error ? "failed" : "sent";
   const providerId = sent?.id;
 
-  // Log to notification_log
-  await sb.from("notification_log").insert({
+  // Log to notification_log. Upsert because a retry reuses the dedup key of
+  // the failed row (UNIQUE(dedup_key, channel)).
+  await sb.from("notification_log").upsert({
     developer_id: payload.developerId,
     channel: "email",
     notification_type: payload.type,
@@ -457,7 +459,8 @@ async function dispatchEmail(
     failure_reason: error ? String(error.message ?? error) : null,
     metadata: { body_preview: payload.body.slice(0, 200) },
     dedup_key: payload.dedupKey || null,
-  });
+    created_at: new Date().toISOString(),
+  }, { onConflict: "dedup_key,channel" });
 
   if (error) {
     console.error(`[notify:email] Resend error for ${email}:`, error);
@@ -640,7 +643,7 @@ async function checkRateLimit(
     .select("id", { count: "exact", head: true })
     .eq("developer_id", devId)
     .eq("channel", channel)
-    .eq("status", "sent")
+    .neq("status", "failed") // the webhook rewrites "sent" to delivered/bounced/...
     .gte("created_at", oneHourAgo);
 
   if ((hourCount ?? 0) >= limits.perHour) return "hourly";
@@ -651,7 +654,7 @@ async function checkRateLimit(
     .select("id", { count: "exact", head: true })
     .eq("developer_id", devId)
     .eq("channel", channel)
-    .eq("status", "sent")
+    .neq("status", "failed")
     .gte("created_at", oneDayAgo);
 
   if ((dayCount ?? 0) >= limits.perDay) return "daily";
