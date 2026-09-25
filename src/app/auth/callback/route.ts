@@ -1,4 +1,4 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -42,8 +42,9 @@ export async function GET(request: Request) {
 
   // Company leagues: provider_token only exists right now. When it carries
   // read:org (the "Verify company" flow, and every later login since GitHub
-  // keeps granted scopes), list the orgs and renew. Joining happens only in
-  // the verify flow. Never stored, and a failure here never breaks login.
+  // keeps granted scopes), list the orgs and renew. Joining and creating
+  // happen only from the Company tab's button. Never stored, and a failure
+  // here never breaks login.
   const providerToken = data.session?.provider_token;
   if (providerToken && githubLogin) {
     try {
@@ -56,8 +57,7 @@ export async function GET(request: Request) {
           .eq("claimed_by", data.user.id)
           .maybeSingle();
         if (dev) {
-          const { seed } = await syncOrgVerifications(dev.id, orgs, { verify: searchParams.get("verify") === "org" });
-          if (seed) after(() => seed().then(() => {}));
+          await syncOrgVerifications(dev.id, orgs);
         }
       }
     } catch (err) {
