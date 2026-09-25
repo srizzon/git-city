@@ -491,6 +491,7 @@ export async function POST(request: Request) {
 
           // Insert feed event + send notifications
           const githubLogin = session.metadata?.github_login;
+          const paid = session.amount_total != null && session.currency ? { amountCents: session.amount_total, currency: session.currency } : null;
           if (giftedTo) {
             const { data: receiver } = await sb
               .from("developers")
@@ -509,7 +510,7 @@ export async function POST(request: Request) {
             });
 
             // Gift notifications: receipt to buyer, alert to receiver
-            sendGiftSentNotification(Number(developerId), githubLogin ?? "", receiver?.github_login ?? "unknown", pending.id, itemId);
+            sendGiftSentNotification(Number(developerId), githubLogin ?? "", receiver?.github_login ?? "unknown", pending.id, itemId, paid);
             sendGiftReceivedNotification(Number(giftedTo), githubLogin ?? "someone", receiver?.github_login ?? "unknown", pending.id, itemId);
           } else {
             await sb.from("activity_feed").insert({
@@ -519,7 +520,7 @@ export async function POST(request: Request) {
             });
 
             // Purchase receipt notification
-            sendPurchaseNotification(Number(developerId), githubLogin ?? "", pending.id, itemId);
+            sendPurchaseNotification(Number(developerId), githubLogin ?? "", pending.id, itemId, paid);
           }
 
           const phItem = getPostHogClient();

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { autoEquipIfSolo } from "@/lib/items";
-import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
+import { paidPrice, sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import { SKY_AD_PLANS, isValidPlanId, getPriceCents, type AdPeriod } from "@/lib/skyAdPlans";
 import { AD_PACKAGES, isValidPackageId, getPackagePriceCents, type AdPackageId } from "@/lib/adPackages";
@@ -173,7 +173,7 @@ export async function POST(request: Request) {
 
           const { data: fullPurchase } = await sb
             .from("purchases")
-            .select("developer_id, item_id, gifted_to")
+            .select("developer_id, item_id, gifted_to, amount_cents, currency")
             .eq("id", purchase.id)
             .single();
 
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
                 target_id: fullPurchase.gifted_to,
                 metadata: { giver_login: dev?.github_login, receiver_login: receiver?.github_login, item_id: fullPurchase.item_id },
               });
-              sendGiftSentNotification(fullPurchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", purchase.id, fullPurchase.item_id);
+              sendGiftSentNotification(fullPurchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", purchase.id, fullPurchase.item_id, paidPrice(fullPurchase));
               sendGiftReceivedNotification(fullPurchase.gifted_to, dev?.github_login ?? "someone", receiver?.github_login ?? "unknown", purchase.id, fullPurchase.item_id);
             } else {
               await sb.from("activity_feed").insert({
@@ -207,7 +207,7 @@ export async function POST(request: Request) {
                 actor_id: fullPurchase.developer_id,
                 metadata: { login: dev?.github_login, item_id: fullPurchase.item_id },
               });
-              sendPurchaseNotification(fullPurchase.developer_id, dev?.github_login ?? "", purchase.id, fullPurchase.item_id);
+              sendPurchaseNotification(fullPurchase.developer_id, dev?.github_login ?? "", purchase.id, fullPurchase.item_id, paidPrice(fullPurchase));
             }
           }
         }
