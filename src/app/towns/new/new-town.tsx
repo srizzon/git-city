@@ -21,8 +21,8 @@ const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), { s
 const IDENTITY: CityIdentity = { sky: 1, signSide: null, logoUrl: null, logoRemoved: false, identityVersion: 0 };
 /** The panel slides out and the camera pushes in before the town page takes over. */
 const LEAVE_MS = 700;
-/** The panel's width on wide screens (lg:w-[400px]). */
-const PANEL_W = 400;
+/** The panel's width on wide screens (lg:w-[440px]). */
+const PANEL_W = 440;
 
 // Create a town like a game makes a world (Roblox's template gallery,
 // Minecraft's Create World): the picked starter city stands live behind the
@@ -42,7 +42,7 @@ export default function NewTown({
 }) {
   const [template, setTemplate] = useState<TemplateId>(startTemplate);
   const [name, setName] = useState(startName ?? (viewer ? `${viewer.login}'s Town` : "My Town"));
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(true);
   // Settings follow the template until you change one.
   const [scoring, setScoring] = useState<ScoringMode | null>(null);
   const [join, setJoin] = useState<JoinMode | null>(null);
@@ -152,7 +152,7 @@ export default function NewTown({
 
       <form
         onSubmit={build}
-        className="absolute inset-x-0 bottom-0 top-[44vh] flex flex-col border-t-[3px] border-border bg-bg lg:inset-y-0 lg:left-0 lg:right-auto lg:top-0 lg:w-[400px] lg:border-t-0 lg:border-r-[3px]"
+        className="absolute inset-x-0 bottom-0 top-[44vh] flex flex-col overflow-y-auto overscroll-contain border-t-[3px] border-border bg-bg lg:inset-y-0 lg:left-0 lg:right-auto lg:top-0 lg:w-[440px] lg:border-t-0 lg:border-r-[3px]"
         style={{
           transform: leaving ? "translateX(-105%)" : undefined,
           opacity: leaving ? 0 : 1,
@@ -164,7 +164,7 @@ export default function NewTown({
             &larr; Towns
           </Link>
         </div>
-        <h1 className="px-5 pt-3 text-2xl leading-none text-cream lg:pt-5 lg:text-3xl">
+        <h1 className="px-5 pt-3 text-2xl leading-none text-cream lg:pt-4 lg:text-3xl">
           New <span className="text-lime">town</span>
         </h1>
         <p className="px-5 pt-2 text-xs leading-relaxed text-muted normal-case">Pick a starter city. You can change everything later.</p>
@@ -173,7 +173,7 @@ export default function NewTown({
         <div
           role="radiogroup"
           aria-label="Starter city"
-          className="mt-4 flex gap-2 overflow-x-auto px-5 pb-1 lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:overflow-x-visible"
+          className="mt-4 flex shrink-0 gap-2 overflow-x-auto px-5 pb-1 lg:flex-col lg:overflow-x-visible"
         >
           {TEMPLATES.map((x) => {
             const on = x.id === template;
@@ -184,7 +184,7 @@ export default function NewTown({
                 role="radio"
                 aria-checked={on}
                 onClick={() => pick(x.id)}
-                className={`btn-press flex w-44 shrink-0 items-start gap-3 border-[3px] px-3 py-3 text-left transition-colors lg:w-auto ${
+                className={`btn-press flex w-44 shrink-0 items-start gap-3 border-[3px] px-3 py-3 text-left lg:items-center lg:py-2 transition-colors lg:w-auto ${
                   on ? "border-lime bg-bg-raised" : "border-border bg-bg-card hover:border-muted"
                 }`}
               >
@@ -198,7 +198,7 @@ export default function NewTown({
           })}
         </div>
 
-        <div className="mt-auto flex flex-col gap-3 border-t-[3px] border-border px-5 py-4">
+        <div className="mt-auto flex flex-col gap-3 border-t-[3px] border-border px-5 pt-4 lg:mt-5">
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] text-muted">Name</span>
             <input
@@ -248,10 +248,13 @@ export default function NewTown({
               Claim your building in the city first, then come back to build a town.
             </p>
           )}
+        </div>
+        {/* The one action stays in reach while the panel scrolls. */}
+        <div className="sticky bottom-0 bg-bg px-5 pt-3 pb-4">
           <button
             type="submit"
             disabled={busy || !nameOk || (!!viewer && !viewer.claimed)}
-            className="btn-press bg-lime px-4 py-3 text-sm tracking-widest text-bg disabled:opacity-40"
+            className="btn-press w-full bg-lime px-4 py-3 text-sm tracking-widest text-bg disabled:opacity-40"
           >
             {busy ? <Pending label={viewer ? "Building" : "Opening GitHub"} /> : viewer ? "Build town" : "Sign in to build"}
           </button>
