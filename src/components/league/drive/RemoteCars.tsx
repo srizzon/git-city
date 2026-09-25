@@ -13,6 +13,7 @@ import { WHEELS } from "@/lib/league-city/drive/vehicle";
 import type { CarApi } from "./Car";
 import CarModel from "./CarModel";
 import Lights from "./Lights";
+import { Bursts, FIRE, type VoxelBursts } from "./Voxels";
 import type { FxSource, FxSources } from "./fx";
 import type { CarFeed } from "./useDrivePresence";
 
@@ -36,6 +37,30 @@ const FOLLOW = 10;
 const TURN_FOLLOW = 12;
 const SNAP_DIST = 6;
 
+// ─── Bots take hits ──────────────────────────────────────────
+// A person's car is pushed by its owner (bump messages). A bot has no owner:
+// it takes the hit here. It lets go of its route, falls under gravity and
+// tumbles, then drives back onto it. Hits wear it down; at zero it blows up
+// into cubes and comes back on its route a few seconds later.
+
+/** Local hits on a bot, by bot id (DriveWorld's crashes and blasts call these). */
+export interface BotTarget {
+  /** Velocity change (m/s) and how hard the hit was (relative speed, m/s). */
+  hit: (vx: number, vz: number, power: number) => void;
+  /** Where it is (m), or null while it's out of town or wrecked. */
+  pos: () => { x: number; z: number } | null;
+}
+export type BotTargets = React.MutableRefObject<Map<string, BotTarget>>;
+
+const BOT_HP = 100;
+/** Damage per m/s of impact. A 15 m/s hit ends it, three soft ones do too. */
+const DAMAGE = 7;
+const KNOCKED_MS = 2200;
+const WRECK_DELAY_MS = 380;
+const WRECKED_MS = 7000;
+/** Past this error (m) a bot back from a knock jumps to its route instead of driving there. */
+const BOT_SNAP_DIST = 60;
+
 const [HX, HY, HZ] = CHASSIS.half;
 const M12 = CHASSIS.mass / 12;
 const MASS = {
@@ -58,11 +83,15 @@ function RemoteCar({
   sources,
   localCar,
   muted,
+  botTargets,
+  bursts,
 }: {
   remote: CarFeed;
   sources: FxSources;
   localCar: React.MutableRefObject<CarApi | null>;
   muted: boolean;
+  botTargets?: BotTargets;
+  bursts?: React.MutableRefObject<VoxelBursts | null>;
 }) {
   const group = useRef<THREE.Group>(null);
   const body = useRef<RapierRigidBody>(null);
@@ -78,6 +107,57 @@ function RemoteCar({
   const audio = useRef<{ engine: Howl; skid: Howl; gain: GainNode | null; horn: (() => void) | null } | null>(null);
   const silent = useRef(muted);
   silent.current = muted;
+  // Bots: health, and until when they're knocked loose or wrecked (performance.now()).
+  const hp = useRef(BOT_HP);
+  const knockedUntil = useRef(0);
+  const wreckedUntil = useRef(0);
+
+  useEffect(() => {
+    if (!remote.bot || !botTargets) return;
+    const map = botTargets.current;
+    const wreck = () => {
+      const b = body.current;
+      if (!b) return;
+      const p = b.translation();
+      const burst = bursts?.current;
+      burst?.burst(p.x * M_TO_UNIT, 3, p.z * M_TO_UNIT, { count: 80, speed: 55, colors: FIRE, size: 1.8, life: 1.1 });
+      burst?.burst(p.x * M_TO_UNIT, 3, p.z * M_TO_UNIT, { count: 30, speed: 35, colors: [remote.color, "#1a1a22"], size: 2.4, life: 1.4 });
+      if (!silent.current) {
+        const boom: Howl = new Howl({ src: [`${BASE}/impact.ogg`], volume: 0.7, onend: () => boom.unload() });
+        boom.play();
+      }
+      wreckedUntil.current = performance.now() + WRECKED_MS;
+      placed.current = false;
+      b.setGravityScale(0, true);
+      b.setTranslation({ x: 0, y: -50, z: 0 }, true);
+      b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      b.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    };
+    map.set(remote.id, {
+      hit: (vx, vz, power) => {
+        const b = body.current;
+        const now = performance.now();
+        if (!b || !placed.current || now < wreckedUntil.current) return;
+        hp.current -= power * DAMAGE;
+        knockedUntil.current = now + KNOCKED_MS;
+        b.setGravityScale(1, true);
+        const m = CHASSIS.mass;
+        b.applyImpulse({ x: vx * m, y: (1.5 + power * 0.22) * m, z: vz * m }, true);
+        const tq = 900 + power * 180;
+        b.applyTorqueImpulse({ x: (Math.random() - 0.5) * tq, y: (Math.random() - 0.5) * tq * 0.5, z: (Math.random() - 0.5) * tq }, true);
+        if (hp.current <= 0) setTimeout(wreck, WRECK_DELAY_MS);
+      },
+      pos: () => {
+        const b = body.current;
+        if (!b || !placed.current || performance.now() < wreckedUntil.current) return null;
+        const p = b.translation();
+        return { x: p.x, z: p.z };
+      },
+    });
+    return () => {
+      map.delete(remote.id);
+    };
+  }, [remote.bot, remote.id, remote.color, botTargets, bursts]);
 
   // Tire marks, smoke and boost trail come from the shared effect pools.
   useEffect(() => {
@@ -113,7 +193,15 @@ function RemoteCar({
   // between are real equal-mass hits and it settles back on track after.
   useBeforePhysicsStep(() => {
     const b = body.current;
-    const now = performance.now() - INTERP_MS;
+    const wall = performance.now();
+    // A bot knocked loose flies free; a wrecked one waits out of reach.
+    if (remote.bot && (wall < knockedUntil.current || wall < wreckedUntil.current)) return;
+    if (remote.bot && b && knockedUntil.current && wall >= knockedUntil.current) {
+      knockedUntil.current = 0;
+      b.setGravityScale(0, true);
+    }
+    if (remote.bot && hp.current <= 0 && wall >= wreckedUntil.current) hp.current = BOT_HP;
+    const now = wall - INTERP_MS;
     const t = remote.buffer.sample(now, target.current);
     const p0 = remote.buffer.sample(now - 50, before.current);
     if (b && (!t || !p0) && placed.current) {
@@ -127,7 +215,7 @@ function RemoteCar({
     const ex = t.x - pos.x;
     const ey = t.y - pos.y;
     const ez = t.z - pos.z;
-    if (!placed.current || Math.hypot(ex, ey, ez) > SNAP_DIST) {
+    if (!placed.current || Math.hypot(ex, ey, ez) > (remote.bot ? BOT_SNAP_DIST : SNAP_DIST)) {
       placed.current = true;
       b.setTranslation({ x: t.x, y: t.y, z: t.z }, true);
       b.setRotation({ x: t.qx, y: t.qy, z: t.qz, w: t.qw }, true);
@@ -135,10 +223,7 @@ function RemoteCar({
       b.setAngvel({ x: 0, y: 0, z: 0 }, true);
       return;
     }
-    b.setLinvel(
-      { x: (t.x - p0.x) / 0.05 + ex * FOLLOW, y: (t.y - p0.y) / 0.05 + ey * FOLLOW, z: (t.z - p0.z) / 0.05 + ez * FOLLOW },
-      true,
-    );
+    b.setLinvel({ x: (t.x - p0.x) / 0.05 + ex * FOLLOW, y: (t.y - p0.y) / 0.05 + ey * FOLLOW, z: (t.z - p0.z) / 0.05 + ez * FOLLOW }, true);
     // Rotation error as an axis-angle, the short way round.
     const r = b.rotation();
     _qa.set(t.qx, t.qy, t.qz, t.qw).multiply(_qb.set(r.x, r.y, r.z, r.w).invert());
@@ -155,7 +240,7 @@ function RemoteCar({
     const s = remote.buffer.sample(performance.now() - INTERP_MS, snap.current);
     // The body's own (interpolated) group, meters.
     const src = anchor.current?.parent;
-    g.visible = !!s && placed.current;
+    g.visible = !!s && placed.current && performance.now() >= wreckedUntil.current;
     if (!s || !src) return;
 
     g.position.copy(src.position).multiplyScalar(M_TO_UNIT);
@@ -219,12 +304,14 @@ function RemoteCar({
         <CarModel color={remote.color} wheelRefs={wheelRefs}>
           <Lights spots={false} braking={() => (flags.current & FLAG_BRAKE) !== 0} />
         </CarModel>
-        <Html position={[0, 7.5, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-          <div className="flex items-center gap-1.5 whitespace-nowrap border-2 border-border bg-bg/80 px-1.5 py-0.5 font-pixel text-[9px] uppercase text-cream">
-            <span className="h-2 w-2" style={{ background: remote.color }} aria-hidden />
-            {remote.bot ? "bot" : remote.name.startsWith("guest-") ? "guest" : `@${remote.name}`}
-          </div>
-        </Html>
+        {!remote.bot && (
+          <Html position={[0, 7.5, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+            <div className="flex items-center gap-1.5 whitespace-nowrap border-2 border-border bg-bg/80 px-1.5 py-0.5 font-pixel text-[9px] uppercase text-cream">
+              <span className="h-2 w-2" style={{ background: remote.color }} aria-hidden />
+              {remote.name.startsWith("guest-") ? "guest" : `@${remote.name}`}
+            </div>
+          </Html>
+        )}
       </group>
     </>
   );
@@ -236,17 +323,21 @@ export default function RemoteCars({
   sources,
   localCar,
   muted,
+  botTargets,
 }: {
   cars: CarFeed[];
   sources: FxSources;
   localCar: React.MutableRefObject<CarApi | null>;
   muted: boolean;
+  botTargets?: BotTargets;
 }) {
+  const bursts = useRef<VoxelBursts | null>(null);
   return (
     <>
       {cars.map((c) => (
-        <RemoteCar key={c.id} remote={c} sources={sources} localCar={localCar} muted={muted} />
+        <RemoteCar key={c.id} remote={c} sources={sources} localCar={localCar} muted={muted} botTargets={botTargets} bursts={bursts} />
       ))}
+      {botTargets && <Bursts ref={bursts} />}
     </>
   );
 }

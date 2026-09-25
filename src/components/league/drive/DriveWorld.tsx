@@ -30,7 +30,7 @@ import { BoostTrail, Smoke } from "./Particles";
 import SkidMarks from "./SkidMarks";
 import { useDriveAudio } from "./useDriveAudio";
 import { useDrivePresence, type BattleEvent } from "./useDrivePresence";
-import RemoteCars from "./RemoteCars";
+import RemoteCars, { type BotTarget } from "./RemoteCars";
 import { useTownBots } from "./useTownBots";
 import type { FxSource, FxSources } from "./fx";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
@@ -291,9 +291,35 @@ export default function DriveWorld({
   // Bots fill in for missing drivers (you count as one).
   const bots = useTownBots(slug, objects, drivers.length + 1);
   const cars = [...drivers.flatMap((d) => remotes.current.get(d.id) ?? []), ...bots];
+  const botTargets = useRef(new Map<string, BotTarget>());
+  /** A blast at (x, z) meters throws every bot in reach, harder the closer. */
+  const blastBots = (x: number, z: number, reach: number, power: number) => {
+    for (const t of botTargets.current.values()) {
+      const p = t.pos();
+      if (!p) continue;
+      const d = Math.hypot(p.x - x, p.z - z);
+      if (d > reach) continue;
+      const k = 1 - d / reach;
+      const nx = d > 0.01 ? (p.x - x) / d : 0;
+      const nz = d > 0.01 ? (p.z - z) / d : 0;
+      t.hit(nx * power * k, nz * power * k, power * k);
+    }
+  };
   const onRemoteHit = (id: string, other: RapierRigidBody) => {
-    // A bot takes the hit in the physics alone: nobody to tell, no crown to take.
-    if (id.startsWith("bot:")) return;
+    if (id.startsWith("bot:")) {
+      // Nobody to tell: the bot takes the hit here, as hard as you came in.
+      const c = car.current;
+      const now = performance.now();
+      if (!c || now - (contacts.current.get(id) ?? 0) < BUMP_DEDUPE_MS) return;
+      contacts.current.set(id, now);
+      const mine = c.body.linvel();
+      const theirs = other.linvel();
+      const rx = mine.x - theirs.x;
+      const rz = mine.z - theirs.z;
+      const power = Math.hypot(rx, rz);
+      if (power > 2) botTargets.current.get(id)?.hit(rx * 0.8, rz * 0.8, power);
+      return;
+    }
     crownHit.current(id);
     const c = car.current;
     const now = performance.now();
@@ -335,7 +361,7 @@ export default function DriveWorld({
             <Lights braking={() => !!car.current?.state.braking} />
           </Car>
           <LocalFx car={car} sources={fx} />
-          <RemoteCars cars={cars} sources={fx} localCar={car} muted={muted || paused} />
+          <RemoteCars cars={cars} sources={fx} localCar={car} muted={muted || paused} botTargets={botTargets} />
           <Battle
             objects={objects}
             car={car}
@@ -347,6 +373,7 @@ export default function DriveWorld({
             impactRef={impact}
             telemetryRef={telemetryRef}
             onKnocked={() => crownKnock.current()}
+            onBlast={blastBots}
             muted={muted || paused}
           />
           <CrownMode
