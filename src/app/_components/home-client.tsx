@@ -3547,7 +3547,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
 
           {/* Navigation hints (bottom-right) — hidden when building card is open */}
           {!selectedBuilding && (
-            <div className="absolute bottom-20 left-3 text-[8px] leading-loose text-muted sm:left-4 sm:text-[9px]">
+            <div className="absolute bottom-20 left-3 hidden text-[8px] leading-loose text-muted sm:left-4 sm:block sm:text-[9px]">
               <div><span className="text-cream">Drag</span> move</div>
               <div><span className="text-cream">Scroll</span> zoom</div>
               <div><span className="text-cream">Right-drag</span> rotate</div>

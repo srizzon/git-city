@@ -23,7 +23,7 @@ export default function MapNavControls({
   return (
     <>
       {showPlaces && (
-        <div className="pointer-events-auto fixed left-1/2 top-3 z-30 flex max-w-[calc(100vw-9rem)] -translate-x-1/2 gap-1.5 overflow-x-auto [scrollbar-width:none] sm:top-4">
+        <div className="no-scrollbar pointer-events-auto fixed left-3 right-3 top-16 z-30 flex gap-1.5 overflow-x-auto overflow-y-hidden pb-1 pr-1 sm:left-1/2 sm:right-auto sm:top-4 sm:max-w-[calc(100vw-9rem)] sm:-translate-x-1/2">
           {MAP_PLACES.map((p) => (
             <button
               key={p.label}
@@ -42,8 +42,9 @@ export default function MapNavControls({
             <polygon points="9,17 13,9 9,10.5 5,9" fill="currentColor" opacity="0.45" />
           </svg>
         </button>
-        <button onClick={() => mapNav.send({ type: "zoom", factor: 0.6 })} className={btn} aria-label="Zoom in">+</button>
-        <button onClick={() => mapNav.send({ type: "zoom", factor: 1 / 0.6 })} className={btn} aria-label="Zoom out">−</button>
+        {/* Phones pinch to zoom; the buttons are for mouse users (Google Maps does the same). */}
+        <button onClick={() => mapNav.send({ type: "zoom", factor: 0.6 })} className={`${btn} max-sm:hidden`} aria-label="Zoom in">+</button>
+        <button onClick={() => mapNav.send({ type: "zoom", factor: 1 / 0.6 })} className={`${btn} max-sm:hidden`} aria-label="Zoom out">−</button>
       </div>
     </>
   );
