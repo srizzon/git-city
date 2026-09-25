@@ -6,6 +6,12 @@
 
 export const SEND_MS = 66;
 export const INTERP_MS = 110;
+/**
+ * Spectators (the city in view mode, ?watch=1) get every car in one message
+ * this often instead of each car's stream, and draw them further behind.
+ */
+export const WATCH_MS = 200;
+export const WATCH_INTERP_MS = 320;
 export const MAX_DRIVERS = 30;
 export const MAX_MESSAGE_BYTES = 512;
 /** Physics works in meters; a 40-lot city spans ±400 m. Anything past this is junk. */
@@ -75,6 +81,8 @@ export type ServerMsg =
   | { t: "join"; id: string; name: string }
   | { t: "leave"; id: string }
   | { t: "full" }
+  /** Spectators only: every driver's latest state, [id, ...11 numbers] each. */
+  | { t: "cars"; cars: [string, ...number[]][] }
   | { t: "bump"; from: string; x: number; z: number }
   | ["s", string, ...number[]];
 
