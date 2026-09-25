@@ -44,7 +44,7 @@ const BOSS_SELF_HIT_IFRAME_MS = 1_200; // i-frames after a boss attack hits you
 // city radius, so the envelope has to cover that.
 const COORD_ABS_MAX = 40_000;
 const ALT_MIN = -200;
-const ALT_MAX = 1_500; // the client ceiling is 1400 (cruise altitude)
+const ALT_MAX = 1_000;
 
 // Happy Hour windows in UTC hours (must mirror src/lib/happyHour.ts)
 const HAPPY_HOUR_UTC_STARTS = [15, 22, 2];

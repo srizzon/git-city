@@ -427,15 +427,21 @@ const DEFAULT_FLY_SPEED = 55;
 const MIN_FLY_SPEED = 30;
 const MAX_FLY_SPEED = 200;
 const MIN_ALT = 25;
-const MAX_ALT = 1400;
-// Cruise: the higher you fly, the faster, so the Bay Area crosses in seconds
-// while low flight between buildings keeps its old pace.
-const CRUISE_FROM_ALT = 250;
-const CRUISE_MAX_MULT = 6;
-// Boost ramps up while held instead of jumping.
-const BOOST_MAX_MULT = 4;
-const BOOST_RAMP_S = 1.1;
-const BOOST_DECAY_S = 0.6;
+const MAX_ALT = 900;
+// Boost: held, speed eases up to 6x (crossing the Bay takes ~30 s instead of
+// minutes); released, it eases back. Speed never depends on altitude.
+const BOOST_MAX_MULT = 6;
+const SPEED_EASE_UP = 1.4;   // 1/s toward a higher target
+const SPEED_EASE_DOWN = 2.2; // 1/s toward a lower target
+// Speed reads through the lens, not the camera distance: the field of view
+// widens with speed (arcade flight / racing convention) plus a slight shake.
+const BASE_FOV = 55;
+const MAX_FOV_KICK = 18;
+// Climb follows forward speed (a constant climb angle), so up/down matches turning.
+const CLIMB_PER_SPEED = 0.9;
+const MIN_CLIMB = 40;
+// Sky coins spawn within this distance of downtown.
+const COIN_RADIUS = 8000;
 
 function smoothstep(a: number, b: number, v: number): number {
   const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
@@ -482,7 +488,13 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
   const flySpeed = useRef(DEFAULT_FLY_SPEED);
   const bank = useRef(0);
   const pitch = useRef(0);
-  const boostLevel = useRef(0);
+  const curSpeed = useRef(DEFAULT_FLY_SPEED);
+  // The boost widens the lens; leaving flight hands the camera back at its base field of view.
+  useEffect(() => () => {
+    const persp = camera as THREE.PerspectiveCamera;
+    persp.fov = BASE_FOV;
+    persp.updateProjectionMatrix();
+  }, [camera]);
 
   // Camera smoothing
   const camPos = useRef(new THREE.Vector3(0, 140, 450));
@@ -872,22 +884,17 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     if (k["KeyW"] || k["ArrowUp"]) altInput = 1;
     if (k["KeyS"] || k["ArrowDown"]) altInput = -1;
 
-    // Shift = boost (ramps up to 4x while held), Alt = slow 0.3x, mobile boost/brake props
-    const boosting = !!(k["ShiftLeft"] || k["ShiftRight"] || boostActive);
-    boostLevel.current = boosting
-      ? Math.min(1, boostLevel.current + dt / BOOST_RAMP_S)
-      : Math.max(0, boostLevel.current - dt / BOOST_DECAY_S);
-    let speedMult = 1 + (BOOST_MAX_MULT - 1) * smoothstep(0, 1, boostLevel.current);
+    // Shift = boost (eases up to 6x while held), Alt = slow 0.3x, mobile boost/brake props
+    let speedMult = 1;
+    if (k["ShiftLeft"] || k["ShiftRight"] || boostActive) speedMult = BOOST_MAX_MULT;
     if (k["AltLeft"] || k["AltRight"] || brakeActive) speedMult = 0.3;
+    const targetSpeed = flySpeed.current * speedMult;
+    const ease = targetSpeed > curSpeed.current ? SPEED_EASE_UP : SPEED_EASE_DOWN;
+    curSpeed.current += (targetSpeed - curSpeed.current) * (1 - Math.exp(-ease * dt));
+    const actualSpeed = curSpeed.current;
 
-    // Altitude cruise: 1x below CRUISE_FROM_ALT, up to 6x at the ceiling.
-    const cruise = 1 + (CRUISE_MAX_MULT - 1) * smoothstep(CRUISE_FROM_ALT, MAX_ALT, pos.current.y);
-    const actualSpeed = flySpeed.current * speedMult * cruise;
-
-    // Climb follows the base speed and boost, not the cruise multiplier, so
-    // up/down keeps the same feel as turning (at most ~2.5x the old rate).
-    const climbScale = Math.min(2.5, Math.sqrt((flySpeed.current * speedMult) / DEFAULT_FLY_SPEED) * (1 + 0.4 * smoothstep(150, 900, pos.current.y)));
-    pos.current.y += altInput * CLIMB_RATE * climbScale * dt;
+    const climb = Math.max(MIN_CLIMB, actualSpeed * CLIMB_PER_SPEED);
+    pos.current.y += altInput * climb * dt;
     pos.current.y = Math.max(MIN_ALT, Math.min(MAX_ALT, pos.current.y));
 
     _fwd.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
@@ -945,15 +952,18 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       }
     }
 
-    // Pulls back with speed, gently past cruise speeds.
-    const camDist = 35 + Math.min(actualSpeed, 150) * 0.2 + Math.max(0, Math.min(actualSpeed, 1200) - 150) * 0.03;
+    // Distance follows the chosen base speed only (as before); boost never pushes the camera away.
+    const camDist = 35 + flySpeed.current * 0.2;
     _camOffset.set(0, 15, camDist).applyAxisAngle(_yAxis, yaw.current);
     _idealCamPos.copy(pos.current).add(_camOffset);
 
     _idealLook.copy(pos.current).addScaledVector(_fwd, 5).y += 2;
 
-    const lerpXZ = 2.0 * dt;
-    const lerpY = 1.8 * dt;
+    // The follow stiffens with speed: a fixed lag rate left the camera
+    // trailing ~speed/2 units behind, so the plane shrank away when fast.
+    const follow = 2.0 + actualSpeed / 18;
+    const lerpXZ = 1 - Math.exp(-follow * dt);
+    const lerpY = 1 - Math.exp(-(follow * 0.9) * dt);
     camPos.current.x += (_idealCamPos.x - camPos.current.x) * lerpXZ;
     camPos.current.z += (_idealCamPos.z - camPos.current.z) * lerpXZ;
     camPos.current.y += (_idealCamPos.y - camPos.current.y) * lerpY;
@@ -968,6 +978,18 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       camera.position.copy(camPos.current);
     }
     camera.lookAt(camLook.current);
+
+    // Sense of speed: wider lens and a faint shake as boost builds.
+    const speedK = smoothstep(1.3, BOOST_MAX_MULT, actualSpeed / Math.max(1, flySpeed.current));
+    const persp = camera as THREE.PerspectiveCamera;
+    const fov = BASE_FOV + MAX_FOV_KICK * speedK;
+    if (Math.abs(persp.fov - fov) > 0.05) { persp.fov = fov; persp.updateProjectionMatrix(); }
+    if (speedK > 0.05) {
+      const t = state.clock.elapsedTime;
+      const amp = 0.35 * speedK;
+      camera.position.x += Math.sin(t * 37.1) * amp;
+      camera.position.y += Math.sin(t * 41.3 + 1.7) * amp * 0.7;
+    }
 
     // Update trail
     if (!trailInit.current) {
@@ -1097,8 +1119,9 @@ function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius, sfM
     ];
 
     // ── SF mode: anchor coins above real buildings, spread across the city ──
-    // Only buildings inside cityRadius (the SF core), not the whole Bay Area.
-    const pool = sfMap ? buildings.filter((b) => b.position[0] ** 2 + b.position[2] ** 2 <= cityRadius * cityRadius) : [];
+    // Only buildings near downtown: across the whole Bay the coins were too sparse to chase.
+    const coinR = Math.min(cityRadius, COIN_RADIUS);
+    const pool = sfMap ? buildings.filter((b) => b.position[0] ** 2 + b.position[2] ** 2 <= coinR * coinR) : [];
     if (sfMap && pool.length > 0) {
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       for (const b of pool) {
