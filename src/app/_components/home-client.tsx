@@ -59,6 +59,7 @@ import RadarMap from "@/components/RadarMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
 import { ensureFootprints, loadHomeSnapshot, loadSFMap, type HomeSnapshot } from "@/lib/city-snapshot-client";
 import { waitForCityFrame } from "@/lib/city-first-frame";
+import { LazyRef } from "@/lib/lazy-ref";
 import { sfRenderMap } from "@/lib/city-sf-layout";
 import { usePerfMode } from "@/lib/perfMode";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
@@ -632,7 +633,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
   const failedUsernamesRef = useRef<Map<string, string>>(new Map()); // username -> error code
   const [buildings, setBuildings] = useState<CityBuilding[]>([]);
   // Keep raw dev records so we can inject new devs and regenerate layout locally
-  const rawDevsRef = useRef<DeveloperRecord[]>([]);
+  const [rawDevsRef] = useState(() => new LazyRef<DeveloperRecord[]>([]));
   // City-wide layout maxima from the v2 snapshot (which only ships placed devs).
   const layoutNormsRef = useRef<LayoutNorms | undefined>(undefined);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1687,11 +1688,32 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
     if (!bustCache) {
       const snapshot = await loadHomeSnapshot();
       if (snapshot) {
-        allDevs = snapshot.developers;
         cityStats = snapshot.stats;
         dropsPayload = snapshot._d ?? [];
         layoutNormsRef.current = snapshot.norms;
         prebuilt = snapshot.layout;
+        // Laid out already and nothing to re-lay out: the records decode on first read.
+        if (prebuilt && pinnedDevs.size === 0) {
+          rawDevsRef.setLazy(() => snapshot.developers);
+          if (dropsPayload.length > 0) dropsPayloadRef.current = dropsPayload;
+          setStats(cityStats);
+          const sfFast = await loadSFMap();
+          sfMapRef.current = sfFast;
+          if (sfFast) {
+            const fast = { ...prebuilt, sfMap: sfRenderMap(sfFast) };
+            mergeDrops(fast.buildings);
+            setBuildings(fast.buildings);
+            setPlazas(fast.plazas);
+            setDecorations(fast.decorations);
+            setRiver(fast.river);
+            setBridges(fast.bridges);
+            setDistrictZones(fast.districtZones);
+            setSfMap(fast.sfMap ?? null);
+            setCityCache({ ...fast, stats: cityStats, get rawDevs() { return rawDevsRef.current; }, norms: layoutNormsRef.current });
+            return fast.buildings;
+          }
+        }
+        allDevs = snapshot.developers;
       }
     }
 
@@ -1781,7 +1803,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
     // Return visit: restore from cache or fetch silently
     const cached = getCityCache();
     if (cached) {
-      rawDevsRef.current = cached.rawDevs ?? [];
+      rawDevsRef.setLazy(() => cached.rawDevs ?? []);
       layoutNormsRef.current = cached.norms;
       setBuildings(cached.buildings);
       setPlazas(cached.plazas);
@@ -1827,8 +1849,11 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         // Self-heals on a fresh environment: builds the snapshot, then retries.
         const snapshot = await loadHomeSnapshot();
         let prebuilt = snapshot?.layout;
+        // Laid out already and nothing to re-lay out: the developer records
+        // decode on first read instead of now (~a second on 87k).
+        const lazyDevs = !!(snapshot && prebuilt && pinnedDevs.size === 0);
         if (snapshot) {
-          allDevs = snapshot.developers;
+          if (!lazyDevs) allDevs = snapshot.developers;
           cityStats = snapshot.stats;
           dropsPayload = snapshot._d ?? [];
           layoutNormsRef.current = snapshot.norms;
@@ -1836,7 +1861,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
 
         // Local dev has no storage snapshot — read straight from the DB so the
         // city renders without a snapshot-generation step. Local-only.
-        if ((!allDevs || allDevs.length === 0) && isLocalSupabase()) {
+        if (!lazyDevs && (!allDevs || allDevs.length === 0) && isLocalSupabase()) {
           try {
             const res = await fetch("/api/city?from=0&to=1000");
             if (res.ok) {
@@ -1851,15 +1876,16 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         setLoadProgress(30);
         performance.mark("city:data");
 
-        if (!allDevs || allDevs.length === 0) {
+        if (!lazyDevs && (!allDevs || allDevs.length === 0)) {
           setLoadProgress(100);
           setLoadStage("ready");
           return;
         }
 
-        // Apply loadout override from localStorage (saved in shop, TTL 10 min)
+        // Apply loadout override from localStorage (saved in shop, TTL 10 min).
+        // Prebuilt snapshots got it in the worker already.
         try {
-          const raw = localStorage.getItem("gitcity:loadout_override");
+          const raw = lazyDevs ? null : localStorage.getItem("gitcity:loadout_override");
           if (raw) {
             const { developerId, loadout, ts } = JSON.parse(raw);
             if (Date.now() - ts < 10 * 60 * 1000) {
@@ -1885,7 +1911,8 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
           prebuilt = undefined; // the worker's layout knows nothing about pins
         }
 
-        rawDevsRef.current = allDevs;
+        if (lazyDevs && snapshot) rawDevsRef.setLazy(() => snapshot.developers);
+        else rawDevsRef.current = allDevs;
         if (dropsPayload.length > 0) dropsPayloadRef.current = dropsPayload;
         setStats(cityStats);
         const sfInit = await loadSFMap();
@@ -1919,8 +1946,8 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
 
         setLoadProgress(80);
 
-        // Save to cache for return visits
-        setCityCache({ ...finalLayout, stats: cityStats, rawDevs: rawDevsRef.current, norms: layoutNormsRef.current });
+        // Save to cache for return visits (records stay lazy until something reads them)
+        setCityCache({ ...finalLayout, stats: cityStats, get rawDevs() { return rawDevsRef.current; }, norms: layoutNormsRef.current });
         setLoadProgress(95);
 
         // Enforce minimum 800ms display time to avoid flash

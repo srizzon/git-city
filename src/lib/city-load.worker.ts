@@ -17,7 +17,10 @@ self.onmessage = async (e: MessageEvent<CityWorkerRequest>) => {
   try {
     const { snapshot, sf, loadoutOverride } = e.data;
     const stream = new Blob([snapshot]).stream().pipeThrough(new DecompressionStream("gzip"));
-    const raw = (await new Response(stream).json()) as SnapshotV2;
+    // Parsed from text so the text itself can go back to the page: cloning an
+    // 18 MB string is a copy, cloning 87k decoded records took ~0.5-1 s.
+    const text = await new Response(stream).text();
+    const raw = JSON.parse(text) as SnapshotV2;
     if (raw?.v !== 2) throw new Error("not a v2 snapshot");
     const decoded = decodeSnapshotV2(raw);
     if (loadoutOverride) {
@@ -34,7 +37,9 @@ self.onmessage = async (e: MessageEvent<CityWorkerRequest>) => {
     // sfMap is a projection of the asset the main thread already holds.
     const { sfMap: _omit, ...layout } = generateSFCityLayout(decoded.developers, sf, decoded.norms);
     void _omit;
-    self.postMessage({ ok: true, snapshot: decoded, layout });
+    const { developers: _devs, ...meta } = decoded;
+    void _devs;
+    self.postMessage({ ok: true, meta: { ...meta, count: decoded.developers.length }, text, layout });
   } catch (err) {
     self.postMessage({ ok: false, error: err instanceof Error ? err.message : String(err) });
   }
