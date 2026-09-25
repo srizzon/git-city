@@ -1985,12 +1985,17 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
   // *reports* sustained frame drops so the HUD can suggest switching to low;
   // the user makes the call via the perf toggle.
   const lowPerf = perfMode === "low";
-  // Graphics A/B flags for measuring phones (?logdepth=0, ?dpr=1, ?bloom=0, ?smaa=0).
+  // Graphics A/B flags for measuring phones (?logdepth=0|1, ?dpr=1, ?bloom=0, ?smaa=0).
+  // Log depth writes depth per pixel, which turns off the hidden-surface
+  // removal of phone GPUs: off by default on touch devices (2x fps on an
+  // iPhone 15). near 6 / far 16000 stays precise enough without it.
   const gfx = useMemo(() => {
     const q = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
     const dprParam = Number(q?.get("dpr"));
+    const touch = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+    const logDepthParam = q?.get("logdepth");
     return {
-      logDepth: q?.get("logdepth") !== "0",
+      logDepth: logDepthParam ? logDepthParam !== "0" : !touch,
       dpr: Number.isFinite(dprParam) && dprParam > 0 ? Math.min(3, dprParam) : null,
       bloom: q?.get("bloom") !== "0",
       smaa: q?.get("smaa") !== "0",
