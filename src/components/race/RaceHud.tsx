@@ -501,8 +501,8 @@ export default function RaceHud({
         {ready && stage === "title" && (
           <div className="mx-auto flex h-full max-w-5xl items-center justify-between gap-6 px-8">
             <div className="flex flex-col gap-2">
-              <p className="text-[10px] text-lime">Time trial · {RUN_LAPS} laps</p>
-              <p className="flex items-center gap-4 text-[10px] text-muted">
+              <p className="text-sm text-lime">Time trial · {RUN_LAPS} laps</p>
+              <p className="flex items-center gap-5 text-[11px] text-muted">
                 <span>
                   Your best <span className="text-cream tabular-nums">{pb !== null ? formatLap(pb) : "-:--.---"}</span>
                 </span>
@@ -532,7 +532,7 @@ export default function RaceHud({
         )}
         {ready && stage === "intro" && (
           <div className="mx-auto flex h-full max-w-5xl items-center justify-end px-8">
-            <p className="text-[9px] text-muted">Any key to skip</p>
+            <p className="text-[11px] text-muted">Any key to skip</p>
           </div>
         )}
       </div>
@@ -577,9 +577,11 @@ export default function RaceHud({
           className={`absolute inset-x-0 top-[30%] flex flex-col items-center ${finishBeat === 1 ? "animate-[race-banner-out_0.3s_ease-in_forwards]" : ""}`}
         >
           <div className="h-4 w-[min(640px,90vw)] bg-[repeating-conic-gradient(#0b0d12_0_25%,#f4efe6_0_50%)] bg-[length:16px_16px]" />
-          <span className="animate-[race-slam_0.3s_ease-out] py-3 text-7xl text-cream drop-shadow-[0_5px_0_#000]">
-            Finish
-          </span>
+          <div className="flex w-[min(640px,90vw)] justify-center bg-bg/85">
+            <span className="animate-[race-slam_0.3s_ease-out] py-4 text-7xl text-cream drop-shadow-[0_5px_0_#000]">
+              Finish
+            </span>
+          </div>
           <div className="h-4 w-[min(640px,90vw)] bg-[repeating-conic-gradient(#0b0d12_0_25%,#f4efe6_0_50%)] bg-[length:16px_16px]" />
         </div>
       )}
@@ -761,14 +763,14 @@ function TrialCard({
   useEffect(() => again.current?.focus({ preventScroll: true }), []);
   return (
     <section
-      className={`${HUD_BOX} absolute right-[6vw] top-1/2 w-[340px] animate-[race-card-in_0.35s_ease-out_both] px-5 py-4`}
+      className={`${HUD_BOX} absolute right-[6vw] top-1/2 w-[360px] animate-[race-card-in_0.35s_ease-out_both] px-5 py-4`}
       style={{ transform: "translateY(-50%)" }}
     >
       <div className="flex items-start justify-between">
-        <p className="text-[10px] text-muted">Time trial · {run.laps.length} laps</p>
+        <p className="text-[11px] text-muted">Time trial · {run.laps.length} laps</p>
         {m && (
           <span
-            className="animate-[race-slam_0.3s_ease-out_0.4s_both] border-[3px] px-2 py-0.5 text-[10px]"
+            className="animate-[race-slam_0.3s_ease-out_0.4s_both] border-[3px] px-2 py-0.5 text-[11px]"
             style={{ borderColor: MEDAL_COLORS[m], color: MEDAL_COLORS[m] }}
           >
             {m}
@@ -776,7 +778,7 @@ function TrialCard({
         )}
       </div>
       <p className="mt-2 text-4xl text-cream tabular-nums">{formatLap(run.total)}</p>
-      <p className="mt-1 flex items-center gap-3 text-[11px] tabular-nums">
+      <p className="mt-2 flex items-center gap-3 text-xs tabular-nums">
         {run.record ? (
           <span className="animate-pulse bg-lime px-2 py-0.5 text-bg">New record</span>
         ) : null}
@@ -789,11 +791,11 @@ function TrialCard({
         {run.laps.map((l, i) => {
           const fastest = l.valid && l.ms === bestLap;
           return (
-            <li key={i} className="flex items-center justify-between text-[11px] tabular-nums">
+            <li key={i} className="flex items-center justify-between text-xs tabular-nums">
               <span className="text-muted">Lap {i + 1}</span>
               <span className={!l.valid ? "text-dim line-through" : fastest ? "text-lime" : "text-cream"}>
                 {formatLap(l.ms)}
-                {fastest && <span className="ml-2 text-[8px]">best</span>}
+                {fastest && <span className="ml-2 text-[9px]">best</span>}
                 {!l.valid && <span className="ml-2 text-[8px] no-underline">void</span>}
               </span>
             </li>
@@ -801,7 +803,7 @@ function TrialCard({
         })}
       </ol>
       {(lapPb || rank !== null) && (
-        <p className="mt-3 flex justify-between text-[9px]">
+        <p className="mt-3 flex justify-between text-[11px]">
           {lapPb ? <span className="text-lime">New best lap</span> : <span />}
           {rank !== null && (
             <span className="text-muted">
@@ -815,14 +817,14 @@ function TrialCard({
           ref={again}
           type="button"
           onClick={onRestart}
-          className="flex items-center justify-center gap-2 bg-lime px-3 py-2 text-[10px] text-bg outline-none transition-[filter] hover:brightness-110 focus-visible:ring-2 focus-visible:ring-cream active:translate-y-px"
+          className="flex items-center justify-center gap-2 bg-lime px-3 py-2.5 text-[11px] text-bg outline-none transition-[filter] hover:brightness-110 focus-visible:ring-2 focus-visible:ring-cream active:translate-y-px"
         >
           <span className="border-2 border-bg px-1">R</span> Again
         </button>
         <button
           type="button"
           onClick={onExit}
-          className="border-2 border-border px-3 py-2 text-[10px] text-cream transition-colors hover:text-lime"
+          className="border-2 border-border px-3 py-2.5 text-[11px] text-cream transition-colors hover:text-lime"
         >
           Back to town
         </button>
