@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendJobDigestNotification } from "@/lib/notification-senders/job-digest";
 import { alertCronHighErrorRate, alertCronTimeout } from "@/lib/cron-monitor";
+import { tallySends } from "@/lib/notifications";
+import { mapWithConcurrency } from "@/lib/concurrency";
+
+export const maxDuration = 300;
 
 const BATCH_SIZE = 50;
-const MAX_DURATION_MS = 55_000; // Abort at 55s to leave margin for response
+const MAX_DURATION_MS = 240_000; // Stop at 240s to leave margin under maxDuration
+const SEND_CONCURRENCY = 4;
+
+type DigestJobs = Parameters<typeof sendJobDigestNotification>[2];
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -60,6 +67,7 @@ export async function GET(req: NextRequest) {
         developer:developers!inner(id, github_login, email)
       `)
       .not("developer.email", "is", null)
+      .order("id", { ascending: true })
       .range(offset, offset + BATCH_SIZE - 1);
 
     if (!rows || rows.length === 0) {
@@ -77,6 +85,7 @@ export async function GET(req: NextRequest) {
       (allPrefs ?? []).map((p) => [p.developer_id, p]),
     );
 
+    const toSend: { id: number; login: string; jobs: DigestJobs }[] = [];
     for (const row of rows) {
       const dev = row.developer as unknown as { id: number; github_login: string; email: string };
       if (!dev.email || !dev.github_login) { results.skipped++; continue; }
@@ -103,9 +112,13 @@ export async function GET(req: NextRequest) {
         .slice(0, 10);
 
       if (matchingJobs.length === 0) { results.skipped++; continue; }
-      sendJobDigestNotification(dev.id, dev.github_login, matchingJobs);
-      results.sent++;
+      toSend.push({ id: dev.id, login: dev.github_login, jobs: matchingJobs });
     }
+
+    tallySends(
+      await mapWithConcurrency(toSend, SEND_CONCURRENCY, (d) => sendJobDigestNotification(d.id, d.login, d.jobs)),
+      results,
+    );
 
     hasMore = rows.length === BATCH_SIZE;
     offset += BATCH_SIZE;
@@ -149,6 +162,7 @@ export async function GET(req: NextRequest) {
       const { data: jobDevIds } = await admin
         .from("job_applications")
         .select("developer_id")
+        .order("id", { ascending: true })
         .range(passiveOffset, passiveOffset + BATCH_SIZE - 1);
 
       if (!jobDevIds || jobDevIds.length === 0) { passiveHasMore = false; break; }
@@ -183,6 +197,7 @@ export async function GET(req: NextRequest) {
         .in("developer_id", devIds);
       const prefsMap = new Map((allPrefs ?? []).map((p) => [p.developer_id, p]));
 
+      const toSend: { id: number; login: string; jobs: DigestJobs }[] = [];
       for (const dev of devs) {
         if (hasProfileSet.has(dev.id)) { results.skipped++; continue; }
         if (!dev.email || !dev.primary_language) { results.skipped++; continue; }
@@ -209,11 +224,16 @@ export async function GET(req: NextRequest) {
           .slice(0, 10);
 
         if (matchingJobs.length === 0) { results.skipped++; continue; }
-        sendJobDigestNotification(dev.id, dev.github_login, matchingJobs);
-        results.sent++;
+        toSend.push({ id: dev.id, login: dev.github_login, jobs: matchingJobs });
       }
 
-      passiveHasMore = devs.length === BATCH_SIZE;
+      tallySends(
+        await mapWithConcurrency(toSend, SEND_CONCURRENCY, (d) => sendJobDigestNotification(d.id, d.login, d.jobs)),
+        results,
+      );
+
+      // Page on the unfiltered application rows, not the filtered devs.
+      passiveHasMore = jobDevIds.length === BATCH_SIZE;
       passiveOffset += BATCH_SIZE;
     }
   }
