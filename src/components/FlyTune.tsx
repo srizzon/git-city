@@ -6,10 +6,10 @@
 import { useState } from "react";
 
 export const FLY_TUNE = {
-  /** Top speed as a multiple of the 55 u/s cruise the flight starts at. */
-  boost: 18,
-  /** How fast the throttle moves while Shift or Alt/Q is held (1/s, log scale). */
-  throttleRate: 1.2,
+  /** Top throttle speed (scroll wheel) as a multiple of the 55 u/s cruise the flight starts at. */
+  boost: 10,
+  /** Shift held multiplies the throttle speed by this, easing back on release. */
+  shiftBoost: 2.5,
   /** Throttle change per scroll-wheel notch (log scale: 0.3 = x1.35 a notch). */
   wheelStep: 0.3,
   /** How fast speed eases toward its target (1/s). */
@@ -33,7 +33,7 @@ export const FLY_TUNE = {
 type Key = keyof typeof FLY_TUNE;
 const RANGES: Record<Key, [number, number, number]> = {
   boost: [1, 30, 0.5],
-  throttleRate: [0.3, 4, 0.1],
+  shiftBoost: [1, 5, 0.1],
   wheelStep: [0.05, 0.8, 0.05],
   speedEase: [0.3, 6, 0.1],
   camDist: [20, 120, 1],

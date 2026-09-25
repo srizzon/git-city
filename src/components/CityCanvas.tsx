@@ -425,10 +425,10 @@ function CameraFocus({
 // ─── Mouse-Driven Flight ─────────────────────────────────────
 
 const DEFAULT_FLY_SPEED = 55;
-// Throttle model (War Thunder, Flight Simulator, GTA planes): the scroll wheel,
-// or Shift / Alt-Q held, moves the throttle and the speed stays where you
-// leave it, from a hover (0) up to cruise x FLY_TUNE.boost. Changes are
-// proportional so they feel the same slow or fast.
+// Throttle model (War Thunder, Flight Simulator, GTA planes): the scroll wheel
+// moves the throttle and the speed stays where you leave it, from a hover (0)
+// up to cruise x FLY_TUNE.boost; Shift boosts and Alt/Q brakes on top while
+// held. Wheel changes are proportional so they feel the same slow or fast.
 const HOVER_BELOW = 8; // under this, lowering the throttle settles into a hover
 const MIN_ALT = 25;
 const MAX_ALT = 900;
@@ -897,19 +897,12 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     if (k["KeyW"] || k["ArrowUp"]) altInput = 1;
     if (k["KeyS"] || k["ArrowDown"]) altInput = -1;
 
-    // Throttle: Shift up, Alt/Q down (mobile: boost/brake buttons); it stays put on release.
-    const maxSpeed = DEFAULT_FLY_SPEED * FLY_TUNE.boost;
-    const up = k["ShiftLeft"] || k["ShiftRight"] || boostActive;
-    const downT = k["AltLeft"] || k["AltRight"] || k["KeyQ"] || brakeActive;
-    if (up && !downT) {
-      flySpeed.current = Math.min(maxSpeed, Math.max(HOVER_BELOW, flySpeed.current) * Math.exp(FLY_TUNE.throttleRate * dt));
-    } else if (downT && !up) {
-      flySpeed.current = flySpeed.current <= HOVER_BELOW
-        ? Math.max(0, flySpeed.current - 12 * dt)
-        : flySpeed.current * Math.exp(-FLY_TUNE.throttleRate * dt);
-    }
-    flySpeed.current = Math.min(maxSpeed, flySpeed.current);
-    const targetSpeed = flySpeed.current;
+    // Throttle (scroll wheel) sets the base speed, which stays put. On top of it,
+    // Shift held boosts and Alt/Q held brakes (mobile: boost/brake buttons),
+    // both easing back to the throttle on release (Ace Combat over War Thunder).
+    const boosting = k["ShiftLeft"] || k["ShiftRight"] || boostActive;
+    const braking = k["AltLeft"] || k["AltRight"] || k["KeyQ"] || brakeActive;
+    const targetSpeed = flySpeed.current * (braking ? 0.3 : boosting ? FLY_TUNE.shiftBoost : 1);
     const ease = targetSpeed > curSpeed.current ? FLY_TUNE.speedEase : FLY_TUNE.speedEase * 1.6;
     curSpeed.current += (targetSpeed - curSpeed.current) * (1 - Math.exp(-ease * dt));
     const actualSpeed = curSpeed.current;
@@ -981,7 +974,8 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     // and following climbs with a lag. Only its angle and height are smoothed,
     // never its position, so the lag doesn't grow with speed and the camera
     // can't overshoot the plane.
-    const speedK = smoothstep(1.3, Math.max(1.4, FLY_TUNE.boost), actualSpeed / DEFAULT_FLY_SPEED);
+    // Lens + shake track how far above the throttle speed the boost has pushed you.
+    const speedK = smoothstep(1.15, Math.max(1.2, FLY_TUNE.shiftBoost), actualSpeed / Math.max(HOVER_BELOW, flySpeed.current));
     if (camYaw.current === null) camYaw.current = yaw.current;
     if (camY.current === null) camY.current = camPos.current.y;
     let dYaw = yaw.current - camYaw.current;
