@@ -14,7 +14,7 @@ import { TRIAL } from "@/lib/league-city/race/trial";
 // with the car slowly (a quick flick of the wheel doesn't swing the world)
 // and looks further ahead the faster you go. "close" is a lower chase view.
 //
-// Around the run it shoots like a broadcast: a slow orbit of the grid on the
+// Around the run it shoots like a broadcast: a slow crane swing behind your car on the
 // title, a flyover from high above the whole circuit down to behind the car,
 // and after the finish trackside cameras that pan with the car going by and
 // zoom to keep it the same size, cutting to the next one ahead.
@@ -31,10 +31,10 @@ const TURN = 2.2;
 const FOLLOW = 7;
 /** Extra look-ahead per m/s of speed (s). */
 const LEAD = 0.45;
-/** Title orbit: radius and height (m), speed (rad/s). */
-const ORBIT = { r: 26, up: 9, speed: 0.12 };
+/** Title crane: radius and height (m), how far it swings (rad) and how fast (rad/s). */
+const ORBIT = { r: 18, up: 5.5, swing: 0.45, speed: 0.2, ahead: 7 };
 /** Trackside cameras: this far ahead of the car (m), off the centerline, low or high. */
-const TV = { ahead: 34, lateral: 10, low: 1.8, high: 8, passed: 10, frame: 4.5 };
+const TV = { ahead: 34, lateral: 8.5, low: 2.6, high: 8, passed: 10, frame: 6 };
 
 const U = M_TO_UNIT;
 const _pos = new THREE.Vector3();
@@ -124,10 +124,11 @@ export default function RaceCamera({
     let k = pos.current.lengthSq() === 0 ? 1 : Math.min(1, FOLLOW * d);
 
     if (shot === "title") {
-      // A slow circle around the grid and the gantry.
-      const a = ((now - shotAt) / 1000) * ORBIT.speed + Math.atan2(grid.tx, grid.tz) + Math.PI * 0.75;
-      _pos.set((grid.x + Math.sin(a) * ORBIT.r) * U, ORBIT.up * U, (grid.z + Math.cos(a) * ORBIT.r) * U);
-      _look.set(grid.x * U, 2 * U, grid.z * U);
+      // The hero shot: a slow crane swing behind and left of your car, the gantry beyond it.
+      const base = Math.atan2(-grid.tx + grid.tz * 0.9, -grid.tz - grid.tx * 0.9);
+      const a = base + Math.sin(((now - shotAt) / 1000) * ORBIT.speed) * ORBIT.swing;
+      _pos.set((p.x + Math.sin(a) * ORBIT.r) * U, ORBIT.up * U, (p.z + Math.cos(a) * ORBIT.r) * U);
+      _look.set((p.x + grid.tx * ORBIT.ahead) * U, 1.5 * U, (p.z + grid.tz * ORBIT.ahead) * U);
       fov = 45;
       k = 1;
     } else if (shot === "intro") {
@@ -154,7 +155,8 @@ export default function RaceCamera({
         const bend = track.samples[i]?.k ?? 0;
         // Inside of the bend (positive curvature turns left, and left is +lateral); alternate on straights.
         const side = Math.abs(bend) > 0.004 ? Math.sign(bend) : n % 2 ? 1 : -1;
-        const off = Math.min(TV.lateral, TRACK.width / 2 + TRACK.runoff - 1);
+        // Just off the asphalt, well inside the wall, so the wall doesn't fill the foreground.
+        const off = Math.min(TV.lateral, TRACK.width / 2 + TRACK.runoff - 2);
         tv.current = {
           x: q.x + q.tz * off * side,
           z: q.z - q.tx * off * side,
@@ -191,7 +193,7 @@ export default function RaceCamera({
       _right.subVectors(look.current, pos.current).cross(UP).normalize();
       const dist = pos.current.distanceTo(look.current);
       const halfW = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist * camera.aspect;
-      _a.addScaledVector(_right, halfW * 0.33 * shift.current);
+      _a.addScaledVector(_right, halfW * 0.45 * shift.current);
     }
     camera.lookAt(_a);
     if (Math.abs(camera.fov - fov) > 0.05) {

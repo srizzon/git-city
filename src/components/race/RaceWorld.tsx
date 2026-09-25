@@ -628,7 +628,7 @@ export default function RaceWorld({
             run={best}
             lapStart={() => laps.current.lapStart}
             offset={() => offset.current}
-            show={() => !racingNow()}
+            show={() => !racingNow() && stageRef.current.stage !== "finish"}
           />
           <RaceCamera mode={camera} car={car} track={track} shot={SHOTS[stage]} shotAt={stageAt} frameLeft={frameLeft} />
           <CameraKey input={input} onToggle={onCameraToggle} />
