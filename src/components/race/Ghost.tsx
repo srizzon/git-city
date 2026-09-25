@@ -10,16 +10,49 @@ import { turboLevel } from "@/lib/league-city/drive/vehicle";
 import { ghostAt, type GhostRun } from "@/lib/league-city/race/ghost";
 
 // Your best lap as a see-through car driving its line, in step with the lap
-// you're on (Trackmania's ghost). And the mini-turbo sparks under your rear
-// wheels while a drift charges: blue, orange, purple.
+// you're on (Trackmania's ghost); your rival's in their color with their name
+// over it. And the mini-turbo sparks under your rear wheels while a drift
+// charges: blue, orange, purple.
 
-export function Ghost({ run, lapStart, offset, show }: {
+/** A name over a ghost: a canvas sprite that always faces the camera. */
+function NameTag({ text, color }: { text: string; color: string }) {
+  const tex = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 256;
+    c.height = 64;
+    const g = c.getContext("2d");
+    if (g) {
+      g.font = "bold 30px monospace";
+      const w = Math.min(248, g.measureText(text).width + 24);
+      g.fillStyle = "rgba(11,13,18,0.8)";
+      g.fillRect((256 - w) / 2, 10, w, 44);
+      g.fillStyle = color;
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.fillText(text, 128, 33, 232);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, [text, color]);
+  useEffect(() => () => tex.dispose(), [tex]);
+  return (
+    <sprite position={[0, 3.2 * M_TO_UNIT, 0]} scale={[4 * M_TO_UNIT, 1 * M_TO_UNIT, 1]}>
+      <spriteMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
+    </sprite>
+  );
+}
+
+export function Ghost({ run, lapStart, offset, show, color = "#ffffff", label }: {
   run: React.MutableRefObject<GhostRun | null>;
   /** Server-clock ms the lap under way started, or null. */
   lapStart: () => number | null;
   offset: () => number;
   /** Read every frame: false hides it (in a race). */
   show: () => boolean;
+  color?: string;
+  /** A name tag over it (a rival's login). */
+  label?: string;
 }) {
   const group = useRef<THREE.Group>(null);
   const wheels = useRef<(THREE.Object3D | null)[]>([]);
@@ -32,7 +65,7 @@ export function Ghost({ run, lapStart, offset, show }: {
       let done = false;
       g.traverse((o) => {
         const m = o as THREE.Mesh;
-        if (!m.isMesh || m.userData.ghosted) return;
+        if (!m.isMesh || m.userData.ghosted || (m as unknown as THREE.Sprite).isSprite) return;
         const mat = (m.material as THREE.Material).clone();
         mat.transparent = true;
         mat.opacity = 0.38;
@@ -60,7 +93,8 @@ export function Ghost({ run, lapStart, offset, show }: {
 
   return (
     <group ref={group} visible={false}>
-      <CarModel color="#ffffff" wheelRefs={wheels} />
+      <CarModel color={color} wheelRefs={wheels} />
+      {label && <NameTag text={label} color={color} />}
     </group>
   );
 }

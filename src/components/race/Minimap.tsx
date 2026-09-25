@@ -11,7 +11,7 @@ import type { RaceTelemetry } from "@/lib/league-city/race/telemetry";
 const SIZE = 190;
 const PAD = 14;
 
-export default function Minimap({ telemetry }: { telemetry: RaceTelemetry }) {
+export default function Minimap({ telemetry, rivalColor = null }: { telemetry: RaceTelemetry; rivalColor?: string | null }) {
   const base = useRef<HTMLCanvasElement>(null);
   const dots = useRef<HTMLCanvasElement>(null);
 
@@ -104,6 +104,8 @@ export default function Minimap({ telemetry }: { telemetry: RaceTelemetry }) {
         d.clearRect(0, 0, SIZE, SIZE);
         const gp = telemetry.ghostPos;
         if (gp) dot(gp.x, gp.z, 3.5, "rgba(255,255,255,0.75)");
+        const rp = telemetry.rivalPos;
+        if (rp && rivalColor) dot(rp.x, rp.z, 4, rivalColor, "rgba(255,255,255,0.8)");
         for (const o of telemetry.others) dot(o.x, o.z, 4, o.color, "#111318");
         const me = telemetry.pos;
         if (me) dot(me.x, me.z, 5, "#c8ff3a", "#111318");
@@ -112,7 +114,7 @@ export default function Minimap({ telemetry }: { telemetry: RaceTelemetry }) {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [telemetry]);
+  }, [telemetry, rivalColor]);
 
   return (
     <div className="relative" style={{ width: SIZE, height: SIZE }}>

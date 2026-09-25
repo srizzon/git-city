@@ -102,6 +102,12 @@ export interface RaceWorldProps {
   onStage: (stage: TrialStage, beatMs?: number) => void;
   /** The results are up: the camera keeps the car to the left. */
   frameLeft: boolean;
+  /** The ghost you race besides your own: someone's best lap, and their login. */
+  rival: { login: string; run: GhostRun } | null;
+  /** Your last few valid laps' paths, newest first: the page sends one with its receipt. */
+  recentLaps: React.MutableRefObject<GhostRun[]>;
+  /** Back to the menu: the car on the grid, the run cleared. */
+  menuRef: React.MutableRefObject<(() => void) | null>;
 }
 
 const BUMP_SHARE = 0.7;
@@ -110,7 +116,7 @@ const BUMP_DEDUPE_MS = 500;
 const U = M_TO_UNIT;
 const NONE: never[] = [];
 
-const SHOTS: Record<TrialStage, RaceShot> = { title: "title", intro: "intro", countdown: "follow", run: "follow", finish: "tv" };
+const SHOTS: Record<TrialStage, RaceShot> = { menu: "title", intro: "intro", countdown: "follow", run: "follow", finish: "tv" };
 
 class Boundary extends Component<{ onFail: () => void; children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -201,6 +207,9 @@ export default function RaceWorld({
   beatMs,
   onStage,
   frameLeft,
+  rival,
+  recentLaps,
+  menuRef,
 }: RaceWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -227,7 +236,7 @@ export default function RaceWorld({
     done: boolean;
   }>({ start: null, lead: 0, laps: [], done: false });
   // No hands on the title, the flyover and past the finish (the autopilot drives).
-  const input = useDriveInput(paused || frozen || stage === "title" || stage === "intro" || stage === "finish");
+  const input = useDriveInput(paused || frozen || stage === "menu" || stage === "intro" || stage === "finish");
   const stageRef = useRef({ stage, at: stageAt, beat: beatMs });
   useEffect(() => {
     stageRef.current = { stage, at: stageAt, beat: beatMs };
@@ -258,8 +267,12 @@ export default function RaceWorld({
   useEffect(() => {
     cb.current = { onRace, onLap, onBests, onReceipt, onGhost, onRun, onStage };
   });
-  // Your best lap here: the ghost, its splits and time.
+  // Your best lap here: the ghost, its splits and time. And your rival's.
   const best = useRef<GhostRun | null>(null);
+  const rivalRun = useRef<GhostRun | null>(rival?.run ?? null);
+  useEffect(() => {
+    rivalRun.current = rival?.run ?? null;
+  }, [rival]);
   const recorder = useRef(new GhostRecorder());
   useEffect(() => {
     best.current = loadGhost(slug);
@@ -402,7 +415,7 @@ export default function RaceWorld({
     tel.current.runStart = null;
     cb.current.onRun(null);
     // Straight back to a short countdown, like Trackmania.
-    if (stageRef.current.stage !== "title" && stageRef.current.stage !== "intro")
+    if (stageRef.current.stage !== "menu" && stageRef.current.stage !== "intro")
       cb.current.onStage("countdown", TRIAL.retryBeatMs);
   };
 
@@ -422,6 +435,26 @@ export default function RaceWorld({
       onReset();
     };
     return () => void (restartRef.current = null);
+  });
+
+  // The menu: the car back on its grid spot, still, the run cleared.
+  useEffect(() => {
+    menuRef.current = () => {
+      const c = car.current;
+      if (racingNow()) return;
+      if (c) {
+        placeCar(c.body, spawn.x * UNIT_TO_M, spawn.z * UNIT_TO_M, headingFromRot(spawn.rot));
+        Object.assign(c.state, newCarState(), { turbo: true });
+      }
+      send({ t: "restart" });
+      restartLaps(laps.current);
+      recorder.current.clear();
+      run.current = { start: null, lead: 0, laps: [], done: false };
+      Object.assign(tel.current, { lapStart: null, split: null, runLap: 1, runStart: null });
+      cb.current.onRun(null);
+      cb.current.onStage("menu");
+    };
+    return () => void (menuRef.current = null);
   });
 
   // Local lap logic, the lights and the HUD's numbers.
@@ -500,6 +533,11 @@ export default function RaceWorld({
         ? ghostAt(best.current, serverNow - lapStart)
         : null;
     hud.ghostPos = g ? { x: g.x, z: g.z } : null;
+    const rg =
+      rivalRun.current && lapStart !== null && !racingNow() && sg.stage !== "finish"
+        ? ghostAt(rivalRun.current, serverNow - lapStart)
+        : null;
+    hud.rivalPos = rg ? { x: rg.x, z: rg.z } : null;
     hud.others = [];
     for (const d of remotes.current.values()) {
       const s = d.buffer.latest;
@@ -539,6 +577,7 @@ export default function RaceWorld({
           say(sfx.finalLap);
         }
         const lap = rec.finish(e.ms);
+        if (lap && e.valid) recentLaps.current = [lap, ...recentLaps.current].slice(0, 4);
         const pb = e.valid && !!lap && (!best.current || e.ms < best.current.ms);
         if (pb && lap) {
           best.current = lap;
@@ -630,6 +669,16 @@ export default function RaceWorld({
             offset={() => offset.current}
             show={() => !racingNow() && stageRef.current.stage !== "finish"}
           />
+          {rival && (
+            <Ghost
+              run={rivalRun}
+              lapStart={() => laps.current.lapStart}
+              offset={() => offset.current}
+              show={() => !racingNow() && stageRef.current.stage !== "finish"}
+              color={carColor(rival.login)}
+              label={`@${rival.login}`}
+            />
+          )}
           <RaceCamera mode={camera} car={car} track={track} shot={SHOTS[stage]} shotAt={stageAt} frameLeft={frameLeft} />
           <CameraKey input={input} onToggle={onCameraToggle} />
           <Ready onReady={onReady} />
