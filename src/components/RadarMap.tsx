@@ -23,6 +23,8 @@ interface RadarMapProps {
   // when no hunt is in progress. Rendered as a pulsing ping so the player knows
   // where to go (the rabbit hides in parks scattered across the city).
   rabbitPos?: [number, number, number] | null;
+  /** Explore mode: clicking the radar reports the world point under the cursor. */
+  onWorldClick?: (x: number, z: number) => void;
 }
 
 // ─── Dimensions ─────────────────────────────────────────────
@@ -60,6 +62,7 @@ export default function RadarMap({
   flyMode,
   remotePilotsRef,
   rabbitPos = null,
+  onWorldClick,
 }: RadarMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [remotePilotBlips, setRemotePilotBlips] = useState<{ id: string; x: number; z: number; yaw: number; login: string }[]>([]);
@@ -190,7 +193,13 @@ export default function RadarMap({
 
   return (
     <div
-      className="pointer-events-none fixed bottom-3 right-3 z-30 sm:bottom-4 sm:right-4"
+      className={`${onWorldClick ? "pointer-events-auto cursor-crosshair" : "pointer-events-none"} fixed bottom-3 right-3 z-30 sm:bottom-4 sm:right-4`}
+      title={onWorldClick ? "Click to go there" : undefined}
+      onClick={onWorldClick && wb && sp ? (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const cx = (e.clientX - r.left - 3) / SCALE, cy = (e.clientY - r.top - 3) / SCALE; // 3px border
+        onWorldClick(wb.x0 + (cx - sp.ox) / sp.s, wb.z0 + (cy - sp.oy) / sp.s);
+      } : undefined}
       style={{
         width: DISPLAY,
         height: DISPLAY,

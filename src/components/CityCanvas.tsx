@@ -7,6 +7,7 @@ import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/
 import { EffectComposer, Bloom, SMAA } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { FLY_TUNE } from "./FlyTune";
+import { mapNav as mapNavBus } from "@/lib/map-nav";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
 import type { LiveSession } from "@/lib/useCodingPresence";
@@ -1710,25 +1711,49 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPositio
     camera.lookAt(TARGET_X, TARGET_Y, TARGET_Z);
   }, [camera]);
 
-  // Double-click / + / - zoom: eases the camera toward a point (Google Maps style).
-  const zoomAnim = useRef<{ fromPos: THREE.Vector3; toPos: THREE.Vector3; fromTarget: THREE.Vector3; toTarget: THREE.Vector3; t: number } | null>(null);
+  // Camera moves driven by the map UI and shortcuts (Google Maps style):
+  // double-click / + / - zoom, the compass (face north), city chips and radar
+  // clicks (fly to a place). One animation: the target glides, the camera
+  // arcs up with the distance travelled and comes back down, heading turns
+  // the short way.
+  const navAnim = useRef<{
+    t: number; dur: number;
+    fromTarget: THREE.Vector3; toTarget: THREE.Vector3;
+    fromR: number; toR: number; fromTheta: number; toTheta: number; phi: number; arc: number;
+  } | null>(null);
   const { gl } = useThree();
   useEffect(() => {
     const el = gl.domElement;
     const ray = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
     const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    const zoomToward = (point: THREE.Vector3 | null, factor: number) => {
+    const sph = new THREE.Spherical();
+    const start = (toTarget: THREE.Vector3, toR: number | null, toTheta: number | null) => {
       const c = controlsRef.current;
       if (!c) return;
       mapNav.userMoved = true;
       c.autoRotate = false;
+      const from = (c.target as THREE.Vector3).clone();
+      sph.setFromVector3(camera.position.clone().sub(from));
+      const travel = from.distanceTo(toTarget);
+      let dTheta = (toTheta ?? sph.theta) - sph.theta;
+      dTheta = Math.atan2(Math.sin(dTheta), Math.cos(dTheta));
+      navAnim.current = {
+        t: 0,
+        dur: Math.min(2.8, 0.45 + travel / 7000),
+        fromTarget: from, toTarget,
+        fromR: sph.radius, toR: Math.min(c.maxDistance, Math.max(c.minDistance, toR ?? sph.radius)),
+        fromTheta: sph.theta, toTheta: sph.theta + dTheta,
+        phi: sph.phi,
+        arc: Math.min(18000, travel * 0.55),
+      };
+    };
+    const zoomToward = (point: THREE.Vector3 | null, factor: number) => {
+      const c = controlsRef.current;
+      if (!c) return;
       const target = c.target as THREE.Vector3;
       const toTarget = point ? target.clone().lerp(point, 1 - factor) : target.clone();
-      const offset = camera.position.clone().sub(target).multiplyScalar(factor);
-      const dist = Math.min(c.maxDistance, Math.max(c.minDistance, offset.length()));
-      offset.setLength(dist);
-      zoomAnim.current = { fromPos: camera.position.clone(), toPos: toTarget.clone().add(offset), fromTarget: target.clone(), toTarget, t: 0 };
+      start(toTarget, camera.position.distanceTo(target) * factor, null);
     };
     const onDbl = (e: MouseEvent) => {
       const r = el.getBoundingClientRect();
@@ -1743,11 +1768,19 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPositio
       if (e.key === "+" || e.key === "=") zoomToward(null, 0.6);
       else if (e.key === "-" || e.key === "_") zoomToward(null, 1 / 0.6);
     };
+    const unsub = mapNavBus.subscribe((cmd) => {
+      const c = controlsRef.current;
+      if (!c) return;
+      if (cmd.type === "zoom") zoomToward(null, cmd.factor);
+      else if (cmd.type === "north") start((c.target as THREE.Vector3).clone(), null, 0);
+      else if (cmd.type === "flyTo") start(new THREE.Vector3(cmd.x, 0, cmd.z), cmd.distance ?? null, null);
+    });
     el.addEventListener("dblclick", onDbl);
     window.addEventListener("keydown", onKey);
-    return () => { el.removeEventListener("dblclick", onDbl); window.removeEventListener("keydown", onKey); };
+    return () => { unsub(); el.removeEventListener("dblclick", onDbl); window.removeEventListener("keydown", onKey); };
   }, [gl, camera]);
 
+  const _navSph = useMemo(() => new THREE.Spherical(), []);
   useFrame((_, delta) => {
     const c = controlsRef.current;
     if (!c) return;
@@ -1755,14 +1788,19 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPositio
     // across the streets, from high up it becomes a map seen from above.
     const d = camera.position.distanceTo(c.target);
     c.maxPolarAngle = MAX_TILT - (MAX_TILT - MIN_TILT_FAR) * smoothstep(2500, 20000, d);
-    const z = zoomAnim.current;
-    if (z) {
-      z.t = Math.min(1, z.t + delta / 0.45);
-      const e = 1 - Math.pow(1 - z.t, 3);
-      camera.position.lerpVectors(z.fromPos, z.toPos, e);
-      c.target.lerpVectors(z.fromTarget, z.toTarget, e);
+    const a = navAnim.current;
+    if (a) {
+      a.t = Math.min(1, a.t + delta / a.dur);
+      const e = a.t < 0.5 ? 4 * a.t ** 3 : 1 - (-2 * a.t + 2) ** 3 / 2; // ease in-out
+      c.target.lerpVectors(a.fromTarget, a.toTarget, e);
+      _navSph.set(
+        a.fromR + (a.toR - a.fromR) * e + a.arc * Math.sin(Math.PI * e),
+        a.phi,
+        a.fromTheta + (a.toTheta - a.fromTheta) * e,
+      );
+      camera.position.setFromSpherical(_navSph).add(c.target);
       c.update();
-      if (z.t >= 1) zoomAnim.current = null;
+      if (a.t >= 1) navAnim.current = null;
     }
   });
 
@@ -1808,7 +1846,7 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPositio
           // The city stops turning on its own the moment you take the camera.
           mapNav.userMoved = true;
           if (controlsRef.current) controlsRef.current.autoRotate = false;
-          zoomAnim.current = null;
+          navAnim.current = null;
         }}
       />
     </>

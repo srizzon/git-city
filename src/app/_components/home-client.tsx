@@ -5,6 +5,8 @@ import { Menu, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { BenchOverlay, benchCount, padBuildings } from "@/components/CityBench";
 import { FlyTunePanel } from "@/components/FlyTune";
+import MapNavControls from "@/components/MapNavControls";
+import { mapNav } from "@/lib/map-nav";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
@@ -3481,6 +3483,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         buildings={buildings}
         visible={loadStage === "done" && !introMode && !rabbitCinematic && (exploreMode || flyMode)}
         flyMode={flyMode}
+        onWorldClick={exploreMode && !flyMode ? (x, z) => mapNav.send({ type: "flyTo", x, z }) : undefined}
         districtZones={districtZones}
         remotePilotsRef={flyPilotsRef}
         rabbitPos={
@@ -3538,6 +3541,9 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
           {/* Feed is opened from the CITY ACTIVITY launcher in the bottom-left
               bar, anchored where the popover rises. A separate top-right button
               opened a bottom-left panel (spatial disconnect), so it was removed. */}
+
+          {/* Compass, zoom buttons and city chips (Google Maps style) */}
+          {!flyMode && <MapNavControls camera={cameraStore} accent={theme.accent} showPlaces={!selectedBuilding} />}
 
           {/* Navigation hints (bottom-right) — hidden when building card is open */}
           {!selectedBuilding && (
