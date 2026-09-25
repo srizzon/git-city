@@ -9,7 +9,6 @@ import {
   trackJobsSearch,
   trackJobsSortChanged,
   trackJobCardClicked,
-  trackJobAlertSubscribed,
   trackCareerProfileCtaClicked,
 } from "@/lib/himetrica";
 import {
@@ -171,7 +170,6 @@ interface JobBoardProps {
 
 export default function JobBoardClient({ username, hasProfile, pageTitle, pageDescription, initialFilters }: JobBoardProps) {
   const filters = useUrlFilters(initialFilters);
-  const rawSearchParams = useSearchParams();
   const [listings, setListings] = useState<JobListing[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -289,13 +287,6 @@ export default function JobBoardClient({ username, hasProfile, pageTitle, pageDe
           </div>
         </div>
 
-        {/* ─── Unsubscribe confirmation ─── */}
-        {rawSearchParams.get("unsubscribed") === "true" && (
-          <div className="mt-6 border-[3px] border-lime/20 bg-lime/[0.03] px-5 py-3">
-            <p className="text-xs text-lime normal-case">You have been unsubscribed from job alerts.</p>
-          </div>
-        )}
-
         {/* ─── Search + Filter toggle ─── */}
         <div className="mt-8 flex gap-2">
           <input
@@ -411,18 +402,14 @@ export default function JobBoardClient({ username, hasProfile, pageTitle, pageDe
               ) : (
                 <>
                   <p className="text-sm text-lime">First jobs dropping soon.</p>
-                  <div className="pt-2">
-                    {hasProfile ? (
-                      <InlineAlertSignup />
-                    ) : (
-                      <>
-                        <p className="text-xs text-muted normal-case mb-4">Set up your profile to apply instantly.</p>
-                        <Link href="/hire/edit" onClick={() => trackCareerProfileCtaClicked("jobs_empty")} className="btn-press inline-block bg-lime px-6 py-3 text-xs text-bg" style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}>
-                          Create Career Profile
-                        </Link>
-                      </>
-                    )}
-                  </div>
+                  {!hasProfile && (
+                    <div className="pt-2">
+                      <p className="text-xs text-muted normal-case mb-4">Set up your profile to apply instantly.</p>
+                      <Link href="/hire/edit" onClick={() => trackCareerProfileCtaClicked("jobs_empty")} className="btn-press inline-block bg-lime px-6 py-3 text-xs text-bg" style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}>
+                        Create Career Profile
+                      </Link>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -455,9 +442,6 @@ export default function JobBoardClient({ username, hasProfile, pageTitle, pageDe
             </button>
           </div>
         )}
-
-        {/* ─── Job alert signup (hide when empty state already shows inline form) ─── */}
-        {listings.length > 0 && <JobAlertSignup />}
 
         <div className="h-12" />
       </div>
@@ -598,131 +582,6 @@ function ActivePill({ label, onClear }: { label: string; onClear: () => void }) 
 
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><p className="text-[10px] text-dim tracking-widest mb-2">{label}</p><div className="flex flex-wrap gap-1.5">{children}</div></div>;
-}
-
-function InlineAlertSignup() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    setStatus("loading");
-    try {
-      const res = await fetch("/api/jobs/alerts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, tech_stack: [] }),
-      });
-      if (!res.ok) throw new Error();
-      setStatus("done");
-      trackJobAlertSubscribed("inline", false);
-    } catch {
-      setStatus("error");
-    }
-  };
-
-  if (status === "done") {
-    return (
-      <div className="pt-2">
-        <p className="text-xs text-lime normal-case">You&apos;re in! We&apos;ll ping you when jobs drop.</p>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="pt-4">
-      <p className="text-xs text-muted normal-case mb-3">Get pinged when they land.</p>
-      <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-        <input
-          type="email"
-          required
-          placeholder="your@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="border-[3px] border-border bg-bg px-4 py-3 text-xs text-cream normal-case outline-none placeholder:text-dim focus-visible:border-lime transition-colors sm:w-64"
-        />
-        <button
-          type="submit"
-          disabled={status === "loading"}
-          className="btn-press bg-lime px-6 py-3 text-xs text-bg disabled:opacity-50 cursor-pointer"
-          style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}
-        >
-          {status === "loading" ? "..." : "Get Job Alerts"}
-        </button>
-      </div>
-      {status === "error" && <p className="mt-2 text-xs text-red-400 normal-case">Something went wrong. Try again.</p>}
-    </form>
-  );
-}
-
-function JobAlertSignup() {
-  const [email, setEmail] = useState("");
-  const [stack, setAlertStack] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    setStatus("loading");
-    try {
-      const res = await fetch("/api/jobs/alerts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          tech_stack: stack.split(",").map((s) => s.trim()).filter(Boolean),
-        }),
-      });
-      if (!res.ok) throw new Error();
-      setStatus("done");
-      trackJobAlertSubscribed("footer", stack.trim().length > 0);
-    } catch {
-      setStatus("error");
-    }
-  };
-
-  if (status === "done") {
-    return (
-      <div className="mt-12 border-[3px] border-lime/20 bg-lime/[0.03] p-8 text-center">
-        <p className="text-sm text-lime">You&apos;re subscribed!</p>
-        <p className="mt-1 text-xs text-muted normal-case">We&apos;ll send you matching jobs every week.</p>
-      </div>
-    );
-  }
-
-  return (
-    <form id="job-alerts" onSubmit={handleSubmit} className="mt-12 border-[3px] border-border bg-bg-raised p-6 sm:p-8">
-      <p className="text-xs text-lime tracking-widest">Get job alerts</p>
-      <p className="mt-1 text-[10px] text-muted normal-case">New matching jobs delivered weekly. No account needed.</p>
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <input
-          type="email"
-          required
-          placeholder="your@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="flex-1 border-[3px] border-border bg-bg px-4 py-3 text-xs text-cream normal-case outline-none placeholder:text-dim focus-visible:border-lime transition-colors"
-        />
-        <input
-          type="text"
-          placeholder="react, typescript, node (optional)"
-          value={stack}
-          onChange={(e) => setAlertStack(e.target.value)}
-          className="flex-1 border-[3px] border-border bg-bg px-4 py-3 text-xs text-cream normal-case outline-none placeholder:text-dim focus-visible:border-lime transition-colors"
-        />
-        <button
-          type="submit"
-          disabled={status === "loading"}
-          className="btn-press bg-lime px-6 py-3 text-xs text-bg disabled:opacity-50"
-          style={{ boxShadow: "3px 3px 0 0 #5a7a00" }}
-        >
-          {status === "loading" ? "..." : "Subscribe"}
-        </button>
-      </div>
-      {status === "error" && <p className="mt-2 text-xs text-red-400 normal-case">Failed to subscribe. Try again.</p>}
-    </form>
-  );
 }
 
 function SkeletonCard() {

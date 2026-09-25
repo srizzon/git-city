@@ -236,12 +236,6 @@ export function trackJobReportSubmitted(job_id: string, reason: string) {
   hm()?.track("job_report_submitted", { job_id, reason });
 }
 
-// ─── Jobs: Alerts ──────────────────────────────────────────
-
-export function trackJobAlertSubscribed(source: "inline" | "footer", has_stack: boolean) {
-  hm()?.track("job_alert_subscribed", { source, has_stack });
-}
-
 // ─── Jobs: Career Profile ──────────────────────────────────
 
 export function trackCareerProfileCtaClicked(source: string) {
