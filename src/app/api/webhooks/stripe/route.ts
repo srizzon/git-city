@@ -9,6 +9,7 @@ import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import type Stripe from "stripe";
 import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pending-review";
 import { getResend } from "@/lib/resend";
+import { escapeHtml } from "@/lib/email-template";
 import { getPostHogClient } from "@/lib/posthog-server";
 
 // Disable body parsing — Stripe needs raw body for signature verification
@@ -288,7 +289,7 @@ export async function POST(request: Request) {
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Package</td><td><strong>${pkg?.label ?? packageId}</strong></td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Amount</td><td><strong>${totalFormatted}/mo</strong></td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Currency</td><td>${(session.currency ?? "usd").toUpperCase()}</td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Customer</td><td>${purchaserEmail ?? "unknown"}</td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Customer</td><td>${escapeHtml(purchaserEmail ?? "unknown")}</td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Vehicles</td><td>${adIds.length} ads (${pkg?.vehicles.join(", ") ?? "?"})</td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Ad IDs</td><td>${adIds.join(", ")}</td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Subscription</td><td>${subscriptionId ?? "none"}</td></tr>

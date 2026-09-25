@@ -412,7 +412,7 @@ function buildDigestFromBatch(
     .slice(0, 10) // Cap at 10 items in digest
     .map((item) => {
       const d = item.event_data as Record<string, string>;
-      return `<li style="margin-bottom: 4px; color: #f0f0f0;">${d.body || d.title || "New event"}</li>`;
+      return `<li style="margin-bottom: 4px; color: #f0f0f0;">${escapeBasicHtml(String(d.body || d.title || "New event"))}</li>`;
     })
     .join("");
 
