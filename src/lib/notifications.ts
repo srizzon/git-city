@@ -4,7 +4,8 @@ import { sendEmail, toResendTag } from "./resend";
 import { mapWithConcurrency } from "./concurrency";
 import { getDeveloperEmail, isRecentlyActive } from "./notification-helpers";
 import { wrapInBaseTemplate } from "./email-template";
-import type { EmailLinks } from "./email/layout";
+import { renderLayout, renderText, type EmailLinks } from "./email/layout";
+import { bulletList, button, heading, paragraph, trackedUrl } from "./email/components";
 
 // ── Types ──
 
@@ -397,57 +398,132 @@ function buildDigestFromBatch(
   batch: { id: number; developer_id: number; notification_type: string; channel: string },
   items: { event_data: Record<string, unknown>; created_at: string }[],
 ): NotificationPayload | null {
-  const count = items.length;
-  if (count === 0) return null;
+  if (items.length === 0) return null;
 
-  // Build a summary based on notification type
-  const typeMap: Record<string, { title: string; bodyFn: (n: number) => string }> = {
-    raid_alert: {
-      title: `Your building was raided ${count} time${count > 1 ? "s" : ""}!`,
-      bodyFn: (n) => `${n} raid${n > 1 ? "s" : ""} while you were away.`,
-    },
-    achievement_unlocked: {
-      title: `${count} new achievement${count > 1 ? "s" : ""} unlocked!`,
-      bodyFn: (n) => `You unlocked ${n} achievement${n > 1 ? "s" : ""}.`,
-    },
-    kudos_received: {
-      title: `You received ${count} kudos!`,
-      bodyFn: (n) => `${n} developer${n > 1 ? "s" : ""} gave you kudos.`,
-    },
-  };
-
-  const template = typeMap[batch.notification_type] ?? {
-    title: `${count} new notification${count > 1 ? "s" : ""}`,
-    bodyFn: (n: number) => `You have ${n} new notification${n > 1 ? "s" : ""}.`,
-  };
-
-  // Build HTML listing individual events
-  const eventListHtml = items
-    .slice(0, 10) // Cap at 10 items in digest
-    .map((item) => {
-      const d = item.event_data as Record<string, string>;
-      return `<li style="margin-bottom: 4px; color: #f0f0f0;">${escapeBasicHtml(String(d.body || d.title || "New event"))}</li>`;
-    })
-    .join("");
-
-  const remainingText = count > 10 ? `<p style="color: #666; font-size: 13px;">...and ${count - 10} more</p>` : "";
+  const eventData = items.map((i) => i.event_data);
+  const { subject, preheader } = digestContent(batch.notification_type, eventData);
 
   return {
     type: `${batch.notification_type}_digest`,
     category: "digest",
     developerId: batch.developer_id,
     dedupKey: `digest:${batch.id}`,
-    title: template.title,
-    body: template.bodyFn(count),
-    html: `
-      <p style="color: #f0f0f0; font-size: 15px;">${template.bodyFn(count)}</p>
-      <ul style="padding-left: 20px; margin: 16px 0;">${eventListHtml}</ul>
-      ${remainingText}
-    `,
+    title: subject,
+    body: preheader,
+    render: (links) => renderDigestEmail(batch.notification_type, eventData, links),
     actionUrl: `${BASE_URL}`,
     priority: "high", // Digests themselves are never re-batched
     channels: [batch.channel as Channel],
   };
+}
+
+const DIGEST_MAX_ROWS = 10;
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** Subject, rows and CTA for a batched digest, per notification type. */
+function digestContent(type: string, events: Record<string, unknown>[]) {
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const num = (v: unknown) => (typeof v === "number" ? v : 0);
+  const firstUrl = events.map((e) => str(e.action_url)).find(Boolean) || BASE_URL;
+  const count = events.length;
+
+  if (type === "raid_alert") {
+    const tagged = events.filter((e) => e.success === true);
+    const held = count - tagged.length;
+    const lastTagger = str(tagged[tagged.length - 1]?.attacker);
+    return {
+      subject: count === 1 ? "Your building was raided" : `Your building was raided ${count} times`,
+      preheader: tagged.length === 0
+        ? `You held off ${count === 1 ? "the attack" : `all ${count}`}.`
+        : held === 0
+          ? `${count === 1 ? "It" : "All of them"} got through.`
+          : `${plural(tagged.length, "raid")} got through, you held off ${held}.`,
+      title: ["", plural(count, "raid"), " on your building"] as [string, string, string],
+      rows: events.map((e) => {
+        const a = num(e.attack_score);
+        const d = num(e.defense_score);
+        return e.success === true
+          ? { lead: `@${str(e.attacker)}`, text: `tagged your building, attack ${a} vs your defense ${d}.` }
+          : { lead: `@${str(e.attacker)}`, text: `was held off, your defense ${d} vs attack ${a}.` };
+      }),
+      cta: lastTagger
+        ? { text: `Raid @${lastTagger} back`, url: `${BASE_URL}/?user=${encodeURIComponent(lastTagger)}` }
+        : { text: "Open Git City", url: BASE_URL },
+    };
+  }
+
+  if (type === "emblem_earned") {
+    const emblems = events.flatMap((e) =>
+      Array.isArray(e.emblems) ? (e.emblems as { name?: unknown; tier?: unknown }[]) : [],
+    );
+    const tier = (t: unknown) => (str(t) ? `${str(t).charAt(0).toUpperCase()}${str(t).slice(1)} emblem.` : "Emblem.");
+    return {
+      subject: `You earned ${plural(emblems.length, "emblem")}`,
+      preheader: `${emblems.length === 1 ? "It's" : "They're"} in your trophy case now.`,
+      title: ["You earned", plural(emblems.length, "emblem"), ""] as [string, string, string],
+      rows: emblems.map((e) => ({ lead: `${str(e.name)}.`, text: tier(e.tier) })),
+      cta: { text: "See your trophy case", url: firstUrl },
+    };
+  }
+
+  if (type === "job_filled") {
+    return {
+      subject: count === 1 ? "A role you applied to was filled" : `${count} roles you applied to were filled`,
+      preheader: `${count === 1 ? "It's" : "They're"} no longer open. There are more roles on the job board.`,
+      title: ["", plural(count, "role"), ` you applied to ${count === 1 ? "was" : "were"} filled`] as [string, string, string],
+      rows: events.map((e) => ({ lead: str(e.listing) || str(e.title), text: str(e.company) ? `at ${str(e.company)}.` : "" })),
+      cta: { text: "Browse jobs", url: `${BASE_URL}/jobs` },
+    };
+  }
+
+  return {
+    subject: `${plural(count, "new notification")}`,
+    preheader: "Here's what happened in Git City.",
+    title: ["", plural(count, "new notification"), ""] as [string, string, string],
+    rows: events.map((e) => ({ lead: str(e.title) || "New event", text: str(e.body) })),
+    cta: { text: "Open Git City", url: firstUrl },
+  };
+}
+
+/** Batched raid / emblem / job digest in the email layout. */
+export function renderDigestEmail(type: string, events: Record<string, unknown>[], links: EmailLinks) {
+  const { subject, preheader, title, rows, cta } = digestContent(type, events);
+  const url = trackedUrl(cta.url, `${type}_digest`);
+  const shown = rows.slice(0, DIGEST_MAX_ROWS);
+  const more = rows.length > DIGEST_MAX_ROWS ? `And ${rows.length - DIGEST_MAX_ROWS} more.` : null;
+  const reason = "You're getting this digest because several notifications arrived close together on Git City.";
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading(title[0], title[1], title[2]),
+      paragraph(preheader),
+      bulletList(shown),
+      more ? paragraph(more, { muted: true }) : "",
+      button(cta.text, url),
+    ].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: [
+      title.join(" ").replace(/\s+/g, " ").trim(),
+      "",
+      preheader,
+      "",
+      ...shown.map((r) => `- ${r.lead} ${r.text}`.trimEnd()),
+      ...(more ? [more] : []),
+      "",
+      `${cta.text}: ${url}`,
+    ],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
 }
 
 // ── Email Dispatch ──

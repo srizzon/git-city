@@ -1,7 +1,48 @@
 import { sendNotificationAsync } from "../notifications";
-import { buildButton } from "../email-template";
+import { EMAIL_BASE_URL, button, heading, paragraph, trackedUrl } from "../email/components";
+import { renderLayout, renderText, type EmailLinks } from "../email/layout";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+export interface StreakBrokenData {
+  login: string;
+  previousStreak: number;
+}
+
+// Sent from the check-in that reset the streak, so today already counts as day 1.
+function streakBrokenHeader(d: StreakBrokenData) {
+  return {
+    subject: `Your ${d.previousStreak}-day streak ended`,
+    preheader: "Today already counts as day 1. Here's how to protect the next one.",
+  };
+}
+
+export function renderStreakBrokenEmail(d: StreakBrokenData, links: EmailLinks) {
+  const { subject, preheader } = streakBrokenHeader(d);
+  const url = trackedUrl("/", "streak_broken");
+  const intro = "You missed a day with no streak freeze to cover it, so your streak reset when you checked in today. That check-in already counts as day 1.";
+  const freezes = "A streak freeze covers one missed day. You earn one every 7 times you complete and claim your daily missions, and you can hold two at a time.";
+  const reason = "You're getting this because your streak on Git City reset.";
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading("Your", `${d.previousStreak}-day streak`, " ended"),
+      paragraph(intro),
+      paragraph(freezes),
+      button("See today's missions", url),
+    ].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: [`Your ${d.previousStreak}-day streak ended`, "", intro, "", freezes, "", `See today's missions: ${url}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
 
 export function sendStreakBrokenNotification(
   devId: number,
@@ -9,21 +50,18 @@ export function sendStreakBrokenNotification(
   previousStreak: number,
   date: string,
 ) {
+  const data: StreakBrokenData = { login, previousStreak };
+  const { subject, preheader } = streakBrokenHeader(data);
+
   sendNotificationAsync({
     type: "streak_broken",
     category: "streak_reminders",
     developerId: devId,
     dedupKey: `streak_broken:${devId}:${date}`,
-    title: `Your ${previousStreak}-day streak ended. Start fresh!`,
-    body: `Your ${previousStreak}-day streak has ended. Check in today to start a new one!`,
-    html: `
-      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#cc4444; letter-spacing:1px; text-transform:uppercase;">Streak ended</p>
-      <h1 style="margin:0 0 8px; font-size:24px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">Your ${previousStreak}-day streak is over.</h1>
-      <p style="margin:0 0 28px; font-size:15px; color:#555555; line-height:1.6;">Every great streak starts with day 1. Check in now to begin again.</p>
-      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 28px;" />
-      ${buildButton("Start Fresh", BASE_URL)}
-    `,
-    actionUrl: BASE_URL,
+    title: subject,
+    body: preheader,
+    render: (links) => renderStreakBrokenEmail(data, links),
+    actionUrl: EMAIL_BASE_URL,
     priority: "high",
     channels: ["email"],
   });
