@@ -24,6 +24,13 @@ self.onmessage = async (e: MessageEvent<CityWorkerRequest>) => {
       const dev = decoded.developers.find((d) => d.id === loadoutOverride.developerId);
       if (dev) dev.loadout = loadoutOverride.loadout;
     }
+    // No lots in this city (a failed seed): the greedy layout needs the SF
+    // footprints, which bay.json no longer ships.
+    if (sf.footprints.length === 0 && !decoded.developers.some((d) => d.lot)) {
+      try {
+        sf.footprints = ((await (await fetch("/maps/sf.json")).json()) as SFMapAsset).footprints;
+      } catch { /* places nobody */ }
+    }
     // sfMap is a projection of the asset the main thread already holds.
     const { sfMap: _omit, ...layout } = generateSFCityLayout(decoded.developers, sf, decoded.norms);
     void _omit;
