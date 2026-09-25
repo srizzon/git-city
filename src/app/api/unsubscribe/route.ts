@@ -103,7 +103,7 @@ export async function GET(request: Request) {
   body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: #0d0d0f; color: #e8dcc8; font-family: 'Silkscreen', monospace; }
   main { width: 100%; max-width: 420px; padding: 40px 28px; border: 1px solid #1c1c20; text-align: center; }
   h1 { margin: 0 0 24px; font-size: 26px; letter-spacing: 4px; color: #c8e64a; }
-  p { margin: 0 0 28px; font-size: 13px; line-height: 1.8; }
+  p { margin: 0 0 28px; font-size: 13px; line-height: 1.8; text-wrap: balance; }
   button { font: inherit; font-size: 14px; letter-spacing: 1px; padding: 14px 28px; border: 0; background: #c8e64a; color: #0d0d0f; cursor: pointer; }
   button:hover { background: #d8f25e; }
   button:focus-visible { outline: 2px solid #e8dcc8; outline-offset: 3px; }
