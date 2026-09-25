@@ -5,6 +5,8 @@ import { Menu, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { BenchOverlay, benchCount, padBuildings } from "@/components/CityBench";
 import { FlyTunePanel } from "@/components/FlyTune";
+import MapNavControls from "@/components/MapNavControls";
+import { mapNav } from "@/lib/map-nav";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
@@ -3481,6 +3483,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         buildings={buildings}
         visible={loadStage === "done" && !introMode && !rabbitCinematic && (exploreMode || flyMode)}
         flyMode={flyMode}
+        onWorldClick={exploreMode && !flyMode ? (x, z) => mapNav.send({ type: "flyTo", x, z }) : undefined}
         districtZones={districtZones}
         remotePilotsRef={flyPilotsRef}
         rabbitPos={
@@ -3539,12 +3542,16 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
               bar, anchored where the popover rises. A separate top-right button
               opened a bottom-left panel (spatial disconnect), so it was removed. */}
 
+          {/* Compass, zoom buttons and city chips (Google Maps style) */}
+          {!flyMode && <MapNavControls camera={cameraStore} accent={theme.accent} showPlaces={!selectedBuilding} />}
+
           {/* Navigation hints (bottom-right) — hidden when building card is open */}
           {!selectedBuilding && (
-            <div className="absolute bottom-20 left-3 text-[8px] leading-loose text-muted sm:left-4 sm:text-[9px]">
-              <div><span className="text-cream">Drag</span> orbit</div>
+            <div className="absolute bottom-20 left-3 hidden text-[8px] leading-loose text-muted sm:left-4 sm:block sm:text-[9px]">
+              <div><span className="text-cream">Drag</span> move</div>
               <div><span className="text-cream">Scroll</span> zoom</div>
-              <div><span className="text-cream">Right-drag</span> pan</div>
+              <div><span className="text-cream">Right-drag</span> rotate</div>
+              <div><span className="text-cream">Double-click</span> zoom in</div>
               <div><span className="text-cream">Click</span> building</div>
               <div><span style={{ color: theme.accent }}>ESC</span> back</div>
             </div>
@@ -4939,7 +4946,8 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         <>
           {/* Nav hints — only on desktop, bottom-right */}
           <div className="pointer-events-none fixed bottom-6 right-6 z-30 hidden text-right text-[9px] leading-loose text-muted sm:block">
-            <div><span className="text-cream">Drag</span> orbit</div>
+            <div><span className="text-cream">Drag</span> move</div>
+            <div><span className="text-cream">Right-drag</span> rotate</div>
             <div><span className="text-cream">Scroll</span> zoom</div>
             <div><span style={{ color: theme.accent }}>ESC</span> close</div>
           </div>

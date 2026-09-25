@@ -7,6 +7,7 @@ import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/
 import { EffectComposer, Bloom, SMAA } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { FLY_TUNE } from "./FlyTune";
+import { mapNav as mapNavBus } from "@/lib/map-nav";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
 import type { LiveSession } from "@/lib/useCodingPresence";
@@ -251,6 +252,12 @@ function RabbitFlyover({
   return null;
 }
 
+// Explore camera limits: tilt up to ~86° close up, flattening to ~20° from
+// high up; once the player takes the camera, nothing auto-rotates it again.
+const MAX_TILT = Math.PI / 2.1;
+const MIN_TILT_FAR = 0.35;
+const mapNav = { userMoved: false };
+
 // ─── Camera Focus (controls OrbitControls target) ───────────
 
 function CameraFocus({
@@ -280,8 +287,8 @@ function CameraFocus({
 
   useEffect(() => {
     if (!focusedBuilding && !focusPosition) {
-      // Re-enable auto-rotate when focus is cleared
-      if (controlsRef.current) {
+      // Re-enable auto-rotate when focus is cleared (unless the player has taken the camera)
+      if (controlsRef.current && !mapNav.userMoved) {
         controlsRef.current.autoRotate = true;
       }
       return;
@@ -1704,6 +1711,99 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPositio
     camera.lookAt(TARGET_X, TARGET_Y, TARGET_Z);
   }, [camera]);
 
+  // Camera moves driven by the map UI and shortcuts (Google Maps style):
+  // double-click / + / - zoom, the compass (face north), city chips and radar
+  // clicks (fly to a place). One animation: the target glides, the camera
+  // arcs up with the distance travelled and comes back down, heading turns
+  // the short way.
+  const navAnim = useRef<{
+    t: number; dur: number;
+    fromTarget: THREE.Vector3; toTarget: THREE.Vector3;
+    fromR: number; toR: number; fromTheta: number; toTheta: number; phi: number; arc: number;
+  } | null>(null);
+  const { gl } = useThree();
+  useEffect(() => {
+    const el = gl.domElement;
+    const ray = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const sph = new THREE.Spherical();
+    const start = (toTarget: THREE.Vector3, toR: number | null, toTheta: number | null) => {
+      const c = controlsRef.current;
+      if (!c) return;
+      mapNav.userMoved = true;
+      c.autoRotate = false;
+      const from = (c.target as THREE.Vector3).clone();
+      sph.setFromVector3(camera.position.clone().sub(from));
+      const travel = from.distanceTo(toTarget);
+      let dTheta = (toTheta ?? sph.theta) - sph.theta;
+      dTheta = Math.atan2(Math.sin(dTheta), Math.cos(dTheta));
+      navAnim.current = {
+        t: 0,
+        dur: Math.min(2.8, 0.45 + travel / 7000),
+        fromTarget: from, toTarget,
+        fromR: sph.radius, toR: Math.min(c.maxDistance, Math.max(c.minDistance, toR ?? sph.radius)),
+        fromTheta: sph.theta, toTheta: sph.theta + dTheta,
+        phi: sph.phi,
+        arc: Math.min(18000, travel * 0.55),
+      };
+    };
+    const zoomToward = (point: THREE.Vector3 | null, factor: number) => {
+      const c = controlsRef.current;
+      if (!c) return;
+      const target = c.target as THREE.Vector3;
+      const toTarget = point ? target.clone().lerp(point, 1 - factor) : target.clone();
+      start(toTarget, camera.position.distanceTo(target) * factor, null);
+    };
+    const onDbl = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      const hit = new THREE.Vector3();
+      zoomToward(ray.ray.intersectPlane(ground, hit) ? hit : null, 0.5);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.key === "+" || e.key === "=") zoomToward(null, 0.6);
+      else if (e.key === "-" || e.key === "_") zoomToward(null, 1 / 0.6);
+    };
+    const unsub = mapNavBus.subscribe((cmd) => {
+      const c = controlsRef.current;
+      if (!c) return;
+      if (cmd.type === "zoom") zoomToward(null, cmd.factor);
+      else if (cmd.type === "north") start((c.target as THREE.Vector3).clone(), null, 0);
+      else if (cmd.type === "flyTo") start(new THREE.Vector3(cmd.x, 0, cmd.z), cmd.distance ?? null, null);
+    });
+    el.addEventListener("dblclick", onDbl);
+    window.addEventListener("keydown", onKey);
+    return () => { unsub(); el.removeEventListener("dblclick", onDbl); window.removeEventListener("keydown", onKey); };
+  }, [gl, camera]);
+
+  const _navSph = useMemo(() => new THREE.Spherical(), []);
+  useFrame((_, delta) => {
+    const c = controlsRef.current;
+    if (!c) return;
+    // Tilt flattens as you zoom out, like Google Earth: close up you can look
+    // across the streets, from high up it becomes a map seen from above.
+    const d = camera.position.distanceTo(c.target);
+    c.maxPolarAngle = MAX_TILT - (MAX_TILT - MIN_TILT_FAR) * smoothstep(2500, 20000, d);
+    const a = navAnim.current;
+    if (a) {
+      a.t = Math.min(1, a.t + delta / a.dur);
+      const e = a.t < 0.5 ? 4 * a.t ** 3 : 1 - (-2 * a.t + 2) ** 3 / 2; // ease in-out
+      c.target.lerpVectors(a.fromTarget, a.toTarget, e);
+      _navSph.set(
+        a.fromR + (a.toR - a.fromR) * e + a.arc * Math.sin(Math.PI * e),
+        a.phi,
+        a.fromTheta + (a.toTheta - a.fromTheta) * e,
+      );
+      camera.position.setFromSpherical(_navSph).add(c.target);
+      c.update();
+      if (a.t >= 1) navAnim.current = null;
+    }
+  });
+
   // Report camera position ~10fps (every 6 frames), and only when it moved —
   // an idle camera used to re-render the whole page 10×/s.
   const lastReported = useRef<[number, number, number, number]>([NaN, NaN, NaN, NaN]);
@@ -1723,16 +1823,31 @@ function OrbitScene({ buildings, focusedBuilding, focusedBuildingB, focusPositio
       {!isCompareCinematicPlaying && (
         <CameraFocus buildings={buildings} focusedBuilding={focusedBuilding} focusedBuildingB={focusedBuildingB} controlsRef={controlsRef} focusPosition={focusPosition} />
       )}
+      {/* Google Maps / Earth style: left-drag pans the ground, right-drag (or
+          Shift/Ctrl + left) rotates and tilts, the wheel zooms toward the
+          cursor, arrows pan; one finger pans, two pinch and rotate. */}
       <OrbitControls
         ref={controlsRef}
         enableDamping
-        dampingFactor={0.06}
+        dampingFactor={0.08}
         minDistance={40}
         maxDistance={maxDistance ?? 2500}
-        maxPolarAngle={Math.PI / 2.1}
+        maxPolarAngle={MAX_TILT}
         target={homeTarget ?? [TARGET_X, TARGET_Y, TARGET_Z]}
-        autoRotate
+        autoRotate={!mapNav.userMoved}
         autoRotateSpeed={0.15}
+        mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
+        touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+        screenSpacePanning={false}
+        zoomToCursor
+        keyEvents
+        keyPanSpeed={40}
+        onStart={() => {
+          // The city stops turning on its own the moment you take the camera.
+          mapNav.userMoved = true;
+          if (controlsRef.current) controlsRef.current.autoRotate = false;
+          navAnim.current = null;
+        }}
       />
     </>
   );
@@ -1870,7 +1985,7 @@ const _SRGB = THREE.SRGBColorSpace;
 const SUN_DIST = 4000; // light distance from the scene centre
 
 function SunRig({ forceHour }: { forceHour?: number }) {
-  const { scene, gl } = useThree();
+  const { scene, gl, camera } = useThree();
   const dirRef = useRef<THREE.DirectionalLight>(null);
   const ambRef = useRef<THREE.AmbientLight>(null);
   const hemiRef = useRef<THREE.HemisphereLight>(null);
@@ -1901,8 +2016,19 @@ function SunRig({ forceHour }: { forceHour?: number }) {
     const fog = scene.fog as THREE.Fog | null;
     if (fog) {
       fog.color.setRGB(p.fogColor[0], p.fogColor[1], p.fogColor[2], _SRGB);
-      fog.near = p.fogNear;
-      fog.far = p.fogFar;
+      // Above ~2 km (zooming out over the Bay) the fog and the clip planes open
+      // up with altitude, like a map: from high up the whole region reads.
+      const lift = 1 + Math.max(0, camera.position.y - 2000) / 1400;
+      fog.near = p.fogNear * lift;
+      fog.far = p.fogFar * lift;
+      const persp = camera as THREE.PerspectiveCamera;
+      const far = Math.max(16000, fog.far * 1.25);
+      const near = Math.max(6, camera.position.y / 500);
+      if (Math.abs(persp.far - far) > 50 || Math.abs(persp.near - near) > 0.5) {
+        persp.far = far;
+        persp.near = near;
+        persp.updateProjectionMatrix();
+      }
     }
     // Background base (the sky dome covers most of it; this fills any gap).
     if (!(scene.background instanceof THREE.Color)) scene.background = new THREE.Color();
@@ -2099,7 +2225,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
     return {
       target: [dx, 70, dz] as [number, number, number],
       camPos: [dx - 500, 1700, dz + 850] as [number, number, number],
-      maxDistance: 9000,
+      maxDistance: 36000, // the whole Bay Area from above
     };
   }, [sfMap]);
 
