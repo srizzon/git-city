@@ -9,7 +9,7 @@ import { renderStreakBrokenEmail } from "../../notification-senders/streak-broke
 import { renderStreakMilestoneEmail } from "../../notification-senders/streak";
 import { renderWeeklyRecapEmail, type WeeklyRecapData } from "../../notification-senders/weekly-recap";
 import { renderWelcomeEmail } from "../../notification-senders/welcome";
-import { PREVIEW_LINKS, type EmailPreviews } from "./types";
+import { PREVIEW_LINKS, TRANSACTIONAL_PREVIEW_LINKS, type EmailPreviews } from "./types";
 
 const RECAP: WeeklyRecapData = {
   login: "srizzon",
@@ -36,7 +36,7 @@ const EMBLEM_DIAMOND = { id: "mayor", name: "Mayor", tier: "diamond", descriptio
 
 // Sample renders for the admin preview (?template=<key>) and test sends.
 export const GAME_PREVIEWS: EmailPreviews = {
-  "welcome-sample": () => renderWelcomeEmail("srizzon", 7576, PREVIEW_LINKS),
+  "welcome-sample": () => renderWelcomeEmail("srizzon", 7576, TRANSACTIONAL_PREVIEW_LINKS),
   "raid-tagged": () =>
     renderRaidEmail(
       { defenderLogin: "kristoferborges", attackerLogin: "pyromains", raidId: "a878a3cc-379c-4528-91ad-11612fa5b797", success: true, attackScore: 22, defenseScore: 4 },

@@ -5,7 +5,7 @@ import { renderLeagueOvertakenEmail } from "../../notification-senders/league-ov
 import { renderJoinRequestEmail, renderRequestApprovedEmail } from "../../notification-senders/league-requests";
 import { renderLeagueWeeklyEmail, type LeagueWeeklyEmailData } from "../../notification-senders/league-weekly";
 import { renderGiftSentEmail, renderPurchaseEmail } from "../../notification-senders/purchase";
-import { PREVIEW_LINKS, type EmailPreviews } from "./types";
+import { PREVIEW_LINKS, TRANSACTIONAL_PREVIEW_LINKS, type EmailPreviews } from "./types";
 
 const TOWN = { leagueSlug: "ship-city", leagueName: "Ship City" };
 const DATE = new Date("2026-09-25T14:00:00Z");
@@ -56,15 +56,15 @@ export const TOWNS_PREVIEWS: EmailPreviews = {
   "town-join-request": () => renderJoinRequestEmail({ ...TOWN, requesterLogin: "mrousavy" }, PREVIEW_LINKS),
   "town-request-approved": () => renderRequestApprovedEmail({ ...TOWN, adminLogin: "srizzon" }, PREVIEW_LINKS),
   "purchase-card": () =>
-    renderPurchaseEmail({ login: "srizzon", itemId: "neon_outline", price: { amountCents: 499, currency: "usd" }, date: DATE }, PREVIEW_LINKS),
+    renderPurchaseEmail({ login: "srizzon", itemId: "neon_outline", price: { amountCents: 499, currency: "usd" }, date: DATE }, TRANSACTIONAL_PREVIEW_LINKS),
   "purchase-pix": () =>
-    renderPurchaseEmail({ login: "srizzon", itemId: "crown_item", price: { amountCents: 2490, currency: "brl" }, date: DATE }, PREVIEW_LINKS),
+    renderPurchaseEmail({ login: "srizzon", itemId: "crown_item", price: { amountCents: 2490, currency: "brl" }, date: DATE }, TRANSACTIONAL_PREVIEW_LINKS),
   "purchase-pixels-freeze": () =>
-    renderPurchaseEmail({ login: "srizzon", itemId: "streak_freeze", price: { amountCents: 120, currency: "PX" }, date: DATE }, PREVIEW_LINKS),
+    renderPurchaseEmail({ login: "srizzon", itemId: "streak_freeze", price: { amountCents: 120, currency: "PX" }, date: DATE }, TRANSACTIONAL_PREVIEW_LINKS),
   "purchase-raid-item": () =>
-    renderPurchaseEmail({ login: "srizzon", itemId: "raid_rocket", price: { amountCents: 300, currency: "PX" }, date: DATE }, PREVIEW_LINKS),
+    renderPurchaseEmail({ login: "srizzon", itemId: "raid_rocket", price: { amountCents: 300, currency: "PX" }, date: DATE }, TRANSACTIONAL_PREVIEW_LINKS),
   "gift-sent": () =>
-    renderGiftSentEmail({ receiverLogin: "pyromains", itemId: "lightning_aura", price: { amountCents: 299, currency: "usd" }, date: DATE }, PREVIEW_LINKS),
+    renderGiftSentEmail({ receiverLogin: "pyromains", itemId: "lightning_aura", price: { amountCents: 299, currency: "usd" }, date: DATE }, TRANSACTIONAL_PREVIEW_LINKS),
   "gift-received": () => renderGiftReceivedEmail({ giverLogin: "srizzon", receiverLogin: "pyromains", itemId: "lightning_aura" }, PREVIEW_LINKS),
   "gift-received-raid-item": () => renderGiftReceivedEmail({ giverLogin: "srizzon", receiverLogin: "pyromains", itemId: "tag_gold" }, PREVIEW_LINKS),
 };
