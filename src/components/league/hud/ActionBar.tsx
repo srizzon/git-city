@@ -24,6 +24,8 @@ export default function ActionBar({
   onInvite,
   onEdit,
   onDrive,
+  onRace,
+  raceRecord = null,
   onLeave,
   join,
   requests = 0,
@@ -37,6 +39,10 @@ export default function ActionBar({
   onInvite: () => void;
   onEdit?: () => void;
   onDrive?: () => void;
+  /** The town's race track (with a screen over the load). */
+  onRace?: () => void;
+  /** "Record @x 0:22.912", for the tooltip. */
+  raceRecord?: string | null;
   /** Leaves the league; resolves to an error message, or null when done. */
   onLeave?: () => Promise<string | null>;
   /** Non-members: join, ask to join, or the pending request. */
@@ -145,7 +151,16 @@ export default function ActionBar({
         </button>
       )}
       {onDrive && desktop && (
-        <Link href={`/town/${slug}/race`} title="The town's race track" className={`${BTN} text-lime hover:text-cream`}>
+        <Link
+          href={`/town/${slug}/race`}
+          onClick={(e) => {
+            if (!onRace || e.metaKey || e.ctrlKey || e.shiftKey) return;
+            e.preventDefault();
+            onRace();
+          }}
+          title={raceRecord ? `The town's race track · ${raceRecord}` : "The town's race track"}
+          className={`${BTN} text-lime hover:text-cream`}
+        >
           <Flag {...ICON} aria-hidden />
           <span>Race</span>
         </Link>

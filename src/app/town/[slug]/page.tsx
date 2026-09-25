@@ -13,6 +13,8 @@ import {
   type League,
   type Viewer,
 } from "@/lib/leagues/service";
+import { getLapBoard } from "@/lib/league-city/race/board";
+import { TRACK_ID } from "@/lib/league-city/race/track";
 import { getCityNorms, getGlobalRanking, getGlobalWinner, getLeagueCityDevs, getLeaguePageData } from "@/lib/leagues/queries";
 import { isoDay, weekStart } from "@/lib/leagues/scoring";
 import { getCachedCity } from "@/lib/league-city/service";
@@ -67,7 +69,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   const data = await getLeaguePageData(league, viewer);
   const lastWeek = weekStart(new Date());
   lastWeek.setUTCDate(lastWeek.getUTCDate() - 7);
-  const [city, cityDevs, cityNorms, globalWinner, inviteToken, badges, weeklyRank] = await Promise.all([
+  const [city, cityDevs, cityNorms, globalWinner, inviteToken, badges, weeklyRank, raceRecord] = await Promise.all([
     getCachedCity(league.id),
     getLeagueCityDevs(data.members),
     getCityNorms(),
@@ -80,6 +82,10 @@ export default async function LeaguePage({ params, searchParams }: Props) {
           .then((r) => r.rows.find((row) => row.league_id === league.id)?.rank ?? null)
           .catch(() => null)
       : Promise.resolve(null),
+    // The race gate's plate: the track record.
+    getLapBoard(league.id, TRACK_ID, 1)
+      .then((rows) => (rows[0] ? { login: rows[0].login, best_ms: rows[0].best_ms } : null))
+      .catch(() => null),
   ]);
 
   // Query params are attacker-written: name only an invited member, pass on
@@ -106,6 +112,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
       cityDevs={cityDevs}
       cityNorms={cityNorms}
       topCompanyLastWeek={globalWinner?.slug === league.slug}
+      raceRecord={raceRecord}
       invite={invitee}
       inviteToken={token}
       refLogin={refLogin}

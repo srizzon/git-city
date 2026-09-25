@@ -50,6 +50,8 @@ import { MobileActionBar, MobileTownHeader } from "@/components/league/hud/Mobil
 import IntroOverlay, { OUTRO_MS } from "@/components/league/hud/IntroOverlay";
 import { carIntro } from "@/lib/league-city/intro";
 import { townDisplayName } from "@/lib/towns/names";
+import { formatLap } from "@/lib/league-city/race/laps";
+import TransitScreen from "@/components/league/hud/TransitScreen";
 import TownQuest from "@/components/league/hud/TownQuest";
 import { freshQuest, nextStep, parseQuest, questKey, questSteps, type QuestState, type QuestStep } from "@/lib/towns/quest";
 import { chime } from "@/lib/sfx/chime";
@@ -100,8 +102,11 @@ export default function LeagueClient({
   groupLink,
   badges,
   weeklyRank = null,
+  raceRecord = null,
 }: {
   data: LeaguePageData;
+  /** The race track's record, for the race gate and the Race button. */
+  raceRecord?: { login: string; best_ms: number } | null;
   city: LeagueCity;
   cityDevs: Record<string, unknown>[];
   cityNorms: LayoutNorms;
@@ -136,6 +141,15 @@ export default function LeagueClient({
   // The camera looks at a building without opening its card (a new invitee's).
   const [peek, setPeek] = useState<string | null>(null);
   const router = useRouter();
+
+  // ─── Race track ────────────────────────────────────────────
+  // The gate on the approach road (click it, or drive out through it) and the
+  // Race button take you to the town's track; a screen covers the load.
+  const [goingRace, setGoingRace] = useState(false);
+  const goRace = useCallback(() => {
+    setGoingRace(true);
+    router.push(`/town/${league.slug}/race`);
+  }, [router, league.slug]);
   const isAdmin = !!viewer?.is_admin;
 
   // ─── Editor ────────────────────────────────────────────────
@@ -403,9 +417,10 @@ export default function LeagueClient({
             onHonk: (b: CityBuilding) => setFocused(b),
             crownApi,
             onCrown: setCrownView,
+            onRaceGate: goRace,
           }
         : undefined,
-    [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail, league.slug, driverName],
+    [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail, league.slug, driverName, goRace],
   );
 
   // Everyone out driving, drawn in view mode too (the drive room takes over in the car).
@@ -626,6 +641,7 @@ export default function LeagueClient({
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-bg font-pixel uppercase text-warm">
+      {goingRace && <TransitScreen title={`${townDisplayName(league.name)} GP`} line="Heading to the track…" />}
       <LeagueScene
         h={es.h}
         identity={identity}
@@ -633,6 +649,11 @@ export default function LeagueClient({
         intro={intro}
         onIntroEnd={endIntro}
         onIntroTick={onIntroTick}
+        raceGate={{
+          townName: townDisplayName(league.name),
+          record: raceRecord ? formatLap(raceRecord.best_ms) : null,
+          onClick: goRace,
+        }}
         onPortalClick={!isMember ? () => {
           setFocused(null);
           setPanel("report");
@@ -841,6 +862,8 @@ export default function LeagueClient({
                 }}
                 onEdit={isAdmin ? enterEdit : undefined}
                 onDrive={enterDrive}
+                onRace={goRace}
+                raceRecord={raceRecord ? `Record @${raceRecord.login} ${formatLap(raceRecord.best_ms)}` : null}
                 drivingNow={watch.drivers.length}
                 onLeave={isMember ? leave : undefined}
                 join={
