@@ -6,6 +6,7 @@ export const EMAIL_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegit
 
 export const COLORS = {
   bg: "#0d0d0f",
+  raised: "#161618",
   border: "#2a2a30",
   cream: "#e8dcc8",
   warm: "#d4cfc4",
@@ -82,6 +83,22 @@ export function bulletList(items: { lead: string; text: string }[]): string {
     .join("\n");
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
   ${rows}
+</table>`;
+}
+
+/** A row of up to three number tiles, e.g. XP this week, streak, visitors. */
+export function statTiles(items: { value: string; label: string }[]): string {
+  const cells = items
+    .map((item, i) => {
+      const gap = i === items.length - 1 ? "" : `<td width="8" style="font-size:0; line-height:0;">&nbsp;</td>`;
+      return `<td valign="top" width="${Math.floor(100 / items.length)}%" style="padding:14px 12px; background-color:${COLORS.raised}; background-image:linear-gradient(${COLORS.raised},${COLORS.raised});">
+      ${gmailSafe(`<div style="font-family:${FONT}; font-size:24px; line-height:1.2; font-weight:700; color:${COLORS.cream}; font-variant-numeric:tabular-nums;">${escapeHtml(item.value)}</div>
+      <div style="margin-top:4px; font-family:${FONT}; font-size:12px; line-height:1.4; color:${COLORS.muted};">${escapeHtml(item.label)}</div>`)}
+    </td>${gap}`;
+    })
+    .join("\n");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 28px;">
+  <tr>${cells}</tr>
 </table>`;
 }
 
