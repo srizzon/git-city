@@ -68,6 +68,17 @@ export interface DeveloperRecord {
   // Leagues
   invited?: boolean; // league member who hasn't joined yet: drawn faded
   active_league_crown?: LeagueCrown | null;
+  // City lot: the fixed address the SF layout places this building on.
+  lot?: CityLot | null;
+}
+
+/** A fixed address on the map (city_lots row). w/d cap the building's footprint. */
+export interface CityLot {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  downtown: boolean;
 }
 
 export interface LeagueCrown {

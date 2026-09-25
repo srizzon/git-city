@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { evaluateEmblems } from "@/lib/emblems";
 import { cacheEmailFromAuth, touchLastActive, ensurePreferences } from "@/lib/notification-helpers";
+import { assignCityLot } from "@/lib/city-lots";
 import { sendWelcomeNotification } from "@/lib/notification-senders/welcome";
 import { sendReferralJoinedNotification } from "@/lib/notification-senders/referral";
 import { fetchGitHubDeveloperData } from "@/lib/github-api";
@@ -130,6 +131,9 @@ export async function provisionDeveloperOnLogin(
       // Cache email + update last_active_at on every login
       cacheEmailFromAuth(dev.id, authUserId).catch(() => {});
       touchLastActive(dev.id);
+
+      // A building needs a lot. Idempotent: a player who has one keeps it.
+      await assignCityLot(admin, dev.id);
 
       // Leagues: an invited member becomes active on their first claim.
       if (claimedNow) {

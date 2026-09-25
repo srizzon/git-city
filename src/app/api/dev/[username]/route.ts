@@ -6,6 +6,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { githubLoginsFromIdentities, isAdminUser } from "@/lib/auth-identity";
 import type { TopRepo } from "@/lib/github";
 import { calculateGithubXp } from "@/lib/xp";
+import { assignCityLot, getCityLot } from "@/lib/city-lots";
 import {
   ghHeaders,
   fetchExpandedGitHubData,
@@ -169,8 +170,12 @@ export async function GET(
             .eq("id", created.id)
             .single();
 
+          // Your own new building gets its lot now; an admin-created one waits
+          // for its owner's login.
+          const lot = ownsFetched ? await assignCityLot(sb, created.id) : null;
+
           revalidatePath(`/dev/${data.github_login}`);
-          return NextResponse.json({ ...(withRank ?? created), exists: true });
+          return NextResponse.json({ ...(withRank ?? created), lot, exists: true });
         }
       }
 
@@ -218,8 +223,11 @@ export async function GET(
     });
   }
 
+  // Where the building stands, so search and deep links place it on its lot.
+  const lot = await getCityLot(sb, cached.id);
+
   return NextResponse.json(
-    { ...cached, exists: true, ...(needsStatsRefresh ? { _stale: true } : {}) },
+    { ...cached, lot, exists: true, ...(needsStatsRefresh ? { _stale: true } : {}) },
     {
       headers: {
         "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
