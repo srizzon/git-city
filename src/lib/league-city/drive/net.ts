@@ -71,6 +71,7 @@ export type ClientMsg =
   | { t: "crown_drop" }
   /** Race track only (party/race.ts). */
   | { t: "race_start" }
+  | { t: "restart" }
   | ["s", ...number[]];
 // Server → client
 export type ServerMsg =

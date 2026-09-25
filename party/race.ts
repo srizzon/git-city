@@ -203,6 +203,13 @@ export default class RaceServer implements Party.Server {
       return;
     }
 
+    // R in practice: back behind the line, the lap starts over. Never in a race.
+    if (t === "restart") {
+      const d = this.drivers.get(sender.id);
+      if (d && !inRace(this.race, sender.id)) restartLaps(d.laps);
+      return;
+    }
+
     if (t === "bump") {
       const d = this.drivers.get(sender.id);
       const now = Date.now();
