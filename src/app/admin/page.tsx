@@ -28,6 +28,11 @@ const SECTIONS: { heading: string; links: AdminLink[] }[] = [
         title: "Landmarks",
         description: "Featured developer landmark buildings",
       },
+      {
+        href: "/admin/league-reports",
+        title: "Town logo reports",
+        description: "Reported town logos: take down or dismiss",
+      },
     ],
   },
   {
