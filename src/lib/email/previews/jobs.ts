@@ -15,6 +15,8 @@ import { renderJobRejectedEmail } from "../../notification-senders/job-rejected"
 import { renderJobReportedAdminEmail, renderJobReportedEmail } from "../../notification-senders/job-reported";
 import { PREVIEW_LINKS, type EmailPreviews } from "./types";
 
+// Transactional mail (forceSend) has no unsubscribe link, only email settings.
+const TRANSACTIONAL = {};
 const LISTING_ID = "3f6c1a52-9d1e-4b7a-8a51-2c0e4f7d9b10";
 const TITLE = "Senior Frontend Engineer";
 const COMPANY = "Acme Corp";
@@ -31,11 +33,11 @@ const MANY_JOBS: MatchingJob[] = Array.from({ length: 10 }, (_, i) => ({ ...DIGE
 // Sample renders for the admin preview (?template=<key>) and test sends.
 export const JOBS_PREVIEWS: EmailPreviews = {
   // Developer side
-  "job-application-confirmed": () => renderJobApplicationConfirmedEmail({ listingTitle: TITLE, companyName: COMPANY, hasProfile: true }, PREVIEW_LINKS),
-  "job-application-confirmed-no-profile": () => renderJobApplicationConfirmedEmail({ listingTitle: TITLE, companyName: COMPANY, hasProfile: false }, PREVIEW_LINKS),
-  "job-hired": () => renderJobHiredEmail({ login: "srizzon", companyName: COMPANY, listingTitle: TITLE }, PREVIEW_LINKS),
+  "job-application-confirmed": () => renderJobApplicationConfirmedEmail({ listingTitle: TITLE, companyName: COMPANY, hasProfile: true }, TRANSACTIONAL),
+  "job-application-confirmed-no-profile": () => renderJobApplicationConfirmedEmail({ listingTitle: TITLE, companyName: COMPANY, hasProfile: false }, TRANSACTIONAL),
+  "job-hired": () => renderJobHiredEmail({ login: "srizzon", companyName: COMPANY, listingTitle: TITLE }, TRANSACTIONAL),
   "job-filled": () => renderJobFilledEmail({ listingTitle: TITLE, companyName: COMPANY }, PREVIEW_LINKS),
-  "job-notify-signup": () => renderJobNotifySignupEmail(12, PREVIEW_LINKS),
+  "job-notify-signup": () => renderJobNotifySignupEmail(12, TRANSACTIONAL),
   "job-profile-nudge": () => renderJobProfileNudgeEmail(3, PREVIEW_LINKS),
   "job-referral-converted": () => renderJobReferralConvertedEmail({ login: "srizzon", companyName: COMPANY }, PREVIEW_LINKS),
   "job-digest": () => renderJobDigestEmail(DIGEST_JOBS, PREVIEW_LINKS),
