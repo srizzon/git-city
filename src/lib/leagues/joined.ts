@@ -16,28 +16,35 @@ export async function inviteJoined(leagueId: string, devId: number, login: strin
   const sb = getSupabaseAdmin();
   const { data: league } = await sb.from("leagues").select("slug, name").eq("id", leagueId).single();
   if (!league) return;
-  await rewardInvite(leagueId, devId, invitedBy).catch((err) => console.error("[towns] invite reward failed:", err));
+  const countsForBuilder = await rewardInvite(leagueId, devId, invitedBy).catch((err) => {
+    console.error("[towns] invite reward failed:", err);
+    return false;
+  });
   sendLeagueJoinedNotification({
     inviterId: invitedBy,
     inviteeId: devId,
     inviteeLogin: login,
+    leagueId,
     leagueSlug: league.slug,
     leagueName: league.name,
+    countsForBuilder,
   });
 }
 
-async function rewardInvite(leagueId: string, devId: number, invitedBy: number) {
+/** True when the invite counted toward the inviter's Town Builder emblem. */
+async function rewardInvite(leagueId: string, devId: number, invitedBy: number): Promise<boolean> {
   const sb = getSupabaseAdmin();
   const { data: dev } = await sb.from("developers").select("account_created_at").eq("id", devId).single();
-  if (!accountOldEnough(dev?.account_created_at as string | null | undefined)) return;
+  if (!accountOldEnough(dev?.account_created_at as string | null | undefined)) return false;
   await earnPixels(devId, "town_welcome", leagueId, `town_welcome:${devId}`);
-  await sb.rpc("grant_emblem", {
+  const { data } = await sb.rpc("grant_emblem", {
     p_developer_id: invitedBy,
     p_emblem_id: "town_builder",
     p_claim_key: `town_builder:${devId}`,
     p_meta: { league_id: leagueId, invitee_id: devId },
     p_source: "town",
   });
+  return (data as { granted?: boolean } | null)?.granted === true;
 }
 
 /**
