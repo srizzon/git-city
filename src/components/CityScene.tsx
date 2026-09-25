@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { createWindowAtlas, FocusBeacon } from "./Building3D";
 import InstancedBuildings from "./InstancedBuildings";
+import { signalCityFrame } from "@/lib/city-first-frame";
 import InstancedLabels from "./InstancedLabels";
 import EffectsLayer from "./EffectsLayer";
 import LiveDots from "./LiveDots";
@@ -87,6 +88,18 @@ interface CitySceneProps {
   lowPerf?: boolean;
 }
 
+// Tells the loading screen the city is on screen: two rendered frames after
+// the buildings mount (the first one uploads buffers and compiles shaders).
+function FirstFrameSignal() {
+  const frames = useRef(0);
+  useFrame(() => {
+    if (frames.current > 2) return;
+    frames.current++;
+    if (frames.current === 2) signalCityFrame();
+  });
+  return null;
+}
+
 export default function CityScene({
   buildings,
   colors,
@@ -167,6 +180,7 @@ export default function CityScene({
   return (
     <>
       {/* All buildings: single instanced draw call with custom shader */}
+      {buildings.length > 0 && <FirstFrameSignal />}
       <InstancedBuildings
         buildings={buildings}
         colors={colors}

@@ -57,7 +57,8 @@ import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/x
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
 import RadarMap from "@/components/RadarMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
-import { loadHomeSnapshot, loadSFMap, type HomeSnapshot } from "@/lib/city-snapshot-client";
+import { ensureFootprints, loadHomeSnapshot, loadSFMap, type HomeSnapshot } from "@/lib/city-snapshot-client";
+import { waitForCityFrame } from "@/lib/city-first-frame";
 import { sfRenderMap } from "@/lib/city-sf-layout";
 import { usePerfMode } from "@/lib/perfMode";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
@@ -1738,6 +1739,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
     setStats(cityStats);
     const sf = await loadSFMap();
     sfMapRef.current = sf;
+    if (!prebuilt) await ensureFootprints(sf, allDevs);
     const layout = prebuilt && sf
       ? { ...prebuilt, sfMap: sfRenderMap(sf) }
       : generateCityLayout(allDevs, sf, layoutNormsRef.current, pinnedLogins());
@@ -1888,6 +1890,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         setStats(cityStats);
         const sfInit = await loadSFMap();
         sfMapRef.current = sfInit;
+        if (!prebuilt) await ensureFootprints(sfInit, allDevs);
         // v2 snapshots arrive already laid out by the worker.
         const finalLayout = prebuilt && sfInit
           ? { ...prebuilt, sfMap: sfRenderMap(sfInit) }
@@ -1909,18 +1912,10 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         setLoadStage("rendering");
         setLoadProgress(65);
 
-        await new Promise<void>((resolve) => {
-          let resolved = false;
-          const done = () => {
-            if (resolved) return;
-            resolved = true;
-            resolve();
-          };
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => done());
-          });
-          setTimeout(done, 500);
-        });
+        // Wait until the canvas has drawn the city (signalled from CityScene),
+        // not just a couple of page frames: otherwise a slow canvas left the
+        // intro playing over black. Capped so loading can never hang.
+        await waitForCityFrame(20_000);
 
         setLoadProgress(80);
 
