@@ -116,6 +116,26 @@ export async function sendNotification(payload: NotificationPayload): Promise<Se
   return results;
 }
 
+/** Collapse a sendNotification result into one outcome, for cron counters. */
+export function sendOutcome(results: SendResult[]): "sent" | "skipped" | "error" {
+  if (results.some((r) => r.success)) return "sent";
+  if (results.some((r) => r.skipped === "resend_error" || r.skipped === "send_error")) return "error";
+  return "skipped";
+}
+
+/** Add settled sendNotification calls to a cron's { sent, skipped, errors } counters. */
+export function tallySends(
+  settled: PromiseSettledResult<SendResult[]>[],
+  counters: { sent: number; skipped: number; errors: number },
+): void {
+  for (const r of settled) {
+    const outcome = r.status === "fulfilled" ? sendOutcome(r.value) : "error";
+    if (outcome === "sent") counters.sent++;
+    else if (outcome === "error") counters.errors++;
+    else counters.skipped++;
+  }
+}
+
 /**
  * Fire-and-forget wrapper. Use this in API routes so notifications
  * never block the response. Errors are logged, not thrown.

@@ -1,4 +1,4 @@
-import { sendNotificationAsync } from "../notifications";
+import { sendNotification } from "../notifications";
 import { buildButton } from "../email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
@@ -7,11 +7,11 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
  * Notification sent to developers who signed up for job notifications
  * when the first jobs become available.
  */
-export function sendJobNotifySignupFulfilled(
+export async function sendJobNotifySignupFulfilled(
   devId: number,
   jobCount: number,
 ) {
-  sendNotificationAsync({
+  return sendNotification({
     type: "job_notify_fulfilled",
     category: "transactional",
     developerId: devId,
