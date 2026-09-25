@@ -552,6 +552,12 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
   const searchParams = useSearchParams();
   const userParam = searchParams.get("user");
   const giftedParam = searchParams.get("gifted");
+  // The lo-fi radio portals into #gc-radio-slot. Rendered only after this page
+  // hydrates, so the server HTML never has the slot: when the radio filled it
+  // mid-hydration (a heavy page outlasts GlobalRadio's two-frame wait), React
+  // found an unexpected node there and threw #418.
+  const [radioSlotReady, setRadioSlotReady] = useState(false);
+  useEffect(() => { setRadioSlotReady(true); }, []);
   const bench = benchCount(searchParams.get("bench"));
 
   // Real live event fetched from the server (the production path).
@@ -3551,7 +3557,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
               <span className="text-cream">{theme.name}</span>
               <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
-            <div id="gc-radio-slot" />
+            {radioSlotReady && <div id="gc-radio-slot" />}
             <GraphicsControl
               mode={perfMode}
               preference={perfPreference}
@@ -6109,7 +6115,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
             <span className="text-cream">{theme.name}</span>
             <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
           </button>
-          <div id="gc-radio-slot" suppressHydrationWarning />
+          {radioSlotReady && <div id="gc-radio-slot" />}
           <button
             onClick={replayIntro}
             className="btn-press flex items-center gap-1 border-[3px] border-border bg-bg/70 px-2 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
