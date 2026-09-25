@@ -36,6 +36,13 @@ describe("customJoinDecision", () => {
 
   it("keeps removed members out even with the token", () => {
     expect(customJoinDecision({ status: "former", removed_by: 7 }, true)).toBe("removed");
+    expect(customJoinDecision({ status: "former", removed_by: 7 }, false, true)).toBe("removed");
+  });
+
+  it("lets anyone into an open town", () => {
+    expect(customJoinDecision(null, false, true)).toBe("open");
+    expect(customJoinDecision({ status: "former", removed_by: null }, false, true)).toBe("open");
+    expect(customJoinDecision(null, true, true)).toBe("token");
   });
 
   it("is a no-op for active members", () => {
