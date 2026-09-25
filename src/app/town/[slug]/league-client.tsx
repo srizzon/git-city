@@ -53,6 +53,7 @@ import { townDisplayName } from "@/lib/towns/names";
 import TownQuest from "@/components/league/hud/TownQuest";
 import { freshQuest, nextStep, parseQuest, questKey, questSteps, type QuestState, type QuestStep } from "@/lib/towns/quest";
 import { chime } from "@/lib/sfx/chime";
+import { useDriveWatch } from "@/components/league/drive/useDriveWatch";
 import {
   HOTBAR,
   initEditor,
@@ -406,6 +407,9 @@ export default function LeagueClient({
     [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail, league.slug, driverName],
   );
 
+  // Everyone out driving, drawn in view mode too (the drive room takes over in the car).
+  const watch = useDriveWatch(league.slug, mode === "view");
+
   const newBuildings = useMemo(
     () => sceneObjects.filter((o) => o.kind === "building" && o.is_new),
     [sceneObjects],
@@ -639,6 +643,7 @@ export default function LeagueClient({
         editApiRef={cameraApi}
         editPickables={pickables}
         drive={driveProps}
+        watching={watch}
       >
         {mode === "edit" && (
           <EditorOverlay
@@ -829,6 +834,7 @@ export default function LeagueClient({
                 }}
                 onEdit={isAdmin ? enterEdit : undefined}
                 onDrive={enterDrive}
+                drivingNow={watch.drivers.length}
                 onLeave={isMember ? leave : undefined}
                 join={
                   joinKind

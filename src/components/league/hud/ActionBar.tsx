@@ -28,6 +28,7 @@ export default function ActionBar({
   join,
   requests = 0,
   onReplay,
+  drivingNow = 0,
 }: {
   slug: string;
   canInvite: boolean;
@@ -44,6 +45,8 @@ export default function ActionBar({
   requests?: number;
   /** Replays the town intro. */
   onReplay?: () => void;
+  /** People driving the city right now (their cars are on screen). */
+  drivingNow?: number;
 }) {
   const [shared, setShared] = useState(false);
   const [coarse, setCoarse] = useState(false);
@@ -125,9 +128,20 @@ export default function ActionBar({
         </button>
       )}
       {onDrive && desktop && (
-        <button type="button" onClick={onDrive} title="Drive through the city" className={`${BTN} text-lime hover:text-cream`}>
+        <button
+          type="button"
+          onClick={onDrive}
+          title={drivingNow > 0 ? `Drive with the ${drivingNow} ${drivingNow === 1 ? "person" : "people"} out there` : "Drive through the city"}
+          className={`${BTN} text-lime hover:text-cream`}
+        >
           <Car {...ICON} aria-hidden />
           <span>Drive</span>
+          {drivingNow > 0 && (
+            <span className="flex items-center gap-1 text-[9px] text-cream">
+              <span className="h-1.5 w-1.5 animate-pulse bg-lime" aria-hidden />
+              {drivingNow} on the road
+            </span>
+          )}
         </button>
       )}
       {onDrive && !desktop && (

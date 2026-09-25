@@ -38,7 +38,7 @@ export interface RemoteDriver {
   buffer: SnapshotBuffer;
 }
 
-function partyHost(): string {
+export function partyHost(): string {
   // Local testing: ?partyhost=localhost:1999 against `npx partykit dev`.
   if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
     const q = new URLSearchParams(window.location.search).get("partyhost");

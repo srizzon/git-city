@@ -24,9 +24,13 @@ import LeagueRoads from "./LeagueRoads";
 import LeagueTrees from "./LeagueTrees";
 import EditCamera, { type EditCameraApi, type LotEvent, type Pickable } from "./editor/EditCamera";
 import type { DriveWorldProps } from "./drive/DriveWorld";
+import type { RemoteDriver } from "./drive/useDrivePresence";
+import type { DriverInfo } from "@/lib/league-city/drive/net";
 
 // Drive mode (Rapier, the car, its sounds) loads only when someone drives.
 const DriveWorld = dynamic(() => import("./drive/DriveWorld"), { ssr: false, loading: () => null });
+// Other drivers' cars in view mode load only when someone is out driving.
+const WatchedCars = dynamic(() => import("./drive/WatchedCars"), { ssr: false, loading: () => null });
 
 /** Props that become physics bodies in drive mode (drawn by DriveWorld instead). */
 const KNOCKABLE = new Set(["lamp", "bench", "fountain", "cone", "crates"]);
@@ -407,6 +411,8 @@ export interface LeagueSceneProps {
   riseKey?: string;
   /** Eases the orbit in close (the picker's Build). */
   push?: boolean;
+  /** View mode: the cars of whoever is driving the city right now (useDriveWatch). */
+  watching?: { remotes: React.MutableRefObject<Map<string, RemoteDriver>>; drivers: DriverInfo[] };
   /** Embedded: orbit distance (default 0.85) and how far right the picture shifts on wide screens, in px (default 26% of the width). */
   framing?: { zoom: number; shiftPx: number };
 }
@@ -433,6 +439,7 @@ export default function LeagueScene({
   riseKey,
   push = false,
   framing,
+  watching,
 }: LeagueSceneProps) {
   const editing = mode === "edit";
   const driving = mode === "drive" && !!drive;
@@ -552,6 +559,9 @@ export default function LeagueScene({
           onBuildingClick={editing || driving ? undefined : onBuildingClick}
         />
       </Rise>
+      {watching && mode === "view" && !playing && watching.drivers.length > 0 && (
+        <WatchedCars remotes={watching.remotes} drivers={watching.drivers} />
+      )}
       {driving && drive && <DriveWorld objects={withApproach} buildings={buildings} h={h} {...drive} />}
       {children}
     </Canvas>
