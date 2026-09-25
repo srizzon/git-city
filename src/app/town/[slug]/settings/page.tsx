@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { getLeagueBySlug, getOrCreateInviteToken, getViewer, openInviteLink } from "@/lib/leagues/service";
+import { getLeagueBySlug, getOrCreateInviteToken, getViewer, listJoinRequests, openInviteLink } from "@/lib/leagues/service";
 import { getLeagueMembers } from "@/lib/leagues/queries";
 import SettingsClient from "./settings-client";
 import { townDisplayName } from "@/lib/towns/names";
@@ -32,5 +32,14 @@ export default async function LeagueSettingsPage({ params }: Props) {
     const origin = process.env.PORTLESS_URL ?? (host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : undefined);
     inviteLink = openInviteLink(league.slug, viewer.github_login, await getOrCreateInviteToken(viewer, league), origin);
   }
-  return <SettingsClient league={league} members={members} viewerLogin={viewer.github_login} inviteLink={inviteLink} />;
+  const requests = league.kind === "custom" ? await listJoinRequests(viewer, league) : [];
+  return (
+    <SettingsClient
+      league={league}
+      members={members}
+      viewerLogin={viewer.github_login}
+      inviteLink={inviteLink}
+      requests={requests}
+    />
+  );
 }

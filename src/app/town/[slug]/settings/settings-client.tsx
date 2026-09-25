@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PixelSpinner, { Pending } from "@/components/leagues/PixelSpinner";
 import { Avatar, NO_AUTOFILL } from "@/components/league/hud/shared";
-import type { League } from "@/lib/leagues/service";
+import type { JoinRequest, League } from "@/lib/leagues/service";
+import { REQUEST_TTL_DAYS, type JoinMode } from "@/lib/towns/joining";
 import type { LeagueMemberRow } from "@/lib/leagues/queries";
 
 type Result = { ok: true } | { ok: false; error: string };
 
-async function send(url: string, method: "PATCH" | "DELETE", body?: Record<string, string | boolean>): Promise<Result> {
+async function send(url: string, method: "PATCH" | "DELETE" | "POST", body?: Record<string, string | boolean>): Promise<Result> {
   try {
     const res = await fetch(url, {
       method,
@@ -43,12 +44,14 @@ export default function SettingsClient({
   members,
   viewerLogin,
   inviteLink,
+  requests,
 }: {
   league: League;
   members: LeagueMemberRow[];
   viewerLogin: string;
   /** Custom leagues: the open invite link (carries the invite token). */
   inviteLink: string | null;
+  requests: JoinRequest[];
 }) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
@@ -68,7 +71,11 @@ export default function SettingsClient({
         <p className="mt-1 text-[11px] text-muted">Town settings</p>
 
         <div className="mt-6 space-y-4">
+          {league.kind === "custom" && (league.join_mode === "request" || requests.length > 0) && (
+            <RequestsSection slug={league.slug} requests={requests} onChanged={refresh} />
+          )}
           {league.kind === "custom" && <NameSection api={api} name={league.name} onSaved={refresh} />}
+          {league.kind === "custom" && <JoinModeSection api={api} mode={league.join_mode} onSaved={refresh} />}
           {inviteLink && <InviteLinkSection api={api} link={inviteLink} onRotated={refresh} />}
           <ScoringSection api={api} mode={league.scoring_mode} onSaved={refresh} />
           <MembersSection league={league} members={members} viewerLogin={viewerLogin} onChanged={refresh} />
@@ -198,6 +205,124 @@ function InviteLinkSection({ api, link, onRotated }: { api: string; link: string
       </div>
       <ErrorLine error={error} />
     </Section>
+  );
+}
+
+// ─── Who can join ────────────────────────────────────────────
+
+const JOIN_OPTIONS: { id: JoinMode; label: string; hint: string }[] = [
+  { id: "open", label: "Anyone", hint: "Anyone signed in joins with one click." },
+  { id: "request", label: "Ask first", hint: "Newcomers ask, you let them in." },
+  { id: "invite", label: "Invite only", hint: "Only your invites and your link." },
+];
+
+function JoinModeSection({ api, mode, onSaved }: { api: string; mode: JoinMode; onSaved: () => void }) {
+  const [saving, setSaving] = useState<JoinMode | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pick(id: JoinMode) {
+    setSaving(id);
+    setError(null);
+    const r = await send(api, "PATCH", { join_mode: id });
+    setSaving(null);
+    if (!r.ok) return setError(r.error);
+    onSaved();
+  }
+
+  return (
+    <Section title="Who can join" hint="Invites and your invite link always work.">
+      <div className="grid gap-2 sm:grid-cols-3">
+        {JOIN_OPTIONS.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            aria-pressed={mode === o.id}
+            disabled={saving !== null || mode === o.id}
+            onClick={() => pick(o.id)}
+            className={`btn-press border-2 px-3 py-2.5 text-left ${mode === o.id ? "border-lime" : "border-border hover:border-border-light"}`}
+          >
+            <span className={`block text-[10px] ${mode === o.id ? "text-lime" : "text-cream"}`}>
+              {saving === o.id ? <Pending label="Saving" /> : o.label}
+            </span>
+            <span className="mt-1 block text-[10px] text-muted normal-case">{o.hint}</span>
+          </button>
+        ))}
+      </div>
+      <ErrorLine error={error} />
+    </Section>
+  );
+}
+
+// ─── Join requests ───────────────────────────────────────────
+
+function since(iso: string | null): string | null {
+  return iso ? `GitHub since ${new Date(iso).getUTCFullYear()}` : null;
+}
+
+function RequestsSection({ slug, requests, onChanged }: { slug: string; requests: JoinRequest[]; onChanged: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function decide(login: string, approve: boolean) {
+    setBusy(`${login}:${approve ? "yes" : "no"}`);
+    setError(null);
+    const r = await send(`/api/leagues/${slug}/requests/${encodeURIComponent(login)}`, "POST", { approve });
+    setBusy(null);
+    if (!r.ok) return setError(r.error);
+    onChanged();
+  }
+
+  return (
+    <div id="requests" className="scroll-mt-6">
+      <Section
+        title={`Join requests${requests.length > 0 ? ` · ${requests.length}` : ""}`}
+        hint={`Declining is quiet: they aren't told. Requests expire after ${REQUEST_TTL_DAYS} days.`}
+      >
+        {requests.length === 0 ? (
+          <p className="text-[11px] text-dim normal-case">No requests right now.</p>
+        ) : (
+          <ul className="max-h-[420px] divide-y-2 divide-border overflow-y-auto border-2 border-border">
+            {requests.map((r) => (
+              <li key={r.login} className="flex items-center gap-3 px-3 py-2">
+                <Avatar src={r.avatar_url} size={24} />
+                <div className="min-w-0 flex-1">
+                  <a
+                    href={`/dev/${r.login}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block truncate text-[11px] text-cream normal-case hover:text-lime"
+                  >
+                    @{r.login}
+                  </a>
+                  <p className="text-[9px] text-muted">
+                    {[`${r.contributions.toLocaleString("en-US")} contributions`, since(r.account_created_at)].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => decide(r.login, true)}
+                    className="btn-press min-w-[76px] bg-lime px-2 py-1.5 text-[9px] text-bg disabled:opacity-50"
+                  >
+                    {busy === `${r.login}:yes` ? <Pending label="Letting in" /> : "Let in"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => decide(r.login, false)}
+                    className="btn-press px-2 py-1.5 text-[9px] text-muted hover:text-red-400 disabled:opacity-50"
+                  >
+                    {busy === `${r.login}:no` ? <Pending label="Declining" /> : "Decline"}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <ErrorLine error={error} />
+      </Section>
+    </div>
   );
 }
 
