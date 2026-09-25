@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/resend";
 import { createMagicLinkSession } from "@/lib/advertiser-auth";
 import { renderAdvertiserSignInEmail } from "@/lib/ad-emails";
 import { rateLimit } from "@/lib/rate-limit";
+import { FROM_NOTIFY } from "@/lib/email/senders";
 
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
 
   const { subject, html, text } = renderAdvertiserSignInEmail(verifyUrl.toString());
   const { error: sendError } = await sendEmail({
-    from: "Git City <noreply@thegitcity.com>",
+    from: FROM_NOTIFY,
     to: email,
     subject,
     html,

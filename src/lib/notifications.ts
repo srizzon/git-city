@@ -5,6 +5,7 @@ import { mapWithConcurrency } from "./concurrency";
 import { getDeveloperEmail, isRecentlyActive } from "./notification-helpers";
 import { renderLayout, renderText, type EmailLinks } from "./email/layout";
 import { bulletList, button, heading, paragraph, trackedUrl } from "./email/components";
+import { FROM_MAIL, FROM_NOTIFY } from "./email/senders";
 
 // ── Types ──
 
@@ -60,7 +61,6 @@ export interface SendResult {
 
 // ── Config ──
 
-const FROM = "Git City <noreply@thegitcity.com>";
 const HMAC_SECRET = (() => {
   const secret = process.env.UNSUBSCRIBE_HMAC_SECRET;
   if (!secret) {
@@ -572,7 +572,7 @@ async function dispatchEmail(
   // Send via Resend (throttled, retried on 429, idempotent per dedup key)
   const { data: sent, error } = await sendEmail(
     {
-      from: FROM,
+      from: isTransactional ? FROM_NOTIFY : FROM_MAIL,
       to: email,
       subject: payload.title,
       html: fullHtml,

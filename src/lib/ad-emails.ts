@@ -1,8 +1,8 @@
 import { sendEmail } from "./resend";
 import { EMAIL_BASE_URL, button, heading, label, paragraph, statTiles, trackedUrl } from "./email/components";
 import { renderLayout, renderText, type EmailLinks } from "./email/layout";
+import { FROM_MAIL, FROM_NOTIFY } from "./email/senders";
 
-const FROM = "Git City <noreply@thegitcity.com>";
 
 /** Advertisers have no email preferences page, so the footer carries no settings link. */
 export const ADVERTISER_LINKS: EmailLinks = { settingsUrl: null };
@@ -61,8 +61,8 @@ function statsTiles(stats: AdStats) {
 }
 
 /** Throws on a Resend error so the cron doesn't mark the ad as notified. */
-async function send(to: string, email: RenderedAdEmail) {
-  const { error } = await sendEmail({ from: FROM, to, subject: email.subject, html: email.html, text: email.text });
+async function send(to: string, email: RenderedAdEmail, from = FROM_NOTIFY) {
+  const { error } = await sendEmail({ from, to, subject: email.subject, html: email.html, text: email.text });
   if (error) throw new Error(`Resend error: ${error.message}`);
 }
 
@@ -207,7 +207,7 @@ export function renderAdFollowup7dEmail(adBrand: string | null, stats: AdStats, 
 }
 
 export async function sendAdFollowup7dEmail(email: string, adBrand: string | null, stats: AdStats, cityDevs: number) {
-  await send(email, renderAdFollowup7dEmail(adBrand, stats, cityDevs));
+  await send(email, renderAdFollowup7dEmail(adBrand, stats, cityDevs), FROM_MAIL);
 }
 
 // ── 4. 30 days after: growth since the ad ended ──
@@ -271,7 +271,7 @@ export async function sendAdFollowup30dEmail(
   cityDevs: number,
   cityDevsWhenEnded: number,
 ) {
-  await send(email, renderAdFollowup30dEmail(adBrand, stats, cityDevs, cityDevsWhenEnded));
+  await send(email, renderAdFollowup30dEmail(adBrand, stats, cityDevs, cityDevsWhenEnded), FROM_MAIL);
 }
 
 // ── Sign-in link for the business dashboard (ads and jobs) ──

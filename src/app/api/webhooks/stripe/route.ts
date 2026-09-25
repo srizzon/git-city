@@ -11,6 +11,7 @@ import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pendin
 import { sendEmail } from "@/lib/resend";
 import { renderAdSaleEmail } from "@/lib/admin-emails";
 import { getPostHogClient } from "@/lib/posthog-server";
+import { FROM_NOTIFY } from "@/lib/email/senders";
 
 // Disable body parsing — Stripe needs raw body for signature verification
 export const dynamic = "force-dynamic";
@@ -289,7 +290,7 @@ export async function POST(request: Request) {
               endsAt,
             });
             const { error: emailError } = await sendEmail({
-              from: "Git City Ads <ads@thegitcity.com>",
+              from: FROM_NOTIFY,
               to: "samuelrizzondev@gmail.com",
               subject: saleEmail.subject,
               html: saleEmail.html,

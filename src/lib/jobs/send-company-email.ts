@@ -1,7 +1,8 @@
 import { sendEmail, toResendTag } from "@/lib/resend";
 import { COMPANY_UNSUBSCRIBE_URL } from "./email-blocks";
+import { FROM_JOBS } from "../email/senders";
 
-const FROM = "Git City Jobs <noreply@thegitcity.com>";
+const FROM = FROM_JOBS;
 
 /**
  * Send an email to a company (advertiser) or the jobs admin. `html` is the full

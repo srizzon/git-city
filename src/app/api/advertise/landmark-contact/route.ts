@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendEmail } from "@/lib/resend";
 import { rateLimit } from "@/lib/rate-limit";
 import { renderLandmarkInquiryEmail } from "@/lib/admin-emails";
+import { FROM_NOTIFY } from "@/lib/email/senders";
 
 const TO = "samuel@thegitcity.com";
-const FROM = "Git City <noreply@thegitcity.com>";
+const FROM = FROM_NOTIFY;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {

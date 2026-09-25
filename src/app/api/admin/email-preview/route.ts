@@ -7,6 +7,7 @@ import { renderRaidEmail } from "@/lib/notification-senders/raid";
 import { sendEmail } from "@/lib/resend";
 import { EMAIL_PREVIEWS } from "@/lib/email/previews";
 import { RECAP_DEV_COLUMNS, loadRecapContext, loadWeeklyRecaps, renderWeeklyRecapEmail } from "@/lib/notification-senders/weekly-recap";
+import { FROM_NOTIFY } from "@/lib/email/senders";
 
 const PREVIEW_LINKS = { unsubscribeUrl: "https://thegitcity.com/api/unsubscribe?dev=0&cat=all&token=preview" };
 
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     }
     if (!user.email) return NextResponse.json({ error: "Your account has no email" }, { status: 400 });
     const { data, error } = await sendEmail({
-      from: "Git City <noreply@thegitcity.com>",
+      from: FROM_NOTIFY,
       to: user.email,
       subject: `[Test] ${email.subject}`,
       html: email.html,

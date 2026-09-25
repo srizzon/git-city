@@ -2,6 +2,7 @@ import { sendEmail } from "@/lib/resend";
 import { button, detailRows, heading, label, paragraph, statTiles, trackedUrl } from "@/lib/email/components";
 import { renderLayout, renderText } from "@/lib/email/layout";
 import { ADVERTISER_DASHBOARD_URL, ADVERTISER_LINKS, compactNumber, formatNumber } from "@/lib/ad-emails";
+import { FROM_MAIL } from "../email/senders";
 
 export interface AdReport {
   advertiserEmail: string;
@@ -120,7 +121,7 @@ export function renderWeeklyAdReportEmail(r: AdReport) {
 export async function sendWeeklyAdReport(report: AdReport) {
   const { subject, html, text } = renderWeeklyAdReportEmail(report);
   const { error } = await sendEmail({
-    from: "Git City <noreply@thegitcity.com>",
+    from: FROM_MAIL,
     to: report.advertiserEmail,
     subject,
     html,

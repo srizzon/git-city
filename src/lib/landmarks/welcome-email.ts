@@ -4,6 +4,7 @@ import { COLORS, FONT, button, escapeHtml, gmailSafe, heading, paragraph, tracke
 import { renderLayout, renderText, type EmailLinks } from "@/lib/email/layout";
 import { ADVERTISER_DASHBOARD_URL } from "@/lib/ad-emails";
 import type { Landmark } from "./types";
+import { FROM_NOTIFY } from "../email/senders";
 
 // Set by hand in the environment; the fallback is the figure hardcoded when
 // landmarks shipped (April 2026), not a live number.
@@ -70,7 +71,7 @@ export async function sendWelcomeEmail(landmark: Landmark, recipients: string[])
   const failed: string[] = [];
   let lastError = "";
   for (const to of recipients) {
-    const { error } = await sendEmail({ from: "Git City <noreply@thegitcity.com>", to, subject, html, text });
+    const { error } = await sendEmail({ from: FROM_NOTIFY, to, subject, html, text });
     if (error) {
       failed.push(to);
       lastError = error.message;
