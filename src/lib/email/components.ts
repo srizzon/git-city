@@ -40,14 +40,15 @@ export function heroImage(opts: { src: string; href: string; alt: string }): str
 </a>`;
 }
 
-/** Page title. `highlight` is appended in lime, e.g. the player's handle. */
-export function heading(text: string, highlight?: string): string {
-  const hl = highlight ? ` <span style="color:${COLORS.lime};">${escapeHtml(highlight)}</span>` : "";
-  return `<h1 class="h1" style="margin:0 0 12px; font-family:${FONT}; font-size:28px; line-height:1.2; font-weight:700; color:${COLORS.cream};">${escapeHtml(text)}${hl}</h1>`;
+/** Page title. `highlight` is shown in lime between `text` and `after`, e.g. a handle. */
+export function heading(text: string, highlight?: string, after = ""): string {
+  const gap = text && highlight ? " " : "";
+  const hl = highlight ? `${gap}<span style="color:${COLORS.lime};">${escapeHtml(highlight)}</span>` : "";
+  return `<h1 class="h1" style="margin:0 0 12px; font-family:${FONT}; font-size:28px; line-height:1.2; font-weight:700; color:${COLORS.cream};">${escapeHtml(text)}${hl}${escapeHtml(after)}</h1>`;
 }
 
 export function paragraph(text: string): string {
-  return `<p style="margin:0 0 28px; font-family:${FONT}; font-size:16px; line-height:1.6; color:${COLORS.warm};">${escapeHtml(text)}</p>`;
+  return `<p style="margin:0 0 20px; font-family:${FONT}; font-size:16px; line-height:1.6; color:${COLORS.warm};">${escapeHtml(text)}</p>`;
 }
 
 /** Small uppercase label above a group, e.g. "Three ways to climb". */
@@ -59,7 +60,7 @@ export function label(text: string): string {
 export function bulletList(items: { lead: string; text: string }[]): string {
   const rows = items
     .map((item, i) => {
-      const bottom = i === items.length - 1 ? 0 : 14;
+      const bottom = i === items.length - 1 ? 20 : 14;
       return `<tr>
     <td width="22" valign="top" style="padding:7px 0 0;"><div style="width:8px; height:8px; background-color:${COLORS.lime}; font-size:0; line-height:0;">&nbsp;</div></td>
     <td style="padding:0 0 ${bottom}px; font-family:${FONT}; font-size:16px; line-height:1.5; color:${COLORS.warm};"><strong style="color:${COLORS.cream};">${escapeHtml(item.lead)}</strong> ${escapeHtml(item.text)}</td>
@@ -73,7 +74,7 @@ export function bulletList(items: { lead: string; text: string }[]): string {
 
 /** The one call to action: lime block with a darker bottom edge. */
 export function button(text: string, url: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:32px 0 0;">
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:12px 0 0;">
   <tr><td bgcolor="${COLORS.lime}" style="background-color:${COLORS.lime}; border-bottom:4px solid ${COLORS.limeDark};">
     <a href="${escapeHtml(url)}" style="display:inline-block; padding:14px 28px; font-family:${FONT}; font-size:16px; font-weight:700; color:${COLORS.bg}; text-decoration:none;">${escapeHtml(text)}</a>
   </td></tr>
