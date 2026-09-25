@@ -4,11 +4,12 @@ import { getViewer } from "@/lib/leagues/service";
 import { joinCompanyLeague, VERIFICATION_DAYS } from "@/lib/leagues/verification";
 import { assertSameOrigin, leagueErrorResponse, readJson } from "@/lib/leagues/http";
 import { LeagueError } from "@/lib/leagues/service";
+import { startFrom } from "@/lib/towns/company-start";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// POST { org }: join (or create) the company league of an org the dev proved
+// POST { org, template?, scoring? }: join (or create) the company league of an org the dev proved
 // membership of through the read:org OAuth.
 export async function POST(req: Request) {
   const bad = assertSameOrigin(req);
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
   if (!proof) return NextResponse.json({ error: "Verify with GitHub first." }, { status: 403 });
 
   try {
-    const { slug, seed } = await joinCompanyLeague(viewer.id, org, "private");
+    const { slug, seed } = await joinCompanyLeague(viewer.id, org, "private", startFrom(body));
     if (seed) after(() => seed().then(() => {}));
     return NextResponse.json({ slug });
   } catch (err) {

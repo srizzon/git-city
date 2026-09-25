@@ -18,6 +18,7 @@ export default function JoinPanel({
   invitee,
   refLogin,
   inviteToken,
+  org = null,
   onClose,
 }: {
   leagueSlug: string;
@@ -26,6 +27,8 @@ export default function JoinPanel({
   invitee: string | null;
   refLogin: string | null;
   inviteToken: string | null;
+  /** Company towns: the GitHub org, so verifying opens with it picked. */
+  org?: string | null;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -94,7 +97,7 @@ export default function JoinPanel({
     return (
       <Panel title="Work here?" onClose={onClose}>
         <p className="text-[11px] text-muted normal-case">Company towns are for the org&apos;s members. Verify on GitHub to move in.</p>
-        <Link href="/towns/verify" className={PRIMARY}>
+        <Link href={`/towns/new?kind=company${org ? `&org=${encodeURIComponent(org)}` : ""}`} className={PRIMARY}>
           Verify your company
         </Link>
       </Panel>

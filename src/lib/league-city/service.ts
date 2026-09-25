@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { invalidateLeague, leagueTag } from "@/lib/leagues/cache";
 import { START_H } from "./grid";
 import { starterOps } from "./starter";
+import { DEFAULT_TEMPLATE, type TemplateId } from "./templates";
 import { leagueAssetUrl } from "./identity";
 import type { CityIdentity, CityObject, CityOp } from "./types";
 
@@ -152,10 +153,11 @@ export function getCachedCity(leagueId: string): Promise<LeagueCity> {
 
 /**
  * Builds the starter city from the current members when the league has no
- * city yet. Safe to race: the first batch carries `init`, which the SQL
- * function skips when another call already built the city.
+ * city yet, from `template` (a new town's pick; older leagues get crew). Safe
+ * to race: the first batch carries `init`, which the SQL function skips when
+ * another call already built the city.
  */
-export async function ensureCity(leagueId: string): Promise<void> {
+export async function ensureCity(leagueId: string, template: TemplateId = DEFAULT_TEMPLATE): Promise<void> {
   const sb = getSupabaseAdmin();
   const { data: existing } = await sb.from("league_cities").select("version").eq("league_id", leagueId).maybeSingle();
   if (existing && Number(existing.version) > 0) return;
@@ -175,7 +177,7 @@ export async function ensureCity(leagueId: string): Promise<void> {
     if (data.length < 1000) break;
   }
 
-  const starter = starterOps(members);
+  const starter = starterOps(members, template);
   // The starter lays out existing members; only later arrivals are NEW.
   const ops: CityOp[] = starter.ops.map((op) => (op.op === "place" && op.kind === "building" ? { ...op, id: crypto.randomUUID() } : op));
   const dismiss: CityOp[] = ops.flatMap((op) => (op.op === "place" && op.kind === "building" && op.id ? [{ op: "dismiss_new", id: op.id }] : []));

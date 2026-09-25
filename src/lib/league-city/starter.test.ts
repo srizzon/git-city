@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { GROW_AT, LOT, START_H, bounds, inBounds, lotCount } from "./grid";
-import { ENTRANCE, PORTAL_POS, starterH, starterOps } from "./starter";
+import { ENTRANCE, PORTAL_POS, starterH, starterObjects, starterOps } from "./starter";
+import { propProblem } from "./props";
+import { TEMPLATE_IDS } from "./templates";
 
 const members = (n: number) => Array.from({ length: n }, (_, i) => ({ developer_id: i + 1, weight: i }));
 
@@ -67,5 +69,51 @@ describe("starterOps", () => {
     const edge = (o: (typeof trees)[number]) =>
       "px" in o && ([b.x0 * LOT, b.x1 * LOT].includes(o.px) || [b.z0 * LOT, b.z1 * LOT].includes(o.pz));
     expect(trees.every(edge)).toBe(true);
+  });
+});
+
+describe("templates", () => {
+  const sizes = [1, 8, 60, 150];
+  for (const id of TEMPLATE_IDS) {
+    for (const n of sizes) {
+      it(`${id} with ${n} members: valid lots and props, everyone placed`, () => {
+        const city = starterOps(members(n), id);
+        expect(city.ops[0]).toEqual({ op: "init", h: city.h });
+        expect(city.unplaced).toEqual([]);
+        const objects = starterObjects(city);
+        const lots = objects.filter((o) => o.px === null);
+        const keys = lots.map((o) => `${o.x},${o.z}`);
+        expect(new Set(keys).size).toBe(keys.length);
+        expect(lots.every((o) => inBounds(city.h, o.x, o.z))).toBe(true);
+        expect(lots.length).toBeLessThanOrEqual(GROW_AT * lotCount(city.h));
+        expect(objects.filter((o) => o.kind === "building")).toHaveLength(n);
+        // The gate is the same everywhere.
+        expect(objects.some((o) => o.item_type === "road" && o.x === 0 && o.z === 0 && o.locked)).toBe(true);
+        expect(objects.filter((o) => o.item_type === "portal")).toHaveLength(1);
+        // Every prop stands where the SQL would let it.
+        const props = objects.filter((o) => o.px !== null && o.pz !== null && o.item_type !== "portal");
+        for (const p of props) {
+          expect([p.item_type, propProblem(objects, city.h, { item_type: p.item_type!, px: p.px!, pz: p.pz!, id: p.id })]).toEqual([p.item_type, null]);
+        }
+      });
+    }
+  }
+
+  it("each template looks different", () => {
+    const shapes = TEMPLATE_IDS.map((id) =>
+      starterOps(members(1), id)
+        .ops.filter((o) => o.op === "place" && o.kind === "item" && o.item_type === "road")
+        .map((o) => ("x" in o ? `${o.x},${o.z}` : ""))
+        .sort()
+        .join("|"),
+    );
+    expect(new Set(shapes).size).toBe(TEMPLATE_IDS.length);
+  });
+
+  it("race has jumps and hq has lamps", () => {
+    const race = starterOps(members(1), "race").ops;
+    expect(race.some((o) => o.op === "place" && o.kind === "item" && o.item_type === "ramp_big")).toBe(true);
+    const hq = starterOps(members(1), "hq").ops;
+    expect(hq.filter((o) => o.op === "place" && o.kind === "item" && o.item_type === "lamp").length).toBeGreaterThan(4);
   });
 });

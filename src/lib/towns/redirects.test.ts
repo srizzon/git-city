@@ -19,13 +19,14 @@ function resolve(path: string): string | null {
 describe("town redirects", () => {
   it("maps every old path to its town path", () => {
     expect(resolve("/leagues")).toBe("/towns");
-    expect(resolve("/leagues/verify")).toBe("/towns/verify");
+    expect(resolve("/leagues/verify")).toBe("/towns/new?kind=company");
+    expect(resolve("/towns/verify")).toBe("/towns/new?kind=company");
     expect(resolve("/league/acme")).toBe("/town/acme");
     expect(resolve("/league/acme/settings")).toBe("/town/acme/settings");
   });
 
   it("never redirects a new path", () => {
-    for (const p of ["/towns", "/towns/verify", "/town/acme", "/town/acme/settings", "/leaguers"]) {
+    for (const p of ["/towns", "/towns/new", "/town/acme", "/town/acme/settings", "/leaguers"]) {
       expect(resolve(p)).toBeNull();
     }
   });

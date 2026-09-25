@@ -6,7 +6,9 @@ import { reassignAdmin, slugify } from "./service";
 import { LeagueError } from "./errors";
 import { companyLeagueName, isReservedSlug, LOGIN_RE } from "./names";
 import { inviteJoined } from "./joined";
-import { autoPlace, removeBuilding } from "@/lib/league-city/service";
+import { autoPlace, ensureCity, removeBuilding } from "@/lib/league-city/service";
+import { COMPANY_TEMPLATE, templateFor, type TemplateId } from "@/lib/league-city/templates";
+import type { ScoringMode } from "./scoring";
 import { seedOrgLogo } from "@/lib/league-city/logo";
 
 // ─── Company league verification ────────────────────────────
@@ -139,10 +141,16 @@ export async function syncOrgVerifications(
  * Callers must have verified membership first. Throws LeagueError("removed")
  * when the league's admin removed this dev: only a new invite lets them back.
  */
+/**
+ * Joins (or creates) the org's company town. The one who creates it picks the
+ * starter city and the race's scoring (`start`); later joiners get the town
+ * as it is.
+ */
 export async function joinCompanyLeague(
   devId: number,
   rawOrg: string,
   verification: "public" | "private",
+  start: { template?: TemplateId; scoring?: ScoringMode } = {},
 ): Promise<{ slug: string; created: boolean; seed: (() => Promise<number>) | null }> {
   const sb = getSupabaseAdmin();
   const org = rawOrg.toLowerCase();
@@ -174,6 +182,11 @@ export async function joinCompanyLeague(
     } else {
       league = inserted;
       created = true;
+      const template = start.template ?? COMPANY_TEMPLATE;
+      const scoring = start.scoring ?? templateFor(template).scoring;
+      await sb.from("leagues").update({ scoring_mode: scoring }).eq("id", inserted.id);
+      // The city before the creator's building goes in, so it's the picked layout.
+      await ensureCity(inserted.id, template).catch((err) => console.error("[league-city] starter city failed", err));
     }
   }
   if (!league) throw new Error(`Could not create company town for ${org}`);

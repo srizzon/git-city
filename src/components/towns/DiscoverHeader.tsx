@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import CreateLeague from "@/app/towns/create-league";
 import { Pending } from "@/components/leagues/PixelSpinner";
 import { NO_AUTOFILL } from "@/components/league/hud/shared";
 import type { TownCard } from "@/lib/towns/rows";
@@ -11,8 +10,7 @@ import { TownMeta } from "./TownCard";
 
 const BTN = "btn-press flex items-center justify-center gap-2 border-[3px] px-4 py-2.5 text-xs whitespace-nowrap";
 
-export default function DiscoverHeader({ signedIn, startCreating }: { signedIn: boolean; startCreating: boolean }) {
-  const [creating, setCreating] = useState(startCreating);
+export default function DiscoverHeader() {
   const [surprising, setSurprising] = useState(false);
 
   async function surprise() {
@@ -41,14 +39,9 @@ export default function DiscoverHeader({ signedIn, startCreating }: { signedIn: 
           <button type="button" onClick={surprise} disabled={surprising} className={`${BTN} border-border text-cream hover:border-lime`}>
             {surprising ? <Pending label="Picking" /> : "🎲 Surprise me"}
           </button>
-          <button
-            type="button"
-            onClick={() => setCreating((c) => !c)}
-            aria-expanded={creating}
-            className={`${BTN} border-lime bg-lime text-bg`}
-          >
+          <Link href="/towns/new" className={`${BTN} border-lime bg-lime text-bg`}>
             + Create a town
-          </button>
+          </Link>
         </div>
       </nav>
 
@@ -65,12 +58,6 @@ export default function DiscoverHeader({ signedIn, startCreating }: { signedIn: 
           <Search />
         </div>
       </div>
-
-      {creating && (
-        <div className="mt-6 grid max-w-md gap-2">
-          <CreateLeague signedIn={signedIn} defaultOpen />
-        </div>
-      )}
     </header>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/leagues/service";
 import { getCityNorms, getLeagueCityDevs, getLeagueMembers } from "@/lib/leagues/queries";
 import { getCachedCity } from "@/lib/league-city/service";
@@ -31,13 +32,15 @@ const ROWS: { id: RowId; title: string }[] = [
 
 export default async function TownsPage({ searchParams }: { searchParams: Promise<{ create?: string }> }) {
   const { create } = await searchParams;
+  // Old "create" links (emails, sign-in returns) open the new town screen.
+  if (create === "1") redirect("/towns/new");
   const viewer = await getViewer();
   const discover = await getDiscover(viewer);
   const hero = discover.featured ? await loadHero(discover.featured) : null;
 
   return (
     <main className="min-h-screen bg-bg pb-24 font-pixel uppercase text-warm">
-      <DiscoverHeader signedIn={!!viewer} startCreating={create === "1"} />
+      <DiscoverHeader />
 
       {discover.featured && hero ? <Hero featured={discover.featured} hero={hero} /> : <NoTowns />}
 
@@ -50,7 +53,7 @@ export default async function TownsPage({ searchParams }: { searchParams: Promis
               id={r.id}
               title={r.title}
               cards={discover.rows[r.id]}
-              action={r.id === "companies" ? { href: "/towns/verify", label: "Verify your company" } : undefined}
+              action={r.id === "companies" ? { href: "/towns/new?kind=company", label: "Start your company\u2019s town" } : undefined}
             />
           ) : null,
         )}
@@ -101,7 +104,7 @@ function NoTowns() {
         <p className="mt-3 max-w-md text-sm leading-relaxed text-muted normal-case">
           Start one for your team or friends. The town with the most visitors each week gets this spot.
         </p>
-        <Link href="/towns?create=1" className="btn-press mt-6 inline-block bg-lime px-6 py-3 text-sm tracking-widest text-bg">
+        <Link href="/towns/new" className="btn-press mt-6 inline-block bg-lime px-6 py-3 text-sm tracking-widest text-bg">
           + Create a town
         </Link>
       </div>

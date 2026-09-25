@@ -35,6 +35,7 @@ export default function InvitePanel({
   inCity,
   onShow,
   onPlaced,
+  onShared,
   onClose,
 }: {
   slug: string;
@@ -51,6 +52,8 @@ export default function InvitePanel({
   onShow: (login: string) => void;
   /** The invitee's building just showed up: point the camera at it. */
   onPlaced: (login: string) => void;
+  /** Someone got invited, or a link was copied or shared. */
+  onShared?: () => void;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -85,6 +88,7 @@ export default function InvitePanel({
         emailed: json.emailed === true,
       });
       setLogin("");
+      onShared?.();
       // Re-fetch the page so the new building shows up in the city.
       startRefresh(() => router.refresh());
     } catch {
@@ -98,6 +102,7 @@ export default function InvitePanel({
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
+      onShared?.();
     } catch {
       setCopied(false);
     }
@@ -109,6 +114,7 @@ export default function InvitePanel({
     try {
       await navigator.clipboard.writeText(link);
       setCopiedLogin(login);
+      onShared?.();
       setTimeout(() => setCopiedLogin((c) => (c === login ? null : c)), 1800);
     } catch {
       setCopiedLogin(null);
@@ -120,6 +126,7 @@ export default function InvitePanel({
     try {
       await navigator.clipboard.writeText(groupLink);
       setGroupCopied(true);
+      onShared?.();
       setTimeout(() => setGroupCopied(false), 1800);
     } catch {
       setGroupCopied(false);
@@ -130,6 +137,7 @@ export default function InvitePanel({
     if (!groupLink) return;
     try {
       await navigator.share({ url: groupLink });
+      onShared?.();
     } catch {
       // cancelled
     }
