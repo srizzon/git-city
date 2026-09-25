@@ -320,16 +320,16 @@ function LeagueCamera({
 
 // Discover's hero: on wide screens the copy sits on the left, so the picture
 // shifts right to keep the town clear of it.
-function HeroFraming() {
+function HeroFraming({ shiftPx }: { shiftPx?: number }) {
   const camera = useThree((s) => s.camera);
   const width = useThree((s) => s.size.width);
   const height = useThree((s) => s.size.height);
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return;
-    if (width >= 1024) camera.setViewOffset(width, height, -width * 0.26, 0, width, height);
+    if (width >= 1024) camera.setViewOffset(width, height, -(shiftPx ?? width * 0.26), 0, width, height);
     else camera.clearViewOffset();
     return () => camera.clearViewOffset();
-  }, [camera, width, height]);
+  }, [camera, width, height, shiftPx]);
   return null;
 }
 
@@ -343,6 +343,30 @@ function IntroPlayer({ h, objects, color, tallest, onEnd, onTick }: { h: number;
     return { intro: carIntro(portal?.pz ?? undefined), end: { pos: f.position.toArray(), look: f.target.toArray() } };
   });
   return <TownIntro intro={plan.intro} end={plan.end} color={color} ceiling={tallest + 60} onEnd={onEnd} onTick={onTick} />;
+}
+
+// Grows its children up from the ground each time `k` changes (after
+// `delay` seconds), with a small overshoot. Without a key it's a plain group.
+const RISE_S = 0.32;
+function Rise({ k, delay, children }: { k?: string; delay: number; children: React.ReactNode }) {
+  const ref = useRef<THREE.Group>(null);
+  const t = useRef(1);
+  useEffect(() => {
+    if (k === undefined) return;
+    t.current = -delay / RISE_S;
+    ref.current?.scale.set(1, 0.001, 1);
+  }, [k, delay]);
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g || t.current >= 1) return;
+    t.current = Math.min(1, t.current + dt / RISE_S);
+    const x = Math.max(0, t.current);
+    // ease-out-back: past full height, then settles
+    const c = 1.7;
+    const e = 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2);
+    g.scale.y = Math.max(0.001, e);
+  });
+  return <group ref={ref}>{children}</group>;
 }
 
 // ─── Scene ───────────────────────────────────────────────────
@@ -379,6 +403,12 @@ export interface LeagueSceneProps {
   drive?: Omit<DriveWorldProps, "objects" | "buildings" | "h">;
   /** Fill the parent box instead of the viewport, and ignore the pointer (Discover's hero). */
   embedded?: boolean;
+  /** A new value raises the city from the ground, streets first (the template picker). */
+  riseKey?: string;
+  /** Eases the orbit in close (the picker's Build). */
+  push?: boolean;
+  /** Embedded: orbit distance (default 0.85) and how far right the picture shifts on wide screens, in px (default 26% of the width). */
+  framing?: { zoom: number; shiftPx: number };
 }
 
 export default function LeagueScene({
@@ -400,6 +430,9 @@ export default function LeagueScene({
   children,
   drive,
   embedded = false,
+  riseKey,
+  push = false,
+  framing,
 }: LeagueSceneProps) {
   const editing = mode === "edit";
   const driving = mode === "drive" && !!drive;
@@ -461,7 +494,7 @@ export default function LeagueScene({
       <ThemeLights theme={theme} themeIndex={themeKey} />
       {/* Moon and stars from the main city's matching sky. */}
       <ThemeSkyFX themeIndex={skyFx} theme={theme} lowSky />
-      {embedded && <HeroFraming />}
+      {embedded && <HeroFraming shiftPx={framing?.shiftPx} />}
       {editing ? (
         <EditCamera h={h} onLot={onLot ?? (() => {})} apiRef={editApiRef} pickables={editPickables} />
       ) : (
@@ -470,7 +503,7 @@ export default function LeagueScene({
           focus={mode === "view" && !playing ? focusedBuilding : null}
           spin={mode === "view" && !playing}
           driving={driving || playing}
-          zoom={embedded ? 0.85 : 1}
+          zoom={(embedded ? (framing?.zoom ?? 0.85) : 1) * (push ? 0.45 : 1)}
           tallest={embedded ? tallest : 0}
         />
       )}
@@ -478,13 +511,19 @@ export default function LeagueScene({
       {playing && intro && <IntroPlayer key={intro.n} h={h} objects={objects} color={intro.color} tallest={tallest} onEnd={onIntroEnd ?? (() => {})} onTick={onIntroTick} />}
       <LeagueGround h={h} theme={theme} />
       {approach.length > 0 && <ApproachGround theme={theme} />}
-      <LeagueRoads objects={withApproach} markingColor={theme.roadMarkingColor} />
-      <PlazaSlabs objects={objects} theme={theme} />
-      <LeagueToys objects={objects} driving={driving} />
-      <InstancedDecorations items={decorations} roadMarkingColor={theme.roadMarkingColor} sidewalkColor={theme.sidewalkColor} />
-      <Suspense fallback={null}>
-        <LeagueTrees objects={objects} />
-      </Suspense>
+      <Rise k={riseKey} delay={0}>
+        <LeagueRoads objects={withApproach} markingColor={theme.roadMarkingColor} />
+        <PlazaSlabs objects={objects} theme={theme} />
+      </Rise>
+      <Rise k={riseKey} delay={0.12}>
+        <LeagueToys objects={objects} driving={driving} />
+        <InstancedDecorations items={decorations} roadMarkingColor={theme.roadMarkingColor} sidewalkColor={theme.sidewalkColor} />
+      </Rise>
+      <Rise k={riseKey} delay={0.2}>
+        <Suspense fallback={null}>
+          <LeagueTrees objects={objects} />
+        </Suspense>
+      </Rise>
 
       {identity && (
         <IdentityLayer
@@ -504,13 +543,15 @@ export default function LeagueScene({
         />
       )}
 
-      <CityScene
-        buildings={buildings}
-        colors={theme.building}
-        accentColor={theme.building.accent}
-        focusedBuilding={editing || driving ? null : (focused ?? null)}
-        onBuildingClick={editing || driving ? undefined : onBuildingClick}
-      />
+      <Rise k={riseKey} delay={0.28}>
+        <CityScene
+          buildings={buildings}
+          colors={theme.building}
+          accentColor={theme.building.accent}
+          focusedBuilding={editing || driving ? null : (focused ?? null)}
+          onBuildingClick={editing || driving ? undefined : onBuildingClick}
+        />
+      </Rise>
       {driving && drive && <DriveWorld objects={withApproach} buildings={buildings} h={h} {...drive} />}
       {children}
     </Canvas>
