@@ -3542,9 +3542,10 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
           {/* Navigation hints (bottom-right) — hidden when building card is open */}
           {!selectedBuilding && (
             <div className="absolute bottom-20 left-3 text-[8px] leading-loose text-muted sm:left-4 sm:text-[9px]">
-              <div><span className="text-cream">Drag</span> orbit</div>
+              <div><span className="text-cream">Drag</span> move</div>
               <div><span className="text-cream">Scroll</span> zoom</div>
-              <div><span className="text-cream">Right-drag</span> pan</div>
+              <div><span className="text-cream">Right-drag</span> rotate</div>
+              <div><span className="text-cream">Double-click</span> zoom in</div>
               <div><span className="text-cream">Click</span> building</div>
               <div><span style={{ color: theme.accent }}>ESC</span> back</div>
             </div>
@@ -4939,7 +4940,8 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         <>
           {/* Nav hints — only on desktop, bottom-right */}
           <div className="pointer-events-none fixed bottom-6 right-6 z-30 hidden text-right text-[9px] leading-loose text-muted sm:block">
-            <div><span className="text-cream">Drag</span> orbit</div>
+            <div><span className="text-cream">Drag</span> move</div>
+            <div><span className="text-cream">Right-drag</span> rotate</div>
             <div><span className="text-cream">Scroll</span> zoom</div>
             <div><span style={{ color: theme.accent }}>ESC</span> close</div>
           </div>
