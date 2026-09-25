@@ -1,7 +1,50 @@
 import { sendNotificationAsync } from "../notifications";
-import { buildButton } from "../email-template";
+import { EMAIL_BASE_URL, button, heading, heroImage, paragraph, trackedUrl } from "../email/components";
+import { renderLayout, renderText, type EmailLinks } from "../email/layout";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+/** PX credited to the referrer per referred developer (earn rule "referral", migration 105). */
+const REFERRAL_PX = 25;
+
+export interface ReferralJoinedData {
+  referrerLogin: string;
+  referredLogin: string;
+}
+
+function referralHeader(d: ReferralJoinedData) {
+  return {
+    subject: `@${d.referredLogin} joined through your link`,
+    preheader: `You earned ${REFERRAL_PX} PX. Go see their new building.`,
+  };
+}
+
+export function renderReferralJoinedEmail(d: ReferralJoinedData, links: EmailLinks) {
+  const { subject, preheader } = referralHeader(d);
+  const url = trackedUrl(`/?user=${encodeURIComponent(d.referredLogin)}`, "referral_joined");
+  const intro = `They claimed their building through your invite link, and you earned ${REFERRAL_PX} PX for it. Each developer you invite earns you more.`;
+  const cta = `Visit @${d.referredLogin}`;
+  const reason = "You're getting this because someone joined Git City through your invite link.";
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    hero: heroImage({
+      src: `${EMAIL_BASE_URL}/dev/${encodeURIComponent(d.referredLogin)}/opengraph-image`,
+      href: url,
+      alt: `@${d.referredLogin}'s building in Git City`,
+    }),
+    body: [heading("", `@${d.referredLogin}`, " moved in"), paragraph(intro), button(cta, url)].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: [`@${d.referredLogin} moved in`, "", intro, "", `${cta}: ${url}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
 
 export function sendReferralJoinedNotification(
   referrerId: number,
@@ -9,21 +52,18 @@ export function sendReferralJoinedNotification(
   referredLogin: string,
   referredId: number,
 ) {
+  const data: ReferralJoinedData = { referrerLogin, referredLogin };
+  const { subject, preheader } = referralHeader(data);
+
   sendNotificationAsync({
     type: "referral_joined",
     category: "social",
     developerId: referrerId,
     dedupKey: `referral:${referrerId}:${referredId}`,
-    title: `Your referral @${referredLogin} just joined Git City!`,
-    body: `@${referredLogin} joined Git City through your referral link.`,
-    html: `
-      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">Referral joined</p>
-      <h1 style="margin:0 0 8px; font-size:24px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">@${referredLogin} is in Git City!</h1>
-      <p style="margin:0 0 28px; font-size:15px; color:#555555; line-height:1.6;">They just claimed their building through your referral link. Keep sharing to unlock referral achievements!</p>
-      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 28px;" />
-      ${buildButton("Visit Their Building", `${BASE_URL}/?user=${referredLogin}`)}
-    `,
-    actionUrl: `${BASE_URL}/?user=${referredLogin}`,
+    title: subject,
+    body: preheader,
+    render: (links) => renderReferralJoinedEmail(data, links),
+    actionUrl: `${EMAIL_BASE_URL}/?user=${referredLogin}`,
     priority: "normal",
     channels: ["email"],
   });
