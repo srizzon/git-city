@@ -16,7 +16,8 @@ import type { RoomBests } from "@/lib/league-city/race/net";
 import type { BoardRow } from "@/lib/league-city/race/board";
 import { pointAt, theTrack } from "@/lib/league-city/race/track";
 import { M_TO_UNIT } from "@/lib/league-city/drive/tuning";
-import { TRIAL, runCounts, type TrialStage } from "@/lib/league-city/race/trial";
+import { TRIAL, pickRival, runCounts, type TrialStage } from "@/lib/league-city/race/trial";
+import type { GhostRun } from "@/lib/league-city/race/ghost";
 
 // The town's race track: one Canvas in daylight (read at a glance from the
 // high camera), the track and the race room (RaceWorld, loaded on the client
@@ -61,11 +62,22 @@ export default function RaceClient({
   townName,
   viewerLogin,
   board: initialBoard,
+  week: initialWeek,
+  lastWinner,
+  ghosts: initialGhosts,
+  members,
 }: {
   slug: string;
   townName: string;
   viewerLogin: string | null;
   board: BoardRow[];
+  /** This week's board (the season) and last week's winner. */
+  week: BoardRow[];
+  lastWinner: BoardRow | null;
+  /** Logins with a ghost to race. */
+  ghosts: string[];
+  /** The town's members, for the drivers list. */
+  members: { login: string; avatar_url: string | null }[];
 }) {
   const router = useRouter();
   const track = useMemo(() => theTrack(), []);
@@ -84,7 +96,7 @@ export default function RaceClient({
   const [run, setRun] = useState<TrialResult | null>(null);
   // Title → flyover → countdown → run → finish; R goes back to a short countdown.
   const [trial, setTrial] = useState<{ stage: TrialStage; at: number; beat: number }>({
-    stage: "title",
+    stage: "menu",
     at: 0,
     beat: TRIAL.beatMs,
   });
@@ -102,12 +114,44 @@ export default function RaceClient({
   const [race, setRace] = useState<RaceView | null>(null);
   const [bests, setBests] = useState<RoomBests>([]);
   const [board, setBoard] = useState(initialBoard);
+  const [week, setWeek] = useState(initialWeek);
+  const [ghosts, setGhosts] = useState(initialGhosts);
+  // Your rival: the ghost you asked for (?ghost=, the leaderboard), else pickRival's.
+  const [asked, setAsked] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () => setAsked(new URLSearchParams(window.location.search).get("ghost"));
+    read();
+  }, []);
+  const [rival, setRival] = useState<{ login: string; run: GhostRun } | null>(null);
+  const recentLaps = useRef<GhostRun[]>([]);
+  const menuRef = useRef<(() => void) | null>(null);
+  const introSeen = useRef(false);
   const [feed, setFeed] = useState<LapFeedItem[]>([]);
   const [saved, setSaved] = useState<{ ms: number; rank: number; improved: boolean; at: number } | null>(null);
   const startRef = useRef<(() => void) | null>(null);
   const restartRef = useRef<(() => void) | null>(null);
   const [guest] = useState(() => `guest-${Math.random().toString(36).slice(2, 6).padEnd(4, "0")}`);
   const name = viewerLogin ?? guest;
+  const rivalLogin = pickRival(board, name, ghosts, asked);
+  useEffect(() => {
+    if (!rivalLogin) {
+      const clear = () => setRival(null);
+      clear();
+      return;
+    }
+    let live = true;
+    fetch(`/api/towns/${slug}/race/ghost?login=${encodeURIComponent(rivalLogin)}`)
+      .then((r) => (r.ok ? (r.json() as Promise<GhostRun & { login: string }>) : null))
+      .then((g) => {
+        if (live) setRival(g ? { login: g.login, run: g } : null);
+      })
+      .catch(() => {
+        // offline: race your own ghost only
+      });
+    return () => {
+      live = false;
+    };
+  }, [rivalLogin, slug]);
 
   useEffect(() => {
     const read = () => {
@@ -138,11 +182,13 @@ export default function RaceClient({
   }, [router, slug]);
   useEffect(() => router.prefetch(`/town/${slug}`), [router, slug]);
 
-  // Past the line the autopilot has the car, so R comes from here.
+  // Past the line the autopilot has the car, so R (again) and M (menu) come from here.
   useEffect(() => {
     if (trial.stage !== "finish") return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === "KeyR" && !e.repeat) restartRef.current?.();
+      if (e.repeat) return;
+      if (e.code === "KeyR") restartRef.current?.();
+      if (e.code === "KeyM") menuRef.current?.();
     };
     window.addEventListener("keydown", onKey);
     const t1 = setTimeout(() => setFinishBeat(1), TRIAL.bannerMs);
@@ -154,20 +200,26 @@ export default function RaceClient({
     };
   }, [trial.stage]);
 
-  // Title: Enter or Space starts. The flyover runs once, any key skips it.
-  const begin = useCallback(() => goStage("intro"), [goStage]);
+  // Time trial from the menu: the flyover the first time (any key skips it), then straight to 3-2-1.
+  const begin = useCallback(() => {
+    if (introSeen.current) return goStage("countdown", TRIAL.beatMs);
+    introSeen.current = true;
+    goStage("intro");
+  }, [goStage]);
+  /** Race a driver's ghost from the leaderboard: they become your rival, and the run starts. */
+  const raceGhost = useCallback(
+    (login: string) => {
+      setAsked(login);
+      begin();
+    },
+    [begin],
+  );
+  const toMenu = useCallback(() => {
+    setPaused(false);
+    menuRef.current?.();
+  }, []);
   useEffect(() => {
     if (!ready || paused) return;
-    if (trial.stage === "title") {
-      const onKey = (e: KeyboardEvent) => {
-        if ((e.code === "Enter" || e.code === "Space") && !e.repeat) {
-          e.preventDefault();
-          begin();
-        }
-      };
-      window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
-    }
     if (trial.stage === "intro") {
       const skip = (e: KeyboardEvent) => {
         if (e.key !== "Escape" && !e.repeat) goStage("countdown", TRIAL.beatMs);
@@ -179,7 +231,7 @@ export default function RaceClient({
         clearTimeout(t);
       };
     }
-  }, [ready, paused, trial.stage, begin, goStage]);
+  }, [ready, paused, trial.stage, goStage]);
 
   const onRun = useCallback(
     (r: RunResult | null) => {
@@ -221,23 +273,46 @@ export default function RaceClient({
     setFeed((f) => [{ ...e, at }, ...f].slice(0, 5));
   }, []);
 
+  const boardRef = useRef(board);
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
   const onReceipt = useCallback(
     async (token: string) => {
+      // The lap's path goes along when it beats your best on the board (the receipt says its time).
+      let ghost: GhostRun | null = null;
+      try {
+        const ms = (JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))) as { ms: number }).ms;
+        const mine = boardRef.current.find((b) => b.login.toLowerCase() === name.toLowerCase())?.best_ms ?? Infinity;
+        const lap = recentLaps.current.find((g) => Math.abs(g.ms - ms) < 600);
+        if (lap && ms < mine) ghost = { ...lap, ms };
+      } catch {
+        // an odd token: the lap goes without its ghost
+      }
       try {
         const res = await fetch(`/api/towns/${slug}/race/lap`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token }),
+          body: JSON.stringify({ token, ghost }),
         });
         if (!res.ok) return;
-        const data = (await res.json()) as { best_ms: number; improved: boolean; rank: number; board: BoardRow[] };
+        const data = (await res.json()) as {
+          best_ms: number;
+          improved: boolean;
+          rank: number;
+          ghost_saved: boolean;
+          board: BoardRow[];
+          week: BoardRow[];
+        };
         setBoard(data.board);
+        setWeek(data.week);
+        if (data.ghost_saved) setGhosts((g) => (g.some((x) => x.toLowerCase() === name.toLowerCase()) ? g : [...g, name]));
         if (data.improved) setSaved({ ms: data.best_ms, rank: data.rank, improved: true, at: Date.now() });
       } catch {
         // offline: the lap still showed in the feed
       }
     },
-    [slug],
+    [slug, name],
   );
 
   const onReady = useCallback(() => setReady(true), []);
@@ -303,10 +378,14 @@ export default function RaceClient({
             beatMs={trial.beat}
             onStage={goStage}
             frameLeft={trial.stage === "finish" && finishBeat === 2}
+            rival={rival}
+            recentLaps={recentLaps}
+            menuRef={menuRef}
           />
         )}
       </Canvas>
       <RaceHud
+        slug={slug}
         townName={townName}
         telemetry={telemetry}
         ready={ready}
@@ -327,6 +406,13 @@ export default function RaceClient({
         stage={trial.stage}
         finishBeat={finishBeat}
         onBegin={begin}
+        onMenu={toMenu}
+        onRaceGhost={raceGhost}
+        week={week}
+        lastWinner={lastWinner}
+        ghosts={ghosts}
+        members={members}
+        rival={rival ? { login: rival.login, ms: rival.run.ms } : null}
         you={name}
         onStart={() => startRef.current?.()}
         onRestart={() => restartRef.current?.()}

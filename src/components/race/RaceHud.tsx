@@ -8,6 +8,7 @@ import StartScreen from "@/components/league/hud/drive/StartScreen";
 import CopyLink from "@/components/league/hud/drive/CopyLink";
 import type { RaceCameraMode } from "./RaceCamera";
 import Minimap from "./Minimap";
+import RaceMenu from "./RaceMenu";
 import { TURBO } from "@/lib/league-city/drive/tuning";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import type { BoardRow } from "@/lib/league-city/race/board";
@@ -56,6 +57,7 @@ const who = (name: string) => (name.startsWith("guest-") ? "guest" : `@${name}`)
 const signed = (ms: number) => `${ms < 0 ? "-" : "+"}${(Math.abs(ms) / 1000).toFixed(3)}`;
 
 export default function RaceHud({
+  slug,
   townName,
   telemetry,
   ready,
@@ -76,6 +78,13 @@ export default function RaceHud({
   stage,
   finishBeat,
   onBegin,
+  onMenu,
+  onRaceGhost,
+  week,
+  lastWinner,
+  ghosts,
+  members,
+  rival,
   you,
   onStart,
   onRestart,
@@ -84,6 +93,7 @@ export default function RaceHud({
   onMute,
   onExit,
 }: {
+  slug: string;
   townName: string;
   telemetry: RaceTelemetry;
   ready: boolean;
@@ -108,6 +118,13 @@ export default function RaceHud({
   /** After the line: 0 FINISH, 1 banner gone, 2 results in. */
   finishBeat: number;
   onBegin: () => void;
+  onMenu: () => void;
+  onRaceGhost: (login: string) => void;
+  week: BoardRow[];
+  lastWinner: BoardRow | null;
+  ghosts: string[];
+  members: { login: string; avatar_url: string | null }[];
+  rival: { login: string; ms: number } | null;
   you: string;
   onStart: () => void;
   onRestart: () => void;
@@ -250,7 +267,7 @@ export default function RaceHud({
   const record = board[0] ?? null;
   // The driving HUD shows from the countdown to the line.
   const live = ready && (stage === "countdown" || stage === "run");
-  const bars = ready && (stage === "title" || stage === "intro");
+  const bars = ready && (stage === "menu" || stage === "intro");
   const boardRank = board.find((b) => b.login.toLowerCase() === you.toLowerCase())?.rank ?? null;
 
   return (
@@ -358,7 +375,7 @@ export default function RaceHud({
             )}
           </section>
           <div className={`${HUD_BOX} flex justify-center p-2`}>
-            <Minimap telemetry={telemetry} />
+            <Minimap telemetry={telemetry} rivalColor={rival ? carColor(rival.login) : null} />
           </div>
         </div>
       )}
@@ -501,36 +518,18 @@ export default function RaceHud({
       <div
         className={`absolute inset-x-0 bottom-0 overflow-hidden bg-black transition-[height] duration-500 ease-out ${bars ? "h-[16vh] min-h-[96px]" : "h-0"}`}
       >
-        {ready && stage === "title" && (
-          <div className="mx-auto flex h-full max-w-5xl items-center justify-between gap-6 px-8">
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-lime">Time trial · {RUN_LAPS} laps</p>
-              <p className="flex items-center gap-5 text-[11px] text-muted">
-                <span>
-                  Your best <span className="text-cream tabular-nums">{pb !== null ? formatLap(pb) : "-:--.---"}</span>
-                </span>
-                {medal && (
-                  <span className="flex items-center gap-1.5" style={{ color: MEDAL_COLORS[medal] }}>
-                    <span className="h-2.5 w-2.5" style={{ background: MEDAL_COLORS[medal] }} aria-hidden />
-                    {medal}
-                  </span>
-                )}
-                {record && (
-                  <span className="normal-case">
-                    Record <span className="text-cream">@{record.login}</span>{" "}
-                    <span className="tabular-nums text-cream">{formatLap(record.best_ms)}</span>
-                  </span>
-                )}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onBegin}
-              className="pointer-events-auto flex items-center gap-3 bg-lime px-5 py-3 text-xs text-bg transition-[filter] hover:brightness-110 active:translate-y-px"
-            >
-              <span className="animate-pulse">Press Enter</span>
-              <span aria-hidden>▸</span>
-            </button>
+        {ready && stage === "menu" && (
+          <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-[6vw] text-[11px] text-muted">
+            <span>
+              <span className="text-cream">↑↓</span> choose · <span className="text-cream">Enter</span> select ·{" "}
+              <span className="text-cream">Esc</span> pause
+            </span>
+            {record && (
+              <span className="normal-case">
+                Town record <span className="text-cream">@{record.login}</span>{" "}
+                <span className="tabular-nums text-cream">{formatLap(record.best_ms)}</span>
+              </span>
+            )}
           </div>
         )}
         {ready && stage === "intro" && (
@@ -539,6 +538,29 @@ export default function RaceHud({
           </div>
         )}
       </div>
+
+      {ready && stage === "menu" && !paused && !leaving && (
+        <RaceMenu
+          slug={slug}
+          townName={townName}
+          you={you}
+          signedIn={signedIn}
+          pb={pb}
+          board={board}
+          week={week}
+          lastWinner={lastWinner}
+          ghosts={ghosts}
+          members={members}
+          drivers={drivers}
+          rival={rival}
+          startable={startable}
+          raceOn={r?.phase === "live" || r?.phase === "countdown"}
+          onBegin={onBegin}
+          onRaceGhost={onRaceGhost}
+          onStartRace={onStart}
+          onExit={onExit}
+        />
+      )}
 
       {/* 3, 2, 1, GO */}
       {cue && (
@@ -591,7 +613,15 @@ export default function RaceHud({
 
       {/* Time trial results, over the car driving itself */}
       {run && !racing && stage === "finish" && finishBeat === 2 && (
-        <TrialCard run={run} ghostMs={ghostMs} rank={boardRank} townName={townName} onRestart={onRestart} onExit={onExit} />
+        <TrialCard
+          run={run}
+          ghostMs={ghostMs}
+          weekRank={week.find((b) => b.login.toLowerCase() === you.toLowerCase())?.rank ?? null}
+          allRank={boardRank}
+          rival={rival}
+          onRestart={onRestart}
+          onMenu={onMenu}
+        />
       )}
 
       {/* Wrong way */}
@@ -731,6 +761,7 @@ export default function RaceHud({
       {paused && ready && !leaving && (
         <PauseMenu
           controls={CONTROLS}
+          onMenu={stage !== "menu" && !racing ? onMenu : undefined}
           camera={camera === "high" ? "top" : "chase"}
           muted={muted}
           onResume={onResume}
@@ -747,17 +778,19 @@ export default function RaceHud({
 function TrialCard({
   run,
   ghostMs,
-  rank,
-  townName,
+  weekRank,
+  allRank,
+  rival,
   onRestart,
-  onExit,
+  onMenu,
 }: {
   run: TrialResult;
   ghostMs: number | null;
-  rank: number | null;
-  townName: string;
+  weekRank: number | null;
+  allRank: number | null;
+  rival: { login: string; ms: number } | null;
   onRestart: () => void;
-  onExit: () => void;
+  onMenu: () => void;
 }) {
   const valid = run.laps.filter((x) => x.valid).map((x) => x.ms);
   const bestLap = valid.length ? Math.min(...valid) : null;
@@ -807,14 +840,26 @@ function TrialCard({
           );
         })}
       </ol>
-      {(lapPb || rank !== null) && (
-        <p className="mt-3 flex justify-between text-[11px]">
-          {lapPb ? <span className="text-lime">New best lap</span> : <span />}
-          {rank !== null && (
-            <span className="text-muted">
-              #{rank} in {townName}
-            </span>
-          )}
+      {lapPb && <p className="mt-3 text-[11px] text-lime">New best lap</p>}
+      {rival && bestLap !== null && (
+        <p className="mt-3 flex items-center justify-between border-2 border-border px-3 py-2 text-[11px]">
+          <span className="normal-case" style={{ color: carColor(rival.login) }}>
+            vs @{rival.login}
+          </span>
+          <span className={`tabular-nums ${bestLap < rival.ms ? "text-lime" : "text-[#ff6b6b]"}`}>
+            {bestLap < rival.ms ? "Beat their ghost " : ""}
+            {signed(bestLap - rival.ms)}
+          </span>
+        </p>
+      )}
+      {(weekRank !== null || allRank !== null) && (
+        <p className="mt-3 flex gap-5 text-[11px] text-muted">
+          <span>
+            This week <span className="text-cream">{weekRank ? `#${weekRank}` : "-"}</span>
+          </span>
+          <span>
+            All time <span className="text-cream">{allRank ? `#${allRank}` : "-"}</span>
+          </span>
         </p>
       )}
       <div className="mt-4 grid grid-cols-2 gap-2">
@@ -828,10 +873,10 @@ function TrialCard({
         </button>
         <button
           type="button"
-          onClick={onExit}
-          className="border-2 border-border px-3 py-2.5 text-[11px] text-cream transition-colors hover:text-lime"
+          onClick={onMenu}
+          className="flex items-center justify-center gap-2 border-2 border-border px-3 py-2.5 text-[11px] text-cream transition-colors hover:text-lime"
         >
-          Back to town
+          <span className="border-2 border-border px-1">M</span> Menu
         </button>
       </div>
     </section>

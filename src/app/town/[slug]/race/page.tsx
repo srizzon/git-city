@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { currentSlugFor, getLeagueBySlug, getViewer } from "@/lib/leagues/service";
-import { getLapBoard } from "@/lib/league-city/race/board";
+import { getGhostLogins, getLapBoard, getLastWeekWinner, getWeekBoard } from "@/lib/league-city/race/board";
+import { getLeagueMembers } from "@/lib/leagues/queries";
 import { TRACK_ID } from "@/lib/league-city/race/track";
 import { townDisplayName } from "@/lib/towns/names";
 import RaceClient from "./race-client";
@@ -30,13 +31,27 @@ export default async function RacePage({ params }: Props) {
     if (!moved) notFound();
     permanentRedirect(`/town/${moved}/race`);
   }
-  const [viewer, board] = await Promise.all([getViewer(), getLapBoard(league.id, TRACK_ID)]);
+  const [viewer, board, week, lastWinner, ghosts, members] = await Promise.all([
+    getViewer(),
+    getLapBoard(league.id, TRACK_ID),
+    getWeekBoard(league.id, TRACK_ID),
+    getLastWeekWinner(league.id, TRACK_ID),
+    getGhostLogins(league.id, TRACK_ID),
+    getLeagueMembers(league.id),
+  ]);
   return (
     <RaceClient
       slug={league.slug}
       townName={townDisplayName(league.name)}
       viewerLogin={viewer?.github_login ?? null}
       board={board}
+      week={week}
+      lastWinner={lastWinner}
+      ghosts={ghosts}
+      members={members
+        .filter((m) => m.status === "active")
+        .map((m) => ({ login: m.login, avatar_url: m.avatar_url }))
+        .slice(0, 200)}
     />
   );
 }
