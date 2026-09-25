@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { createMagicLinkSession } from "@/lib/advertiser-auth";
 import { wrapInBaseTemplate, buildButton } from "@/lib/email-template";
 import { rateLimit } from "@/lib/rate-limit";
@@ -72,8 +72,7 @@ export async function POST(request: NextRequest) {
     verifyUrl.searchParams.set("redirect", body.redirect);
   }
 
-  const resend = getResend();
-  await resend.emails.send({
+  const { error: sendError } = await sendEmail({
     from: "Git City <noreply@thegitcity.com>",
     to: email,
     subject: "Sign in to Git City",
@@ -88,6 +87,11 @@ export async function POST(request: NextRequest) {
       </p>
     `),
   });
+
+  if (sendError) {
+    console.error("[ads-magic-link] Resend error:", sendError);
+    return NextResponse.json({ error: "Failed to send the sign-in email. Try again." }, { status: 502 });
+  }
 
   return NextResponse.json({ ok: true });
 }

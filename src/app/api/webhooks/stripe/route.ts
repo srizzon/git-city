@@ -8,7 +8,7 @@ import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notifi
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import type Stripe from "stripe";
 import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pending-review";
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { escapeHtml } from "@/lib/email-template";
 import { getPostHogClient } from "@/lib/posthog-server";
 
@@ -276,8 +276,7 @@ export async function POST(request: Request) {
           const isLandmark = pkg?.landmark === true;
 
           try {
-            const resend = getResend();
-            await resend.emails.send({
+            const { error: emailError } = await sendEmail({
               from: "Git City Ads <ads@thegitcity.com>",
               to: "samuelrizzondev@gmail.com",
               subject: isLandmark
@@ -299,6 +298,7 @@ export async function POST(request: Request) {
                 ${isLandmark ? "<p style='margin-top:16px;color:#c8e64a;'><strong>⚠️ This is a Landmark package. You need to create a custom 3D building and post on Instagram/X.</strong></p>" : ""}
               `,
             });
+            if (emailError) throw new Error(emailError.message);
           } catch (emailErr) {
             console.error("Failed to send admin ad sale email:", emailErr);
           }

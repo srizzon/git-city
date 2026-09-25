@@ -1,5 +1,5 @@
 import "server-only";
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
 import type { Landmark } from "./types";
 
@@ -46,11 +46,11 @@ export async function sendWelcomeEmail(
     throw new Error("No recipients");
   }
   const { subject, html } = renderWelcomeEmail(landmark);
-  const resend = getResend();
-  await resend.emails.send({
+  const { error } = await sendEmail({
     from: "Git City <noreply@thegitcity.com>",
     to: recipients,
     subject,
     html,
   });
+  if (error) throw new Error(`Resend error: ${error.message}`);
 }
