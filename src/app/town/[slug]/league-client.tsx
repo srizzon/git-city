@@ -54,6 +54,7 @@ import TownQuest from "@/components/league/hud/TownQuest";
 import { freshQuest, nextStep, parseQuest, questKey, questSteps, type QuestState, type QuestStep } from "@/lib/towns/quest";
 import { chime } from "@/lib/sfx/chime";
 import { useDriveWatch } from "@/components/league/drive/useDriveWatch";
+import { useTownBots } from "@/components/league/drive/useTownBots";
 import {
   HOTBAR,
   initEditor,
@@ -409,6 +410,12 @@ export default function LeagueClient({
 
   // Everyone out driving, drawn in view mode too (the drive room takes over in the car).
   const watch = useDriveWatch(league.slug, mode === "view");
+  // Bots fill the streets when few people are driving (lib/league-city/drive/bots).
+  const bots = useTownBots(league.slug, sceneObjects, watch.drivers.length, mode === "view");
+  const watchedCars = useMemo(
+    () => [...watch.drivers.flatMap((d) => watch.remotes.current.get(d.id) ?? []), ...bots],
+    [watch.drivers, watch.remotes, bots],
+  );
 
   const newBuildings = useMemo(
     () => sceneObjects.filter((o) => o.kind === "building" && o.is_new),
@@ -643,7 +650,7 @@ export default function LeagueClient({
         editApiRef={cameraApi}
         editPickables={pickables}
         drive={driveProps}
-        watching={watch}
+        watching={watchedCars}
       >
         {mode === "edit" && (
           <EditorOverlay

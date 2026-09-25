@@ -6,7 +6,7 @@ import { Html } from "@react-three/drei";
 import { CuboidCollider, RigidBody, useBeforePhysicsStep, type RapierRigidBody } from "@react-three/rapier";
 import { Howl, Howler } from "howler";
 import * as THREE from "three";
-import { FLAG_BOOST, FLAG_BRAKE, FLAG_HORN, INTERP_MS, emptySnapshot, type CarSnapshot, type DriverInfo } from "@/lib/league-city/drive/net";
+import { FLAG_BOOST, FLAG_BRAKE, FLAG_HORN, INTERP_MS, emptySnapshot, type CarSnapshot } from "@/lib/league-city/drive/net";
 import { startHorn } from "@/lib/league-city/drive/horn";
 import { CHASSIS, M_TO_UNIT, STEER, WHEEL } from "@/lib/league-city/drive/tuning";
 import { WHEELS } from "@/lib/league-city/drive/vehicle";
@@ -14,7 +14,7 @@ import type { CarApi } from "./Car";
 import CarModel from "./CarModel";
 import Lights from "./Lights";
 import type { FxSource, FxSources } from "./fx";
-import type { RemoteDriver } from "./useDrivePresence";
+import type { CarFeed } from "./useDrivePresence";
 
 // Everyone else driving in this city. Each car follows its snapshots
 // (INTERP_MS behind real time) as a dynamic body with the same mass as yours,
@@ -59,7 +59,7 @@ function RemoteCar({
   localCar,
   muted,
 }: {
-  remote: RemoteDriver;
+  remote: CarFeed;
   sources: FxSources;
   localCar: React.MutableRefObject<CarApi | null>;
   muted: boolean;
@@ -116,6 +116,12 @@ function RemoteCar({
     const now = performance.now() - INTERP_MS;
     const t = remote.buffer.sample(now, target.current);
     const p0 = remote.buffer.sample(now - 50, before.current);
+    if (b && (!t || !p0) && placed.current) {
+      // Gone (a bot that drove out of town): park the body out of reach.
+      placed.current = false;
+      b.setTranslation({ x: 0, y: -50, z: 0 }, true);
+      b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    }
     if (!b || !t || !p0) return;
     const pos = b.translation();
     const ex = t.x - pos.x;
@@ -216,7 +222,7 @@ function RemoteCar({
         <Html position={[0, 7.5, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
           <div className="flex items-center gap-1.5 whitespace-nowrap border-2 border-border bg-bg/80 px-1.5 py-0.5 font-pixel text-[9px] uppercase text-cream">
             <span className="h-2 w-2" style={{ background: remote.color }} aria-hidden />
-            {remote.name.startsWith("guest-") ? "guest" : `@${remote.name}`}
+            {remote.bot ? "bot" : remote.name.startsWith("guest-") ? "guest" : `@${remote.name}`}
           </div>
         </Html>
       </group>
@@ -224,25 +230,23 @@ function RemoteCar({
   );
 }
 
+/** Everyone else in the car, and the town's bots: bodies you can hit, back on course after. */
 export default function RemoteCars({
-  remotes,
-  drivers,
+  cars,
   sources,
   localCar,
   muted,
 }: {
-  remotes: React.MutableRefObject<Map<string, RemoteDriver>>;
-  drivers: DriverInfo[];
+  cars: CarFeed[];
   sources: FxSources;
   localCar: React.MutableRefObject<CarApi | null>;
   muted: boolean;
 }) {
   return (
     <>
-      {drivers.map((d) => {
-        const r = remotes.current.get(d.id);
-        return r ? <RemoteCar key={d.id} remote={r} sources={sources} localCar={localCar} muted={muted} /> : null;
-      })}
+      {cars.map((c) => (
+        <RemoteCar key={c.id} remote={c} sources={sources} localCar={localCar} muted={muted} />
+      ))}
     </>
   );
 }

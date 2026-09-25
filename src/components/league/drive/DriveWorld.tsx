@@ -31,6 +31,7 @@ import SkidMarks from "./SkidMarks";
 import { useDriveAudio } from "./useDriveAudio";
 import { useDrivePresence, type BattleEvent } from "./useDrivePresence";
 import RemoteCars from "./RemoteCars";
+import { useTownBots } from "./useTownBots";
 import type { FxSource, FxSources } from "./fx";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { useDriveInput } from "./useDriveInput";
@@ -287,7 +288,12 @@ export default function DriveWorld({
     },
     onBattle: (e) => (e.t === "crown" ? crownSink.current(e) : battleSink.current(e)),
   });
+  // Bots fill in for missing drivers (you count as one).
+  const bots = useTownBots(slug, objects, drivers.length + 1);
+  const cars = [...drivers.flatMap((d) => remotes.current.get(d.id) ?? []), ...bots];
   const onRemoteHit = (id: string, other: RapierRigidBody) => {
+    // A bot takes the hit in the physics alone: nobody to tell, no crown to take.
+    if (id.startsWith("bot:")) return;
     crownHit.current(id);
     const c = car.current;
     const now = performance.now();
@@ -329,7 +335,7 @@ export default function DriveWorld({
             <Lights braking={() => !!car.current?.state.braking} />
           </Car>
           <LocalFx car={car} sources={fx} />
-          <RemoteCars remotes={remotes} drivers={drivers} sources={fx} localCar={car} muted={muted || paused} />
+          <RemoteCars cars={cars} sources={fx} localCar={car} muted={muted || paused} />
           <Battle
             objects={objects}
             car={car}

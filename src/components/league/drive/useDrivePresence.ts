@@ -21,6 +21,7 @@ import {
   type ServerMsg,
 } from "@/lib/league-city/drive/net";
 import type { CarApi } from "./Car";
+import { syncBotClock } from "@/lib/league-city/drive/bots";
 import type { DriveInputRef } from "./useDriveInput";
 
 // Joins the league city's drive room: says hello, streams your car ~15 times
@@ -31,10 +32,16 @@ export type BattleEvent =
   | { t: "boxes"; boxes: BoxState[] }
   | Extract<ServerMsg, { t: "box" } | { t: "got" } | { t: "fx" } | { t: "gone" } | { t: "crown" }>;
 
-export interface RemoteDriver {
+/** A car to draw: someone's snapshots, or a town bot's plan (bot: true). */
+export interface CarFeed {
   id: string;
   name: string;
   color: string;
+  buffer: { sample(t: number, out: CarSnapshot): CarSnapshot | null };
+  bot?: boolean;
+}
+
+export interface RemoteDriver extends CarFeed {
   buffer: SnapshotBuffer;
 }
 
@@ -112,6 +119,7 @@ export function useDrivePresence({
       }
       if (msg.t === "welcome") {
         selfId.current = msg.you;
+        syncBotClock(msg.now);
         onBattleRef.current({ t: "boxes", boxes: msg.boxes ?? [] });
         if (msg.crown) onBattleRef.current({ t: "crown", crown: msg.crown, now: msg.now });
         for (const d of msg.drivers) {
