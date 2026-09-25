@@ -32,6 +32,8 @@ export default function InvitePanel({
   kind,
   joinMode,
   isAdmin,
+  inCity,
+  onShow,
   onClose,
 }: {
   slug: string;
@@ -42,6 +44,10 @@ export default function InvitePanel({
   kind: "company" | "custom";
   joinMode: JoinMode;
   isAdmin: boolean;
+  /** Whether a login's building is in the scene right now. */
+  inCity: (login: string) => boolean;
+  /** Close the panel and fly to that building. */
+  onShow: (login: string) => void;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -189,49 +195,16 @@ export default function InvitePanel({
       </form>
 
       <div aria-live="polite">
-        {state.kind === "sending" && (
-          <p className="mt-3 flex items-center gap-2 text-[10px] text-muted normal-case">
-            <PixelSpinner size={5} />
-            Loading @{state.login} from GitHub and raising their building. This takes a few seconds.
-          </p>
-        )}
         {state.kind === "error" && <p className="mt-3 text-[11px] text-red-400 normal-case">{state.message}</p>}
-        {state.kind === "done" && (
-          <div className="mt-3 border-2 border-lime/60 bg-bg-raised p-3">
-            <div className="flex items-center gap-3">
-              <Avatar src={state.avatar} size={32} faded />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs text-cream normal-case">@{state.login} is in the city</p>
-                <p className="flex items-center gap-2 text-[10px] text-muted normal-case">
-                  {refreshing ? (
-                    <>
-                      <PixelSpinner size={4} /> Placing their building
-                    </>
-                  ) : (
-                    state.emailed
-                      ? "We emailed them the invite. You can send this link too."
-                      : `@${state.login} has no Git City account yet. Send them this link.`
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <input
-                readOnly
-                value={state.link}
-                aria-label="Invite link"
-                onFocus={(e) => e.currentTarget.select()}
-                className="min-w-0 flex-1 bg-bg px-2 py-2 text-[11px] text-cream normal-case outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => copy(state.link)}
-                className={`btn-press min-w-[80px] px-3 text-[10px] ${copied ? "bg-lime text-bg" : "border-2 border-lime text-lime"}`}
-              >
-                {copied ? "Copied" : "Copy link"}
-              </button>
-            </div>
-          </div>
+        {(state.kind === "sending" || state.kind === "done") && (
+          <InviteProgress
+            state={state}
+            placed={state.kind === "done" && inCity(state.login)}
+            settled={state.kind === "done" && !refreshing}
+            copied={copied}
+            onCopy={copy}
+            onShow={onShow}
+          />
         )}
       </div>
 
@@ -259,5 +232,106 @@ export default function InvitePanel({
         </div>
       )}
     </Panel>
+  );
+}
+
+type StepState = "todo" | "active" | "done" | "stuck";
+
+function Step({ state, children }: { state: StepState; children: React.ReactNode }) {
+  return (
+    <li className="flex min-h-[20px] items-center gap-2.5 text-[11px] normal-case">
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden>
+        {state === "done" && (
+          <span className="flex h-4 w-4 items-center justify-center bg-lime text-bg">
+            <Check size={11} strokeWidth={3.5} />
+          </span>
+        )}
+        {state === "active" && <PixelSpinner size={4} />}
+        {state === "todo" && <span className="h-3 w-3 border-2 border-border" />}
+        {state === "stuck" && <span className="h-3 w-3 border-2 border-red-400" />}
+      </span>
+      <span className={state === "todo" ? "text-dim" : state === "stuck" ? "text-red-400" : "text-cream"}>{children}</span>
+    </li>
+  );
+}
+
+/**
+ * The three things an invite does, each ticked only when it really happened:
+ * the GitHub lookup (the request), the building showing up in the scene (the
+ * refresh after it), and the invite reaching them (email or your link).
+ */
+function InviteProgress({
+  state,
+  placed,
+  settled,
+  copied,
+  onCopy,
+  onShow,
+}: {
+  state: Extract<InviteState, { kind: "sending" | "done" }>;
+  placed: boolean;
+  settled: boolean;
+  copied: boolean;
+  onCopy: (link: string) => void;
+  onShow: (login: string) => void;
+}) {
+  const done = state.kind === "done";
+  // The refresh finished and the building still isn't there: the city is full.
+  const stuck = done && settled && !placed;
+  const complete = done && placed;
+
+  return (
+    <div className={`mt-3 border-2 bg-bg-raised p-3 ${complete ? "border-lime/60" : "border-border"}`}>
+      <div className="flex items-center gap-3">
+        <Avatar src={`https://github.com/${state.login}.png?size=64`} size={32} faded />
+        <p className="min-w-0 flex-1 truncate text-xs text-cream normal-case">@{state.login}</p>
+        {complete && (
+          <button
+            type="button"
+            onClick={() => onShow(state.login)}
+            className="btn-press shrink-0 border-2 border-lime px-2.5 py-1 text-[9px] text-lime hover:bg-lime hover:text-bg"
+          >
+            See it
+          </button>
+        )}
+      </div>
+
+      <ol className="mt-3 space-y-1.5">
+        <Step state={done ? "done" : "active"}>{done ? "Found on GitHub" : "Finding them on GitHub"}</Step>
+        <Step state={!done ? "todo" : placed ? "done" : stuck ? "stuck" : "active"}>
+          {placed
+            ? "Their building is in the city, faded until they join"
+            : stuck
+              ? "No lot left in the city. Make room in the editor."
+              : "Raising their building"}
+        </Step>
+        <Step state={!done ? "todo" : "done"}>
+          {!done
+            ? "Invite them"
+            : state.emailed
+              ? "Invite emailed. You can send the link too."
+              : "No Git City account yet: send them the link"}
+        </Step>
+      </ol>
+
+      {done && (
+        <div className="mt-3 flex gap-2">
+          <input
+            readOnly
+            value={state.link}
+            aria-label="Invite link"
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-w-0 flex-1 bg-bg px-2 py-2 text-[11px] text-cream normal-case outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => onCopy(state.link)}
+            className={`btn-press min-w-[80px] px-3 text-[10px] ${copied ? "bg-lime text-bg" : "border-2 border-lime text-lime"}`}
+          >
+            {copied ? "Copied" : "Copy link"}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
