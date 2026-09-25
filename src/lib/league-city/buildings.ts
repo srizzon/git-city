@@ -15,18 +15,22 @@ export const TOWN_MIN_HEIGHT = 48;
 export const TOWN_MAX_HEIGHT = 190;
 const FLOOR_H = 6;
 
+/** Above 1, most buildings stay low and a few stand tall, like a real skyline. */
+const SKYLINE_CURVE = 1.6;
+
 /**
- * City heights → town heights, on a log scale over this town's own range: the
- * shortest building gets the floor, the tallest the ceiling, order kept. A
- * town where everyone is the same size sits in the middle.
+ * City heights → town heights by rank inside the town: the shortest building
+ * gets the floor, the tallest the ceiling, and the rest spread between on a
+ * curve, whatever the raw numbers are. Equal heights stay equal; a town where
+ * everyone is the same size sits in the middle.
  */
 export function townHeights(heights: readonly number[]): number[] {
-  const logs = heights.map((h) => Math.log(Math.max(1, h)));
-  const lo = Math.min(...logs);
-  const hi = Math.max(...logs);
-  return logs.map((l) => {
-    const t = hi - lo > 1e-6 ? (l - lo) / (hi - lo) : 0.5;
-    return Math.round(TOWN_MIN_HEIGHT + t * (TOWN_MAX_HEIGHT - TOWN_MIN_HEIGHT));
+  const levels = [...new Set(heights)].sort((a, b) => a - b);
+  const rank = new Map(levels.map((h, i) => [h, i]));
+  return heights.map((h) => {
+    const t = levels.length > 1 ? (rank.get(h) ?? 0) / (levels.length - 1) : 0.5;
+    const curved = levels.length > 1 ? t ** SKYLINE_CURVE : t;
+    return Math.round(TOWN_MIN_HEIGHT + curved * (TOWN_MAX_HEIGHT - TOWN_MIN_HEIGHT));
   });
 }
 
