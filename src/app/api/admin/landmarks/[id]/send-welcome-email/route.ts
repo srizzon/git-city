@@ -63,8 +63,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   }
 
   try {
-    await sendWelcomeEmail(landmark, Array.from(resolved));
-    return NextResponse.json({ ok: true, sentTo: Array.from(resolved) });
+    const failed = await sendWelcomeEmail(landmark, Array.from(resolved));
+    const sentTo = Array.from(resolved).filter((e) => !failed.includes(e));
+    return NextResponse.json({ ok: true, sentTo, failed });
   } catch (err) {
     console.error("[landmarks] send welcome failed", err);
     const msg = err instanceof Error ? err.message : "Send failed";
