@@ -35,11 +35,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!league) return { title: "Town not found - Git City" };
   const title = `${townDisplayName(league.name)} - Git City`;
   const description = `${townDisplayName(league.name)} in Git City: a skyline built together, a weekly race and a crown for the winner.`;
+  // The card's URL carries identity_version: a new logo or sky is a new URL.
+  const city = await getCachedCity(league.id).catch(() => null);
+  const image = { url: `/town/${league.slug}/og?v=${city?.identity.identityVersion ?? 0}`, width: 1200, height: 630, alt: "Town in Git City" };
   return {
     title,
     description,
-    openGraph: { title, description },
-    twitter: { card: "summary_large_image", title, description },
+    openGraph: { title, description, images: [image] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
     ...(league.hidden ? { robots: { index: false, follow: false } } : {}),
   };
 }
