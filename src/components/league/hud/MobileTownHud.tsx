@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, Clock, Home, LogIn, LogOut, MoreHorizontal, Play, Settings, Share2, ShieldCheck, Trophy, UserPlus } from "lucide-react";
+import { Check, ChevronLeft, Clock, LogIn, LogOut, MoreHorizontal, Play, Settings, Share2, ShieldCheck, Trophy, UserPlus } from "lucide-react";
 import { Pending } from "@/components/leagues/PixelSpinner";
 import type { LeaguePageData } from "@/lib/leagues/queries";
 import type { TownBadges } from "@/lib/towns/milestones";
@@ -163,9 +163,6 @@ export function MobileActionBar({
     <div ref={menuRef} className="pointer-events-none relative w-full">
       {menu && (
         <div className={`${HUD_BOX} absolute bottom-full right-0 mb-2 flex min-w-[200px] flex-col divide-y-2 divide-border text-[10px]`} role="menu">
-          <Link href="/" role="menuitem" className="flex items-center gap-2.5 px-3 py-3 text-cream">
-            <Home {...ICON} aria-hidden /> Git City
-          </Link>
           {isAdmin && (
             <Link href={`/town/${slug}/settings`} role="menuitem" className="flex items-center gap-2.5 px-3 py-3 text-cream">
               <Settings {...ICON} aria-hidden /> Settings

@@ -8,7 +8,7 @@ import { leagueAssetUrl } from "./identity";
 import type { CityIdentity, CityObject, CityOp } from "./types";
 
 // ─── League city service ────────────────────────────────────
-// Every write goes through apply_league_city_ops (migration 144), which locks
+// Every write goes through apply_league_city_ops (migration 145), which locks
 // the league's city, validates the batch against the item catalog and bumps
 // the version.
 

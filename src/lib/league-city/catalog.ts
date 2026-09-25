@@ -1,5 +1,5 @@
 // ─── Item catalog ───────────────────────────────────────────
-// Mirror of league_item_types (migration 144): one row per item type. The SQL
+// Mirror of league_item_types (migration 145): one row per item type. The SQL
 // function reads footprint, radius and limits from the table; the editor reads
 // them from here. A new type is a row in both.
 //

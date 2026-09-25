@@ -2,7 +2,7 @@
 // A grid of LOT-unit lots anchored at the entrance. A city of half-width `h`
 // spans x in [-h, h] and z in [-2h+1, 0]: south is +z, so z = 0 is the
 // entrance row, and the city grows north, east and west, never south. Mirrors
-// league_city_bounds (migration 144).
+// league_city_bounds (migration 145).
 //
 // Directions and `rot`: clockwise from north (-z), in degrees.
 //   0 = N (-z), 90 = E (+x), 180 = S (+z), 270 = W (-x).

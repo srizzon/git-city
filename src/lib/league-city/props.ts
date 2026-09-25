@@ -1,6 +1,6 @@
 // ─── Props ──────────────────────────────────────────────────
 // Free-standing decorations: a world position, a footprint radius (catalog.ts),
-// and rules mirrored from league_prop_problem (migration 144): inside the city, not on
+// and rules mirrored from league_prop_problem (migration 145): inside the city, not on
 // a building's lot, not on asphalt (roads are ROAD_HALF*2 wide: a center
 // square plus an arm toward each road neighbor; driving toys are exempt), not
 // overlapping another prop. Air objects (planes, blimps) only need a center
