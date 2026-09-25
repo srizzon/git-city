@@ -36,41 +36,12 @@ export default async function TownsPage({ searchParams }: { searchParams: Promis
   const hero = discover.featured ? await loadHero(discover.featured) : null;
 
   return (
-    <main className="min-h-screen bg-bg pb-16 font-pixel uppercase text-warm">
+    <main className="min-h-screen bg-bg pb-24 font-pixel uppercase text-warm">
       <DiscoverHeader signedIn={!!viewer} startCreating={create === "1"} />
 
-      <section className="relative h-[52vh] min-h-[320px] max-h-[620px] overflow-hidden border-y-[3px] border-border bg-bg-raised">
-        {discover.featured && hero ? (
-          <>
-            <TownHero city={hero.city} cityDevs={hero.cityDevs} cityNorms={hero.cityNorms} />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-bg via-bg/60 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 mx-auto max-w-6xl px-4 pb-6">
-              <p className="text-[10px] text-lime">&#9733; Town of the week</p>
-              <h2 className="mt-1 text-3xl leading-tight text-cream normal-case sm:text-4xl">{discover.featured.name}</h2>
-              <p className="mt-1 flex gap-3 text-[10px] text-muted">
-                {discover.featured.verified && <span className="text-lime">&#10003; Verified</span>}
-                <span>
-                  {discover.featured.totalBuildings.toLocaleString("en-US")} building
-                  {discover.featured.totalBuildings === 1 ? "" : "s"}
-                </span>
-              </p>
-              <div className="mt-4 flex gap-2">
-                <Link
-                  href={`/town/${discover.featured.slug}`}
-                  className="btn-press bg-lime px-4 py-2.5 text-[11px] tracking-widest text-bg"
-                >
-                  &#9654; Visit
-                </Link>
-                <HeroDrive slug={discover.featured.slug} />
-              </div>
-            </div>
-          </>
-        ) : (
-          <EmptyHero />
-        )}
-      </section>
+      {discover.featured && hero ? <Hero featured={discover.featured} hero={hero} /> : <NoTowns />}
 
-      <div className="mx-auto max-w-6xl px-4">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
         {discover.yours.length > 0 && <Row id="yours" title="Your towns" cards={discover.yours} />}
         {ROWS.map((r) =>
           discover.rows[r.id].length > 0 ? (
@@ -79,15 +50,62 @@ export default async function TownsPage({ searchParams }: { searchParams: Promis
               id={r.id}
               title={r.title}
               cards={discover.rows[r.id]}
-              action={r.id === "companies" ? { href: "/towns/verify", label: "Verify yours" } : undefined}
+              action={r.id === "companies" ? { href: "/towns/verify", label: "Verify your company" } : undefined}
             />
           ) : null,
         )}
-        {Object.values(discover.rows).every((r) => r.length === 0) && discover.yours.length === 0 && (
-          <p className="mt-10 text-center text-[11px] text-muted normal-case">No towns yet. Be the first to start one.</p>
-        )}
       </div>
     </main>
+  );
+}
+
+const REASON_LABEL: Record<FeaturedTown["reason"], string> = {
+  week: "★ Town of the week",
+  staff: "★ Staff pick",
+  biggest: "🏆 Biggest town",
+};
+
+function Hero({ featured, hero }: { featured: FeaturedTown; hero: NonNullable<Awaited<ReturnType<typeof loadHero>>> }) {
+  return (
+    <section className="relative h-[62vh] min-h-[440px] max-h-[680px] overflow-hidden border-y-[3px] border-border bg-bg-raised">
+      <TownHero city={hero.city} cityDevs={hero.cityDevs} cityNorms={hero.cityNorms} />
+      {/* Legibility: dark from the bottom-left corner, where the copy sits. */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-bg/80 via-transparent to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+        <p className="text-xs tracking-widest text-lime">{REASON_LABEL[featured.reason]}</p>
+        <h2 className="mt-3 max-w-3xl text-4xl leading-tight text-cream normal-case sm:text-6xl">{featured.name}</h2>
+        <p className="mt-3 flex gap-4 text-sm text-muted">
+          {featured.verified && <span className="text-lime">&#10003; Verified</span>}
+          <span>
+            {featured.totalBuildings.toLocaleString("en-US")} building{featured.totalBuildings === 1 ? "" : "s"}
+          </span>
+        </p>
+        <div className="mt-6 flex gap-3">
+          <Link href={`/town/${featured.slug}`} className="btn-press bg-lime px-6 py-3 text-sm tracking-widest text-bg">
+            &#9654; Visit
+          </Link>
+          <HeroDrive slug={featured.slug} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Nothing built anywhere yet: one line and the one thing to do.
+function NoTowns() {
+  return (
+    <section className="border-y-[3px] border-border bg-bg-raised">
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <h2 className="text-2xl text-cream sm:text-3xl">No towns yet</h2>
+        <p className="mt-3 max-w-md text-sm leading-relaxed text-muted normal-case">
+          Start one for your team or friends. The town with the most visitors each week gets this spot.
+        </p>
+        <Link href="/towns?create=1" className="btn-press mt-6 inline-block bg-lime px-6 py-3 text-sm tracking-widest text-bg">
+          + Create a town
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -117,58 +135,20 @@ function Row({
   action?: { href: string; label: string };
 }) {
   return (
-    <section id={`row-${id}`} className="mt-10 scroll-mt-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-base text-cream">{title}</h2>
+    <section id={`row-${id}`} className="mt-14 scroll-mt-6">
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <h2 className="text-xl text-cream sm:text-2xl">{title}</h2>
         {action && (
-          <Link href={action.href} className="text-[10px] text-lime hover:text-cream">
+          <Link href={action.href} className="shrink-0 text-xs text-lime transition-colors hover:text-cream">
             {action.label} &rarr;
           </Link>
         )}
       </div>
-      <div className="-mx-4 mt-3 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2">
+      <div className="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:scroll-px-6 sm:px-6">
         {cards.map((c) => (
           <TownCard key={c.slug} card={c} />
         ))}
       </div>
     </section>
-  );
-}
-
-// No Town of the week yet: a flat pixel skyline and the one thing to do.
-const SKYLINE = [38, 62, 46, 80, 54, 92, 58, 70, 44, 86, 50, 66, 40, 74, 56];
-
-function EmptyHero() {
-  return (
-    <div className="absolute inset-0 flex flex-col">
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4">
-        <p className="text-[10px] text-lime">&#9733; Town of the week</p>
-        <h2 className="mt-1 text-2xl leading-tight text-cream normal-case sm:text-3xl">Could be yours.</h2>
-        <p className="mt-2 max-w-sm text-[10px] text-muted normal-case">
-          The town with the most visitors each week takes this spot for the next seven days.
-        </p>
-        <Link href="/towns?create=1" className="btn-press mt-4 self-start bg-lime px-4 py-2.5 text-[11px] tracking-widest text-bg">
-          + Create a town
-        </Link>
-      </div>
-      <div className="flex h-2/5 items-end justify-center gap-1.5 px-4" aria-hidden>
-        {SKYLINE.map((h, i) => (
-          <div key={i} className="relative w-8 bg-border sm:w-12" style={{ height: `${h}%` }}>
-            <div
-              className="absolute inset-1.5 opacity-60"
-              style={{
-                backgroundImage: "linear-gradient(var(--color-lime) 50%, transparent 50%)",
-                backgroundSize: "6px 10px",
-                maskImage: "linear-gradient(90deg, #000 40%, transparent 40%)",
-                WebkitMaskImage: "linear-gradient(90deg, #000 40%, transparent 40%)",
-                maskSize: "10px 100%",
-                WebkitMaskSize: "10px 100%",
-              }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="h-1 bg-border" />
-    </div>
   );
 }

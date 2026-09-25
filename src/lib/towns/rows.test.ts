@@ -117,9 +117,16 @@ describe("featured", () => {
       town("gone", { featured_week: "2026-09-21", buildings: 0 }),
       town("future", { featured_week: "2026-09-28" }),
     ];
-    expect(pickFeatured(towns, now)?.slug).toBe("last");
-    expect(pickFeatured([...towns, town("now", { featured_week: "2026-09-21" })], now)?.slug).toBe("now");
-    expect(pickFeatured([town("x")], now)).toBeNull();
+    expect(pickFeatured(towns, now)).toMatchObject({ town: { slug: "last" }, reason: "week" });
+    expect(pickFeatured([...towns, town("now", { featured_week: "2026-09-21" })], now)?.town.slug).toBe("now");
+  });
+
+  it("falls back to the staff pick, then the biggest town", () => {
+    const towns = [town("small", { buildings: 3 }), town("big", { buildings: 40 }), town("empty", { buildings: 0 })];
+    expect(pickFeatured(towns, now, "small")).toMatchObject({ town: { slug: "small" }, reason: "staff" });
+    expect(pickFeatured(towns, now, "empty")).toMatchObject({ town: { slug: "big" }, reason: "biggest" });
+    expect(pickFeatured(towns, now)).toMatchObject({ town: { slug: "big" }, reason: "biggest" });
+    expect(pickFeatured([town("x", { buildings: 0 })], now)).toBeNull();
   });
 });
 

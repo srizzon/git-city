@@ -10,7 +10,7 @@ export default function HeroDrive({ slug }: { slug: string }) {
   return (
     <Link
       href={`/town/${slug}?drive=1`}
-      className="btn-press border-2 border-lime bg-bg/70 px-4 py-2.5 text-[11px] tracking-widest text-lime"
+      className="btn-press border-[3px] border-lime bg-bg/70 px-6 py-2.5 text-sm tracking-widest text-lime"
     >
       🚗 Drive
     </Link>

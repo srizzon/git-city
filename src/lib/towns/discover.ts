@@ -3,12 +3,22 @@ import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getDevLeagues, getGlobalRanking } from "@/lib/leagues/queries";
 import type { Viewer } from "@/lib/leagues/service";
-import { pickFeatured, selectRows, surpriseCandidates, toCard, type RowId, type TownCard, type TownEntry } from "./rows";
+import {
+  pickFeatured,
+  selectRows,
+  surpriseCandidates,
+  toCard,
+  type FeaturedReason,
+  type RowId,
+  type TownCard,
+  type TownEntry,
+} from "./rows";
 
 export interface FeaturedTown extends TownCard {
   id: string;
   /** Real count for the hero line; the card rules still hide it under 10. */
   totalBuildings: number;
+  reason: FeaturedReason;
 }
 
 export interface Discover {
@@ -19,10 +29,33 @@ export interface Discover {
 
 async function loadCatalog(): Promise<TownEntry[]> {
   const { data, error } = await getSupabaseAdmin().rpc("town_catalog");
+  // PGRST202: a database without migration 141 yet (staging before its push).
+  if (error?.code === "PGRST202") return loadBasicCatalog();
   if (error) throw error;
   return ((data ?? []) as (Omit<TownEntry, "id"> & { league_id: string })[]).map(({ league_id, ...t }) => ({
     ...t,
     id: league_id,
+  }));
+}
+
+/** Towns and building counts only, no visits or edits: before migration 141. */
+async function loadBasicCatalog(): Promise<TownEntry[]> {
+  const sb = getSupabaseAdmin();
+  const [{ data: leagues, error }, { data: objects }] = await Promise.all([
+    sb.from("leagues").select("id, slug, name, kind, github_org, created_at").eq("hidden", false),
+    sb.from("league_objects").select("league_id").eq("kind", "building").limit(50_000),
+  ]);
+  if (error) throw error;
+  const buildings = new Map<string, number>();
+  for (const o of objects ?? []) buildings.set(o.league_id, (buildings.get(o.league_id) ?? 0) + 1);
+  return (leagues ?? []).map((l) => ({
+    ...(l as Pick<TownEntry, "slug" | "name" | "kind" | "github_org" | "created_at">),
+    id: l.id as string,
+    featured_week: null,
+    buildings: buildings.get(l.id as string) ?? 0,
+    ops_7d: 0,
+    visitors_7d: 0,
+    visitors_prev: 0,
   }));
 }
 
@@ -45,11 +78,14 @@ const getSharedRows = unstable_cache(
   async () => {
     const [towns, ranking] = await Promise.all([getTownCatalog(), getGlobalRanking()]);
     const now = new Date();
-    const featured = pickFeatured(towns, now);
+    const staff = process.env.TOWN_OF_WEEK_OVERRIDE?.trim().toLowerCase() || null;
+    const pick = pickFeatured(towns, now, staff);
     const companies = ranking.rows.filter((r) => r.rank !== null).map((r) => r.league_id);
     return {
-      featured: featured ? { ...toCard(featured, now), id: featured.id, totalBuildings: featured.buildings } : null,
-      rows: selectRows(towns, { now, featuredId: featured?.id ?? null, companies }),
+      featured: pick
+        ? { ...toCard(pick.town, now), id: pick.town.id, totalBuildings: pick.town.buildings, reason: pick.reason }
+        : null,
+      rows: selectRows(towns, { now, featuredId: pick?.town.id ?? null, companies }),
     };
   },
   ["towns-discover"],

@@ -9,7 +9,7 @@ import type { TownCard } from "@/lib/towns/rows";
 import { isDesktop } from "./useDesktop";
 import { TownMeta } from "./TownCard";
 
-const BTN = "btn-press flex items-center justify-center gap-1.5 border-2 px-3 py-2 text-[10px] whitespace-nowrap";
+const BTN = "btn-press flex items-center justify-center gap-2 border-[3px] px-4 py-2.5 text-xs whitespace-nowrap";
 
 export default function DiscoverHeader({ signedIn, startCreating }: { signedIn: boolean; startCreating: boolean }) {
   const [creating, setCreating] = useState(startCreating);
@@ -32,33 +32,42 @@ export default function DiscoverHeader({ signedIn, startCreating }: { signedIn: 
   }
 
   return (
-    <header className="mx-auto max-w-6xl px-4 pt-6 pb-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link href="/" className="text-xs text-muted transition-colors hover:text-cream">
+    <header className="mx-auto max-w-6xl px-4 pt-6 pb-8 sm:px-6">
+      <nav className="flex items-center justify-between gap-3">
+        <Link href="/" className="text-sm text-muted transition-colors hover:text-cream">
           &larr; City
         </Link>
-        <h1 className="text-2xl text-cream">
-          To<span className="text-lime">wns</span>
-        </h1>
-        <div className="order-last w-full sm:order-none sm:w-auto sm:flex-1">
-          <Search />
-        </div>
-        <div className="ml-auto flex gap-2 sm:ml-0">
+        <div className="flex gap-2">
           <button type="button" onClick={surprise} disabled={surprising} className={`${BTN} border-border text-cream hover:border-lime`}>
             {surprising ? <Pending label="Picking" /> : "🎲 Surprise me"}
           </button>
-          {!creating && (
-            <button type="button" onClick={() => setCreating(true)} className={`${BTN} border-lime bg-lime text-bg`}>
-              + Create a town
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setCreating((c) => !c)}
+            aria-expanded={creating}
+            className={`${BTN} border-lime bg-lime text-bg`}
+          >
+            + Create a town
+          </button>
+        </div>
+      </nav>
+
+      <div className="mt-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-4xl leading-none text-cream sm:text-5xl">
+            To<span className="text-lime">wns</span>
+          </h1>
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-muted normal-case">
+            Your group&apos;s own place in Git City. Built together, open to anyone to visit and drive.
+          </p>
+        </div>
+        <div className="w-full md:w-96">
+          <Search />
         </div>
       </div>
-      <p className="mt-2 text-[10px] text-muted normal-case">
-        Your group&apos;s own place in Git City. Built together, open to anyone to visit and drive.
-      </p>
+
       {creating && (
-        <div className="mt-4 grid max-w-md gap-2">
+        <div className="mt-6 grid max-w-md gap-2">
           <CreateLeague signedIn={signedIn} defaultOpen />
         </div>
       )}
@@ -104,16 +113,16 @@ function Search() {
         onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
         placeholder="Search a town or GitHub org"
         aria-label="Search towns"
-        className="w-full border-2 border-border bg-bg-card px-3 py-2 text-base text-cream normal-case outline-none placeholder:text-dim focus:border-lime sm:text-xs"
+        className="w-full border-[3px] border-border bg-bg-card px-4 py-3 text-base text-cream normal-case outline-none placeholder:text-dim focus:border-lime sm:text-sm"
       />
       {open && shown && (
-        <ul className="absolute inset-x-0 top-full z-20 mt-1 max-h-80 overflow-y-auto border-2 border-border bg-bg-raised">
-          {shown.length === 0 && <li className="px-3 py-2 text-[10px] text-muted normal-case">No town matches that.</li>}
+        <ul className="absolute inset-x-0 top-full z-20 mt-1 max-h-96 overflow-y-auto border-[3px] border-border bg-bg-raised">
+          {shown.length === 0 && <li className="px-4 py-3 text-sm text-muted normal-case">No town matches that.</li>}
           {shown.map((r) => (
             <li key={r.slug}>
-              <Link href={`/town/${r.slug}`} className="block px-3 py-2 hover:bg-bg-card focus:bg-bg-card focus:outline-none">
-                <span className="text-xs text-cream normal-case">{r.name}</span>
-                <TownMeta card={r} />
+              <Link href={`/town/${r.slug}`} className="block px-4 py-3 hover:bg-bg-card focus:bg-bg-card focus:outline-none">
+                <span className="text-sm text-cream normal-case">{r.name}</span>
+                <TownMeta card={r} className="mt-1" />
               </Link>
             </li>
           ))}

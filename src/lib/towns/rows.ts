@@ -64,16 +64,28 @@ export function mondayOf(d: Date): string {
   return m.toISOString().slice(0, 10);
 }
 
+export type FeaturedReason = "week" | "staff" | "biggest";
+
 /**
- * Town of the week for the top of Discover: this week's pick, else the most
- * recent past pick, else null. A pick with no buildings left doesn't count.
+ * The live town at the top of Discover, never empty while any town has a
+ * building: Town of the week (this week's pick, else the latest past one),
+ * else the staff pick (TOWN_OF_WEEK_OVERRIDE slug), else the biggest town.
  */
-export function pickFeatured(towns: TownEntry[], now: Date): TownEntry | null {
+export function pickFeatured(
+  towns: TownEntry[],
+  now: Date,
+  staffSlug: string | null = null,
+): { town: TownEntry; reason: FeaturedReason } | null {
+  const built = towns.filter((t) => t.buildings > 0);
   const thisWeek = mondayOf(now);
-  const picks = towns
-    .filter((t) => t.featured_week && t.featured_week <= thisWeek && t.buildings > 0)
-    .sort((a, b) => (b.featured_week ?? "").localeCompare(a.featured_week ?? ""));
-  return picks[0] ?? null;
+  const week = built
+    .filter((t) => t.featured_week && t.featured_week <= thisWeek)
+    .sort((a, b) => (b.featured_week ?? "").localeCompare(a.featured_week ?? ""))[0];
+  if (week) return { town: week, reason: "week" };
+  const staff = staffSlug ? built.find((t) => t.slug === staffSlug) : undefined;
+  if (staff) return { town: staff, reason: "staff" };
+  const biggest = [...built].sort((a, b) => b.buildings - a.buildings || a.slug.localeCompare(b.slug))[0];
+  return biggest ? { town: biggest, reason: "biggest" } : null;
 }
 
 /**
