@@ -3,6 +3,7 @@ import {
   MAX_DRIVERS,
   MAX_MESSAGE_BYTES,
   SEND_MS,
+  WATCH_MS,
   BUMP_MIN_MS,
   decodeState,
   validBump,
@@ -46,6 +47,12 @@ import {
 //
 // Crown Rush: the server runs the match (see crown.ts) and broadcasts its
 // state on every change and once a second while it's live.
+//
+// Spectators connect with ?watch=1: people looking at the city without
+// driving. They get the welcome, joins and leaves, and every car batched in
+// one "cars" message each WATCH_MS instead of each car's 15 Hz stream, so a
+// crowd watching costs a few messages a second, not drivers × watchers × 15.
+// They never count toward MAX_DRIVERS and nothing they send is read.
 
 interface Driver {
   name: string;
@@ -70,6 +77,25 @@ export default class DriveServer implements Party.Server {
   private crown = idleCrown();
   private crownTimer: ReturnType<typeof setInterval> | null = null;
   private lastCrownSync = 0;
+  private watchers = new Set<string>();
+  private watchTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Batches every car for the spectators while there are any. */
+  private runWatchClock() {
+    if (this.watchTimer) return;
+    this.watchTimer = setInterval(() => {
+      if (this.watchers.size === 0) {
+        if (this.watchTimer) clearInterval(this.watchTimer);
+        this.watchTimer = null;
+        return;
+      }
+      const cars: [string, ...number[]][] = [];
+      for (const [id, d] of this.drivers) if (d.state) cars.push([id, ...d.state]);
+      if (cars.length === 0) return;
+      const msg = JSON.stringify({ t: "cars", cars } satisfies ServerMsg);
+      for (const id of this.watchers) this.room.getConnection(id)?.send(msg);
+    }, WATCH_MS);
+  }
 
   private sendCrown() {
     const now = Date.now();
@@ -103,8 +129,11 @@ export default class DriveServer implements Party.Server {
 
   constructor(readonly room: Party.Room) {}
 
-  onConnect(conn: Connection, _ctx: ConnectionContext) {
-    void _ctx;
+  onConnect(conn: Connection, ctx: ConnectionContext) {
+    if (new URL(ctx.request.url).searchParams.get("watch") === "1") {
+      this.watchers.add(conn.id);
+      this.runWatchClock();
+    }
     const msg: ServerMsg = {
       t: "welcome",
       you: conn.id,
@@ -117,6 +146,7 @@ export default class DriveServer implements Party.Server {
   }
 
   onMessage(message: string | ArrayBuffer | ArrayBufferView, sender: Connection) {
+    if (this.watchers.has(sender.id)) return;
     if (typeof message !== "string" || message.length > MAX_MESSAGE_BYTES) return;
     let msg: unknown;
     try {
@@ -135,7 +165,7 @@ export default class DriveServer implements Party.Server {
       if (!s) return;
       d.lastState = now;
       d.state = encodeState(s);
-      this.room.broadcast(JSON.stringify(["s", sender.id, ...d.state]), [sender.id]);
+      this.room.broadcast(JSON.stringify(["s", sender.id, ...d.state]), [sender.id, ...this.watchers]);
       return;
     }
 
@@ -232,6 +262,7 @@ export default class DriveServer implements Party.Server {
   }
 
   onClose(conn: Connection) {
+    this.watchers.delete(conn.id);
     const at = this.where(conn.id) ?? [this.crown.x, this.crown.z];
     if (!this.drivers.delete(conn.id)) return;
     if (leaveCrown(this.crown, conn.id, Date.now(), at[0], at[1])) this.sendCrown();
