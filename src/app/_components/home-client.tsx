@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo, useSyncExternalStore
 import { Menu, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { BenchOverlay, benchCount, padBuildings } from "@/components/CityBench";
+import { FlyTunePanel } from "@/components/FlyTune";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
@@ -2767,6 +2768,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
   return (
     <main className="relative min-h-screen overflow-hidden bg-bg font-pixel uppercase text-warm">
       {bench > 0 && <BenchOverlay count={canvasBuildings.length} />}
+      {flyMode && searchParams.get("tune") === "1" && <FlyTunePanel />}
       {/* Boss Invasion HUD overlay (only when live event mode) */}
       {bossPreview?.mode === "live" && <BossEventHUD flyMode={flyMode} accentColor={theme.accent} shadowColor={theme.shadow} leaderboard={liveLeaderboard} participants={liveEvent?.participants ?? 0} selfLogin={authLogin} />}
 

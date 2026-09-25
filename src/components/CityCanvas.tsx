@@ -6,6 +6,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/drei";
 import { EffectComposer, Bloom, SMAA } from "@react-three/postprocessing";
 import * as THREE from "three";
+import { FLY_TUNE } from "./FlyTune";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
 import type { LiveSession } from "@/lib/useCodingPresence";
@@ -428,18 +429,10 @@ const MIN_FLY_SPEED = 30;
 const MAX_FLY_SPEED = 200;
 const MIN_ALT = 25;
 const MAX_ALT = 900;
-// Boost: held, speed eases up to 6x (crossing the Bay takes ~30 s instead of
-// minutes); released, it eases back. Speed never depends on altitude.
-const BOOST_MAX_MULT = 6;
-const SPEED_EASE_UP = 1.4;   // 1/s toward a higher target
-const SPEED_EASE_DOWN = 2.2; // 1/s toward a lower target
+// Boost, easing, camera arm and lens live in FLY_TUNE (FlyTune.tsx, ?tune=1).
 // Speed reads through the lens, not the camera distance: the field of view
 // widens with speed (arcade flight / racing convention) plus a slight shake.
 const BASE_FOV = 55;
-const MAX_FOV_KICK = 18;
-// Climb follows forward speed (a constant climb angle), so up/down matches turning.
-const CLIMB_PER_SPEED = 0.9;
-const MIN_CLIMB = 40;
 // Sky coins spawn within this distance of downtown.
 const COIN_RADIUS = 8000;
 
@@ -465,9 +458,6 @@ function deadzoneCurve(v: number): number {
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
-const _camOffset = new THREE.Vector3();
-const _idealCamPos = new THREE.Vector3();
-const _idealLook = new THREE.Vector3();
 const _blendedPos = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 
@@ -489,6 +479,10 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
   const bank = useRef(0);
   const pitch = useRef(0);
   const curSpeed = useRef(DEFAULT_FLY_SPEED);
+  const yawRate = useRef(0);
+  const climbRate = useRef(0);
+  const camYaw = useRef<number | null>(null);
+  const camY = useRef<number | null>(null);
   // The boost widens the lens; leaving flight hands the camera back at its base field of view.
   useEffect(() => () => {
     const persp = camera as THREE.PerspectiveCamera;
@@ -878,7 +872,9 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     if (k["KeyA"] || k["ArrowLeft"]) turnInput = -1;
     if (k["KeyD"] || k["ArrowRight"]) turnInput = 1;
 
-    yaw.current -= turnInput * TURN_RATE * dt;
+    // Turning ramps in and out instead of snapping to full rate.
+    yawRate.current += (turnInput * TURN_RATE - yawRate.current) * (1 - Math.exp(-FLY_TUNE.turnEase * dt));
+    yaw.current -= yawRate.current * dt;
 
     let altInput = deadzoneCurve(my);
     if (k["KeyW"] || k["ArrowUp"]) altInput = 1;
@@ -886,15 +882,18 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
 
     // Shift = boost (eases up to 6x while held), Alt = slow 0.3x, mobile boost/brake props
     let speedMult = 1;
-    if (k["ShiftLeft"] || k["ShiftRight"] || boostActive) speedMult = BOOST_MAX_MULT;
+    if (k["ShiftLeft"] || k["ShiftRight"] || boostActive) speedMult = FLY_TUNE.boost;
     if (k["AltLeft"] || k["AltRight"] || brakeActive) speedMult = 0.3;
     const targetSpeed = flySpeed.current * speedMult;
-    const ease = targetSpeed > curSpeed.current ? SPEED_EASE_UP : SPEED_EASE_DOWN;
+    const ease = targetSpeed > curSpeed.current ? FLY_TUNE.speedEase : FLY_TUNE.speedEase * 1.6;
     curSpeed.current += (targetSpeed - curSpeed.current) * (1 - Math.exp(-ease * dt));
     const actualSpeed = curSpeed.current;
 
-    const climb = Math.max(MIN_CLIMB, actualSpeed * CLIMB_PER_SPEED);
-    pos.current.y += altInput * climb * dt;
+    // Climb grows slower than speed (sqrt, as before boost existed) and ramps in and out.
+    const climbTarget = altInput * CLIMB_RATE * Math.sqrt(actualSpeed / DEFAULT_FLY_SPEED);
+    climbRate.current += (climbTarget - climbRate.current) * (1 - Math.exp(-FLY_TUNE.climbEase * dt));
+    pos.current.y += climbRate.current * dt;
+    if (pos.current.y <= MIN_ALT || pos.current.y >= MAX_ALT) climbRate.current = 0;
     pos.current.y = Math.max(MIN_ALT, Math.min(MAX_ALT, pos.current.y));
 
     _fwd.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
@@ -935,7 +934,7 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     // Broadcast position to multiplayer presence (throttled internally)
     onFlyMove?.(pos.current.x, pos.current.y, pos.current.z, yaw.current, bank.current);
 
-    const targetBank = -turnInput * MAX_BANK;
+    const targetBank = -(yawRate.current / TURN_RATE) * MAX_BANK;
     bank.current += (targetBank - bank.current) * 5 * dt;
 
     const targetPitch = altInput * MAX_PITCH;
@@ -952,25 +951,25 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       }
     }
 
-    // Distance follows the chosen base speed only (as before); boost never pushes the camera away.
-    const camDist = 35 + flySpeed.current * 0.2;
-    _camOffset.set(0, 15, camDist).applyAxisAngle(_yAxis, yaw.current);
-    _idealCamPos.copy(pos.current).add(_camOffset);
-
-    _idealLook.copy(pos.current).addScaledVector(_fwd, 5).y += 2;
-
-    // The follow stiffens with speed: a fixed lag rate left the camera
-    // trailing ~speed/2 units behind, so the plane shrank away when fast.
-    const follow = 2.0 + actualSpeed / 18;
-    const lerpXZ = 1 - Math.exp(-follow * dt);
-    const lerpY = 1 - Math.exp(-(follow * 0.9) * dt);
-    camPos.current.x += (_idealCamPos.x - camPos.current.x) * lerpXZ;
-    camPos.current.z += (_idealCamPos.z - camPos.current.z) * lerpXZ;
-    camPos.current.y += (_idealCamPos.y - camPos.current.y) * lerpY;
-    // The look point must follow at least as tightly as the position: with a
-    // fixed rate it trailed ~speed/4 units, past the camera itself at boost
-    // speed, and the camera turned to face the plane's back.
-    camLook.current.lerp(_idealLook, 1 - Math.exp(-(4.0 + follow * 2) * dt));
+    // Camera arm: a fixed distance behind the plane, swinging in behind turns
+    // and following climbs with a lag. Only its angle and height are smoothed,
+    // never its position, so the lag doesn't grow with speed and the camera
+    // can't overshoot the plane.
+    const speedK = smoothstep(1.3, Math.max(1.4, FLY_TUNE.boost), actualSpeed / Math.max(1, flySpeed.current));
+    if (camYaw.current === null) camYaw.current = yaw.current;
+    if (camY.current === null) camY.current = camPos.current.y;
+    let dYaw = yaw.current - camYaw.current;
+    dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
+    camYaw.current += dYaw * (1 - Math.exp(-FLY_TUNE.camYawLag * dt));
+    camY.current += (pos.current.y + FLY_TUNE.camHeight - camY.current) * (1 - Math.exp(-FLY_TUNE.camHeightLag * dt));
+    const arm = FLY_TUNE.camDist * (1 + 0.12 * speedK);
+    camPos.current.set(
+      pos.current.x + Math.sin(camYaw.current) * arm,
+      camY.current,
+      pos.current.z + Math.cos(camYaw.current) * arm,
+    );
+    camLook.current.copy(pos.current).addScaledVector(_fwd, 8);
+    camLook.current.y += 2;
 
     // Apply transition blend if coming back from free-cam
     if (wasJustUnpaused.current && transitionProgress.current < 1) {
@@ -983,9 +982,8 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     camera.lookAt(camLook.current);
 
     // Sense of speed: wider lens and a faint shake as boost builds.
-    const speedK = smoothstep(1.3, BOOST_MAX_MULT, actualSpeed / Math.max(1, flySpeed.current));
     const persp = camera as THREE.PerspectiveCamera;
-    const fov = BASE_FOV + MAX_FOV_KICK * speedK;
+    const fov = BASE_FOV + FLY_TUNE.fovKick * speedK;
     if (Math.abs(persp.fov - fov) > 0.05) { persp.fov = fov; persp.updateProjectionMatrix(); }
     if (speedK > 0.05) {
       const t = state.clock.elapsedTime;
