@@ -1,5 +1,5 @@
 import { LEGAL_CNPJ, LEGAL_NAME } from "../legal";
-import { COLORS, EMAIL_BASE_URL, FONT, escapeHtml } from "./components";
+import { COLORS, EMAIL_BASE_URL, FONT, escapeHtml, gmailSafe } from "./components";
 
 export const CONTACT_EMAIL = "samuel@thegitcity.com";
 
@@ -40,14 +40,17 @@ export function renderLayout(opts: LayoutOptions): string {
 <title>${escapeHtml(opts.title)}</title>
 <style>
   :root { color-scheme: dark; supported-color-schemes: dark; }
+  u + .body .gb-screen { background:#000; mix-blend-mode:screen; }
+  u + .body .gb-diff { background:#000; mix-blend-mode:difference; }
   @media only screen and (max-width: 620px) {
     .h1 { font-size: 24px !important; }
   }
 </style>
 </head>
-<body style="margin:0; padding:0; background-color:${COLORS.bg}; -webkit-text-size-adjust:100%;">
+<body class="body" style="margin:0; padding:0; background-color:${COLORS.bg}; -webkit-text-size-adjust:100%;">
+<u></u>
 <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">${escapeHtml(opts.preheader)}${PREHEADER_PAD}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLORS.bg}" style="background-color:${COLORS.bg};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLORS.bg}" style="background-color:${COLORS.bg}; background-image:linear-gradient(${COLORS.bg},${COLORS.bg});">
 <tr><td align="center" style="padding:32px 0 40px;">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:600px;">
     <tr><td class="px" style="padding:0 20px 20px;">
@@ -58,11 +61,12 @@ export function renderLayout(opts: LayoutOptions): string {
       ${opts.body}
     </td></tr>
     <tr><td class="px" style="padding:48px 20px 0;">
-      <div style="border-top:1px solid ${COLORS.border}; padding-top:20px; font-family:${FONT}; font-size:13px; line-height:1.6; color:${COLORS.muted};">
+      <div style="height:1px; line-height:1px; font-size:0; background-color:${COLORS.border}; background-image:linear-gradient(${COLORS.border},${COLORS.border});">&nbsp;</div>
+      <div style="padding-top:20px;">${gmailSafe(`<div style="font-family:${FONT}; font-size:13px; line-height:1.6; color:${COLORS.muted};">
         ${escapeHtml(opts.reason)}<br>
         <a href="${EMAIL_BASE_URL}/settings" style="color:${COLORS.muted}; text-decoration:underline;">Email settings</a> &nbsp;&middot;&nbsp; <a href="${escapeHtml(opts.links.unsubscribeUrl)}" style="color:${COLORS.muted}; text-decoration:underline;">Unsubscribe</a><br>
         ${LEGAL_NAME} &middot; CNPJ ${LEGAL_CNPJ} &middot; ${CONTACT_EMAIL}
-      </div>
+      </div>`)}</div>
     </td></tr>
   </table>
 </td></tr>
