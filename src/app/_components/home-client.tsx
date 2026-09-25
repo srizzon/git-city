@@ -3383,11 +3383,11 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Shift</span>
-                        <span>boost</span>
+                        <span>faster</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Alt</span>
-                        <span>slow</span>
+                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Alt / Q</span>
+                        <span>slower, down to a hover</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Click / F</span>
@@ -3416,7 +3416,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
       {/* ─── Mobile Fly HUD (bottom controls only — top bar is unified above) ─── */}
       {isMobile && flyMode && (
         <>
-          {/* Boost + Slow — bottom left, retro style */}
+          {/* Throttle: Slower + Faster, held — bottom left, retro style */}
           {!flyPaused && (
             <div className="fixed z-50 flex gap-1.5 select-none" style={{ bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: "16px", WebkitTouchCallout: "none" }}>
               <button
@@ -3429,7 +3429,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
                   color: flyBrakeActive ? theme.accent : "var(--color-muted)",
                 }}
               >
-                Slow
+                Slower
               </button>
               <button
                 onTouchStart={(e) => { e.stopPropagation(); setFlyBoostActive(true); }}
@@ -3442,7 +3442,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
                   boxShadow: flyBoostActive ? "0 0 12px rgba(255,180,40,0.25)" : "none",
                 }}
               >
-                Boost
+                Faster
               </button>
             </div>
           )}

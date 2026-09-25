@@ -6,8 +6,10 @@
 import { useState } from "react";
 
 export const FLY_TUNE = {
-  /** Boost multiplier on the base speed while Shift is held. */
+  /** Top speed as a multiple of the 55 u/s cruise the flight starts at. */
   boost: 18,
+  /** How fast the throttle moves while Shift or Alt/Q is held (1/s, log scale). */
+  throttleRate: 1.2,
   /** How fast speed eases toward its target (1/s). */
   speedEase: 2.2,
   /** Camera arm length behind the plane. */
@@ -29,6 +31,7 @@ export const FLY_TUNE = {
 type Key = keyof typeof FLY_TUNE;
 const RANGES: Record<Key, [number, number, number]> = {
   boost: [1, 30, 0.5],
+  throttleRate: [0.3, 4, 0.1],
   speedEase: [0.3, 6, 0.1],
   camDist: [20, 120, 1],
   camHeight: [0, 60, 1],

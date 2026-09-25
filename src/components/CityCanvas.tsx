@@ -425,8 +425,11 @@ function CameraFocus({
 // ─── Mouse-Driven Flight ─────────────────────────────────────
 
 const DEFAULT_FLY_SPEED = 55;
-// Arcade model (Ace Combat, Star Fox): one cruise speed, Shift to boost and
-// Alt to brake, easing back to cruise on release. No throttle wheel.
+// Throttle model (War Thunder, Flight Simulator, GTA planes): Shift raises the
+// throttle and Alt/Q lowers it while held, and the speed stays where you leave
+// it, from a hover (0) up to cruise x FLY_TUNE.boost. Changes are proportional
+// (doubling every ~0.6 s) so they feel the same slow or fast. No scroll wheel.
+const HOVER_BELOW = 8; // under this, lowering the throttle settles into a hover
 const MIN_ALT = 25;
 const MAX_ALT = 900;
 // Boost, easing, camera arm and lens live in FLY_TUNE (FlyTune.tsx, ?tune=1).
@@ -691,10 +694,12 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       onPause(false);
     };
 
-    const FLIGHT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight"]);
+    const FLIGHT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight"]);
 
     const down = (e: KeyboardEvent) => {
       keys.current[e.code] = true;
+      // Alt lowers the throttle; on Windows its default would focus the browser menu.
+      if (e.code === "AltLeft" || e.code === "AltRight") e.preventDefault();
       if (e.code === "Escape") {
         if (!paused.current) {
           // Flying → pause
@@ -879,17 +884,26 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     if (k["KeyW"] || k["ArrowUp"]) altInput = 1;
     if (k["KeyS"] || k["ArrowDown"]) altInput = -1;
 
-    // Shift = boost (eases up to 6x while held), Alt = slow 0.3x, mobile boost/brake props
-    let speedMult = 1;
-    if (k["ShiftLeft"] || k["ShiftRight"] || boostActive) speedMult = FLY_TUNE.boost;
-    if (k["AltLeft"] || k["AltRight"] || brakeActive) speedMult = 0.3;
-    const targetSpeed = flySpeed.current * speedMult;
+    // Throttle: Shift up, Alt/Q down (mobile: boost/brake buttons); it stays put on release.
+    const maxSpeed = DEFAULT_FLY_SPEED * FLY_TUNE.boost;
+    const up = k["ShiftLeft"] || k["ShiftRight"] || boostActive;
+    const downT = k["AltLeft"] || k["AltRight"] || k["KeyQ"] || brakeActive;
+    if (up && !downT) {
+      flySpeed.current = Math.min(maxSpeed, Math.max(HOVER_BELOW, flySpeed.current) * Math.exp(FLY_TUNE.throttleRate * dt));
+    } else if (downT && !up) {
+      flySpeed.current = flySpeed.current <= HOVER_BELOW
+        ? Math.max(0, flySpeed.current - 12 * dt)
+        : flySpeed.current * Math.exp(-FLY_TUNE.throttleRate * dt);
+    }
+    flySpeed.current = Math.min(maxSpeed, flySpeed.current);
+    const targetSpeed = flySpeed.current;
     const ease = targetSpeed > curSpeed.current ? FLY_TUNE.speedEase : FLY_TUNE.speedEase * 1.6;
     curSpeed.current += (targetSpeed - curSpeed.current) * (1 - Math.exp(-ease * dt));
     const actualSpeed = curSpeed.current;
 
-    // Climb grows slower than speed (sqrt, as before boost existed) and ramps in and out.
-    const climbTarget = altInput * CLIMB_RATE * Math.sqrt(actualSpeed / DEFAULT_FLY_SPEED);
+    // Climb grows slower than speed (sqrt) and ramps in and out; a hovering
+    // plane still climbs and dives, at a floor rate.
+    const climbTarget = altInput * CLIMB_RATE * Math.max(0.6, Math.sqrt(actualSpeed / DEFAULT_FLY_SPEED));
     climbRate.current += (climbTarget - climbRate.current) * (1 - Math.exp(-FLY_TUNE.climbEase * dt));
     pos.current.y += climbRate.current * dt;
     if (pos.current.y <= MIN_ALT || pos.current.y >= MAX_ALT) climbRate.current = 0;
@@ -954,7 +968,7 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     // and following climbs with a lag. Only its angle and height are smoothed,
     // never its position, so the lag doesn't grow with speed and the camera
     // can't overshoot the plane.
-    const speedK = smoothstep(1.3, Math.max(1.4, FLY_TUNE.boost), actualSpeed / Math.max(1, flySpeed.current));
+    const speedK = smoothstep(1.3, Math.max(1.4, FLY_TUNE.boost), actualSpeed / DEFAULT_FLY_SPEED);
     if (camYaw.current === null) camYaw.current = yaw.current;
     if (camY.current === null) camY.current = camPos.current.y;
     let dYaw = yaw.current - camYaw.current;
