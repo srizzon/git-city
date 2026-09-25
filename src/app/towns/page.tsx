@@ -68,7 +68,7 @@ const REASON_LABEL: Record<FeaturedTown["reason"], string> = {
 function Hero({ featured, hero }: { featured: FeaturedTown; hero: NonNullable<Awaited<ReturnType<typeof loadHero>>> }) {
   return (
     <section className="relative h-[62vh] min-h-[440px] max-h-[680px] overflow-hidden border-y-[3px] border-border bg-bg-raised">
-      <TownHero city={hero.city} cityDevs={hero.cityDevs} cityNorms={hero.cityNorms} />
+      <TownHero city={hero.city} cityDevs={hero.cityDevs} cityNorms={hero.cityNorms} name={featured.name} />
       {/* Legibility: dark from the bottom-left corner, where the copy sits. */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-bg/80 via-transparent to-transparent" />

@@ -58,7 +58,7 @@ export default function Car({
   spawn,
   objects,
   buildings,
-  size,
+  h,
   input,
   telemetry,
   apiRef,
@@ -72,7 +72,7 @@ export default function Car({
   spawn: Spawn;
   objects: CityObject[];
   buildings: CityBuilding[];
-  size: number;
+  h: number;
   input: React.MutableRefObject<DriveInputRef>;
   telemetry: DriveTelemetry;
   apiRef: React.MutableRefObject<CarApi | null>;
@@ -169,9 +169,9 @@ export default function Car({
       (b) => Math.abs(wx - b.position[0]) < b.width / 2 + 4 && Math.abs(wz - b.position[2]) < b.depth / 2 + 4,
     );
     if (!inside) return;
-    const lot = nearestFreeLot(objects, size, wx, wz);
+    const lot = nearestFreeLot(objects, h, wx, wz);
     if (lot) placeCar(body, lot[0] * LOT * UNIT_TO_M, lot[1] * LOT * UNIT_TO_M, carHeading(body));
-  }, [buildings, objects, size]);
+  }, [buildings, objects, h]);
 
   useFrame(() => {
     const body = bodyRef.current;

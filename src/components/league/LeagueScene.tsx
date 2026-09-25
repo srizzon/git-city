@@ -12,8 +12,11 @@ import { THEMES, ThemeLights, type CityTheme } from "@/components/city/theme";
 import ThemeSkyFX from "@/components/ThemeSkyFX";
 import { InstancedDecorations } from "@/components/city/decorations";
 import type { CityBuilding, CityDecoration } from "@/lib/github";
-import { LOT, lotToWorld, maxLot, minLot, rotToRadians, terrainBounds } from "@/lib/league-city/grid";
-import type { CityObject } from "@/lib/league-city/types";
+import { LOT, bounds, lotToWorld, rotToRadians, terrainBounds, worldBounds } from "@/lib/league-city/grid";
+import type { CityIdentity, CityObject } from "@/lib/league-city/types";
+import type { IntroPath } from "@/lib/league-city/intro";
+import IdentityLayer from "./identity/IdentityLayer";
+import TownIntro from "./identity/TownIntro";
 import LeagueToys from "./LeagueToys";
 import LeagueRoads from "./LeagueRoads";
 import LeagueTrees from "./LeagueTrees";
@@ -26,14 +29,15 @@ const DriveWorld = dynamic(() => import("./drive/DriveWorld"), { ssr: false, loa
 /** Props that become physics bodies in drive mode (drawn by DriveWorld instead). */
 const KNOCKABLE = new Set(["lamp", "bench", "fountain", "cone", "crates"]);
 
-// Full-screen league city: one Canvas, midnight theme, the league's lots with
-// roads, trees, decorations and member buildings (invited ones faded).
+// Full-screen league city: one Canvas, the town's sky theme, its lots with
+// roads, trees, decorations, member buildings (invited ones faded) and its
+// identity pieces (portal, billboards, flags, sky, hill sign).
 
 // Towns use Midnight with more light: brighter ambient and sky, a lighter
 // ground and sidewalks, so the city reads at a glance. Same buildings and
 // window colors as the main city.
 const MIDNIGHT = THEMES[1];
-const theme: CityTheme = {
+const TOWN_MIDNIGHT: CityTheme = {
   ...MIDNIGHT,
   fogColor: "#10203a",
   fogNear: 700,
@@ -53,37 +57,49 @@ const theme: CityTheme = {
   roadMarkingColor: "#b8c4d4",
   sidewalkColor: "#646a7c",
 };
-// Keys the theme's lights and sky (a value of its own, apart from the main city's).
-const THEME_INDEX = 11;
+// Keys the tuned Midnight's lights and sky (a value of its own, apart from the main city's).
+const TOWN_MIDNIGHT_KEY = 11;
 const EXPOSURE = 1.65;
 /** The grass-less world around the terrain; the fog fades it into the horizon. */
 const VOID_COLOR = "#0b1422";
 /** Under 1 lowers the orbit camera so the horizon, sky and moon stay in view. */
 const CAMERA_LIFT = 0.62;
+const DEFAULT_SKY = 1; // Midnight
+
+/**
+ * The town's sky from settings (THEMES order: Emerald, Midnight, Sunset,
+ * Neon). Midnight is the brighter town tuning above; the others are the main
+ * city's themes as they are.
+ */
+function townTheme(sky: number): { theme: CityTheme; key: number; fx: 0 | 1 | 2 | 3 } {
+  // ThemeSkyFX orders its moons and stars Midnight, Sunset, Neon, Emerald.
+  const fx = ([3, 0, 1, 2] as const)[sky] ?? 0;
+  if (sky === DEFAULT_SKY || !THEMES[sky]) return { theme: TOWN_MIDNIGHT, key: TOWN_MIDNIGHT_KEY, fx: 0 };
+  return { theme: THEMES[sky], key: sky, fx };
+}
 
 // ─── Ground ──────────────────────────────────────────────────
 
-function LeagueGround({ size }: { size: number }) {
-  const { cx, cz, width } = terrainBounds(size);
+function LeagueGround({ h, theme }: { h: number; theme: CityTheme }) {
+  const { cx, cz, width, depth } = terrainBounds(h);
   const lines = useMemo(() => {
     const pts: number[] = [];
-    const lo = (minLot(size) - 0.5) * LOT;
-    const hi = (maxLot(size) + 0.5) * LOT;
-    for (let i = minLot(size); i <= maxLot(size) + 1; i++) {
-      const v = (i - 0.5) * LOT;
-      pts.push(v, 0.1, lo, v, 0.1, hi, lo, 0.1, v, hi, 0.1, v);
-    }
+    const b = bounds(h);
+    const w = worldBounds(h);
+    for (let x = b.x0; x <= b.x1 + 1; x++) pts.push((x - 0.5) * LOT, 0.1, w.minZ, (x - 0.5) * LOT, 0.1, w.maxZ);
+    for (let z = b.z0; z <= b.z1 + 1; z++) pts.push(w.minX, 0.1, (z - 0.5) * LOT, w.maxX, 0.1, (z - 0.5) * LOT);
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
     return g;
-  }, [size]);
+  }, [h]);
   useEffect(() => () => lines.dispose(), [lines]);
+  const span = Math.max(width, depth);
 
   return (
     <group>
       {/* Terrain */}
       <mesh position={[cx, 0, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[width, width]} />
+        <planeGeometry args={[width, depth]} />
         <meshStandardMaterial color={theme.groundColor} emissive={theme.groundColor} emissiveIntensity={0.15} roughness={0.95} />
       </mesh>
       {/* Lot lines */}
@@ -92,7 +108,7 @@ function LeagueGround({ size }: { size: number }) {
       </lineSegments>
       {/* Void around the terrain, lost in the fog */}
       <mesh position={[cx, -2, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[width * 12, width * 12]} />
+        <planeGeometry args={[span * 12, span * 12]} />
         <meshBasicMaterial color={VOID_COLOR} />
       </mesh>
     </group>
@@ -103,7 +119,7 @@ function LeagueGround({ size }: { size: number }) {
 
 const _m = new THREE.Matrix4();
 
-function PlazaSlabs({ objects }: { objects: CityObject[] }) {
+function PlazaSlabs({ objects, theme }: { objects: CityObject[]; theme: CityTheme }) {
   const lots = useMemo(() => objects.filter((o) => o.item_type === "plaza" && o.px === null), [objects]);
   const ref = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
@@ -141,8 +157,10 @@ function toDecorations(objects: CityObject[], driving: boolean): CityDecoration[
 
 // ─── Camera ──────────────────────────────────────────────────
 
-function cameraFrame(size: number, aspect = 1.6, zoom = 1, tallest = 0) {
-  const { cx, cz, width } = terrainBounds(size);
+function cameraFrame(h: number, aspect = 1.6, zoom = 1, tallest = 0) {
+  const t = terrainBounds(h);
+  const { cx, cz } = t;
+  const width = Math.max(t.width, t.depth);
   // Portrait screens are narrow: back off so the terrain still fits across.
   // `tallest` (hero only) keeps the camera above and back from the towers.
   const dist = Math.max((width * 0.95 + 120) * Math.max(1, 1.3 / aspect) ** 0.55 * zoom, tallest * 1.9);
@@ -159,14 +177,14 @@ const _fromLook = new THREE.Vector3();
 // Frames the terrain, and flies to a selected building like the home city
 // (camera outside the building, looking at its top), then back on close.
 function LeagueCamera({
-  size,
+  h,
   focus,
   spin = true,
   driving = false,
   zoom = 1,
   tallest = 0,
 }: {
-  size: number;
+  h: number;
   focus: CityBuilding | null;
   spin?: boolean;
   /** The drive camera owns the view; on exit this eases back to the orbit. */
@@ -177,7 +195,7 @@ function LeagueCamera({
 }) {
   const camera = useThree((s) => s.camera);
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
-  const frame = useMemo(() => cameraFrame(size, aspect, zoom, tallest), [size, aspect, zoom, tallest]);
+  const frame = useMemo(() => cameraFrame(h, aspect, zoom, tallest), [h, aspect, zoom, tallest]);
   const controls = useRef<OrbitControlsImpl>(null);
   const [rotate, setRotate] = useState(true);
   const fly = useRef({ t: 1, toPos: new THREE.Vector3(), toLook: new THREE.Vector3() });
@@ -307,7 +325,16 @@ function HeroFraming() {
 export type SceneMode = "view" | "edit" | "preview" | "drive";
 
 export interface LeagueSceneProps {
-  size: number;
+  h: number;
+  /** Sky, logo, hill sign. */
+  identity?: CityIdentity;
+  /** Town name, for the portal, plates and hill sign. */
+  name?: string;
+  /** The portal sign was clicked (report the logo). */
+  onPortalClick?: () => void;
+  /** First-visit intro; the camera is the intro's until onIntroEnd. */
+  intro?: IntroPath | null;
+  onIntroEnd?: () => void;
   objects: CityObject[];
   buildings: CityBuilding[];
   focused?: string | null;
@@ -321,13 +348,18 @@ export interface LeagueSceneProps {
   /** Editor overlays (grid, ghost, selection), rendered inside the Canvas. */
   children?: React.ReactNode;
   /** Drive mode: the car and its world. */
-  drive?: Omit<DriveWorldProps, "objects" | "buildings" | "size">;
+  drive?: Omit<DriveWorldProps, "objects" | "buildings" | "h">;
   /** Fill the parent box instead of the viewport, and ignore the pointer (Discover's hero). */
   embedded?: boolean;
 }
 
 export default function LeagueScene({
-  size,
+  h,
+  identity,
+  name = "",
+  onPortalClick,
+  intro = null,
+  onIntroEnd,
   objects,
   buildings,
   focused,
@@ -349,7 +381,9 @@ export default function LeagueScene({
   const [lost, setLost] = useState(false);
   const decorations = useMemo(() => toDecorations(objects, driving), [objects, driving]);
   const tallest = useMemo(() => buildings.reduce((m, b) => Math.max(m, b.height), 0), [buildings]);
-  const initial = useMemo(() => cameraFrame(size), [size]);
+  const initial = useMemo(() => cameraFrame(h), [h]);
+  const { theme, key: themeKey, fx: skyFx } = townTheme(identity?.sky ?? DEFAULT_SKY);
+  const playing = !!intro && mode === "view";
   const driveRef = useRef(drive);
   useEffect(() => {
     driveRef.current = drive;
@@ -392,31 +426,50 @@ export default function LeagueScene({
       }}
     >
       <fog attach="fog" args={[theme.fogColor, theme.fogNear * 2, theme.fogFar * 1.2]} />
-      <ThemeLights theme={theme} themeIndex={THEME_INDEX} />
-      {/* Moon and stars from the main city's Midnight sky (its index there is 0). */}
-      <ThemeSkyFX themeIndex={0} theme={theme} lowSky />
+      <ThemeLights theme={theme} themeIndex={themeKey} />
+      {/* Moon and stars from the main city's matching sky. */}
+      <ThemeSkyFX themeIndex={skyFx} theme={theme} lowSky />
       {embedded && <HeroFraming />}
       {editing ? (
-        <EditCamera size={size} onLot={onLot ?? (() => {})} apiRef={editApiRef} pickables={editPickables} />
+        <EditCamera h={h} onLot={onLot ?? (() => {})} apiRef={editApiRef} pickables={editPickables} />
       ) : (
         <LeagueCamera
-          size={size}
-          focus={mode === "view" ? focusedBuilding : null}
-          spin={mode === "view"}
-          driving={driving}
+          h={h}
+          focus={mode === "view" && !playing ? focusedBuilding : null}
+          spin={mode === "view" && !playing}
+          driving={driving || playing}
           zoom={embedded ? 0.85 : 1}
           tallest={embedded ? tallest : 0}
         />
       )}
 
-      <LeagueGround size={size} />
+      {playing && intro && <TownIntro path={intro} onEnd={onIntroEnd ?? (() => {})} />}
+      <LeagueGround h={h} theme={theme} />
       <LeagueRoads objects={objects} markingColor={theme.roadMarkingColor} />
-      <PlazaSlabs objects={objects} />
+      <PlazaSlabs objects={objects} theme={theme} />
       <LeagueToys objects={objects} driving={driving} />
       <InstancedDecorations items={decorations} roadMarkingColor={theme.roadMarkingColor} sidewalkColor={theme.sidewalkColor} />
       <Suspense fallback={null}>
         <LeagueTrees objects={objects} />
       </Suspense>
+
+      {identity && (
+        <IdentityLayer
+          objects={objects}
+          identity={identity}
+          name={name}
+          h={h}
+          hillColor={theme.groundColor}
+          onPortalClick={
+            onPortalClick && mode === "view"
+              ? (e) => {
+                  e.stopPropagation();
+                  onPortalClick();
+                }
+              : undefined
+          }
+        />
+      )}
 
       <CityScene
         buildings={buildings}
@@ -425,7 +478,7 @@ export default function LeagueScene({
         focusedBuilding={editing || driving ? null : (focused ?? null)}
         onBuildingClick={editing || driving ? undefined : onBuildingClick}
       />
-      {driving && drive && <DriveWorld objects={objects} buildings={buildings} size={size} {...drive} />}
+      {driving && drive && <DriveWorld objects={objects} buildings={buildings} h={h} {...drive} />}
       {children}
     </Canvas>
   );

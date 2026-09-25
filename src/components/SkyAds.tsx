@@ -133,7 +133,16 @@ export function createLedTexture(text: string, color: string, bgColor: string) {
 
 // ─── BannerPlane — Airplane towing LED marquee banner ────────
 
-function BannerPlane({
+/** A fixed flight for a town's plane or blimp, instead of the city-wide orbit. */
+export interface SkyPath {
+  cx: number;
+  cz: number;
+  /** Plane: orbit radius. Blimp: drift radius around its point. */
+  r: number;
+  altitude: number;
+}
+
+export function BannerPlane({
   ad,
   index,
   total,
@@ -141,6 +150,7 @@ function BannerPlane({
   flyMode,
   onAdClick,
   meshRef,
+  path,
 }: {
   ad: SkyAd;
   index: number;
@@ -149,6 +159,7 @@ function BannerPlane({
   flyMode: boolean;
   onAdClick?: (ad: SkyAd) => void;
   meshRef?: React.Ref<THREE.Mesh>;
+  path?: SkyPath;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF("/models/paper-plane.glb");
@@ -198,9 +209,11 @@ function BannerPlane({
 
   // Flight — spread planes across multiple orbit radii so they cover the whole city
   const radiusFraction = 0.25 + (index / Math.max(total - 1, 1)) * 0.5; // 25-75% of city radius
-  const rx = cityRadius * radiusFraction * (0.9 + (index % 3) * 0.1);
-  const rz = cityRadius * radiusFraction * (0.8 + ((index + 1) % 3) * 0.1);
-  const altitude = 180 + index * 20 + (index % 3) * 40;
+  const rx = path ? path.r : cityRadius * radiusFraction * (0.9 + (index % 3) * 0.1);
+  const rz = path ? path.r : cityRadius * radiusFraction * (0.8 + ((index + 1) % 3) * 0.1);
+  const altitude = path ? path.altitude : 180 + index * 20 + (index % 3) * 40;
+  const cx = path?.cx ?? 0;
+  const cz = path?.cz ?? 0;
   const speed = 30 + (index % 4) * 5;
   const phaseOffset = (index * Math.PI * 2) / total;
   const angle = useRef(phaseOffset);
@@ -221,7 +234,7 @@ function BannerPlane({
     const bank = -Math.sin(a) * 0.2;
 
     if (groupRef.current) {
-      groupRef.current.position.set(x, altitude + Math.sin(t * 0.8 + index) * 2, z);
+      groupRef.current.position.set(cx + x, altitude + Math.sin(t * 0.8 + index) * 2, cz + z);
       groupRef.current.rotation.set(0, yaw, bank, "YXZ");
     }
 
@@ -311,7 +324,7 @@ function BannerPlane({
 
 // ─── Blimp — Dirigible with LED screens ──────────────────────
 
-function Blimp({
+export function Blimp({
   ad,
   index,
   total,
@@ -319,6 +332,7 @@ function Blimp({
   flyMode,
   onAdClick,
   screenRef,
+  path,
 }: {
   ad: SkyAd;
   index: number;
@@ -327,6 +341,7 @@ function Blimp({
   flyMode: boolean;
   onAdClick?: (ad: SkyAd) => void;
   screenRef?: React.Ref<THREE.Mesh>;
+  path?: SkyPath;
 }) {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -355,9 +370,11 @@ function Blimp({
   }, [tex, ledMat]);
 
   // Orbit blimps around the landmarks area (center of city)
-  const r = 350 + index * 60;
-  const altitude = 400 + index * 25 + (index % 2) * 30;
-  const speed = 5 + (index % 3) * 2;
+  const r = path ? path.r : 350 + index * 60;
+  const altitude = path ? path.altitude : 400 + index * 25 + (index % 2) * 30;
+  const speed = path ? 2 : 5 + (index % 3) * 2;
+  const cx = path?.cx ?? 0;
+  const cz = path?.cz ?? 0;
   const phaseOffset = (index * Math.PI * 2) / Math.max(total, 1);
   const angle = useRef(phaseOffset);
 
@@ -374,7 +391,7 @@ function Blimp({
     const yaw = Math.atan2(-vx, -vz);
 
     if (groupRef.current) {
-      groupRef.current.position.set(x, altitude + Math.sin(t * 0.3) * 2, z);
+      groupRef.current.position.set(cx + x, altitude + Math.sin(t * 0.3) * 2, cz + z);
       groupRef.current.rotation.set(0, yaw, 0);
     }
 
