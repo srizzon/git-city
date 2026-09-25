@@ -8,7 +8,7 @@ import type { RapierContext, RapierRigidBody } from "@react-three/rapier";
 import type { DriveInput } from "./input";
 import { isFlipped } from "./spawn";
 import type { SurfaceGrip } from "./surface";
-import { BOOST, DRIFT, ENGINE, M_TO_UNIT, RESPAWN, STEER, SURFACE, WHEEL } from "./tuning";
+import { BOOST, DRIFT, ENGINE, M_TO_UNIT, RESPAWN, STEER, SURFACE, TURBO, WHEEL } from "./tuning";
 
 type World = RapierContext["world"];
 export type VehicleController = ReturnType<World["createVehicleController"]>;
@@ -31,8 +31,12 @@ export interface CarState {
   /** Spinning out (oil, a ball hit): seconds left and which way. */
   spinLeft: number;
   spinDir: number;
-  /** Boost left, 0…1, filled by drifting; null = unlimited (the town). */
-  boostFuel: number | null;
+  /** Race track: no Shift boost; a drift charges a mini-turbo that fires when it ends. */
+  turbo: boolean;
+  /** Seconds drifted in the drift under way (the mini-turbo's charge). */
+  driftCharge: number;
+  /** Mini-turbo seconds left. */
+  turboLeft: number;
   /** Top speed multiplier (the crown holder is slower). */
   topMul: number;
   /** Sideways speed, m/s. */
@@ -51,7 +55,7 @@ export const WHEELS: { x: number; z: number; front: boolean }[] = [
 export function newCarState(): CarState {
   return {
     speed: 0, steer: 0, boosting: false, braking: false, slip: 0,
-    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, boostFuel: null, topMul: 1, lateral: 0, surface: "road",
+    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, turbo: false, driftCharge: 0, turboLeft: 0, topMul: 1, lateral: 0, surface: "road",
   };
 }
 
@@ -93,6 +97,13 @@ const SPIN_RATE = 7;
 const SPIN_DRAG = 1.2;
 
 /** Start a spin-out: the car loses grip and turns in circles for `seconds`. */
+/** Mini-turbo level for a drift held this long (s): 0 none, 1 blue, 2 orange, 3 purple. */
+export function turboLevel(charge: number): number {
+  let l = 0;
+  for (let i = 0; i < TURBO.charge.length; i++) if (charge >= TURBO.charge[i]) l = i + 1;
+  return l;
+}
+
 export function spinOut(s: CarState, seconds: number, dir: number = Math.random() < 0.5 ? -1 : 1): void {
   s.spinLeft = Math.max(s.spinLeft, seconds);
   s.spinDir = dir < 0 ? -1 : 1;
@@ -128,10 +139,16 @@ export function stepCar(
   if (!spinning && !s.drifting && input.handbrake && input.steer !== 0 && speed > DRIFT.minSpeed && grounded) {
     s.drifting = true;
     s.driftDir = Math.sign(input.steer);
+    s.driftCharge = 0;
   } else if (s.drifting && (!input.handbrake || speed < DRIFT.endSpeed)) {
     s.drifting = false;
     s.recovering = DRIFT.recoverTime;
+    // Let go of a charged drift: the mini-turbo fires (not when it just died out).
+    if (s.turbo && speed >= DRIFT.endSpeed) s.turboLeft = Math.max(s.turboLeft, TURBO.seconds[turboLevel(s.driftCharge)]);
+    s.driftCharge = 0;
   }
+  if (s.drifting && grounded) s.driftCharge += dt;
+  if (spinning) s.driftCharge = 0;
   s.recovering = Math.max(0, s.recovering - dt);
 
   // Grip and top speed per wheel, from the surface under it.
@@ -148,13 +165,9 @@ export function stepCar(
     }
   });
 
-  // Boost: unlimited while held, or from the tank a drift fills (the race track).
-  const fuel = s.boostFuel;
-  s.boosting = input.boost && (fuel === null || fuel > 0);
-  if (fuel !== null) {
-    const fill = s.drifting && grounded ? BOOST.driftFill : 0;
-    s.boostFuel = Math.min(1, Math.max(0, fuel + (fill - (s.boosting ? BOOST.drain : 0)) * dt));
-  }
+  // Boost: unlimited while Shift is held in the town; on the race track only a mini-turbo.
+  s.turboLeft = Math.max(0, s.turboLeft - dt);
+  s.boosting = s.turbo ? s.turboLeft > 0 : input.boost;
   const top = (s.boosting ? BOOST.topSpeed : rearTop) * s.topMul;
 
   // Throttle, brake and reverse (boost drives even without throttle).

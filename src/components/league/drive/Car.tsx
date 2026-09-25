@@ -10,7 +10,7 @@ import type { CityObject } from "@/lib/league-city/types";
 import { nearestFreeLot, type Spawn } from "@/lib/league-city/drive/spawn";
 import { surfaceAt, surfaceIndex, type SurfaceGrip } from "@/lib/league-city/drive/surface";
 import type { DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import { BOOST, CHASSIS, M_TO_UNIT, TOYS, UNIT_TO_M, WHEEL } from "@/lib/league-city/drive/tuning";
+import { CHASSIS, M_TO_UNIT, TOYS, UNIT_TO_M, WHEEL } from "@/lib/league-city/drive/tuning";
 import { honkTarget, padKick } from "@/lib/league-city/drive/reactions";
 import { padAt } from "@/lib/league-city/toys";
 import {
@@ -54,9 +54,9 @@ const _axisX = new THREE.Vector3(1, 0, 0);
 const _axisY = new THREE.Vector3(0, 1, 0);
 const _spin = new THREE.Quaternion();
 
-function freshState(tank: boolean): CarState {
+function freshState(turbo: boolean): CarState {
   const s = newCarState();
-  if (tank) s.boostFuel = BOOST.startFuel;
+  s.turbo = turbo;
   return s;
 }
 
@@ -75,7 +75,7 @@ export default function Car({
   onReset,
   surface,
   respawnAt,
-  tank = false,
+  turbo = false,
   children,
 }: {
   spawn: Spawn;
@@ -99,8 +99,8 @@ export default function Car({
   surface?: (wx: number, wz: number) => SurfaceGrip;
   /** Where R puts the car, when set (the race track's last checkpoint); else the spawn. */
   respawnAt?: React.MutableRefObject<Spawn | null>;
-  /** Boost comes from a tank that drifting fills, instead of unlimited. */
-  tank?: boolean;
+  /** No Shift boost: drifts charge a mini-turbo instead (the race track). */
+  turbo?: boolean;
   /** Rendered inside the visible car (lights). */
   children?: React.ReactNode;
 }) {
@@ -109,7 +109,7 @@ export default function Car({
   const rigidObj = useRef<THREE.Object3D>(null);
   const group = useRef<THREE.Group>(null);
   const wheelRefs = useRef<(THREE.Object3D | null)[]>([]);
-  const state = useRef<CarState>(freshState(tank));
+  const state = useRef<CarState>(freshState(turbo));
   const controller = useRef<VehicleController | null>(null);
 
   const surfaces = useMemo(() => surfaceIndex(objects), [objects]);
@@ -149,10 +149,7 @@ export default function Car({
     if (!body) return;
     const s = respawnAt?.current ?? spawnRef.current;
     placeCar(body, s.x * UNIT_TO_M, s.z * UNIT_TO_M, headingFromRot(s.rot));
-    // A reset keeps what's in the tank.
-    const fuel = state.current.boostFuel;
-    state.current = freshState(tank);
-    state.current.boostFuel = fuel;
+    state.current = freshState(turbo);
     onReset?.();
   };
 
