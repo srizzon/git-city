@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { createBrowserSupabase } from "@/lib/supabase";
@@ -16,7 +16,7 @@ import type { CityIdentity, CityObject } from "@/lib/league-city/types";
 import type { LeagueCity } from "@/lib/league-city/service";
 import type { OrgState } from "@/lib/towns/company-orgs";
 import { companyStep, normalizeOrgInput, type OrgCheck } from "@/lib/towns/company-step";
-import { CompanyPanel } from "./company-panel";
+import { CityStepNote, CompanySteps, OrgStep, type CompanyStage } from "./company-panel";
 import type { ScoringMode } from "@/lib/leagues/scoring";
 import { JOIN_MODES, type JoinMode } from "@/lib/towns/joining";
 
@@ -64,17 +64,21 @@ export default function NewTown({
   const [kind, setKind] = useState<TownKind>(startKind);
   const [template, setTemplate] = useState<TemplateId>(startTemplate ?? (startKind === "company" ? COMPANY_TEMPLATE : DEFAULT_TEMPLATE));
   // Company tab: the org being looked at and what the server found out about it.
-  const [orgInput, setOrgInput] = useState(startCheck ? "" : (startOrg ?? ""));
-  const [check, setCheck] = useState<OrgCheck | null>(startCheck);
+  const [orgInput, setOrgInput] = useState(startCheck?.org ?? startOrg ?? "");
+  const [lastCheck, setCheck] = useState<OrgCheck | null>(startCheck);
   const [checking, setChecking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [stage, setStage] = useState<CompanyStage>("org");
   const company = kind === "company";
-  const step = companyStep(company ? check : null);
-  // The org already has a town: you move into that one, the city is already built.
-  const existing = company && check?.account === "org" && check.town ? check.town : null;
-  // The starter cities and settings show until we know the org's town is
-  // already built: you pick first, and the pick applies when you build it.
-  const choosing = !company || !existing;
+  // A check only counts while the input still names its org.
+  const check = company && lastCheck && lastCheck.org === normalizeOrgInput(orgInput) ? lastCheck : null;
+  const step = companyStep(check);
+  // Step 2 is only for an org you can build or move into.
+  const cityStage = company && stage === "city" && (step.kind === "build" || step.kind === "move_in");
+  // The org already has a town: the preview shows it, the city is already built.
+  const existing = check?.account === "org" && check.town ? check.town : null;
+  // Starter cities and settings: always for friends, step 2 of a new company town.
+  const choosing = !company || (cityStage && step.kind === "build");
   const [name, setName] = useState(startName ?? (viewer ? `${viewer.login}'s Town` : "My Town"));
   const [showSettings, setShowSettings] = useState(true);
   // Settings follow the template until you change one.
@@ -199,42 +203,47 @@ export default function NewTown({
     }
   }
 
+  // Only the newest check may land: an older answer can arrive after it.
+  const checkSeq = useRef(0);
+
   /** Asks the server about an org. Read-only: nothing is built or joined. */
   async function runCheck(raw?: string): Promise<OrgCheck | null> {
     const org = normalizeOrgInput(raw ?? orgInput);
     if (!org) {
-      setError(raw ?? orgInput ? "That isn't a GitHub org name. Try the name in its address: github.com/name." : "Type your org's GitHub name.");
+      setError((raw ?? orgInput).trim() ? "That isn't a GitHub org name. Use the name in its address: github.com/name." : "Type your org's GitHub name.");
       return null;
     }
+    const seq = ++checkSeq.current;
     setChecking(true);
     setError(null);
-    setNotice(null);
     try {
       const res = await fetch(`/api/leagues/verify/check?org=${encodeURIComponent(org)}`, { cache: "no-store" });
       const json = (await res.json()) as OrgCheck & { error?: string };
+      if (seq !== checkSeq.current) return null;
       if (!res.ok) {
         setError(json.error ?? "Couldn't check that org. Try again.");
         return null;
       }
       setCheck(json);
-      setOrgInput(json.org);
       // The address follows the org, so a reload or a shared link lands here again.
       window.history.replaceState(null, "", `/towns/new?kind=company&org=${encodeURIComponent(json.org)}`);
       return json;
     } catch {
-      setError("Network error. Try again.");
+      if (seq === checkSeq.current) setError("Network error. Try again.");
       return null;
     } finally {
-      setChecking(false);
+      if (seq === checkSeq.current) setChecking(false);
     }
   }
 
-  function changeOrg() {
-    setCheck(null);
-    setError(null);
-    setNotice(null);
-    window.history.replaceState(null, "", "/towns/new?kind=company");
-  }
+  // Checks the org once you stop typing, like a username field.
+  const typedOrg = company && viewer ? normalizeOrgInput(orgInput) : null;
+  useEffect(() => {
+    if (!typedOrg || lastCheck?.org === typedOrg) return;
+    const id = setTimeout(() => void runCheck(typedOrg), 600);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runCheck reads the latest state
+  }, [typedOrg, lastCheck?.org]);
 
   const slugOfJoin = (j: Record<string, unknown>) => String(j.slug);
 
@@ -255,16 +264,23 @@ export default function NewTown({
         String((j.league as { slug: string }).slug),
       );
     }
-    if (!check || step.kind === "no_account" || step.kind === "person" || step.kind === "github_down" || step.kind === "not_member") {
-      await runCheck(check && step.kind !== "no_account" && step.kind !== "person" ? check.org : undefined);
+    if (!cityStage) {
+      // Step 1 never builds: it moves on, opens your town, or checks again.
+      if (step.kind === "build" || step.kind === "move_in") {
+        setNotice(null);
+        setStage("city");
+        return;
+      }
+      if (step.kind === "open") {
+        setBusy(true);
+        window.location.href = `/town/${step.slug}`;
+        return;
+      }
+      if (step.kind === "removed") return;
+      await runCheck();
       return;
     }
-    if (step.kind === "open") {
-      setBusy(true);
-      window.location.href = `/town/${step.slug}`;
-      return;
-    }
-    if (step.kind === "removed") return;
+    if (!check) return;
     const expect = step.kind === "build" ? "create" : "join";
     return go(
       "/api/leagues/verify/join",
@@ -274,6 +290,7 @@ export default function NewTown({
         // The town changed since the check (someone built it first, or the
         // membership went private): look again and say why the screen moved.
         if (json.code !== "town_exists" && json.code !== "no_town" && json.code !== "not_member") return false;
+        if (json.code === "not_member") setStage("org");
         void runCheck(check.org).then((fresh) => {
           if (fresh && typeof json.error === "string" && json.code !== "not_member") setNotice(json.error);
         });
@@ -288,19 +305,21 @@ export default function NewTown({
     ? "Sign in to build"
     : !company
       ? "Build town"
-      : step.kind === "none" || step.kind === "no_account" || step.kind === "person"
-        ? "Check org"
-        : step.kind === "github_down" || step.kind === "not_member"
-          ? "Check again"
-          : step.kind === "open"
-            ? `Open ${check?.townLabel ?? "town"}`
-            : step.kind === "removed"
-              ? "Removed by the admin"
-              : step.kind === "move_in"
-                ? step.leaving
-                  ? `Move to ${check?.townLabel ?? "town"}`
-                  : "Move in"
-                : `Build ${check?.townLabel ?? "town"}`;
+      : cityStage
+        ? step.kind === "build"
+          ? `Build ${check?.townLabel ?? "town"}`
+          : step.kind === "move_in" && step.leaving
+            ? `Move to ${check?.townLabel ?? "town"}`
+            : "Move in"
+        : step.kind === "open"
+          ? `Open ${check?.townLabel ?? "town"}`
+          : step.kind === "removed"
+            ? "Removed by the admin"
+            : step.kind === "not_member"
+              ? "Check again"
+              : step.kind === "github_down"
+                ? "Try again"
+                : "Continue";
   const pending = !viewer
     ? "Opening GitHub"
     : checking
@@ -316,7 +335,7 @@ export default function NewTown({
     !nameOk ||
     (!!viewer && !viewer.claimed) ||
     (company && !!viewer && step.kind === "removed") ||
-    (company && !!viewer && (step.kind === "none" || step.kind === "no_account" || step.kind === "person") && !inputOk);
+    (company && !!viewer && !cityStage && !inputOk);
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-bg font-pixel uppercase text-warm" style={{ animation: "fade-in 0.5s ease-out both" }}>
@@ -368,16 +387,19 @@ export default function NewTown({
             </button>
           ))}
         </div>
-        <p className="px-5 pt-3 text-xs leading-relaxed text-muted normal-case">
-          {!company
-            ? "Pick a starter city. You can change everything later."
-            : viewer
-              ? "One town per GitHub org. Your colleagues' buildings come in with it."
-              : "One town per GitHub org. Your colleagues' buildings come in with it. Sign in with GitHub, then tell us your org."}
-        </p>
+        {company && viewer && <CompanySteps stage={cityStage ? "city" : "org"} />}
+        {!cityStage && (
+          <p className="px-5 pt-3 text-xs leading-relaxed text-muted normal-case">
+            {!company
+              ? "Pick a starter city. You can change everything later."
+              : viewer
+                ? "One town per GitHub org. Your colleagues' buildings come in with it."
+                : "One town per GitHub org. Your colleagues' buildings come in with it. Sign in with GitHub, then tell us your org."}
+          </p>
+        )}
 
-        {company && viewer && (
-          <CompanyPanel
+        {company && viewer && !cityStage && (
+          <OrgStep
             login={viewer.login}
             orgs={orgs}
             input={orgInput}
@@ -385,13 +407,18 @@ export default function NewTown({
               setOrgInput(v);
               setError(null);
             }}
-            onCheck={(o) => void runCheck(o)}
-            onChange={changeOrg}
+            onPick={(o) => {
+              setOrgInput(o);
+              setError(null);
+            }}
             check={check}
             step={step}
             checking={checking}
-            notice={notice}
           />
+        )}
+        {cityStage && check && <CityStepNote check={check} step={step} />}
+        {cityStage && notice && (
+          <p className="mx-5 mt-2 border-[3px] border-lime/60 bg-bg-card px-3 py-2 text-[11px] leading-relaxed text-cream normal-case">{notice}</p>
         )}
 
         {choosing && (
@@ -490,11 +517,25 @@ export default function NewTown({
           )}
         </div>
         {/* The one action stays in reach while the panel scrolls. */}
-        <div className="sticky bottom-0 bg-bg px-5 pt-3 pb-4">
+        <div className="sticky bottom-0 flex gap-2 bg-bg px-5 pt-3 pb-4">
+          {cityStage && (
+            <button
+              type="button"
+              onClick={() => {
+                setStage("org");
+                setNotice(null);
+                setError(null);
+              }}
+              disabled={busy}
+              className="btn-press shrink-0 border-[3px] border-border px-4 py-3 text-sm tracking-widest text-muted transition-colors hover:text-cream disabled:opacity-40"
+            >
+              Back
+            </button>
+          )}
           <button
             type="submit"
             disabled={actionDisabled}
-            className="btn-press w-full bg-lime px-4 py-3 text-sm tracking-widest text-bg disabled:opacity-40"
+            className="btn-press min-w-0 flex-1 bg-lime px-4 py-3 text-sm tracking-widest text-bg disabled:opacity-40"
           >
             {busy || checking ? <Pending label={pending} /> : action}
           </button>
