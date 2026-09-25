@@ -4,7 +4,6 @@
     { "path": "/api/cron/flush-batches",   "schedule": "*/15 * * * *" },
     { "path": "/api/cron/streak-reminder", "schedule": "0 20 * * *" },
     { "path": "/api/cron/weekly-digest",   "schedule": "0 10 * * 1" },
-    { "path": "/api/cron/monthly-digest",  "schedule": "0 10 1 * *" },
     { "path": "/api/cron/re-engagement",   "schedule": "0 14 * * *" },
     { "path": "/api/cron/city-snapshot",   "schedule": "*/10 * * * *" },
     { "path": "/api/cron/ad-weekly-report", "schedule": "0 10 * * 1" },
