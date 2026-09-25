@@ -14,6 +14,7 @@
 import { decodeSnapshotV2, SNAPSHOT_V2_PATH, type SnapshotV2 } from "./city-snapshot-format";
 import type { CityLayout, LayoutNorms, SFMapAsset } from "./github";
 import type { CityWorkerRequest } from "./city-load.worker";
+import type { MapGeometryArrays } from "./map-geometry.worker";
 
 const STORAGE_PREFIX = "storage/v1/object/public/city-data";
 
@@ -40,14 +41,37 @@ async function getGzipJson(url: string): Promise<any | null> {
 // Bay Area map asset: SF plus the cities around it (baked from OSM, see
 // scripts/bake-bay-map.mjs). Fetched once, shared by every
 // layout recompute. Falls back to undefined (procedural layout) if missing.
+const MAP_URL = "/maps/bay.json";
 let sfMapPromise: Promise<SFMapAsset | undefined> | null = null;
 export function loadSFMap(): Promise<SFMapAsset | undefined> {
   if (!sfMapPromise) {
-    sfMapPromise = fetch("/maps/bay.json")
+    sfMapPromise = fetch(MAP_URL)
       .then((r) => (r.ok ? r.json() : undefined))
       .catch(() => undefined);
   }
   return sfMapPromise;
+}
+
+// Ground geometry (roads, parks, land), built in a worker from the start of the
+// page load so it's ready when the city shows; null if the worker can't run
+// (the map layer then builds it on the main thread).
+let mapGeometryPromise: Promise<MapGeometryArrays | null> | null = null;
+export function loadMapGeometry(): Promise<MapGeometryArrays | null> {
+  if (!mapGeometryPromise) {
+    mapGeometryPromise = new Promise((resolve) => {
+      if (typeof Worker === "undefined") return resolve(null);
+      try {
+        const worker = new Worker(new URL("./map-geometry.worker.ts", import.meta.url));
+        const timer = setTimeout(() => { worker.terminate(); resolve(null); }, WORKER_TIMEOUT_MS);
+        worker.onmessage = (e) => { clearTimeout(timer); worker.terminate(); resolve(e.data?.ok ? e.data.out : null); };
+        worker.onerror = () => { clearTimeout(timer); worker.terminate(); resolve(null); };
+        worker.postMessage({ url: MAP_URL });
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+  return mapGeometryPromise;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,5 +181,6 @@ export function loadHomeSnapshot(): Promise<HomeSnapshot | null> {
 
 if (typeof window !== "undefined" && window.location.pathname === "/") {
   loadSFMap();
+  loadMapGeometry();
   pending = fetchHomeSnapshot();
 }
