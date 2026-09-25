@@ -94,11 +94,11 @@ export async function POST() {
   if (claimResult.total % 7 === 0) {
     const { data: devFreeze } = await admin
       .from("developers")
-      .select("streak_freeze_count")
+      .select("streak_freezes_available")
       .eq("id", dev.id)
       .single();
 
-    if ((devFreeze?.streak_freeze_count ?? 0) < 2) {
+    if ((devFreeze?.streak_freezes_available ?? 0) < 2) {
       await admin.rpc("grant_streak_freeze", { p_developer_id: dev.id });
       await admin.from("streak_freeze_log").insert({
         developer_id: dev.id,

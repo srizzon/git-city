@@ -1,72 +1,95 @@
 import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
-import { buildButton, buildStatsTable, escapeHtml } from "@/lib/email-template";
+import { COMPANY_DASHBOARD_URL, COMPANY_LINKS, plural } from "@/lib/jobs/email-blocks";
+import { button, heading, paragraph, statTiles, trackedUrl } from "@/lib/email/components";
+import { renderLayout, renderText, type EmailLinks } from "@/lib/email/layout";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+const fmt = (n: number) => n.toLocaleString("en-US");
 
-/**
- * Email sent when a job listing is about to expire (5 days warning).
- */
-export async function sendJobExpiringEmail(
-  email: string,
-  listingTitle: string,
-  daysLeft: number,
-  stats: { views: number; applies: number },
-) {
-  const bodyHtml = `
-    <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#f59e0b; letter-spacing:1px; text-transform:uppercase;">Expiring soon</p>
-    <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${escapeHtml(listingTitle)}</h1>
-    <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-      Your listing expires in <strong>${daysLeft} day${daysLeft === 1 ? "" : "s"}</strong>.
-      Here's how it performed so far:
-    </p>
-    ${buildStatsTable([
-      { label: "Views", value: stats.views.toLocaleString() },
-      { label: "Applications", value: stats.applies.toLocaleString() },
-    ])}
-    <p style="margin:0 0 24px; font-size:14px; color:#555555; line-height:1.6;">
-      After expiration, your listing will no longer appear in search results.
-      You can repost it anytime from your dashboard.
-    </p>
-    ${buildButton("View Dashboard", `${BASE_URL}/jobs/dashboard`)}
-  `;
-
-  await sendCompanyEmail({
-    to: email,
-    subject: `Your listing expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}: ${listingTitle}`,
-    html: bodyHtml,
-    text: `Your listing expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}: ${listingTitle}\n\nHere's how it performed so far:\n- Views: ${stats.views.toLocaleString()}\n- Applications: ${stats.applies.toLocaleString()}\n\nAfter expiration, your listing will no longer appear in search results. You can repost it anytime from your dashboard.\n\nView Dashboard: ${BASE_URL}/jobs/dashboard`,
-  });
+export interface JobExpiringData {
+  listingTitle: string;
+  daysLeft: number;
+  views: number;
+  applies: number;
 }
 
-/**
- * Email sent when a job listing has expired, with final stats.
- */
-export async function sendJobExpiredEmail(
-  email: string,
-  listingTitle: string,
-  stats: { views: number; applies: number; hires: number },
-) {
-  const bodyHtml = `
-    <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#999999; letter-spacing:1px; text-transform:uppercase;">Listing ended</p>
-    <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${escapeHtml(listingTitle)}</h1>
-    <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-      Your listing has expired. Here are the final numbers:
-    </p>
-    ${buildStatsTable([
-      { label: "Views", value: stats.views.toLocaleString() },
-      { label: "Applications", value: stats.applies.toLocaleString() },
-      { label: "Hires", value: stats.hires.toLocaleString() },
-    ])}
-    <p style="margin:0 0 24px; font-size:14px; color:#555555; line-height:1.6;">
-      Still hiring? Repost your listing to reach more developers.
-    </p>
-    ${buildButton("Repost Listing", `${BASE_URL}/jobs/dashboard`)}
-  `;
+export function renderJobExpiringEmail(d: JobExpiringData, links: EmailLinks = COMPANY_LINKS) {
+  const days = plural(d.daysLeft, "day");
+  const subject = `Your listing ends in ${days}`;
+  const preheader = `${d.listingTitle} has ${plural(d.views, "view")} and ${plural(d.applies, "application")} so far.`;
+  const dashboardUrl = trackedUrl(COMPANY_DASHBOARD_URL, "job_expiring");
+  const intro = `${d.listingTitle} comes off the job board in ${days}. Here's how it's done so far.`;
+  const next = "Once it ends, developers can no longer find it or apply. Still hiring after that? Repost it from your dashboard.";
+  const reason = "You're getting this because you have a listing on Git City Jobs.";
+  const tiles = [
+    { value: fmt(d.views), label: "Views" },
+    { value: fmt(d.applies), label: "Applications" },
+    { value: `${d.daysLeft}d`, label: "Left" },
+  ];
 
-  await sendCompanyEmail({
-    to: email,
-    subject: `Final results for: ${listingTitle}`,
-    html: bodyHtml,
-    text: `Final results for: ${listingTitle}\n\nYour listing has expired. Here are the final numbers:\n- Views: ${stats.views.toLocaleString()}\n- Applications: ${stats.applies.toLocaleString()}\n- Hires: ${stats.hires.toLocaleString()}\n\nStill hiring? Repost your listing to reach more developers.\n\nRepost Listing: ${BASE_URL}/jobs/dashboard`,
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [heading(`Your listing ends in ${days}`), paragraph(intro), statTiles(tiles), paragraph(next), button("Open your dashboard", dashboardUrl)].join("\n"),
+    reason,
+    links,
   });
+
+  const text = renderText({
+    lines: [`Your listing ends in ${days}`, "", intro, "", ...tiles.map((t) => `${t.label}: ${t.value}`), "", next, "", `Open your dashboard: ${dashboardUrl}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** Sent when a listing is about to expire (EXPIRY_WARNING_DAYS before). */
+export async function sendJobExpiringEmail(email: string, listingTitle: string, daysLeft: number, stats: { views: number; applies: number }) {
+  const { subject, html, text } = renderJobExpiringEmail({ listingTitle, daysLeft, ...stats });
+  await sendCompanyEmail({ to: email, subject, html, text, type: "job_expiring" });
+}
+
+export interface JobExpiredData {
+  listingTitle: string;
+  views: number;
+  applies: number;
+  hires: number;
+}
+
+export function renderJobExpiredEmail(d: JobExpiredData, links: EmailLinks = COMPANY_LINKS) {
+  const subject = `Listing ended: ${d.listingTitle}`;
+  const preheader = `Final numbers: ${plural(d.views, "view")}, ${plural(d.applies, "application")}, ${plural(d.hires, "hire")}.`;
+  const dashboardUrl = trackedUrl(COMPANY_DASHBOARD_URL, "job_expired");
+  const intro = `${d.listingTitle} has expired and is off the job board. Here are the final numbers.`;
+  const next = d.hires > 0
+    ? "Hiring for another role? Repost this listing or post a new one from your dashboard."
+    : "Still hiring? Repost it from your dashboard to put it back in front of developers.";
+  const reason = "You're getting this because you had a listing on Git City Jobs.";
+  const tiles = [
+    { value: fmt(d.views), label: "Views" },
+    { value: fmt(d.applies), label: "Applications" },
+    { value: fmt(d.hires), label: d.hires === 1 ? "Hire" : "Hires" },
+  ];
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [heading("Your listing has ended"), paragraph(intro), statTiles(tiles), paragraph(next), button("Repost listing", dashboardUrl)].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: ["Your listing has ended", "", intro, "", ...tiles.map((t) => `${t.label}: ${t.value}`), "", next, "", `Repost listing: ${dashboardUrl}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** Sent when a listing has expired, with its final numbers. */
+export async function sendJobExpiredEmail(email: string, listingTitle: string, stats: { views: number; applies: number; hires: number }) {
+  const { subject, html, text } = renderJobExpiredEmail({ listingTitle, ...stats });
+  await sendCompanyEmail({ to: email, subject, html, text, type: "job_expired" });
 }

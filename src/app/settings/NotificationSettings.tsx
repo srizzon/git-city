@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PixelSelect } from "@/components/ui/PixelSelect";
 
 interface Prefs {
   email_enabled: boolean;
@@ -200,15 +199,15 @@ export default function NotificationSettings() {
             <Toggle
               checked={prefs.streak_reminders}
               onChange={(v) => save({ streak_reminders: v })}
-              label="Streak reminders"
-              sublabel="Daily reminder to check in and keep your streak"
+              label="Daily reminder"
+              sublabel="Your streak or unfinished missions, at most once a day"
               disabled={emailOff}
             />
             <Toggle
               checked={prefs.social}
               onChange={(v) => save({ social: v })}
-              label="Social notifications"
-              sublabel="Raids, kudos, achievements, gifts"
+              label="Raids and social"
+              sublabel="Raids on your building, gifts, rare emblems and referrals"
               disabled={emailOff}
             />
             <Toggle
@@ -221,8 +220,8 @@ export default function NotificationSettings() {
             <Toggle
               checked={prefs.digest}
               onChange={(v) => save({ digest: v })}
-              label="Weekly digest"
-              sublabel="Summary of your activity and stats"
+              label="Weekly recap"
+              sublabel="Mondays, only when something happened in your week"
               disabled={emailOff}
             />
             <Toggle
@@ -256,75 +255,35 @@ export default function NotificationSettings() {
           </div>
         </div>
 
-        {/* Digest frequency */}
-        <div className="border-[3px] border-border bg-bg-raised p-6 sm:p-8 mb-6">
-          <h2 className="text-sm text-cream mb-2">Digest frequency</h2>
+        {/* Raid alert bundling (digest_frequency: realtime or not) */}
+        <div className="border-[3px] border-border bg-bg-raised p-6 sm:p-8">
+          <h2 className="text-sm text-cream mb-2">Raid alerts</h2>
           <p className="text-xs text-muted/40 normal-case mb-5">
-            How often to bundle low-priority notifications into a digest
+            One email per raid, or several raids bundled into one email
           </p>
           <div className="flex flex-wrap gap-2">
-            {(["realtime", "hourly", "daily", "weekly"] as const).map((freq) => (
+            {(["realtime", "daily"] as const).map((freq) => (
               <button
                 key={freq}
                 onClick={() => save({ digest_frequency: freq })}
                 disabled={emailOff}
                 className={`border-[3px] px-4 py-2.5 text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c8e64a]/50 ${
-                  prefs.digest_frequency === freq
+                  (freq === "realtime") === (prefs.digest_frequency === "realtime")
                     ? "border-[#c8e64a] text-[#c8e64a] bg-[#c8e64a]/10"
                     : "border-border text-muted hover:border-border-light"
                 } ${emailOff ? "opacity-40 pointer-events-none" : ""}`}
               >
-                {freq === "realtime" ? "Instant" : freq}
+                {freq === "realtime" ? "Instant" : "Bundled"}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Quiet hours */}
-        <div className="border-[3px] border-border bg-bg-raised p-6 sm:p-8">
-          <h2 className="text-sm text-cream mb-2">Quiet hours</h2>
-          <p className="text-xs text-muted/40 normal-case mb-5">
-            No push notifications during these hours (email is unaffected)
-          </p>
-          <div className="flex items-center gap-3">
-            <PixelSelect
-              value={prefs.quiet_hours_start === null ? "" : String(prefs.quiet_hours_start)}
-              onChange={(v) => save({ quiet_hours_start: v === "" ? null : Number(v) })}
-              disabled={emailOff}
-              ariaLabel="Quiet hours start"
-              className="w-28"
-              options={[
-                { value: "", label: "Off" },
-                ...Array.from({ length: 24 }, (_, i) => ({
-                  value: String(i),
-                  label: `${String(i).padStart(2, "0")}:00`,
-                })),
-              ]}
-            />
-            <span className="text-xs text-muted">to</span>
-            <PixelSelect
-              value={prefs.quiet_hours_end === null ? "" : String(prefs.quiet_hours_end)}
-              onChange={(v) => save({ quiet_hours_end: v === "" ? null : Number(v) })}
-              disabled={emailOff}
-              ariaLabel="Quiet hours end"
-              className="w-28"
-              options={[
-                { value: "", label: "Off" },
-                ...Array.from({ length: 24 }, (_, i) => ({
-                  value: String(i),
-                  label: `${String(i).padStart(2, "0")}:00`,
-                })),
-              ]}
-            />
-            <span className="text-xs text-muted/40 normal-case">UTC</span>
-          </div>
-        </div>
-
         {/* Footer note */}
         <p className="mt-6 text-xs text-muted/30 normal-case text-center">
-          Transactional emails (purchase receipts, hiring confirmations) are always sent.
+          Receipts and account emails always arrive.
           <br />
-          You can also unsubscribe from the link at the bottom of any email.
+          Every other email has a one-click unsubscribe for its own category.
         </p>
       </div>
     </main>

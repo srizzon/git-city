@@ -1,37 +1,60 @@
 import { sendNotificationAsync } from "../notifications";
-import { buildButton, escapeHtml } from "../email-template";
+import { EMAIL_BASE_URL, button, heading, paragraph, trackedUrl } from "../email/components";
+import { renderLayout, renderText, type EmailLinks } from "../email/layout";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+export interface JobFilledData {
+  listingTitle: string;
+  companyName: string;
+}
+
+function filledHeader(d: JobFilledData) {
+  return {
+    subject: `Position filled: ${d.listingTitle}`,
+    preheader: `${d.companyName} filled the role. There are more open on the job board.`,
+  };
+}
+
+export function renderJobFilledEmail(d: JobFilledData, links: EmailLinks) {
+  const { subject, preheader } = filledHeader(d);
+  const jobsUrl = trackedUrl("/jobs", "job_filled");
+  const intro = `${d.companyName} has filled the ${d.listingTitle} role you applied to, so it's no longer taking applications. Thanks for putting yourself forward.`;
+  const next = "New roles land on the job board every week, and your weekly job matches pick out the ones that fit your skills.";
+  const reason = "You're getting this because you applied to this role on Git City.";
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [heading("This role has been filled"), paragraph(intro), paragraph(next), button("Browse open jobs", jobsUrl)].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: ["This role has been filled", "", intro, "", next, "", `Browse open jobs: ${jobsUrl}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
 
 /**
- * Notification sent to developers who applied when a job gets filled.
- * Low priority, batches into digest. Skips the hired developer.
+ * Sent to developers who applied when a company marks the listing filled.
+ * Low priority, batches into a digest. Skips the hired developer.
  */
-export function sendJobFilledNotification(
-  devId: number,
-  listingTitle: string,
-  companyName: string,
-) {
+export function sendJobFilledNotification(devId: number, listingTitle: string, companyName: string) {
+  const data: JobFilledData = { listingTitle, companyName };
+  const { subject, preheader } = filledHeader(data);
+
   sendNotificationAsync({
     type: "job_filled",
     category: "jobs_updates",
     developerId: devId,
     dedupKey: `job_filled:${devId}:${listingTitle}`,
-    title: `Position filled: ${listingTitle}`,
-    body: `The ${listingTitle} role at ${companyName} has been filled.`,
-    html: `
-      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#999999; letter-spacing:1px; text-transform:uppercase;">Position update</p>
-      <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">Position filled</h1>
-      <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-        The <strong>${escapeHtml(listingTitle)}</strong> role at <strong>${escapeHtml(companyName)}</strong> has been filled.
-      </p>
-      <p style="margin:0 0 24px; font-size:14px; color:#555555; line-height:1.6;">
-        Keep exploring! There are more opportunities waiting for you.
-      </p>
-      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 24px;" />
-      ${buildButton("Browse Jobs", `${BASE_URL}/jobs`)}
-    `,
-    actionUrl: `${BASE_URL}/jobs`,
+    title: subject,
+    body: preheader,
+    render: (links) => renderJobFilledEmail(data, links),
+    actionUrl: `${EMAIL_BASE_URL}/jobs`,
     priority: "low",
     channels: ["email"],
     batchKey: `job_updates:${devId}`,

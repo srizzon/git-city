@@ -149,7 +149,11 @@ export function LandmarkForm({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Send failed");
-      addToast("success", `Sent to ${(json.sentTo ?? []).length} recipient(s)`);
+      const failed: string[] = json.failed ?? [];
+      addToast(
+        failed.length ? "error" : "success",
+        `Sent to ${(json.sentTo ?? []).length} recipient(s)${failed.length ? `, failed: ${failed.join(", ")}` : ""}`,
+      );
     } catch (e) {
       addToast("error", e instanceof Error ? e.message : String(e));
     }

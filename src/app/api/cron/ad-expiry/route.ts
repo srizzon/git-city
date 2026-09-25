@@ -18,25 +18,27 @@ export async function GET(request: NextRequest) {
   const sb = getSupabaseAdmin();
   const results = { expiring: 0, expired: 0, followup_7d: 0, followup_30d: 0, errors: 0 };
 
-  // Helper: get ad stats (impressions, clicks, unique countries)
+  // Helper: get ad stats (impressions, clicks, link clicks, unique countries).
+  // CTR is link clicks over impressions, the same as the advertiser dashboard.
   async function getAdStats(adId: string): Promise<AdStats> {
-    const [impRes, clickRes, countryRes] = await Promise.all([
+    const countEvents = (eventType: string) =>
       sb
         .from("sky_ad_events")
         .select("id", { count: "exact", head: true })
         .eq("ad_id", adId)
-        .eq("event_type", "impression"),
-      sb
-        .from("sky_ad_events")
-        .select("id", { count: "exact", head: true })
-        .eq("ad_id", adId)
-        .in("event_type", ["click", "cta_click"]),
+        .eq("event_type", eventType);
+
+    const [impRes, clickRes, linkRes, countryRes] = await Promise.all([
+      countEvents("impression"),
+      countEvents("click"),
+      countEvents("cta_click"),
       sb.rpc("count_ad_countries", { p_ad_id: adId }),
     ]);
 
     return {
       impressions: impRes.count ?? 0,
       clicks: clickRes.count ?? 0,
+      linkClicks: linkRes.count ?? 0,
       countries: typeof countryRes.data === "number" ? countryRes.data : undefined,
     };
   }
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     const { data: expiringAds } = await sb
       .from("sky_ads")
-      .select("id, brand, purchaser_email, tracking_token, ends_at, expiry_notified")
+      .select("id, brand, purchaser_email, ends_at, expiry_notified")
       .eq("active", true)
       .not("ends_at", "is", null)
       .not("purchaser_email", "is", null)
@@ -79,17 +81,9 @@ export async function GET(request: NextRequest) {
         try {
           const endsAt = new Date(ad.ends_at);
           const daysLeft = Math.max(1, Math.ceil((endsAt.getTime() - now.getTime()) / 86_400_000));
-          const trackingUrl = `https://thegitcity.com/advertise/track/${ad.tracking_token}`;
-
           const stats = await getAdStats(ad.id);
 
-          await sendAdExpiringEmail(
-            ad.purchaser_email,
-            ad.brand ?? "Your Ad",
-            daysLeft,
-            trackingUrl,
-            stats,
-          );
+          await sendAdExpiringEmail(ad.purchaser_email, ad.brand ?? null, daysLeft, stats);
 
           await sb
             .from("sky_ads")
@@ -108,30 +102,30 @@ export async function GET(request: NextRequest) {
     results.errors++;
   }
 
+  // Expired ads are flipped to active=false by pg_cron every 15 min
+  // (deactivate_expired_ads), so steps 2-4 must not filter on active. Each step
+  // only looks at a recent ends_at window so old ads never get a late email.
+
   // ── 2. Ads already expired (send final stats) ──
   try {
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+    // expiry_notified is NULL (never notified) or "expiring"; .neq() alone drops NULLs.
     const { data: expiredAds } = await sb
       .from("sky_ads")
       .select("id, brand, purchaser_email, ends_at, expiry_notified")
-      .eq("active", true)
       .not("ends_at", "is", null)
       .not("purchaser_email", "is", null)
       .lt("ends_at", now.toISOString())
-      .neq("expiry_notified", "expired")
-      .neq("expiry_notified", "followup_7d")
-      .neq("expiry_notified", "followup_30d");
+      .gte("ends_at", threeDaysAgo.toISOString())
+      .or("expiry_notified.is.null,expiry_notified.eq.expiring");
 
     if (expiredAds) {
       for (const ad of expiredAds) {
         try {
           const stats = await getAdStats(ad.id);
 
-          await sendAdExpiredEmail(
-            ad.purchaser_email,
-            ad.brand ?? "Your Ad",
-            stats,
-            "https://thegitcity.com/advertise",
-          );
+          await sendAdExpiredEmail(ad.purchaser_email, ad.brand ?? null, stats);
 
           await sb
             .from("sky_ads")
@@ -153,15 +147,16 @@ export async function GET(request: NextRequest) {
   // ── 3. 7-day follow-up ──
   try {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
 
     const { data: followupAds } = await sb
       .from("sky_ads")
       .select("id, brand, purchaser_email, ends_at")
-      .eq("active", true)
       .eq("expiry_notified", "expired")
       .not("ends_at", "is", null)
       .not("purchaser_email", "is", null)
-      .lt("ends_at", sevenDaysAgo.toISOString());
+      .lt("ends_at", sevenDaysAgo.toISOString())
+      .gte("ends_at", tenDaysAgo.toISOString());
 
     if (followupAds) {
       const cityDevs = await getCityDevs();
@@ -172,7 +167,7 @@ export async function GET(request: NextRequest) {
 
           await sendAdFollowup7dEmail(
             ad.purchaser_email,
-            ad.brand ?? "Your Ad",
+            ad.brand ?? null,
             stats,
             cityDevs,
           );
@@ -197,15 +192,16 @@ export async function GET(request: NextRequest) {
   // ── 4. 30-day win-back ──
   try {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const thirtyThreeDaysAgo = new Date(now.getTime() - 33 * 24 * 60 * 60 * 1000);
 
     const { data: winbackAds } = await sb
       .from("sky_ads")
       .select("id, brand, purchaser_email, ends_at")
-      .eq("active", true)
       .eq("expiry_notified", "followup_7d")
       .not("ends_at", "is", null)
       .not("purchaser_email", "is", null)
-      .lt("ends_at", thirtyDaysAgo.toISOString());
+      .lt("ends_at", thirtyDaysAgo.toISOString())
+      .gte("ends_at", thirtyThreeDaysAgo.toISOString());
 
     if (winbackAds) {
       const cityDevs = await getCityDevs();
@@ -217,7 +213,7 @@ export async function GET(request: NextRequest) {
 
           await sendAdFollowup30dEmail(
             ad.purchaser_email,
-            ad.brand ?? "Your Ad",
+            ad.brand ?? null,
             stats,
             cityDevs,
             cityDevsWhenEnded,

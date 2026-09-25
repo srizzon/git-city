@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
 import { getSupabaseAdmin } from "./supabase";
-import { getResend } from "./resend";
+import { sendEmail, toResendTag } from "./resend";
+import { mapWithConcurrency } from "./concurrency";
 import { getDeveloperEmail, isRecentlyActive } from "./notification-helpers";
-import { wrapInBaseTemplate } from "./email-template";
+import { renderLayout, renderText, type EmailLinks } from "./email/layout";
+import { bulletList, button, heading, paragraph, trackedUrl } from "./email/components";
 
 // ── Types ──
 
@@ -31,7 +33,7 @@ export interface NotificationPayload {
   // Content (adapts per channel)
   title: string;                         // email subject, push title
   body: string;                          // push body, email preview text
-  html?: string;                         // rich email body (wrapped in base template)
+  render?: (links: EmailLinks) => { html: string; text: string }; // full email; without it the body is sent as one paragraph
   actionUrl?: string;                    // CTA link / deep link
   iconUrl?: string;                      // push notification icon
   data?: Record<string, unknown>;        // structured data for push/in_app deep links
@@ -68,11 +70,18 @@ const HMAC_SECRET = (() => {
 })();
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
-const RATE_LIMITS: Record<Channel, { perHour: number; perDay: number }> = {
-  email: { perHour: 20, perDay: 50 },
-  push: { perHour: 20, perDay: 50 },
-  in_app: { perHour: 200, perDay: 1000 },
+// Non-transactional caps. Over the cap, batchable events (raids, emblems) roll
+// into the next digest instead of being dropped.
+const RATE_LIMITS: Record<Channel, { perHour: number; perDay: number; perWeek: number }> = {
+  email: { perHour: 2, perDay: 3, perWeek: 8 },
+  push: { perHour: 20, perDay: 50, perWeek: 200 },
+  in_app: { perHour: 200, perDay: 1000, perWeek: 5000 },
 };
+
+// Recaps and marketing stop for anyone idle this long (sunset). Social
+// triggers like raid alerts still go out: they're the best way back in.
+const SUNSET_DAYS = 90;
+const SUNSET_CATEGORIES: NotificationCategory[] = ["digest", "marketing"];
 
 // Categories exempt from rate limiting (always send)
 const RATE_LIMIT_EXEMPT: NotificationCategory[] = ["transactional"];
@@ -113,6 +122,26 @@ export async function sendNotification(payload: NotificationPayload): Promise<Se
   return results;
 }
 
+/** Collapse a sendNotification result into one outcome, for cron counters. */
+export function sendOutcome(results: SendResult[]): "sent" | "skipped" | "error" {
+  if (results.some((r) => r.success)) return "sent";
+  if (results.some((r) => r.skipped === "resend_error" || r.skipped === "send_error")) return "error";
+  return "skipped";
+}
+
+/** Add settled sendNotification calls to a cron's { sent, skipped, errors } counters. */
+export function tallySends(
+  settled: PromiseSettledResult<SendResult[]>[],
+  counters: { sent: number; skipped: number; errors: number },
+): void {
+  for (const r of settled) {
+    const outcome = r.status === "fulfilled" ? sendOutcome(r.value) : "error";
+    if (outcome === "sent") counters.sent++;
+    else if (outcome === "error") counters.errors++;
+    else counters.skipped++;
+  }
+}
+
 /**
  * Fire-and-forget wrapper. Use this in API routes so notifications
  * never block the response. Errors are logged, not thrown.
@@ -127,12 +156,12 @@ export function sendNotificationAsync(payload: NotificationPayload): void {
  * Flush all closed batches. Called by cron job.
  * Returns number of batches flushed.
  */
-export async function flushPendingBatches(): Promise<number> {
+export async function flushPendingBatches(deadline = Infinity): Promise<number> {
   const sb = getSupabaseAdmin();
 
   const { data: batches } = await sb
     .from("notification_batches")
-    .select("id, batch_key, developer_id, notification_type, channel")
+    .select("id, batch_key, developer_id, notification_type, channel, closes_at")
     .is("processed_at", null)
     .lte("closes_at", new Date().toISOString())
     .order("closes_at", { ascending: true })
@@ -142,7 +171,12 @@ export async function flushPendingBatches(): Promise<number> {
 
   let flushed = 0;
 
-  for (const batch of batches) {
+  // Processed batches are deleted (items cascade) so the next batch for the
+  // same key can be created under UNIQUE(batch_key, channel).
+  const removeBatch = (id: number) => sb.from("notification_batches").delete().eq("id", id);
+
+  await mapWithConcurrency(batches, 4, async (batch) => {
+    if (Date.now() > deadline) return;
     try {
       const { data: items } = await sb
         .from("notification_batch_items")
@@ -151,30 +185,26 @@ export async function flushPendingBatches(): Promise<number> {
         .order("created_at", { ascending: true });
 
       if (!items || items.length === 0) {
-        // Empty batch, just mark processed
-        await sb
-          .from("notification_batches")
-          .update({ processed_at: new Date().toISOString() })
-          .eq("id", batch.id);
-        continue;
+        await removeBatch(batch.id);
+        return;
       }
 
       // Build digest notification from batch items
       const digestPayload = buildDigestFromBatch(batch, items);
       if (digestPayload) {
-        await sendNotification(digestPayload);
+        const results = await sendNotification(digestPayload);
+        // Keep a batch whose send errored for the next flush, for up to a day.
+        const errored = results.some((r) => r.skipped === "resend_error" || r.skipped === "send_error");
+        const stale = Date.now() - Date.parse(batch.closes_at) > 86_400_000;
+        if (errored && !stale) return;
       }
 
-      await sb
-        .from("notification_batches")
-        .update({ processed_at: new Date().toISOString() })
-        .eq("id", batch.id);
-
+      await removeBatch(batch.id);
       flushed++;
     } catch (err) {
       console.error(`[notify:batch] Failed to flush batch ${batch.id}:`, err);
     }
-  }
+  });
 
   return flushed;
 }
@@ -204,13 +234,21 @@ async function processChannel(
     }
   }
 
-  // 3. Dedup check
+  // Sunset: no recaps or marketing for long-idle players
+  if (!payload.forceSend && SUNSET_CATEGORIES.includes(payload.category)) {
+    if (!(await isRecentlyActive(payload.developerId, SUNSET_DAYS * 24 * 60))) {
+      return { channel, success: false, skipped: "sunset" };
+    }
+  }
+
+  // 3. Dedup check (a failed attempt doesn't count, so it can be retried)
   if (payload.dedupKey) {
     const { data: existing } = await sb
       .from("notification_log")
       .select("id")
       .eq("dedup_key", payload.dedupKey)
       .eq("channel", channel)
+      .neq("status", "failed")
       .maybeSingle();
 
     if (existing) {
@@ -294,21 +332,46 @@ async function addToBatch(
       .single();
 
     if (error) {
-      // Race condition: another process created the batch. Try to find it.
-      const { data: raceBatch } = await sb
+      // UNIQUE(batch_key, channel): either another process created the batch,
+      // a closed batch is waiting for the flush cron (join it, it goes out on
+      // the next flush), or a legacy processed row is still holding the key.
+      const { data: pendingBatch } = await sb
         .from("notification_batches")
         .select("id")
         .eq("batch_key", batchKey)
         .eq("channel", channel)
         .is("processed_at", null)
-        .gt("closes_at", new Date().toISOString())
         .maybeSingle();
 
-      if (!raceBatch) {
-        console.error(`[notify:batch] Failed to create/find batch for ${batchKey}:`, error);
-        return { channel, success: false, skipped: "batch_create_failed" };
+      if (pendingBatch) {
+        batchId = pendingBatch.id;
+      } else {
+        // Processed batches are deleted on flush now; clear an old one and retry.
+        await sb
+          .from("notification_batches")
+          .delete()
+          .eq("batch_key", batchKey)
+          .eq("channel", channel)
+          .not("processed_at", "is", null);
+
+        const { data: retryBatch, error: retryError } = await sb
+          .from("notification_batches")
+          .insert({
+            batch_key: batchKey,
+            developer_id: payload.developerId,
+            notification_type: payload.type,
+            channel,
+            closes_at: closesAt,
+          })
+          .select("id")
+          .single();
+
+        if (retryError || !retryBatch) {
+          console.error(`[notify:batch] Failed to create/find batch for ${batchKey}:`, retryError ?? error);
+          return { channel, success: false, skipped: "batch_create_failed" };
+        }
+        batchId = retryBatch.id;
       }
-      batchId = raceBatch.id;
     } else {
       batchId = newBatch.id;
     }
@@ -333,57 +396,134 @@ function buildDigestFromBatch(
   batch: { id: number; developer_id: number; notification_type: string; channel: string },
   items: { event_data: Record<string, unknown>; created_at: string }[],
 ): NotificationPayload | null {
-  const count = items.length;
-  if (count === 0) return null;
+  if (items.length === 0) return null;
 
-  // Build a summary based on notification type
-  const typeMap: Record<string, { title: string; bodyFn: (n: number) => string }> = {
-    raid_alert: {
-      title: `Your building was raided ${count} time${count > 1 ? "s" : ""}!`,
-      bodyFn: (n) => `${n} raid${n > 1 ? "s" : ""} while you were away.`,
-    },
-    achievement_unlocked: {
-      title: `${count} new achievement${count > 1 ? "s" : ""} unlocked!`,
-      bodyFn: (n) => `You unlocked ${n} achievement${n > 1 ? "s" : ""}.`,
-    },
-    kudos_received: {
-      title: `You received ${count} kudos!`,
-      bodyFn: (n) => `${n} developer${n > 1 ? "s" : ""} gave you kudos.`,
-    },
-  };
-
-  const template = typeMap[batch.notification_type] ?? {
-    title: `${count} new notification${count > 1 ? "s" : ""}`,
-    bodyFn: (n: number) => `You have ${n} new notification${n > 1 ? "s" : ""}.`,
-  };
-
-  // Build HTML listing individual events
-  const eventListHtml = items
-    .slice(0, 10) // Cap at 10 items in digest
-    .map((item) => {
-      const d = item.event_data as Record<string, string>;
-      return `<li style="margin-bottom: 4px; color: #f0f0f0;">${d.body || d.title || "New event"}</li>`;
-    })
-    .join("");
-
-  const remainingText = count > 10 ? `<p style="color: #666; font-size: 13px;">...and ${count - 10} more</p>` : "";
+  const eventData = items.map((i) => i.event_data);
+  const { subject, preheader } = digestContent(batch.notification_type, eventData);
 
   return {
     type: `${batch.notification_type}_digest`,
-    category: "digest",
+    // Same category as the events it bundles, so the raid/jobs toggles (not
+    // the weekly recap one) control it and the recap sunset doesn't stop it.
+    category: batch.notification_type === "job_filled" ? "jobs_updates" : "social",
     developerId: batch.developer_id,
     dedupKey: `digest:${batch.id}`,
-    title: template.title,
-    body: template.bodyFn(count),
-    html: `
-      <p style="color: #f0f0f0; font-size: 15px;">${template.bodyFn(count)}</p>
-      <ul style="padding-left: 20px; margin: 16px 0;">${eventListHtml}</ul>
-      ${remainingText}
-    `,
+    title: subject,
+    body: preheader,
+    render: (links) => renderDigestEmail(batch.notification_type, eventData, links),
     actionUrl: `${BASE_URL}`,
     priority: "high", // Digests themselves are never re-batched
     channels: [batch.channel as Channel],
   };
+}
+
+const DIGEST_MAX_ROWS = 10;
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** Subject, rows and CTA for a batched digest, per notification type. */
+function digestContent(type: string, events: Record<string, unknown>[]) {
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const num = (v: unknown) => (typeof v === "number" ? v : 0);
+  const firstUrl = events.map((e) => str(e.action_url)).find(Boolean) || BASE_URL;
+  const count = events.length;
+
+  if (type === "raid_alert") {
+    const tagged = events.filter((e) => e.success === true);
+    const held = count - tagged.length;
+    const lastTagger = str(tagged[tagged.length - 1]?.attacker);
+    return {
+      subject: count === 1 ? "Your building was raided" : `Your building was raided ${count} times`,
+      preheader: tagged.length === 0
+        ? `You held off ${count === 1 ? "the attack" : `all ${count}`}.`
+        : held === 0
+          ? `${count === 1 ? "It" : "All of them"} got through.`
+          : `${plural(tagged.length, "raid")} got through, you held off ${held}.`,
+      title: ["", plural(count, "raid"), " on your building"] as [string, string, string],
+      rows: events.map((e) => {
+        const a = num(e.attack_score);
+        const d = num(e.defense_score);
+        return e.success === true
+          ? { lead: `@${str(e.attacker)}`, text: `tagged your building, attack ${a} vs your defense ${d}.` }
+          : { lead: `@${str(e.attacker)}`, text: `was held off, your defense ${d} vs attack ${a}.` };
+      }),
+      cta: lastTagger
+        ? { text: `Raid @${lastTagger} back`, url: `${BASE_URL}/?user=${encodeURIComponent(lastTagger)}` }
+        : { text: "Open Git City", url: BASE_URL },
+    };
+  }
+
+  if (type === "emblem_earned") {
+    const emblems = events.flatMap((e) =>
+      Array.isArray(e.emblems) ? (e.emblems as { name?: unknown; tier?: unknown }[]) : [],
+    );
+    const tier = (t: unknown) => (str(t) ? `${str(t).charAt(0).toUpperCase()}${str(t).slice(1)} emblem.` : "Emblem.");
+    return {
+      subject: `You earned ${plural(emblems.length, "emblem")}`,
+      preheader: `${emblems.length === 1 ? "It's" : "They're"} in your trophy case now.`,
+      title: ["You earned", plural(emblems.length, "emblem"), ""] as [string, string, string],
+      rows: emblems.map((e) => ({ lead: `${str(e.name)}.`, text: tier(e.tier) })),
+      cta: { text: "See your trophy case", url: firstUrl },
+    };
+  }
+
+  if (type === "job_filled") {
+    return {
+      subject: count === 1 ? "A role you applied to was filled" : `${count} roles you applied to were filled`,
+      preheader: `${count === 1 ? "It's" : "They're"} no longer open. There are more roles on the job board.`,
+      title: ["", plural(count, "role"), ` you applied to ${count === 1 ? "was" : "were"} filled`] as [string, string, string],
+      rows: events.map((e) => ({ lead: str(e.listing) || str(e.title), text: str(e.company) ? `at ${str(e.company)}.` : "" })),
+      cta: { text: "Browse jobs", url: `${BASE_URL}/jobs` },
+    };
+  }
+
+  return {
+    subject: `${plural(count, "new notification")}`,
+    preheader: "Here's what happened in Git City.",
+    title: ["", plural(count, "new notification"), ""] as [string, string, string],
+    rows: events.map((e) => ({ lead: str(e.title) || "New event", text: str(e.body) })),
+    cta: { text: "Open Git City", url: firstUrl },
+  };
+}
+
+/** Batched raid / emblem / job digest in the email layout. */
+export function renderDigestEmail(type: string, events: Record<string, unknown>[], links: EmailLinks) {
+  const { subject, preheader, title, rows, cta } = digestContent(type, events);
+  const url = trackedUrl(cta.url, `${type}_digest`);
+  const shown = rows.slice(0, DIGEST_MAX_ROWS);
+  const more = rows.length > DIGEST_MAX_ROWS ? `And ${rows.length - DIGEST_MAX_ROWS} more.` : null;
+  const reason = "You're getting this digest because several notifications arrived close together on Git City.";
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading(title[0], title[1], title[2]),
+      paragraph(preheader),
+      bulletList(shown),
+      more ? paragraph(more, { muted: true }) : "",
+      button(cta.text, url),
+    ].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: [
+      title.join(" ").replace(/\s+/g, " ").trim(),
+      "",
+      preheader,
+      "",
+      ...shown.map((r) => `- ${r.lead} ${r.text}`.trimEnd()),
+      ...(more ? [more] : []),
+      "",
+      `${cta.text}: ${url}`,
+    ],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
 }
 
 // ── Email Dispatch ──
@@ -409,33 +549,54 @@ async function dispatchEmail(
     return { channel: "email", success: false, skipped: `suppressed:${suppressed.reason}` };
   }
 
-  // Build unsubscribe URL (transactional/forceSend still get one for CAN-SPAM)
-  const unsubCategory = payload.forceSend ? "all" : payload.category;
-  const unsubUrl = buildUnsubscribeUrl(payload.developerId, unsubCategory);
+  // Receipts and account mail (transactional or forceSend) carry no
+  // unsubscribe: it used to switch off "transactional" or all email, with no
+  // way back in settings. They link to email settings instead.
+  const isTransactional = payload.forceSend || payload.category === "transactional";
+  const unsubUrl = isTransactional ? undefined : buildUnsubscribeUrl(payload.developerId, payload.category);
 
   // Build final HTML
-  const bodyHtml = payload.html || `<p>${escapeBasicHtml(payload.body)}</p>`;
-  const fullHtml = wrapInBaseTemplate(bodyHtml, unsubUrl);
+  let fullHtml: string;
+  let text = payload.body;
+  if (payload.render) {
+    const rendered = payload.render({ unsubscribeUrl: unsubUrl });
+    fullHtml = rendered.html;
+    text = rendered.text;
+  } else {
+    const reason = "You're getting this because you have a Git City account.";
+    const links = { unsubscribeUrl: unsubUrl };
+    fullHtml = renderLayout({ title: payload.title, preheader: payload.body, body: paragraph(payload.body), reason, links });
+    text = renderText({ lines: [payload.body], reason, links });
+  }
 
-  // Send via Resend
-  const resend = getResend();
-  const { data: sent, error } = await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: payload.title,
-    html: fullHtml,
-    text: payload.body,
-    headers: {
-      "List-Unsubscribe": `<${unsubUrl}>`,
-      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  // Send via Resend (throttled, retried on 429, idempotent per dedup key)
+  const { data: sent, error } = await sendEmail(
+    {
+      from: FROM,
+      to: email,
+      subject: payload.title,
+      html: fullHtml,
+      text,
+      headers: unsubUrl
+        ? {
+            "List-Unsubscribe": `<${unsubUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          }
+        : undefined,
+      tags: [
+        { name: "type", value: toResendTag(payload.type) },
+        { name: "category", value: toResendTag(payload.category) },
+      ],
     },
-  });
+    payload.dedupKey ? { idempotencyKey: payload.dedupKey.slice(0, 256) } : undefined,
+  );
 
   const status = error ? "failed" : "sent";
   const providerId = sent?.id;
 
-  // Log to notification_log
-  await sb.from("notification_log").insert({
+  // Log to notification_log. Upsert because a retry reuses the dedup key of
+  // the failed row (UNIQUE(dedup_key, channel)).
+  await sb.from("notification_log").upsert({
     developer_id: payload.developerId,
     channel: "email",
     notification_type: payload.type,
@@ -447,7 +608,8 @@ async function dispatchEmail(
     failure_reason: error ? String(error.message ?? error) : null,
     metadata: { body_preview: payload.body.slice(0, 200) },
     dedup_key: payload.dedupKey || null,
-  });
+    created_at: new Date().toISOString(),
+  }, { onConflict: "dedup_key,channel" });
 
   if (error) {
     console.error(`[notify:email] Resend error for ${email}:`, error);
@@ -630,7 +792,7 @@ async function checkRateLimit(
     .select("id", { count: "exact", head: true })
     .eq("developer_id", devId)
     .eq("channel", channel)
-    .eq("status", "sent")
+    .neq("status", "failed") // the webhook rewrites "sent" to delivered/bounced/...
     .gte("created_at", oneHourAgo);
 
   if ((hourCount ?? 0) >= limits.perHour) return "hourly";
@@ -641,10 +803,21 @@ async function checkRateLimit(
     .select("id", { count: "exact", head: true })
     .eq("developer_id", devId)
     .eq("channel", channel)
-    .eq("status", "sent")
+    .neq("status", "failed")
     .gte("created_at", oneDayAgo);
 
   if ((dayCount ?? 0) >= limits.perDay) return "daily";
+
+  const oneWeekAgo = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+  const { count: weekCount } = await sb
+    .from("notification_log")
+    .select("id", { count: "exact", head: true })
+    .eq("developer_id", devId)
+    .eq("channel", channel)
+    .neq("status", "failed")
+    .gte("created_at", oneWeekAgo);
+
+  if ((weekCount ?? 0) >= limits.perWeek) return "weekly";
 
   return null;
 }
@@ -707,13 +880,4 @@ export function verifyHmacToken(devId: number, category: string, token: string):
   const expected = generateHmacToken(devId, category);
   if (expected.length !== token.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token));
-}
-
-// ── Helpers ──
-
-function escapeBasicHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }

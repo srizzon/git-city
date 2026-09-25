@@ -1,11 +1,64 @@
 import { sendNotificationAsync } from "../notifications";
-import { buildButton, escapeHtml } from "../email-template";
+import { EMAIL_BASE_URL, button, callout, detailRows, heading, paragraph, trackedUrl } from "../email/components";
+import { renderLayout, renderText, type EmailLinks } from "../email/layout";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+export interface JobApplicationConfirmedData {
+  listingTitle: string;
+  companyName: string;
+  hasProfile: boolean;
+}
 
-/**
- * Confirmation email sent to the developer after they apply to a job.
- */
+function confirmedHeader(d: JobApplicationConfirmedData) {
+  return {
+    subject: `Application sent to ${d.companyName}`,
+    preheader: `${d.listingTitle}. They now have your career profile and contact details.`,
+  };
+}
+
+export function renderJobApplicationConfirmedEmail(d: JobApplicationConfirmedData, links: EmailLinks) {
+  const { subject, preheader } = confirmedHeader(d);
+  const applicationsUrl = trackedUrl("/jobs/my-applications", "job_application_confirmed");
+  const intro = `${d.companyName} now has your career profile, including your contact details. If they want to move forward, they'll reach out to you directly.`;
+  const nudge = d.hasProfile ? null : "Companies read your career profile first. Complete it to stand out.";
+  const reason = "You're getting this because you applied to a job on Git City.";
+  const rows = [
+    { label: "Role", value: d.listingTitle },
+    { label: "Company", value: d.companyName },
+  ];
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading("Your application is in"),
+      detailRows(rows),
+      paragraph(intro),
+      nudge ? callout(nudge) : "",
+      button("View my applications", applicationsUrl),
+    ].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: [
+      "Your application is in",
+      "",
+      ...rows.map((r) => `${r.label}: ${r.value}`),
+      "",
+      intro,
+      ...(nudge ? ["", nudge] : []),
+      "",
+      `View my applications: ${applicationsUrl}`,
+    ],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** Confirmation to the developer after they apply to a job. */
 export function sendJobApplicationConfirmedNotification(
   devId: number,
   login: string,
@@ -14,33 +67,18 @@ export function sendJobApplicationConfirmedNotification(
   listingId: string,
   hasProfile: boolean,
 ) {
-  const profileNudge = hasProfile
-    ? ""
-    : `
-      <div style="background-color:#fef3c7; border-left:4px solid #f59e0b; padding:12px 16px; margin:0 0 24px; border-radius:0 4px 4px 0;">
-        <p style="margin:0; font-size:13px; color:#92400e; font-family:Helvetica,Arial,sans-serif;">
-          <strong>Tip:</strong> Companies can see your career profile. <a href="${BASE_URL}/hire/edit" style="color:#92400e; text-decoration:underline;">Complete it</a> to stand out.
-        </p>
-      </div>`;
+  const data: JobApplicationConfirmedData = { listingTitle, companyName, hasProfile };
+  const { subject, preheader } = confirmedHeader(data);
 
   sendNotificationAsync({
     type: "job_application_confirmed",
     category: "transactional",
     developerId: devId,
     dedupKey: `job_applied:${devId}:${listingId}`,
-    title: `Application sent: ${listingTitle}`,
-    body: `Your application to ${listingTitle} at ${companyName} was sent. The company will be notified.`,
-    html: `
-      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">Application sent</p>
-      <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${escapeHtml(listingTitle)}</h1>
-      <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-        Your application to <strong>${escapeHtml(companyName)}</strong> was sent. The company will be notified about your profile.
-      </p>
-      ${profileNudge}
-      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 24px;" />
-      ${buildButton("View My Applications", `${BASE_URL}/jobs/my-applications`)}
-    `,
-    actionUrl: `${BASE_URL}/jobs/my-applications`,
+    title: subject,
+    body: preheader,
+    render: (links) => renderJobApplicationConfirmedEmail(data, links),
+    actionUrl: `${EMAIL_BASE_URL}/jobs/my-applications`,
     priority: "high",
     forceSend: true,
     channels: ["email"],

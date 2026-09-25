@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { createMagicLinkSession } from "@/lib/advertiser-auth";
-import { wrapInBaseTemplate, buildButton } from "@/lib/email-template";
+import { renderAdvertiserSignInEmail } from "@/lib/ad-emails";
 import { rateLimit } from "@/lib/rate-limit";
 
 function getBaseUrl(): string {
@@ -72,22 +72,19 @@ export async function POST(request: NextRequest) {
     verifyUrl.searchParams.set("redirect", body.redirect);
   }
 
-  const resend = getResend();
-  await resend.emails.send({
+  const { subject, html, text } = renderAdvertiserSignInEmail(verifyUrl.toString());
+  const { error: sendError } = await sendEmail({
     from: "Git City <noreply@thegitcity.com>",
     to: email,
-    subject: "Sign in to Git City",
-    html: wrapInBaseTemplate(`
-      <h2 style="margin-top: 0; font-family: 'Silkscreen', monospace; color: #111111;">Sign in to Git City</h2>
-      <p style="color: #555555; font-family: Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6;">
-        Click the button below to sign in. This link expires in 15 minutes.
-      </p>
-      ${buildButton("Sign In", verifyUrl.toString())}
-      <p style="margin-top: 24px; color: #999999; font-family: Helvetica, Arial, sans-serif; font-size: 12px;">
-        If you didn't request this, you can safely ignore this email.
-      </p>
-    `),
+    subject,
+    html,
+    text,
   });
+
+  if (sendError) {
+    console.error("[ads-magic-link] Resend error:", sendError);
+    return NextResponse.json({ error: "Failed to send the sign-in email. Try again." }, { status: 502 });
+  }
 
   return NextResponse.json({ ok: true });
 }

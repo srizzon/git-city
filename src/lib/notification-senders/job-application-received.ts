@@ -1,16 +1,17 @@
 import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
-import { buildButton, escapeHtml } from "@/lib/email-template";
+import { COMPANY_LINKS, formatSalary, linkRows, plural } from "@/lib/jobs/email-blocks";
+import { SENIORITY_LABELS } from "@/lib/jobs/constants";
+import { EMAIL_BASE_URL, bulletList, button, callout, heading, label, paragraph, trackedUrl } from "@/lib/email/components";
+import { renderLayout, renderText, type EmailLinks } from "@/lib/email/layout";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
-
-interface ApplicationInfo {
+export interface ApplicationInfo {
   developerLogin: string;
   hasProfile: boolean;
   firstName?: string | null;
   lastName?: string | null;
   email?: string | null;
   phone?: string | null;
-  skills?: string[];
+  skills?: string[] | null;
   seniority?: string | null;
   salaryMin?: number | null;
   salaryMax?: number | null;
@@ -18,156 +19,145 @@ interface ApplicationInfo {
   bio?: string | null;
   resumeUrl?: string | null;
   linkedinUrl?: string | null;
-  qualityScore?: number;
-  badges?: string[];
 }
 
-/**
- * Email sent to the company when a developer applies natively.
- * Includes full profile contact data.
- */
-export async function sendJobApplicationReceivedEmail(
-  email: string,
-  listingTitle: string,
-  listingId: string,
-  application: ApplicationInfo,
-) {
-  const fullName = [application.firstName, application.lastName].filter(Boolean).join(" ");
-  const displayName = fullName || `@${application.developerLogin}`;
-
-  const profileBadge = application.hasProfile
-    ? `<span style="display:inline-block; background:#ecfdf5; color:#059669; font-size:11px; padding:2px 8px; border-radius:3px; font-weight:600;">Has profile</span>`
-    : `<span style="display:inline-block; background:#fef3c7; color:#92400e; font-size:11px; padding:2px 8px; border-radius:3px; font-weight:600;">No profile</span>`;
-
-  const scoreLine = application.qualityScore != null
-    ? `<p style="margin:0 0 4px; font-size:14px; color:#555555;">Quality score: <strong style="color:#111111;">${application.qualityScore}/100</strong></p>`
-    : "";
-
-  const badgesLine = application.badges && application.badges.length > 0
-    ? `<p style="margin:0 0 12px; font-size:13px; color:#999999;">${application.badges.join(" &middot; ")}</p>`
-    : "";
-
-  // Contact info block (only for native applications with contact data)
-  const contactLines: string[] = [];
-  if (application.email) contactLines.push(`Email: <a href="mailto:${escapeHtml(application.email)}" style="color:#5a8a00;">${escapeHtml(application.email)}</a>`);
-  if (application.phone) contactLines.push(`Phone: ${escapeHtml(application.phone)}`);
-  if (application.linkedinUrl) contactLines.push(`LinkedIn: <a href="${escapeHtml(application.linkedinUrl)}" style="color:#5a8a00;">${escapeHtml(application.linkedinUrl)}</a>`);
-  if (application.resumeUrl) contactLines.push(`<a href="${escapeHtml(application.resumeUrl)}" style="color:#5a8a00;">Download Resume</a>`);
-
-  const contactBlock = contactLines.length > 0
-    ? `<div style="background-color:#f0fdf4; padding:12px 16px; border-radius:6px; margin:0 0 16px;">
-        <p style="margin:0 0 8px; font-size:12px; font-weight:bold; color:#059669; text-transform:uppercase; letter-spacing:1px;">Contact</p>
-        ${contactLines.map((l) => `<p style="margin:0 0 4px; font-size:14px; color:#333333;">${l}</p>`).join("")}
-      </div>`
-    : "";
-
-  // Skills & seniority
-  const skillsLine = application.skills && application.skills.length > 0
-    ? `<p style="margin:0 0 4px; font-size:13px; color:#555555;">Skills: ${escapeHtml(application.skills.slice(0, 10).join(", "))}</p>`
-    : "";
-  const seniorityLine = application.seniority
-    ? `<p style="margin:0 0 4px; font-size:13px; color:#555555;">Seniority: ${escapeHtml(application.seniority)}</p>`
-    : "";
-  const salaryLine = application.salaryMin && application.salaryMax
-    ? `<p style="margin:0 0 4px; font-size:13px; color:#555555;">Salary: ${application.salaryCurrency ?? "USD"} ${application.salaryMin.toLocaleString()}-${application.salaryMax.toLocaleString()}</p>`
-    : "";
-  const bioLine = application.bio
-    ? `<p style="margin:0 0 0; font-size:13px; color:#777777; font-style:italic;">"${escapeHtml(application.bio.slice(0, 200))}"</p>`
-    : "";
-
-  const bodyHtml = `
-    <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">New candidate</p>
-    <h1 style="margin:0 0 4px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${escapeHtml(displayName)}</h1>
-    <p style="margin:0 0 16px; font-size:14px; color:#999999;">@${escapeHtml(application.developerLogin)}</p>
-    <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-      applied to <strong>${escapeHtml(listingTitle)}</strong>
-    </p>
-    ${contactBlock}
-    <div style="background-color:#f9fafb; padding:16px; border-radius:6px; margin:0 0 24px;">
-      ${scoreLine}
-      ${badgesLine}
-      ${seniorityLine}
-      ${skillsLine}
-      ${salaryLine}
-      ${bioLine}
-      <p style="margin:8px 0 0;">${profileBadge}</p>
-    </div>
-    ${buildButton("View Candidates", `${BASE_URL}/jobs/dashboard`)}
-    <p style="margin:20px 0 0; font-size:12px; color:#999999;">
-      View their full profile and GitHub stats in your <a href="${BASE_URL}/jobs/dashboard" style="color:#5a8a00; text-decoration:underline;">dashboard</a>.
-    </p>
-  `;
-
-  const scoreText = application.qualityScore != null ? `Quality score: ${application.qualityScore}/100\n` : "";
-  const badgesText = application.badges && application.badges.length > 0 ? `${application.badges.join(", ")}\n` : "";
-  const contactText = [
-    application.email ? `Email: ${application.email}` : "",
-    application.phone ? `Phone: ${application.phone}` : "",
-  ].filter(Boolean).join("\n");
-
-  await sendCompanyEmail({
-    to: email,
-    subject: `New candidate for ${listingTitle}: ${displayName}`,
-    html: bodyHtml,
-    text: `New candidate for ${listingTitle}: ${displayName} (@${application.developerLogin})\n\n${contactText}\n\n${scoreText}${badgesText}\n\nView Candidates: ${BASE_URL}/jobs/dashboard`,
-  });
+export interface JobApplicationReceivedData {
+  listingTitle: string;
+  listingId: string;
+  application: ApplicationInfo;
 }
 
-/**
- * Batch digest email: multiple applications received.
- */
-export async function sendJobApplicationsBatchEmail(
-  email: string,
-  listingTitle: string,
-  applications: { login: string; hasProfile: boolean; firstName?: string | null; lastName?: string | null }[],
-) {
-  const withProfile = applications.filter((a) => a.hasProfile).length;
-  const total = applications.length;
+const REASON = "You're getting this because someone applied to your listing on Git City Jobs.";
 
-  const listHtml = applications
-    .slice(0, 10)
-    .map((a) => {
-      const badge = a.hasProfile ? "&#x2705;" : "";
-      const name = [a.firstName, a.lastName].filter(Boolean).join(" ");
-      const display = name ? `${name} (@${escapeHtml(a.login)})` : `@${escapeHtml(a.login)}`;
-      return `<li style="margin-bottom:4px; font-size:14px; color:#555555;">${display} ${badge}</li>`;
-    })
-    .join("");
+const candidatesUrl = (listingId: string, campaign: string) => trackedUrl(`/jobs/dashboard/${listingId}/candidates`, campaign);
 
-  const moreText = total > 10
-    ? `<p style="color:#999999; font-size:13px;">...and ${total - 10} more</p>`
-    : "";
+function fullName(a: { firstName?: string | null; lastName?: string | null }): string {
+  return [a.firstName, a.lastName].filter(Boolean).join(" ");
+}
 
-  const bodyHtml = `
-    <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">New candidates</p>
-    <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${total} new application${total > 1 ? "s" : ""}</h1>
-    <p style="margin:0 0 16px; font-size:15px; color:#555555; line-height:1.6;">
-      for <strong>${escapeHtml(listingTitle)}</strong>
-    </p>
-    <p style="margin:0 0 12px; font-size:14px; color:#555555;">
-      ${withProfile} of ${total} have a complete career profile.
-    </p>
-    <ul style="margin:0 0 24px; padding-left:20px; list-style:disc;">
-      ${listHtml}
-    </ul>
-    ${moreText}
-    ${buildButton("Review Candidates", `${BASE_URL}/jobs/dashboard`)}
-  `;
+export function renderJobApplicationReceivedEmail(d: JobApplicationReceivedData, links: EmailLinks = COMPANY_LINKS) {
+  const a = d.application;
+  const name = fullName(a) || `@${a.developerLogin}`;
+  const subject = `New candidate: ${name}`;
+  const preheader = `Applied to ${d.listingTitle}. Their contact details are inside.`;
+  const reviewUrl = candidatesUrl(d.listingId, "job_application");
+  const intro = `${fullName(a) ? `@${a.developerLogin}` : "They"} applied to ${d.listingTitle}.`;
 
-  const listText = applications
-    .slice(0, 10)
-    .map((a) => {
-      const name = [a.firstName, a.lastName].filter(Boolean).join(" ");
-      const display = name ? `${name} (@${a.login})` : `@${a.login}`;
-      return `- ${display}${a.hasProfile ? " (has profile)" : ""}`;
-    })
-    .join("\n");
-  const moreLineText = total > 10 ? `\n...and ${total - 10} more` : "";
+  const salary = formatSalary(a.salaryMin, a.salaryMax, a.salaryCurrency);
+  const rows = [
+    a.email ? { label: "Email", value: a.email, href: `mailto:${a.email}` } : null,
+    a.phone ? { label: "Phone", value: a.phone, href: `tel:${a.phone.replace(/[^\d+]/g, "")}` } : null,
+    a.linkedinUrl ? { label: "LinkedIn", value: a.linkedinUrl.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""), href: a.linkedinUrl } : null,
+    a.resumeUrl ? { label: "Resume", value: "Open resume", href: a.resumeUrl } : null,
+    { label: "Profile", value: `thegitcity.com/hire/${a.developerLogin}`, href: `${EMAIL_BASE_URL}/hire/${encodeURIComponent(a.developerLogin)}` },
+    a.seniority ? { label: "Seniority", value: SENIORITY_LABELS[a.seniority] ?? a.seniority } : null,
+    salary ? { label: "Salary", value: salary } : null,
+    a.skills?.length ? { label: "Skills", value: a.skills.slice(0, 10).join(", ") } : null,
+  ].filter((r): r is { label: string; value: string; href?: string } => r !== null);
 
-  await sendCompanyEmail({
-    to: email,
-    subject: `${total} new candidate${total > 1 ? "s" : ""} for ${listingTitle}`,
-    html: bodyHtml,
-    text: `${total} new application${total > 1 ? "s" : ""} for ${listingTitle}\n\n${withProfile} of ${total} have a complete career profile.\n\n${listText}${moreLineText}\n\nReview Candidates: ${BASE_URL}/jobs/dashboard`,
+  const bio = a.bio ? (a.bio.length > 280 ? `${a.bio.slice(0, 277).trimEnd()}...` : a.bio) : null;
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading(name),
+      paragraph(intro),
+      linkRows(rows),
+      bio ? label("In their words") + callout(bio) : "",
+      button("Review candidate", reviewUrl),
+    ].join("\n"),
+    reason: REASON,
+    links,
   });
+
+  const text = renderText({
+    lines: [
+      name,
+      "",
+      intro,
+      "",
+      ...rows.map((r) => `${r.label}: ${r.href && !r.href.startsWith("mailto:") && !r.href.startsWith("tel:") ? r.href : r.value}`),
+      ...(bio ? ["", `In their words: ${bio}`] : []),
+      "",
+      `Review candidate: ${reviewUrl}`,
+    ],
+    reason: REASON,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** Sent to the company when one developer applied since the last flush. */
+export async function sendJobApplicationReceivedEmail(email: string, listingTitle: string, listingId: string, application: ApplicationInfo) {
+  const { subject, html, text } = renderJobApplicationReceivedEmail({ listingTitle, listingId, application });
+  await sendCompanyEmail({ to: email, subject, html, text, type: "job_application_received" });
+}
+
+export interface BatchApplicant {
+  login: string;
+  hasProfile: boolean;
+  firstName?: string | null;
+  lastName?: string | null;
+}
+
+export interface JobApplicationsBatchData {
+  listingTitle: string;
+  listingId: string;
+  applications: BatchApplicant[];
+}
+
+const SHOWN = 10;
+
+export function renderJobApplicationsBatchEmail(d: JobApplicationsBatchData, links: EmailLinks = COMPANY_LINKS) {
+  const total = d.applications.length;
+  const subject = `${plural(total, "new candidate")} for ${d.listingTitle}`;
+  const names = d.applications.map((a) => fullName(a) || `@${a.login}`);
+  const lead = total > 2 ? `${names.slice(0, 2).join(", ")} and ${total - 2} more` : names.join(" and ");
+  const preheader = `${lead} applied. Their contact details are in your dashboard.`;
+  const reviewUrl = candidatesUrl(d.listingId, "job_application");
+  const intro = `${plural(total, "developer")} applied to ${d.listingTitle}.`;
+  const items = d.applications.slice(0, SHOWN).map((a) => {
+    const name = fullName(a);
+    return name ? { lead: name, text: `@${a.login}` } : { lead: `@${a.login}`, text: "" };
+  });
+  const more = total > SHOWN ? `And ${plural(total - SHOWN, "more candidate")} in your dashboard.` : null;
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading(`${plural(total, "new candidate")}`),
+      paragraph(intro),
+      bulletList(items),
+      more ? paragraph(more, { muted: true }) : "",
+      button("Review candidates", reviewUrl),
+    ].join("\n"),
+    reason: REASON,
+    links,
+  });
+
+  const text = renderText({
+    lines: [
+      `${plural(total, "new candidate")}`,
+      "",
+      intro,
+      "",
+      ...items.map((i) => `- ${i.lead}${i.text ? ` (${i.text})` : ""}`),
+      ...(more ? [more] : []),
+      "",
+      `Review candidates: ${reviewUrl}`,
+    ],
+    reason: REASON,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** Sent to the company when several developers applied since the last flush. */
+export async function sendJobApplicationsBatchEmail(email: string, listingTitle: string, listingId: string, applications: BatchApplicant[]) {
+  const { subject, html, text } = renderJobApplicationsBatchEmail({ listingTitle, listingId, applications });
+  await sendCompanyEmail({ to: email, subject, html, text, type: "job_applications_batch" });
 }

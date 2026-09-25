@@ -1,31 +1,34 @@
-import { getResend } from "@/lib/resend";
-import { wrapInBaseTemplate } from "@/lib/email-template";
+import { sendEmail, toResendTag } from "@/lib/resend";
+import { COMPANY_UNSUBSCRIBE_URL } from "./email-blocks";
 
 const FROM = "Git City Jobs <noreply@thegitcity.com>";
 
 /**
- * Send an email to a company (advertiser). Wraps Resend with:
- * - Base template
- * - Text fallback
- * - List-Unsubscribe header (links to support email)
+ * Send an email to a company (advertiser) or the jobs admin. `html` is the full
+ * email from renderLayout. Companies have no preference system, so the
+ * List-Unsubscribe header asks support by email.
+ * Throws on a Resend error so callers don't record the email as sent.
  */
 export async function sendCompanyEmail(opts: {
   to: string;
   subject: string;
   html: string;
   text: string;
+  /** Email type for Resend analytics, e.g. "job_approved". */
+  type: string;
   replyTo?: string;
 }) {
-  const resend = getResend();
-  await resend.emails.send({
+  const { error } = await sendEmail({
     from: FROM,
     to: opts.to,
     subject: opts.subject,
-    html: wrapInBaseTemplate(opts.html),
+    html: opts.html,
     text: opts.text,
     replyTo: opts.replyTo,
     headers: {
-      "List-Unsubscribe": "<mailto:support@thegitcity.com?subject=Unsubscribe>",
+      "List-Unsubscribe": `<${COMPANY_UNSUBSCRIBE_URL}>`,
     },
+    tags: [{ name: "type", value: toResendTag(opts.type) }],
   });
+  if (error) throw new Error(`Resend error: ${error.message}`);
 }

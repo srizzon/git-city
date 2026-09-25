@@ -230,6 +230,7 @@ export async function POST(request: Request) {
   await autoEquipIfSolo(ownerId, item_id);
 
   // Activity feed + notifications
+  const paid = typeof result.price === "number" ? { amountCents: result.price, currency: "PX" } : null;
   if (recipientId) {
     const { data: receiver } = await sb
       .from("developers")
@@ -248,7 +249,7 @@ export async function POST(request: Request) {
       },
     });
 
-    sendGiftSentNotification(dev.id, githubLogin, receiver?.github_login ?? "unknown", idempotencyKey, item_id);
+    sendGiftSentNotification(dev.id, githubLogin, receiver?.github_login ?? "unknown", idempotencyKey, item_id, paid);
     sendGiftReceivedNotification(recipientId, githubLogin, receiver?.github_login ?? "unknown", idempotencyKey, item_id);
   } else {
     await sb.from("activity_feed").insert({
@@ -257,7 +258,7 @@ export async function POST(request: Request) {
       metadata: { login: githubLogin, item_id },
     });
 
-    sendPurchaseNotification(dev.id, githubLogin, idempotencyKey, item_id);
+    sendPurchaseNotification(dev.id, githubLogin, idempotencyKey, item_id, paid);
   }
 
   return NextResponse.json({

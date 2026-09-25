@@ -1,56 +1,81 @@
 import "server-only";
-import { getResend } from "@/lib/resend";
-import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
+import { sendEmail } from "@/lib/resend";
+import { COLORS, FONT, button, escapeHtml, gmailSafe, heading, paragraph, trackedUrl } from "@/lib/email/components";
+import { renderLayout, renderText, type EmailLinks } from "@/lib/email/layout";
+import { ADVERTISER_DASHBOARD_URL } from "@/lib/ad-emails";
 import type { Landmark } from "./types";
 
-const BASE_URL = "https://thegitcity.com";
+// Set by hand in the environment; the fallback is the figure hardcoded when
+// landmarks shipped (April 2026), not a live number.
 const MONTHLY_VISITORS =
   process.env.NEXT_PUBLIC_MONTHLY_VISITOR_COUNT ?? "22,642";
 
-export function renderWelcomeEmail(landmark: Landmark): { subject: string; html: string } {
-  const subject = `Your building is live in Git City`;
-  const deepLink = `${BASE_URL}/?landmark=${encodeURIComponent(landmark.slug)}`;
-  const dashboard = `${BASE_URL}/ads/dashboard?sponsor=${encodeURIComponent(landmark.slug)}`;
+const LINKS: EmailLinks = { settingsUrl: null };
 
-  const body = `
-    <h1 style="margin: 0 0 16px; font-family: Helvetica, Arial, sans-serif; font-size: 22px; color: #111;">
-      ${escapeHtml(landmark.name)}, your HQ is now standing in Git City.
-    </h1>
+export function renderLandmarkWelcomeEmail(landmark: Landmark) {
+  const subject = "Your HQ is live in Git City";
+  const preheader = `${landmark.name} is on the map. Here's the link that always shows it.`;
+  const deepLink = trackedUrl(`/?landmark=${encodeURIComponent(landmark.slug)}`, "landmark_welcome");
+  const dashboardUrl = trackedUrl(ADVERTISER_DASHBOARD_URL, "landmark_welcome");
 
-    <p style="margin: 0 0 14px; font-family: Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #333;">
-      ${escapeHtml(MONTHLY_VISITORS)} developers visit Git City each month.
-      Your building is visible in the rotation starting today.
-    </p>
+  const audience = `${MONTHLY_VISITORS} developers visit Git City each month. Starting today, your building is part of the landmark rotation: three landmark spots in the city, reshuffled every 30 minutes.`;
+  const share = "The button below opens the city with your HQ always in the lineup. Share it, bookmark it, send it to your team.";
+  const analytics = "Views and clicks are in your analytics dashboard.";
+  const reason = `You're getting this because you own ${landmark.name}, a sponsored landmark in Git City.`;
 
-    <p style="margin: 0 0 8px; font-family: Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #333;">
-      The button below opens the city and flies the camera straight to your HQ.
-      Share it, bookmark it, forward it to your team.
-    </p>
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading("", landmark.name, " is standing in Git City"),
+      paragraph(audience),
+      paragraph(share),
+      gmailSafe(
+        `<p style="margin:0 0 20px; font-family:${FONT}; font-size:14px; line-height:1.6; color:${COLORS.muted};">Views and clicks are in your <a href="${escapeHtml(dashboardUrl)}" style="color:${COLORS.cream}; text-decoration:underline;">analytics dashboard</a>.</p>`,
+      ),
+      button("View your building", deepLink),
+    ].join("\n"),
+    reason,
+    links: LINKS,
+  });
 
-    ${buildButton("View your building", deepLink)}
+  const text = renderText({
+    lines: [
+      `${landmark.name} is standing in Git City`,
+      "",
+      audience,
+      "",
+      share,
+      "",
+      `View your building: ${deepLink}`,
+      "",
+      `${analytics} ${dashboardUrl}`,
+    ],
+    reason,
+    links: LINKS,
+  });
 
-    <p style="margin: 22px 0 0; text-align: center; font-family: Helvetica, Arial, sans-serif; font-size: 13px; color: #666;">
-      <a href="${escapeHtml(dashboard)}" style="color: #666; text-decoration: underline;">Analytics dashboard</a>
-    </p>
-  `;
-
-  const html = wrapInBaseTemplate(body);
-  return { subject, html };
+  return { subject, preheader, html, text };
 }
 
-export async function sendWelcomeEmail(
-  landmark: Landmark,
-  recipients: string[],
-): Promise<void> {
+/**
+ * Sends one email per recipient so owners never see each other's addresses.
+ * Returns the addresses that failed; throws only when every send failed.
+ */
+export async function sendWelcomeEmail(landmark: Landmark, recipients: string[]): Promise<string[]> {
   if (recipients.length === 0) {
     throw new Error("No recipients");
   }
-  const { subject, html } = renderWelcomeEmail(landmark);
-  const resend = getResend();
-  await resend.emails.send({
-    from: "Git City <noreply@thegitcity.com>",
-    to: recipients,
-    subject,
-    html,
-  });
+  const { subject, html, text } = renderLandmarkWelcomeEmail(landmark);
+  const failed: string[] = [];
+  let lastError = "";
+  for (const to of recipients) {
+    const { error } = await sendEmail({ from: "Git City <noreply@thegitcity.com>", to, subject, html, text });
+    if (error) {
+      failed.push(to);
+      lastError = error.message;
+    }
+  }
+  if (failed.length === recipients.length) throw new Error(`Resend error: ${lastError}`);
+  return failed;
 }
