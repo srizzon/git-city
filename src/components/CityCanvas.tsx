@@ -427,7 +427,20 @@ const DEFAULT_FLY_SPEED = 55;
 const MIN_FLY_SPEED = 30;
 const MAX_FLY_SPEED = 200;
 const MIN_ALT = 25;
-const MAX_ALT = 900;
+const MAX_ALT = 1400;
+// Cruise: the higher you fly, the faster, so the Bay Area crosses in seconds
+// while low flight between buildings keeps its old pace.
+const CRUISE_FROM_ALT = 250;
+const CRUISE_MAX_MULT = 6;
+// Boost ramps up while held instead of jumping.
+const BOOST_MAX_MULT = 4;
+const BOOST_RAMP_S = 1.1;
+const BOOST_DECAY_S = 0.6;
+
+function smoothstep(a: number, b: number, v: number): number {
+  const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
 const TURN_RATE = 2.0;
 const CLIMB_RATE = 55;
 const MAX_BANK = 0.55;
@@ -469,6 +482,7 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
   const flySpeed = useRef(DEFAULT_FLY_SPEED);
   const bank = useRef(0);
   const pitch = useRef(0);
+  const boostLevel = useRef(0);
 
   // Camera smoothing
   const camPos = useRef(new THREE.Vector3(0, 140, 450));
@@ -858,17 +872,24 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     if (k["KeyW"] || k["ArrowUp"]) altInput = 1;
     if (k["KeyS"] || k["ArrowDown"]) altInput = -1;
 
-    // Shift = boost 2x, Alt = slow 0.3x, mobile boost/brake props
-    let speedMult = 1;
-    if (k["ShiftLeft"] || k["ShiftRight"] || boostActive) speedMult = 2;
+    // Shift = boost (ramps up to 4x while held), Alt = slow 0.3x, mobile boost/brake props
+    const boosting = !!(k["ShiftLeft"] || k["ShiftRight"] || boostActive);
+    boostLevel.current = boosting
+      ? Math.min(1, boostLevel.current + dt / BOOST_RAMP_S)
+      : Math.max(0, boostLevel.current - dt / BOOST_DECAY_S);
+    let speedMult = 1 + (BOOST_MAX_MULT - 1) * smoothstep(0, 1, boostLevel.current);
     if (k["AltLeft"] || k["AltRight"] || brakeActive) speedMult = 0.3;
 
-    const actualSpeed = flySpeed.current * speedMult;
+    // Altitude cruise: 1x below CRUISE_FROM_ALT, up to 6x at the ceiling.
+    const cruise = 1 + (CRUISE_MAX_MULT - 1) * smoothstep(CRUISE_FROM_ALT, MAX_ALT, pos.current.y);
+    const actualSpeed = flySpeed.current * speedMult * cruise;
 
     // Climb scales gently with speed using sqrt so it stays proportional
-    // without getting out of control at high speeds
+    // without getting out of control at high speeds; high up it climbs faster
+    // so reaching cruise height doesn't drag.
     const climbScale = Math.sqrt(actualSpeed / DEFAULT_FLY_SPEED);
-    pos.current.y += altInput * CLIMB_RATE * climbScale * dt;
+    const climbAlt = 1 + 1.5 * smoothstep(150, 900, pos.current.y);
+    pos.current.y += altInput * CLIMB_RATE * climbScale * climbAlt * dt;
     pos.current.y = Math.max(MIN_ALT, Math.min(MAX_ALT, pos.current.y));
 
     _fwd.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
@@ -926,7 +947,8 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       }
     }
 
-    const camDist = 35 + flySpeed.current * 0.2;
+    // Pulls back with speed, gently past cruise speeds.
+    const camDist = 35 + Math.min(actualSpeed, 150) * 0.2 + Math.max(0, Math.min(actualSpeed, 1200) - 150) * 0.03;
     _camOffset.set(0, 15, camDist).applyAxisAngle(_yAxis, yaw.current);
     _idealCamPos.copy(pos.current).add(_camOffset);
 
@@ -984,9 +1006,9 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     hudTimer.current += dt;
     if (hudTimer.current > 0.25) {
       hudTimer.current = 0;
-      lastHudSpeed.current = Math.round(flySpeed.current);
+      lastHudSpeed.current = Math.round(actualSpeed);
       lastHudAlt.current = Math.round(pos.current.y);
-      onHud(flySpeed.current, pos.current.y, pos.current.x, pos.current.z, yaw.current);
+      onHud(actualSpeed, pos.current.y, pos.current.x, pos.current.z, yaw.current);
     }
   });
 
