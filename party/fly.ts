@@ -39,10 +39,10 @@ const BOSS_RESET_DELAY_MS = 8_000; // after defeat, boss stays gone this long
 const BOSS_SELF_HIT_IFRAME_MS = 1_200; // i-frames after a boss attack hits you
 
 // World bounds — reject moves outside a sane envelope to prevent griefing
-// the presence system with NaN/Infinity or absurd coordinates. The SF map
-// reaches x ≈ -10k (the Golden Gate) and the client lets pilots fly to 1.3x
-// the city radius, so the envelope has to cover that.
-const COORD_ABS_MAX = 20_000;
+// the presence system with NaN/Infinity or absurd coordinates. The Bay Area
+// map reaches ~26k from downtown and the client lets pilots fly to 1.3x the
+// city radius, so the envelope has to cover that.
+const COORD_ABS_MAX = 40_000;
 const ALT_MIN = -200;
 const ALT_MAX = 1_000;
 
@@ -636,11 +636,13 @@ export default class FlyServer implements Party.Server {
       const mag = Math.sqrt(msg.dirX * msg.dirX + msg.dirY * msg.dirY + msg.dirZ * msg.dirZ);
       if (!Number.isFinite(mag) || mag < 0.1 || mag > 5) return;
       // Anti-cheat: claimed spawn must be near the last known pilot position.
-      // 50u tolerance covers high-speed boost + 8u front-of-nose offset.
+      // Moves arrive every ~100 ms and boost tops out ~1000 u/s (up to ~1650
+      // when tuned), so the pilot can be ~165u past its last report, plus the
+      // 30u muzzle offset.
       const dxs = msg.x - pilot.x;
       const dys = msg.y - pilot.y;
       const dzs = msg.z - pilot.z;
-      if (dxs * dxs + dys * dys + dzs * dzs > 50 * 50) return;
+      if (dxs * dxs + dys * dys + dzs * dzs > 200 * 200) return;
 
       pilot.recentShots.push(now);
 

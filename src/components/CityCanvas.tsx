@@ -6,6 +6,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/drei";
 import { EffectComposer, Bloom, SMAA } from "@react-three/postprocessing";
 import * as THREE from "three";
+import { FLY_TUNE } from "./FlyTune";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
 import type { LiveSession } from "@/lib/useCodingPresence";
@@ -424,10 +425,26 @@ function CameraFocus({
 // ─── Mouse-Driven Flight ─────────────────────────────────────
 
 const DEFAULT_FLY_SPEED = 55;
-const MIN_FLY_SPEED = 30;
-const MAX_FLY_SPEED = 200;
+// Throttle model (War Thunder, Flight Simulator, GTA planes): the scroll wheel
+// moves the throttle and the speed stays where you leave it, from a hover (0)
+// up to cruise x FLY_TUNE.boost; Shift boosts and Alt/Q brakes on top while
+// held. Wheel changes are proportional so they feel the same slow or fast.
+const HOVER_BELOW = 8; // under this, lowering the throttle settles into a hover
 const MIN_ALT = 25;
 const MAX_ALT = 900;
+// Boost, easing, camera arm and lens live in FLY_TUNE (FlyTune.tsx, ?tune=1).
+// Speed reads through the lens, not the camera distance: the field of view
+// widens with speed (arcade flight / racing convention) plus a slight shake.
+const BASE_FOV = 55;
+// Projectile speed every client uses (ProjectileSwarm, BossEvent, BossMinions).
+const PROJECTILE_BASE_SPEED = 1200;
+// Sky coins spawn within this distance of downtown.
+const COIN_RADIUS = 8000;
+
+function smoothstep(a: number, b: number, v: number): number {
+  const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
 const TURN_RATE = 2.0;
 const CLIMB_RATE = 55;
 const MAX_BANK = 0.55;
@@ -446,9 +463,6 @@ function deadzoneCurve(v: number): number {
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
-const _camOffset = new THREE.Vector3();
-const _idealCamPos = new THREE.Vector3();
-const _idealLook = new THREE.Vector3();
 const _blendedPos = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 
@@ -469,6 +483,17 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
   const flySpeed = useRef(DEFAULT_FLY_SPEED);
   const bank = useRef(0);
   const pitch = useRef(0);
+  const curSpeed = useRef(DEFAULT_FLY_SPEED);
+  const yawRate = useRef(0);
+  const climbRate = useRef(0);
+  const camYaw = useRef<number | null>(null);
+  const camY = useRef<number | null>(null);
+  // The boost widens the lens; leaving flight hands the camera back at its base field of view.
+  useEffect(() => () => {
+    const persp = camera as THREE.PerspectiveCamera;
+    persp.fov = BASE_FOV;
+    persp.updateProjectionMatrix();
+  }, [camera]);
 
   // Camera smoothing
   const camPos = useRef(new THREE.Vector3(0, 140, 450));
@@ -539,10 +564,16 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
         mouse.current.y = -((e.clientY / window.innerHeight) * 2 - 1);
       }
     };
+    // Scroll wheel is the throttle: each notch (deltaY ~100) scales speed by
+    // ~1.35, so cruise to top speed is ~10 notches; scrolling down past
+    // HOVER_BELOW settles into a hover.
     const onWheel = (e: WheelEvent) => {
-      if (!paused.current) {
-        flySpeed.current = Math.max(MIN_FLY_SPEED, Math.min(MAX_FLY_SPEED, flySpeed.current - e.deltaY * 0.05));
-      }
+      if (paused.current) return;
+      if ((e.target as HTMLElement | null)?.closest?.("button, a, input, [data-ui]")) return;
+      const maxSpeed = DEFAULT_FLY_SPEED * FLY_TUNE.boost;
+      const factor = Math.exp(-e.deltaY * FLY_TUNE.wheelStep / 100);
+      if (factor > 1) flySpeed.current = Math.min(maxSpeed, Math.max(HOVER_BELOW, flySpeed.current) * factor);
+      else flySpeed.current = flySpeed.current * factor < HOVER_BELOW ? 0 : flySpeed.current * factor;
     };
 
     // Touch handlers for mobile joystick
@@ -676,10 +707,12 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       onPause(false);
     };
 
-    const FLIGHT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight"]);
+    const FLIGHT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight"]);
 
     const down = (e: KeyboardEvent) => {
       keys.current[e.code] = true;
+      // Alt lowers the throttle; on Windows its default would focus the browser menu.
+      if (e.code === "AltLeft" || e.code === "AltRight") e.preventDefault();
       if (e.code === "Escape") {
         if (!paused.current) {
           // Flying → pause
@@ -743,7 +776,11 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       const spawnX = pos.current.x + dirX * 30;
       const spawnY = pos.current.y + dirY * 30;
       const spawnZ = pos.current.z + dirZ * 30;
-      handler(spawnX, spawnY, spawnZ, dirX, dirY, dirZ);
+      // Shots inherit the plane's speed: every client moves a projectile at
+      // dir * 1200 u/s, so scaling dir adds the plane's velocity and a shot
+      // fired at boost speed still leaves ahead of the nose.
+      const inherit = 1 + curSpeed.current / PROJECTILE_BASE_SPEED;
+      handler(spawnX, spawnY, spawnZ, dirX * inherit, dirY * inherit, dirZ * inherit);
     };
 
     const startAutofire = () => {
@@ -852,23 +889,30 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     if (k["KeyA"] || k["ArrowLeft"]) turnInput = -1;
     if (k["KeyD"] || k["ArrowRight"]) turnInput = 1;
 
-    yaw.current -= turnInput * TURN_RATE * dt;
+    // Turning ramps in and out instead of snapping to full rate.
+    yawRate.current += (turnInput * TURN_RATE - yawRate.current) * (1 - Math.exp(-FLY_TUNE.turnEase * dt));
+    yaw.current -= yawRate.current * dt;
 
     let altInput = deadzoneCurve(my);
     if (k["KeyW"] || k["ArrowUp"]) altInput = 1;
     if (k["KeyS"] || k["ArrowDown"]) altInput = -1;
 
-    // Shift = boost 2x, Alt = slow 0.3x, mobile boost/brake props
-    let speedMult = 1;
-    if (k["ShiftLeft"] || k["ShiftRight"] || boostActive) speedMult = 2;
-    if (k["AltLeft"] || k["AltRight"] || brakeActive) speedMult = 0.3;
+    // Throttle (scroll wheel) sets the base speed, which stays put. On top of it,
+    // Shift held boosts and Alt/Q held brakes (mobile: boost/brake buttons),
+    // both easing back to the throttle on release (Ace Combat over War Thunder).
+    const boosting = k["ShiftLeft"] || k["ShiftRight"] || boostActive;
+    const braking = k["AltLeft"] || k["AltRight"] || k["KeyQ"] || brakeActive;
+    const targetSpeed = flySpeed.current * (braking ? 0.3 : boosting ? FLY_TUNE.shiftBoost : 1);
+    const ease = targetSpeed > curSpeed.current ? FLY_TUNE.speedEase : FLY_TUNE.speedEase * 1.6;
+    curSpeed.current += (targetSpeed - curSpeed.current) * (1 - Math.exp(-ease * dt));
+    const actualSpeed = curSpeed.current;
 
-    const actualSpeed = flySpeed.current * speedMult;
-
-    // Climb scales gently with speed using sqrt so it stays proportional
-    // without getting out of control at high speeds
-    const climbScale = Math.sqrt(actualSpeed / DEFAULT_FLY_SPEED);
-    pos.current.y += altInput * CLIMB_RATE * climbScale * dt;
+    // Climb grows slower than speed (sqrt) and ramps in and out; a hovering
+    // plane still climbs and dives, at a floor rate.
+    const climbTarget = altInput * CLIMB_RATE * Math.max(0.6, Math.sqrt(actualSpeed / DEFAULT_FLY_SPEED));
+    climbRate.current += (climbTarget - climbRate.current) * (1 - Math.exp(-FLY_TUNE.climbEase * dt));
+    pos.current.y += climbRate.current * dt;
+    if (pos.current.y <= MIN_ALT || pos.current.y >= MAX_ALT) climbRate.current = 0;
     pos.current.y = Math.max(MIN_ALT, Math.min(MAX_ALT, pos.current.y));
 
     _fwd.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
@@ -909,7 +953,7 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     // Broadcast position to multiplayer presence (throttled internally)
     onFlyMove?.(pos.current.x, pos.current.y, pos.current.z, yaw.current, bank.current);
 
-    const targetBank = -turnInput * MAX_BANK;
+    const targetBank = -(yawRate.current / TURN_RATE) * MAX_BANK;
     bank.current += (targetBank - bank.current) * 5 * dt;
 
     const targetPitch = altInput * MAX_PITCH;
@@ -926,18 +970,26 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       }
     }
 
-    const camDist = 35 + flySpeed.current * 0.2;
-    _camOffset.set(0, 15, camDist).applyAxisAngle(_yAxis, yaw.current);
-    _idealCamPos.copy(pos.current).add(_camOffset);
-
-    _idealLook.copy(pos.current).addScaledVector(_fwd, 5).y += 2;
-
-    const lerpXZ = 2.0 * dt;
-    const lerpY = 1.8 * dt;
-    camPos.current.x += (_idealCamPos.x - camPos.current.x) * lerpXZ;
-    camPos.current.z += (_idealCamPos.z - camPos.current.z) * lerpXZ;
-    camPos.current.y += (_idealCamPos.y - camPos.current.y) * lerpY;
-    camLook.current.lerp(_idealLook, 4.0 * dt);
+    // Camera arm: a fixed distance behind the plane, swinging in behind turns
+    // and following climbs with a lag. Only its angle and height are smoothed,
+    // never its position, so the lag doesn't grow with speed and the camera
+    // can't overshoot the plane.
+    // Lens + shake track how far above the throttle speed the boost has pushed you.
+    const speedK = smoothstep(1.15, Math.max(1.2, FLY_TUNE.shiftBoost), actualSpeed / Math.max(HOVER_BELOW, flySpeed.current));
+    if (camYaw.current === null) camYaw.current = yaw.current;
+    if (camY.current === null) camY.current = camPos.current.y;
+    let dYaw = yaw.current - camYaw.current;
+    dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
+    camYaw.current += dYaw * (1 - Math.exp(-FLY_TUNE.camYawLag * dt));
+    camY.current += (pos.current.y + FLY_TUNE.camHeight - camY.current) * (1 - Math.exp(-FLY_TUNE.camHeightLag * dt));
+    const arm = FLY_TUNE.camDist * (1 + 0.12 * speedK);
+    camPos.current.set(
+      pos.current.x + Math.sin(camYaw.current) * arm,
+      camY.current,
+      pos.current.z + Math.cos(camYaw.current) * arm,
+    );
+    camLook.current.copy(pos.current).addScaledVector(_fwd, 8);
+    camLook.current.y += 2;
 
     // Apply transition blend if coming back from free-cam
     if (wasJustUnpaused.current && transitionProgress.current < 1) {
@@ -948,6 +1000,17 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       camera.position.copy(camPos.current);
     }
     camera.lookAt(camLook.current);
+
+    // Sense of speed: wider lens and a faint shake as boost builds.
+    const persp = camera as THREE.PerspectiveCamera;
+    const fov = BASE_FOV + FLY_TUNE.fovKick * speedK;
+    if (Math.abs(persp.fov - fov) > 0.05) { persp.fov = fov; persp.updateProjectionMatrix(); }
+    if (speedK > 0.05) {
+      const t = state.clock.elapsedTime;
+      const amp = 0.35 * speedK;
+      camera.position.x += Math.sin(t * 37.1) * amp;
+      camera.position.y += Math.sin(t * 41.3 + 1.7) * amp * 0.7;
+    }
 
     // Update trail
     if (!trailInit.current) {
@@ -984,9 +1047,9 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     hudTimer.current += dt;
     if (hudTimer.current > 0.25) {
       hudTimer.current = 0;
-      lastHudSpeed.current = Math.round(flySpeed.current);
+      lastHudSpeed.current = Math.round(actualSpeed);
       lastHudAlt.current = Math.round(pos.current.y);
-      onHud(flySpeed.current, pos.current.y, pos.current.x, pos.current.z, yaw.current);
+      onHud(actualSpeed, pos.current.y, pos.current.x, pos.current.z, yaw.current);
     }
   });
 
@@ -1077,9 +1140,12 @@ function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius, sfM
     ];
 
     // ── SF mode: anchor coins above real buildings, spread across the city ──
-    if (sfMap && buildings.length > 0) {
+    // Only buildings near downtown: across the whole Bay the coins were too sparse to chase.
+    const coinR = Math.min(cityRadius, COIN_RADIUS);
+    const pool = sfMap ? buildings.filter((b) => b.position[0] ** 2 + b.position[2] ** 2 <= coinR * coinR) : [];
+    if (sfMap && pool.length > 0) {
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-      for (const b of buildings) {
+      for (const b of pool) {
         const x = b.position[0], z = b.position[2];
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
@@ -1100,13 +1166,13 @@ function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius, sfM
         for (let relax = 0; relax < 6; relax++) {
           const sep = baseSep * (1 - relax * 0.15);
           for (let attempt = 0; attempt < 30; attempt++) {
-            const b = buildings[Math.floor(rng() * buildings.length)];
+            const b = pool[Math.floor(rng() * pool.length)];
             const x = b.position[0] + (rng() - 0.5) * 60;
             const z = b.position[2] + (rng() - 0.5) * 60;
             if (farEnough(x, z, sep)) { placed.push({ x, z }); return [x, z]; }
           }
         }
-        const b = buildings[Math.floor(rng() * buildings.length)];
+        const b = pool[Math.floor(rng() * pool.length)];
         const x = b.position[0], z = b.position[2];
         placed.push({ x, z });
         return [x, z];
@@ -2022,6 +2088,9 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
     }
     return max;
   }, [buildings]);
+  // Sky ads, fireworks and fly coins stay over the SF core (its edge sits at
+  // ~13.5k); only the flight boundary follows the whole Bay Area city.
+  const skyRadius = sfMap ? Math.min(cityRadius, 13500) : cityRadius;
 
   // San Francisco mode: camera + controls frame the downtown (Financial District)
   const sfHome = useMemo(() => {
@@ -2140,7 +2209,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           {!introMode && flyMode && (
             <>
               <VehicleFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} cityRadius={cityRadius} isMobile={isMobile} onJoystickState={onJoystickState} boostActive={flyBoostActive} brakeActive={flyBrakeActive} onFlyMove={onFlyMove} onShoot={flyOnShoot} canShoot={flyPvpEnabled === true} pendingRespawnRef={flyPendingRespawnRef} selfStateRef={flySelfStateRef} />
-              <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={cityRadius} sfMap={sfMap} buildings={buildings} />
+              <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={skyRadius} sfMap={sfMap} buildings={buildings} />
             </>
           )}
 
@@ -2247,7 +2316,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         />
       )}
 
-      {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={cityRadius} />}
+      {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={skyRadius} />}
 
       {!wallpaperMode && rabbitSighting && rabbitSighting >= 1 && rabbitSighting <= 5 && (() => {
         const plazaIdx = RABBIT_PLAZA_INDICES[rabbitSighting - 1];
@@ -2307,7 +2376,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       {!wallpaperMode && skyAds && skyAds.length > 0 && (
         <>
-          <SkyAds ads={skyAds} cityRadius={cityRadius} flyMode={flyMode} onAdClick={blockCityClicks ? undefined : onAdClick} onAdViewed={onAdViewed} />
+          <SkyAds ads={skyAds} cityRadius={skyRadius} flyMode={flyMode} onAdClick={blockCityClicks ? undefined : onAdClick} onAdViewed={onAdViewed} />
           <BuildingAds
             ads={skyAds}
             buildings={buildings}

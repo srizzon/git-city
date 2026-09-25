@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo, useSyncExternalStore
 import { Menu, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { BenchOverlay, benchCount, padBuildings } from "@/components/CityBench";
+import { FlyTunePanel } from "@/components/FlyTune";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
@@ -2767,6 +2768,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
   return (
     <main className="relative min-h-screen overflow-hidden bg-bg font-pixel uppercase text-warm">
       {bench > 0 && <BenchOverlay count={canvasBuildings.length} />}
+      {flyMode && searchParams.get("tune") === "1" && <FlyTunePanel />}
       {/* Boss Invasion HUD overlay (only when live event mode) */}
       {bossPreview?.mode === "live" && <BossEventHUD flyMode={flyMode} accentColor={theme.accent} shadowColor={theme.shadow} leaderboard={liveLeaderboard} participants={liveEvent?.participants ?? 0} selfLogin={authLogin} />}
 
@@ -3380,16 +3382,12 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
                         <span>steer</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Shift</span>
-                        <span>boost</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Alt</span>
-                        <span>slow</span>
-                      </div>
-                      <div className="flex items-center gap-2">
                         <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Scroll</span>
-                        <span>base speed</span>
+                        <span>speed, down to a hover</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Shift / Q</span>
+                        <span>boost / brake</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Click / F</span>
@@ -3418,7 +3416,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
       {/* ─── Mobile Fly HUD (bottom controls only — top bar is unified above) ─── */}
       {isMobile && flyMode && (
         <>
-          {/* Boost + Slow — bottom left, retro style */}
+          {/* Boost + Slow, held, on top of the throttle — bottom left, retro style */}
           {!flyPaused && (
             <div className="fixed z-50 flex gap-1.5 select-none" style={{ bottom: "max(24px, env(safe-area-inset-bottom, 24px))", left: "16px", WebkitTouchCallout: "none" }}>
               <button

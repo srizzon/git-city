@@ -71,7 +71,7 @@ supabase/
 - **Kenney models** (`public/models/trees/*.glb`, `public/models/props/*.glb`): from [Kenney](https://kenney.nl) Nature Kit / City Kit (CC0 — public domain). Free to use, modify, and redistribute; attribution appreciated but not required. These ARE in the repo. Raw unpacked kit folders stay local (`kenney/` is gitignored).
 - **Kenney Car Kit** (`public/models/cars/*.glb`): the sedan body and a wheel from [Kenney](https://kenney.nl/assets/car-kit) Car Kit (CC0). These ARE in the repo.
 - **Drive sounds** (`public/sounds/drive/*.ogg`): `engine`, `skid` and `impact` from [KenneyNL/Starter-Kit-Racing](https://github.com/KenneyNL/Starter-Kit-Racing) (CC0; the skid sound is by Landeplage, also CC0). The horn is synthesized in code, no file.
-- **San Francisco map** (`public/maps/sf.json`): baked from [OpenStreetMap](https://www.openstreetmap.org/copyright) data. OSM data is **ODbL** — the "© OpenStreetMap contributors" credit MUST stay visible on the SF map (rendered in `home-client.tsx`). The committed `public/maps/sf.json` is what ships; the bake script lives under the gitignored `scripts/` folder and is not in the repo.
+- **San Francisco and Bay Area maps** (`public/maps/sf.json`, `public/maps/bay.json`, `src/lib/maps/bay-lots.json`): baked from [OpenStreetMap](https://www.openstreetmap.org/copyright) data (the Bay from a Geofabrik extract). OSM data is **ODbL** — the "© OpenStreetMap contributors" credit MUST stay visible on the map (rendered in `home-client.tsx`). The committed files are what ship; the bake scripts live under the gitignored `scripts/` folder and are not in the repo.
 
 ## Key files
 

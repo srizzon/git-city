@@ -34,12 +34,12 @@ interface TermLine {
 
 const LIME = "#c8e64a";
 
-// Static facts about the baked SF map (public/maps/sf.json). The map file
-// only changes when scripts/bake-sf-map.mjs reruns, so these are constants.
-const BUILDINGS = 169458;
-const STREETS = 4883;
-const PARKS = 327;
-const SF_KIB = 2724; // 2,789,497 bytes
+// Static facts about the baked Bay Area map (public/maps/bay.json). The map
+// file only changes when scripts/bake-bay-map.mjs reruns, so these are constants.
+const BUILDINGS = 1196228;
+const STREETS = 25097;
+const PARKS = 1017;
+const SF_KIB = 6144; // 6292211 bytes
 
 // Fallbacks for when the snapshot stats haven't arrived yet (script reaches
 // the developer lines before fetch completes on slow connections).

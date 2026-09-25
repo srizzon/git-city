@@ -3,10 +3,11 @@ import { gzipSync } from "zlib";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { buildDropsArray, CITY_DEV_COLUMNS, loadCityExtras, mergeCityExtras } from "@/lib/city-extras";
 import { selectPlacedDevelopers, type CityLot, type DeveloperRecord, type SFMapAsset } from "@/lib/github";
-import { seedLotsFromLayout } from "@/lib/city-sf-layout";
+import { seedLotsFromLayout, type SeedLot } from "@/lib/city-sf-layout";
 import { computeLayoutNorms } from "@/lib/city-layout-core";
 import { encodeSnapshotV2, SNAPSHOT_V2_PATH } from "@/lib/city-snapshot-format";
 import sfMapJson from "../../../../../public/maps/sf.json";
+import bayLotsJson from "@/lib/maps/bay-lots.json";
 
 export const maxDuration = 300;
 
@@ -14,6 +15,8 @@ const STORAGE_BUCKET = "city-data";
 const STORAGE_PATH = "snapshot.json";
 const PAGE_SIZE = 1000; // Supabase PostgREST caps at 1000 rows per request
 const SEED_BATCH = 4000;
+const FILL_BATCH = 5000;
+const FILL_MAX_BATCHES = 20; // up to 100k per run; later runs finish the rest
 const LOT_COLUMNS = "id, x, z, max_w, max_d, downtown, developer_id";
 const MAP = "sf";
 
@@ -86,19 +89,50 @@ export async function GET(request: NextRequest) {
   // First run after migration 147 (or a fresh environment): freeze today's
   // layout into city_lots. A run that died halfway is cleared first, and the
   // lots only count once finish_city_lots_seed marks the seed complete.
+  // Seeds a map's lots unless its seed is complete; a half-finished one is
+  // cleared first, and its lots only count once finish_city_lots_seed runs.
+  const seedMap = async (map: string, seed: SeedLot[]): Promise<number | string> => {
+    const reset = await sb.rpc("reset_city_lots_seed", { p_map: map });
+    if (reset.error) return `reset_city_lots_seed(${map}): ${reset.error.message}`;
+    let n = 0;
+    for (let i = 0; i < seed.length; i += SEED_BATCH) {
+      const { data, error } = await sb.rpc("seed_city_lots", { p_map: map, p_lots: seed.slice(i, i + SEED_BATCH) });
+      if (error) return `seed_city_lots(${map}): ${error.message}`;
+      n += (data as number) ?? 0;
+    }
+    const done = await sb.rpc("finish_city_lots_seed", { p_map: map });
+    if (done.error) return `finish_city_lots_seed(${map}): ${done.error.message}`;
+    return n;
+  };
+
+  // First run after migration 147 (or a fresh environment): freeze today's
+  // layout into SF's lots.
   let seeded = 0;
   if (lots && lots.length === 0 && devs.length > 0) {
-    const seed = seedLotsFromLayout(devs as unknown as DeveloperRecord[], sfMapJson as unknown as SFMapAsset);
-    const reset = await sb.rpc("reset_city_lots_seed", { p_map: MAP });
-    if (reset.error) return NextResponse.json({ error: `reset_city_lots_seed: ${reset.error.message}` }, { status: 500 });
-    for (let i = 0; i < seed.length; i += SEED_BATCH) {
-      const { data, error } = await sb.rpc("seed_city_lots", { p_map: MAP, p_lots: seed.slice(i, i + SEED_BATCH) });
-      if (error) return NextResponse.json({ error: `seed_city_lots: ${error.message}` }, { status: 500 });
-      seeded += (data as number) ?? 0;
-    }
-    const done = await sb.rpc("finish_city_lots_seed", { p_map: MAP });
-    if (done.error) return NextResponse.json({ error: `finish_city_lots_seed: ${done.error.message}` }, { status: 500 });
+    const r = await seedMap(MAP, seedLotsFromLayout(devs as unknown as DeveloperRecord[], sfMapJson as unknown as SFMapAsset));
+    if (typeof r === "string") return NextResponse.json({ error: r }, { status: 500 });
+    seeded += r;
     lots = await loadLots();
+  }
+
+  // The Bay Area around SF (scripts/bake-bay-map.mjs): empty lots, seeded once.
+  let filled = 0;
+  if (lots && lots.length > 0) {
+    const { data: bayDone, error: bayErr } = await sb.from("city_lot_seeds").select("map").eq("map", "bay").maybeSingle();
+    if (!bayErr && !bayDone) {
+      const { w, d, lots: bay } = bayLotsJson as { w: number; d: number; lots: [number, number, number][] };
+      const r = await seedMap("bay", bay.map(([x, z, ring]) => ({ x, z, w, d, ring, downtown: false, dev_id: null })));
+      if (typeof r === "string") return NextResponse.json({ error: r }, { status: 500 });
+      seeded += r;
+    }
+    // Free lots go to developers without one: claimed first, then by rank.
+    for (let i = 0; i < FILL_MAX_BATCHES; i++) {
+      const { data, error } = await sb.rpc("fill_city_lots", { p_limit: FILL_BATCH });
+      if (error) { console.error("fill_city_lots:", error.message); break; }
+      filled += (data as number) ?? 0;
+      if (((data as number) ?? 0) < FILL_BATCH) break;
+    }
+    if (filled > 0 || seeded > 0) lots = await loadLots();
   }
 
   // Each developer carries their lot, so clients place buildings instead of
@@ -191,6 +225,7 @@ export async function GET(request: NextRequest) {
     lots: lots?.length ?? 0,
     lots_held: lotByDev.size,
     lots_seeded: seeded,
+    lots_filled: filled,
     v2_size_kb: Math.round(compressedV2.length / 1024),
     duration_ms: Date.now() - started,
   });
