@@ -1,31 +1,48 @@
 // ─── League city grid ───────────────────────────────────────
-// Square grid of LOT-unit lots centered on (0,0). A city of `size` lots spans
-// x, z in [-size/2, size - size/2 - 1] (size is always even). Mirrors the
-// checks in apply_league_city_ops (migration 126).
+// A grid of LOT-unit lots anchored at the entrance. A city of half-width `h`
+// spans x in [-h, h] and z in [-2h+1, 0]: south is +z, so z = 0 is the
+// entrance row, and the city grows north, east and west, never south. Mirrors
+// league_city_bounds (migration 144).
 //
 // Directions and `rot`: clockwise from north (-z), in degrees.
 //   0 = N (-z), 90 = E (+x), 180 = S (+z), 270 = W (-x).
 // In three.js (y up), a clockwise turn seen from above is rotation.y = -rot.
 
 export const LOT = 48;
-export const START_SIZE = 12;
-export const MAX_SIZE = 40;
+/** 13 × 12 lots. */
+export const START_H = 6;
+/** 41 × 40 lots. */
+export const MAX_H = 20;
 export const GROW_AT = 0.7;
 
 export type Rot = 0 | 90 | 180 | 270;
 
-/** Lowest lot coordinate on each axis. */
-export function minLot(size: number): number {
-  return -Math.floor(size / 2);
+export interface LotBounds {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
 }
 
-/** Highest lot coordinate on each axis. */
-export function maxLot(size: number): number {
-  return size - Math.floor(size / 2) - 1;
+/** Lot range of a city of half-width h (inclusive). */
+export function bounds(h: number): LotBounds {
+  return { x0: -h, x1: h, z0: -2 * h + 1, z1: 0 };
 }
 
-export function inBounds(size: number, x: number, z: number): boolean {
-  return x >= minLot(size) && x <= maxLot(size) && z >= minLot(size) && z <= maxLot(size);
+/** Number of lots in the city. */
+export function lotCount(h: number): number {
+  return (2 * h + 1) * 2 * h;
+}
+
+export function inBounds(h: number, x: number, z: number): boolean {
+  const b = bounds(h);
+  return x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1;
+}
+
+/** World-space rectangle of the city's ground (lot edges). */
+export function worldBounds(h: number): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  const b = bounds(h);
+  return { minX: (b.x0 - 0.5) * LOT, maxX: (b.x1 + 0.5) * LOT, minZ: (b.z0 - 0.5) * LOT, maxZ: (b.z1 + 0.5) * LOT };
 }
 
 /** Center of a lot in world units. */
@@ -38,22 +55,22 @@ export function worldToLot(wx: number, wz: number): [number, number] {
   return [Math.round(wx / LOT), Math.round(wz / LOT)];
 }
 
-/** World-space center and width of the terrain (it is off-center by half a lot). */
-export function terrainBounds(size: number): { cx: number; cz: number; width: number } {
-  const c = ((minLot(size) + maxLot(size)) / 2) * LOT;
-  return { cx: c, cz: c, width: size * LOT };
+/** World-space center and size of the terrain. */
+export function terrainBounds(h: number): { cx: number; cz: number; width: number; depth: number } {
+  const w = worldBounds(h);
+  return { cx: (w.minX + w.maxX) / 2, cz: (w.minZ + w.maxZ) / 2, width: w.maxX - w.minX, depth: w.maxZ - w.minZ };
 }
 
-/** True when `occupied` objects fill more than GROW_AT of the terrain. */
-export function shouldGrow(occupied: number, size: number): boolean {
-  return size < MAX_SIZE && occupied > GROW_AT * size * size;
+/** True when `occupied` lot objects fill more than GROW_AT of the terrain. */
+export function shouldGrow(occupied: number, h: number): boolean {
+  return h < MAX_H && occupied > GROW_AT * lotCount(h);
 }
 
-/** Size after growing one ring at a time until occupancy is under the threshold. */
-export function grownSize(occupied: number, size: number): number {
-  let s = size;
-  while (shouldGrow(occupied, s)) s += 2;
-  return s;
+/** Half-width after growing one step at a time until occupancy is under the threshold. */
+export function grownH(occupied: number, h: number): number {
+  let n = h;
+  while (shouldGrow(occupied, n)) n += 1;
+  return n;
 }
 
 export function rotToRadians(rot: number): number {

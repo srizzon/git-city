@@ -2,7 +2,7 @@
 // Client-side mirror of apply_league_city_ops' bounds and lot checks, so the
 // editor ghost can show green/red before a save.
 
-import { inBounds } from "./grid";
+import { inBounds, type LotBounds } from "./grid";
 import type { CityObject } from "./types";
 
 export type PlaceResult = { ok: true } | { ok: false; reason: "out_of_bounds" | "lot_taken" };
@@ -10,26 +10,21 @@ export type PlaceResult = { ok: true } | { ok: false; reason: "out_of_bounds" | 
 type Lot = Pick<CityObject, "id" | "x" | "z">;
 
 /** Whether (x, z) is free for a new object, or for `movingId` to move there. */
-export function canPlace(objects: readonly Lot[], size: number, x: number, z: number, movingId?: string): PlaceResult {
-  if (!Number.isInteger(x) || !Number.isInteger(z) || !inBounds(size, x, z)) return { ok: false, reason: "out_of_bounds" };
+export function canPlace(objects: readonly Lot[], h: number, x: number, z: number, movingId?: string): PlaceResult {
+  if (!Number.isInteger(x) || !Number.isInteger(z) || !inBounds(h, x, z)) return { ok: false, reason: "out_of_bounds" };
   for (const o of objects) {
     if (o.x === x && o.z === z && o.id !== movingId) return { ok: false, reason: "lot_taken" };
   }
   return { ok: true };
 }
 
-/** Free lots in the order auto-placement picks them: touching a road first, then nearest the center. */
-export function freeLotsInOrder(
-  occupied: ReadonlySet<string>,
-  roads: ReadonlySet<string>,
-  lo: number,
-  hi: number,
-): [number, number][] {
+/** Free lots in the order auto-placement picks them: touching a road first, then nearest the entrance. */
+export function freeLotsInOrder(occupied: ReadonlySet<string>, roads: ReadonlySet<string>, b: LotBounds): [number, number][] {
   const touchesRoad = (x: number, z: number) =>
     roads.has(lotKey(x, z - 1)) || roads.has(lotKey(x + 1, z)) || roads.has(lotKey(x, z + 1)) || roads.has(lotKey(x - 1, z));
   const lots: { x: number; z: number; road: boolean }[] = [];
-  for (let x = lo; x <= hi; x++) {
-    for (let z = lo; z <= hi; z++) {
+  for (let x = b.x0; x <= b.x1; x++) {
+    for (let z = b.z0; z <= b.z1; z++) {
       if (!occupied.has(lotKey(x, z))) lots.push({ x, z, road: touchesRoad(x, z) });
     }
   }

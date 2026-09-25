@@ -16,12 +16,12 @@ describe("lPath", () => {
   const tree = (x: number, z: number) => ({ x, z, item_type: "tree_oak" as const });
 
   it("skips existing road lots", () => {
-    expect(lPath([0, 0], [3, 0], [road(1, 0)], 12)).toEqual([[0, 0], [2, 0], [3, 0]]);
+    expect(lPath([0, 0], [3, 0], [road(1, 0)], 6)).toEqual([[0, 0], [2, 0], [3, 0]]);
   });
   it("stops at an occupied lot", () => {
-    expect(lPath([0, 0], [3, 0], [tree(2, 0)], 12)).toEqual([[0, 0], [1, 0]]);
+    expect(lPath([0, 0], [3, 0], [tree(2, 0)], 6)).toEqual([[0, 0], [1, 0]]);
   });
   it("stops at the edge", () => {
-    expect(lPath([4, 0], [8, 0], [], 12)).toEqual([[4, 0], [5, 0]]);
+    expect(lPath([5, 0], [9, 0], [], 6)).toEqual([[5, 0], [6, 0]]);
   });
 });

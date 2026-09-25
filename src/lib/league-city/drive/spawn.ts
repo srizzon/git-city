@@ -1,10 +1,13 @@
 // ─── Spawn and recovery ─────────────────────────────────────
 // Where the car starts (and respawns): on the road in front of your building,
-// else the crossing nearest the center, else the free lot nearest the center.
+// else the entrance road facing north, so the car drives in through the
+// portal; a city without its entrance road falls back to the crossing nearest
+// the entrance, then the free lot nearest it.
 // Also flip detection and the push-out lot when a building lands on the car.
 
 import { lotKey } from "../placement";
-import { LOT, maxLot, minLot } from "../grid";
+import { LOT, bounds } from "../grid";
+import { ENTRANCE_SPAWN } from "../identity-geometry";
 import type { CityObject } from "../types";
 
 /** City units, and a heading in degrees clockwise from north. */
@@ -38,7 +41,7 @@ function neighbors(roads: ReadonlySet<string>, x: number, z: number): number {
   return DIRS.filter(([dx, dz]) => roads.has(lotKey(x + dx, z + dz))).length;
 }
 
-export function spawnPoint(objects: readonly Obj[], viewerDevId: number | null, size: number): Spawn {
+export function spawnPoint(objects: readonly Obj[], viewerDevId: number | null, h: number): Spawn {
   const roads = roadSet(objects);
   const at = (x: number, z: number, rot: number): Spawn => ({ x: x * LOT, z: z * LOT, rot });
 
@@ -51,6 +54,8 @@ export function spawnPoint(objects: readonly Obj[], viewerDevId: number | null, 
     }
   }
 
+  if (roads.has(lotKey(0, 0))) return { ...ENTRANCE_SPAWN };
+
   let best: { x: number; z: number; score: number } | null = null;
   for (const key of roads) {
     const [x, z] = key.split(",").map(Number);
@@ -60,7 +65,7 @@ export function spawnPoint(objects: readonly Obj[], viewerDevId: number | null, 
   }
   if (best) return at(best.x, best.z, roadHeading(roads, best.x, best.z));
 
-  const [x, z] = nearestFreeLot(objects, size, 0, 0) ?? [0, 0];
+  const [x, z] = nearestFreeLot(objects, h, 0, 0) ?? [0, 0];
   return at(x, z, 0);
 }
 
@@ -73,7 +78,7 @@ export function isFlipped(up: { y: number }): boolean {
  * The lot nearest a world point (city units) with no building and no prop
  * near its center, or null when the city is full.
  */
-export function nearestFreeLot(objects: readonly Obj[], size: number, wx: number, wz: number): [number, number] | null {
+export function nearestFreeLot(objects: readonly Obj[], h: number, wx: number, wz: number): [number, number] | null {
   const taken = new Set<string>();
   for (const o of objects) {
     if (o.kind === "building") taken.add(lotKey(o.x, o.z));
@@ -81,8 +86,9 @@ export function nearestFreeLot(objects: readonly Obj[], size: number, wx: number
   }
   let best: [number, number] | null = null;
   let bestD = Infinity;
-  for (let x = minLot(size); x <= maxLot(size); x++) {
-    for (let z = minLot(size); z <= maxLot(size); z++) {
+  const b = bounds(h);
+  for (let x = b.x0; x <= b.x1; x++) {
+    for (let z = b.z0; z <= b.z1; z++) {
       if (taken.has(lotKey(x, z))) continue;
       const d = (x * LOT - wx) ** 2 + (z * LOT - wz) ** 2;
       if (d < bestD) {

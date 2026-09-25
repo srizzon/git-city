@@ -6,6 +6,7 @@ import type { CityObject } from "../types";
 import { buildColliders, colliderKey } from "./colliders";
 import { deadzone, readInput, type GamepadLike } from "./input";
 import { isFlipped, nearestFreeLot, spawnPoint } from "./spawn";
+import { ENTRANCE_SPAWN } from "../identity-geometry";
 import { surfaceAt, surfaceIndex } from "./surface";
 import { SURFACE, UNIT_TO_M } from "./tuning";
 
@@ -23,7 +24,7 @@ const building = (login: string, x: number, z: number, width: number, depth: num
 
 describe("colliders", () => {
   it("sizes a building cuboid from its footprint, in meters", () => {
-    const [c] = buildColliders([], [building("ana", LOT, 0, 30, 20, 100)], 12);
+    const [c] = buildColliders([], [building("ana", LOT, 0, 30, 20, 100)], 6);
     expect(c).toMatchObject({ id: "building:ana", body: "fixed" });
     expect(c.pos[0]).toBeCloseTo(LOT * UNIT_TO_M);
     expect(c.pos[1]).toBeCloseTo(50 * UNIT_TO_M);
@@ -45,13 +46,13 @@ describe("colliders", () => {
   });
 
   it("skips roads and plazas (surfaces need no collider)", () => {
-    const cs = buildColliders([lot("r", "road", 0, 0), lot("p", "plaza", 1, 0)], [], 12);
+    const cs = buildColliders([lot("r", "road", 0, 0), lot("p", "plaza", 1, 0)], [], 6);
     expect(cs.find((c) => c.id === "r" || c.id === "p")).toBeUndefined();
   });
 
   it("turns the ramp wedge with its rotation, for every angle", () => {
     for (let rot = 0; rot < 360; rot++) {
-      const [c] = buildColliders([prop("ramp", "ramp", 0, 0, rot)], [], 12);
+      const [c] = buildColliders([prop("ramp", "ramp", 0, 0, rot)], [], 6);
       if (c.shape.type !== "hull") throw new Error("ramp should be a hull");
       const p = c.shape.points;
       expect(p).toHaveLength(18);
@@ -69,15 +70,29 @@ describe("colliders", () => {
     }
   });
 
-  it("walls the terrain edge and follows the city size", () => {
-    const small = buildColliders([], [], 12).filter((c) => c.id.startsWith("wall"));
-    const big = buildColliders([], [], 14).filter((c) => c.id.startsWith("wall"));
+  it("walls the terrain rectangle and follows the city size, south edge fixed", () => {
+    const small = buildColliders([], [], 6).filter((c) => c.id.startsWith("wall"));
+    const big = buildColliders([], [], 7).filter((c) => c.id.startsWith("wall"));
     expect(small).toHaveLength(4);
-    const north = (cs: typeof small) => cs.find((c) => c.id.startsWith("wall-n"))!;
-    // 12 lots: lots -6..5, north edge at -6.5 lots.
-    expect(north(small).pos[2]).toBeLessThan(-6.5 * LOT * UNIT_TO_M);
-    expect(north(big).pos[2]).toBeLessThan(north(small).pos[2]);
-    expect(colliderKey(north(small))).not.toBe(colliderKey(north(big)));
+    const wall = (cs: typeof small, side: string) => cs.find((c) => c.id.startsWith(`wall-${side}`))!;
+    // h = 6: lots z -11..0, north edge at -11.5 lots, south at 0.5; x -6..6.
+    expect(wall(small, "n").pos[2]).toBeLessThan(-11.5 * LOT * UNIT_TO_M);
+    expect(wall(small, "s").pos[2]).toBeGreaterThan(0.5 * LOT * UNIT_TO_M);
+    expect(wall(small, "e").pos[0]).toBeGreaterThan(6.5 * LOT * UNIT_TO_M);
+    expect(wall(big, "n").pos[2]).toBeLessThan(wall(small, "n").pos[2]);
+    expect(wall(big, "s").pos[2]).toBeCloseTo(wall(small, "s").pos[2]);
+    expect(colliderKey(wall(small, "n"))).not.toBe(colliderKey(wall(big, "n")));
+  });
+
+  it("gives the portal and billboards two posts the car passes between, flags a pole, planes nothing", () => {
+    const mine = (objs: CityObject[]) => buildColliders(objs, [], 6).filter((c) => !/^(wall|ground)/.test(c.id));
+    const portal = mine([prop("pt", "portal", 0, 4)]);
+    expect(portal).toHaveLength(2);
+    expect(portal[0].pos[0]).toBeLessThan(0);
+    expect(portal[1].pos[0]).toBeGreaterThan(0);
+    expect(mine([prop("b", "billboard", LOT, -LOT)])).toHaveLength(2);
+    expect(mine([prop("f", "flag", LOT, -LOT)])).toHaveLength(1);
+    expect(mine([prop("pl", "plane", 0, -LOT), prop("bl", "blimp", 0, -LOT)])).toHaveLength(0);
   });
 });
 
@@ -150,22 +165,26 @@ describe("input", () => {
 
 describe("spawn", () => {
   const city = [
-    lot("r0", "road", 0, 0), lot("r1", "road", 1, 0), lot("r2", "road", -1, 0), lot("r3", "road", 0, 1), lot("r4", "road", 0, -1),
-    lot("r5", "road", 3, 2), lot("r6", "road", 3, 3),
-    bld("mine", 7, 4, 2),
+    lot("r0", "road", 0, 0), lot("r1", "road", 0, -1), lot("r2", "road", 0, -2), lot("r3", "road", 1, -2), lot("r4", "road", -1, -2),
+    lot("r5", "road", 3, -4), lot("r6", "road", 3, -5),
+    bld("mine", 7, 4, -4),
   ];
 
   it("starts on the road in front of your building, along the road", () => {
-    expect(spawnPoint(city, 7, 12)).toEqual({ x: 3 * LOT, z: 2 * LOT, rot: 0 });
+    expect(spawnPoint(city, 7, 6)).toEqual({ x: 3 * LOT, z: -4 * LOT, rot: 0 });
   });
 
-  it("starts at the crossing nearest the center when you have no building", () => {
-    expect(spawnPoint(city, null, 12)).toMatchObject({ x: 0, z: 0 });
-    expect(spawnPoint(city, 99, 12)).toMatchObject({ x: 0, z: 0 });
+  it("starts on the entrance road facing north when you have no building", () => {
+    expect(spawnPoint(city, null, 6)).toEqual(ENTRANCE_SPAWN);
+    expect(spawnPoint(city, 99, 6)).toEqual(ENTRANCE_SPAWN);
+  });
+
+  it("falls back to the crossing nearest the entrance without an entrance road", () => {
+    expect(spawnPoint(city.slice(1), null, 6)).toMatchObject({ x: 0, z: -2 * LOT });
   });
 
   it("falls back to the nearest free lot when there are no roads", () => {
-    const s = spawnPoint([bld("b", 1, 0, 0)], null, 12);
+    const s = spawnPoint([bld("b", 1, 0, 0)], null, 6);
     expect(Math.abs(s.x) + Math.abs(s.z)).toBe(LOT);
   });
 
@@ -176,14 +195,14 @@ describe("spawn", () => {
   });
 
   it("pushes out to the nearest lot without a building or a prop", () => {
-    const objs = [bld("a", 1, 1, 0), prop("t", "tree_oak", 2 * LOT, 0)];
-    expect(nearestFreeLot(objs, 12, 1.4 * LOT, 0.2 * LOT)).toEqual([1, 1]);
-    expect(nearestFreeLot(objs, 12, 0.9 * LOT, 0)).toEqual([0, 0]);
+    const objs = [bld("a", 1, 1, -1), prop("t", "tree_oak", 2 * LOT, -LOT)];
+    expect(nearestFreeLot(objs, 6, 1.4 * LOT, -0.8 * LOT)).toEqual([1, 0]);
+    expect(nearestFreeLot(objs, 6, 0.9 * LOT, -LOT)).toEqual([0, -1]);
   });
 
   it("returns null when every lot is taken", () => {
     const full: CityObject[] = [];
-    for (let x = -6; x <= 5; x++) for (let z = -6; z <= 5; z++) full.push(bld(`${x},${z}`, x * 100 + z, x, z));
-    expect(nearestFreeLot(full, 12, 0, 0)).toBeNull();
+    for (let x = -6; x <= 6; x++) for (let z = -11; z <= 0; z++) full.push(bld(`${x},${z}`, x * 100 + z, x, z));
+    expect(nearestFreeLot(full, 6, 0, 0)).toBeNull();
   });
 });
