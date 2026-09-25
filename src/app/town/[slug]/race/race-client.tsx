@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { THEMES, ThemeLights, type CityTheme } from "@/components/city/theme";
-import { createRaceTelemetry, type LapNews, type RaceView, type RunResult } from "@/lib/league-city/race/telemetry";
+import { createRaceTelemetry, type LapNews, type RaceView, type RunResult, type TrialResult } from "@/lib/league-city/race/telemetry";
 import RaceHud, { type LapFeedItem } from "@/components/race/RaceHud";
 import { isDesktop } from "@/components/towns/useDesktop";
 import type { RaceCameraMode } from "@/components/race/RaceCamera";
@@ -16,6 +16,7 @@ import type { RoomBests } from "@/lib/league-city/race/net";
 import type { BoardRow } from "@/lib/league-city/race/board";
 import { pointAt, theTrack } from "@/lib/league-city/race/track";
 import { M_TO_UNIT } from "@/lib/league-city/drive/tuning";
+import { TRIAL, runCounts, type TrialStage } from "@/lib/league-city/race/trial";
 
 // The town's race track: one Canvas in daylight (read at a glance from the
 // high camera), the track and the race room (RaceWorld, loaded on the client
@@ -24,6 +25,8 @@ import { M_TO_UNIT } from "@/lib/league-city/drive/tuning";
 const RaceWorld = dynamic(() => import("@/components/race/RaceWorld"), { ssr: false, loading: () => null });
 
 const MUTE_KEY = "gc:drive-muted";
+const totalKey = (slug: string) => `gc:race-total:${slug}`;
+
 
 // A clear afternoon: blue sky, warm sun, soft fill, no fog to speak of.
 const DAY: CityTheme = {
@@ -78,7 +81,21 @@ export default function RaceClient({
   const [failed, setFailed] = useState(false);
   const [camera, setCamera] = useState<RaceCameraMode>("high");
   const [ghostMs, setGhostMs] = useState<number | null>(null);
-  const [run, setRun] = useState<RunResult | null>(null);
+  const [run, setRun] = useState<TrialResult | null>(null);
+  // Title → flyover → countdown → run → finish; R goes back to a short countdown.
+  const [trial, setTrial] = useState<{ stage: TrialStage; at: number; beat: number }>({
+    stage: "title",
+    at: 0,
+    beat: TRIAL.beatMs,
+  });
+  // After the line: 0 FINISH, 1 banner gone, 2 results in.
+  const [finishBeat, setFinishBeat] = useState(0);
+  const goStage = useCallback((stage: TrialStage, beat?: number) => {
+    setFinishBeat(0);
+    setTrial((t) =>
+      t.stage === stage && stage !== "countdown" ? t : { stage, at: performance.now(), beat: beat ?? t.beat },
+    );
+  }, []);
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(false);
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
@@ -115,15 +132,71 @@ export default function RaceClient({
   const toggleCamera = useCallback(() => setCamera((c) => (c === "high" ? "close" : "high")), []);
   const exit = useCallback(() => router.push(`/town/${slug}`), [router, slug]);
 
-  // The car is stopped on the results, so R comes from here.
+  // Past the line the autopilot has the car, so R comes from here.
   useEffect(() => {
-    if (!run) return;
+    if (trial.stage !== "finish") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "KeyR" && !e.repeat) restartRef.current?.();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [run]);
+    const t1 = setTimeout(() => setFinishBeat(1), TRIAL.bannerMs);
+    const t2 = setTimeout(() => setFinishBeat(2), TRIAL.resultsMs);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [trial.stage]);
+
+  // Title: Enter or Space starts. The flyover runs once, any key skips it.
+  const begin = useCallback(() => goStage("intro"), [goStage]);
+  useEffect(() => {
+    if (!ready || paused) return;
+    if (trial.stage === "title") {
+      const onKey = (e: KeyboardEvent) => {
+        if ((e.code === "Enter" || e.code === "Space") && !e.repeat) {
+          e.preventDefault();
+          begin();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }
+    if (trial.stage === "intro") {
+      const skip = (e: KeyboardEvent) => {
+        if (e.key !== "Escape" && !e.repeat) goStage("countdown", TRIAL.beatMs);
+      };
+      window.addEventListener("keydown", skip);
+      const t = setTimeout(() => goStage("countdown", TRIAL.beatMs), TRIAL.introMs);
+      return () => {
+        window.removeEventListener("keydown", skip);
+        clearTimeout(t);
+      };
+    }
+  }, [ready, paused, trial.stage, begin, goStage]);
+
+  const onRun = useCallback(
+    (r: RunResult | null) => {
+      if (!r) return setRun(null);
+      let prevBest: number | null = null;
+      try {
+        const v = Number(localStorage.getItem(totalKey(slug)));
+        prevBest = v > 0 ? v : null;
+      } catch {
+        // storage blocked: every run is a first
+      }
+      const record = runCounts(r.laps) && (prevBest === null || r.total < prevBest);
+      if (record) {
+        try {
+          localStorage.setItem(totalKey(slug), String(r.total));
+        } catch {
+          // storage blocked
+        }
+      }
+      setRun({ ...r, prevBest, record });
+    },
+    [slug],
+  );
 
   // Esc pauses; Esc again on the pause menu leaves the track.
   useEffect(() => {
@@ -218,7 +291,12 @@ export default function RaceClient({
             startRef={startRef}
             onGhost={setGhostMs}
             restartRef={restartRef}
-            onRun={setRun}
+            onRun={onRun}
+            stage={trial.stage}
+            stageAt={trial.at}
+            beatMs={trial.beat}
+            onStage={goStage}
+            frameLeft={trial.stage === "finish" && finishBeat === 2}
           />
         )}
       </Canvas>
@@ -239,6 +317,9 @@ export default function RaceClient({
         signedIn={!!viewerLogin}
         ghostMs={ghostMs}
         run={run}
+        stage={trial.stage}
+        finishBeat={finishBeat}
+        onBegin={begin}
         you={name}
         onStart={() => startRef.current?.()}
         onRestart={() => restartRef.current?.()}

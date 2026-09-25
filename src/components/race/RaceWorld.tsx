@@ -23,7 +23,7 @@ import { useDriveInput } from "@/components/league/drive/useDriveInput";
 import { useDrivePresence } from "@/components/league/drive/useDrivePresence";
 import type { Spawn } from "@/lib/league-city/drive/spawn";
 import type { SurfaceGrip } from "@/lib/league-city/drive/surface";
-import { CHASSIS, GRAVITY, M_TO_UNIT, SURFACE, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
+import { CHASSIS, GRAVITY, M_TO_UNIT, SURFACE, TURBO, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
 import {
   carHeading,
   headingFromRot,
@@ -35,10 +35,13 @@ import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { TRACK, locate, pointAt, type Track } from "@/lib/league-city/race/track";
 import { curbRuns, wallSegments } from "@/lib/league-city/race/layout";
 import { newLapState, restartLaps, stepLaps } from "@/lib/league-city/race/laps";
-import { idleRace, inRace, litLights, type RaceState } from "@/lib/league-city/race/race";
+import { RACE, idleRace, inRace, litLights, type RaceState } from "@/lib/league-city/race/race";
 import type { RaceServerMsg, RaceWelcome, RoomBests } from "@/lib/league-city/race/net";
 import TrackScene from "./TrackScene";
-import RaceCamera, { type RaceCameraMode } from "./RaceCamera";
+import RaceCamera, { type RaceCameraMode, type RaceShot } from "./RaceCamera";
+import { autopilot, type AutopilotState } from "@/lib/league-city/race/autopilot";
+import { sfx } from "@/lib/league-city/race/sfx";
+import { TRIAL, countdownBeat, judgeLaunch, trialLights, type TrialStage } from "@/lib/league-city/race/trial";
 import { DriftSparks, Ghost } from "./Ghost";
 import {
   GhostRecorder,
@@ -59,6 +62,11 @@ import {
 // tank that drifting fills), everyone else's, and the race room. The room
 // times the laps; this runs the same lap logic locally only for the running
 // clock, the wrong-way warning and where R puts you (the last checkpoint).
+//
+// The time trial runs through stages (trial.ts) the page sets: the car waits
+// on the grid through the title and the flyover, is held through 3-2-1 (the
+// throttle only judges the rocket start), runs three laps timed from GO, and
+// past the line drives itself while the results show.
 
 export interface RaceWorldProps {
   track: Track;
@@ -86,6 +94,14 @@ export interface RaceWorldProps {
   restartRef: React.MutableRefObject<(() => void) | null>;
   /** A time trial run ended (its laps and total), or null when a new one starts. */
   onRun: (r: RunResult | null) => void;
+  /** The trial stage, when it began (performance.now) and the countdown's beat (ms). */
+  stage: TrialStage;
+  stageAt: number;
+  beatMs: number;
+  /** Move the trial on (the countdown's end, the finish, a restart). */
+  onStage: (stage: TrialStage, beatMs?: number) => void;
+  /** The results are up: the camera keeps the car to the left. */
+  frameLeft: boolean;
 }
 
 const BUMP_SHARE = 0.7;
@@ -93,6 +109,8 @@ const BUMP_HOP = 1.2;
 const BUMP_DEDUPE_MS = 500;
 const U = M_TO_UNIT;
 const NONE: never[] = [];
+
+const SHOTS: Record<TrialStage, RaceShot> = { title: "title", intro: "intro", countdown: "follow", run: "follow", finish: "tv" };
 
 class Boundary extends Component<{ onFail: () => void; children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -178,6 +196,11 @@ export default function RaceWorld({
   onGhost,
   restartRef,
   onRun,
+  stage,
+  stageAt,
+  beatMs,
+  onStage,
+  frameLeft,
 }: RaceWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -196,14 +219,31 @@ export default function RaceWorld({
 
   // Held on the grid until the lights go out.
   const [frozen, setFrozen] = useState(false);
-  // A time trial run is RUN_LAPS laps; once it's done the car stops until R.
-  const [finished, setFinished] = useState(false);
+  // A time trial run is RUN_LAPS laps from GO. `lead`: GO to the first crossing of the line, part of lap 1.
   const run = useRef<{
     start: number | null;
+    lead: number;
     laps: { ms: number; valid: boolean }[];
     done: boolean;
-  }>({ start: null, laps: [], done: false });
-  const input = useDriveInput(paused || frozen || finished);
+  }>({ start: null, lead: 0, laps: [], done: false });
+  // No hands on the title, the flyover and past the finish (the autopilot drives).
+  const input = useDriveInput(paused || frozen || stage === "title" || stage === "intro" || stage === "finish");
+  const stageRef = useRef({ stage, at: stageAt, beat: beatMs });
+  useEffect(() => {
+    stageRef.current = { stage, at: stageAt, beat: beatMs };
+  }, [stage, stageAt, beatMs]);
+  // The countdown: the beat last shown, and since when the throttle has been down (ms in).
+  const count = useRef({ at: 0, beat: -1, heldFrom: null as number | null });
+  const stallUntil = useRef(0);
+  const pilot = useRef<AutopilotState>({ s: null });
+  const raceLaps = useRef(0);
+  const mutedRef = useRef(muted);
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
+  const say = useCallback((play: () => void) => {
+    if (!mutedRef.current && !document.hidden) play();
+  }, []);
   const car = useRef<CarApi | null>(null);
   const impact = useRef({ strength: 0, at: 0 });
   const fx = useRef(new Map<string, FxSource>());
@@ -214,9 +254,9 @@ export default function RaceWorld({
   const placedFor = useRef(0);
   const contacts = useRef(new Map<string, number>());
 
-  const cb = useRef({ onRace, onLap, onBests, onReceipt, onGhost, onRun });
+  const cb = useRef({ onRace, onLap, onBests, onReceipt, onGhost, onRun, onStage });
   useEffect(() => {
-    cb.current = { onRace, onLap, onBests, onReceipt, onGhost, onRun };
+    cb.current = { onRace, onLap, onBests, onReceipt, onGhost, onRun, onStage };
   });
   // Your best lap here: the ghost, its splits and time.
   const best = useRef<GhostRun | null>(null);
@@ -263,6 +303,9 @@ export default function RaceWorld({
     respawnAt.current = spotSpawn(g.x, g.z, g.heading);
     restartLaps(laps.current);
     laps.current.s = null;
+    raceLaps.current = 0;
+    run.current = { start: null, lead: 0, laps: [], done: false };
+    cb.current.onRun(null);
   }, [track]);
 
   const onOther = (msg: { t: string } & Record<string, unknown>) => {
@@ -277,11 +320,22 @@ export default function RaceWorld({
     const m = msg as unknown as RaceServerMsg;
     if (m.t === "race") {
       offset.current = m.now - Date.now();
+      const was = race.current;
       race.current = m.race;
       progressRef.current = m.progress;
       takeSlot();
       const me = selfRef.current;
       setFrozen(!!me && m.race.phase === "countdown" && inRace(m.race, me));
+      // A race you're in takes over the trial; your finish in it is a finish like any other.
+      const st = stageRef.current.stage;
+      if (me && inRace(m.race, me) && m.race.phase === "countdown" && st !== "run") cb.current.onStage("run");
+      const done = (r: RaceState) => !!me && r.finished.some((f) => f.id === me);
+      if (done(m.race) && !done(was) && m.race.startsAt === was.startsAt) {
+        say(sfx.finish);
+        pilot.current = { s: null };
+        send({ t: "auto" });
+        cb.current.onStage("finish");
+      }
       publish();
     } else if (m.t === "lap" || m.t === "void") {
       cb.current.onLap(m);
@@ -343,11 +397,13 @@ export default function RaceWorld({
     recorder.current.clear();
     tel.current.lapStart = null;
     tel.current.split = null;
-    run.current = { start: null, laps: [], done: false };
+    run.current = { start: null, lead: 0, laps: [], done: false };
     tel.current.runLap = 1;
     tel.current.runStart = null;
-    setFinished(false);
     cb.current.onRun(null);
+    // Straight back to a short countdown, like Trackmania.
+    if (stageRef.current.stage !== "title" && stageRef.current.stage !== "intro")
+      cb.current.onStage("countdown", TRIAL.retryBeatMs);
   };
 
   // The HUD button: what R does, from outside the car.
@@ -356,6 +412,7 @@ export default function RaceWorld({
       const c = car.current;
       if (!c) return;
       if (racingNow()) {
+        if (stageRef.current.stage === "finish") return;
         const at = respawnAt.current;
         if (at) placeCar(c.body, at.x * UNIT_TO_M, at.z * UNIT_TO_M, headingFromRot(at.rot));
         return;
@@ -382,6 +439,47 @@ export default function RaceWorld({
     if (frozen && serverNow >= r.startsAt) setFrozen(false);
     const c = car.current;
     if (!c) return;
+    const now = performance.now();
+    const sg = stageRef.current;
+    hud.countdown = null;
+    if (sg.stage === "countdown" && !racingNow()) {
+      // 3-2-1-GO on the gantry and a beep a beat. The car is held; the throttle only judges the launch.
+      const cd = count.current;
+      if (cd.at !== sg.at) Object.assign(cd, { at: sg.at, beat: -1, heldFrom: null });
+      const el = now - sg.at;
+      const beat = countdownBeat(el, sg.beat);
+      const raw = input.current.input;
+      if (raw.throttle > 0) cd.heldFrom ??= el;
+      else cd.heldFrom = null;
+      input.current.input = { ...raw, throttle: 0, brake: 0, steer: 0, handbrake: false, boost: false };
+      lit.current = trialLights(beat);
+      hud.lights = 0;
+      hud.countdown = beat;
+      if (beat !== cd.beat) {
+        cd.beat = beat;
+        if (beat > 0) say(sfx.beep);
+      }
+      if (beat === 0) {
+        say(sfx.go);
+        hud.goAt = now;
+        const launch = judgeLaunch(cd.heldFrom, sg.beat);
+        hud.launch = { kind: launch, at: now };
+        if (launch === "rocket") {
+          const lv = TRIAL.rocketLevel;
+          Object.assign(c.state, { pushLevel: lv, turboLeft: TURBO.seconds[lv], turboPush: TURBO.push, turboFired: lv });
+          say(sfx.rocket);
+        } else if (launch === "early") stallUntil.current = now + TRIAL.stallMs;
+        run.current = { start: serverNow, lead: 0, laps: [], done: false };
+        cb.current.onStage("run");
+      }
+    }
+    // A jumped launch: the wheels spin for a moment.
+    if (now < stallUntil.current) input.current.input = { ...input.current.input, throttle: 0 };
+    // Past the finish the car drives itself.
+    if (sg.stage === "finish") {
+      const p0 = c.body.translation();
+      input.current.input = autopilot(track, pilot.current, p0.x, p0.z, carHeading(c.body), c.state.speed);
+    }
     // What Shift would fire: the banked turbo, or the one this drift is charging.
     hud.driftLevel = Math.max(
       c.state.turboStored,
@@ -409,7 +507,6 @@ export default function RaceWorld({
     }
     // The grid slot, in case the race news came before the car existed.
     if (r.phase === "countdown") takeSlot();
-    const now = performance.now();
     if (now - lastStep.current < 66) return;
     lastStep.current = now;
     const p = c.body.translation();
@@ -429,10 +526,18 @@ export default function RaceWorld({
         const pb = best.current?.splits[e.k];
         if (TRACK.splits.includes(e.k) && pb !== undefined && l.lapStart !== null && l.valid) {
           hud.split = { delta: Math.round(e.at - l.lapStart - pb), at: performance.now() };
+          if (sg.stage === "run") say(() => sfx.chime(hud.split!.delta <= 0));
         }
       }
       if (e.t === "lap") {
-        if (best.current) hud.split = { delta: e.ms - best.current.ms, at: performance.now() };
+        if (best.current && sg.stage === "run") {
+          hud.split = { delta: e.ms - best.current.ms, at: performance.now() };
+          say(() => sfx.chime(hud.split!.delta <= 0));
+        }
+        if (racing && ++raceLaps.current === RACE.laps - 1) {
+          hud.finalLapAt = performance.now();
+          say(sfx.finalLap);
+        }
         const lap = rec.finish(e.ms);
         const pb = e.valid && !!lap && (!best.current || e.ms < best.current.ms);
         if (pb && lap) {
@@ -442,22 +547,41 @@ export default function RaceWorld({
         }
         // The run: RUN_LAPS laps from the first crossing, then the flag.
         const rn = run.current;
-        if (!racing && !rn.done && rn.start !== null) {
-          rn.laps.push({ ms: e.ms, valid: e.valid });
+        if (!racing && !rn.done && rn.start !== null && sg.stage === "run") {
+          // Lap 1 runs from GO: the roll up to the line is part of it.
+          rn.laps.push({ ms: rn.laps.length === 0 ? e.ms + rn.lead : e.ms, valid: e.valid });
+          if (rn.laps.length === RUN_LAPS - 1) {
+            hud.finalLapAt = performance.now();
+            say(sfx.finalLap);
+          }
           if (rn.laps.length >= RUN_LAPS) {
             rn.done = true;
-            setFinished(true);
+            say(sfx.finish);
+            pilot.current = { s: null };
+            send({ t: "auto" });
+            cb.current.onStage("finish");
             cb.current.onRun({ laps: [...rn.laps], total: Math.round(e.at - rn.start) });
           }
         }
       }
-      if (e.t === "start" && !racing && !run.current.done)
-        run.current = { start: e.at, laps: [], done: false };
+      if (e.t === "start" && !racing && !run.current.done) {
+        // After a race, practice has no countdown: the run starts at the line.
+        if (run.current.start === null) run.current = { start: e.at, lead: 0, laps: [], done: false };
+        else run.current.lead = Math.max(0, e.at - run.current.start);
+      }
       if (e.t === "start" || e.t === "lap") rec.begin(e.at);
     }
     if (!racing && !respawnAt.current) respawnAt.current = spawn;
     // In a race the clock runs from lights out; otherwise it's the lap under way.
-    hud.lapStart = racing && r.phase === "live" ? r.startsAt : run.current.done ? null : l.lapStart;
+    const rn = run.current;
+    hud.lapStart =
+      racing && r.phase === "live"
+        ? r.startsAt
+        : rn.done || sg.stage === "countdown"
+          ? null
+          : rn.start !== null && rn.laps.length === 0
+            ? rn.start
+            : l.lapStart;
     hud.runLap = Math.min(RUN_LAPS, run.current.laps.length + 1);
     hud.runStart = racing || run.current.done ? null : run.current.start;
     hud.wrongWay = l.wrongWay;
@@ -506,7 +630,7 @@ export default function RaceWorld({
             offset={() => offset.current}
             show={() => !racingNow()}
           />
-          <RaceCamera mode={camera} car={car} />
+          <RaceCamera mode={camera} car={car} track={track} shot={SHOTS[stage]} shotAt={stageAt} frameLeft={frameLeft} />
           <CameraKey input={input} onToggle={onCameraToggle} />
           <Ready onReady={onReady} />
         </Physics>

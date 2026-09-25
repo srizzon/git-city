@@ -20,15 +20,21 @@ import {
   type LapNews,
   type RaceTelemetry,
   type RaceView,
-  type RunResult,
+  type TrialResult,
 } from "@/lib/league-city/race/telemetry";
 import { theTrack } from "@/lib/league-city/race/track";
+import type { TrialStage } from "@/lib/league-city/race/trial";
 
 // Race track HUD, after Trackmania. Top center: the lap clock, and under it
 // how you stand against your best lap at each split (green ahead, red
 // behind). Top left: your best, the medals and the town record. Top right:
 // camera, sound, exit, the town's board and who's on track. Bottom: speed and
 // the mini-turbo charge. Center: start lights, wrong way, race results.
+//
+// Around the run it frames the moment: letterbox bars on the title (the run's
+// card sits in the bottom bar, on black, so it reads) and the flyover, big
+// 3-2-1-GO numbers, a FINAL LAP banner, then past the line the driving HUD
+// goes, FINISH slams in and the results slide in on the right.
 
 const SEG =
   "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
@@ -66,6 +72,9 @@ export default function RaceHud({
   signedIn,
   ghostMs,
   run,
+  stage,
+  finishBeat,
+  onBegin,
   you,
   onStart,
   onRestart,
@@ -91,7 +100,11 @@ export default function RaceHud({
   /** Your best lap in this browser (the ghost's), ms. */
   ghostMs: number | null;
   /** The time trial run that just ended, or null while driving one. */
-  run: RunResult | null;
+  run: TrialResult | null;
+  stage: TrialStage;
+  /** After the line: 0 FINISH, 1 banner gone, 2 results in. */
+  finishBeat: number;
+  onBegin: () => void;
   you: string;
   onStart: () => void;
   onRestart: () => void;
@@ -109,6 +122,9 @@ export default function RaceHud({
   const turbo = useRef<HTMLSpanElement>(null);
   const flash = useRef<HTMLSpanElement>(null);
   const wrong = useRef<HTMLDivElement>(null);
+  const finalLap = useRef<HTMLDivElement>(null);
+  const launch = useRef<HTMLSpanElement>(null);
+  const [cue, setCue] = useState("");
   const [lights, setLights] = useState(0);
   const [go, setGo] = useState(false);
   // The race timers and the feed's fading read this; it ticks once a second.
@@ -172,6 +188,22 @@ export default function RaceHud({
         }
       }
       if (wrong.current) wrong.current.dataset.on = String(telemetry.wrongWay);
+      // 3, 2, 1, then GO for a moment.
+      const n = telemetry.countdown;
+      const nextCue =
+        n !== null && n > 0 ? String(n) : performance.now() - telemetry.goAt < 800 ? "Go" : "";
+      setCue((c) => (c === nextCue ? c : nextCue));
+      if (finalLap.current)
+        finalLap.current.dataset.on = String(performance.now() - telemetry.finalLapAt < 2200);
+      if (launch.current) {
+        const l = telemetry.launch;
+        const on = !!l && l.kind !== "none" && performance.now() - l.at < 1400;
+        launch.current.dataset.on = String(on);
+        if (l && on) {
+          launch.current.textContent = l.kind === "rocket" ? "Rocket start!" : "Too early";
+          launch.current.dataset.kind = l.kind;
+        }
+      }
       if (telemetry.lights !== lastLights) {
         if (lastLights === RACE.lights && telemetry.lights === 0) setGo(true);
         lastLights = telemetry.lights;
@@ -213,11 +245,15 @@ export default function RaceHud({
   );
   const medal = medalFor(pb);
   const record = board[0] ?? null;
+  // The driving HUD shows from the countdown to the line.
+  const live = ready && (stage === "countdown" || stage === "run");
+  const bars = ready && (stage === "title" || stage === "intro");
+  const boardRank = board.find((b) => b.login.toLowerCase() === you.toLowerCase())?.rank ?? null;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
       {/* Clock and split */}
-      {ready && (
+      {live && (
         <div className="absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-1.5">
           <div className={`${HUD_BOX} flex flex-col items-center px-5 py-2`}>
             <span className="text-[9px] text-muted">
@@ -269,7 +305,7 @@ export default function RaceHud({
       )}
 
       {/* Your best, the medals and the map */}
-      {ready && (
+      {live && (
         <div className="absolute left-4 top-4 flex w-[210px] flex-col gap-3">
           <section className={`${HUD_BOX} px-3 py-2.5`}>
             <p className="flex items-baseline justify-between text-[9px] text-muted">
@@ -356,7 +392,7 @@ export default function RaceHud({
         </button>
       </div>
 
-      {ready && (
+      {live && (
         <div className="absolute right-4 top-20 flex w-[230px] flex-col gap-3">
           <section className={`${HUD_BOX} px-3 py-2.5`}>
             <p className="text-[9px] text-cream">{townName} best laps</p>
@@ -454,69 +490,103 @@ export default function RaceHud({
         </div>
       )}
 
-      {/* Time trial finished */}
-      {run && !racing && (
-        <section
-          className={`${HUD_BOX} pointer-events-auto absolute left-1/2 top-1/2 w-[320px] -translate-x-1/2 -translate-y-1/2 px-5 py-4`}
-        >
-          <p className="text-center text-[10px] text-lime">Finish</p>
-          <p className="mt-1 text-center text-3xl text-cream tabular-nums">
-            {formatLap(run.total)}
-          </p>
-          <ol className="mt-3 space-y-1 border-t-2 border-border pt-3">
-            {run.laps.map((l, i) => {
-              const fastest =
-                l.valid && l.ms === Math.min(...run.laps.filter((x) => x.valid).map((x) => x.ms));
-              return (
-                <li key={i} className="flex items-center justify-between text-[11px] tabular-nums">
-                  <span className="text-muted">Lap {i + 1}</span>
-                  <span
-                    className={
-                      !l.valid ? "text-dim line-through" : fastest ? "text-lime" : "text-cream"
-                    }
-                  >
-                    {formatLap(l.ms)}
-                    {!l.valid && <span className="ml-2 text-[8px] no-underline">void</span>}
+      {/* Title: the run's card in the bottom letterbox bar, on black */}
+      <div
+        className={`absolute inset-x-0 top-0 bg-black transition-[height] duration-500 ease-out ${bars ? "h-[11vh]" : "h-0"}`}
+        aria-hidden
+      />
+      <div
+        className={`absolute inset-x-0 bottom-0 overflow-hidden bg-black transition-[height] duration-500 ease-out ${bars ? "h-[16vh] min-h-[96px]" : "h-0"}`}
+      >
+        {ready && stage === "title" && (
+          <div className="mx-auto flex h-full max-w-5xl items-center justify-between gap-6 px-8">
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] text-lime">Time trial · {RUN_LAPS} laps</p>
+              <p className="flex items-center gap-4 text-[10px] text-muted">
+                <span>
+                  Your best <span className="text-cream tabular-nums">{pb !== null ? formatLap(pb) : "-:--.---"}</span>
+                </span>
+                {medal && (
+                  <span className="flex items-center gap-1.5" style={{ color: MEDAL_COLORS[medal] }}>
+                    <span className="h-2.5 w-2.5" style={{ background: MEDAL_COLORS[medal] }} aria-hidden />
+                    {medal}
                   </span>
-                </li>
-              );
-            })}
-          </ol>
-          {(() => {
-            const bestLap = Math.min(...run.laps.filter((x) => x.valid).map((x) => x.ms));
-            const m = Number.isFinite(bestLap) ? medalFor(bestLap) : null;
-            const isPb = Number.isFinite(bestLap) && ghostMs !== null && bestLap <= ghostMs;
-            return (
-              <div className="mt-3 flex items-center justify-center gap-3 text-[10px]">
-                {m ? (
-                  <span className="flex items-center gap-1.5" style={{ color: MEDAL_COLORS[m] }}>
-                    <span className="h-3 w-3" style={{ background: MEDAL_COLORS[m] }} aria-hidden />
-                    {m}
-                  </span>
-                ) : (
-                  <span className="text-dim normal-case">No medal yet</span>
                 )}
-                {isPb && <span className="text-lime">New best lap</span>}
-              </div>
-            );
-          })()}
-          <div className="mt-4 grid grid-cols-2 gap-2">
+                {record && (
+                  <span className="normal-case">
+                    Record <span className="text-cream">@{record.login}</span>{" "}
+                    <span className="tabular-nums text-cream">{formatLap(record.best_ms)}</span>
+                  </span>
+                )}
+              </p>
+            </div>
             <button
               type="button"
-              onClick={onRestart}
-              className="flex items-center justify-center gap-2 bg-lime px-3 py-2 text-[10px] text-bg transition-[filter] hover:brightness-110 active:translate-y-px"
+              onClick={onBegin}
+              className="pointer-events-auto flex items-center gap-3 bg-lime px-5 py-3 text-xs text-bg transition-[filter] hover:brightness-110 active:translate-y-px"
             >
-              <span className="border-2 border-bg px-1">R</span> Again
-            </button>
-            <button
-              type="button"
-              onClick={onExit}
-              className="border-2 border-border px-3 py-2 text-[10px] text-cream transition-colors hover:text-lime"
-            >
-              Back to town
+              <span className="animate-pulse">Press Enter</span>
+              <span aria-hidden>▸</span>
             </button>
           </div>
-        </section>
+        )}
+        {ready && stage === "intro" && (
+          <div className="mx-auto flex h-full max-w-5xl items-center justify-end px-8">
+            <p className="text-[9px] text-muted">Any key to skip</p>
+          </div>
+        )}
+      </div>
+
+      {/* 3, 2, 1, GO */}
+      {cue && (
+        <div className="absolute left-1/2 top-[26%] flex -translate-x-1/2 flex-col items-center gap-3">
+          <span
+            key={cue}
+            className={`animate-[race-slam_0.25s_ease-out] text-[88px] leading-none drop-shadow-[0_5px_0_#000] ${cue === "Go" ? "text-lime" : "text-cream"}`}
+          >
+            {cue}
+          </span>
+          {cue !== "Go" && stage === "countdown" && (
+            <span className="bg-bg/80 px-3 py-1 text-[10px] normal-case text-cream">
+              Hold <span className="text-lime">W</span> on 2 for a rocket start
+            </span>
+          )}
+        </div>
+      )}
+      <span
+        ref={launch}
+        data-on="false"
+        data-kind="none"
+        className="absolute left-1/2 top-[40%] -translate-x-1/2 text-2xl opacity-0 drop-shadow-[0_3px_0_#000] transition-opacity data-[kind=early]:text-[#ff6b6b] data-[kind=rocket]:text-lime data-[on=true]:opacity-100"
+        aria-hidden
+      />
+
+      {/* Final lap */}
+      <div
+        ref={finalLap}
+        data-on="false"
+        className="absolute left-1/2 top-[30%] -translate-x-1/2 scale-90 border-y-[3px] border-lime bg-bg/85 px-10 py-2 text-3xl text-lime opacity-0 transition-[opacity,transform] duration-200 data-[on=true]:scale-100 data-[on=true]:opacity-100"
+        aria-hidden
+      >
+        Final lap
+      </div>
+
+      {/* FINISH: slams in on the line, leaves before the results */}
+      {stage === "finish" && finishBeat < 2 && (
+        <div
+          className={`absolute inset-x-0 top-[30%] flex flex-col items-center ${finishBeat === 1 ? "animate-[race-banner-out_0.3s_ease-in_forwards]" : ""}`}
+        >
+          <div className="h-4 w-[min(640px,90vw)] bg-[repeating-conic-gradient(#0b0d12_0_25%,#f4efe6_0_50%)] bg-[length:16px_16px]" />
+          <span className="animate-[race-slam_0.3s_ease-out] py-3 text-7xl text-cream drop-shadow-[0_5px_0_#000]">
+            Finish
+          </span>
+          <div className="h-4 w-[min(640px,90vw)] bg-[repeating-conic-gradient(#0b0d12_0_25%,#f4efe6_0_50%)] bg-[length:16px_16px]" />
+        </div>
+      )}
+
+      {/* Time trial results, over the car driving itself */}
+      {run && !racing && stage === "finish" && finishBeat === 2 && (
+        <TrialCard run={run} ghostMs={ghostMs} rank={boardRank} townName={townName} onRestart={onRestart} onExit={onExit} />
       )}
 
       {/* Wrong way */}
@@ -531,11 +601,17 @@ export default function RaceHud({
       )}
 
       {/* Results */}
-      {r?.phase === "over" && r.finished.length > 0 && serverNow - r.endsAt < 20_000 && (
+      {((r?.phase === "over" && r.finished.length > 0 && serverNow - r.endsAt < 20_000) ||
+        (r && racing && stage === "finish" && finishBeat === 2)) && (
         <section
           className={`${HUD_BOX} absolute left-1/2 top-[30%] w-[300px] -translate-x-1/2 px-4 py-3`}
         >
           <p className="text-center text-[10px] text-lime">Chequered flag</p>
+          {r.phase === "over" && (
+            <p className="mt-1 text-center text-[9px] text-muted">
+              <span className="text-cream">R</span> to drive again
+            </p>
+          )}
           <ol className="mt-2 space-y-1">
             {r.finished.map((f, i) => (
               <li
@@ -556,7 +632,7 @@ export default function RaceHud({
                   <span className="min-w-0 flex-1 truncate normal-case">
                     {who(r.names[id] ?? id)}
                   </span>
-                  <span>DNF</span>
+                  <span>{r.phase === "over" ? "DNF" : "Racing…"}</span>
                 </li>
               ))}
           </ol>
@@ -574,7 +650,7 @@ export default function RaceHud({
       </span>
 
       {/* Speed and mini-turbo */}
-      {ready && (
+      {live && (
         <div
           className={`${HUD_BOX} absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-4 px-4 py-2`}
         >
@@ -609,7 +685,7 @@ export default function RaceHud({
         </div>
       )}
 
-      {ready && (
+      {live && (
         <div
           className={`${HUD_BOX} absolute bottom-4 right-4 px-3 py-2 text-right text-[9px] leading-loose text-muted transition-opacity duration-700 ${hints ? "opacity-100" : "opacity-0"}`}
         >
@@ -620,7 +696,7 @@ export default function RaceHud({
           ))}
         </div>
       )}
-      {ready && !hints && (
+      {live && !hints && (
         <button
           type="button"
           onClick={onRestart}
@@ -657,5 +733,100 @@ export default function RaceHud({
         />
       )}
     </div>
+  );
+}
+
+/** The run's results: total, against your best run, each lap, the medal, and what to do next. */
+function TrialCard({
+  run,
+  ghostMs,
+  rank,
+  townName,
+  onRestart,
+  onExit,
+}: {
+  run: TrialResult;
+  ghostMs: number | null;
+  rank: number | null;
+  townName: string;
+  onRestart: () => void;
+  onExit: () => void;
+}) {
+  const valid = run.laps.filter((x) => x.valid).map((x) => x.ms);
+  const bestLap = valid.length ? Math.min(...valid) : null;
+  const m = medalFor(bestLap);
+  const lapPb = bestLap !== null && ghostMs !== null && bestLap <= ghostMs;
+  const delta = run.prevBest !== null ? run.total - run.prevBest : null;
+  const again = useRef<HTMLButtonElement>(null);
+  useEffect(() => again.current?.focus({ preventScroll: true }), []);
+  return (
+    <section
+      className={`${HUD_BOX} absolute right-[6vw] top-1/2 w-[340px] animate-[race-card-in_0.35s_ease-out_both] px-5 py-4`}
+      style={{ transform: "translateY(-50%)" }}
+    >
+      <div className="flex items-start justify-between">
+        <p className="text-[10px] text-muted">Time trial · {run.laps.length} laps</p>
+        {m && (
+          <span
+            className="animate-[race-slam_0.3s_ease-out_0.4s_both] border-[3px] px-2 py-0.5 text-[10px]"
+            style={{ borderColor: MEDAL_COLORS[m], color: MEDAL_COLORS[m] }}
+          >
+            {m}
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-4xl text-cream tabular-nums">{formatLap(run.total)}</p>
+      <p className="mt-1 flex items-center gap-3 text-[11px] tabular-nums">
+        {run.record ? (
+          <span className="animate-pulse bg-lime px-2 py-0.5 text-bg">New record</span>
+        ) : null}
+        {delta !== null && (
+          <span className={delta < 0 ? "text-lime" : "text-[#ff6b6b]"}>{signed(delta)}</span>
+        )}
+        {delta === null && !run.record && <span className="text-dim normal-case">A lap voided: no record</span>}
+      </p>
+      <ol className="mt-4 space-y-1.5 border-t-2 border-border pt-3">
+        {run.laps.map((l, i) => {
+          const fastest = l.valid && l.ms === bestLap;
+          return (
+            <li key={i} className="flex items-center justify-between text-[11px] tabular-nums">
+              <span className="text-muted">Lap {i + 1}</span>
+              <span className={!l.valid ? "text-dim line-through" : fastest ? "text-lime" : "text-cream"}>
+                {formatLap(l.ms)}
+                {fastest && <span className="ml-2 text-[8px]">best</span>}
+                {!l.valid && <span className="ml-2 text-[8px] no-underline">void</span>}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {(lapPb || rank !== null) && (
+        <p className="mt-3 flex justify-between text-[9px]">
+          {lapPb ? <span className="text-lime">New best lap</span> : <span />}
+          {rank !== null && (
+            <span className="text-muted">
+              #{rank} in {townName}
+            </span>
+          )}
+        </p>
+      )}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button
+          ref={again}
+          type="button"
+          onClick={onRestart}
+          className="flex items-center justify-center gap-2 bg-lime px-3 py-2 text-[10px] text-bg outline-none transition-[filter] hover:brightness-110 focus-visible:ring-2 focus-visible:ring-cream active:translate-y-px"
+        >
+          <span className="border-2 border-bg px-1">R</span> Again
+        </button>
+        <button
+          type="button"
+          onClick={onExit}
+          className="border-2 border-border px-3 py-2 text-[10px] text-cream transition-colors hover:text-lime"
+        >
+          Back to town
+        </button>
+      </div>
+    </section>
   );
 }
