@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { getSupabaseAdmin } from "./supabase";
 import { sendEmail, toResendTag } from "./resend";
+import { mapWithConcurrency } from "./concurrency";
 import { getDeveloperEmail, isRecentlyActive } from "./notification-helpers";
 import { wrapInBaseTemplate } from "./email-template";
 import type { EmailLinks } from "./email/layout";
@@ -129,12 +130,12 @@ export function sendNotificationAsync(payload: NotificationPayload): void {
  * Flush all closed batches. Called by cron job.
  * Returns number of batches flushed.
  */
-export async function flushPendingBatches(): Promise<number> {
+export async function flushPendingBatches(deadline = Infinity): Promise<number> {
   const sb = getSupabaseAdmin();
 
   const { data: batches } = await sb
     .from("notification_batches")
-    .select("id, batch_key, developer_id, notification_type, channel")
+    .select("id, batch_key, developer_id, notification_type, channel, closes_at")
     .is("processed_at", null)
     .lte("closes_at", new Date().toISOString())
     .order("closes_at", { ascending: true })
@@ -144,7 +145,12 @@ export async function flushPendingBatches(): Promise<number> {
 
   let flushed = 0;
 
-  for (const batch of batches) {
+  // Processed batches are deleted (items cascade) so the next batch for the
+  // same key can be created under UNIQUE(batch_key, channel).
+  const removeBatch = (id: number) => sb.from("notification_batches").delete().eq("id", id);
+
+  await mapWithConcurrency(batches, 4, async (batch) => {
+    if (Date.now() > deadline) return;
     try {
       const { data: items } = await sb
         .from("notification_batch_items")
@@ -153,30 +159,26 @@ export async function flushPendingBatches(): Promise<number> {
         .order("created_at", { ascending: true });
 
       if (!items || items.length === 0) {
-        // Empty batch, just mark processed
-        await sb
-          .from("notification_batches")
-          .update({ processed_at: new Date().toISOString() })
-          .eq("id", batch.id);
-        continue;
+        await removeBatch(batch.id);
+        return;
       }
 
       // Build digest notification from batch items
       const digestPayload = buildDigestFromBatch(batch, items);
       if (digestPayload) {
-        await sendNotification(digestPayload);
+        const results = await sendNotification(digestPayload);
+        // Keep a batch whose send errored for the next flush, for up to a day.
+        const errored = results.some((r) => r.skipped === "resend_error" || r.skipped === "send_error");
+        const stale = Date.now() - Date.parse(batch.closes_at) > 86_400_000;
+        if (errored && !stale) return;
       }
 
-      await sb
-        .from("notification_batches")
-        .update({ processed_at: new Date().toISOString() })
-        .eq("id", batch.id);
-
+      await removeBatch(batch.id);
       flushed++;
     } catch (err) {
       console.error(`[notify:batch] Failed to flush batch ${batch.id}:`, err);
     }
-  }
+  });
 
   return flushed;
 }
@@ -297,21 +299,46 @@ async function addToBatch(
       .single();
 
     if (error) {
-      // Race condition: another process created the batch. Try to find it.
-      const { data: raceBatch } = await sb
+      // UNIQUE(batch_key, channel): either another process created the batch,
+      // a closed batch is waiting for the flush cron (join it, it goes out on
+      // the next flush), or a legacy processed row is still holding the key.
+      const { data: pendingBatch } = await sb
         .from("notification_batches")
         .select("id")
         .eq("batch_key", batchKey)
         .eq("channel", channel)
         .is("processed_at", null)
-        .gt("closes_at", new Date().toISOString())
         .maybeSingle();
 
-      if (!raceBatch) {
-        console.error(`[notify:batch] Failed to create/find batch for ${batchKey}:`, error);
-        return { channel, success: false, skipped: "batch_create_failed" };
+      if (pendingBatch) {
+        batchId = pendingBatch.id;
+      } else {
+        // Processed batches are deleted on flush now; clear an old one and retry.
+        await sb
+          .from("notification_batches")
+          .delete()
+          .eq("batch_key", batchKey)
+          .eq("channel", channel)
+          .not("processed_at", "is", null);
+
+        const { data: retryBatch, error: retryError } = await sb
+          .from("notification_batches")
+          .insert({
+            batch_key: batchKey,
+            developer_id: payload.developerId,
+            notification_type: payload.type,
+            channel,
+            closes_at: closesAt,
+          })
+          .select("id")
+          .single();
+
+        if (retryError || !retryBatch) {
+          console.error(`[notify:batch] Failed to create/find batch for ${batchKey}:`, retryError ?? error);
+          return { channel, success: false, skipped: "batch_create_failed" };
+        }
+        batchId = retryBatch.id;
       }
-      batchId = raceBatch.id;
     } else {
       batchId = newBatch.id;
     }
