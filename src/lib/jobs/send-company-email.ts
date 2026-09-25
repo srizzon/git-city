@@ -1,4 +1,4 @@
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { wrapInBaseTemplate } from "@/lib/email-template";
 
 const FROM = "Git City Jobs <noreply@thegitcity.com>";
@@ -8,6 +8,7 @@ const FROM = "Git City Jobs <noreply@thegitcity.com>";
  * - Base template
  * - Text fallback
  * - List-Unsubscribe header (links to support email)
+ * Throws on a Resend error so callers don't record the email as sent.
  */
 export async function sendCompanyEmail(opts: {
   to: string;
@@ -16,8 +17,7 @@ export async function sendCompanyEmail(opts: {
   text: string;
   replyTo?: string;
 }) {
-  const resend = getResend();
-  await resend.emails.send({
+  const { error } = await sendEmail({
     from: FROM,
     to: opts.to,
     subject: opts.subject,
@@ -28,4 +28,5 @@ export async function sendCompanyEmail(opts: {
       "List-Unsubscribe": "<mailto:support@thegitcity.com?subject=Unsubscribe>",
     },
   });
+  if (error) throw new Error(`Resend error: ${error.message}`);
 }

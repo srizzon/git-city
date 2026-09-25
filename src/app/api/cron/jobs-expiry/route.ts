@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       const expiredIds = expired.map((l) => l.id);
       await admin
         .from("job_listings")
-        .update({ status: "expired", expiry_notified: "expired" })
+        .update({ status: "expired" })
         .in("id", expiredIds);
 
       for (const listing of expired) {
@@ -109,6 +109,11 @@ export async function GET(req: NextRequest) {
               hires: hireCount ?? 0,
             },
           );
+
+          await admin
+            .from("job_listings")
+            .update({ expiry_notified: "expired" })
+            .eq("id", listing.id);
 
           results.expired++;
         } catch (err) {
