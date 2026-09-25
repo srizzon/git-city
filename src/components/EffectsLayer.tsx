@@ -129,6 +129,12 @@ const EFFECTS_MAX_RADIUS = 9000;
 // calls as one up close. Sized by footprint only (height just locates the
 // roof), so a short building's crown shows exactly like a tower's up close.
 const MIN_EFFECT_FOOTPRINT_PX = 6;
+// Phones: each cosmetic is ~10 draw calls and iOS Safari pays heavily per call
+// (~750 calls kept an iPhone 15 at ~10 fps on the home view). Cosmetics show
+// once a building is big enough on screen to read them, and fewer at a time.
+const IS_TOUCH = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+const TOUCH_MIN_EFFECT_FOOTPRINT_PX = 24;
+const TOUCH_MAX_ACTIVE = 60;
 // Raid tag text is legible only up close; below this footprint the LED panel
 // draws as a solid glow of its average color (instanced, InstancedEffects).
 const RAID_TEXT_MIN_PX = 60;
@@ -167,7 +173,7 @@ export default function EffectsLayer({
   lowPerf,
 }: EffectsLayerProps) {
   const effectsRadius = lowPerf ? LOW_PERF_RADIUS : EFFECTS_RADIUS;
-  const maxActiveEffects = lowPerf ? LOW_PERF_MAX_ACTIVE : MAX_ACTIVE_EFFECTS;
+  const maxActiveEffects = lowPerf ? LOW_PERF_MAX_ACTIVE : IS_TOUCH ? TOUCH_MAX_ACTIVE : MAX_ACTIVE_EFFECTS;
   const lastUpdate = useRef(-1);
   const activeSetRef = useRef(new Set<number>());
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
@@ -253,7 +259,8 @@ export default function EffectsLayer({
     // px per world unit at distance 1 — footprint px = width * pxPerUnit / dist.
     const fov = (camera as THREE.PerspectiveCamera).fov ?? 55;
     const pxPerUnit = size.height / (2 * Math.tan((fov * Math.PI) / 360));
-    const minPxSq = MIN_EFFECT_FOOTPRINT_PX * MIN_EFFECT_FOOTPRINT_PX;
+    const minPx = IS_TOUCH ? TOUCH_MIN_EFFECT_FOOTPRINT_PX : MIN_EFFECT_FOOTPRINT_PX;
+    const minPxSq = minPx * minPx;
 
     const candidates = querySpatialGrid(grid, cx, cz, keepRadius);
     const farSq = keepRadius * keepRadius;
