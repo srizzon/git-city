@@ -2089,6 +2089,8 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
   // ── Ensure logged-in user's building always appears + claimed status is fresh ──
   // Covers: page reload, new tab, cache expiry, auth callback failure
   const ensuringAuthBuilding = useRef<string | null>(null);
+  const authBuildingRetries = useRef(0);
+  const [authBuildingRetry, setAuthBuildingRetry] = useState(0);
   const refreshedClaimedStatus = useRef(false);
   useEffect(() => {
     if (!authLogin || buildings.length === 0) return;
@@ -2122,7 +2124,15 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
     (async () => {
       try {
         const res = await fetch(`/api/dev/${encodeURIComponent(authLogin)}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          // Transient (429, 5xx): let the effect run again, a few times, backing off.
+          ensuringAuthBuilding.current = null;
+          if (authBuildingRetries.current < 3) {
+            const n = ++authBuildingRetries.current;
+            setTimeout(() => setAuthBuildingRetry(n), 2000 * 2 ** n);
+          }
+          return;
+        }
         const devData = await res.json();
         if (devData.exists === false) return;
 
@@ -2163,7 +2173,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         ensuringAuthBuilding.current = null;
       }
     })();
-  }, [authLogin, buildings, userParam, stats]);
+  }, [authLogin, buildings, userParam, stats, authBuildingRetry]);
 
   // Handle ?compare=userA,userB deep link
   const compareParam = searchParams.get("compare");
