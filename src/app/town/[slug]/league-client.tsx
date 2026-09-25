@@ -417,10 +417,9 @@ export default function LeagueClient({
             onHonk: (b: CityBuilding) => setFocused(b),
             crownApi,
             onCrown: setCrownView,
-            onRaceGate: goRace,
           }
         : undefined,
-    [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail, league.slug, driverName, goRace],
+    [driving, viewerDevId, telemetry, driveCamera, toggleCamera, muted, paused, onDriveReady, onDriveFail, league.slug, driverName],
   );
 
   // Everyone out driving, drawn in view mode too (the drive room takes over in the car).
@@ -649,11 +648,6 @@ export default function LeagueClient({
         intro={intro}
         onIntroEnd={endIntro}
         onIntroTick={onIntroTick}
-        raceGate={{
-          townName: townDisplayName(league.name),
-          record: raceRecord ? formatLap(raceRecord.best_ms) : null,
-          onClick: goRace,
-        }}
         onPortalClick={!isMember ? () => {
           setFocused(null);
           setPanel("report");

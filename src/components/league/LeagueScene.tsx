@@ -28,7 +28,6 @@ import type { DriveWorldProps } from "./drive/DriveWorld";
 import type { CarFeed } from "./drive/useDrivePresence";
 
 // Drive mode (Rapier, the car, its sounds) loads only when someone drives.
-import RaceGate from "./RaceGate";
 const DriveWorld = dynamic(() => import("./drive/DriveWorld"), { ssr: false, loading: () => null });
 // Other drivers' cars in view mode load only when someone is out driving.
 const WatchedCars = dynamic(() => import("./drive/WatchedCars"), { ssr: false, loading: () => null });
@@ -347,8 +346,6 @@ export interface LeagueSceneProps {
   name?: string;
   /** The portal sign was clicked (report the logo). */
   onPortalClick?: () => void;
-  /** The town's page: the gate to its race track on the approach road (click it in view mode). */
-  raceGate?: { townName: string; record: string | null; onClick: () => void };
   /** First-visit intro; the camera is the intro's until onIntroEnd. */
   /** n: a new number replays it. color: the intro car's paint. */
   intro?: { n: number; color: string } | null;
@@ -386,7 +383,6 @@ export default function LeagueScene({
   identity,
   name = "",
   onPortalClick,
-  raceGate,
   intro = null,
   onIntroEnd,
   onIntroTick,
@@ -524,9 +520,6 @@ export default function LeagueScene({
           onBuildingClick={editing || driving ? undefined : onBuildingClick}
         />
       </Rise>
-      {raceGate && approach.length > 0 && !playing && mode !== "edit" && (
-        <RaceGate townName={raceGate.townName} record={raceGate.record} onClick={mode === "view" ? raceGate.onClick : undefined} />
-      )}
       {watching && mode === "view" && !playing && watching.length > 0 && <WatchedCars cars={watching} />}
       {driving && drive && <DriveWorld objects={withApproach} buildings={buildings} h={h} {...drive} />}
       {children}
