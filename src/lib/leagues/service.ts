@@ -21,6 +21,7 @@ import {
 } from "@/lib/towns/joining";
 import { accountOldEnough } from "@/lib/towns/invites";
 import { sendJoinRequestNotification, sendRequestApprovedNotification } from "@/lib/notification-senders/league-requests";
+import { sendLeagueInvitedNotification } from "@/lib/notification-senders/league-invited";
 
 export { LeagueError } from "./errors";
 
@@ -291,6 +292,8 @@ export interface InviteResult {
   login: string;
   status: MemberStatus;
   created_building: boolean;
+  /** They have a Git City account, so the invite went to their email too. */
+  emailed: boolean;
   link: string;
 }
 
@@ -363,10 +366,10 @@ export async function inviteMember(
   }
 
   let createdBuilding = false;
-  let { data: dev } = await sb.from("developers").select("id, github_login").eq("github_login", login).maybeSingle();
+  let { data: dev } = await sb.from("developers").select("id, github_login, claimed").eq("github_login", login).maybeSingle();
   if (!dev) {
     try {
-      dev = await createDeveloperFromGitHub(login);
+      dev = { ...(await createDeveloperFromGitHub(login)), claimed: false };
       createdBuilding = true;
     } catch (err) {
       if (err instanceof GitHubFetchError) {
@@ -380,6 +383,7 @@ export async function inviteMember(
 
   const existing = await getMembership(league.id, dev.id);
   let status: MemberStatus = existing?.status ?? "invited";
+  const fresh = !existing || existing.status === "former";
   if (!existing) {
     const { error } = await sb.from("league_members").insert({
       league_id: league.id,
@@ -406,10 +410,23 @@ export async function inviteMember(
     status = "invited";
   }
 
+  // Only devs who signed in once have an email on file; everyone else gets the link from the inviter.
+  const emailed = fresh && !createdBuilding && dev.claimed === true;
+  if (emailed) {
+    sendLeagueInvitedNotification({
+      inviteeId: dev.id,
+      inviterLogin: viewer.github_login,
+      leagueId: league.id,
+      leagueName: league.name,
+      link: inviteLink(league.slug, viewer.github_login, dev.github_login),
+    });
+  }
+
   return {
     login: dev.github_login,
     status,
     created_building: createdBuilding,
+    emailed,
     link: inviteLink(league.slug, viewer.github_login, dev.github_login, origin),
   };
 }

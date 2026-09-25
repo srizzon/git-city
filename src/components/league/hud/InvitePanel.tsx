@@ -12,7 +12,7 @@ import { Avatar, NO_AUTOFILL } from "./shared";
 type InviteState =
   | { kind: "idle" }
   | { kind: "sending"; login: string }
-  | { kind: "done"; login: string; avatar: string | null; link: string }
+  | { kind: "done"; login: string; avatar: string | null; link: string; emailed: boolean }
   | { kind: "error"; message: string };
 
 /** What happens to whoever opens the group link, by who shares it and the town's setting. */
@@ -68,7 +68,13 @@ export default function InvitePanel({
         setState({ kind: "error", message: json.error ?? "Couldn't invite." });
         return;
       }
-      setState({ kind: "done", login: json.login, avatar: `https://github.com/${json.login}.png?size=64`, link: json.link });
+      setState({
+        kind: "done",
+        login: json.login,
+        avatar: `https://github.com/${json.login}.png?size=64`,
+        link: json.link,
+        emailed: json.emailed === true,
+      });
       setLogin("");
       // Re-fetch the page so the new building shows up in the city.
       startRefresh(() => router.refresh());
@@ -202,7 +208,9 @@ export default function InvitePanel({
                       <PixelSpinner size={4} /> Placing their building
                     </>
                   ) : (
-                    "Faded until they sign in. Send them this link."
+                    state.emailed
+                      ? "We emailed them the invite. You can send this link too."
+                      : `@${state.login} has no Git City account yet. Send them this link.`
                   )}
                 </p>
               </div>
