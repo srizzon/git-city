@@ -425,8 +425,8 @@ function CameraFocus({
 // ─── Mouse-Driven Flight ─────────────────────────────────────
 
 const DEFAULT_FLY_SPEED = 55;
-const MIN_FLY_SPEED = 30;
-const MAX_FLY_SPEED = 200;
+// Arcade model (Ace Combat, Star Fox): one cruise speed, Shift to boost and
+// Alt to brake, easing back to cruise on release. No throttle wheel.
 const MIN_ALT = 25;
 const MAX_ALT = 900;
 // Boost, easing, camera arm and lens live in FLY_TUNE (FlyTune.tsx, ?tune=1).
@@ -559,11 +559,6 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
         mouse.current.y = -((e.clientY / window.innerHeight) * 2 - 1);
       }
     };
-    const onWheel = (e: WheelEvent) => {
-      if (!paused.current) {
-        flySpeed.current = Math.max(MIN_FLY_SPEED, Math.min(MAX_FLY_SPEED, flySpeed.current - e.deltaY * 0.05));
-      }
-    };
 
     // Touch handlers for mobile joystick
     const onTouchStart = (e: TouchEvent) => {
@@ -605,7 +600,6 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     };
 
     window.addEventListener("mousemove", onMove);
-    window.addEventListener("wheel", onWheel, { passive: true });
 
     // Touch: start on canvas element, move/end on window to catch finger leaving canvas
     const canvas = document.querySelector("canvas");
@@ -619,7 +613,6 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
 
     return () => {
       window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("wheel", onWheel);
       if (canvas) {
         canvas.removeEventListener("touchstart", onTouchStart);
       }

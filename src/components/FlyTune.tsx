@@ -1,29 +1,29 @@
 "use client";
 
-// Live flight tuning (?tune=1 in fly mode). The flight loop reads FLY_TUNE every
+// Live flight tuning (?tune=1 in fly mode). Defaults are Sam's tuned values (2026-09-25). The flight loop reads FLY_TUNE every
 // frame, so dragging a slider changes the feel immediately; "copy" puts the
 // values on the clipboard to bake them in as defaults.
 import { useState } from "react";
 
 export const FLY_TUNE = {
   /** Boost multiplier on the base speed while Shift is held. */
-  boost: 6,
+  boost: 9.5,
   /** How fast speed eases toward its target (1/s). */
-  speedEase: 1.4,
+  speedEase: 2.2,
   /** Camera arm length behind the plane. */
-  camDist: 46,
+  camDist: 74,
   /** Camera height above the plane. */
-  camHeight: 15,
+  camHeight: 24,
   /** How fast the camera swings in behind a turn (1/s): lower = lazier. */
-  camYawLag: 3.5,
+  camYawLag: 6.3,
   /** How fast the camera follows a climb or dive (1/s). */
-  camHeightLag: 3,
+  camHeightLag: 4.2,
   /** How fast turning ramps in and out (1/s). */
-  turnEase: 6,
+  turnEase: 9.5,
   /** How fast climbing ramps in and out (1/s). */
-  climbEase: 4,
+  climbEase: 6.5,
   /** Extra field of view at full boost (degrees). */
-  fovKick: 18,
+  fovKick: 10,
 };
 
 type Key = keyof typeof FLY_TUNE;

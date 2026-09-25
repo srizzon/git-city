@@ -3390,10 +3390,6 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
                         <span>slow</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Scroll</span>
-                        <span>base speed</span>
-                      </div>
-                      <div className="flex items-center gap-2">
                         <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Click / F</span>
                         <span>fire</span>
                       </div>

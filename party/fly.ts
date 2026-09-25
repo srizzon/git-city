@@ -636,11 +636,12 @@ export default class FlyServer implements Party.Server {
       const mag = Math.sqrt(msg.dirX * msg.dirX + msg.dirY * msg.dirY + msg.dirZ * msg.dirZ);
       if (!Number.isFinite(mag) || mag < 0.1 || mag > 5) return;
       // Anti-cheat: claimed spawn must be near the last known pilot position.
-      // 50u tolerance covers high-speed boost + 8u front-of-nose offset.
+      // Moves arrive every ~100 ms and boost tops out ~520 u/s, so the pilot
+      // can be ~55u past its last report, plus the 30u muzzle offset.
       const dxs = msg.x - pilot.x;
       const dys = msg.y - pilot.y;
       const dzs = msg.z - pilot.z;
-      if (dxs * dxs + dys * dys + dzs * dzs > 50 * 50) return;
+      if (dxs * dxs + dys * dys + dzs * dzs > 120 * 120) return;
 
       pilot.recentShots.push(now);
 
