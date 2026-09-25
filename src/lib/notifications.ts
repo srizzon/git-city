@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { getSupabaseAdmin } from "./supabase";
-import { getResend } from "./resend";
+import { sendEmail, toResendTag } from "./resend";
 import { getDeveloperEmail, isRecentlyActive } from "./notification-helpers";
 import { wrapInBaseTemplate } from "./email-template";
 import type { EmailLinks } from "./email/layout";
@@ -428,19 +428,25 @@ async function dispatchEmail(
     fullHtml = wrapInBaseTemplate(bodyHtml, unsubUrl);
   }
 
-  // Send via Resend
-  const resend = getResend();
-  const { data: sent, error } = await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: payload.title,
-    html: fullHtml,
-    text,
-    headers: {
-      "List-Unsubscribe": `<${unsubUrl}>`,
-      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  // Send via Resend (throttled, retried on 429, idempotent per dedup key)
+  const { data: sent, error } = await sendEmail(
+    {
+      from: FROM,
+      to: email,
+      subject: payload.title,
+      html: fullHtml,
+      text,
+      headers: {
+        "List-Unsubscribe": `<${unsubUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+      tags: [
+        { name: "type", value: toResendTag(payload.type) },
+        { name: "category", value: toResendTag(payload.category) },
+      ],
     },
-  });
+    payload.dedupKey ? { idempotencyKey: payload.dedupKey.slice(0, 256) } : undefined,
+  );
 
   const status = error ? "failed" : "sent";
   const providerId = sent?.id;
