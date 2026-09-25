@@ -1,6 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getInviteToken, getLeagueBySlug, getViewer } from "@/lib/leagues/service";
+import { headers } from "next/headers";
+import {
+  countJoinRequests,
+  getInviteToken,
+  getJoinAction,
+  getLeagueBySlug,
+  getOrCreateInviteToken,
+  getViewer,
+  openInviteLink,
+  type League,
+  type Viewer,
+} from "@/lib/leagues/service";
 import { getCityNorms, getGlobalWinner, getLeagueCityDevs, getLeaguePageData } from "@/lib/leagues/queries";
 import { isoDay, weekStart } from "@/lib/leagues/scoring";
 import { getCachedCity } from "@/lib/league-city/service";
@@ -14,7 +25,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string }>;
+  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string; join?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -34,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function LeaguePage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const { invite, ref, t, edit, drive } = await searchParams;
+  const { invite, ref, t, edit, drive, join } = await searchParams;
   const league = await getLeagueBySlug(slug);
   if (!league) notFound();
 
@@ -60,6 +71,14 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   const token = t && tokenMatches(t, inviteToken) ? t : null;
   const refLogin = ref && LOGIN_RE.test(ref) ? ref.toLowerCase() : null;
 
+  const isAdmin = data.viewer?.is_admin === true;
+  const isMember = data.viewer?.status === "active";
+  const [joinAction, pendingRequests, groupLink] = await Promise.all([
+    getJoinAction(league, viewer, !!token),
+    isAdmin && league.kind === "custom" ? countJoinRequests(league.id).catch(() => 0) : Promise.resolve(0),
+    viewer && isMember ? groupInviteLink(league, viewer, isAdmin) : Promise.resolve(null),
+  ]);
+
   return (
     <LeagueClient
       data={data}
@@ -72,7 +91,28 @@ export default async function LeaguePage({ params, searchParams }: Props) {
       refLogin={refLogin}
       startEditing={edit === "1" && data.viewer?.is_admin === true}
       startDriving={drive === "1"}
+      startJoin={join === "1"}
+      joinAction={joinAction}
+      pendingRequests={pendingRequests}
+      groupLink={groupLink}
       badges={badges}
     />
   );
+}
+
+/**
+ * The link a member drops in a group chat. The admin's carries the town's
+ * invite token (anyone who opens it joins); everyone else's is the town with
+ * their ref, so newcomers join or ask by the town's setting.
+ */
+async function groupInviteLink(league: League, viewer: Viewer, isAdmin: boolean): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const origin = (
+    process.env.PORTLESS_URL ?? (host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : "https://thegitcity.com")
+  ).replace(/\/$/, "");
+  if (isAdmin && league.kind === "custom") {
+    return openInviteLink(league.slug, viewer.github_login, await getOrCreateInviteToken(viewer, league), origin);
+  }
+  return `${origin}/town/${league.slug}?ref=${encodeURIComponent(viewer.github_login)}`;
 }

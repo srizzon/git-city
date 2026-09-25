@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Car, Check, LogOut, Pencil, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { Car, Check, Clock, LogIn, LogOut, Pencil, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
 import { Pending } from "@/components/leagues/PixelSpinner";
 import { HUD_BOX } from "./shared";
 
@@ -11,6 +11,9 @@ import { HUD_BOX } from "./shared";
 const SEG = "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
 const BTN = `${SEG} gap-2 px-3 py-2 text-[10px] sm:px-4`;
 const ICON_BTN = `${SEG} w-10 justify-center py-2`;
+// The lime call to action keeps its fill on hover (SEG's white tint would wash it out).
+const PRIMARY_BTN =
+  "flex items-center gap-2 bg-lime px-3 py-2 text-[10px] text-bg transition-[filter] hover:brightness-110 sm:px-4 [&>*]:transition-transform active:[&>*]:translate-y-px";
 const ICON = { size: 14, strokeWidth: 2.5 } as const;
 
 export default function ActionBar({
@@ -22,6 +25,8 @@ export default function ActionBar({
   onEdit,
   onDrive,
   onLeave,
+  join,
+  requests = 0,
 }: {
   slug: string;
   canInvite: boolean;
@@ -32,6 +37,10 @@ export default function ActionBar({
   onDrive?: () => void;
   /** Leaves the league; resolves to an error message, or null when done. */
   onLeave?: () => Promise<string | null>;
+  /** Non-members: join, ask to join, or the pending request. */
+  join?: { kind: "join" | "ask" | "pending"; onClick: () => void };
+  /** Admin: open join requests, shown on the settings icon. */
+  requests?: number;
 }) {
   const [shared, setShared] = useState(false);
   const [coarse, setCoarse] = useState(false);
@@ -102,6 +111,16 @@ export default function ActionBar({
 
   return (
     <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border`}>
+      {join && (
+        <button
+          type="button"
+          onClick={join.onClick}
+          className={join.kind === "pending" ? `${BTN} text-muted hover:text-cream` : PRIMARY_BTN}
+        >
+          {join.kind === "pending" ? <Clock {...ICON} aria-hidden /> : <LogIn {...ICON} aria-hidden />}
+          <span>{join.kind === "join" ? "Join" : join.kind === "ask" ? "Ask to join" : "Requested"}</span>
+        </button>
+      )}
       {onDrive && desktop && (
         <button type="button" onClick={onDrive} title="Drive through the city" className={`${BTN} text-lime hover:text-cream`}>
           <Car {...ICON} aria-hidden />
@@ -143,10 +162,13 @@ export default function ActionBar({
           <span>Work here? Verify</span>
         </Link>
       )}
-      <button type="button" onClick={share} aria-live="polite" className={`${BTN} min-w-[92px] text-cream hover:text-lime`}>
-        {shared ? <Check {...ICON} aria-hidden /> : <Share2 {...ICON} aria-hidden />}
-        <span>{shared ? "Copied" : "Share"}</span>
-      </button>
+      {/* Members share from Invite, with a link that brings people in. */}
+      {!canInvite && (
+        <button type="button" onClick={share} aria-live="polite" className={`${BTN} min-w-[92px] text-cream hover:text-lime`}>
+          {shared ? <Check {...ICON} aria-hidden /> : <Share2 {...ICON} aria-hidden />}
+          <span>{shared ? "Copied" : "Share"}</span>
+        </button>
+      )}
       {isAdmin && canEdit && (
         <button type="button" onClick={onEdit} title="Edit the city" className={`${BTN} text-cream hover:text-lime`}>
           <Pencil {...ICON} aria-hidden />
@@ -177,8 +199,18 @@ export default function ActionBar({
         </span>
       )}
       {isAdmin && (
-        <Link href={`/town/${slug}/settings`} aria-label="Town settings" className={`${ICON_BTN} text-cream hover:text-lime`}>
+        <Link
+          href={requests > 0 ? `/town/${slug}/settings#requests` : `/town/${slug}/settings`}
+          aria-label={requests > 0 ? `Town settings, ${requests} join request${requests === 1 ? "" : "s"}` : "Town settings"}
+          title={requests > 0 ? `${requests} join request${requests === 1 ? "" : "s"}` : "Town settings"}
+          className={`${ICON_BTN} relative text-cream hover:text-lime`}
+        >
           <Settings {...ICON} aria-hidden />
+          {requests > 0 && (
+            <span className="absolute right-1 top-0.5 min-w-[14px] bg-lime px-0.5 text-center text-[8px] leading-[14px] text-bg">
+              {requests > 9 ? "9+" : requests}
+            </span>
+          )}
         </Link>
       )}
       {onLeave && leave === "idle" && (

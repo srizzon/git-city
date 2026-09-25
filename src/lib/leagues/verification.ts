@@ -205,6 +205,7 @@ export async function joinCompanyLeague(
       joined_at: row?.status === "active" && row.joined_at ? row.joined_at : now,
       left_at: null,
       removed_by: null,
+      joined_via: row?.status === "active" ? undefined : "org",
     },
     { onConflict: "league_id,developer_id" },
   );

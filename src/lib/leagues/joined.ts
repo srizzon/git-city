@@ -4,7 +4,7 @@ import { sendLeagueJoinedNotification } from "@/lib/notification-senders/league-
 import { isPublicOrgMember, VERIFICATION_DAYS } from "./verification";
 import { autoPlace } from "@/lib/league-city/service";
 import { earnPixels } from "@/lib/pixels";
-import { oldEnoughForInviteReward } from "@/lib/towns/invites";
+import { accountOldEnough } from "@/lib/towns/invites";
 
 /**
  * An invite became a member: email whoever invited `devId`, give the invitee
@@ -29,7 +29,7 @@ export async function inviteJoined(leagueId: string, devId: number, login: strin
 async function rewardInvite(leagueId: string, devId: number, invitedBy: number) {
   const sb = getSupabaseAdmin();
   const { data: dev } = await sb.from("developers").select("account_created_at").eq("id", devId).single();
-  if (!oldEnoughForInviteReward(dev?.account_created_at as string | null | undefined)) return;
+  if (!accountOldEnough(dev?.account_created_at as string | null | undefined)) return;
   await earnPixels(devId, "town_welcome", leagueId, `town_welcome:${devId}`);
   await sb.rpc("grant_emblem", {
     p_developer_id: invitedBy,
@@ -78,6 +78,7 @@ export async function activateOnClaim(devId: number, login: string): Promise<num
       joined_at: now,
       left_at: null,
       verification: "public",
+      joined_via: "org",
       verified_until: new Date(Date.now() + VERIFICATION_DAYS * 86_400_000).toISOString(),
     };
     hasCompany = true;

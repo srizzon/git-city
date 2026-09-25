@@ -10,6 +10,18 @@ import { cleanLeagueName, isReservedSlug, LOGIN_RE } from "./names";
 import { LeagueError, dbError } from "./errors";
 import { customJoinDecision, newInviteToken, tokenMatches } from "./invite-token";
 import { invalidateLeague } from "./cache";
+import {
+  MAX_PENDING_REQUESTS,
+  REQUEST_TTL_DAYS,
+  isJoinMode,
+  joinAction,
+  type JoinAction,
+  type JoinMode,
+  type JoinRequestRow,
+} from "@/lib/towns/joining";
+import { accountOldEnough } from "@/lib/towns/invites";
+import { sendJoinRequestNotification, sendRequestApprovedNotification } from "@/lib/notification-senders/league-requests";
+import { sendLeagueInvitedNotification } from "@/lib/notification-senders/league-invited";
 
 export { LeagueError } from "./errors";
 
@@ -30,6 +42,8 @@ export interface League {
   created_at: string;
   /** Test leagues: reachable by URL, left out of every listing. */
   hidden?: boolean;
+  /** Custom towns: how newcomers get in (migration 143). */
+  join_mode: JoinMode;
 }
 
 export interface Viewer {
@@ -46,7 +60,7 @@ export const MAX_INVITES_PER_DAY = 20;
 export const MAX_LEAGUES_CREATED_PER_DAY = 5;
 
 /** Every league column except invite_token, which only the admin may read. */
-export const LEAGUE_COLUMNS = "id, slug, name, kind, github_org, scoring_mode, admin_id, created_by, created_at, hidden";
+export const LEAGUE_COLUMNS = "id, slug, name, kind, github_org, scoring_mode, admin_id, created_by, created_at, hidden, join_mode";
 
 // ─── Viewer ─────────────────────────────────────────────────
 
@@ -198,7 +212,7 @@ export async function joinLeague(
   const existing = await getMembership(league.id, viewer.id);
   const needsToken = existing?.status !== "active" && existing?.status !== "invited";
   const tokenOk = needsToken && tokenMatches(token, await getInviteToken(league.id));
-  const decision = customJoinDecision(existing, tokenOk);
+  const decision = customJoinDecision(existing, tokenOk, league.join_mode === "open");
   if (decision === "active") return "active";
   if (decision === "removed") {
     throw new LeagueError("removed", "The admin removed you from this town. Ask them for a new invite.", 403);
@@ -206,7 +220,11 @@ export async function joinLeague(
   if (decision === "needs_invite") {
     throw new LeagueError(
       "needs_invite",
-      token ? "This invite link is no longer valid." : "You need an invite link to join this town.",
+      token
+        ? "This invite link is no longer valid."
+        : league.join_mode === "request"
+          ? "Ask the admin to let you in."
+          : "You need an invite link to join this town.",
       403,
     );
   }
@@ -235,11 +253,13 @@ export async function joinLeague(
       joined_at: new Date().toISOString(),
       left_at: null,
       removed_by: null,
+      joined_via: decision === "invited" ? "invite" : decision === "token" ? "link" : "open",
     },
     { onConflict: "league_id,developer_id" },
   );
   if (error) throw dbError("join_failed", error);
   await autoPlace(league.id, viewer.id);
+  await closeRequest(league.id, viewer.id, null);
 
   // A personal invite, or the open link shared by a member (ref).
   if (existing?.status === "invited" || decision === "token") {
@@ -272,6 +292,8 @@ export interface InviteResult {
   login: string;
   status: MemberStatus;
   created_building: boolean;
+  /** They have a Git City account, so the invite went to their email too. */
+  emailed: boolean;
   link: string;
 }
 
@@ -344,10 +366,10 @@ export async function inviteMember(
   }
 
   let createdBuilding = false;
-  let { data: dev } = await sb.from("developers").select("id, github_login").eq("github_login", login).maybeSingle();
+  let { data: dev } = await sb.from("developers").select("id, github_login, claimed").eq("github_login", login).maybeSingle();
   if (!dev) {
     try {
-      dev = await createDeveloperFromGitHub(login);
+      dev = { ...(await createDeveloperFromGitHub(login)), claimed: false };
       createdBuilding = true;
     } catch (err) {
       if (err instanceof GitHubFetchError) {
@@ -361,6 +383,7 @@ export async function inviteMember(
 
   const existing = await getMembership(league.id, dev.id);
   let status: MemberStatus = existing?.status ?? "invited";
+  const fresh = !existing || existing.status === "former";
   if (!existing) {
     const { error } = await sb.from("league_members").insert({
       league_id: league.id,
@@ -387,12 +410,241 @@ export async function inviteMember(
     status = "invited";
   }
 
+  // Only devs who signed in once have an email on file; everyone else gets the link from the inviter.
+  const emailed = fresh && !createdBuilding && dev.claimed === true;
+  if (emailed) {
+    sendLeagueInvitedNotification({
+      inviteeId: dev.id,
+      inviterLogin: viewer.github_login,
+      leagueId: league.id,
+      leagueName: league.name,
+      link: inviteLink(league.slug, viewer.github_login, dev.github_login),
+    });
+  }
+
   return {
     login: dev.github_login,
     status,
     created_building: createdBuilding,
+    emailed,
     link: inviteLink(league.slug, viewer.github_login, dev.github_login, origin),
   };
+}
+
+// ─── Join requests ──────────────────────────────────────────
+
+const REQUEST_TTL_MS = REQUEST_TTL_DAYS * 86_400_000;
+
+async function getRequest(leagueId: string, devId: number): Promise<JoinRequestRow | null> {
+  const { data } = await getSupabaseAdmin()
+    .from("league_join_requests")
+    .select("status, created_at")
+    .eq("league_id", leagueId)
+    .eq("developer_id", devId)
+    .maybeSingle();
+  return (data as JoinRequestRow | null) ?? null;
+}
+
+/** A pending request ends as approved (joined some other way too) or cancelled. */
+async function closeRequest(leagueId: string, devId: number, decidedBy: number | null, status: "approved" | "cancelled" = "approved") {
+  await getSupabaseAdmin()
+    .from("league_join_requests")
+    .update({ status, decided_at: new Date().toISOString(), decided_by: decidedBy })
+    .eq("league_id", leagueId)
+    .eq("developer_id", devId)
+    .eq("status", "pending");
+}
+
+/** What the town page offers this viewer: join, ask, a pending request, verify, or nothing. */
+export async function getJoinAction(league: League, viewer: Viewer | null, tokenOk: boolean): Promise<JoinAction> {
+  const [membership, request] = viewer
+    ? await Promise.all([getMembership(league.id, viewer.id), getRequest(league.id, viewer.id)])
+    : [null, null];
+  return joinAction({
+    kind: league.kind,
+    mode: league.join_mode,
+    membership: membership ? { status: membership.status, removed_by: membership.removed_by } : null,
+    tokenOk,
+    request,
+  });
+}
+
+/**
+ * Asks to join a town in request mode. Needs a 30+ day old GitHub account;
+ * a dev has at most 5 live requests. The admin gets an email.
+ */
+export async function requestJoin(viewer: Viewer, league: League): Promise<"pending"> {
+  if (league.kind === "company") {
+    throw new LeagueError("needs_verification", "Verify your GitHub org membership to join this town.", 403);
+  }
+  if (league.join_mode !== "request") {
+    throw new LeagueError(
+      "not_requestable",
+      league.join_mode === "open" ? "This town is open: just join." : "This town is invite only.",
+      400,
+    );
+  }
+  const sb = getSupabaseAdmin();
+  const m = await getMembership(league.id, viewer.id);
+  if (m?.status === "active" || m?.status === "invited") {
+    throw new LeagueError("already_member", "You're already in this town. Open your invite to join.", 400);
+  }
+  if (m?.status === "former" && m.removed_by !== null) {
+    throw new LeagueError("removed", "The admin removed you from this town. Ask them for a new invite.", 403);
+  }
+
+  const { data: dev } = await sb.from("developers").select("account_created_at").eq("id", viewer.id).single();
+  if (!accountOldEnough(dev?.account_created_at as string | null | undefined)) {
+    throw new LeagueError("account_too_new", "Your GitHub account needs to be at least 30 days old to ask.", 403);
+  }
+
+  const { data, error } = await sb.rpc("league_request_join", {
+    p_league_id: league.id,
+    p_dev_id: viewer.id,
+    p_max_pending: MAX_PENDING_REQUESTS,
+    p_ttl: `${REQUEST_TTL_DAYS} days`,
+  });
+  if (error) throw dbError("request_failed", error);
+  if (data === "limit") {
+    throw new LeagueError(
+      "request_limit",
+      `You can have ${MAX_PENDING_REQUESTS} requests open at once. Wait for an answer or cancel one.`,
+      429,
+    );
+  }
+  if (data === "requested" && league.admin_id) {
+    sendJoinRequestNotification({
+      adminId: league.admin_id,
+      requesterId: viewer.id,
+      requesterLogin: viewer.github_login,
+      leagueId: league.id,
+      leagueSlug: league.slug,
+      leagueName: league.name,
+    });
+  }
+  return "pending";
+}
+
+export async function cancelJoinRequest(viewer: Viewer, league: League): Promise<void> {
+  await closeRequest(league.id, viewer.id, viewer.id, "cancelled");
+}
+
+export interface JoinRequest {
+  login: string;
+  name: string | null;
+  avatar_url: string | null;
+  contributions: number;
+  account_created_at: string | null;
+  created_at: string;
+}
+
+/** Live pending requests, oldest first. */
+export async function listJoinRequests(viewer: Viewer, league: League): Promise<JoinRequest[]> {
+  requireAdmin(viewer, league);
+  const { data } = await getSupabaseAdmin()
+    .from("league_join_requests")
+    .select(
+      "created_at, developers!league_join_requests_developer_id_fkey(github_login, name, avatar_url, contributions, account_created_at)",
+    )
+    .eq("league_id", league.id)
+    .eq("status", "pending")
+    .gt("created_at", new Date(Date.now() - REQUEST_TTL_MS).toISOString())
+    .order("created_at")
+    .limit(200)
+    .returns<
+      {
+        created_at: string;
+        developers: {
+          github_login: string;
+          name: string | null;
+          avatar_url: string | null;
+          contributions: number;
+          account_created_at: string | null;
+        } | null;
+      }[]
+    >();
+  return (data ?? []).flatMap((r) =>
+    r.developers
+      ? [
+          {
+            login: r.developers.github_login,
+            name: r.developers.name,
+            avatar_url: r.developers.avatar_url,
+            contributions: r.developers.contributions,
+            account_created_at: r.developers.account_created_at,
+            created_at: r.created_at,
+          },
+        ]
+      : [],
+  );
+}
+
+/** Live pending requests for the admin's HUD badge. */
+export async function countJoinRequests(leagueId: string): Promise<number> {
+  const { count } = await getSupabaseAdmin()
+    .from("league_join_requests")
+    .select("developer_id", { count: "exact", head: true })
+    .eq("league_id", leagueId)
+    .eq("status", "pending")
+    .gt("created_at", new Date(Date.now() - REQUEST_TTL_MS).toISOString());
+  return count ?? 0;
+}
+
+/**
+ * Approve: the requester becomes an active member (their building moves in)
+ * and gets an email. Decline: nothing tells the requester; the request just
+ * never turns into a membership.
+ */
+export async function decideJoinRequest(viewer: Viewer, league: League, rawLogin: string, approve: boolean): Promise<void> {
+  requireAdmin(viewer, league);
+  const sb = getSupabaseAdmin();
+  const login = rawLogin.trim().replace(/^@/, "").toLowerCase();
+  const { data: dev } = await sb.from("developers").select("id, github_login").eq("github_login", login).maybeSingle();
+  const request = dev ? await getRequest(league.id, dev.id) : null;
+  if (!dev || request?.status !== "pending" || Date.now() - new Date(request.created_at).getTime() >= REQUEST_TTL_MS) {
+    throw new LeagueError("request_gone", "That request is no longer open.", 404);
+  }
+
+  if (!approve) {
+    const { error } = await sb
+      .from("league_join_requests")
+      .update({ status: "declined", decided_at: new Date().toISOString(), decided_by: viewer.id })
+      .eq("league_id", league.id)
+      .eq("developer_id", dev.id)
+      .eq("status", "pending");
+    if (error) throw dbError("decide_failed", error);
+    return;
+  }
+
+  const existing = await getMembership(league.id, dev.id);
+  if (existing?.status !== "active") {
+    if (!(await takeQuota(dev.id, "membership", MAX_CUSTOM_LEAGUES))) {
+      throw new LeagueError("limit", `@${dev.github_login} is already in ${MAX_CUSTOM_LEAGUES} custom towns.`, 403);
+    }
+    const { error } = await sb.from("league_members").upsert(
+      {
+        league_id: league.id,
+        developer_id: dev.id,
+        status: "active",
+        invited_by: existing?.invited_by ?? null,
+        joined_at: new Date().toISOString(),
+        left_at: null,
+        removed_by: null,
+        joined_via: "request",
+      },
+      { onConflict: "league_id,developer_id" },
+    );
+    if (error) throw dbError("join_failed", error);
+    await autoPlace(league.id, dev.id);
+  }
+  await closeRequest(league.id, dev.id, viewer.id);
+  sendRequestApprovedNotification({
+    developerId: dev.id,
+    adminLogin: viewer.github_login,
+    leagueSlug: league.slug,
+    leagueName: league.name,
+  });
+  invalidateLeague(league.id);
 }
 
 // ─── Admin ──────────────────────────────────────────────────
@@ -405,6 +657,15 @@ export async function setScoringMode(viewer: Viewer, league: League, mode: Scori
   requireAdmin(viewer, league);
   if (mode !== "xp" && mode !== "contributions") throw new LeagueError("invalid_mode", "Unknown scoring mode.");
   const { error } = await getSupabaseAdmin().from("leagues").update({ scoring_mode: mode }).eq("id", league.id);
+  if (error) throw dbError("update_failed", error);
+  invalidateLeague(league.id);
+}
+
+export async function setJoinMode(viewer: Viewer, league: League, mode: unknown): Promise<void> {
+  requireAdmin(viewer, league);
+  if (league.kind !== "custom") throw new LeagueError("company_league", "Company towns are joined by verifying.", 400);
+  if (!isJoinMode(mode)) throw new LeagueError("invalid_mode", "Unknown join setting.");
+  const { error } = await getSupabaseAdmin().from("leagues").update({ join_mode: mode }).eq("id", league.id);
   if (error) throw dbError("update_failed", error);
   invalidateLeague(league.id);
 }

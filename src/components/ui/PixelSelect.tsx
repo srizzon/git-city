@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 // Reusable pixel-art dropdown matching the Git City design system
 // (3px borders, hard pixel shadow, lime accent). Replaces native <select> in
 // forms. Keyboard accessible: ↑/↓ to move, Enter/Space to pick, Esc to close.
+// `searchable` adds a filter box on top, for long lists (a town's members).
 
 export interface PixelOption {
   value: string;
@@ -20,6 +21,8 @@ export function PixelSelect({
   className = "",
   disabled = false,
   ariaLabel,
+  searchable = false,
+  searchPlaceholder = "Search…",
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -28,12 +31,18 @@ export function PixelSelect({
   className?: string;
   disabled?: boolean;
   ariaLabel?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [hi, setHi] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
   const listId = useId();
   const current = options.find((o) => o.value === value);
+  const needle = query.trim().toLowerCase();
+  // Long lists render the first matches only; typing narrows them down.
+  const shown = (needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options).slice(0, 100);
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +54,7 @@ export function PixelSelect({
   }, [open]);
 
   function openMenu() {
+    setQuery("");
     setHi(Math.max(0, options.findIndex((o) => o.value === value)));
     setOpen(true);
   }
@@ -52,6 +62,7 @@ export function PixelSelect({
   function choose(v: string) {
     onChange(v);
     setOpen(false);
+    setQuery("");
   }
 
   function onKey(e: React.KeyboardEvent) {
@@ -60,13 +71,13 @@ export function PixelSelect({
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       if (!open) { openMenu(); return; }
-      if (hi >= 0 && hi < options.length) choose(options[hi].value);
+      if (hi >= 0 && hi < shown.length) choose(shown[hi].value);
       return;
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       if (!open) openMenu();
-      else setHi((h) => Math.min(options.length - 1, h + 1));
+      else setHi((h) => Math.min(shown.length - 1, h + 1));
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
@@ -82,7 +93,7 @@ export function PixelSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
-        onClick={() => !disabled && setOpen((o) => !o)}
+        onClick={() => !disabled && (open ? setOpen(false) : openMenu())}
         onKeyDown={onKey}
         className={`flex w-full items-center justify-between gap-2 border bg-bg px-3 py-2 text-left text-xs outline-none transition-colors ${
           open ? "border-lime" : "border-border hover:border-border-light"
@@ -93,12 +104,26 @@ export function PixelSelect({
       </button>
 
       {open && (
-        <ul
-          role="listbox"
-          id={listId}
-          className="scrollbar-thin absolute left-0 right-0 top-full z-50 mt-1 max-h-60 list-none overflow-auto border-[3px] border-border-light bg-bg-card shadow-[6px_6px_0_0_rgba(0,0,0,0.5)]"
-        >
-          {options.map((o, i) => {
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 border-[3px] border-border-light bg-bg-card shadow-[6px_6px_0_0_rgba(0,0,0,0.5)]">
+          {searchable && (
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setHi(0);
+              }}
+              onKeyDown={onKey}
+              placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+              autoComplete="off"
+              spellCheck={false}
+              className="w-full border-b-[3px] border-border bg-bg px-3 py-2 text-base text-cream normal-case outline-none placeholder:text-dim sm:text-xs"
+            />
+          )}
+          <ul role="listbox" id={listId} className="scrollbar-thin max-h-60 list-none overflow-auto">
+          {searchable && shown.length === 0 && <li className="px-3 py-2 text-[11px] text-dim normal-case">No match.</li>}
+          {shown.map((o, i) => {
             const sel = o.value === value;
             return (
               <li key={o.value}>
@@ -121,7 +146,8 @@ export function PixelSelect({
               </li>
             );
           })}
-        </ul>
+          </ul>
+        </div>
       )}
     </div>
   );
