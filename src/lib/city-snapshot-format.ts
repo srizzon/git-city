@@ -11,13 +11,14 @@
  *  - avatar_url → dropped, rebuilt from the login
  *  - rank → delta from the previous row (rows are rank-ordered)
  *  - always-zero weekly counters (never selected by the cron) → dropped
+ *  - lot → five parallel int columns (x, z, max w, max d, downtown flag)
  *
  * `norms` carries the city-wide maxima the layout normalizes against, so a
  * layout over the trimmed subset matches a layout over everyone.
  *
  * Pure module: imported by the snapshot cron (encode) and the browser (decode).
  */
-import type { LayoutNorms } from "./github";
+import type { CityLot, LayoutNorms } from "./github";
 
 export const SNAPSHOT_V2_PATH = "city-v2.json";
 
@@ -77,6 +78,13 @@ export interface SnapshotV2 {
     pixels_spent: number[];
     /** Optional: snapshots written before leagues don't have it. */
     active_league_crown?: (LeagueCrown | null)[];
+    /** Optional: snapshots written before city lots (146) don't have them. */
+    lot_x?: number[];
+    lot_z?: number[];
+    lot_w?: number[];
+    lot_d?: number[];
+    /** 1 = downtown lot, 0 = not, -1 = no lot. */
+    lot_dt?: number[];
   };
 }
 
@@ -105,6 +113,7 @@ export function encodeSnapshotV2(
     "active_days_last_year", "language_diversity", "app_streak", "rabbit_completed", "district",
     "district_chosen", "xp_total", "xp_level", "owned_items", "custom_color", "billboard_images",
     "achievements", "loadout", "active_raid_tag", "pixels_spent", "active_league_crown",
+    "lot_x", "lot_z", "lot_w", "lot_d", "lot_dt",
   ] as const) {
     (c as Record<string, unknown[]>)[k] = [];
   }
@@ -152,6 +161,12 @@ export function encodeSnapshotV2(
     c.active_raid_tag.push(d.active_raid_tag ?? null);
     c.pixels_spent.push(num(d.pixels_spent));
     c.active_league_crown!.push((d.active_league_crown as LeagueCrown | null | undefined) ?? null);
+    const lot = d.lot as CityLot | null | undefined;
+    c.lot_x!.push(lot ? lot.x : 0);
+    c.lot_z!.push(lot ? lot.z : 0);
+    c.lot_w!.push(lot ? lot.w : 0);
+    c.lot_d!.push(lot ? lot.d : 0);
+    c.lot_dt!.push(lot ? (lot.downtown ? 1 : 0) : -1);
   }
 
   return { v: 2, n: devs.length, c, ...meta } as SnapshotV2;
@@ -212,6 +227,9 @@ export function decodeSnapshotV2(s: SnapshotV2) {
       active_raid_tag: c.active_raid_tag[i],
       pixels_spent: c.pixels_spent[i],
       active_league_crown: c.active_league_crown?.[i] ?? null,
+      lot: c.lot_dt && c.lot_dt[i] >= 0
+        ? { x: c.lot_x![i], z: c.lot_z![i], w: c.lot_w![i], d: c.lot_d![i], downtown: c.lot_dt[i] === 1 }
+        : null,
     };
   }
   return { developers, stats: s.stats, _d: s._d, norms: s.norms, generated_at: s.generated_at };

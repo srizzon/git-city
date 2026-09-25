@@ -139,7 +139,14 @@ export function generateSFCityLayout(
     'mobile', 'gamedev', 'vibe_coder', 'creator', 'security',
   ];
 
-  const { F, candidates, parkPolys } = getSFIndex(asset);
+  // Lot mode: the snapshot carries each building's fixed address (city_lots),
+  // so nothing is computed and nothing moves. The greedy walk below only runs
+  // for data without lots (the cron seeding the lots, or an older snapshot),
+  // and only it needs the footprint index.
+  const lotMode = devs.some((d) => d.lot);
+  const { F, candidates, parkPolys } = lotMode
+    ? { F: asset.footprints, candidates: new Int32Array(0), parkPolys: asset.parks.map((p) => p.p) }
+    : getSFIndex(asset);
   const [dtx, dtz] = asset.meta.downtown;
   const NC = candidates.length;
 
@@ -156,11 +163,47 @@ export function generateSFCityLayout(
     ? calcDepthV2(dev)
     : 12 + seededRandom(hashStr(dev.github_login) + 99) * 16;
 
+  const districtOf = (dev: DeveloperRecord) => {
+    const dctx = dev.district ?? inferDistrict(dev.primary_language);
+    return DISTRICT_ORDER.includes(dctx) ? dctx : inferDistrict(dev.primary_language);
+  };
+  const placed: { dev: DeveloperRecord; x: number; z: number; w: number; d: number; did: string }[] = [];
+  if (lotMode) {
+    for (const dev of devs) {
+      const lot = dev.lot;
+      if (!lot) continue;
+      placed.push({
+        dev, x: lot.x, z: lot.z,
+        w: Math.min(statW(dev), lot.w), d: Math.min(statD(dev), lot.d),
+        did: lot.downtown ? 'downtown' : districtOf(dev),
+      });
+    }
+    // Two devs on one lot: a stale snapshot next to a fresh assignment. The
+    // pinned one (just fetched) wins; otherwise the first keeps it.
+    const byLot = new Map<string, number>();
+    const drop = new Set<number>();
+    placed.forEach((p, i) => {
+      const k = `${p.x},${p.z}`;
+      const prev = byLot.get(k);
+      if (prev === undefined) { byLot.set(k, i); return; }
+      const pinnedNow = pinned?.has(p.dev.github_login.toLowerCase());
+      if (pinnedNow) { drop.add(prev); byLot.set(k, i); } else drop.add(i);
+    });
+    if (drop.size > 0) {
+      const kept = placed.filter((_, i) => !drop.has(i));
+      placed.length = 0;
+      placed.push(...kept);
+    }
+    // Closest to downtown first, like the greedy order: labels and anything
+    // that reads the head of the list expect the core of the city there.
+    const ringOf = (p: { x: number; z: number }) => (p.x - dtx) ** 2 + (p.z - dtz) ** 2;
+    placed.sort((a, b) => ringOf(a) - ringOf(b));
+  }
+
   const PLACE_GAP = 7, PCELL = 48;
   const pgrid = new Map<string, { x: number; z: number; r: number }[]>();
-  const placed: { dev: DeveloperRecord; x: number; z: number; w: number; d: number; did: string }[] = [];
   let di = 0, cur = -1, cw = 0, cd = 0, chalf = 0;
-  for (let oi = 0; oi < NC && di < m; oi++) {
+  for (let oi = 0; oi < NC && di < m && !lotMode; oi++) {
     if (cur !== di) { cur = di; const dv = sorted[di]; cw = statW(dv); cd = statD(dv); chalf = Math.max(cw, cd) / 2 + PLACE_GAP; }
     const fi = candidates[oi];
     const x = F[fi * 3], z = F[fi * 3 + 1];
@@ -173,31 +216,33 @@ export function generateSFCityLayout(
     }
     if (!ok) continue;
     const dev = sorted[di];
-    const dctx = dev.district ?? inferDistrict(dev.primary_language);
-    const did = di < DOWNTOWN ? 'downtown' : (DISTRICT_ORDER.includes(dctx) ? dctx : inferDistrict(dev.primary_language));
+    const did = di < DOWNTOWN ? 'downtown' : districtOf(dev);
     placed.push({ dev, x, z, w: cw, d: cd, did });
     const k = `${gx},${gz}`;
     (pgrid.get(k) ?? pgrid.set(k, []).get(k)!).push({ x, z, r: chalf });
     di++;
   }
 
-  // ---- pinned devs the map had no room for take the weakest lots ----
-  // `placed` runs in centrality order, so its tail holds the weakest buildings.
+  // ---- pinned devs with no building yet take the weakest lots ----
+  // Greedy: `placed` runs in centrality order, so its tail is the weakest.
+  // Lots: it runs closest-first, so its tail is the outermost; only unclaimed
+  // buildings give way, as the server's assign_city_lot does. This is local
+  // to this viewer, a stand-in until the server assigns a real lot.
   if (pinned && pinned.size > 0) {
     const isPinned = (dev: DeveloperRecord) => pinned.has(dev.github_login.toLowerCase());
+    const canYield = (dev: DeveloperRecord) => !isPinned(dev) && (!lotMode || !dev.claimed);
     const placedLogins = new Set(placed.map((p) => p.dev.github_login.toLowerCase()));
     let vi = placed.length - 1;
     for (const dev of sorted) {
       if (!isPinned(dev) || placedLogins.has(dev.github_login.toLowerCase())) continue;
-      while (vi >= 0 && isPinned(placed[vi].dev)) vi--;
+      while (vi >= 0 && !canYield(placed[vi].dev)) vi--;
       if (vi < 0) break;
       const lot = placed[vi];
-      const dctx = dev.district ?? inferDistrict(dev.primary_language);
       // Never bigger than the lot it takes, so it can't overlap a neighbour.
       placed[vi] = {
         dev, x: lot.x, z: lot.z,
         w: Math.min(statW(dev), lot.w), d: Math.min(statD(dev), lot.d),
-        did: DISTRICT_ORDER.includes(dctx) ? dctx : inferDistrict(dev.primary_language),
+        did: districtOf(dev),
       };
       vi--;
     }
@@ -390,4 +435,37 @@ export function selectPlacedDevelopers<T extends DeveloperRecord>(
     [...devs].sort((a, b) => score(b) - score(a)).slice(0, keepN).map((d) => d.github_login),
   );
   return { devs: devs.filter((d) => keep.has(d.github_login)), norms };
+}
+
+// ─── Lot seeding (server) ────────────────────────────────────
+
+export interface SeedLot {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  ring: number;
+  downtown: boolean;
+  dev_id: number | null;
+}
+
+/**
+ * The first city_lots: today's greedy layout over every developer, frozen.
+ * Each placed building becomes a lot at its position, capped at its current
+ * footprint (which the greedy walk already kept clear of its neighbours), and
+ * that developer becomes its first occupant. The city looks the same after.
+ */
+export function seedLotsFromLayout(devs: DeveloperRecord[], asset: SFMapAsset): SeedLot[] {
+  const idByLogin = new Map(devs.map((d) => [d.github_login, d.id]));
+  const [dtx, dtz] = asset.meta.downtown;
+  const { buildings } = generateSFCityLayout(devs.map((d) => ({ ...d, lot: null })), asset);
+  return buildings.map((b) => ({
+    x: Math.round(b.position[0]),
+    z: Math.round(b.position[2]),
+    w: b.width,
+    d: b.depth,
+    ring: Math.round(Math.hypot(b.position[0] - dtx, b.position[2] - dtz)),
+    downtown: b.district === "downtown",
+    dev_id: idByLogin.get(b.login) ?? null,
+  }));
 }
