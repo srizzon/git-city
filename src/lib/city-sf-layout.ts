@@ -362,7 +362,8 @@ export function generateSFCityLayout(
     // Populated city radius: 92nd percentile of building distance from downtown
     // (ignores a handful of far-flung outliers) so spawns land inside the city.
     const bd = placed.map((b) => Math.hypot(b.x - dtx, b.z - dtz)).sort((a, b) => a - b);
-    const cityR = bd.length ? bd[Math.min(bd.length - 1, Math.floor(bd.length * 0.92))] : 2000;
+    // Capped at SF's own radius: with the Bay Area around it, the hunt stays in the city proper.
+    const cityR = Math.min(10500, bd.length ? bd[Math.min(bd.length - 1, Math.floor(bd.length * 0.92))] : 2000);
 
     const FRACTIONS = [0.18, 0.34, 0.52, 0.72, 0.92];
     const GOLDEN = 2.39996; // ~137.5° — even angular spread without clustering

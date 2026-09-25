@@ -1077,9 +1077,11 @@ function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius, sfM
     ];
 
     // ── SF mode: anchor coins above real buildings, spread across the city ──
-    if (sfMap && buildings.length > 0) {
+    // Only buildings inside cityRadius (the SF core), not the whole Bay Area.
+    const pool = sfMap ? buildings.filter((b) => b.position[0] ** 2 + b.position[2] ** 2 <= cityRadius * cityRadius) : [];
+    if (sfMap && pool.length > 0) {
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-      for (const b of buildings) {
+      for (const b of pool) {
         const x = b.position[0], z = b.position[2];
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
@@ -1100,13 +1102,13 @@ function SkyCollectibles({ playerPosRef, accentColor, onCollect, cityRadius, sfM
         for (let relax = 0; relax < 6; relax++) {
           const sep = baseSep * (1 - relax * 0.15);
           for (let attempt = 0; attempt < 30; attempt++) {
-            const b = buildings[Math.floor(rng() * buildings.length)];
+            const b = pool[Math.floor(rng() * pool.length)];
             const x = b.position[0] + (rng() - 0.5) * 60;
             const z = b.position[2] + (rng() - 0.5) * 60;
             if (farEnough(x, z, sep)) { placed.push({ x, z }); return [x, z]; }
           }
         }
-        const b = buildings[Math.floor(rng() * buildings.length)];
+        const b = pool[Math.floor(rng() * pool.length)];
         const x = b.position[0], z = b.position[2];
         placed.push({ x, z });
         return [x, z];
@@ -2022,6 +2024,9 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
     }
     return max;
   }, [buildings]);
+  // Sky ads, fireworks and fly coins stay over the SF core (its edge sits at
+  // ~13.5k); only the flight boundary follows the whole Bay Area city.
+  const skyRadius = sfMap ? Math.min(cityRadius, 13500) : cityRadius;
 
   // San Francisco mode: camera + controls frame the downtown (Financial District)
   const sfHome = useMemo(() => {
@@ -2140,7 +2145,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           {!introMode && flyMode && (
             <>
               <VehicleFlight onExit={onExitFly} onHud={onHud ?? (() => { })} onPause={onPause ?? (() => { })} pauseSignal={flyPauseSignal} hasOverlay={flyHasOverlay} startPaused={flyStartPaused} vehicleType={flyVehicle} posRef={flyPosRef} cityRadius={cityRadius} isMobile={isMobile} onJoystickState={onJoystickState} boostActive={flyBoostActive} brakeActive={flyBrakeActive} onFlyMove={onFlyMove} onShoot={flyOnShoot} canShoot={flyPvpEnabled === true} pendingRespawnRef={flyPendingRespawnRef} selfStateRef={flySelfStateRef} />
-              <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={cityRadius} sfMap={sfMap} buildings={buildings} />
+              <SkyCollectibles playerPosRef={flyPosRef} accentColor={accentColor ?? "#6090e0"} onCollect={onCollect ?? (() => { })} cityRadius={skyRadius} sfMap={sfMap} buildings={buildings} />
             </>
           )}
 
@@ -2247,7 +2252,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         />
       )}
 
-      {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={cityRadius} />}
+      {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={skyRadius} />}
 
       {!wallpaperMode && rabbitSighting && rabbitSighting >= 1 && rabbitSighting <= 5 && (() => {
         const plazaIdx = RABBIT_PLAZA_INDICES[rabbitSighting - 1];
@@ -2307,7 +2312,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       {!wallpaperMode && skyAds && skyAds.length > 0 && (
         <>
-          <SkyAds ads={skyAds} cityRadius={cityRadius} flyMode={flyMode} onAdClick={blockCityClicks ? undefined : onAdClick} onAdViewed={onAdViewed} />
+          <SkyAds ads={skyAds} cityRadius={skyRadius} flyMode={flyMode} onAdClick={blockCityClicks ? undefined : onAdClick} onAdViewed={onAdViewed} />
           <BuildingAds
             ads={skyAds}
             buildings={buildings}

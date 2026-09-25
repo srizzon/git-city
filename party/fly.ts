@@ -39,10 +39,10 @@ const BOSS_RESET_DELAY_MS = 8_000; // after defeat, boss stays gone this long
 const BOSS_SELF_HIT_IFRAME_MS = 1_200; // i-frames after a boss attack hits you
 
 // World bounds — reject moves outside a sane envelope to prevent griefing
-// the presence system with NaN/Infinity or absurd coordinates. The SF map
-// reaches x ≈ -10k (the Golden Gate) and the client lets pilots fly to 1.3x
-// the city radius, so the envelope has to cover that.
-const COORD_ABS_MAX = 20_000;
+// the presence system with NaN/Infinity or absurd coordinates. The Bay Area
+// map reaches ~26k from downtown and the client lets pilots fly to 1.3x the
+// city radius, so the envelope has to cover that.
+const COORD_ABS_MAX = 40_000;
 const ALT_MIN = -200;
 const ALT_MAX = 1_000;
 
