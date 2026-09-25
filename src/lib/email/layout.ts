@@ -1,4 +1,4 @@
-import { LEGAL_CNPJ, LEGAL_NAME } from "../legal";
+import { LEGAL_NAME } from "../legal";
 import { COLORS, EMAIL_BASE_URL, FONT, escapeHtml, gmailSafe } from "./components";
 
 export const CONTACT_EMAIL = "samuel@thegitcity.com";
@@ -79,7 +79,7 @@ export function renderLayout(opts: LayoutOptions): string {
       <div style="padding-top:20px;">${gmailSafe(`<div style="font-family:${FONT}; font-size:13px; line-height:1.6; color:${COLORS.muted};">
         ${escapeHtml(opts.reason)}<br>
         ${footer ? `${footer}<br>` : ""}
-        ${LEGAL_NAME} &middot; CNPJ ${LEGAL_CNPJ} &middot; ${CONTACT_EMAIL}
+        ${LEGAL_NAME} &middot; ${CONTACT_EMAIL}
       </div>`)}</div>
     </td></tr>
   </table>
@@ -97,6 +97,6 @@ export function renderText(opts: { lines: string[]; reason: string; links: Email
     "--",
     opts.reason,
     ...footerLinks(opts.links).map((l) => `${l.label}: ${l.url}`),
-    `${LEGAL_NAME} · CNPJ ${LEGAL_CNPJ} · ${CONTACT_EMAIL}`,
+    `${LEGAL_NAME} · ${CONTACT_EMAIL}`,
   ].join("\n");
 }

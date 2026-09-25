@@ -614,7 +614,7 @@ export default function AdvertiseLanding({ serverCountry }: AdvertiseLandingProp
           </a>
         </p>
         <p className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] text-dim normal-case">
-          <span>Git City &middot; CNPJ 66.241.579/0001-92</span>
+          <span>Git City</span>
           <a href="/terms" className="transition-colors hover:text-cream">Terms</a>
           <a href="/privacy" className="transition-colors hover:text-cream">Privacy</a>
         </p>
