@@ -1935,6 +1935,15 @@ function DynamicSky() {
 // ordered near → far, so the mapping is a straight index.
 const RABBIT_PLAZA_INDICES = [0, 1, 2, 3, 4];
 
+// ?lights=0: hides every point light (landmark glows) to measure their cost on phones.
+function NoPointLights() {
+  const scene = useThree((st) => st.scene);
+  useFrame(() => {
+    scene.traverse((o) => { if ((o as THREE.PointLight).isPointLight && o.visible) o.visible = false; });
+  });
+  return null;
+}
+
 export default function CityCanvas({ buildings, plazas, decorations, river, bridges, sfMap, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, perfMode = "high", onPerfDecline, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onBankClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, resolvedSponsors, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove, bossPreview, flyBossStateRef, flyEngageBoss, flySendBossHit, flySendBossSelfHit }: Props) {
   const sponsors = resolvedSponsors ?? [];
   const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
@@ -1999,6 +2008,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       dpr: Number.isFinite(dprParam) && dprParam > 0 ? Math.min(3, dprParam) : null,
       bloom: q?.get("bloom") !== "0",
       smaa: q?.get("smaa") !== "0",
+      noLights: q?.get("lights") === "0",
     };
   }, []);
   const dpr = gfx.dpr ?? (lowPerf ? 0.75 : 1.25);
@@ -2033,6 +2043,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
+      {gfx.noLights && <NoPointLights />}
       {/* SunRig owns exposure in SF; CityExposure only drives the theme previews. */}
       {!sfHome && <CityExposure cityEnergy={cityEnergy ?? 1} />}
       <PerformanceMonitor

@@ -13,6 +13,8 @@ import type { LiveSession } from "@/lib/useCodingPresence";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
 
+const NO_FX = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("fx") === "0";
+
 const GRID_CELL_SIZE = 200;
 
 // Pre-allocated temp vector for focus info projection
@@ -193,8 +195,8 @@ export default function CityScene({
         focusedBuildingB={focusedBuildingB}
       />
 
-      {/* Effects: React components only for nearby buildings with items */}
-      <EffectsLayer
+      {/* Effects: React components only for nearby buildings with items (?fx=0 turns them off to measure phones) */}
+      {!NO_FX && <EffectsLayer
         buildings={buildings}
         grid={grid}
         colors={colors}
@@ -206,7 +208,7 @@ export default function CityScene({
         flyMode={flyMode}
         ghostPreviewLogin={ghostPreviewLogin}
         lowPerf={lowPerf}
-      />
+      />}
 
       {/* FocusBeacon: standalone, only when a building is focused */}
       {!introMode && focusedBuildingData && (
