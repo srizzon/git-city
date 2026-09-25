@@ -33,10 +33,9 @@ export async function assignCityLot(sb: Admin, devId: number): Promise<CityLot |
 /** A developer's current lot, or null. */
 export async function getCityLot(sb: Admin, devId: number): Promise<CityLot | null> {
   const { data } = await sb
-    .from("developers")
-    .select("city_lots(x, z, max_w, max_d, downtown)")
-    .eq("id", devId)
+    .from("city_lots")
+    .select("x, z, max_w, max_d, downtown")
+    .eq("developer_id", devId)
     .maybeSingle();
-  const lot = (data as { city_lots: { x: number; z: number; max_w: number; max_d: number; downtown: boolean } | null } | null)?.city_lots;
-  return lot ? { x: lot.x, z: lot.z, w: lot.max_w, d: lot.max_d, downtown: lot.downtown } : null;
+  return data ? { x: data.x, z: data.z, w: data.max_w, d: data.max_d, downtown: data.downtown } : null;
 }

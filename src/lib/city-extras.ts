@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // league crown. Shared by /api/city, the city snapshot cron and league pages.
 
 export const CITY_DEV_COLUMNS =
-  "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, claimed_at, created_at, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, active_days_last_year, language_diversity, app_streak, rabbit_completed, district, district_chosen, xp_total, xp_level, lot_id";
+  "id, github_login, name, avatar_url, contributions, total_stars, public_repos, primary_language, rank, claimed, claimed_at, created_at, kudos_count, visit_count, contributions_total, contribution_years, total_prs, total_reviews, repos_contributed_to, followers, following, organizations_count, account_created_at, current_streak, active_days_last_year, language_diversity, app_streak, rabbit_completed, district, district_chosen, xp_total, xp_level";
 
 const PAGE_SIZE = 1000; // PostgREST caps at 1000 rows per request
 

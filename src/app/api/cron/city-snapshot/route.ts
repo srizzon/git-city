@@ -14,10 +14,11 @@ const STORAGE_BUCKET = "city-data";
 const STORAGE_PATH = "snapshot.json";
 const PAGE_SIZE = 1000; // Supabase PostgREST caps at 1000 rows per request
 const SEED_BATCH = 4000;
-const LOT_COLUMNS = "id, x, z, max_w, max_d, downtown";
+const LOT_COLUMNS = "id, x, z, max_w, max_d, downtown, developer_id";
+const MAP = "sf";
 
-type LotRow = { id: number; x: number; z: number; max_w: number; max_d: number; downtown: boolean };
-type DevRow = { id: number; rank: number; lot_id: number | null } & Record<string, unknown>;
+type LotRow = { id: number; x: number; z: number; max_w: number; max_d: number; downtown: boolean; developer_id: number | null };
+type DevRow = { id: number; rank: number } & Record<string, unknown>;
 
 /**
  * Keyset-paginate a table by its integer `id`. OFFSET pagination re-scans every
@@ -65,38 +66,48 @@ export async function GET(request: NextRequest) {
       rows.sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity)),
     );
 
-  // A failed lots read falls back to the greedy trim below instead of failing the snapshot.
-  const loadLots = () => fetchAllById<LotRow>(sb, "city_lots", LOT_COLUMNS).catch((err: Error) => {
-    console.error(err.message);
-    return null;
-  });
+  // Lots count only once their seed completed (city_lot_seeds). Any failure
+  // reading them falls back to the greedy trim below instead of failing.
+  const loadLots = async (): Promise<LotRow[] | null> => {
+    const { data: done, error } = await sb.from("city_lot_seeds").select("map").eq("map", MAP).maybeSingle();
+    if (error) {
+      console.error("city_lot_seeds:", error.message);
+      return null;
+    }
+    if (!done) return [];
+    return fetchAllById<LotRow>(sb, "city_lots", LOT_COLUMNS).catch((err: Error) => {
+      console.error(err.message);
+      return null;
+    });
+  };
 
-  // Fetch everything in parallel
   let [devs, lots] = await Promise.all([loadDevs(), loadLots()]);
 
-  // First run after migration 146 (or a fresh environment): freeze today's
-  // layout into city_lots, then read developers and lots again.
+  // First run after migration 147 (or a fresh environment): freeze today's
+  // layout into city_lots. A run that died halfway is cleared first, and the
+  // lots only count once finish_city_lots_seed marks the seed complete.
   let seeded = 0;
   if (lots && lots.length === 0 && devs.length > 0) {
     const seed = seedLotsFromLayout(devs as unknown as DeveloperRecord[], sfMapJson as unknown as SFMapAsset);
+    const reset = await sb.rpc("reset_city_lots_seed", { p_map: MAP });
+    if (reset.error) return NextResponse.json({ error: `reset_city_lots_seed: ${reset.error.message}` }, { status: 500 });
     for (let i = 0; i < seed.length; i += SEED_BATCH) {
-      const { data, error } = await sb.rpc("seed_city_lots", { p_map: "sf", p_lots: seed.slice(i, i + SEED_BATCH) });
+      const { data, error } = await sb.rpc("seed_city_lots", { p_map: MAP, p_lots: seed.slice(i, i + SEED_BATCH) });
       if (error) return NextResponse.json({ error: `seed_city_lots: ${error.message}` }, { status: 500 });
       seeded += (data as number) ?? 0;
     }
-    [devs, lots] = await Promise.all([loadDevs(), loadLots()]);
+    const done = await sb.rpc("finish_city_lots_seed", { p_map: MAP });
+    if (done.error) return NextResponse.json({ error: `finish_city_lots_seed: ${done.error.message}` }, { status: 500 });
+    lots = await loadLots();
   }
 
   // Each developer carries their lot, so clients place buildings instead of
   // computing a layout.
-  const lotById = new Map<number, CityLot>(
-    (lots ?? []).map((l) => [l.id, { x: l.x, z: l.z, w: l.max_w, d: l.max_d, downtown: l.downtown }]),
-  );
-  for (const d of devs) {
-    const lot = d.lot_id != null ? lotById.get(d.lot_id) : undefined;
-    (d as Record<string, unknown>).lot = lot ?? null;
-    delete (d as Record<string, unknown>).lot_id;
+  const lotByDev = new Map<number, CityLot>();
+  for (const l of lots ?? []) {
+    if (l.developer_id != null) lotByDev.set(l.developer_id, { x: l.x, z: l.z, w: l.max_w, d: l.max_d, downtown: l.downtown });
   }
+  for (const d of devs) (d as Record<string, unknown>).lot = lotByDev.get(d.id) ?? null;
 
   const [extras, activeDropsResult, statsResult] = await Promise.all([
     loadCityExtras(sb, "all"),
@@ -118,7 +129,7 @@ export async function GET(request: NextRequest) {
   // ~9 MB). With lots that is exactly the developers holding one; without
   // lots (seeding failed) it falls back to trimming by the greedy layout. The
   // home page reads this; v1 stays for the wallpaper page and old bundles.
-  const placed = lotById.size > 0
+  const placed = lotByDev.size > 0
     ? {
         devs: developers.filter((d) => (d as Record<string, unknown>).lot),
         norms: computeLayoutNorms(developers as unknown as DeveloperRecord[]),
@@ -177,7 +188,8 @@ export async function GET(request: NextRequest) {
     size_kb: Math.round(compressed.length / 1024),
     uncompressed_kb: Math.round(snapshot.length / 1024),
     v2_developers: placed.devs.length,
-    lots: lotById.size,
+    lots: lots?.length ?? 0,
+    lots_held: lotByDev.size,
     lots_seeded: seeded,
     v2_size_kb: Math.round(compressedV2.length / 1024),
     duration_ms: Date.now() - started,
