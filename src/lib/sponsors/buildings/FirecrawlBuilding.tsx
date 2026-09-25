@@ -3,6 +3,7 @@
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { mergeStaticChildren } from "@/lib/three-merge";
 import type { SponsorBuildingProps } from "../registry";
 
 // ─── Building dimensions ────────────────────────────────
@@ -268,6 +269,7 @@ function createVoxelFlame(accent: string): VoxelFlame {
     }
   }
 
+  mergeStaticChildren(group);
   return { group, mat, coreMat };
 }
 

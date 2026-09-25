@@ -3,6 +3,7 @@
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { mergeStaticChildren } from "@/lib/three-merge";
 import type { SponsorBuildingProps } from "../registry";
 import {
   HEART_BM,
@@ -186,6 +187,7 @@ function createVoxelHeart(accent: string): VoxelHeart {
     }
   }
 
+  mergeStaticChildren(group);
   return { group, mat, coreMat };
 }
 

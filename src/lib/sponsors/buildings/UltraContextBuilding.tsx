@@ -3,6 +3,7 @@
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { mergeStaticChildren } from "@/lib/three-merge";
 import type { SponsorBuildingProps } from "../registry";
 
 // ─── Building dimensions ────────────────────────────────
@@ -183,6 +184,7 @@ function createVoxelBracket(bm: number[][], color: string, accent: string): Voxe
     }
   }
 
+  mergeStaticChildren(group);
   return { group, mat };
 }
 
