@@ -21,6 +21,7 @@ export interface RaceTelemetry extends DriveTelemetry {
   /** For the minimap (meters): you, your ghost, everyone else. */
   pos: { x: number; z: number } | null;
   ghostPos: { x: number; z: number } | null;
+  rivalPos: { x: number; z: number } | null;
   others: { x: number; z: number; color: string }[];
   /** Server-clock ms when the lap under way started, or null. */
   lapStart: number | null;
@@ -41,7 +42,7 @@ export interface RaceTelemetry extends DriveTelemetry {
 }
 
 export function createRaceTelemetry(): RaceTelemetry {
-  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, driftLevel: 0, turbo: false, turboReady: false, split: null, turboFlash: null, pos: null, ghostPos: null, others: [], lapStart: null, offset: 0, wrongWay: false, lights: 0, runLap: 1, runStart: null, countdown: null, goAt: 0, launch: null, finalLapAt: 0 };
+  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, driftLevel: 0, turbo: false, turboReady: false, split: null, turboFlash: null, pos: null, ghostPos: null, rivalPos: null, others: [], lapStart: null, offset: 0, wrongWay: false, lights: 0, runLap: 1, runStart: null, countdown: null, goAt: 0, launch: null, finalLapAt: 0 };
 }
 
 /** Laps in a time trial run (like Mario Kart's time trials). */

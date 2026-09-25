@@ -81,3 +81,39 @@ describe("records", () => {
     expect(runCounts([])).toBe(false);
   });
 });
+
+describe("ghost upload", () => {
+  const frames = (n: number, end: number) => Array.from({ length: n }, (_, i) => [Math.round((end * i) / (n - 1)), i, i, 0]).flat();
+  it("keeps a lap's ghost", async () => {
+    const { cleanGhost } = await import("./ghost");
+    expect(cleanGhost({ frames: frames(100, 30000), splits: [0, 5000] }, 30000)?.ms).toBe(30000);
+  });
+  it("drops junk: wrong length, time going back, not ending at the lap", async () => {
+    const { cleanGhost } = await import("./ghost");
+    expect(cleanGhost({ frames: [1, 2, 3], splits: [] }, 30000)).toBeNull();
+    const back = frames(100, 30000);
+    back[40] = 0;
+    expect(cleanGhost({ frames: back, splits: [] }, 30000)).toBeNull();
+    expect(cleanGhost({ frames: frames(100, 10000), splits: [] }, 30000)).toBeNull();
+    expect(cleanGhost({ frames: frames(100, 30000).map((v, i) => (i === 5 ? NaN : v)), splits: [] }, 30000)).toBeNull();
+  });
+});
+
+describe("rival", () => {
+  const board = [{ login: "ana" }, { login: "bob" }, { login: "cat" }, { login: "you" }];
+  it("is the closest driver above you with a ghost", async () => {
+    const { pickRival } = await import("./trial");
+    expect(pickRival(board, "you", ["ana", "bob"], null)).toBe("bob");
+    expect(pickRival(board, "you", ["ana", "bob", "cat"], null)).toBe("cat");
+  });
+  it("off the board, the slowest with a ghost; P1 has none", async () => {
+    const { pickRival } = await import("./trial");
+    expect(pickRival(board, "guest-1", ["ana", "bob"], null)).toBe("bob");
+    expect(pickRival(board, "ana", ["bob", "cat"], null)).toBeNull();
+  });
+  it("takes the one you asked for, never yourself", async () => {
+    const { pickRival } = await import("./trial");
+    expect(pickRival(board, "you", ["ana"], "cat")).toBe("cat");
+    expect(pickRival(board, "you", ["ana"], "YOU")).toBe("ana");
+  });
+});

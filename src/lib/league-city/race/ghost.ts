@@ -79,6 +79,28 @@ export function ghostAt(run: GhostRun, t: number): { x: number; z: number; yaw: 
   return { x: f[a + 1] + (f[b + 1] - f[a + 1]) * k, z: f[a + 2] + (f[b + 2] - f[a + 2]) * k, yaw: f[a + 3] + dy * k };
 }
 
+/**
+ * A ghost sent with a lap receipt, checked before it's kept: the right shape,
+ * finite numbers, time running forward, ending at the lap's time, inside the
+ * map. Its path is only drawn, never timed, so this keeps out junk, not cheats.
+ */
+export function cleanGhost(input: unknown, ms: number): GhostRun | null {
+  if (!input || typeof input !== "object") return null;
+  const { frames, splits } = input as { frames?: unknown; splits?: unknown };
+  if (!Array.isArray(frames) || !Array.isArray(splits)) return null;
+  if (frames.length < 32 || frames.length % 4 !== 0 || frames.length > MAX_FRAMES * 4) return null;
+  if (splits.length > 64 || !splits.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= ms)) return null;
+  let last = -1;
+  for (let i = 0; i < frames.length; i += 4) {
+    const [t, x, z, yaw] = frames.slice(i, i + 4) as unknown[];
+    if (![t, x, z, yaw].every((v) => typeof v === "number" && Number.isFinite(v))) return null;
+    if ((t as number) < last || Math.abs(x as number) > 2000 || Math.abs(z as number) > 2000) return null;
+    last = t as number;
+  }
+  if (last < ms - 1500 || last > ms + 1500) return null;
+  return { ms, splits: splits as number[], frames: frames as number[] };
+}
+
 const key = (slug: string) => `gc:race-ghost:${slug}:${TRACK_ID}`;
 
 export function loadGhost(slug: string): GhostRun | null {

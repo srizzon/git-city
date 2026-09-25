@@ -1,10 +1,10 @@
 // ─── Time trial flow ────────────────────────────────────────
-// The run from the title to the results: the title card, a flyover (first
+// The run from the menu to the results: the race menu, a flyover (first
 // time only), 3-2-1-GO, the three laps, then the finish with the car on
-// autopilot while the results come in. R from anywhere past the title goes
+// autopilot while the results come in. R from anywhere past the menu goes
 // straight back to a short countdown, like Trackmania.
 
-export type TrialStage = "title" | "intro" | "countdown" | "run" | "finish";
+export type TrialStage = "menu" | "intro" | "countdown" | "run" | "finish";
 
 export const TRIAL = {
   /** The flyover (ms). */
@@ -57,4 +57,25 @@ export interface RunLap {
 /** A run is a record only when every lap counted. */
 export function runCounts(laps: readonly RunLap[]): boolean {
   return laps.length > 0 && laps.every((l) => l.valid);
+}
+
+/**
+ * Whose ghost you race besides your own. The one you asked for (a link, the
+ * leaderboard); else the closest driver above you on the board with a ghost;
+ * off the board, the slowest one on it (the nearest target). P1 races only
+ * their own ghost.
+ */
+export function pickRival(
+  board: readonly { login: string }[],
+  you: string,
+  ghosts: readonly string[],
+  asked: string | null,
+): string | null {
+  const me = you.toLowerCase();
+  const has = new Set(ghosts.map((g) => g.toLowerCase()));
+  if (asked && asked.toLowerCase() !== me) return asked;
+  const at = board.findIndex((b) => b.login.toLowerCase() === me);
+  const above = at < 0 ? board : board.slice(0, at);
+  for (let i = above.length - 1; i >= 0; i--) if (has.has(above[i].login.toLowerCase())) return above[i].login;
+  return null;
 }
