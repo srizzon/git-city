@@ -13,6 +13,12 @@ export interface RaceTelemetry extends DriveTelemetry {
   turbo: boolean;
   /** Latest split vs your best lap: delta (ms, negative is faster) and when it came (performance.now). */
   split: { delta: number; at: number } | null;
+  /** The last mini-turbo fired: its level and when (performance.now). */
+  turboFlash: { level: number; at: number } | null;
+  /** For the minimap (meters): you, your ghost, everyone else. */
+  pos: { x: number; z: number } | null;
+  ghostPos: { x: number; z: number } | null;
+  others: { x: number; z: number; color: string }[];
   /** Server-clock ms when the lap under way started, or null. */
   lapStart: number | null;
   /** serverNow = Date.now() + offset. */
@@ -23,7 +29,7 @@ export interface RaceTelemetry extends DriveTelemetry {
 }
 
 export function createRaceTelemetry(): RaceTelemetry {
-  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, driftLevel: 0, turbo: false, split: null, lapStart: null, offset: 0, wrongWay: false, lights: 0 };
+  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, driftLevel: 0, turbo: false, split: null, turboFlash: null, pos: null, ghostPos: null, others: [], lapStart: null, offset: 0, wrongWay: false, lights: 0 };
 }
 
 export interface RaceView {

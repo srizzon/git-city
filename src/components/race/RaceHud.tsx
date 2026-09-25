@@ -7,6 +7,7 @@ import PauseMenu from "@/components/league/hud/drive/PauseMenu";
 import StartScreen from "@/components/league/hud/drive/StartScreen";
 import CopyLink from "@/components/league/hud/drive/CopyLink";
 import type { RaceCameraMode } from "./RaceCamera";
+import Minimap from "./Minimap";
 import { TURBO } from "@/lib/league-city/drive/tuning";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import type { BoardRow } from "@/lib/league-city/race/board";
@@ -23,7 +24,8 @@ import { theTrack } from "@/lib/league-city/race/track";
 // camera, sound, exit, the town's board and who's on track. Bottom: speed and
 // the mini-turbo charge. Center: start lights, wrong way, race results.
 
-const SEG = "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
+const SEG =
+  "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
 const ICON_BTN = `${SEG} w-10 justify-center py-2 text-cream hover:text-lime`;
 const ICON = { size: 14, strokeWidth: 2.5 } as const;
 
@@ -58,6 +60,7 @@ export default function RaceHud({
   ghostMs,
   you,
   onStart,
+  onRestart,
   onResume,
   onCamera,
   onMute,
@@ -81,6 +84,7 @@ export default function RaceHud({
   ghostMs: number | null;
   you: string;
   onStart: () => void;
+  onRestart: () => void;
   onResume: () => void;
   onCamera: () => void;
   onMute: () => void;
@@ -91,6 +95,7 @@ export default function RaceHud({
   const split = useRef<HTMLSpanElement>(null);
   const pips = useRef<(HTMLSpanElement | null)[]>([]);
   const turbo = useRef<HTMLSpanElement>(null);
+  const flash = useRef<HTMLSpanElement>(null);
   const wrong = useRef<HTMLDivElement>(null);
   const [lights, setLights] = useState(0);
   const [go, setGo] = useState(false);
@@ -114,8 +119,13 @@ export default function RaceHud({
     let lastLights = 0;
     const loop = () => {
       const t = Date.now() + telemetry.offset;
-      if (clock.current) clock.current.textContent = telemetry.lapStart !== null && t >= telemetry.lapStart ? formatLap(t - telemetry.lapStart) : "0:00.000";
-      if (speed.current) speed.current.textContent = String(Math.round(Math.abs(telemetry.speed) * 3.6));
+      if (clock.current)
+        clock.current.textContent =
+          telemetry.lapStart !== null && t >= telemetry.lapStart
+            ? formatLap(t - telemetry.lapStart)
+            : "0:00.000";
+      if (speed.current)
+        speed.current.textContent = String(Math.round(Math.abs(telemetry.speed) * 3.6));
       if (split.current) {
         const sp = telemetry.split;
         const on = !!sp && performance.now() - sp.at < 2500;
@@ -126,9 +136,20 @@ export default function RaceHud({
         }
       }
       pips.current.forEach((p, i) => {
-        if (p) p.style.background = telemetry.driftLevel > i ? TURBO.colors[telemetry.driftLevel] : "transparent";
+        if (p)
+          p.style.background =
+            telemetry.driftLevel > i ? TURBO.colors[telemetry.driftLevel] : "transparent";
       });
       if (turbo.current) turbo.current.dataset.on = String(telemetry.turbo);
+      if (flash.current) {
+        const f = telemetry.turboFlash;
+        const age = f ? performance.now() - f.at : Infinity;
+        flash.current.style.opacity = age < 700 ? String(1 - age / 700) : "0";
+        if (f && age < 700) {
+          flash.current.style.color = TURBO.colors[f.level];
+          flash.current.style.transform = `translateX(-50%) scale(${1 + f.level * 0.15 + (1 - age / 700) * 0.4})`;
+        }
+      }
       if (wrong.current) wrong.current.dataset.on = String(telemetry.wrongWay);
       if (telemetry.lights !== lastLights) {
         if (lastLights === RACE.lights && telemetry.lights === 0) setGo(true);
@@ -154,7 +175,10 @@ export default function RaceHud({
 
   const serverNow = now + (race?.offset ?? 0);
   const startable = !!r && canStart(r, serverNow);
-  const order = r && (r.phase === "live" || r.phase === "over") ? standings(r, race?.progress ?? {}, theTrack().length) : [];
+  const order =
+    r && (r.phase === "live" || r.phase === "over")
+      ? standings(r, race?.progress ?? {}, theTrack().length)
+      : [];
   const place = me ? order.indexOf(me) + 1 : 0;
   const lapNow = r && me ? Math.min(RACE.laps, (r.laps[me] ?? 0) + 1) : 0;
   const recent = feed.filter((f) => now - f.at < 8000);
@@ -162,7 +186,10 @@ export default function RaceHud({
   const justSaved = saved && now - saved.at < 6000 ? saved : null;
   const roomBest = bests.find(([n]) => n === you.toLowerCase())?.[1] ?? null;
   const boardBest = board.find((b) => b.login.toLowerCase() === you.toLowerCase())?.best_ms ?? null;
-  const pb = [ghostMs, roomBest, boardBest].reduce<number | null>((a, b) => (b === null ? a : a === null ? b : Math.min(a, b)), null);
+  const pb = [ghostMs, roomBest, boardBest].reduce<number | null>(
+    (a, b) => (b === null ? a : a === null ? b : Math.min(a, b)),
+    null,
+  );
   const medal = medalFor(pb);
   const record = board[0] ?? null;
 
@@ -174,7 +201,12 @@ export default function RaceHud({
           <div className={`${HUD_BOX} flex flex-col items-center px-5 py-2`}>
             <span className="text-[9px] text-muted">
               {racing ? `Race · lap ${lapNow}/${RACE.laps}` : "Time trial"}
-              {racing && place > 0 && r?.phase === "live" && <span className="text-lime"> · P{place}/{order.length}</span>}
+              {racing && place > 0 && r?.phase === "live" && (
+                <span className="text-lime">
+                  {" "}
+                  · P{place}/{order.length}
+                </span>
+              )}
             </span>
             <span ref={clock} className="text-3xl text-cream tabular-nums">
               0:00.000
@@ -186,7 +218,11 @@ export default function RaceHud({
             data-ahead="true"
             className="border-[3px] border-bg px-3 py-1 text-base text-white tabular-nums opacity-0 transition-opacity data-[ahead=false]:bg-[#e0323c] data-[ahead=true]:bg-[#1f9d55] data-[on=true]:opacity-100"
           />
-          {voided && <span className={`${HUD_BOX} px-3 py-1 text-[10px] text-[#ff6b6b]`}>Lap doesn&apos;t count</span>}
+          {voided && (
+            <span className={`${HUD_BOX} px-3 py-1 text-[10px] text-[#ff6b6b]`}>
+              Lap doesn&apos;t count
+            </span>
+          )}
           {justSaved && (
             <span className={`${HUD_BOX} px-3 py-1 text-[10px] text-lime`}>
               New best {formatLap(justSaved.ms)} · #{justSaved.rank} in {townName}
@@ -206,48 +242,89 @@ export default function RaceHud({
         </div>
       )}
 
-      {/* Your best and the medals */}
+      {/* Your best, the medals and the map */}
       {ready && (
-        <section className={`${HUD_BOX} absolute left-4 top-4 w-[210px] px-3 py-2.5`}>
-          <p className="flex items-baseline justify-between text-[9px] text-muted">
-            <span>Your best</span>
-            <span className="text-sm text-cream tabular-nums">{pb !== null ? formatLap(pb) : "-:--.---"}</span>
-          </p>
-          <ul className="mt-2 space-y-1 border-t-2 border-border pt-2">
-            {MEDALS.map(([m, t]) => {
-              const got = pb !== null && pb <= t;
-              return (
-                <li key={m} className={`flex items-center gap-2 text-[10px] ${got ? "text-cream" : "text-dim"}`}>
-                  <span className="h-3 w-3 border-2" style={{ borderColor: MEDAL_COLORS[m], background: got ? MEDAL_COLORS[m] : "transparent" }} aria-hidden />
-                  <span className="flex-1">{m}</span>
-                  <span className="tabular-nums">{formatLap(t)}</span>
-                </li>
-              );
-            })}
-            <li className="flex items-center gap-2 pt-1 text-[10px] text-lime">
-              <Flag size={11} strokeWidth={2.5} aria-hidden />
-              <span className="min-w-0 flex-1 truncate normal-case">{record ? `@${record.login}` : "Town record"}</span>
-              <span className="tabular-nums">{record ? formatLap(record.best_ms) : "-"}</span>
-            </li>
-          </ul>
-          {medal && (
-            <p className="mt-2 text-[9px] normal-case" style={{ color: MEDAL_COLORS[medal] }}>
-              You hold {medal}.
+        <div className="absolute left-4 top-4 flex w-[210px] flex-col gap-3">
+          <section className={`${HUD_BOX} px-3 py-2.5`}>
+            <p className="flex items-baseline justify-between text-[9px] text-muted">
+              <span>Your best</span>
+              <span className="text-sm text-cream tabular-nums">
+                {pb !== null ? formatLap(pb) : "-:--.---"}
+              </span>
             </p>
-          )}
-          {!signedIn && <p className="mt-2 text-[8px] normal-case text-dim">Sign in to put your laps on the town&apos;s board.</p>}
-        </section>
+            <ul className="mt-2 space-y-1 border-t-2 border-border pt-2">
+              {MEDALS.map(([m, t]) => {
+                const got = pb !== null && pb <= t;
+                return (
+                  <li
+                    key={m}
+                    className={`flex items-center gap-2 text-[10px] ${got ? "text-cream" : "text-dim"}`}
+                  >
+                    <span
+                      className="h-3 w-3 border-2"
+                      style={{
+                        borderColor: MEDAL_COLORS[m],
+                        background: got ? MEDAL_COLORS[m] : "transparent",
+                      }}
+                      aria-hidden
+                    />
+                    <span className="flex-1">{m}</span>
+                    <span className="tabular-nums">{formatLap(t)}</span>
+                  </li>
+                );
+              })}
+              <li className="flex items-center gap-2 pt-1 text-[10px] text-lime">
+                <Flag size={11} strokeWidth={2.5} aria-hidden />
+                <span className="min-w-0 flex-1 truncate normal-case">
+                  {record ? `@${record.login}` : "Town record"}
+                </span>
+                <span className="tabular-nums">{record ? formatLap(record.best_ms) : "-"}</span>
+              </li>
+            </ul>
+            {medal && (
+              <p className="mt-2 text-[9px] normal-case" style={{ color: MEDAL_COLORS[medal] }}>
+                You hold {medal}.
+              </p>
+            )}
+            {!signedIn && (
+              <p className="mt-2 text-[8px] normal-case text-dim">
+                Sign in to put your laps on the town&apos;s board.
+              </p>
+            )}
+          </section>
+          <div className={`${HUD_BOX} flex justify-center p-2`}>
+            <Minimap telemetry={telemetry} />
+          </div>
+        </div>
       )}
 
       {/* Top right */}
-      <div className={`${HUD_BOX} absolute right-4 top-4 flex items-stretch divide-x-2 divide-border`}>
-        <button type="button" onClick={onCamera} aria-label="Camera (C)" title="Camera (C)" className={ICON_BTN}>
+      <div
+        className={`${HUD_BOX} absolute right-4 top-4 flex items-stretch divide-x-2 divide-border`}
+      >
+        <button
+          type="button"
+          onClick={onCamera}
+          aria-label="Camera (C)"
+          title="Camera (C)"
+          className={ICON_BTN}
+        >
           <Camera {...ICON} aria-hidden />
         </button>
-        <button type="button" onClick={onMute} aria-label={muted ? "Sound on" : "Mute"} aria-pressed={muted} className={ICON_BTN}>
+        <button
+          type="button"
+          onClick={onMute}
+          aria-label={muted ? "Sound on" : "Mute"}
+          aria-pressed={muted}
+          className={ICON_BTN}
+        >
           {muted ? <VolumeX {...ICON} aria-hidden /> : <Volume2 {...ICON} aria-hidden />}
         </button>
-        <button type="button" onClick={onExit} className={`${SEG} gap-2 px-3 py-2 text-[10px] text-cream hover:text-lime`}>
+        <button
+          type="button"
+          onClick={onExit}
+          className={`${SEG} gap-2 px-3 py-2 text-[10px] text-cream hover:text-lime`}
+        >
           <X {...ICON} aria-hidden />
           <span>Exit</span>
         </button>
@@ -259,13 +336,20 @@ export default function RaceHud({
             <p className="text-[9px] text-cream">{townName} best laps</p>
             <ol className="mt-2 space-y-1">
               {board.slice(0, 8).map((b) => (
-                <li key={b.login} className={`flex items-center gap-2 text-[10px] ${b.login.toLowerCase() === you.toLowerCase() ? "text-lime" : "text-cream"}`}>
+                <li
+                  key={b.login}
+                  className={`flex items-center gap-2 text-[10px] ${b.login.toLowerCase() === you.toLowerCase() ? "text-lime" : "text-cream"}`}
+                >
                   <span className="w-4 text-right text-muted">{b.rank}</span>
                   <span className="min-w-0 flex-1 truncate normal-case">@{b.login}</span>
                   <span className="tabular-nums">{formatLap(b.best_ms)}</span>
                 </li>
               ))}
-              {board.length === 0 && <li className="text-[9px] normal-case text-muted">No laps yet. Set the first one.</li>}
+              {board.length === 0 && (
+                <li className="text-[9px] normal-case text-muted">
+                  No laps yet. Set the first one.
+                </li>
+              )}
             </ol>
           </section>
 
@@ -285,7 +369,11 @@ export default function RaceHud({
                   const b = bests.find(([n]) => n === d.name.toLowerCase())?.[1];
                   return (
                     <li key={d.id} className="flex items-center gap-1.5 text-[9px] text-muted">
-                      <span className="h-2 w-2" style={{ background: carColor(d.name) }} aria-hidden />
+                      <span
+                        className="h-2 w-2"
+                        style={{ background: carColor(d.name) }}
+                        aria-hidden
+                      />
                       <span className="min-w-0 flex-1 truncate normal-case">{who(d.name)}</span>
                       {b && <span className="tabular-nums text-cream">{formatLap(b)}</span>}
                     </li>
@@ -303,18 +391,35 @@ export default function RaceHud({
                 Race them · {RACE.laps} laps
               </button>
             )}
-            {r?.phase === "countdown" && <p className="mt-2.5 text-center text-[9px] text-lime">Grid forming…</p>}
-            {r?.phase === "live" && !racing && <p className="mt-2.5 text-center text-[9px] text-muted">Race on. Next one after the flag.</p>}
+            {r?.phase === "countdown" && (
+              <p className="mt-2.5 text-center text-[9px] text-lime">Grid forming…</p>
+            )}
+            {r?.phase === "live" && !racing && (
+              <p className="mt-2.5 text-center text-[9px] text-muted">
+                Race on. Next one after the flag.
+              </p>
+            )}
           </section>
 
           {recent.some((f) => f.t === "lap") && (
             <ul className={`${HUD_BOX} space-y-1 px-3 py-2 text-[9px]`}>
               {recent.map((f, i) =>
                 f.t === "lap" ? (
-                  <li key={`${f.at}-${i}`} className="flex items-center gap-1.5 normal-case text-muted">
-                    <span className="h-2 w-2 shrink-0" style={{ background: carColor(f.name) }} aria-hidden />
+                  <li
+                    key={`${f.at}-${i}`}
+                    className="flex items-center gap-1.5 normal-case text-muted"
+                  >
+                    <span
+                      className="h-2 w-2 shrink-0"
+                      style={{ background: carColor(f.name) }}
+                      aria-hidden
+                    />
                     <span className="min-w-0 flex-1 truncate">{who(f.name)}</span>
-                    <span className={`tabular-nums ${f.valid ? (f.pb ? "text-lime" : "text-cream") : "text-dim line-through"}`}>{formatLap(f.ms)}</span>
+                    <span
+                      className={`tabular-nums ${f.valid ? (f.pb ? "text-lime" : "text-cream") : "text-dim line-through"}`}
+                    >
+                      {formatLap(f.ms)}
+                    </span>
                   </li>
                 ) : null,
               )}
@@ -336,11 +441,16 @@ export default function RaceHud({
 
       {/* Results */}
       {r?.phase === "over" && r.finished.length > 0 && serverNow - r.endsAt < 20_000 && (
-        <section className={`${HUD_BOX} absolute left-1/2 top-[30%] w-[300px] -translate-x-1/2 px-4 py-3`}>
+        <section
+          className={`${HUD_BOX} absolute left-1/2 top-[30%] w-[300px] -translate-x-1/2 px-4 py-3`}
+        >
           <p className="text-center text-[10px] text-lime">Chequered flag</p>
           <ol className="mt-2 space-y-1">
             {r.finished.map((f, i) => (
-              <li key={f.id} className={`flex items-center gap-2 text-[10px] ${f.id === me ? "text-lime" : "text-cream"}`}>
+              <li
+                key={f.id}
+                className={`flex items-center gap-2 text-[10px] ${f.id === me ? "text-lime" : "text-cream"}`}
+              >
                 <span className="w-5 text-muted">P{i + 1}</span>
                 <span className="min-w-0 flex-1 truncate normal-case">{who(f.name)}</span>
                 {r.penalty[f.id] ? <span className="text-[8px] text-[#ff6b6b]">+5s</span> : null}
@@ -352,7 +462,9 @@ export default function RaceHud({
               .map((id) => (
                 <li key={id} className="flex items-center gap-2 text-[10px] text-dim">
                   <span className="w-5">-</span>
-                  <span className="min-w-0 flex-1 truncate normal-case">{who(r.names[id] ?? id)}</span>
+                  <span className="min-w-0 flex-1 truncate normal-case">
+                    {who(r.names[id] ?? id)}
+                  </span>
                   <span>DNF</span>
                 </li>
               ))}
@@ -360,28 +472,55 @@ export default function RaceHud({
         </section>
       )}
 
+      {/* Mini-turbo fired */}
+      <span
+        ref={flash}
+        className="absolute bottom-24 left-1/2 text-3xl opacity-0 drop-shadow-[0_3px_0_#000]"
+        style={{ transform: "translateX(-50%)" }}
+        aria-hidden
+      >
+        Turbo!
+      </span>
+
       {/* Speed and mini-turbo */}
       {ready && (
-        <div className={`${HUD_BOX} absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-4 px-4 py-2`}>
+        <div
+          className={`${HUD_BOX} absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-4 px-4 py-2`}
+        >
           <div className="flex items-baseline gap-1.5 tabular-nums">
             <span ref={speed} className="w-[3ch] text-right text-lg text-cream">
               0
             </span>
             <span className="text-[9px] text-muted">km/h</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span ref={turbo} data-on="false" className="text-[8px] text-muted data-[on=true]:text-lime">
-              Turbo
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1.5">
+              <span
+                ref={turbo}
+                data-on="false"
+                className="w-10 text-[9px] text-cream data-[on=true]:text-lime"
+              >
+                Turbo
+              </span>
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  ref={(el) => void (pips.current[i] = el)}
+                  className="h-3 w-5 border-2 border-border"
+                />
+              ))}
+            </div>
+            <span className="text-[8px] normal-case text-muted">
+              Drift to charge, let go to fire
             </span>
-            {[0, 1, 2].map((i) => (
-              <span key={i} ref={(el) => void (pips.current[i] = el)} className="h-3 w-5 border-2 border-border" />
-            ))}
           </div>
         </div>
       )}
 
       {ready && (
-        <div className={`absolute bottom-6 right-6 text-right text-[9px] leading-loose text-muted transition-opacity duration-700 ${hints ? "opacity-100" : "opacity-0"}`}>
+        <div
+          className={`${HUD_BOX} absolute bottom-4 right-4 px-3 py-2 text-right text-[9px] leading-loose text-muted transition-opacity duration-700 ${hints ? "opacity-100" : "opacity-0"}`}
+        >
           {CONTROLS.map(([k, v]) => (
             <div key={k}>
               <span className="text-cream">{k}</span> {v}
@@ -390,16 +529,25 @@ export default function RaceHud({
         </div>
       )}
       {ready && !hints && (
-        <p className="absolute bottom-6 right-6 flex items-center gap-1.5 text-[9px] text-muted">
-          <RotateCcw size={11} strokeWidth={2.5} aria-hidden />
-          <span className="text-cream">R</span> restart
-        </p>
+        <button
+          type="button"
+          onClick={onRestart}
+          className={`${HUD_BOX} absolute bottom-4 right-4 flex items-center gap-2.5 px-3 py-2 text-[11px] text-cream transition-colors hover:text-lime`}
+        >
+          <span className="border-2 border-lime px-1.5 text-lime">R</span>
+          <RotateCcw size={13} strokeWidth={2.5} aria-hidden />
+          {racing ? "Last checkpoint" : "Restart"}
+        </button>
       )}
 
       {failed && (
         <div className="pointer-events-auto absolute inset-0 flex flex-col items-center justify-center gap-4 bg-bg/90">
           <p className="text-xs text-cream">Couldn&apos;t start the car.</p>
-          <button type="button" onClick={() => window.location.reload()} className="btn-press border-2 border-lime px-4 py-2 text-[11px] text-lime">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="btn-press border-2 border-lime px-4 py-2 text-[11px] text-lime"
+          >
             Try again
           </button>
         </div>
@@ -407,7 +555,14 @@ export default function RaceHud({
 
       <StartScreen ready={ready} />
       {paused && ready && (
-        <PauseMenu camera={camera === "high" ? "top" : "chase"} muted={muted} onResume={onResume} onCamera={onCamera} onMute={onMute} onExit={onExit} />
+        <PauseMenu
+          camera={camera === "high" ? "top" : "chase"}
+          muted={muted}
+          onResume={onResume}
+          onCamera={onCamera}
+          onMute={onMute}
+          onExit={onExit}
+        />
       )}
     </div>
   );

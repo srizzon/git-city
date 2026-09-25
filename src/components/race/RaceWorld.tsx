@@ -15,7 +15,7 @@ import { useDrivePresence } from "@/components/league/drive/useDrivePresence";
 import type { Spawn } from "@/lib/league-city/drive/spawn";
 import type { SurfaceGrip } from "@/lib/league-city/drive/surface";
 import { CHASSIS, GRAVITY, M_TO_UNIT, SURFACE, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
-import { carHeading, placeCar, turboLevel } from "@/lib/league-city/drive/vehicle";
+import { carHeading, headingFromRot, newCarState, placeCar, turboLevel } from "@/lib/league-city/drive/vehicle";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { TRACK, locate, pointAt, type Track } from "@/lib/league-city/race/track";
 import { curbRuns, wallSegments } from "@/lib/league-city/race/layout";
@@ -25,7 +25,7 @@ import type { RaceServerMsg, RaceWelcome, RoomBests } from "@/lib/league-city/ra
 import TrackScene from "./TrackScene";
 import RaceCamera, { type RaceCameraMode } from "./RaceCamera";
 import { DriftSparks, Ghost } from "./Ghost";
-import { GhostRecorder, loadGhost, saveGhost, type GhostRun } from "@/lib/league-city/race/ghost";
+import { GhostRecorder, ghostAt, loadGhost, saveGhost, type GhostRun } from "@/lib/league-city/race/ghost";
 import type { LapNews, RaceTelemetry, RaceView } from "@/lib/league-city/race/telemetry";
 
 // The race track's physics world and game: the walls, your car (boost from a
@@ -55,6 +55,8 @@ export interface RaceWorldProps {
   startRef: React.MutableRefObject<(() => void) | null>;
   /** Your best lap in this browser changed (ms). */
   onGhost: (ms: number | null) => void;
+  /** The HUD's Restart button calls this (R does the same). */
+  restartRef: React.MutableRefObject<(() => void) | null>;
 }
 
 const BUMP_SHARE = 0.7;
@@ -145,6 +147,7 @@ export default function RaceWorld({
   onReceipt,
   startRef,
   onGhost,
+  restartRef,
 }: RaceWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -291,6 +294,23 @@ export default function RaceWorld({
     tel.current.split = null;
   };
 
+  // The HUD button: what R does, from outside the car.
+  useEffect(() => {
+    restartRef.current = () => {
+      const c = car.current;
+      if (!c) return;
+      if (racingNow()) {
+        const at = respawnAt.current;
+        if (at) placeCar(c.body, at.x * UNIT_TO_M, at.z * UNIT_TO_M, headingFromRot(at.rot));
+        return;
+      }
+      placeCar(c.body, spawn.x * UNIT_TO_M, spawn.z * UNIT_TO_M, headingFromRot(spawn.rot));
+      Object.assign(c.state, newCarState(), { turbo: true });
+      onReset();
+    };
+    return () => void (restartRef.current = null);
+  });
+
   // Local lap logic, the lights and the HUD's numbers.
   const lastStep = useRef(0);
   useFrame(() => {
@@ -308,6 +328,21 @@ export default function RaceWorld({
     if (!c) return;
     hud.driftLevel = c.state.drifting ? turboLevel(c.state.driftCharge) : 0;
     hud.turbo = c.state.turboLeft > 0;
+    if (c.state.turboFired) {
+      hud.turboFlash = { level: c.state.turboFired, at: performance.now() };
+      c.state.turboFired = 0;
+    }
+    // The minimap's dots.
+    const me = c.body.translation();
+    hud.pos = { x: me.x, z: me.z };
+    const lapStart = laps.current.lapStart;
+    const g = best.current && lapStart !== null && !racingNow() ? ghostAt(best.current, serverNow - lapStart) : null;
+    hud.ghostPos = g ? { x: g.x, z: g.z } : null;
+    hud.others = [];
+    for (const d of remotes.current.values()) {
+      const s = d.buffer.latest;
+      if (s) hud.others.push({ x: s.x, z: s.z, color: d.color });
+    }
     // The grid slot, in case the race news came before the car existed.
     if (r.phase === "countdown") takeSlot();
     const now = performance.now();
