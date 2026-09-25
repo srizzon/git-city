@@ -114,12 +114,25 @@ export const SURFACE = {
   grass: { grip: 1.1, topSpeed: 14 },
 } as const;
 
-// Hold Shift: unlimited boost (no race to budget it for yet).
+// Hold Shift: unlimited boost in the town. On the race track only a mini-turbo.
 export const BOOST = {
   engineMul: 2.6,
   topSpeed: 35,
   /** Extra acceleration while boosting in a drift (m/s²). */
   driftAccel: 6,
+};
+
+// Race track, after Mario Kart: hold a drift and it charges; let go and the
+// turbo is banked; Shift fires it. Longer drifts, bigger turbos.
+export const TURBO = {
+  /** Seconds of drift for each level: blue, orange, purple. */
+  charge: [0.6, 1.3, 2.2],
+  /** Boost seconds per level (index 0: no turbo). */
+  seconds: [0, 0.6, 1.0, 1.5],
+  /** Speed added along the nose when it fires (m/s), spread over `push` seconds. */
+  kick: [0, 3.5, 5.5, 8],
+  push: 0.3,
+  colors: ["#ffffff", "#4cc9ff", "#ff9a1f", "#c75bff"],
 };
 
 export const RESPAWN = {

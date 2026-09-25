@@ -63,6 +63,8 @@ export function useDrivePresence({
   input,
   onBump,
   onBattle,
+  party = "drive",
+  onOther,
 }: {
   slug: string;
   name: string;
@@ -71,13 +73,19 @@ export function useDrivePresence({
   /** Someone hit you: apply this velocity change (m/s) to your car. */
   onBump: (from: string, x: number, z: number) => void;
   onBattle: (e: BattleEvent) => void;
+  /** Which party: the town's drive room, or its race track ("race"). */
+  party?: "drive" | "race";
+  /** Every message this hook doesn't handle itself, plus the welcome (the race track's). */
+  onOther?: (msg: { t: string } & Record<string, unknown>) => void;
 }) {
   const onBumpRef = useRef(onBump);
   const onBattleRef = useRef(onBattle);
+  const onOtherRef = useRef(onOther);
   const selfId = useRef<string | null>(null);
   useEffect(() => {
     onBumpRef.current = onBump;
     onBattleRef.current = onBattle;
+    onOtherRef.current = onOther;
   });
   const remotes = useRef(new Map<string, RemoteDriver>());
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
@@ -91,7 +99,7 @@ export function useDrivePresence({
       if (!map.has(id)) map.set(id, { id, name: n, color: carColor(n), buffer: new SnapshotBuffer() });
     };
 
-    const ws = new PartySocket({ host: partyHost(), party: "drive", room: slug });
+    const ws = new PartySocket({ host: partyHost(), party, room: slug });
     socket.current = ws;
     ws.addEventListener("open", () => {
       // A reconnect gets a fresh welcome with everyone still here.
@@ -129,6 +137,7 @@ export function useDrivePresence({
           if (s) map.get(d.id)!.buffer.push(performance.now(), s);
         }
         publish();
+        onOtherRef.current?.(msg as unknown as { t: string } & Record<string, unknown>);
       } else if (msg.t === "join") {
         add(msg.id, msg.name);
         publish();
@@ -138,6 +147,8 @@ export function useDrivePresence({
       } else if (msg.t === "leave") {
         map.delete(msg.id);
         publish();
+      } else {
+        onOtherRef.current?.(msg as unknown as { t: string } & Record<string, unknown>);
       }
     });
     return () => {
@@ -145,7 +156,7 @@ export function useDrivePresence({
       ws.close();
       map.clear();
     };
-  }, [slug, name]);
+  }, [slug, name, party]);
 
   // Stream your car.
   useFrame(() => {

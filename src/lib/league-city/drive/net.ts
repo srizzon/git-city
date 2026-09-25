@@ -69,6 +69,11 @@ export type ClientMsg =
   | { t: "crown_grab" }
   | { t: "crown_hit"; victim: string; steal: boolean }
   | { t: "crown_drop" }
+  /** Race track only (party/race.ts). */
+  | { t: "race_start" }
+  | { t: "restart" }
+  /** Race track: past the finish the car drives itself; the room stops timing it. */
+  | { t: "auto" }
   | ["s", ...number[]];
 // Server → client
 export type ServerMsg =

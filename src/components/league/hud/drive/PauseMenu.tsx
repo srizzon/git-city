@@ -18,7 +18,7 @@ export const CONTROLS: [string, string][] = [
   ["Esc", "pause"],
 ];
 
-type Item = { id: "resume" | "camera" | "sound" | "exit"; label: string };
+type Item = { id: "resume" | "camera" | "sound" | "menu" | "exit"; label: string };
 
 // Standard gamepad buttons.
 const PAD_A = 0;
@@ -34,6 +34,8 @@ export default function PauseMenu({
   onCamera,
   onMute,
   onExit,
+  controls = CONTROLS,
+  onMenu,
 }: {
   camera: DriveCameraMode;
   muted: boolean;
@@ -41,11 +43,16 @@ export default function PauseMenu({
   onCamera: () => void;
   onMute: () => void;
   onExit: () => void;
+  /** The keys listed beside the menu (the race track has its own). */
+  controls?: [string, string][];
+  /** A "Race menu" item (the race track). */
+  onMenu?: () => void;
 }) {
   const items: Item[] = [
     { id: "resume", label: "Resume" },
     { id: "camera", label: `Camera: ${camera === "chase" ? "Chase" : "Top-down"}` },
     { id: "sound", label: `Sound: ${muted ? "Off" : "On"}` },
+    ...(onMenu ? [{ id: "menu" as const, label: "Race menu" }] : []),
     { id: "exit", label: "Exit" },
   ];
   const [sel, setSel] = useState(0);
@@ -54,6 +61,7 @@ export default function PauseMenu({
     if (id === "resume") onResume();
     else if (id === "camera") onCamera();
     else if (id === "sound") onMute();
+    else if (id === "menu") onMenu?.();
     else onExit();
   };
   const pickRef = useRef(pick);
@@ -138,7 +146,7 @@ export default function PauseMenu({
           </ul>
 
           <dl className="hidden grid-cols-[auto_auto] gap-x-6 gap-y-2 self-start text-[10px] sm:grid">
-            {CONTROLS.map(([k, v]) => (
+            {controls.map(([k, v]) => (
               <div key={k} className="contents">
                 <dt className="text-cream">{k}</dt>
                 <dd className="text-muted">{v}</dd>

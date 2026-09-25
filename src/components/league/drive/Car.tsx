@@ -8,7 +8,7 @@ import type { CityBuilding } from "@/lib/github";
 import { LOT } from "@/lib/league-city/grid";
 import type { CityObject } from "@/lib/league-city/types";
 import { nearestFreeLot, type Spawn } from "@/lib/league-city/drive/spawn";
-import { surfaceAt, surfaceIndex } from "@/lib/league-city/drive/surface";
+import { surfaceAt, surfaceIndex, type SurfaceGrip } from "@/lib/league-city/drive/surface";
 import type { DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { CHASSIS, M_TO_UNIT, TOYS, UNIT_TO_M, WHEEL } from "@/lib/league-city/drive/tuning";
 import { honkTarget, padKick } from "@/lib/league-city/drive/reactions";
@@ -54,6 +54,12 @@ const _axisX = new THREE.Vector3(1, 0, 0);
 const _axisY = new THREE.Vector3(0, 1, 0);
 const _spin = new THREE.Quaternion();
 
+function freshState(turbo: boolean): CarState {
+  const s = newCarState();
+  s.turbo = turbo;
+  return s;
+}
+
 export default function Car({
   spawn,
   objects,
@@ -67,6 +73,9 @@ export default function Car({
   onRemoteHit,
   onHonk,
   onReset,
+  surface,
+  respawnAt,
+  turbo = false,
   children,
 }: {
   spawn: Spawn;
@@ -86,6 +95,12 @@ export default function Car({
   onHonk?: (b: CityBuilding) => void;
   /** R, or fell out of the world: back to the spawn point. */
   onReset?: () => void;
+  /** Surface under a point (city units), instead of the city's roads (the race track). */
+  surface?: (wx: number, wz: number) => SurfaceGrip;
+  /** Where R puts the car, when set (the race track's last checkpoint); else the spawn. */
+  respawnAt?: React.MutableRefObject<Spawn | null>;
+  /** No Shift boost: drifts charge a mini-turbo instead (the race track). */
+  turbo?: boolean;
   /** Rendered inside the visible car (lights). */
   children?: React.ReactNode;
 }) {
@@ -94,11 +109,11 @@ export default function Car({
   const rigidObj = useRef<THREE.Object3D>(null);
   const group = useRef<THREE.Group>(null);
   const wheelRefs = useRef<(THREE.Object3D | null)[]>([]);
-  const state = useRef<CarState>(newCarState());
+  const state = useRef<CarState>(freshState(turbo));
   const controller = useRef<VehicleController | null>(null);
 
   const surfaces = useMemo(() => surfaceIndex(objects), [objects]);
-  const gripAt = useMemo(() => (wx: number, wz: number) => surfaceAt(surfaces, wx, wz), [surfaces]);
+  const gripAt = useMemo(() => surface ?? ((wx: number, wz: number) => surfaceAt(surfaces, wx, wz)), [surfaces, surface]);
   const gripRef = useRef(gripAt);
   gripRef.current = gripAt;
 
@@ -132,9 +147,9 @@ export default function Car({
   const reset = () => {
     const body = bodyRef.current;
     if (!body) return;
-    const s = spawnRef.current;
+    const s = respawnAt?.current ?? spawnRef.current;
     placeCar(body, s.x * UNIT_TO_M, s.z * UNIT_TO_M, headingFromRot(s.rot));
-    state.current = newCarState();
+    state.current = freshState(turbo);
     onReset?.();
   };
 

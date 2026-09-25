@@ -21,6 +21,8 @@ import { spawnPoint } from "@/lib/league-city/drive/spawn";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
 import Car, { type CarApi } from "./Car";
+import { RACE_GATE } from "../RaceGate";
+import { carHeading } from "@/lib/league-city/drive/vehicle";
 import DriveCamera from "./DriveCamera";
 import Battle from "./Battle";
 import CrownMode, { type CrownApi, type CrownView } from "./CrownMode";
@@ -28,11 +30,11 @@ import HonkFlash from "./HonkFlash";
 import Lights from "./Lights";
 import { BoostTrail, Smoke } from "./Particles";
 import SkidMarks from "./SkidMarks";
-import { useDriveAudio } from "./useDriveAudio";
 import { useDrivePresence, type BattleEvent } from "./useDrivePresence";
 import RemoteCars, { type BotTarget } from "./RemoteCars";
 import { useTownBots } from "./useTownBots";
-import type { FxSource, FxSources } from "./fx";
+import type { FxSource } from "./fx";
+import { CameraKey, DriveAudio, LocalFx } from "./carFx";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { useDriveInput } from "./useDriveInput";
 
@@ -68,6 +70,8 @@ export interface DriveWorldProps {
   crownApi: React.MutableRefObject<CrownApi | null>;
   /** Crown Rush state for the HUD. */
   onCrown: (v: CrownView) => void;
+  /** Drove out through the race gate on the approach road (RaceGate): off to the track. */
+  onRaceGate?: () => void;
 }
 
 /** A bump carries this share of the hitter's relative velocity, plus a small hop (m/s). */
@@ -192,33 +196,20 @@ function DynamicProp({ spec }: { spec: ColliderSpec }) {
   );
 }
 
-function CameraKey({ input, onToggle }: { input: ReturnType<typeof useDriveInput>; onToggle: () => void }) {
-  useFrame(() => {
-    if (input.current.pressed.camera) onToggle();
-  });
-  return null;
-}
-
-/** Your car as an effects source (tire marks, smoke, boost trail). */
-function LocalFx({ car, sources }: { car: React.MutableRefObject<CarApi | null>; sources: FxSources }) {
-  const entry = useRef<FxSource | null>(null);
+/** Drives out through the race gate: past its line, heading out of town, and moving. Once. */
+function GateWatch({ car, onEnter }: { car: React.MutableRefObject<CarApi | null>; onEnter: () => void }) {
+  const done = useRef(false);
   useFrame(() => {
     const c = car.current;
-    if (!c) return;
-    entry.current ??= { group: c.group, rearWheels: [], slip: 0, boosting: false, grounded: true };
-    const e = entry.current;
-    e.group = c.group;
-    e.rearWheels = c.wheels.slice(2, 4);
-    e.slip = c.state.slip;
-    e.boosting = c.state.boosting;
-    e.grounded = c.controller.wheelIsInContact(2) || c.controller.wheelIsInContact(3);
-    sources.current.set("local", e);
+    if (!c || done.current) return;
+    const p = c.body.translation();
+    const x = p.x * M_TO_UNIT;
+    const z = p.z * M_TO_UNIT;
+    if (z < RACE_GATE.z || z > RACE_GATE.z + 16 || Math.abs(x) > RACE_GATE.halfX) return;
+    if (c.body.linvel().z < 2 || Math.cos(carHeading(c.body)) < 0.5) return;
+    done.current = true;
+    onEnter();
   });
-  return null;
-}
-
-function DriveAudio(props: Parameters<typeof useDriveAudio>[0]) {
-  useDriveAudio(props);
   return null;
 }
 
@@ -242,6 +233,7 @@ export default function DriveWorld({
   onHonk,
   crownApi,
   onCrown,
+  onRaceGate,
 }: DriveWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -394,6 +386,7 @@ export default function DriveWorld({
           <BoostTrail sources={fx} />
           <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} />
           <DriveCamera mode={camera} car={car} impact={impact} />
+          {onRaceGate && <GateWatch car={car} onEnter={onRaceGate} />}
           <CameraKey input={input} onToggle={onCameraToggle} />
           <Ready onReady={onReady} />
         </Physics>

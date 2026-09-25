@@ -8,7 +8,7 @@ import type { RapierContext, RapierRigidBody } from "@react-three/rapier";
 import type { DriveInput } from "./input";
 import { isFlipped } from "./spawn";
 import type { SurfaceGrip } from "./surface";
-import { BOOST, DRIFT, ENGINE, M_TO_UNIT, RESPAWN, STEER, SURFACE, WHEEL } from "./tuning";
+import { BOOST, DRIFT, ENGINE, M_TO_UNIT, RESPAWN, STEER, SURFACE, TURBO, WHEEL } from "./tuning";
 
 type World = RapierContext["world"];
 export type VehicleController = ReturnType<World["createVehicleController"]>;
@@ -31,6 +31,20 @@ export interface CarState {
   /** Spinning out (oil, a ball hit): seconds left and which way. */
   spinLeft: number;
   spinDir: number;
+  /** Race track: a drift charges a mini-turbo, banked when it ends; Shift fires it. */
+  turbo: boolean;
+  /** Seconds drifted in the drift under way (the mini-turbo's charge). */
+  driftCharge: number;
+  /** Banked mini-turbo level (0 none … 3), waiting for Shift. */
+  turboStored: number;
+  /** Mini-turbo seconds left, and of its push (the kick, spread out so nothing jolts). */
+  turboLeft: number;
+  turboPush: number;
+  pushLevel: number;
+  /** Shift was held last step (a press fires once). */
+  boostHeld: boolean;
+  /** Level of the last mini-turbo fired (the HUD clears it once shown). */
+  turboFired: number;
   /** Top speed multiplier (the crown holder is slower). */
   topMul: number;
   /** Sideways speed, m/s. */
@@ -49,7 +63,7 @@ export const WHEELS: { x: number; z: number; front: boolean }[] = [
 export function newCarState(): CarState {
   return {
     speed: 0, steer: 0, boosting: false, braking: false, slip: 0,
-    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, topMul: 1, lateral: 0, surface: "road",
+    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, turbo: false, driftCharge: 0, turboStored: 0, turboLeft: 0, turboPush: 0, pushLevel: 0, boostHeld: false, turboFired: 0, topMul: 1, lateral: 0, surface: "road",
   };
 }
 
@@ -91,6 +105,13 @@ const SPIN_RATE = 7;
 const SPIN_DRAG = 1.2;
 
 /** Start a spin-out: the car loses grip and turns in circles for `seconds`. */
+/** Mini-turbo level for a drift held this long (s): 0 none, 1 blue, 2 orange, 3 purple. */
+export function turboLevel(charge: number): number {
+  let l = 0;
+  for (let i = 0; i < TURBO.charge.length; i++) if (charge >= TURBO.charge[i]) l = i + 1;
+  return l;
+}
+
 export function spinOut(s: CarState, seconds: number, dir: number = Math.random() < 0.5 ? -1 : 1): void {
   s.spinLeft = Math.max(s.spinLeft, seconds);
   s.spinDir = dir < 0 ? -1 : 1;
@@ -126,10 +147,17 @@ export function stepCar(
   if (!spinning && !s.drifting && input.handbrake && input.steer !== 0 && speed > DRIFT.minSpeed && grounded) {
     s.drifting = true;
     s.driftDir = Math.sign(input.steer);
+    s.driftCharge = 0;
   } else if (s.drifting && (!input.handbrake || speed < DRIFT.endSpeed)) {
     s.drifting = false;
     s.recovering = DRIFT.recoverTime;
+    // Let go of a charged drift (not one that just died out): the mini-turbo is banked for Shift.
+    const level = s.turbo && speed >= DRIFT.endSpeed ? turboLevel(s.driftCharge) : 0;
+    if (level > s.turboStored) s.turboStored = level;
+    s.driftCharge = 0;
   }
+  if (s.drifting && grounded) s.driftCharge += dt;
+  if (spinning) s.driftCharge = 0;
   s.recovering = Math.max(0, s.recovering - dt);
 
   // Grip and top speed per wheel, from the surface under it.
@@ -146,8 +174,29 @@ export function stepCar(
     }
   });
 
-  // Boost: unlimited while held.
-  s.boosting = input.boost;
+  // Boost: unlimited while Shift is held in the town. On the race track a Shift
+  // press fires the banked mini-turbo: a push along the nose spread over
+  // TURBO.push seconds, then boost for the rest of its time.
+  if (s.turbo && input.boost && !s.boostHeld && s.turboStored > 0) {
+    s.pushLevel = s.turboStored;
+    s.turboLeft = TURBO.seconds[s.turboStored];
+    s.turboPush = TURBO.push;
+    s.turboFired = s.turboStored;
+    s.turboStored = 0;
+  }
+  s.boostHeld = input.boost;
+  s.turboLeft = Math.max(0, s.turboLeft - dt);
+  s.boosting = s.turbo ? s.turboLeft > 0 : input.boost;
+  if (s.turboPush > 0 && grounded) {
+    const step = Math.min(dt, s.turboPush);
+    s.turboPush -= step;
+    if (speed < BOOST.topSpeed) {
+      const [nx, , nz] = rotate(q, [0, 0, 1]);
+      const add = (TURBO.kick[s.pushLevel] / TURBO.push) * step;
+      const v = body.linvel();
+      body.setLinvel({ x: v.x + nx * add, y: v.y, z: v.z + nz * add }, true);
+    }
+  }
   const top = (s.boosting ? BOOST.topSpeed : rearTop) * s.topMul;
 
   // Throttle, brake and reverse (boost drives even without throttle).
