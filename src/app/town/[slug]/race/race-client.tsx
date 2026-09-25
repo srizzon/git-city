@@ -130,7 +130,13 @@ export default function RaceClient({
     });
   }, []);
   const toggleCamera = useCallback(() => setCamera((c) => (c === "high" ? "close" : "high")), []);
-  const exit = useCallback(() => router.push(`/town/${slug}`), [router, slug]);
+  // Leaving shows a screen at once and stops the car: the town takes a few seconds to load.
+  const [leaving, setLeaving] = useState(false);
+  const exit = useCallback(() => {
+    setLeaving(true);
+    router.push(`/town/${slug}`);
+  }, [router, slug]);
+  useEffect(() => router.prefetch(`/town/${slug}`), [router, slug]);
 
   // Past the line the autopilot has the car, so R comes from here.
   useEffect(() => {
@@ -201,14 +207,14 @@ export default function RaceClient({
   // Esc pauses; Esc again on the pause menu leaves the track.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || leaving) return;
       e.preventDefault();
       if (paused) exit();
       else setPaused(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [paused, exit]);
+  }, [paused, exit, leaving]);
 
   const onLap = useCallback((e: LapNews) => {
     const at = Date.now();
@@ -279,8 +285,8 @@ export default function RaceClient({
             telemetry={telemetry}
             camera={camera}
             onCameraToggle={toggleCamera}
-            muted={muted}
-            paused={paused}
+            muted={muted || leaving}
+            paused={paused || leaving}
             onReady={onReady}
             onFail={onFail}
             onDrivers={setDrivers}
@@ -308,6 +314,7 @@ export default function RaceClient({
         camera={camera}
         muted={muted}
         paused={paused}
+        leaving={leaving}
         drivers={drivers}
         race={race}
         bests={bests}

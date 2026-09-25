@@ -34,6 +34,7 @@ export default function PauseMenu({
   onCamera,
   onMute,
   onExit,
+  controls = CONTROLS,
 }: {
   camera: DriveCameraMode;
   muted: boolean;
@@ -41,6 +42,8 @@ export default function PauseMenu({
   onCamera: () => void;
   onMute: () => void;
   onExit: () => void;
+  /** The keys listed beside the menu (the race track has its own). */
+  controls?: [string, string][];
 }) {
   const items: Item[] = [
     { id: "resume", label: "Resume" },
@@ -138,7 +141,7 @@ export default function PauseMenu({
           </ul>
 
           <dl className="hidden grid-cols-[auto_auto] gap-x-6 gap-y-2 self-start text-[10px] sm:grid">
-            {CONTROLS.map(([k, v]) => (
+            {controls.map(([k, v]) => (
               <div key={k} className="contents">
                 <dt className="text-cream">{k}</dt>
                 <dd className="text-muted">{v}</dd>
