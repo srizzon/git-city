@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CityBuilding } from "@/lib/github";
-import { maxLot, minLot } from "@/lib/league-city/grid";
+import { bounds } from "@/lib/league-city/grid";
+import { isAir } from "@/lib/league-city/catalog";
 import { freeLotsInOrder, lotKey } from "@/lib/league-city/placement";
 import { ghostFit, type GhostFit } from "@/lib/league-city/editor/ghost";
 import { lPath } from "@/lib/league-city/editor/paint";
@@ -65,7 +66,7 @@ export function useEditorController({
       store.dispatch({ type: "pickUp", id });
       const occupied = new Set([...s.objects.values()].map((o) => lotKey(o.x, o.z)));
       const roads = new Set([...s.objects.values()].filter((o) => o.item_type === "road").map((o) => lotKey(o.x, o.z)));
-      const free = freeLotsInOrder(occupied, roads, minLot(s.size), maxLot(s.size))[0];
+      const free = freeLotsInOrder(occupied, roads, bounds(s.h))[0];
       if (free) cameraApi.current?.lookAtLot(free[0], free[1]);
     },
     [store, cameraApi],
@@ -107,7 +108,7 @@ export function useEditorController({
 
       if (e.kind === "hover") {
         // A road in progress follows the cursor as an L.
-        if (tool.kind === "road" && dragFrom.current) setRoadPath(lPath(dragFrom.current, [e.x, e.z], s.objects.values(), s.size));
+        if (tool.kind === "road" && dragFrom.current) setRoadPath(lPath(dragFrom.current, [e.x, e.z], s.objects.values(), s.h));
         return;
       }
 
@@ -133,10 +134,10 @@ export function useEditorController({
       if (tool.kind === "road") {
         if (!dragFrom.current) {
           dragFrom.current = [e.x, e.z];
-          setRoadPath(lPath([e.x, e.z], [e.x, e.z], s.objects.values(), s.size));
+          setRoadPath(lPath([e.x, e.z], [e.x, e.z], s.objects.values(), s.h));
           return;
         }
-        const lots = lPath(dragFrom.current, [e.x, e.z], s.objects.values(), s.size);
+        const lots = lPath(dragFrom.current, [e.x, e.z], s.objects.values(), s.h);
         dragFrom.current = null;
         setRoadPath(null);
         if (lots.length === 0) store.dispatch({ type: "notify", kind: "hint", message: "A building is in the way." });
@@ -145,7 +146,10 @@ export function useEditorController({
       }
 
       if (tool.kind === "place") {
-        store.dispatch({ type: "place", id: uuid(), ...spot });
+        const id = uuid();
+        store.dispatch({ type: "place", id, ...spot });
+        // A new plane or blimp opens its panel (message, colors).
+        if (isAir(tool.item) && store.getState().objects.has(id)) store.dispatch({ type: "select", id });
         return;
       }
       if (tool.kind === "bulldoze") {

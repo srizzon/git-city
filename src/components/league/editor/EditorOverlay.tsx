@@ -4,7 +4,8 @@ import { useEffect, useMemo } from "react";
 import { Billboard } from "@react-three/drei";
 import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
-import { LOT, lotToWorld, maxLot, minLot, rotToRadians } from "@/lib/league-city/grid";
+import { LOT, bounds, lotToWorld, rotToRadians, worldBounds } from "@/lib/league-city/grid";
+import { BILLBOARD, FLAG } from "@/lib/league-city/identity-geometry";
 import type { GhostFit } from "@/lib/league-city/editor/ghost";
 import type { CityObject, ItemType } from "@/lib/league-city/types";
 import { propRadius } from "@/lib/league-city/props";
@@ -36,19 +37,17 @@ export interface GhostSpec {
     | null;
 }
 
-function Grid({ size }: { size: number }) {
+function Grid({ h }: { h: number }) {
   const geo = useMemo(() => {
     const pts: number[] = [];
-    const lo = (minLot(size) - 0.5) * LOT;
-    const hi = (maxLot(size) + 0.5) * LOT;
-    for (let i = minLot(size); i <= maxLot(size) + 1; i++) {
-      const v = (i - 0.5) * LOT;
-      pts.push(v, 0.8, lo, v, 0.8, hi, lo, 0.8, v, hi, 0.8, v);
-    }
+    const b = bounds(h);
+    const w = worldBounds(h);
+    for (let x = b.x0; x <= b.x1 + 1; x++) pts.push((x - 0.5) * LOT, 0.8, w.minZ, (x - 0.5) * LOT, 0.8, w.maxZ);
+    for (let z = b.z0; z <= b.z1 + 1; z++) pts.push(w.minX, 0.8, (z - 0.5) * LOT, w.maxX, 0.8, (z - 0.5) * LOT);
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
     return g;
-  }, [size]);
+  }, [h]);
   useEffect(() => () => geo.dispose(), [geo]);
   return (
     <lineSegments geometry={geo} renderOrder={4}>
@@ -105,6 +104,40 @@ function ItemProxy({ item, color }: { item: ItemType; color: string }) {
         <cylinderGeometry args={[8, 8.5, 6, 16]} />
         {mat}
       </mesh>
+    );
+  if (item === "billboard")
+    return (
+      <mesh position={[0, BILLBOARD.bottom + BILLBOARD.h / 2, 0]}>
+        <boxGeometry args={[BILLBOARD.w, BILLBOARD.h, 1.4]} />
+        {mat}
+      </mesh>
+    );
+  if (item === "flag")
+    return (
+      <group>
+        <mesh position={[0, FLAG.poleH / 2, 0]}>
+          <cylinderGeometry args={[0.5, 0.5, FLAG.poleH, 6]} />
+          {mat}
+        </mesh>
+        <mesh position={[FLAG.clothW / 2, FLAG.poleH - FLAG.clothH / 2, 0]}>
+          <planeGeometry args={[FLAG.clothW, FLAG.clothH]} />
+          {mat}
+        </mesh>
+      </group>
+    );
+  if (item === "plane" || item === "blimp")
+    // Air objects: a column from the ground up to where they fly.
+    return (
+      <group>
+        <mesh position={[0, 40, 0]}>
+          <cylinderGeometry args={[0.6, 0.6, 80, 6]} />
+          {mat}
+        </mesh>
+        <mesh position={[0, 84, 0]} scale={item === "blimp" ? [8, 5, 16] : [6, 2, 6]}>
+          <sphereGeometry args={[1, 12, 8]} />
+          {mat}
+        </mesh>
+      </group>
     );
   if (item === "ramp" || item === "ramp_big") return <RampProxy color={color} big={item === "ramp_big"} />;
   if (item === "speed_bump") return <BumpProxy color={color} />;
@@ -296,7 +329,7 @@ function NewMarkers({ buildings }: { buildings: { x: number; z: number; top: num
 }
 
 export default function EditorOverlay({
-  size,
+  h,
   objects,
   buildingByDev,
   grid,
@@ -305,7 +338,7 @@ export default function EditorOverlay({
   ghost,
   roadPath,
 }: {
-  size: number;
+  h: number;
   objects: CityObject[];
   /** Laid-out buildings (for heights), keyed by developer id. */
   buildingByDev: ReadonlyMap<number, CityBuilding>;
@@ -331,7 +364,7 @@ export default function EditorOverlay({
 
   return (
     <group>
-      {grid && <Grid size={size} />}
+      {grid && <Grid h={h} />}
       {hover && !ghost && !roadPath && hovered?.px != null && hovered.pz != null && (
         <Ring wx={hovered.px} wz={hovered.pz} r={propRadius(hovered.item_type) + 2} color="#ffffff" />
       )}

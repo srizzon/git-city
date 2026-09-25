@@ -313,7 +313,106 @@ const SPRITES: Record<ItemType, Sprite> = {
     ],
     palette: { g: "#2f8a4a", G: "#1f6636", t: TRUNK },
   },
+  portal: {
+    rows: [
+      "............",
+      "bbbbbbbbbbbb",
+      "bwwwwwwwwwwb",
+      "bbbbbbbbbbbb",
+      ".pl......lp.",
+      ".pl......lp.",
+      ".pl......lp.",
+      ".pl......lp.",
+      ".pl......lp.",
+      ".pl......lp.",
+      "mmmm....mmmm",
+      "............",
+    ],
+    palette: { b: "#1b1f27", w: "#ffffff", p: "#232a36", l: "#c8e64a", m: "#3a3f4a" },
+  },
+  billboard: {
+    rows: [
+      "............",
+      "ffffffffffff",
+      "fLLLLwwwwwwf",
+      "fLLLLwwwwwwf",
+      "fLLLLwwwwwwf",
+      "fLLLLwwwwwwf",
+      "ffffffffffff",
+      "..yy....yy..",
+      "..m......m..",
+      "..m......m..",
+      "..m......m..",
+      ".mmm....mmm.",
+    ],
+    palette: { f: "#1b1f27", L: "#c8e64a", w: "#8a93a6", y: "#fff3c4", m: "#3a3f4a" },
+  },
+  flag: {
+    rows: [
+      "..o.........",
+      "..pcccccc...",
+      "..pcLLLLcc..",
+      "..pcLLLLccc.",
+      "..pcLLLLcc..",
+      "..pcccccc...",
+      "..p.........",
+      "..p.........",
+      "..p.........",
+      "..p.........",
+      "..p.........",
+      ".ppp........",
+    ],
+    palette: { o: "#e8c547", p: "#c9ccd2", c: "#2b3a67", L: "#c8e64a" },
+  },
+  blimp: {
+    rows: [
+      "............",
+      "...hhhhhh...",
+      ".hhhhhhhhhh.",
+      "hhhllllllhhf",
+      "hhllllllllhf",
+      "hhhllllllhhf",
+      ".hhhhhhhhhh.",
+      "...hhhhhh...",
+      ".....gg.....",
+      "............",
+      "............",
+      "............",
+    ],
+    palette: { h: "#c0c8d0", l: "#c8e64a", f: "#8890a0", g: "#8890a0" },
+  },
+  plane: {
+    rows: [
+      "............",
+      "..w.........",
+      "..ww........",
+      "wwwwwr......",
+      "..ww.r......",
+      "..w...r.....",
+      "......llllll",
+      "......llllll",
+      "......llllll",
+      "............",
+      "............",
+      "............",
+    ],
+    palette: { w: "#f4f1e8", r: "#8a93a6", l: "#c8e64a" },
+  },
 };
+
+/** The hill sign isn't an object: a slot in the Identity tab that opens its panel. */
+export function HillSignIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" shapeRendering="crispEdges" aria-hidden>
+      <rect x={0} y={9} width={12} height={3} fill="#2f5a3a" />
+      <rect x={2} y={7} width={8} height={2} fill="#2f5a3a" />
+      <rect x={1} y={4} width={2} height={3} fill="#f4f1e8" />
+      <rect x={4} y={4} width={2} height={3} fill="#f4f1e8" />
+      <rect x={7} y={4} width={2} height={3} fill="#f4f1e8" />
+      <rect x={10} y={4} width={1} height={3} fill="#f4f1e8" />
+    </svg>
+  );
+}
 
 export function ItemIcon({ item, size = 24 }: { item: ItemType; size?: number }) {
   const { rows, palette } = SPRITES[item];
@@ -350,4 +449,9 @@ export const ITEM_NAMES: Record<ItemType, string> = {
   tree_detailed: "Wild tree",
   tree_palm_tall: "Palm",
   tree_pine_tall_a: "Pine",
+  portal: "Portal",
+  billboard: "Billboard",
+  flag: "Flag",
+  plane: "Plane",
+  blimp: "Blimp",
 };

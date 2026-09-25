@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Car, Check, Clock, LogIn, LogOut, Pencil, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { Car, Check, Clock, LogIn, LogOut, Pencil, Play, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
 import { Pending } from "@/components/leagues/PixelSpinner";
 import { HUD_BOX } from "./shared";
 
@@ -27,6 +27,7 @@ export default function ActionBar({
   onLeave,
   join,
   requests = 0,
+  onReplay,
 }: {
   slug: string;
   canInvite: boolean;
@@ -41,6 +42,8 @@ export default function ActionBar({
   join?: { kind: "join" | "ask" | "pending"; onClick: () => void };
   /** Admin: open join requests, shown on the settings icon. */
   requests?: number;
+  /** Replays the town intro. */
+  onReplay?: () => void;
 }) {
   const [shared, setShared] = useState(false);
   const [coarse, setCoarse] = useState(false);
@@ -161,6 +164,11 @@ export default function ActionBar({
           <ShieldCheck {...ICON} aria-hidden />
           <span>Work here? Verify</span>
         </Link>
+      )}
+      {onReplay && (
+        <button type="button" onClick={onReplay} aria-label="Replay the town intro" title="Replay the intro" className={`${ICON_BTN} text-cream hover:text-lime`}>
+          <Play {...ICON} aria-hidden />
+        </button>
       )}
       {/* Members share from Invite, with a link that brings people in. */}
       {!canInvite && (

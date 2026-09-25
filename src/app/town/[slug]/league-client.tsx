@@ -40,7 +40,13 @@ import type { DriverInfo } from "@/lib/league-city/drive/net";
 import type { CrownApi, CrownView } from "@/components/league/drive/CrownMode";
 import { createEditorStore } from "@/lib/league-city/editor/store";
 import { keyToAction } from "@/lib/league-city/editor/shortcuts";
-import { MAX_SIZE, START_SIZE } from "@/lib/league-city/grid";
+import { MAX_H, START_H } from "@/lib/league-city/grid";
+import { isAir } from "@/lib/league-city/catalog";
+import { introSeenKey } from "@/lib/league-city/identity";
+import { introPath, type IntroPath } from "@/lib/league-city/intro";
+import type { CityIdentity, ObjectProps, SignSide } from "@/lib/league-city/types";
+import { HillSignPanel, PlazaPanel, SkyPanel } from "@/components/league/hud/editor/IdentityPanel";
+import ReportPanel from "@/components/league/hud/ReportPanel";
 import {
   HOTBAR,
   initEditor,
@@ -66,7 +72,7 @@ const MUTE_KEY = "gc:drive-muted";
 /** While driving, check for city changes (an admin's Done) this often. */
 const DRIVE_POLL_MS = 5000;
 
-type PanelId = "hall" | "standings" | "invite" | "join" | null;
+type PanelId = "hall" | "standings" | "invite" | "join" | "report" | null;
 
 export default function LeagueClient({
   data,
@@ -123,7 +129,16 @@ export default function LeagueClient({
   const editing = mode === "edit" || mode === "preview";
   const driving = mode === "drive";
   useTownVisit(league.slug, !!viewer && viewer.status !== "active" && viewer.status !== "invited", driving);
-  const [store] = useState(() => createEditorStore(initEditor(city)));
+  const [store] = useState(() => createEditorStore(initEditor(city, !!city.identity.logoUrl)));
+  // Identity from the server, with the hill sign side applied optimistically.
+  // The override holds until the server's value changes (a refresh brings the truth).
+  const [signOverride, setSignOverride] = useState<{ side: SignSide | null; base: SignSide | null } | null>(null);
+  const identity: CityIdentity = useMemo(
+    () =>
+      signOverride && signOverride.base === city.identity.signSide ? { ...city.identity, signSide: signOverride.side } : city.identity,
+    [city.identity, signOverride],
+  );
+  useEffect(() => store.dispatch({ type: "setHasLogo", hasLogo: !!city.identity.logoUrl }), [city.identity.logoUrl, store]);
   const cameraApi = useRef<EditCameraApi | null>(null);
   const pickables = useRef<Pickable[]>([]);
   const [leaving, setLeaving] = useState(false);
@@ -228,14 +243,13 @@ export default function LeagueClient({
     [es.objects, carrying, replacing],
   );
 
-  const sceneSize = es.size;
   const shrinkNote = useMemo(() => {
     if (!editing) return "";
     const ring = ringContents(es);
     if (ring.blocked) return "Move the buildings off the edge first";
     return ring.removes.length > 0
-      ? `Remove the outer ring and the ${ring.removes.length} item${ring.removes.length === 1 ? "" : "s"} on it`
-      : "Remove the outer ring of lots";
+      ? `Remove the edge lots and the ${ring.removes.length} item${ring.removes.length === 1 ? "" : "s"} on them`
+      : "Remove a column each side and two rows north";
   }, [editing, es]);
 
   // Server data changed (refresh after Done, an invite): take it if it's not older.
@@ -252,10 +266,12 @@ export default function LeagueClient({
   useEffect(() => {
     const mid: Partial<Record<string, number>> = {
       lamp: 9, bench: 1.5, fountain: 4, ramp: 3, ramp_big: 5, boost_pad: 0.5, speed_bump: 0.5, cone: 1.2, crates: 5, tire_wall: 2.5,
+      portal: 32, billboard: 19, flag: 24,
     };
+    // Planes and blimps are picked where they fly (a plane circles; its center marks it).
     pickables.current = [...es.objects.values()].flatMap((o) =>
       o.px !== null && o.pz !== null && o.item_type
-        ? [{ id: o.id, x: o.px, y: mid[o.item_type] ?? 16, z: o.pz }]
+        ? [{ id: o.id, x: o.px, y: isAir(o.item_type) ? Number(o.props?.alt ?? 160) : (mid[o.item_type] ?? 16), z: o.pz }]
         : [],
     );
   }, [es.objects]);
@@ -383,6 +399,103 @@ export default function LeagueClient({
     [sceneObjects],
   );
 
+  // ─── Intro ─────────────────────────────────────────────────
+  // First visit to each town (localStorage, like the home), the ▶ button
+  // replays it. Click or Esc skips. Lands on your building, else this
+  // week's leader.
+  const [intro, setIntro] = useState<IntroPath | null>(null);
+  const buildIntro = useCallback((): IntroPath => {
+    const objs = [...store.getState().objects.values()];
+    const leaderLogin = data.week.standings[0]?.login?.toLowerCase() ?? null;
+    const landingDev =
+      viewerDevId ?? (leaderLogin ? (members.find((m) => m.login.toLowerCase() === leaderLogin)?.developer_id ?? null) : null);
+    const landingObj = landingDev !== null ? objs.find((o) => o.kind === "building" && o.developer_id === landingDev) : undefined;
+    const landingB = landingObj && landingObj.developer_id !== null ? byDevId.get(landingObj.developer_id) : undefined;
+    const portal = objs.find((o) => o.item_type === "portal");
+    const plaza = objs.filter((o) => o.item_type === "plaza" && o.px === null).sort((a, b) => b.z - a.z || Math.abs(a.x) - Math.abs(b.x))[0];
+    return introPath({
+      h: store.getState().h,
+      portal: portal && portal.px !== null && portal.pz !== null ? [portal.px, portal.pz] : null,
+      plaza: plaza ? [plaza.x * 48, plaza.z * 48] : null,
+      billboards: objs.flatMap((o) => (o.item_type === "billboard" && o.px !== null && o.pz !== null ? [[o.px, o.pz] as [number, number]] : [])),
+      sky: objs.flatMap((o) => (isAir(o.item_type) && o.px !== null && o.pz !== null ? [{ x: o.px, z: o.pz, alt: Number(o.props?.alt ?? 160) }] : [])),
+      signSide: identity.signSide,
+      landing: landingObj && landingB ? { x: landingObj.x * 48, z: landingObj.z * 48, top: landingB.height } : null,
+      tallest: Math.max(0, ...[...byDevId.values()].map((b) => b.height)),
+    });
+  }, [store, data.week.standings, viewerDevId, members, byDevId, identity.signSide]);
+  const landingLogin = useRef<string | null>(null);
+  const playIntro = useCallback(() => {
+    setFocused(null);
+    setPanel(null);
+    const leader = data.week.standings[0]?.login ?? null;
+    const mine = viewer && viewerDevId !== null ? viewer.login : null;
+    landingLogin.current = (mine ?? leader)?.toLowerCase() ?? null;
+    setIntro(buildIntro());
+  }, [buildIntro, data.week.standings, viewer, viewerDevId]);
+  const endIntro = useCallback(() => {
+    setIntro(null);
+    const login = landingLogin.current;
+    const b = login ? [...byDevId.values()].find((x) => x.loginLower === login) : undefined;
+    if (b) setFocused(b);
+  }, [byDevId]);
+  const skipIntro = useCallback(() => setIntro(null), []);
+  const introChecked = useRef(false);
+  useEffect(() => {
+    if (introChecked.current || startEditing || startDriving || showJoinCta) return;
+    introChecked.current = true;
+    let seen = false;
+    try {
+      seen = localStorage.getItem(introSeenKey(league.slug)) === "1";
+      localStorage.setItem(introSeenKey(league.slug), "1");
+    } catch {
+      // storage blocked: the intro plays every visit
+    }
+    // After the first paint, from a callback: the scene mounts first.
+    if (!seen) window.setTimeout(playIntro, 0);
+  }, [league.slug, playIntro, startEditing, startDriving, showJoinCta]);
+  useEffect(() => {
+    if (!intro) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") skipIntro();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [intro, skipIntro]);
+
+  // ─── Identity panels (editor) ──────────────────────────────
+  const [hillPanel, setHillPanel] = useState(false);
+  const [hillSaving, setHillSaving] = useState(false);
+  const [hillError, setHillError] = useState<string | null>(null);
+  const pickHillSide = async (side: SignSide | null) => {
+    setHillSaving(true);
+    setHillError(null);
+    const before = identity.signSide;
+    const base = city.identity.signSide;
+    setSignOverride({ side, base });
+    try {
+      const res = await fetch(`/api/leagues/${league.slug}/identity`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sign_side: side }),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        setSignOverride({ side: before, base });
+        setHillError(json.error ?? "Couldn't save.");
+      }
+    } catch {
+      setSignOverride({ side: before, base });
+      setHillError("Network error. Try again.");
+    }
+    setHillSaving(false);
+  };
+  const panelId = es.held ?? es.selection;
+  const panelObj = mode === "edit" && panelId ? es.objects.get(panelId) : undefined;
+  const panelType = panelObj?.item_type;
+  const setProps = (props: ObjectProps) => panelObj && store.dispatch({ type: "setProps", id: panelObj.id, props });
+  const closeObjPanel = () => store.dispatch({ type: "select", id: null });
+
   const leave = async (): Promise<string | null> => {
     try {
       const res = await fetch(`/api/leagues/${league.slug}/leave`, { method: "POST" });
@@ -407,9 +520,17 @@ export default function LeagueClient({
   }, []);
 
   return (
-    <main className="fixed inset-0 overflow-hidden bg-bg font-pixel uppercase text-warm">
+    <main className="fixed inset-0 overflow-hidden bg-bg font-pixel uppercase text-warm" onPointerDown={intro ? skipIntro : undefined}>
       <LeagueScene
-        size={sceneSize}
+        h={es.h}
+        identity={identity}
+        name={league.name}
+        intro={intro}
+        onIntroEnd={endIntro}
+        onPortalClick={!isMember ? () => {
+          setFocused(null);
+          setPanel("report");
+        } : undefined}
         objects={sceneObjects}
         buildings={buildings}
         focused={focused?.login ?? peek}
@@ -426,7 +547,7 @@ export default function LeagueClient({
       >
         {mode === "edit" && (
           <EditorOverlay
-            size={es.size}
+            h={es.h}
             objects={sceneObjects}
             buildingByDev={byDevId}
             grid={editor.grid}
@@ -455,10 +576,10 @@ export default function LeagueClient({
             onRedo={() => store.dispatch({ type: "redo" })}
             onPreview={togglePreview}
             onDone={done}
-            size={es.size}
-            maxSize={MAX_SIZE}
+            h={es.h}
+            maxSize={MAX_H}
             onExpand={() => store.dispatch({ type: "expand" })}
-            minSize={START_SIZE}
+            minSize={START_H}
             shrinkNote={shrinkNote}
             onShrink={() => store.dispatch({ type: "shrink" })}
           />
@@ -480,6 +601,14 @@ export default function LeagueClient({
                 onTool={(tool) => store.dispatch({ type: "setTool", tool })}
                 onPickBuilding={editor.pickBuilding}
                 hint={editor.hint}
+                objects={es.objects}
+                hasLogo={es.hasLogo}
+                hasHillSign={identity.signSide !== null}
+                onHillSign={() => {
+                  closeObjPanel();
+                  setHillError(null);
+                  setHillPanel(true);
+                }}
                 onWheel={(dir) => {
                   const n =
                     es.hotbarTab === "buildings"
@@ -490,6 +619,15 @@ export default function LeagueClient({
               />
               <EditorTips />
               <CameraHints />
+              {(panelType === "plane" || panelType === "blimp") && panelObj && (
+                <SkyPanel key={`${panelObj.id}:${String(panelObj.props?.text ?? "")}`} object={panelObj} onChange={setProps} onClose={closeObjPanel} />
+              )}
+              {panelType === "plaza" && panelObj && (
+                <PlazaPanel key={panelObj.id} object={panelObj} hasLogo={es.hasLogo} onChange={setProps} onClose={closeObjPanel} />
+              )}
+              {hillPanel && !panelObj && (
+                <HillSignPanel side={identity.signSide} saving={hillSaving} error={hillError} onPick={pickHillSide} onClose={() => setHillPanel(false)} />
+              )}
             </>
           )}
           <EditorToasts notice={es.notice} />
@@ -515,7 +653,7 @@ export default function LeagueClient({
       )}
 
       {/* HUD: the wrappers ignore the pointer so the city stays draggable. */}
-      {!editing && !driving && (
+      {!editing && !driving && !intro && (
         <>
           <div className="pointer-events-none fixed left-4 top-4 z-30">
             <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} badges={badges} pendingRequests={pendingRequests} />
@@ -568,12 +706,25 @@ export default function LeagueClient({
                     : undefined
                 }
                 requests={pendingRequests}
+                onReplay={playIntro}
               />
             </div>
           </div>
         </>
       )}
 
+      {intro && (
+        <button
+          type="button"
+          onClick={skipIntro}
+          className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 bg-bg/70 px-3 py-1.5 text-[9px] text-muted backdrop-blur-sm hover:text-cream"
+        >
+          Click or Esc to skip
+        </button>
+      )}
+      {panel === "report" && (
+        <ReportPanel slug={league.slug} name={league.name} logoUrl={identity.logoUrl} signedIn={!!viewer} onClose={close} />
+      )}
       {panel === "hall" && <HallOfFamePanel data={data} onClose={close} />}
       {panel === "standings" && <StandingsPanel data={data} onClose={close} />}
       {panel === "invite" && isMember && viewer && (
