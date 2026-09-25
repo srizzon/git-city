@@ -20,6 +20,11 @@ type Vec3 = [number, number, number];
 const BACK = 18;
 const UP = 8;
 const AHEAD = 14;
+/** The opening shot: pulled back and up, looking down at the car. */
+const WIDE_BACK = 48;
+const WIDE_UP = 32;
+/** Share of the approach spent easing from the opening shot into the chase view. */
+const SETTLE = 0.65;
 
 const _want = new THREE.Vector3();
 const _look = new THREE.Vector3();
@@ -30,10 +35,17 @@ const _axisY = new THREE.Vector3(0, 1, 0);
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
 
-/** Chase camera behind a car heading north (−z) at (x, z). Portrait screens sit further back. */
-function chase(x: number, z: number, pos: THREE.Vector3, look: THREE.Vector3, far = 1) {
-  pos.set(x, UP * far, z + BACK * far);
-  look.set(x, 4, z - AHEAD);
+/**
+ * Camera behind a car heading north (−z) at (x, z). `wide` 1 is the opening
+ * shot (back, up, looking down at the car), 0 the chase view (low, looking
+ * down the road). Portrait screens sit further back.
+ */
+function chase(x: number, z: number, pos: THREE.Vector3, look: THREE.Vector3, far = 1, wide = 0) {
+  const back = BACK + (WIDE_BACK - BACK) * wide;
+  const up = UP + (WIDE_UP - UP) * wide;
+  pos.set(x, up * far, z + back * far);
+  // Wide: aim a little past the car, so it sits low in frame with the arch and city above.
+  look.set(x, 4 - 4 * wide, z - AHEAD - 30 * wide);
 }
 
 export default function TownIntro({
@@ -65,7 +77,7 @@ export default function TownIntro({
   const endLook = useMemo(() => new THREE.Vector3(...end.look), [end]);
 
   useEffect(() => {
-    chase(intro.x, intro.startZ, _want, _look, far);
+    chase(intro.x, intro.startZ, _want, _look, far, 1);
     camera.position.copy(_want);
     camera.lookAt(_look);
     cam.current.look.copy(_look);
@@ -113,7 +125,8 @@ export default function TownIntro({
 
     const c = cam.current;
     if (st.t <= intro.cruise) {
-      chase(intro.x, z, _want, c.look, far);
+      const wide = 1 - smooth(Math.min(1, st.t / (intro.cruise * SETTLE)));
+      chase(intro.x, z, _want, c.look, far, wide);
       camera.position.copy(_want);
       camera.lookAt(c.look);
       return;
