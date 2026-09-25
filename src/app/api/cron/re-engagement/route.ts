@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { sendNotificationAsync } from "@/lib/notifications";
+import { sendNotification, tallySends } from "@/lib/notifications";
 import { buildButton } from "@/lib/email-template";
+import { mapWithConcurrency } from "@/lib/concurrency";
+
+export const maxDuration = 300;
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+const TIME_BUDGET_MS = 240_000;
+const SEND_CONCURRENCY = 4;
 
 interface ReEngagementTier {
   daysInactive: number;
@@ -67,7 +72,8 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   // Year-week for dedup (each tier once per week max)
   const yearWeek = `${now.getFullYear()}-W${String(Math.ceil(((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7)).padStart(2, "0")}`;
-  const results = { sent: 0, skipped: 0, errors: 0 };
+  const started = Date.now();
+  const results = { sent: 0, skipped: 0, errors: 0, timedOut: false };
 
   for (const tier of TIERS) {
     const inactiveAfter = new Date(now.getTime() - tier.daysInactive * 86_400_000).toISOString();
@@ -77,6 +83,11 @@ export async function GET(request: NextRequest) {
     const batchSize = 50;
 
     while (true) {
+      if (Date.now() - started > TIME_BUDGET_MS) {
+        results.timedOut = true;
+        break;
+      }
+
       // Find devs who were last active in the target window for this tier
       const { data: devs } = await sb
         .from("developers")
@@ -85,6 +96,7 @@ export async function GET(request: NextRequest) {
         .not("email", "is", null)
         .lte("last_active_at", inactiveBefore)
         .gte("last_active_at", inactiveAfter)
+        .order("id", { ascending: true })
         .range(offset, offset + batchSize - 1);
 
       if (!devs || devs.length === 0) break;
@@ -112,19 +124,17 @@ export async function GET(request: NextRequest) {
         kudosCounts.set(k.receiver_id, (kudosCounts.get(k.receiver_id) ?? 0) + 1);
       }
 
-      for (const dev of devs) {
-        // Marketing defaults to false, must be explicitly opted in
-        if (!marketingMap.get(dev.id)) {
-          results.skipped++;
-          continue;
-        }
+      // Marketing defaults to false, must be explicitly opted in
+      const optedIn = devs.filter((dev) => marketingMap.get(dev.id));
+      results.skipped += devs.length - optedIn.length;
 
+      const sendResults = await mapWithConcurrency(optedIn, SEND_CONCURRENCY, async (dev) => {
         const kudos = kudosCounts.get(dev.id) ?? 0;
         const extraInfo = kudos > 0
           ? `<p style="color: #c8e64a; font-size: 14px;">You received ${kudos} kudos while you were away!</p>`
           : "";
 
-        sendNotificationAsync({
+        return sendNotification({
           type: "re_engagement",
           category: "marketing",
           developerId: dev.id,
@@ -136,8 +146,8 @@ export async function GET(request: NextRequest) {
           priority: "low",
           channels: ["email"],
         });
-        results.sent++;
-      }
+      });
+      tallySends(sendResults, results);
 
       if (devs.length < batchSize) break;
       offset += batchSize;

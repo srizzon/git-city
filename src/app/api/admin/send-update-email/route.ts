@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { getDeveloperEmail } from "@/lib/notification-helpers";
 import { buildUnsubscribeUrl } from "@/lib/notifications";
 
@@ -37,7 +37,6 @@ export async function POST(request: NextRequest) {
   }
 
   const sb = getSupabaseAdmin();
-  const resend = getResend();
   const results = { sent: 0, skipped: 0, failed: 0 };
 
   let offset = 0;
@@ -84,7 +83,7 @@ export async function POST(request: NextRequest) {
         `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0a0a0e;"><tr><td align="center" style="padding: 0 20px 48px;"><span style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #3a3a44;"><a href="${unsubUrl}" style="color: #3a3a44; text-decoration: underline; font-family: 'Silkscreen', monospace; font-size: 11px;">unsubscribe</a></span></td></tr></table></body>`,
       );
 
-      const { error } = await resend.emails.send({
+      const { error } = await sendEmail({
         from: FROM,
         to: email,
         subject,

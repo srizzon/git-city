@@ -44,7 +44,7 @@ export async function sendJobApplicationReceivedEmail(
     : "";
 
   const badgesLine = application.badges && application.badges.length > 0
-    ? `<p style="margin:0 0 12px; font-size:13px; color:#999999;">${application.badges.join(" &middot; ")}</p>`
+    ? `<p style="margin:0 0 12px; font-size:13px; color:#999999;">${application.badges.map(escapeHtml).join(" &middot; ")}</p>`
     : "";
 
   // Contact info block (only for native applications with contact data)
@@ -69,7 +69,7 @@ export async function sendJobApplicationReceivedEmail(
     ? `<p style="margin:0 0 4px; font-size:13px; color:#555555;">Seniority: ${escapeHtml(application.seniority)}</p>`
     : "";
   const salaryLine = application.salaryMin && application.salaryMax
-    ? `<p style="margin:0 0 4px; font-size:13px; color:#555555;">Salary: ${application.salaryCurrency ?? "USD"} ${application.salaryMin.toLocaleString()}-${application.salaryMax.toLocaleString()}</p>`
+    ? `<p style="margin:0 0 4px; font-size:13px; color:#555555;">Salary: ${escapeHtml(application.salaryCurrency ?? "USD")} ${application.salaryMin.toLocaleString()}-${application.salaryMax.toLocaleString()}</p>`
     : "";
   const bioLine = application.bio
     ? `<p style="margin:0 0 0; font-size:13px; color:#777777; font-style:italic;">"${escapeHtml(application.bio.slice(0, 200))}"</p>`
@@ -129,7 +129,7 @@ export async function sendJobApplicationsBatchEmail(
     .map((a) => {
       const badge = a.hasProfile ? "&#x2705;" : "";
       const name = [a.firstName, a.lastName].filter(Boolean).join(" ");
-      const display = name ? `${name} (@${escapeHtml(a.login)})` : `@${escapeHtml(a.login)}`;
+      const display = name ? `${escapeHtml(name)} (@${escapeHtml(a.login)})` : `@${escapeHtml(a.login)}`;
       return `<li style="margin-bottom:4px; font-size:14px; color:#555555;">${display} ${badge}</li>`;
     })
     .join("");

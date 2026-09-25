@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { rateLimit } from "@/lib/rate-limit";
 import { escapeHtml, wrapInBaseTemplate } from "@/lib/email-template";
 
@@ -77,14 +77,14 @@ export async function POST(request: NextRequest) {
   `);
 
   try {
-    const resend = getResend();
-    await resend.emails.send({
+    const { error } = await sendEmail({
       from: FROM,
       to: TO,
       replyTo: email,
       subject: `Landmark inquiry — ${company} (${name})`,
       html,
     });
+    if (error) throw new Error(error.message);
   } catch (err) {
     console.error("[landmark-contact] failed to send email", err);
     return NextResponse.json(

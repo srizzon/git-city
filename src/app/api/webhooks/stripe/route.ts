@@ -8,7 +8,8 @@ import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notifi
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import type Stripe from "stripe";
 import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pending-review";
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
+import { escapeHtml } from "@/lib/email-template";
 import { getPostHogClient } from "@/lib/posthog-server";
 
 // Disable body parsing — Stripe needs raw body for signature verification
@@ -275,8 +276,7 @@ export async function POST(request: Request) {
           const isLandmark = pkg?.landmark === true;
 
           try {
-            const resend = getResend();
-            await resend.emails.send({
+            const { error: emailError } = await sendEmail({
               from: "Git City Ads <ads@thegitcity.com>",
               to: "samuelrizzondev@gmail.com",
               subject: isLandmark
@@ -288,7 +288,7 @@ export async function POST(request: Request) {
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Package</td><td><strong>${pkg?.label ?? packageId}</strong></td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Amount</td><td><strong>${totalFormatted}/mo</strong></td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Currency</td><td>${(session.currency ?? "usd").toUpperCase()}</td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Customer</td><td>${purchaserEmail ?? "unknown"}</td></tr>
+                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Customer</td><td>${escapeHtml(purchaserEmail ?? "unknown")}</td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Vehicles</td><td>${adIds.length} ads (${pkg?.vehicles.join(", ") ?? "?"})</td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Ad IDs</td><td>${adIds.join(", ")}</td></tr>
                   <tr><td style="padding:4px 12px 4px 0;color:#888;">Subscription</td><td>${subscriptionId ?? "none"}</td></tr>
@@ -298,6 +298,7 @@ export async function POST(request: Request) {
                 ${isLandmark ? "<p style='margin-top:16px;color:#c8e64a;'><strong>⚠️ This is a Landmark package. You need to create a custom 3D building and post on Instagram/X.</strong></p>" : ""}
               `,
             });
+            if (emailError) throw new Error(emailError.message);
           } catch (emailErr) {
             console.error("Failed to send admin ad sale email:", emailErr);
           }

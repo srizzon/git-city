@@ -1,4 +1,4 @@
-import { sendNotificationAsync } from "../notifications";
+import { sendNotification } from "../notifications";
 import { buildButton, escapeHtml } from "../email-template";
 import { SENIORITY_LABELS, LOCATION_TYPE_LABELS } from "../jobs/constants";
 
@@ -20,12 +20,12 @@ interface MatchingJob {
  * Weekly job digest notification for developers.
  * Sends matching jobs based on career profile preferences.
  */
-export function sendJobDigestNotification(
+export async function sendJobDigestNotification(
   devId: number,
   login: string,
   jobs: MatchingJob[],
 ) {
-  if (jobs.length === 0) return;
+  if (jobs.length === 0) return [];
 
   const jobListHtml = jobs
     .slice(0, 8)
@@ -63,7 +63,7 @@ export function sendJobDigestNotification(
     ? `1 new job matches your profile`
     : `${jobs.length} new jobs match your profile`;
 
-  sendNotificationAsync({
+  return sendNotification({
     type: "job_digest",
     category: "jobs_digest",
     developerId: devId,

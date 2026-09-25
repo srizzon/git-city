@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { getSupabaseAdmin } from "./supabase";
-import { getResend } from "./resend";
+import { sendEmail, toResendTag } from "./resend";
+import { mapWithConcurrency } from "./concurrency";
 import { getDeveloperEmail, isRecentlyActive } from "./notification-helpers";
 import { wrapInBaseTemplate } from "./email-template";
 import type { EmailLinks } from "./email/layout";
@@ -115,6 +116,26 @@ export async function sendNotification(payload: NotificationPayload): Promise<Se
   return results;
 }
 
+/** Collapse a sendNotification result into one outcome, for cron counters. */
+export function sendOutcome(results: SendResult[]): "sent" | "skipped" | "error" {
+  if (results.some((r) => r.success)) return "sent";
+  if (results.some((r) => r.skipped === "resend_error" || r.skipped === "send_error")) return "error";
+  return "skipped";
+}
+
+/** Add settled sendNotification calls to a cron's { sent, skipped, errors } counters. */
+export function tallySends(
+  settled: PromiseSettledResult<SendResult[]>[],
+  counters: { sent: number; skipped: number; errors: number },
+): void {
+  for (const r of settled) {
+    const outcome = r.status === "fulfilled" ? sendOutcome(r.value) : "error";
+    if (outcome === "sent") counters.sent++;
+    else if (outcome === "error") counters.errors++;
+    else counters.skipped++;
+  }
+}
+
 /**
  * Fire-and-forget wrapper. Use this in API routes so notifications
  * never block the response. Errors are logged, not thrown.
@@ -129,12 +150,12 @@ export function sendNotificationAsync(payload: NotificationPayload): void {
  * Flush all closed batches. Called by cron job.
  * Returns number of batches flushed.
  */
-export async function flushPendingBatches(): Promise<number> {
+export async function flushPendingBatches(deadline = Infinity): Promise<number> {
   const sb = getSupabaseAdmin();
 
   const { data: batches } = await sb
     .from("notification_batches")
-    .select("id, batch_key, developer_id, notification_type, channel")
+    .select("id, batch_key, developer_id, notification_type, channel, closes_at")
     .is("processed_at", null)
     .lte("closes_at", new Date().toISOString())
     .order("closes_at", { ascending: true })
@@ -144,7 +165,12 @@ export async function flushPendingBatches(): Promise<number> {
 
   let flushed = 0;
 
-  for (const batch of batches) {
+  // Processed batches are deleted (items cascade) so the next batch for the
+  // same key can be created under UNIQUE(batch_key, channel).
+  const removeBatch = (id: number) => sb.from("notification_batches").delete().eq("id", id);
+
+  await mapWithConcurrency(batches, 4, async (batch) => {
+    if (Date.now() > deadline) return;
     try {
       const { data: items } = await sb
         .from("notification_batch_items")
@@ -153,30 +179,26 @@ export async function flushPendingBatches(): Promise<number> {
         .order("created_at", { ascending: true });
 
       if (!items || items.length === 0) {
-        // Empty batch, just mark processed
-        await sb
-          .from("notification_batches")
-          .update({ processed_at: new Date().toISOString() })
-          .eq("id", batch.id);
-        continue;
+        await removeBatch(batch.id);
+        return;
       }
 
       // Build digest notification from batch items
       const digestPayload = buildDigestFromBatch(batch, items);
       if (digestPayload) {
-        await sendNotification(digestPayload);
+        const results = await sendNotification(digestPayload);
+        // Keep a batch whose send errored for the next flush, for up to a day.
+        const errored = results.some((r) => r.skipped === "resend_error" || r.skipped === "send_error");
+        const stale = Date.now() - Date.parse(batch.closes_at) > 86_400_000;
+        if (errored && !stale) return;
       }
 
-      await sb
-        .from("notification_batches")
-        .update({ processed_at: new Date().toISOString() })
-        .eq("id", batch.id);
-
+      await removeBatch(batch.id);
       flushed++;
     } catch (err) {
       console.error(`[notify:batch] Failed to flush batch ${batch.id}:`, err);
     }
-  }
+  });
 
   return flushed;
 }
@@ -206,13 +228,14 @@ async function processChannel(
     }
   }
 
-  // 3. Dedup check
+  // 3. Dedup check (a failed attempt doesn't count, so it can be retried)
   if (payload.dedupKey) {
     const { data: existing } = await sb
       .from("notification_log")
       .select("id")
       .eq("dedup_key", payload.dedupKey)
       .eq("channel", channel)
+      .neq("status", "failed")
       .maybeSingle();
 
     if (existing) {
@@ -296,21 +319,46 @@ async function addToBatch(
       .single();
 
     if (error) {
-      // Race condition: another process created the batch. Try to find it.
-      const { data: raceBatch } = await sb
+      // UNIQUE(batch_key, channel): either another process created the batch,
+      // a closed batch is waiting for the flush cron (join it, it goes out on
+      // the next flush), or a legacy processed row is still holding the key.
+      const { data: pendingBatch } = await sb
         .from("notification_batches")
         .select("id")
         .eq("batch_key", batchKey)
         .eq("channel", channel)
         .is("processed_at", null)
-        .gt("closes_at", new Date().toISOString())
         .maybeSingle();
 
-      if (!raceBatch) {
-        console.error(`[notify:batch] Failed to create/find batch for ${batchKey}:`, error);
-        return { channel, success: false, skipped: "batch_create_failed" };
+      if (pendingBatch) {
+        batchId = pendingBatch.id;
+      } else {
+        // Processed batches are deleted on flush now; clear an old one and retry.
+        await sb
+          .from("notification_batches")
+          .delete()
+          .eq("batch_key", batchKey)
+          .eq("channel", channel)
+          .not("processed_at", "is", null);
+
+        const { data: retryBatch, error: retryError } = await sb
+          .from("notification_batches")
+          .insert({
+            batch_key: batchKey,
+            developer_id: payload.developerId,
+            notification_type: payload.type,
+            channel,
+            closes_at: closesAt,
+          })
+          .select("id")
+          .single();
+
+        if (retryError || !retryBatch) {
+          console.error(`[notify:batch] Failed to create/find batch for ${batchKey}:`, retryError ?? error);
+          return { channel, success: false, skipped: "batch_create_failed" };
+        }
+        batchId = retryBatch.id;
       }
-      batchId = raceBatch.id;
     } else {
       batchId = newBatch.id;
     }
@@ -364,7 +412,7 @@ function buildDigestFromBatch(
     .slice(0, 10) // Cap at 10 items in digest
     .map((item) => {
       const d = item.event_data as Record<string, string>;
-      return `<li style="margin-bottom: 4px; color: #f0f0f0;">${d.body || d.title || "New event"}</li>`;
+      return `<li style="margin-bottom: 4px; color: #f0f0f0;">${escapeBasicHtml(String(d.body || d.title || "New event"))}</li>`;
     })
     .join("");
 
@@ -427,25 +475,32 @@ async function dispatchEmail(
     fullHtml = wrapInBaseTemplate(bodyHtml, unsubUrl);
   }
 
-  // Send via Resend
-  const resend = getResend();
-  const { data: sent, error } = await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: payload.title,
-    html: fullHtml,
-    text,
-    headers: {
-      "List-Unsubscribe": `<${unsubUrl}>`,
-      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  // Send via Resend (throttled, retried on 429, idempotent per dedup key)
+  const { data: sent, error } = await sendEmail(
+    {
+      from: FROM,
+      to: email,
+      subject: payload.title,
+      html: fullHtml,
+      text,
+      headers: {
+        "List-Unsubscribe": `<${unsubUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+      tags: [
+        { name: "type", value: toResendTag(payload.type) },
+        { name: "category", value: toResendTag(payload.category) },
+      ],
     },
-  });
+    payload.dedupKey ? { idempotencyKey: payload.dedupKey.slice(0, 256) } : undefined,
+  );
 
   const status = error ? "failed" : "sent";
   const providerId = sent?.id;
 
-  // Log to notification_log
-  await sb.from("notification_log").insert({
+  // Log to notification_log. Upsert because a retry reuses the dedup key of
+  // the failed row (UNIQUE(dedup_key, channel)).
+  await sb.from("notification_log").upsert({
     developer_id: payload.developerId,
     channel: "email",
     notification_type: payload.type,
@@ -457,7 +512,8 @@ async function dispatchEmail(
     failure_reason: error ? String(error.message ?? error) : null,
     metadata: { body_preview: payload.body.slice(0, 200) },
     dedup_key: payload.dedupKey || null,
-  });
+    created_at: new Date().toISOString(),
+  }, { onConflict: "dedup_key,channel" });
 
   if (error) {
     console.error(`[notify:email] Resend error for ${email}:`, error);
@@ -640,7 +696,7 @@ async function checkRateLimit(
     .select("id", { count: "exact", head: true })
     .eq("developer_id", devId)
     .eq("channel", channel)
-    .eq("status", "sent")
+    .neq("status", "failed") // the webhook rewrites "sent" to delivered/bounced/...
     .gte("created_at", oneHourAgo);
 
   if ((hourCount ?? 0) >= limits.perHour) return "hourly";
@@ -651,7 +707,7 @@ async function checkRateLimit(
     .select("id", { count: "exact", head: true })
     .eq("developer_id", devId)
     .eq("channel", channel)
-    .eq("status", "sent")
+    .neq("status", "failed")
     .gte("created_at", oneDayAgo);
 
   if ((dayCount ?? 0) >= limits.perDay) return "daily";

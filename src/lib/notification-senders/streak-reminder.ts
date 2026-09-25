@@ -1,9 +1,9 @@
-import { sendNotificationAsync } from "../notifications";
+import { sendNotification } from "../notifications";
 import { buildButton } from "../email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
-export function sendStreakReminderNotification(
+export async function sendStreakReminderNotification(
   devId: number,
   login: string,
   currentStreak: number,
@@ -14,7 +14,7 @@ export function sendStreakReminderNotification(
     ? `<p style="margin:0 0 28px; font-size:13px; color:#999999;">You have a streak freeze available, but don't waste it!</p>`
     : "";
 
-  sendNotificationAsync({
+  return sendNotification({
     type: "streak_reminder",
     category: "streak_reminders",
     developerId: devId,

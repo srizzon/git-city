@@ -1,4 +1,4 @@
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
@@ -34,11 +34,11 @@ export async function sendJobCompanyWelcomeEmail(
     </p>
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
+  const { error } = await sendEmail({
     from: FROM,
     to: email,
     subject: "Welcome to Git City Jobs",
     html: wrapInBaseTemplate(bodyHtml),
   });
+  if (error) throw new Error(`Resend error: ${error.message}`);
 }

@@ -1,11 +1,11 @@
-import { sendNotificationAsync } from "../notifications";
+import { sendNotification } from "../notifications";
 import { buildButton, escapeHtml } from "../email-template";
 import { townDisplayName } from "../towns/names";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
 /** "Bruno overtook you" email. Max one per dev per UTC day across all towns. */
-export function sendLeagueOvertakenNotification(opts: {
+export async function sendLeagueOvertakenNotification(opts: {
   developerId: number;
   leagueSlug: string;
   leagueName: string;
@@ -19,7 +19,7 @@ export function sendLeagueOvertakenNotification(opts: {
   const title = `@${opts.overtakerLogin} overtook you in ${town}`;
   const body = `They're ${opts.gap} point${opts.gap === 1 ? "" : "s"} ahead. You're ${opts.newRank === 1 ? "1st" : `#${opts.newRank}`} now. The week closes Monday 00:00 UTC.`;
 
-  sendNotificationAsync({
+  return sendNotification({
     type: "league_overtaken",
     category: "leagues",
     developerId: opts.developerId,

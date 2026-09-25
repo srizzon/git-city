@@ -1,4 +1,4 @@
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { wrapInBaseTemplate, buildButton, escapeHtml } from "@/lib/email-template";
 
 interface AdReport {
@@ -45,7 +45,6 @@ function changeColor(current: number, prev: number): string {
 }
 
 export async function sendWeeklyAdReport(report: AdReport) {
-  const resend = getResend();
 
   const impChange = pctLabel(report.totals.impressions, report.prevTotals.impressions);
   const engChange = pctLabel(report.totals.engagements, report.prevTotals.engagements);
@@ -145,10 +144,11 @@ export async function sendWeeklyAdReport(report: AdReport) {
     </p>
   `;
 
-  await resend.emails.send({
+  const { error } = await sendEmail({
     from: "Git City <noreply@thegitcity.com>",
     to: report.advertiserEmail,
     subject: `Your Git City ads: ${fmtNum(report.totals.impressions)} views this week`,
     html: wrapInBaseTemplate(bodyHtml),
   });
+  if (error) throw new Error(`Resend error: ${error.message}`);
 }

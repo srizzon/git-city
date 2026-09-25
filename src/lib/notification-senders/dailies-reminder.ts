@@ -1,9 +1,9 @@
-import { sendNotificationAsync } from "../notifications";
+import { sendNotification } from "../notifications";
 import { buildButton } from "../email-template";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
-export function sendDailiesReminderNotification(
+export async function sendDailiesReminderNotification(
   devId: number,
   login: string,
   completedCount: number,
@@ -11,7 +11,7 @@ export function sendDailiesReminderNotification(
 ) {
   const remaining = 3 - completedCount;
 
-  sendNotificationAsync({
+  return sendNotification({
     type: "dailies_reminder",
     category: "social",
     developerId: devId,
