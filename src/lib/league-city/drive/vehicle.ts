@@ -37,6 +37,8 @@ export interface CarState {
   driftCharge: number;
   /** Mini-turbo seconds left. */
   turboLeft: number;
+  /** Level of the last mini-turbo fired (the HUD clears it once shown). */
+  turboFired: number;
   /** Top speed multiplier (the crown holder is slower). */
   topMul: number;
   /** Sideways speed, m/s. */
@@ -55,7 +57,7 @@ export const WHEELS: { x: number; z: number; front: boolean }[] = [
 export function newCarState(): CarState {
   return {
     speed: 0, steer: 0, boosting: false, braking: false, slip: 0,
-    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, turbo: false, driftCharge: 0, turboLeft: 0, topMul: 1, lateral: 0, surface: "road",
+    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, turbo: false, driftCharge: 0, turboLeft: 0, turboFired: 0, topMul: 1, lateral: 0, surface: "road",
   };
 }
 
@@ -143,8 +145,16 @@ export function stepCar(
   } else if (s.drifting && (!input.handbrake || speed < DRIFT.endSpeed)) {
     s.drifting = false;
     s.recovering = DRIFT.recoverTime;
-    // Let go of a charged drift: the mini-turbo fires (not when it just died out).
-    if (s.turbo && speed >= DRIFT.endSpeed) s.turboLeft = Math.max(s.turboLeft, TURBO.seconds[turboLevel(s.driftCharge)]);
+    // Let go of a charged drift: the mini-turbo fires (not when it just died out):
+    // an instant kick along the nose, then a few tenths of boost.
+    const level = s.turbo && speed >= DRIFT.endSpeed ? turboLevel(s.driftCharge) : 0;
+    if (level > 0) {
+      s.turboLeft = Math.max(s.turboLeft, TURBO.seconds[level]);
+      s.turboFired = level;
+      const [nx, , nz] = rotate(q, [0, 0, 1]);
+      const v = body.linvel();
+      body.setLinvel({ x: v.x + nx * TURBO.kick[level], y: v.y, z: v.z + nz * TURBO.kick[level] }, true);
+    }
     s.driftCharge = 0;
   }
   if (s.drifting && grounded) s.driftCharge += dt;

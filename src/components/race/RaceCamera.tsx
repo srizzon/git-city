@@ -59,8 +59,10 @@ export default function RaceCamera({ mode, car }: { mode: RaceCameraMode; car: R
     look.current.lerp(_look, k);
     camera.position.copy(pos.current);
     camera.lookAt(look.current);
-    if (Math.abs(camera.fov - view.fov) > 0.1) {
-      camera.fov += (view.fov - camera.fov) * Math.min(1, 4 * d);
+    // A turbo widens the view for a moment.
+    const fov = view.fov + (c.state.turboLeft > 0 ? 9 : 0);
+    if (Math.abs(camera.fov - fov) > 0.1) {
+      camera.fov += (fov - camera.fov) * Math.min(1, 5 * d);
       camera.updateProjectionMatrix();
     }
   });

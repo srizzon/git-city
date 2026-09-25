@@ -128,7 +128,9 @@ export const TURBO = {
   /** Seconds of drift for each level: blue, orange, purple. */
   charge: [0.6, 1.3, 2.2],
   /** Boost seconds per level (index 0: no turbo). */
-  seconds: [0, 0.45, 0.85, 1.3],
+  seconds: [0, 0.6, 1.0, 1.5],
+  /** Instant speed added along the nose when it fires (m/s). */
+  kick: [0, 3.5, 5.5, 8],
   colors: ["#ffffff", "#4cc9ff", "#ff9a1f", "#c75bff"],
 };
 
