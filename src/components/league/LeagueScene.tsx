@@ -14,7 +14,7 @@ import { InstancedDecorations } from "@/components/city/decorations";
 import type { CityBuilding, CityDecoration } from "@/lib/github";
 import { LOT, bounds, lotToWorld, rotToRadians, terrainBounds, worldBounds } from "@/lib/league-city/grid";
 import type { CityIdentity, CityObject } from "@/lib/league-city/types";
-import { carRoute } from "@/lib/league-city/intro";
+import { carIntro } from "@/lib/league-city/intro";
 import { approachRoads } from "@/lib/league-city/starter";
 import { APPROACH_LOTS } from "@/lib/league-city/identity-geometry";
 import IdentityLayer from "./identity/IdentityLayer";
@@ -333,15 +333,16 @@ function HeroFraming() {
   return null;
 }
 
-// The intro car's route comes from the city; it ends on the orbit's own frame
+// The intro car drives in through the city's portal; it ends on the orbit's own frame
 // for this screen, so nothing jumps.
 function IntroPlayer({ h, objects, color, tallest, onEnd }: { h: number; objects: CityObject[]; color: string; tallest: number; onEnd: () => void }) {
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
   const [plan] = useState(() => {
     const f = cameraFrame(h, aspect);
-    return { route: carRoute(objects), end: { pos: f.position.toArray(), look: f.target.toArray() } };
+    const portal = objects.find((o) => o.item_type === "portal");
+    return { intro: carIntro(portal?.pz ?? undefined), end: { pos: f.position.toArray(), look: f.target.toArray() } };
   });
-  return <TownIntro route={plan.route} end={plan.end} color={color} ceiling={tallest + 60} onEnd={onEnd} />;
+  return <TownIntro intro={plan.intro} end={plan.end} color={color} ceiling={tallest + 60} onEnd={onEnd} />;
 }
 
 // ─── Scene ───────────────────────────────────────────────────

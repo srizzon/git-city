@@ -7,19 +7,20 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import CarModel from "@/components/league/drive/CarModel";
 import { WHEEL, M_TO_UNIT } from "@/lib/league-city/drive/tuning";
 import { WHEELS } from "@/lib/league-city/drive/vehicle";
-import { INTRO_TIMING, driveProgress, type CarRoute, type Vec3 } from "@/lib/league-city/intro";
+import { carAt, type CarIntro } from "@/lib/league-city/intro";
 
-// Plays the town intro (lib/league-city/intro): a car drives the route with
-// the chase camera behind it, parks, then the camera glides up on a curve to
-// the scene's frame, where the orbit controls take over.
+type Vec3 = [number, number, number];
+
+// Plays the town intro (lib/league-city/intro): a car drives in from far out
+// on the approach with the chase camera behind it; just past the arch the
+// camera lifts on a curve to the scene's frame while the car brakes to a stop,
+// and the orbit controls take over.
 
 /** Chase view, city units (drive mode's chase: 7 m back, 2.8 m up). */
 const BACK = 18;
 const UP = 8;
 const AHEAD = 14;
 
-const _p = new THREE.Vector3();
-const _t = new THREE.Vector3();
 const _want = new THREE.Vector3();
 const _look = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -29,14 +30,20 @@ const _axisY = new THREE.Vector3(0, 1, 0);
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
 
+/** Chase camera behind a car heading north (−z) at (x, z). */
+function chase(x: number, z: number, pos: THREE.Vector3, look: THREE.Vector3) {
+  pos.set(x, UP, z + BACK);
+  look.set(x, 4, z - AHEAD);
+}
+
 export default function TownIntro({
-  route,
+  intro,
   end,
   color,
   ceiling,
   onEnd,
 }: {
-  route: CarRoute;
+  intro: CarIntro;
   end: { pos: Vec3; look: Vec3 };
   color: string;
   /** Height that clears every building: the camera goes up to it before swinging out. */
@@ -47,40 +54,19 @@ export default function TownIntro({
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   const car = useRef<THREE.Group>(null);
   const wheelRefs = useRef<(THREE.Object3D | null)[]>([]);
-  const state = useRef({ t: 0, ended: false, spin: 0, yaw: 0, steer: 0, ready: false });
-  const cam = useRef({ pos: new THREE.Vector3(), look: new THREE.Vector3(), fromPos: new THREE.Vector3(), fromLook: new THREE.Vector3(), frozen: false });
-
-  const curve = useMemo(() => {
-    const c = new THREE.CatmullRomCurve3(route.points.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal");
-    c.getLength();
-    return c;
-  }, [route]);
-  const length = useMemo(() => curve.getLength(), [curve]);
+  const state = useRef({ t: 0, ended: false, spin: 0 });
+  const cam = useRef({ look: new THREE.Vector3(), fromPos: new THREE.Vector3(), fromLook: new THREE.Vector3() });
   const endPos = useMemo(() => new THREE.Vector3(...end.pos), [end]);
   const endLook = useMemo(() => new THREE.Vector3(...end.look), [end]);
 
-  /** Poses the car at route share s; returns its forward direction in _t. */
-  const pose = (s: number) => {
-    curve.getPointAt(s, _p);
-    curve.getTangentAt(s, _t);
-    _t.y = 0;
-    _t.normalize();
-  };
-
-  const chase = (out: THREE.Vector3, look: THREE.Vector3) => {
-    out.copy(_p).addScaledVector(_t, -BACK);
-    out.y = UP;
-    look.copy(_p).addScaledVector(_t, AHEAD);
-    look.y = 4;
-  };
-
   useEffect(() => {
-    pose(0);
-    chase(cam.current.pos, cam.current.look);
-    camera.position.copy(cam.current.pos);
-    camera.lookAt(cam.current.look);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camera, curve]);
+    chase(intro.x, intro.startZ, _want, _look);
+    camera.position.copy(_want);
+    camera.lookAt(_look);
+    cam.current.look.copy(_look);
+    // The camera lets go of the car here.
+    chase(intro.x, intro.switchZ, cam.current.fromPos, cam.current.fromLook);
+  }, [camera, intro]);
 
   // Skipped: hand the controls whatever the camera looks at now.
   useEffect(
@@ -96,61 +82,37 @@ export default function TownIntro({
     const st = state.current;
     if (st.ended) return;
     const dt = Math.min(delta, 0.05);
-    const prevS = driveProgress(st.t / route.duration);
     st.t += dt;
-    const { hold, rise } = INTRO_TIMING;
-    const driveEnd = route.duration;
-    const s = driveProgress(st.t / driveEnd);
+    const { z, speed } = carAt(intro, st.t);
 
-    // The car.
-    pose(s);
+    // The car, heading north; wheels roll with its speed.
     const g = car.current;
     if (g) {
-      g.position.copy(_p);
-      const yaw = Math.atan2(_t.x, _t.z);
-      if (!st.ready) {
-        st.yaw = yaw;
-        st.ready = true;
-      }
-      let dyaw = yaw - st.yaw;
-      if (dyaw > Math.PI) dyaw -= 2 * Math.PI;
-      if (dyaw < -Math.PI) dyaw += 2 * Math.PI;
-      st.yaw = yaw;
-      g.rotation.set(0, yaw, 0);
-      const speed = ((s - prevS) * length) / dt;
+      g.position.set(intro.x, 0, z);
+      g.rotation.set(0, Math.PI, 0);
       st.spin += (speed * dt) / (WHEEL.radius * M_TO_UNIT);
-      const steerWant = THREE.MathUtils.clamp((dyaw / dt) * 0.35, -0.5, 0.5);
-      st.steer += (steerWant - st.steer) * Math.min(1, dt * 8);
       WHEELS.forEach((w, i) => {
         const obj = wheelRefs.current[i];
         if (!obj) return;
         obj.position.set(w.x * M_TO_UNIT, (WHEEL.connectionY - WHEEL.restLength) * M_TO_UNIT, w.z * M_TO_UNIT);
-        _q.setFromAxisAngle(_axisY, (w.front ? st.steer : 0) + (w.x < 0 ? Math.PI : 0));
+        _q.setFromAxisAngle(_axisY, w.x < 0 ? Math.PI : 0);
         _spin.setFromAxisAngle(_axisX, st.spin * (w.x < 0 ? -1 : 1));
         obj.quaternion.copy(_q).multiply(_spin);
       });
     }
 
-    // The camera: chase while driving and parked, then the rise.
     const c = cam.current;
-    if (st.t < driveEnd + hold) {
-      chase(_want, _look);
-      const k = 1 - Math.exp(-4 * dt);
-      c.pos.lerp(_want, k);
-      c.look.lerp(_look, Math.min(1, k * 1.5));
-      camera.position.copy(c.pos);
+    if (st.t <= intro.cruise) {
+      chase(intro.x, z, _want, c.look);
+      camera.position.copy(_want);
       camera.lookAt(c.look);
       return;
     }
-    if (!c.frozen) {
-      c.fromPos.copy(c.pos);
-      c.fromLook.copy(c.look);
-      c.frozen = true;
-    }
-    const u = Math.min(1, (st.t - driveEnd - hold) / rise);
+
+    // Straight up, clear of every roof, then out to the frame (cubic Bézier
+    // whose first handle is right above where the camera let go).
+    const u = Math.min(1, (st.t - intro.cruise) / intro.rise);
     const e = smooth(u);
-    // Straight up over the parked car, clear of every roof, then out to the
-    // frame (cubic Bézier: the first handle is right above the start).
     const up = Math.max(ceiling, endPos.y);
     const i = 1 - e;
     const w0 = i * i * i;

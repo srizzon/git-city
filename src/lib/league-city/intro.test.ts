@@ -1,57 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { LOT } from "./grid";
-import { starterOps } from "./starter";
-import { applyLocal } from "./editor/state";
-import { LANE, carRoute, driveProgress, introSeconds } from "./intro";
-import type { CityObject, CityOp } from "./types";
+import { CRUISE, carAt, carIntro, introSeconds } from "./intro";
 
-const road = (x: number, z: number) => ({ item_type: "road" as const, x, z, px: null });
-const starter = (): CityObject[] => {
-  const ops = starterOps([{ developer_id: 1, weight: 1 }]).ops.map((op, i) => (op.op === "place" && !op.id ? { ...op, id: `o${i}` } : op)) as CityOp[];
-  return [...applyLocal(new Map(), ops).values()];
-};
+describe("carIntro", () => {
+  const c = carIntro();
 
-describe("carRoute", () => {
-  it("starts outside on the approach and goes through the portal in the right lane", () => {
-    const { points } = carRoute(starter());
-    expect(points[0][1]).toBeGreaterThan(LOT);
-    expect(points[0][0]).toBe(LANE);
-    expect(points[1]).toEqual([LANE, LOT / 2 + 20]);
+  it("starts far out on the approach, well before the arch", () => {
+    expect(c.startZ - LOT / 2).toBeGreaterThan(5 * LOT);
   });
 
-  it("turns right onto the starter's cross street and parks a bit past the corner", () => {
-    const { points } = carRoute(starter());
-    const park = points.at(-1)!;
-    expect(park[0]).toBeGreaterThan(LOT);
-    expect(Math.abs(park[1] - -6 * LOT)).toBeLessThan(LOT / 2);
+  it("switches a little past the arch and stops up the main street", () => {
+    expect(c.switchZ).toBeLessThan(LOT / 2);
+    expect(c.switchZ).toBeGreaterThan(-LOT);
+    expect(c.stopZ).toBeLessThan(c.switchZ);
+    expect(c.stopZ).toBeGreaterThan(-3 * LOT);
   });
 
-  it("turns left when the only cross street goes west", () => {
-    const objs = [road(0, 0), road(0, -1), road(0, -2), road(0, -3), road(-1, -3)];
-    expect(carRoute(objs).points.at(-1)![0]).toBeLessThan(-LOT);
+  it("cruises to the switch, then brakes smoothly to a stop at the end of the rise", () => {
+    expect(carAt(c, 0).z).toBe(c.startZ);
+    expect(carAt(c, c.cruise).z).toBeCloseTo(c.switchZ);
+    expect(carAt(c, c.cruise).speed).toBe(CRUISE);
+    expect(carAt(c, c.cruise + c.rise).z).toBeCloseTo(c.stopZ);
+    expect(carAt(c, c.cruise + c.rise).speed).toBeCloseTo(0);
+    expect(carAt(c, 99).z).toBeCloseTo(c.stopZ);
   });
 
-  it("parks on the main street when there's no cross street", () => {
-    const objs = [road(0, 0), road(0, -1), road(0, -2), road(0, -3)];
-    const park = carRoute(objs).points.at(-1)!;
-    expect(park[0]).toBeGreaterThan(LANE);
-    expect(park[1]).toBeLessThan(-2 * LOT);
-  });
-
-  it("takes an unhurried 10 to 16 seconds in all", () => {
-    const s = introSeconds(carRoute(starter()));
-    expect(s).toBeGreaterThanOrEqual(10);
-    expect(s).toBeLessThanOrEqual(16);
-  });
-});
-
-describe("driveProgress", () => {
-  it("covers the route and eases to a stop", () => {
-    expect(driveProgress(0)).toBe(0);
-    expect(driveProgress(1)).toBeCloseTo(1);
-    const end = driveProgress(1) - driveProgress(0.98);
-    const mid = driveProgress(0.52) - driveProgress(0.5);
-    expect(end).toBeLessThan(mid / 5);
-    for (let u = 0.01; u <= 1; u += 0.01) expect(driveProgress(u)).toBeGreaterThanOrEqual(driveProgress(u - 0.01));
+  it("lasts about 10 seconds", () => {
+    expect(introSeconds(c)).toBeGreaterThan(8);
+    expect(introSeconds(c)).toBeLessThan(13);
   });
 });
