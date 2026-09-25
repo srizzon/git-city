@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Car, Check, Clock, LogIn, LogOut, Pencil, Play, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { Car, Check, Clock, Flag, LogIn, LogOut, Pencil, Play, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
 import { Pending } from "@/components/leagues/PixelSpinner";
 import { HUD_BOX } from "./shared";
 
@@ -143,6 +143,12 @@ export default function ActionBar({
             </span>
           )}
         </button>
+      )}
+      {onDrive && desktop && (
+        <Link href={`/town/${slug}/race`} title="The town's race track" className={`${BTN} text-lime hover:text-cream`}>
+          <Flag {...ICON} aria-hidden />
+          <span>Race</span>
+        </Link>
       )}
       {onDrive && !desktop && (
         <span className="relative flex">
