@@ -35,9 +35,10 @@ export default function GlobalRadio() {
   // When the main page provides a slot, portal into it (inline with theme/intro buttons)
   if (slot) return createPortal(<LofiRadio />, slot);
 
-  // Fallback for other pages: fixed bottom-left
+  // Fallback for other pages: fixed bottom-left, desktop only (on a phone it
+  // lands on top of page controls like the town action bar).
   return (
-    <div className="pointer-events-auto fixed bottom-4 left-3 z-25 sm:left-4">
+    <div className="pointer-events-auto fixed bottom-4 left-3 z-25 max-sm:hidden sm:left-4">
       <LofiRadio />
     </div>
   );
