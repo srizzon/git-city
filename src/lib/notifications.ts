@@ -405,7 +405,9 @@ function buildDigestFromBatch(
 
   return {
     type: `${batch.notification_type}_digest`,
-    category: "digest",
+    // Same category as the events it bundles, so the raid/jobs toggles (not
+    // the weekly recap one) control it and the recap sunset doesn't stop it.
+    category: batch.notification_type === "job_filled" ? "jobs_updates" : "social",
     developerId: batch.developer_id,
     dedupKey: `digest:${batch.id}`,
     title: subject,
