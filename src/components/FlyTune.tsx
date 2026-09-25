@@ -10,6 +10,8 @@ export const FLY_TUNE = {
   boost: 18,
   /** How fast the throttle moves while Shift or Alt/Q is held (1/s, log scale). */
   throttleRate: 1.2,
+  /** Throttle change per scroll-wheel notch (log scale: 0.3 = x1.35 a notch). */
+  wheelStep: 0.3,
   /** How fast speed eases toward its target (1/s). */
   speedEase: 2.2,
   /** Camera arm length behind the plane. */
@@ -32,6 +34,7 @@ type Key = keyof typeof FLY_TUNE;
 const RANGES: Record<Key, [number, number, number]> = {
   boost: [1, 30, 0.5],
   throttleRate: [0.3, 4, 0.1],
+  wheelStep: [0.05, 0.8, 0.05],
   speedEase: [0.3, 6, 0.1],
   camDist: [20, 120, 1],
   camHeight: [0, 60, 1],

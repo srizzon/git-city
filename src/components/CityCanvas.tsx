@@ -425,10 +425,10 @@ function CameraFocus({
 // ─── Mouse-Driven Flight ─────────────────────────────────────
 
 const DEFAULT_FLY_SPEED = 55;
-// Throttle model (War Thunder, Flight Simulator, GTA planes): Shift raises the
-// throttle and Alt/Q lowers it while held, and the speed stays where you leave
-// it, from a hover (0) up to cruise x FLY_TUNE.boost. Changes are proportional
-// (doubling every ~0.6 s) so they feel the same slow or fast. No scroll wheel.
+// Throttle model (War Thunder, Flight Simulator, GTA planes): the scroll wheel,
+// or Shift / Alt-Q held, moves the throttle and the speed stays where you
+// leave it, from a hover (0) up to cruise x FLY_TUNE.boost. Changes are
+// proportional so they feel the same slow or fast.
 const HOVER_BELOW = 8; // under this, lowering the throttle settles into a hover
 const MIN_ALT = 25;
 const MAX_ALT = 900;
@@ -564,6 +564,17 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
         mouse.current.y = -((e.clientY / window.innerHeight) * 2 - 1);
       }
     };
+    // Scroll wheel is the throttle: each notch (deltaY ~100) scales speed by
+    // ~1.35, so cruise to top speed is ~10 notches; scrolling down past
+    // HOVER_BELOW settles into a hover.
+    const onWheel = (e: WheelEvent) => {
+      if (paused.current) return;
+      if ((e.target as HTMLElement | null)?.closest?.("button, a, input, [data-ui]")) return;
+      const maxSpeed = DEFAULT_FLY_SPEED * FLY_TUNE.boost;
+      const factor = Math.exp(-e.deltaY * FLY_TUNE.wheelStep / 100);
+      if (factor > 1) flySpeed.current = Math.min(maxSpeed, Math.max(HOVER_BELOW, flySpeed.current) * factor);
+      else flySpeed.current = flySpeed.current * factor < HOVER_BELOW ? 0 : flySpeed.current * factor;
+    };
 
     // Touch handlers for mobile joystick
     const onTouchStart = (e: TouchEvent) => {
@@ -605,6 +616,7 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     };
 
     window.addEventListener("mousemove", onMove);
+    window.addEventListener("wheel", onWheel, { passive: true });
 
     // Touch: start on canvas element, move/end on window to catch finger leaving canvas
     const canvas = document.querySelector("canvas");
@@ -618,6 +630,7 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
 
     return () => {
       window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("wheel", onWheel);
       if (canvas) {
         canvas.removeEventListener("touchstart", onTouchStart);
       }

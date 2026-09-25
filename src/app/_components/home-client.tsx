@@ -3382,12 +3382,12 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
                         <span>steer</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Shift</span>
-                        <span>faster</span>
+                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Scroll</span>
+                        <span>speed, down to a hover</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Alt / Q</span>
-                        <span>slower, down to a hover</span>
+                        <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Shift / Q</span>
+                        <span>faster / slower</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-20 shrink-0 whitespace-nowrap text-cream uppercase tracking-wider">Click / F</span>
