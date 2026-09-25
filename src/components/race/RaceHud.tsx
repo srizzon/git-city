@@ -9,6 +9,7 @@ import CopyLink from "@/components/league/hud/drive/CopyLink";
 import type { RaceCameraMode } from "./RaceCamera";
 import Minimap from "./Minimap";
 import RaceMenu from "./RaceMenu";
+import TransitScreen from "@/components/league/hud/TransitScreen";
 import { TURBO } from "@/lib/league-city/drive/tuning";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import type { BoardRow } from "@/lib/league-city/race/board";
@@ -757,7 +758,7 @@ export default function RaceHud({
       )}
 
       <StartScreen ready={ready} />
-      {leaving && <LeavingScreen townName={townName} />}
+      {leaving && <TransitScreen title={`Back to ${townName}`} line="Parking the car…" />}
       {paused && ready && !leaving && (
         <PauseMenu
           controls={CONTROLS}
@@ -883,31 +884,3 @@ function TrialCard({
   );
 }
 
-/** Exit picked: the track blurs behind "Back to <town>" and a running bar until the town loads. */
-function LeavingScreen({ townName }: { townName: string }) {
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setStep((n) => n + 1), 120);
-    return () => clearInterval(id);
-  }, []);
-  const BLOCKS = 16;
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="pointer-events-auto absolute inset-0 z-50 flex animate-[fade-in_0.15s_ease-out] items-center justify-center bg-bg/70 backdrop-blur-md"
-    >
-      <div className="flex flex-col gap-6 px-6">
-        <h2 className="text-3xl tracking-[0.2em] text-cream sm:text-4xl">Back to {townName}</h2>
-        <div className="flex gap-1" aria-hidden>
-          {Array.from({ length: BLOCKS }, (_, i) => {
-            // Four lit blocks running left to right.
-            const on = (i - (step % (BLOCKS + 4)) + BLOCKS + 4) % (BLOCKS + 4) >= BLOCKS;
-            return <span key={i} className={`h-4 w-5 border-2 ${on ? "border-lime bg-lime" : "border-border bg-bg"}`} />;
-          })}
-        </div>
-        <p className="text-[11px] text-muted">Parking the car…</p>
-      </div>
-    </div>
-  );
-}
