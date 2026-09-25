@@ -11,10 +11,13 @@ export default function LeagueTitle({
   data,
   topCompanyLastWeek,
   badges,
+  pendingRequests = 0,
 }: {
   data: LeaguePageData;
   topCompanyLastWeek: boolean;
   badges: TownBadges;
+  /** Admin only: open join requests, with a link to answer them. */
+  pendingRequests?: number;
 }) {
   const { league, counts } = data;
   return (
@@ -38,6 +41,18 @@ export default function LeagueTitle({
         <p className="mt-1.5 text-[10px] text-muted">
           {fmt(counts.total)} buildings · {fmt(counts.joined)} joined · {fmt(counts.invited)} invited
         </p>
+        {pendingRequests > 0 && (
+          <Link
+            href={`/town/${league.slug}/settings#requests`}
+            className="pointer-events-auto mt-3 flex items-center justify-between gap-3 border-2 border-lime bg-lime/10 px-2.5 py-1.5 text-[10px] text-lime transition-colors hover:bg-lime hover:text-bg"
+          >
+            <span className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 animate-pulse bg-lime" aria-hidden />
+              {pendingRequests} join request{pendingRequests === 1 ? "" : "s"}
+            </span>
+            <span>Review &rarr;</span>
+          </Link>
+        )}
         {badges.milestones.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5 text-[9px]">
             {badges.milestones.map((m) => (

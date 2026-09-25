@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { getLeagueBySlug, getOrCreateInviteToken, getViewer, listJoinRequests, openInviteLink } from "@/lib/leagues/service";
+import {
+  countJoinRequests,
+  getLeagueBySlug,
+  getOrCreateInviteToken,
+  getViewer,
+  listJoinRequests,
+  openInviteLink,
+} from "@/lib/leagues/service";
 import { getLeagueMembers } from "@/lib/leagues/queries";
 import SettingsClient from "./settings-client";
 import { townDisplayName } from "@/lib/towns/names";
@@ -32,7 +39,11 @@ export default async function LeagueSettingsPage({ params }: Props) {
     const origin = process.env.PORTLESS_URL ?? (host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : undefined);
     inviteLink = openInviteLink(league.slug, viewer.github_login, await getOrCreateInviteToken(viewer, league), origin);
   }
-  const requests = league.kind === "custom" ? await listJoinRequests(viewer, league) : [];
+  const custom = league.kind === "custom";
+  const [requests, requestTotal] = await Promise.all([
+    custom ? listJoinRequests(viewer, league) : Promise.resolve([]),
+    custom ? countJoinRequests(league.id) : Promise.resolve(0),
+  ]);
   return (
     <SettingsClient
       league={league}
@@ -40,6 +51,7 @@ export default async function LeagueSettingsPage({ params }: Props) {
       viewerLogin={viewer.github_login}
       inviteLink={inviteLink}
       requests={requests}
+      requestTotal={requestTotal}
     />
   );
 }

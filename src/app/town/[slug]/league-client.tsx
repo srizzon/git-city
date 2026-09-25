@@ -510,7 +510,7 @@ export default function LeagueClient({
       {!editing && !driving && (
         <>
           <div className="pointer-events-none fixed left-4 top-4 z-30">
-            <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} badges={badges} />
+            <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} badges={badges} pendingRequests={pendingRequests} />
           </div>
 
           <div
@@ -577,6 +577,12 @@ export default function LeagueClient({
           kind={league.kind}
           joinMode={league.join_mode}
           isAdmin={isAdmin}
+          inCity={(login) => buildings.some((b) => b.loginLower === login.toLowerCase())}
+          onShow={(login) => {
+            const b = buildings.find((x) => x.loginLower === login.toLowerCase());
+            setPanel(null);
+            if (b) setFocused(b);
+          }}
           onClose={close}
         />
       )}

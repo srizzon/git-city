@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PixelSpinner, { Pending } from "@/components/leagues/PixelSpinner";
 import { Avatar, NO_AUTOFILL } from "@/components/league/hud/shared";
+import { PixelSelect } from "@/components/ui/PixelSelect";
 import type { JoinRequest, League } from "@/lib/leagues/service";
 import { REQUEST_TTL_DAYS, type JoinMode } from "@/lib/towns/joining";
 import type { LeagueMemberRow } from "@/lib/leagues/queries";
@@ -45,6 +46,7 @@ export default function SettingsClient({
   viewerLogin,
   inviteLink,
   requests,
+  requestTotal,
 }: {
   league: League;
   members: LeagueMemberRow[];
@@ -52,6 +54,7 @@ export default function SettingsClient({
   /** Custom leagues: the open invite link (carries the invite token). */
   inviteLink: string | null;
   requests: JoinRequest[];
+  requestTotal: number;
 }) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
@@ -71,8 +74,8 @@ export default function SettingsClient({
         <p className="mt-1 text-[11px] text-muted">Town settings</p>
 
         <div className="mt-6 space-y-4">
-          {league.kind === "custom" && (league.join_mode === "request" || requests.length > 0) && (
-            <RequestsSection slug={league.slug} requests={requests} onChanged={refresh} />
+          {league.kind === "custom" && (league.join_mode === "request" || requestTotal > 0) && (
+            <RequestsSection slug={league.slug} requests={requests} total={requestTotal} onChanged={refresh} />
           )}
           {league.kind === "custom" && <NameSection api={api} name={league.name} onSaved={refresh} />}
           {league.kind === "custom" && <JoinModeSection api={api} mode={league.join_mode} onSaved={refresh} />}
@@ -259,7 +262,20 @@ function since(iso: string | null): string | null {
   return iso ? `GitHub since ${new Date(iso).getUTCFullYear()}` : null;
 }
 
-function RequestsSection({ slug, requests, onChanged }: { slug: string; requests: JoinRequest[]; onChanged: () => void }) {
+function RequestsSection({
+  slug,
+  requests,
+  total,
+  onChanged,
+}: {
+  slug: string;
+  requests: JoinRequest[];
+  /** All live requests; `requests` holds the oldest 200. */
+  total: number;
+  onChanged: () => void;
+}) {
+  const [limit, setLimit] = useState(PAGE);
+  const visible = requests.slice(0, limit);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -275,14 +291,14 @@ function RequestsSection({ slug, requests, onChanged }: { slug: string; requests
   return (
     <div id="requests" className="scroll-mt-6">
       <Section
-        title={`Join requests${requests.length > 0 ? ` · ${requests.length}` : ""}`}
+        title={`Join requests${total > 0 ? ` · ${total}` : ""}`}
         hint={`Declining is quiet: they aren't told. Requests expire after ${REQUEST_TTL_DAYS} days.`}
       >
         {requests.length === 0 ? (
           <p className="text-[11px] text-dim normal-case">No requests right now.</p>
         ) : (
-          <ul className="max-h-[420px] divide-y-2 divide-border overflow-y-auto border-2 border-border">
-            {requests.map((r) => (
+          <ul className="max-h-[440px] divide-y-2 divide-border overflow-y-auto border-2 border-border">
+            {visible.map((r) => (
               <li key={r.login} className="flex items-center gap-3 px-3 py-2">
                 <Avatar src={r.avatar_url} size={24} />
                 <div className="min-w-0 flex-1">
@@ -319,6 +335,20 @@ function RequestsSection({ slug, requests, onChanged }: { slug: string; requests
               </li>
             ))}
           </ul>
+        )}
+        {requests.length > visible.length && (
+          <button
+            type="button"
+            onClick={() => setLimit((l) => l + PAGE)}
+            className="btn-press mt-2 w-full border-2 border-border px-3 py-2 text-[10px] text-cream hover:border-lime"
+          >
+            Show {Math.min(PAGE, requests.length - visible.length)} more
+          </button>
+        )}
+        {total > PAGE && (
+          <p className="mt-2 text-[10px] text-muted normal-case">
+            A long line? Set Who can join to Anyone and everyone walks straight in.
+          </p>
         )}
         <ErrorLine error={error} />
       </Section>
@@ -369,6 +399,9 @@ function ScoringSection({ api, mode, onSaved }: { api: string; mode: "xp" | "con
 
 // ─── Members ─────────────────────────────────────────────────
 
+/** Rows rendered per page in the member and request lists. */
+const PAGE = 50;
+
 function MembersSection({
   league,
   members,
@@ -384,7 +417,15 @@ function MembersSection({
   const [removing, setRemoving] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const sorted = [...members].sort((a, b) => (a.status === b.status ? a.login.localeCompare(b.login) : a.status === "active" ? -1 : 1));
+  const [filter, setFilter] = useState<"all" | "active" | "invited">("all");
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(PAGE);
+  const joined = members.filter((m) => m.status === "active").length;
+  const needle = query.trim().replace(/^@/, "").toLowerCase();
+  const sorted = [...members]
+    .filter((m) => (filter === "all" || m.status === filter) && (!needle || m.login.toLowerCase().includes(needle)))
+    .sort((a, b) => (a.status === b.status ? a.login.localeCompare(b.login) : a.status === "active" ? -1 : 1));
+  const visible = sorted.slice(0, limit);
 
   async function copyLink(login: string) {
     const url = `${window.location.origin}/town/${league.slug}?ref=${encodeURIComponent(viewerLogin)}&invite=${encodeURIComponent(login)}`;
@@ -414,8 +455,45 @@ function MembersSection({
         "Removed members leave the city. Only a new invite from you brings them back."
       }
     >
-      <ul className="max-h-[420px] divide-y-2 divide-border overflow-y-auto border-2 border-border">
-        {sorted.map((m) => {
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          {...NO_AUTOFILL}
+          type="search"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setLimit(PAGE);
+          }}
+          placeholder="Find a member"
+          aria-label="Find a member"
+          className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none placeholder:text-dim focus:border-lime sm:text-[11px]"
+        />
+        <div className="flex border-2 border-border" role="group" aria-label="Show">
+          {(
+            [
+              ["all", `All ${members.length}`],
+              ["active", `Joined ${joined}`],
+              ["invited", `Invited ${members.length - joined}`],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={filter === id}
+              onClick={() => {
+                setFilter(id);
+                setLimit(PAGE);
+              }}
+              className={`px-2.5 py-2 text-[9px] ${filter === id ? "bg-lime text-bg" : "text-muted hover:text-cream"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {sorted.length === 0 && <p className="text-[11px] text-dim normal-case">No member matches that.</p>}
+      <ul className={`max-h-[440px] divide-y-2 divide-border overflow-y-auto border-2 border-border ${sorted.length === 0 ? "hidden" : ""}`}>
+        {visible.map((m) => {
           const me = m.login === viewerLogin;
           return (
             <li key={m.developer_id} className="flex items-center gap-3 px-3 py-2">
@@ -470,6 +548,15 @@ function MembersSection({
           );
         })}
       </ul>
+      {sorted.length > visible.length && (
+        <button
+          type="button"
+          onClick={() => setLimit((l) => l + PAGE)}
+          className="btn-press mt-2 w-full border-2 border-border px-3 py-2 text-[10px] text-cream hover:border-lime"
+        >
+          Show {Math.min(PAGE, sorted.length - visible.length)} more · {sorted.length - visible.length} left
+        </button>
+      )}
       <ErrorLine error={error} />
     </Section>
   );
@@ -518,19 +605,16 @@ function TransferSection({
         </p>
       ) : (
         <form onSubmit={transfer} className="flex flex-wrap gap-2">
-          <select
+          <PixelSelect
             value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            aria-label="New admin"
-            className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-2 py-2 text-base text-cream normal-case sm:text-[11px]"
-          >
-            {candidates.map((m) => (
-              <option key={m.developer_id} value={m.login}>
-                @{m.login}
-              </option>
-            ))}
-          </select>
-          <button type="submit" disabled={saving} className="btn-press min-w-[100px] border-2 border-border px-3 py-2 text-[10px] text-cream disabled:opacity-50">
+            onChange={setTarget}
+            ariaLabel="New admin"
+            searchable={candidates.length > 8}
+            searchPlaceholder="Find a member"
+            className="min-w-0 flex-1"
+            options={candidates.map((m) => ({ value: m.login, label: `@${m.login}` }))}
+          />
+          <button type="submit" disabled={saving || !target} className="btn-press min-w-[100px] border-2 border-border px-3 py-2 text-[10px] text-cream hover:border-lime disabled:opacity-50">
             {saving ? <Pending label="Moving" /> : "Transfer"}
           </button>
         </form>
