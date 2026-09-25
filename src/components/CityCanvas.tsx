@@ -884,12 +884,10 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     const cruise = 1 + (CRUISE_MAX_MULT - 1) * smoothstep(CRUISE_FROM_ALT, MAX_ALT, pos.current.y);
     const actualSpeed = flySpeed.current * speedMult * cruise;
 
-    // Climb scales gently with speed using sqrt so it stays proportional
-    // without getting out of control at high speeds; high up it climbs faster
-    // so reaching cruise height doesn't drag.
-    const climbScale = Math.sqrt(actualSpeed / DEFAULT_FLY_SPEED);
-    const climbAlt = 1 + 1.5 * smoothstep(150, 900, pos.current.y);
-    pos.current.y += altInput * CLIMB_RATE * climbScale * climbAlt * dt;
+    // Climb follows the base speed and boost, not the cruise multiplier, so
+    // up/down keeps the same feel as turning (at most ~2.5x the old rate).
+    const climbScale = Math.min(2.5, Math.sqrt((flySpeed.current * speedMult) / DEFAULT_FLY_SPEED) * (1 + 0.4 * smoothstep(150, 900, pos.current.y)));
+    pos.current.y += altInput * CLIMB_RATE * climbScale * dt;
     pos.current.y = Math.max(MIN_ALT, Math.min(MAX_ALT, pos.current.y));
 
     _fwd.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
