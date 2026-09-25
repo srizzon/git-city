@@ -3,7 +3,6 @@ import { getSupabaseAdmin } from "./supabase";
 import { sendEmail, toResendTag } from "./resend";
 import { mapWithConcurrency } from "./concurrency";
 import { getDeveloperEmail, isRecentlyActive } from "./notification-helpers";
-import { wrapInBaseTemplate } from "./email-template";
 import { renderLayout, renderText, type EmailLinks } from "./email/layout";
 import { bulletList, button, heading, paragraph, trackedUrl } from "./email/components";
 
@@ -34,8 +33,7 @@ export interface NotificationPayload {
   // Content (adapts per channel)
   title: string;                         // email subject, push title
   body: string;                          // push body, email preview text
-  html?: string;                         // rich email body (wrapped in base template)
-  render?: (links: EmailLinks) => { html: string; text: string }; // full email in the new layout; wins over html
+  render?: (links: EmailLinks) => { html: string; text: string }; // full email; without it the body is sent as one paragraph
   actionUrl?: string;                    // CTA link / deep link
   iconUrl?: string;                      // push notification icon
   data?: Record<string, unknown>;        // structured data for push/in_app deep links
@@ -565,8 +563,10 @@ async function dispatchEmail(
     fullHtml = rendered.html;
     text = rendered.text;
   } else {
-    const bodyHtml = payload.html || `<p>${escapeBasicHtml(payload.body)}</p>`;
-    fullHtml = wrapInBaseTemplate(bodyHtml, unsubUrl);
+    const reason = "You're getting this because you have a Git City account.";
+    const links = { unsubscribeUrl: unsubUrl };
+    fullHtml = renderLayout({ title: payload.title, preheader: payload.body, body: paragraph(payload.body), reason, links });
+    text = renderText({ lines: [payload.body], reason, links });
   }
 
   // Send via Resend (throttled, retried on 429, idempotent per dedup key)
@@ -880,13 +880,4 @@ export function verifyHmacToken(devId: number, category: string, token: string):
   const expected = generateHmacToken(devId, category);
   if (expected.length !== token.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token));
-}
-
-// ── Helpers ──
-
-function escapeBasicHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }

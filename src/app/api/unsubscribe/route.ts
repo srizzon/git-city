@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyHmacToken } from "@/lib/notifications";
-import { escapeHtml } from "@/lib/email-template";
+import { escapeHtml } from "@/lib/email/components";
 
 const VALID_CATEGORIES = [
   "transactional", "social", "digest", "marketing", "streak_reminders",
