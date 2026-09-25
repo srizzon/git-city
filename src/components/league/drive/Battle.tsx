@@ -37,6 +37,31 @@ import { Bomb, Bursts, Crate, FIRE, Missile, SHOCK_COLORS, type VoxelBursts } fr
 // car: a shockwave, a bomb you drive over, a missile that reaches you. Every
 // blast throws the car up and tumbling, and knocks the crown off its holder.
 
+// A short rising two-note chime, synthesized like the horn (no sound file).
+let chimeCtx: AudioContext | null = null;
+function chime() {
+  try {
+    chimeCtx ??= new AudioContext();
+    const ctx = chimeCtx;
+    const t0 = ctx.currentTime;
+    [880, 1318.5].forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "square";
+      o.frequency.value = f;
+      const t = t0 + i * 0.07;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.12, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      o.connect(g).connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.18);
+    });
+  } catch {
+    // no audio
+  }
+}
+
 interface Fx {
   id: number;
   from: string;
@@ -129,6 +154,10 @@ export default function Battle({
   const done = useRef(new Set<number>());
   const asked = useRef(new Set<string>());
   const held = useRef<BattleItem | null>(null);
+  // Mirrors `held` for rendering: boxes fade while you can't take one.
+  const [holding, setHolding] = useState(false);
+  // Boxes you just drove through, hidden before the server answers.
+  const [taken, setTaken] = useState<Set<string>>(() => new Set());
   const bursts = useRef<VoxelBursts | null>(null);
   const boom = useRef<Howl | null>(null);
   const silent = useRef(muted);
@@ -203,6 +232,13 @@ export default function Battle({
         refresh();
       } else if (e.t === "box") {
         if (boxes.current[e.box]) boxes.current[e.box] = { gen: e.gen, at: now + e.wait };
+        setTaken((t) => {
+          const key = `${e.box}:${e.gen - 1}`;
+          if (!t.has(key)) return t;
+          const next = new Set(t);
+          next.delete(key);
+          return next;
+        });
         refresh();
         later(e.wait);
       } else if (e.t === "got") {
@@ -210,6 +246,7 @@ export default function Battle({
           held.current = e.item;
           telemetryRef.current.held = e.item;
           telemetryRef.current.gotAt = now;
+          setHolding(true);
         }
       } else if (e.t === "fx") {
         if (!isItem(e.item)) return;
@@ -270,6 +307,25 @@ export default function Battle({
         if (asked.current.has(key)) return;
         asked.current.add(key);
         send({ t: "take", box: i, gen: b.gen });
+        // Feedback right away: the box pops, cubes fly, a chime plays.
+        setTaken((t) => new Set(t).add(key));
+        bursts.current?.burst(pos[0] * M_TO_UNIT, 3.6, pos[1] * M_TO_UNIT, {
+          count: 46,
+          speed: 32,
+          colors: ["#ffd23f", "#ff9a3c", "#c8e64a", "#fff2c0"],
+          size: 1.3,
+          life: 0.7,
+        });
+        if (!silent.current) chime();
+        // Nobody answered (someone else got there first, the room dropped it): show it again.
+        setTimeout(() => {
+          setTaken((t) => {
+            if (!t.has(key) || (boxes.current[i]?.gen ?? 0) > b.gen) return t;
+            const next = new Set(t);
+            next.delete(key);
+            return next;
+          });
+        }, 1500);
       });
     }
 
@@ -278,6 +334,7 @@ export default function Battle({
     if (input.current.pressed.fire && item) {
       held.current = null;
       telemetryRef.current.held = null;
+      setHolding(false);
       if (item === "shock") send({ t: "use", item, x: p.x, z: p.z, dx: fx, dz: fz });
       else if (item === "bomb") send({ t: "use", item, x: p.x - fx * DROP_BEHIND, z: p.z - fz * DROP_BEHIND, dx: fx, dz: fz });
       else {
@@ -329,7 +386,8 @@ export default function Battle({
       <Bursts ref={bursts} />
       {shown.map((b) => {
         const pos = boxPosition(spots, b.i, b.gen, UNIT_TO_M);
-        return pos ? <Crate key={`${b.i}:${b.gen}`} x={pos[0] * M_TO_UNIT} z={pos[1] * M_TO_UNIT} /> : null;
+        if (!pos || taken.has(`${b.i}:${b.gen}`)) return null;
+        return <Crate key={`${b.i}:${b.gen}`} x={pos[0] * M_TO_UNIT} z={pos[1] * M_TO_UNIT} faded={holding} />;
       })}
       {fxList.map((f) =>
         f.item === "bomb" ? <Bombs key={f.id} fx={f} /> : f.item === "missile" ? <Missiles key={f.id} fx={f} bursts={bursts} /> : null,

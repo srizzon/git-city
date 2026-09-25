@@ -168,7 +168,8 @@ function crateTexture(): THREE.CanvasTexture {
 
 let sharedCrate: THREE.CanvasTexture | null = null;
 
-export function Crate({ x, z, size = 3.6 }: { x: number; z: number; size?: number }) {
+/** `faded`: you already hold an attack, so this box can't be taken right now. */
+export function Crate({ x, z, size = 3.6, faded = false }: { x: number; z: number; size?: number; faded?: boolean }) {
   const ref = useRef<THREE.Group>(null);
   const tex = useMemo(() => (sharedCrate ??= crateTexture()), []);
   useFrame((state) => {
@@ -182,7 +183,16 @@ export function Crate({ x, z, size = 3.6 }: { x: number; z: number; size?: numbe
     <group ref={ref} position={[x, size, z]}>
       <mesh>
         <boxGeometry args={[size, size, size]} />
-        <meshStandardMaterial map={tex} emissiveMap={tex} emissive="#ffffff" emissiveIntensity={0.55} roughness={0.9} />
+        <meshStandardMaterial
+          map={tex}
+          emissiveMap={tex}
+          emissive="#ffffff"
+          emissiveIntensity={faded ? 0.2 : 0.55}
+          roughness={0.9}
+          transparent={faded}
+          opacity={faded ? 0.28 : 1}
+          depthWrite={!faded}
+        />
       </mesh>
     </group>
   );
