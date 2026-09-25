@@ -69,6 +69,8 @@ export type ClientMsg =
   | { t: "crown_grab" }
   | { t: "crown_hit"; victim: string; steal: boolean }
   | { t: "crown_drop" }
+  /** Race track only (party/race.ts). */
+  | { t: "race_start" }
   | ["s", ...number[]];
 // Server → client
 export type ServerMsg =
