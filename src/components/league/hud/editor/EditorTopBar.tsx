@@ -97,9 +97,9 @@ export default function EditorTopBar({
         <button
           type="button"
           onClick={onShrink}
-          disabled={size <= minSize}
+          disabled={h <= minSize}
           aria-label="Shrink the city"
-          title={size <= minSize ? "The city is at its smallest size" : shrinkNote}
+          title={h <= minSize ? "The city is at its smallest size" : shrinkNote}
           className={`${SEG} text-cream`}
         >
           <Shrink {...ICON} aria-hidden />
