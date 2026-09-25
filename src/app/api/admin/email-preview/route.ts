@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { renderWelcomeEmail } from "@/lib/notification-senders/welcome";
 import { renderRaidEmail } from "@/lib/notification-senders/raid";
 import { sendEmail } from "@/lib/resend";
+import { RECAP_DEV_COLUMNS, loadRecapContext, loadWeeklyRecaps, renderWeeklyRecapEmail } from "@/lib/notification-senders/weekly-recap";
 
 const PREVIEW_LINKS = { unsubscribeUrl: "https://thegitcity.com/api/unsubscribe?dev=0&cat=all&token=preview" };
 
@@ -50,6 +51,15 @@ export async function GET(req: NextRequest) {
       .ilike("github_login", login)
       .maybeSingle();
     return respond(renderWelcomeEmail(dev?.github_login ?? login, dev?.rank ?? null, PREVIEW_LINKS));
+  }
+
+  // ?login= previews that developer's real last 7 days, even when the cron would skip them.
+  if (template === "recap") {
+    const login = req.nextUrl.searchParams.get("login") ?? "srizzon";
+    const { data: dev } = await getSupabaseAdmin().from("developers").select(RECAP_DEV_COLUMNS).ilike("github_login", login).maybeSingle();
+    if (!dev) return NextResponse.json({ error: "Developer not found" }, { status: 404 });
+    const recaps = await loadWeeklyRecaps([dev], await loadRecapContext());
+    return respond(renderWeeklyRecapEmail(recaps.get(dev.id)!, PREVIEW_LINKS));
   }
 
   // ?raid= previews a real raid from the defender's side; defaults to the latest one.
@@ -148,7 +158,7 @@ export async function GET(req: NextRequest) {
   const t = TEMPLATES[template];
   if (!t) {
     return NextResponse.json(
-      { error: "Unknown template", available: ["welcome", "raid", ...Object.keys(TEMPLATES)] },
+      { error: "Unknown template", available: ["welcome", "raid", "recap", ...Object.keys(TEMPLATES)] },
       { status: 400 },
     );
   }
