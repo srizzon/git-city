@@ -11,6 +11,9 @@ import { HUD_BOX } from "./shared";
 const SEG = "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
 const BTN = `${SEG} gap-2 px-3 py-2 text-[10px] sm:px-4`;
 const ICON_BTN = `${SEG} w-10 justify-center py-2`;
+// The lime call to action keeps its fill on hover (SEG's white tint would wash it out).
+const PRIMARY_BTN =
+  "flex items-center gap-2 bg-lime px-3 py-2 text-[10px] text-bg transition-[filter] hover:brightness-110 sm:px-4 [&>*]:transition-transform active:[&>*]:translate-y-px";
 const ICON = { size: 14, strokeWidth: 2.5 } as const;
 
 export default function ActionBar({
@@ -112,7 +115,7 @@ export default function ActionBar({
         <button
           type="button"
           onClick={join.onClick}
-          className={`${BTN} ${join.kind === "pending" ? "text-muted hover:text-cream" : "bg-lime text-bg hover:bg-lime/90"}`}
+          className={join.kind === "pending" ? `${BTN} text-muted hover:text-cream` : PRIMARY_BTN}
         >
           {join.kind === "pending" ? <Clock {...ICON} aria-hidden /> : <LogIn {...ICON} aria-hidden />}
           <span>{join.kind === "join" ? "Join" : join.kind === "ask" ? "Ask to join" : "Requested"}</span>
