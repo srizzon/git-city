@@ -43,7 +43,7 @@ import { keyToAction } from "@/lib/league-city/editor/shortcuts";
 import { MAX_H, START_H } from "@/lib/league-city/grid";
 import { isAir } from "@/lib/league-city/catalog";
 import { introSeenKey } from "@/lib/league-city/identity";
-import type { IntroPieces } from "@/lib/league-city/intro";
+import { carColor } from "@/lib/league-city/drive/net";
 import type { CityIdentity, ObjectProps, SignSide } from "@/lib/league-city/types";
 import { HillSignPanel, PlazaPanel, SkyPanel } from "@/components/league/hud/editor/IdentityPanel";
 import ReportPanel from "@/components/league/hud/ReportPanel";
@@ -403,20 +403,12 @@ export default function LeagueClient({
   // First visit to each town (localStorage, like the home), the ▶ button
   // replays it. Click or Esc skips. Lands on your building, else this
   // week's leader.
-  const [intro, setIntro] = useState<{ pieces: IntroPieces; n: number } | null>(null);
+  const [intro, setIntro] = useState<{ n: number; color: string } | null>(null);
   const playIntro = useCallback(() => {
     setFocused(null);
     setPanel(null);
-    const portal = [...store.getState().objects.values()].find((o) => o.item_type === "portal");
-    setIntro((prev) => ({
-      pieces: {
-        h: store.getState().h,
-        portal: portal && portal.px !== null && portal.pz !== null ? [portal.px, portal.pz] : null,
-        tallest: Math.max(0, ...[...byDevId.values()].map((b) => b.height)),
-      },
-      n: (prev?.n ?? 0) + 1,
-    }));
-  }, [store, byDevId]);
+    setIntro((prev) => ({ n: (prev?.n ?? 0) + 1, color: carColor(driverName) }));
+  }, [driverName]);
   const endIntro = useCallback(() => setIntro(null), []);
   const skipIntro = useCallback(() => setIntro(null), []);
   const introChecked = useRef(false);

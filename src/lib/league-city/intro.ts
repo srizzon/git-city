@@ -1,99 +1,108 @@
 // ─── Town intro ─────────────────────────────────────────────
-// First-visit camera move, in two phases:
-//   1. approach: from far away at the height of the portal's sign, straight
-//      toward the entrance, slowing to a stop in front of it (never under it)
-//   2. orbit: one turn around the town, rising and pulling out, ending
-//      exactly on the scene's normal camera frame so the orbit controls take
-//      over without a jump
+// First visit: a car drives in. It starts outside on the approach road,
+// passes through the portal, goes up the main street, turns onto the first
+// cross street and pulls over to park. The camera rides behind it (the drive
+// mode's chase view); once parked, it glides up to the scene's normal camera
+// frame and the orbit controls take over.
+//
+// This file is the route and timing, pure and testable; TownIntro plays it.
 
-import { terrainBounds, worldBounds } from "./grid";
-import { PORTAL } from "./identity-geometry";
+import { LOT } from "./grid";
+import { lotKey } from "./placement";
+import { APPROACH_LOTS } from "./identity-geometry";
+import type { CityObject } from "./types";
 
+export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
 
-export interface IntroPieces {
-  h: number;
-  portal: [number, number] | null;
-  /** Tallest building: the orbit rises above it. */
-  tallest?: number;
-}
+/** Keep right: lane center off the road's middle, city units. */
+export const LANE = 6;
+/** Distance from the lane to the parking spot at the curb. */
+const PULL_OVER = 6;
+/** Cruise speed, city units per second (about 55 km/h in drive mode's scale). */
+export const CRUISE = 52;
+/** How far down the cross street the car parks. */
+const PARK_AFTER_TURN = 1.4 * LOT;
 
-export interface IntroFrame {
-  pos: Vec3;
-  look: Vec3;
-}
-
-export interface IntroPhase {
-  pos: Vec3[];
-  look: Vec3[];
-  /** Seconds. */
+export interface CarRoute {
+  /** Lane points in drive order; the last one is the parking spot. */
+  points: Vec2[];
+  /** Seconds for the drive (the car slows to a stop at the end). */
   duration: number;
-  /** out: arrives slowing down. inout: starts and lands gently. */
-  ease: "out" | "inout";
-  /** Seconds to stay still after the phase. */
-  hold?: number;
 }
 
-export interface IntroPath {
-  phases: IntroPhase[];
+export interface IntroTiming {
+  /** Parked, before the camera leaves the car. */
+  hold: number;
+  /** Chase view up to the city frame. */
+  rise: number;
 }
 
-export const APPROACH_SECONDS = 5;
-export const HOLD_SECONDS = 0.6;
-export const ORBIT_SECONDS = 9;
-const ORBIT_STEPS = 10;
+export const INTRO_TIMING: IntroTiming = { hold: 0.8, rise: 3.2 };
 
-export function introPath(p: IntroPieces, end: IntroFrame): IntroPath {
-  const w = worldBounds(p.h);
-  const t = terrainBounds(p.h);
-  const gateZ = p.portal?.[1] ?? w.maxZ;
-  const signY = PORTAL.height + PORTAL.beam / 2;
-  const sign: Vec3 = [0, signY, gateZ];
+type Obj = Pick<CityObject, "item_type" | "x" | "z" | "px">;
 
-  // 1. Approach, level with the sign.
-  const stop: Vec3 = [0, signY, gateZ + 70];
-  const approach: IntroPhase = {
-    pos: [
-      [0, signY + 6, gateZ + 700],
-      [0, signY + 3, gateZ + 350],
-      stop,
-    ],
-    look: [sign, sign, sign],
-    duration: APPROACH_SECONDS,
-    ease: "out",
-    hold: HOLD_SECONDS,
-  };
+/**
+ * The drive: straight up the main street (x = 0) from the approach, then
+ * right onto the first cross street that leaves it (left if only that way
+ * exists), and park at the curb. Without a cross street it parks on the main
+ * street a few lots in.
+ */
+export function carRoute(objects: readonly Obj[]): CarRoute {
+  const roads = new Set(objects.filter((o) => o.px === null && o.item_type === "road").map((o) => lotKey(o.x, o.z)));
+  const startZ = LOT / 2 + APPROACH_LOTS * LOT - 12;
+  const points: Vec2[] = [[LANE, startZ], [LANE, LOT / 2 + 20]];
 
-  // 2. Orbit: from in front of the portal all the way round to the frame.
-  const r0 = Math.hypot(stop[0] - t.cx, stop[2] - t.cz);
-  const a0 = Math.atan2(stop[2] - t.cz, stop[0] - t.cx);
-  const r1 = Math.hypot(end.pos[0] - t.cx, end.pos[2] - t.cz);
-  let a1 = Math.atan2(end.pos[2] - t.cz, end.pos[0] - t.cx);
-  // Always turn the same way, and more than half a turn.
-  while (a1 > a0 - Math.PI) a1 -= Math.PI * 2;
-  const high = Math.max(end.pos[1], (p.tallest ?? 0) + 80);
-  const center: Vec3 = [t.cx, 30, t.cz];
-  const pos: Vec3[] = [];
-  const look: Vec3[] = [];
-  for (let i = 0; i <= ORBIT_STEPS; i++) {
-    const k = i / ORBIT_STEPS;
-    const a = a0 + (a1 - a0) * k;
-    // Pull back first (away from the towers), then round at the frame's distance.
-    const r = r0 + (r1 - r0) * Math.min(1, k * 2);
-    // Up fast enough to clear the rooftops, then down onto the frame's height.
-    const y = i === ORBIT_STEPS ? end.pos[1] : signY + (high - signY) * Math.min(1, k * 2) + (end.pos[1] - high) * Math.max(0, (k - 0.6) / 0.4);
-    pos.push(i === 0 ? stop : i === ORBIT_STEPS ? end.pos : [t.cx + Math.cos(a) * r, y, t.cz + Math.sin(a) * r]);
-    // The eye leaves the sign for the middle of town over the first stretch.
-    const m = Math.min(1, k * 2);
-    look.push(i === ORBIT_STEPS ? end.look : [sign[0] + (center[0] - sign[0]) * m, sign[1] + (center[1] - sign[1]) * m, sign[2] + (center[2] - sign[2]) * m]);
+  // First crossing north of the entrance, at least two lots in.
+  let cross: { z: number; dir: 1 | -1 } | null = null;
+  for (let z = -2; z >= -40 && roads.has(lotKey(0, z)); z--) {
+    if (roads.has(lotKey(1, z))) {
+      cross = { z, dir: 1 };
+      break;
+    }
+    if (roads.has(lotKey(-1, z))) {
+      cross = { z, dir: -1 };
+      break;
+    }
   }
-  const orbit: IntroPhase = { pos, look, duration: ORBIT_SECONDS, ease: "inout" };
 
-  return { phases: [approach, orbit] };
+  if (cross) {
+    const cz = cross.z * LOT;
+    const d = cross.dir;
+    // Heading east the right lane is south of the middle (+z); heading west, north.
+    const laneZ = cz + d * LANE;
+    points.push([LANE, cz + 2 * LOT], [LANE, cz + LOT * 0.6]);
+    // The corner: a wide, smooth arc.
+    points.push([LANE + d * 4, laneZ + d * 10], [LANE + d * 14, laneZ + d * 1.5]);
+    points.push([d * LOT * 0.9, laneZ], [d * PARK_AFTER_TURN, laneZ + d * PULL_OVER * 0.6], [d * (PARK_AFTER_TURN + 18), laneZ + d * PULL_OVER]);
+  } else {
+    points.push([LANE, -1.5 * LOT], [LANE + PULL_OVER * 0.6, -2.3 * LOT], [LANE + PULL_OVER, -2.6 * LOT]);
+  }
+
+  return { points, duration: pathLength(points) / CRUISE + 2.5 };
 }
 
-/** Total seconds, holds included. */
-export function introSeconds(path: IntroPath): number {
-  return path.phases.reduce((s, ph) => s + ph.duration + (ph.hold ?? 0), 0);
+export function pathLength(points: readonly Vec2[]): number {
+  let l = 0;
+  for (let i = 1; i < points.length; i++) l += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+  return l;
 }
 
+/**
+ * Share of the route covered at time u (0..1): rolls in at cruise speed and
+ * eases to a stop over the last stretch, so it parks instead of halting.
+ */
+export function driveProgress(u: number): number {
+  const x = Math.min(1, Math.max(0, u));
+  const brake = 0.3;
+  // Constant speed, then a linear slowdown to zero that meets it smoothly.
+  const v = 1 / (1 - brake / 2);
+  if (x <= 1 - brake) return x * v;
+  const k = (x - (1 - brake)) / brake;
+  return (1 - brake) * v + brake * v * (k - (k * k) / 2);
+}
+
+/** Total seconds, parked hold and camera rise included. */
+export function introSeconds(route: CarRoute, timing: IntroTiming = INTRO_TIMING): number {
+  return route.duration + timing.hold + timing.rise;
+}

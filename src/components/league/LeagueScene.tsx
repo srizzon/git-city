@@ -14,7 +14,7 @@ import { InstancedDecorations } from "@/components/city/decorations";
 import type { CityBuilding, CityDecoration } from "@/lib/github";
 import { LOT, bounds, lotToWorld, rotToRadians, terrainBounds, worldBounds } from "@/lib/league-city/grid";
 import type { CityIdentity, CityObject } from "@/lib/league-city/types";
-import { introPath, type IntroPieces } from "@/lib/league-city/intro";
+import { carRoute } from "@/lib/league-city/intro";
 import { approachRoads } from "@/lib/league-city/starter";
 import { APPROACH_LOTS } from "@/lib/league-city/identity-geometry";
 import IdentityLayer from "./identity/IdentityLayer";
@@ -333,14 +333,15 @@ function HeroFraming() {
   return null;
 }
 
-// The intro ends on the orbit's own frame for this screen, so nothing jumps.
-function IntroPlayer({ h, intro, onEnd }: { h: number; intro: { pieces: IntroPieces }; onEnd: () => void }) {
+// The intro car's route comes from the city; it ends on the orbit's own frame
+// for this screen, so nothing jumps.
+function IntroPlayer({ h, objects, color, tallest, onEnd }: { h: number; objects: CityObject[]; color: string; tallest: number; onEnd: () => void }) {
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
-  const [path] = useState(() => {
+  const [plan] = useState(() => {
     const f = cameraFrame(h, aspect);
-    return introPath(intro.pieces, { pos: f.position.toArray(), look: f.target.toArray() });
+    return { route: carRoute(objects), end: { pos: f.position.toArray(), look: f.target.toArray() } };
   });
-  return <TownIntro path={path} onEnd={onEnd} />;
+  return <TownIntro route={plan.route} end={plan.end} color={color} ceiling={tallest + 60} onEnd={onEnd} />;
 }
 
 // ─── Scene ───────────────────────────────────────────────────
@@ -356,8 +357,8 @@ export interface LeagueSceneProps {
   /** The portal sign was clicked (report the logo). */
   onPortalClick?: () => void;
   /** First-visit intro; the camera is the intro's until onIntroEnd. */
-  /** n: a new number replays it. */
-  intro?: { pieces: IntroPieces; n?: number } | null;
+  /** n: a new number replays it. color: the intro car's paint. */
+  intro?: { n: number; color: string } | null;
   onIntroEnd?: () => void;
   objects: CityObject[];
   buildings: CityBuilding[];
@@ -470,7 +471,7 @@ export default function LeagueScene({
         />
       )}
 
-      {playing && intro && <IntroPlayer key={intro.n ?? 0} h={h} intro={intro} onEnd={onIntroEnd ?? (() => {})} />}
+      {playing && intro && <IntroPlayer key={intro.n} h={h} objects={objects} color={intro.color} tallest={tallest} onEnd={onIntroEnd ?? (() => {})} />}
       <LeagueGround h={h} theme={theme} />
       {approach.length > 0 && <ApproachGround theme={theme} />}
       <LeagueRoads objects={withApproach} markingColor={theme.roadMarkingColor} />
