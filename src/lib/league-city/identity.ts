@@ -10,6 +10,13 @@ export const LEAGUE_ASSETS_BUCKET = "league-assets";
 /** Labels for THEMES by index (components/city/theme). */
 export const SKY_LABELS = ["Emerald", "Midnight", "Sunset", "Neon"] as const;
 export const DEFAULT_SKY = 1;
+/** Accent and shadow per sky, the same pair the home city uses for its theme. */
+export const SKY_ACCENTS: readonly { accent: string; shadow: string }[] = [
+  { accent: "#f0c060", shadow: "#806020" },
+  { accent: "#6090e0", shadow: "#203870" },
+  { accent: "#c8e64a", shadow: "#5a7a00" },
+  { accent: "#e040c0", shadow: "#600860" },
+];
 /** Settings swatches (top → horizon), from each theme's sky stops. */
 export const SKY_SWATCHES = [
   ["#000804", "#003c1c", "#004828"],

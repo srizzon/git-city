@@ -42,7 +42,7 @@ import { createEditorStore } from "@/lib/league-city/editor/store";
 import { keyToAction } from "@/lib/league-city/editor/shortcuts";
 import { MAX_H, START_H } from "@/lib/league-city/grid";
 import { isAir } from "@/lib/league-city/catalog";
-import { introSeenKey } from "@/lib/league-city/identity";
+import { SKY_ACCENTS, introSeenKey } from "@/lib/league-city/identity";
 import { carColor } from "@/lib/league-city/drive/net";
 import type { CityIdentity, ObjectProps, SignSide } from "@/lib/league-city/types";
 import { HillSignPanel, PlazaPanel, SkyPanel } from "@/components/league/hud/editor/IdentityPanel";
@@ -729,16 +729,24 @@ export default function LeagueClient({
           clock={introClock}
           crossAt={introCrossAt}
           outro={!intro}
-          label={league.kind === "company" && league.github_org ? `@${league.github_org}` : "Git City town"}
+          story={
+            data.counts.joined === 1
+              ? "One developer built this town"
+              : league.kind === "company" && league.github_org
+                ? `${data.counts.joined} developers from @${league.github_org} built this town`
+                : `${data.counts.joined} developers built this town`
+          }
           name={townDisplayName(league.name)}
-          buildings={data.counts.total}
           race={
             weeklyRank !== null
-              ? `#${weeklyRank} this week`
+              ? `#${weeklyRank} among companies this week`
               : data.week.standings[0]
                 ? `@${data.week.standings[0].login} leads this week`
                 : null
           }
+          logoUrl={identity.logoUrl}
+          accent={(SKY_ACCENTS[identity.sky] ?? SKY_ACCENTS[1]).accent}
+          shadow={(SKY_ACCENTS[identity.sky] ?? SKY_ACCENTS[1]).shadow}
           onSkip={skipIntro}
         />
       )}

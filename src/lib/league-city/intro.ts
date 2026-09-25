@@ -12,8 +12,8 @@ import { APPROACH_LOTS } from "./identity-geometry";
 
 /** Keep right: lane center off the road's middle, city units. */
 export const LANE = 6;
-/** City units per second (about 55 km/h in drive mode's scale). */
-export const CRUISE = 52;
+/** City units per second (about 40 km/h in drive mode's scale): unhurried, so the arch reads. */
+export const CRUISE = 38;
 /** Seconds for the camera to go from the chase view to the city frame. */
 export const RISE = 3.5;
 /** How far past the arch the camera lets go of the car. */

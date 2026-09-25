@@ -1,150 +1,189 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-// Everything over the town intro, shot by shot:
-//   0–0.6s     fade in from black, letterbox bars already in (this is a cutscene)
-//   approach   nothing: the arch carries the name
-//   crossing   the title lands in the bottom bar: a lime rule draws out from
-//              the center, the label, the name letter by letter, then the
-//              stats line counting up. It holds over the reveal of the city.
-//   outro      the title fades, the bars pull back, and the HUD comes in
-// Driven by the intro's own clock (not wall time) while it plays, so a slow
-// frame rate can't separate the text from the car; the outro runs on wall
-// time once the scene is done.
+// Everything over the town intro, in the home city intro's language (its
+// letterbox bars, text in the lower bar, the accent word, the confetti):
+//   start      the bars grow in from the edges
+//   approach   one line: who built this town
+//   crossing   "Welcome to <town>", the name in the sky's accent, the logo
+//              beside it and this week's race under it; confetti. Held over
+//              the reveal of the city.
+//   outro      the text fades and the bars shrink back; then the HUD comes in
+// Lines change on the intro's own clock (not wall time), so a slow frame rate
+// can't separate them from the car; the fades are CSS, like the home's.
 
-export const OUTRO_MS = 900;
+export const OUTRO_MS = 1000;
 
-const clamp = (v: number) => Math.min(1, Math.max(0, v));
-const out3 = (v: number) => 1 - (1 - v) ** 3;
-/** 0 → 1 between a and b seconds, eased. */
-const ramp = (t: number, a: number, b: number) => out3(clamp((t - a) / (b - a)));
+/** Small seeded PRNG (mulberry32): the same confetti every render. */
+function seeded(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 export interface IntroOverlayProps {
   /** Seconds into the intro, written by the scene every frame. */
   clock: React.MutableRefObject<number>;
-  /** When the car passes under the arch (seconds): the title's beat. */
+  /** When the car passes under the arch (seconds): the welcome's beat. */
   crossAt: number;
-  /** The scene is done: fade the title, pull the bars back. */
+  /** The scene is done: fade the text, shrink the bars. */
   outro: boolean;
-  label: string;
+  /** "18 developers built this town". */
+  story: string;
+  /** Town name as shown in the HUD. */
   name: string;
-  buildings: number;
-  /** After the building count: "#3 THIS WEEK", "@DEV3 LEADS THIS WEEK", or null. */
+  /** "#3 among companies this week", "@dev3 leads this week", or null. */
   race: string | null;
+  logoUrl: string | null;
+  /** The sky's accent and shadow (see SKY_ACCENTS). */
+  accent: string;
+  shadow: string;
   onSkip: () => void;
 }
 
-export default function IntroOverlay({ clock, crossAt, outro, label, name, buildings, race, onSkip }: IntroOverlayProps) {
-  const black = useRef<HTMLDivElement>(null);
-  const top = useRef<HTMLDivElement>(null);
-  const bottom = useRef<HTMLDivElement>(null);
-  const title = useRef<HTMLDivElement>(null);
-  const ruleL = useRef<HTMLSpanElement>(null);
-  const ruleR = useRef<HTMLSpanElement>(null);
-  const labelEl = useRef<HTMLSpanElement>(null);
-  const letters = useRef<(HTMLSpanElement | null)[]>([]);
-  const stats = useRef<HTMLSpanElement>(null);
-  const count = useRef<HTMLSpanElement>(null);
-  const skip = useRef<HTMLButtonElement>(null);
-  const outroAt = useRef<number | null>(null);
+export default function IntroOverlay({ clock, crossAt, outro, story, name, race, logoUrl, accent, shadow, onSkip }: IntroOverlayProps) {
+  // -1 before the first line, 0 the story line, 1 the welcome.
+  const [phase, setPhase] = useState(-1);
+  const [barsIn, setBarsIn] = useState(false);
+  const [confetti, setConfetti] = useState(false);
+  const phaseRef = useRef(-1);
+
+  // Bars grow in on the first frame after mount, so the transition runs.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setBarsIn(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   useEffect(() => {
-    if (outro && outroAt.current === null) outroAt.current = performance.now();
-  }, [outro]);
-
-  useEffect(() => {
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const chars = letters.current;
     let raf = 0;
     const tick = () => {
       const t = clock.current;
-      const o = outroAt.current === null ? 0 : (performance.now() - outroAt.current) / OUTRO_MS;
-      const c = t - crossAt; // seconds since the crossing
-
-      if (black.current) black.current.style.opacity = String(1 - ramp(t, 0, 0.6));
-
-      // Bars: in from the start, back out during the outro's second half.
-      const bars = 1 - ramp(o, 0.35, 1);
-      if (top.current) top.current.style.transform = `translateY(${-(1 - bars) * 100}%)`;
-      if (bottom.current) bottom.current.style.transform = `translateY(${(1 - bars) * 100}%)`;
-
-      // Title, from the crossing; gone in the outro's first half.
-      const fade = 1 - ramp(o, 0, 0.45);
-      if (title.current) title.current.style.opacity = String(fade);
-      const rule = ramp(c, 0, 0.5);
-      if (ruleL.current) ruleL.current.style.transform = `scaleX(${rule})`;
-      if (ruleR.current) ruleR.current.style.transform = `scaleX(${rule})`;
-      if (labelEl.current) labelEl.current.style.opacity = String(ramp(c, 0.2, 0.6));
-      const n = Math.max(1, chars.length);
-      chars.forEach((el, i) => {
-        if (!el) return;
-        const k = ramp(c, 0.4 + (0.7 * i) / n, 0.65 + (0.7 * i) / n);
-        el.style.opacity = String(k);
-        el.style.transform = still ? "none" : `translateY(${(1 - k) * 6}px)`;
-      });
-      const s = ramp(c, 1.1, 1.5);
-      if (stats.current) stats.current.style.opacity = String(s);
-      if (count.current) count.current.textContent = String(Math.round(buildings * ramp(c, 1.1, 1.9)));
-      if (skip.current) skip.current.style.opacity = String(0.7 * (1 - ramp(o, 0, 0.3)));
-
+      const next = t >= crossAt ? 1 : t >= 0.6 && t < crossAt - 0.35 ? 0 : t >= crossAt - 0.35 ? -2 : -1;
+      if (next !== phaseRef.current) {
+        phaseRef.current = next;
+        setPhase(next);
+        if (next === 1) window.setTimeout(() => setConfetti(true), 450);
+      }
       raf = requestAnimationFrame(tick);
     };
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [clock, crossAt, buildings]);
+  }, [clock, crossAt]);
+
+  const bars = barsIn && !outro;
+  const text = outro ? -1 : phase;
+
+  // Same burst as the home intro, in the sky's colors; fixed per mount.
+  const pieces = useMemo(() => {
+    const colors = [accent, "#fff", shadow, "#f0c060", "#e040c0", "#60c0f0"];
+    const random = seeded(name.length * 7919 + 17);
+    return Array.from({ length: 25 }, (_, i) => {
+      const w = 3 + random() * 5;
+      return {
+        color: colors[i % colors.length],
+        left: 10 + random() * 80,
+        delay: random() * 0.6,
+        duration: 2.5 + random() * 1.5,
+        w,
+        h: random() > 0.5 ? w : w * 0.35,
+        drift: (random() - 0.5) * 80,
+        rotation: random() * 720,
+      };
+    });
+  }, [accent, shadow, name]);
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-40 font-pixel uppercase">
-      <div ref={black} className="absolute inset-0 bg-black" />
-      <div ref={top} className="absolute inset-x-0 top-0 h-[13vh] bg-black sm:h-[12vh]">
-        <button
-          ref={skip}
-          type="button"
-          onClick={onSkip}
-          className="pointer-events-auto absolute bottom-3 right-4 flex items-center gap-2 text-[9px] text-muted opacity-70 transition-colors hover:text-cream sm:right-6"
+    <div className="pointer-events-none fixed inset-0 z-50">
+      {/* Letterbox bars, as in the home intro (scaleY: composited only). */}
+      <div
+        className="absolute inset-x-0 top-0 origin-top bg-black/80 transition-transform duration-1000"
+        style={{ height: "12%", transform: bars ? "scaleY(1)" : "scaleY(0)" }}
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 origin-bottom bg-black/80 transition-transform duration-1000"
+        style={{ height: "18%", transform: bars ? "scaleY(1)" : "scaleY(0)" }}
+      />
+
+      {/* Text in the lower bar */}
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-center px-4" style={{ height: "18%" }}>
+        <p
+          className="absolute text-center font-pixel normal-case text-cream"
+          style={{
+            fontSize: "clamp(0.85rem, 3vw, 1.5rem)",
+            letterSpacing: "0.05em",
+            opacity: text === 0 ? 1 : 0,
+            transition: "opacity 0.7s ease-in-out",
+          }}
         >
-          <span className="border border-muted/60 px-1 py-px">Esc</span> Skip
-        </button>
-      </div>
-      <div ref={bottom} className="absolute inset-x-0 bottom-0 flex h-[13vh] items-center justify-center bg-black px-4 sm:h-[12vh]">
-        <div ref={title} className="flex w-full max-w-3xl flex-col items-center" aria-live="polite" aria-label={`${label}: ${name}`}>
-          <div className="flex w-full items-center gap-3 sm:gap-4">
-            <span ref={ruleL} className="h-0.5 flex-1 origin-right scale-x-0 bg-lime" />
-            <span ref={labelEl} className="shrink-0 text-[10px] tracking-[0.35em] text-lime opacity-0 sm:text-[11px]">
-              {label}
-            </span>
-            <span ref={ruleR} className="h-0.5 flex-1 origin-left scale-x-0 bg-lime" />
-          </div>
-          <span className="mt-2 max-w-full truncate text-2xl leading-tight text-cream normal-case sm:mt-2.5 sm:text-4xl" aria-hidden>
-            {[...name].map((ch, i) => (
-              <span
-                key={i}
-                ref={(el) => {
-                  letters.current[i] = el;
-                }}
-                className="inline-block whitespace-pre opacity-0"
-              >
-                {ch}
-              </span>
-            ))}
-          </span>
-          <span ref={stats} className="mt-2 flex flex-wrap justify-center gap-x-2 text-center text-[9px] tracking-[0.2em] text-muted opacity-0 sm:text-[11px] sm:tracking-[0.25em]" aria-hidden>
-            <span>
-              <span ref={count} className="tabular-nums text-cream">
-                0
-              </span>{" "}
-              {buildings === 1 ? "building" : "buildings"}
-            </span>
+          {story}
+        </p>
+
+        <div
+          className="absolute flex max-w-[calc(100vw-2rem)] items-center gap-3 sm:gap-5"
+          style={{
+            opacity: text === 1 ? 1 : 0,
+            transform: text === 1 ? "scale(1)" : "scale(0.95)",
+            transition: "opacity 0.8s ease-out, transform 0.8s ease-out",
+          }}
+        >
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt=""
+              className="shrink-0 [image-rendering:pixelated]"
+              style={{ width: "clamp(2.5rem, 7vw, 4.5rem)", height: "clamp(2.5rem, 7vw, 4.5rem)", boxShadow: `4px 4px 0 0 ${shadow}` }}
+            />
+          )}
+          <div className="flex min-w-0 flex-col items-center gap-1.5 sm:items-start">
+            <p className="font-pixel uppercase text-cream text-balance" style={{ fontSize: "clamp(1.1rem, 4.4vw, 2.6rem)", lineHeight: 1.1 }}>
+              Welcome to <span style={{ color: accent }}>{name}</span>
+            </p>
             {race && (
-              <>
-                <span className="max-sm:hidden">·</span>
-                <span className="max-sm:basis-full">{race}</span>
-              </>
+              <p className="font-pixel normal-case text-cream/70" style={{ fontSize: "clamp(0.7rem, 1.8vw, 1rem)", letterSpacing: "0.05em" }}>
+                {race}
+              </p>
             )}
-          </span>
+          </div>
         </div>
       </div>
+
+      {confetti && !outro && (
+        <div className="absolute inset-0 overflow-hidden">
+          {pieces.map((p, i) => (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                left: `${p.left}%`,
+                top: "-8px",
+                width: `${p.w}px`,
+                height: `${p.h}px`,
+                backgroundColor: p.color,
+                animation: `introConfettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
+                transform: `rotate(${p.rotation}deg) translateX(${p.drift}px)`,
+                opacity: 0,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Skip, top right, outside the bars' text: as in the home intro. */}
+      <button
+        type="button"
+        onClick={onSkip}
+        className="pointer-events-auto absolute right-4 top-4 font-pixel text-[10px] uppercase text-cream/40 transition-colors hover:text-cream sm:text-xs"
+        style={{ opacity: outro ? 0 : 1, transition: "opacity 0.3s" }}
+      >
+        Skip &gt;
+      </button>
     </div>
   );
 }
