@@ -39,7 +39,7 @@ const LIME = "#c8e64a";
 const BUILDINGS = 1196228;
 const STREETS = 25097;
 const PARKS = 1017;
-const SF_KIB = 6144; // 6292211 bytes
+const SF_KIB = 4002; // 4098200 bytes
 
 // Fallbacks for when the snapshot stats haven't arrived yet (script reaches
 // the developer lines before fetch completes on slow connections).

@@ -42,6 +42,7 @@ async function getGzipJson(url: string): Promise<any | null> {
 // scripts/bake-bay-map.mjs). Fetched once, shared by every
 // layout recompute. Falls back to undefined (procedural layout) if missing.
 const MAP_URL = "/maps/bay.json";
+export const SF_FOOTPRINTS_URL = "/maps/sf.json";
 let sfMapPromise: Promise<SFMapAsset | undefined> | null = null;
 export function loadSFMap(): Promise<SFMapAsset | undefined> {
   if (!sfMapPromise) {
@@ -50,6 +51,22 @@ export function loadSFMap(): Promise<SFMapAsset | undefined> {
       .catch(() => undefined);
   }
   return sfMapPromise;
+}
+
+/**
+ * bay.json ships without building footprints: buildings stand on their lots
+ * (city_lots), so only the old greedy layout needs them, for a city that
+ * arrives without lots (a failed seed). Then, and only then, they come from
+ * the original SF map. Mutates the shared asset so every later layout has them.
+ */
+export async function ensureFootprints(asset: SFMapAsset | undefined, devs: { lot?: unknown }[]): Promise<void> {
+  if (!asset || asset.footprints.length > 0 || devs.some((d) => d.lot)) return;
+  try {
+    const sf = (await (await fetch(SF_FOOTPRINTS_URL)).json()) as SFMapAsset;
+    asset.footprints = sf.footprints;
+  } catch {
+    /* the fallback layout just places nobody */
+  }
 }
 
 // Ground geometry (roads, parks, land), built in a worker from the start of the
