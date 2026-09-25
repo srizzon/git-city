@@ -71,11 +71,18 @@ const HMAC_SECRET = (() => {
 })();
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
-const RATE_LIMITS: Record<Channel, { perHour: number; perDay: number }> = {
-  email: { perHour: 20, perDay: 50 },
-  push: { perHour: 20, perDay: 50 },
-  in_app: { perHour: 200, perDay: 1000 },
+// Non-transactional caps. Over the cap, batchable events (raids, emblems) roll
+// into the next digest instead of being dropped.
+const RATE_LIMITS: Record<Channel, { perHour: number; perDay: number; perWeek: number }> = {
+  email: { perHour: 2, perDay: 3, perWeek: 8 },
+  push: { perHour: 20, perDay: 50, perWeek: 200 },
+  in_app: { perHour: 200, perDay: 1000, perWeek: 5000 },
 };
+
+// Recaps and marketing stop for anyone idle this long (sunset). Social
+// triggers like raid alerts still go out: they're the best way back in.
+const SUNSET_DAYS = 90;
+const SUNSET_CATEGORIES: NotificationCategory[] = ["digest", "marketing"];
 
 // Categories exempt from rate limiting (always send)
 const RATE_LIMIT_EXEMPT: NotificationCategory[] = ["transactional"];
@@ -225,6 +232,13 @@ async function processChannel(
   if (!payload.forceSend) {
     if (!getCategoryEnabled(prefs, channel, payload.category)) {
       return { channel, success: false, skipped: "category_disabled" };
+    }
+  }
+
+  // Sunset: no recaps or marketing for long-idle players
+  if (!payload.forceSend && SUNSET_CATEGORIES.includes(payload.category)) {
+    if (!(await isRecentlyActive(payload.developerId, SUNSET_DAYS * 24 * 60))) {
+      return { channel, success: false, skipped: "sunset" };
     }
   }
 
@@ -459,9 +473,11 @@ async function dispatchEmail(
     return { channel: "email", success: false, skipped: `suppressed:${suppressed.reason}` };
   }
 
-  // Build unsubscribe URL (transactional/forceSend still get one for CAN-SPAM)
-  const unsubCategory = payload.forceSend ? "all" : payload.category;
-  const unsubUrl = buildUnsubscribeUrl(payload.developerId, unsubCategory);
+  // Receipts and account mail (transactional or forceSend) carry no
+  // unsubscribe: it used to switch off "transactional" or all email, with no
+  // way back in settings. They link to email settings instead.
+  const isTransactional = payload.forceSend || payload.category === "transactional";
+  const unsubUrl = isTransactional ? undefined : buildUnsubscribeUrl(payload.developerId, payload.category);
 
   // Build final HTML
   let fullHtml: string;
@@ -483,10 +499,12 @@ async function dispatchEmail(
       subject: payload.title,
       html: fullHtml,
       text,
-      headers: {
-        "List-Unsubscribe": `<${unsubUrl}>`,
-        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-      },
+      headers: unsubUrl
+        ? {
+            "List-Unsubscribe": `<${unsubUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          }
+        : undefined,
       tags: [
         { name: "type", value: toResendTag(payload.type) },
         { name: "category", value: toResendTag(payload.category) },
@@ -711,6 +729,17 @@ async function checkRateLimit(
     .gte("created_at", oneDayAgo);
 
   if ((dayCount ?? 0) >= limits.perDay) return "daily";
+
+  const oneWeekAgo = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+  const { count: weekCount } = await sb
+    .from("notification_log")
+    .select("id", { count: "exact", head: true })
+    .eq("developer_id", devId)
+    .eq("channel", channel)
+    .neq("status", "failed")
+    .gte("created_at", oneWeekAgo);
+
+  if ((weekCount ?? 0) >= limits.perWeek) return "weekly";
 
   return null;
 }
