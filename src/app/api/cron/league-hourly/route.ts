@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
       const next = after.get(league.id);
       if (!prev || !next || next.standings.length < 2) continue;
       for (const o of detectOvertakes(prev.standings, next.standings)) {
-        toNotify.push({ ...o, leagueSlug: league.slug, leagueName: league.name });
+        toNotify.push({ ...o, leagueSlug: league.slug, leagueName: league.name, scoringMode: next.mode });
       }
     }
     overtakes = toNotify.length;
