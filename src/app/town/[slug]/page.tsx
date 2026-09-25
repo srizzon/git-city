@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { headers } from "next/headers";
 import {
   countJoinRequests,
+  currentSlugFor,
   getInviteToken,
   getJoinAction,
   getLeagueBySlug,
@@ -45,9 +46,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function LeaguePage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const { invite, ref, t, edit, drive, join } = await searchParams;
+  const query = await searchParams;
+  const { invite, ref, t, edit, drive, join } = query;
   const league = await getLeagueBySlug(slug);
-  if (!league) notFound();
+  if (!league) {
+    // A renamed town: send old links (invites included) to its new address.
+    const moved = await currentSlugFor(slug);
+    if (!moved) notFound();
+    const qs = new URLSearchParams(
+      Object.entries(query).flatMap(([k, v]) => (typeof v === "string" ? [[k, v]] : [])),
+    ).toString();
+    permanentRedirect(`/town/${moved}${qs ? `?${qs}` : ""}`);
+  }
 
   const viewer = await getViewer();
   const data = await getLeaguePageData(league, viewer);

@@ -153,7 +153,11 @@ export async function joinCompanyLeague(
     const info = await fetchOrgInfo(org);
     const orgSlug = slugify(org);
     const base = isReservedSlug(orgSlug) ? `${orgSlug}-town` : orgSlug;
-    const { data: clash } = await sb.from("leagues").select("id").eq("slug", base).maybeSingle();
+    const [{ data: taken }, { data: former }] = await Promise.all([
+      sb.from("leagues").select("id").eq("slug", base).maybeSingle(),
+      sb.from("league_slug_history").select("slug").eq("slug", base).maybeSingle(),
+    ]);
+    const clash = taken ?? former;
     const slug = clash ? `${base}-${Date.now().toString(36).slice(-4)}` : base;
     // The org's display name is org-controlled text: same rules as a custom name.
     const name = companyLeagueName(info?.name, info?.login || org);

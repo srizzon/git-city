@@ -10,9 +10,11 @@ describe("townDisplayName", () => {
   it("keeps a name that already ends in Town", () => {
     expect(townDisplayName("Pixel Town")).toBe("Pixel Town");
     expect(townDisplayName("pixel town")).toBe("pixel town");
+    expect(townDisplayName("Ship City")).toBe("Ship City");
   });
 
   it("only matches the whole word", () => {
     expect(townDisplayName("Downtown")).toBe("Downtown Town");
+    expect(townDisplayName("Velocity")).toBe("Velocity Town");
   });
 });
