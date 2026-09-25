@@ -19,11 +19,11 @@ export interface TownTemplate {
 }
 
 export const TEMPLATES: readonly TownTemplate[] = [
-  { id: "crew", name: "Crew", blurb: "A main street and a plaza for your friends.", scoring: "xp", join: "invite" },
-  { id: "race", name: "Race track", blurb: "A loop with ramps and boost pads. Open to anyone.", scoring: "xp", join: "open" },
+  { id: "crew", name: "Crew", blurb: "A main street and a plaza for your friends.", scoring: "xp", join: "request" },
+  { id: "race", name: "Race track", blurb: "A loop with ramps and boost pads.", scoring: "xp", join: "request" },
   { id: "hq", name: "Company HQ", blurb: "Downtown blocks. The race counts code only.", scoring: "contributions", join: "request" },
-  { id: "park", name: "Park village", blurb: "Few streets, lots of trees, a big plaza.", scoring: "xp", join: "open" },
-  { id: "blank", name: "Blank", blurb: "Just the gate. Build everything yourself.", scoring: "xp", join: "invite" },
+  { id: "park", name: "Park village", blurb: "Few streets, lots of trees, a big plaza.", scoring: "xp", join: "request" },
+  { id: "blank", name: "Blank", blurb: "Just the gate. Build everything yourself.", scoring: "xp", join: "request" },
 ];
 
 export const DEFAULT_TEMPLATE: TemplateId = "crew";
