@@ -39,7 +39,9 @@ export function getCityCache(): CityCache | null {
 }
 
 export function setCityCache(data: Omit<CityCache, "timestamp">) {
-  cache = { ...data, timestamp: Date.now() };
+  // Copies property descriptors, not values: rawDevs may be a lazy getter, and
+  // a spread would call it, decoding every developer record during load.
+  cache = Object.defineProperties({ timestamp: Date.now() }, Object.getOwnPropertyDescriptors(data)) as CityCache;
 }
 
 export function clearCityCache() {

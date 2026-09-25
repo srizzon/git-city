@@ -12,17 +12,28 @@ import { loadMapGeometry } from "@/lib/city-snapshot-client";
 import type { MapGeometryArrays } from "@/lib/map-geometry.worker";
 
 // Ground geometry arrays → BufferGeometries (built in a worker, see map-geometry.ts).
-function toGeometry(positions: Float32Array): THREE.BufferGeometry {
+function toGeometry(positions: Float32Array, bounds: SFRenderMap["bounds"]): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   g.setAttribute("normal", new THREE.BufferAttribute(upNormals(positions), 3));
+  // Every ground piece lies within the map bounds: give three the sphere
+  // instead of letting it walk millions of vertices on the first cull
+  // (~230 ms on a mid phone).
+  const [minx, minz, maxx, maxz] = bounds;
+  g.boundingSphere = new THREE.Sphere(
+    new THREE.Vector3((minx + maxx) / 2, 0, (minz + maxz) / 2),
+    Math.hypot(maxx - minx, maxz - minz) / 2 + 10,
+  );
   return g;
 }
 
 interface GroundGeos { asphalt: THREE.BufferGeometry; sidewalk: THREE.BufferGeometry; parks: THREE.BufferGeometry; land: THREE.BufferGeometry | null }
 
-function toGroundGeos(a: MapGeometryArrays): GroundGeos {
-  return { asphalt: toGeometry(a.asphalt), sidewalk: toGeometry(a.sidewalk), parks: toGeometry(a.parks), land: a.land ? toGeometry(a.land) : null };
+function toGroundGeos(a: MapGeometryArrays, bounds: SFRenderMap["bounds"]): GroundGeos {
+  return {
+    asphalt: toGeometry(a.asphalt, bounds), sidewalk: toGeometry(a.sidewalk, bounds),
+    parks: toGeometry(a.parks, bounds), land: a.land ? toGeometry(a.land, bounds) : null,
+  };
 }
 
 /** The worker's geometry, or the same work on the main thread if it can't run. */
@@ -32,13 +43,13 @@ function useGroundGeos(sfMap: SFRenderMap): GroundGeos | null {
     let alive = true;
     loadMapGeometry().then((arrays) => {
       if (!alive) return;
-      if (arrays) { setGeos(toGroundGeos(arrays)); return; }
+      if (arrays) { setGeos(toGroundGeos(arrays, sfMap.bounds)); return; }
       const { asphalt, sidewalk } = buildRoadArrays(sfMap.roads, 0);
       setGeos(toGroundGeos({
         asphalt, sidewalk,
         parks: buildParkArray(sfMap.parks, 0),
         land: sfMap.landMask ? buildLandArray(sfMap.landMask, sfMap.bounds, -0.5) : null,
-      }));
+      }, sfMap.bounds));
     });
     return () => { alive = false; };
   }, [sfMap]);
