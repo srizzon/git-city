@@ -7,7 +7,7 @@ export const WINNER_XP = 100;
 /** Pixel prize for winners of leagues with 5+ active members. Open question in the spec; tune later. */
 export const WINNER_PIXELS = 50;
 export const PIXEL_MIN_ACTIVE = 5;
-const CROWN_DAYS = 7;
+export const CROWN_DAYS = 7;
 
 export interface ClosedLeague {
   league: { id: string; slug: string; name: string; kind: string };
