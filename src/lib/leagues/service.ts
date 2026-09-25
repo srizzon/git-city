@@ -81,6 +81,16 @@ export async function getLeagueBySlug(slug: string): Promise<League | null> {
   return (data as League | null) ?? null;
 }
 
+/** The current slug of a town that used to live at `slug`, or null. */
+export async function currentSlugFor(oldSlug: string): Promise<string | null> {
+  const { data } = await getSupabaseAdmin()
+    .from("league_slug_history")
+    .select("leagues!inner(slug)")
+    .eq("slug", oldSlug.toLowerCase())
+    .maybeSingle();
+  return (data as { leagues: { slug: string } } | null)?.leagues.slug ?? null;
+}
+
 export async function getMembership(leagueId: string, devId: number) {
   const { data } = await getSupabaseAdmin()
     .from("league_members")
@@ -148,8 +158,12 @@ async function isGithubOrg(login: string): Promise<boolean> {
 
 async function uniqueSlug(base: string): Promise<string> {
   const sb = getSupabaseAdmin();
-  const { data } = await sb.from("leagues").select("slug").like("slug", `${base}%`);
-  const taken = new Set((data ?? []).map((r) => r.slug as string));
+  // Old addresses stay taken: they redirect to the town that had them.
+  const [{ data }, { data: old }] = await Promise.all([
+    sb.from("leagues").select("slug").like("slug", `${base}%`),
+    sb.from("league_slug_history").select("slug").like("slug", `${base}%`),
+  ]);
+  const taken = new Set([...(data ?? []), ...(old ?? [])].map((r) => r.slug as string));
   if (!taken.has(base)) return base;
   for (let i = 2; i < 1000; i++) {
     const s = `${base}-${i}`;
