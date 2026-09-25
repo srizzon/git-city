@@ -125,12 +125,27 @@ export async function GET(request: NextRequest) {
       if (typeof r === "string") return NextResponse.json({ error: r }, { status: 500 });
       seeded += r;
     }
-    // Free lots go to developers without one: claimed first, then by rank.
-    for (let i = 0; i < FILL_MAX_BATCHES; i++) {
-      const { data, error } = await sb.rpc("fill_city_lots", { p_limit: FILL_BATCH });
-      if (error) { console.error("fill_city_lots:", error.message); break; }
-      filled += (data as number) ?? 0;
-      if (((data as number) ?? 0) < FILL_BATCH) break;
+    // Free lots go to developers without one: claimed first, then by rank. The
+    // waiting list is built here (developers are already in memory; scanning
+    // them in SQL passes the API timeout) and handed over as ids.
+    const held = new Set((lots ?? []).filter((l) => l.developer_id != null).map((l) => l.developer_id as number));
+    if (seeded > 0) {
+      const fresh = await loadLots();
+      for (const l of fresh ?? []) if (l.developer_id != null) held.add(l.developer_id);
+    }
+    const waiting = devs
+      .filter((d) => !held.has(d.id))
+      .sort((a, b) =>
+        Number(Boolean(b.claimed)) - Number(Boolean(a.claimed))
+        || (a.rank ?? Infinity) - (b.rank ?? Infinity)
+        || a.id - b.id)
+      .map((d) => d.id);
+    for (let i = 0; i < FILL_MAX_BATCHES && i * FILL_BATCH < waiting.length; i++) {
+      const { data, error } = await sb.rpc("fill_city_lots_for", { p_dev_ids: waiting.slice(i * FILL_BATCH, (i + 1) * FILL_BATCH) });
+      if (error) { console.error("fill_city_lots_for:", error.message); break; }
+      const n = (data as number) ?? 0;
+      filled += n;
+      if (n === 0) break; // no free lots left
     }
     if (filled > 0 || seeded > 0) lots = await loadLots();
   }
