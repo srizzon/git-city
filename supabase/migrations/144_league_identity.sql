@@ -64,7 +64,7 @@ INSERT INTO public.league_item_types (item_type, footprint, radius, max_per_city
   ('tree_detailed',    'prop', 7,    NULL, NULL,  false, false),
   ('tree_palm_tall',   'prop', 7,    NULL, NULL,  false, false),
   ('tree_pine_tall_a', 'prop', 7,    NULL, NULL,  false, false),
-  ('portal',           'prop', 3,    1,    NULL,  true,  true),
+  ('portal',           'prop', 0,    1,    NULL,  true,  true),
   ('billboard',        'prop', 6,    4,    NULL,  false, false),
   ('flag',             'prop', 2,    12,   NULL,  false, false),
   ('plane',            'air',  0,    3,    'sky', false, false),
@@ -980,12 +980,12 @@ BEGIN
 
     WITH ins AS (
       INSERT INTO public.league_objects (league_id, kind, item_type, x, z, px, pz, rot, locked)
-      SELECT r.league_id, 'item', 'portal', 0, 0, 0, 4, 0, true
+      SELECT r.league_id, 'item', 'portal', 0, 1, 0, 24, 0, true
       WHERE NOT EXISTS (SELECT 1 FROM public.league_objects o WHERE o.league_id = r.league_id AND o.item_type = 'portal')
       RETURNING id
     )
     SELECT v_places || COALESCE(jsonb_agg(jsonb_build_object('op', 'place', 'kind', 'item', 'item_type', 'portal',
-                                                             'px', 0, 'pz', 4, 'id', ins.id, 'locked', true)), '[]'::jsonb)
+                                                             'px', 0, 'pz', 24, 'id', ins.id, 'locked', true)), '[]'::jsonb)
     INTO v_places FROM ins;
 
     -- Ground props around the entrance that no longer stand.

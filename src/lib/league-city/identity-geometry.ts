@@ -16,5 +16,12 @@ export const BILLBOARD = { w: 28, h: 14, bottom: 12, legX: 10, leg: 1.2 } as con
 
 export const FLAG = { poleH: 30, pole: 0.45, clothW: 15, clothH: 10 } as const;
 
-/** Where the car starts when you have no building: the entrance road, facing north through the portal. */
-export const ENTRANCE_SPAWN = { x: 0, z: 18, rot: 0 } as const;
+/**
+ * The approach: the main street runs on past the city's south edge for this
+ * many lots, outside the grid, so the portal reads as a way in. Drawn and
+ * driven only; the editor and the SQL never see these lots.
+ */
+export const APPROACH_LOTS = 2;
+
+/** Where the car starts when you have no building: on the approach, facing north through the portal. */
+export const ENTRANCE_SPAWN = { x: 0, z: 48 * 1.4, rot: 0 } as const;

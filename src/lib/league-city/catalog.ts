@@ -54,7 +54,8 @@ export const CATALOG: Record<ItemType, ItemTypeRow> = {
   tree_detailed: prop(7),
   tree_palm_tall: prop(7),
   tree_pine_tall_a: prop(7),
-  portal: prop(3, { max: 1, systemOnly: true, onRoad: true }),
+  // Radius 0: it stands on the south edge line; its pillars flank the road.
+  portal: prop(0, { max: 1, systemOnly: true, onRoad: true }),
   billboard: prop(6, { max: 4 }),
   flag: prop(2, { max: 12 }),
   plane: air,

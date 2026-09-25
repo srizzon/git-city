@@ -84,6 +84,12 @@ describe("colliders", () => {
     expect(colliderKey(wall(small, "n"))).not.toBe(colliderKey(wall(big, "n")));
   });
 
+  it("opens the south wall between the portal pillars onto a walled approach", () => {
+    const walls = buildColliders([lot("e", "road", 0, 0)], [], 6).map((c) => c.id.split(":")[0]);
+    expect(walls).not.toContain("wall-s");
+    expect(walls).toEqual(expect.arrayContaining(["wall-sw", "wall-se", "approach-w", "approach-e", "approach-end", "approach-ground"]));
+  });
+
   it("gives the portal and billboards two posts the car passes between, flags a pole, planes nothing", () => {
     const mine = (objs: CityObject[]) => buildColliders(objs, [], 6).filter((c) => !/^(wall|ground)/.test(c.id));
     const portal = mine([prop("pt", "portal", 0, 4)]);

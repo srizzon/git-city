@@ -8,7 +8,8 @@
 
 import type { CityBuilding } from "@/lib/github";
 import { rotToRadians, worldBounds } from "../grid";
-import { BILLBOARD, FLAG, PORTAL } from "../identity-geometry";
+import { APPROACH_LOTS, BILLBOARD, FLAG, PORTAL } from "../identity-geometry";
+import { LOT } from "../grid";
 import { RAMP, RAMP_BIG, rampCorners, type RampSize } from "../ramp";
 import { CONE, SPEED_BUMP, TIRE_WALL_HEIGHT, TIRE_WALL_WIDTH, TIRE, crateLayout, toWorld, CRATE } from "../toys";
 import { TREE_TYPES, type CityObject } from "../types";
@@ -158,7 +159,24 @@ export function buildColliders(objects: readonly CityObject[], buildings: readon
   const wh = WALL.height / 2;
   out.push({ id: `ground:${h}`, body: "fixed", pos: [mx, -1, mz], rotY: 0, shape: { type: "cuboid", half: [hx + 10, 1, hz + 10] } });
   out.push({ id: `wall-n:${h}`, body: "fixed", pos: [mx, wh, z0 - t], rotY: 0, shape: { type: "cuboid", half: [hx + 2 * t, wh, t] } });
-  out.push({ id: `wall-s:${h}`, body: "fixed", pos: [mx, wh, z1 + t], rotY: 0, shape: { type: "cuboid", half: [hx + 2 * t, wh, t] } });
+  // With an entrance, the south wall opens between the portal pillars onto
+  // the approach road, which gets its own ground and walls.
+  const entrance = objects.some((o) => o.px === null && o.item_type === "road" && o.x === 0 && o.z === 0);
+  if (!entrance) {
+    out.push({ id: `wall-s:${h}`, body: "fixed", pos: [mx, wh, z1 + t], rotY: 0, shape: { type: "cuboid", half: [hx + 2 * t, wh, t] } });
+  } else {
+    const gap = (PORTAL.halfSpan - PORTAL.pillar / 2) * U;
+    const side = (x0 - 2 * t + (-gap)) / 2;
+    const sideHalf = (-gap - (x0 - 2 * t)) / 2;
+    out.push({ id: `wall-sw:${h}`, body: "fixed", pos: [side, wh, z1 + t], rotY: 0, shape: { type: "cuboid", half: [sideHalf, wh, t] } });
+    out.push({ id: `wall-se:${h}`, body: "fixed", pos: [-side, wh, z1 + t], rotY: 0, shape: { type: "cuboid", half: [sideHalf, wh, t] } });
+    const len = APPROACH_LOTS * LOT * U;
+    const az = z1 + len / 2;
+    out.push({ id: `approach-ground:${h}`, body: "fixed", pos: [0, -1, az], rotY: 0, shape: { type: "cuboid", half: [gap + 10, 1, len / 2 + 2] } });
+    out.push({ id: `approach-w:${h}`, body: "fixed", pos: [-gap - t, wh, az], rotY: 0, shape: { type: "cuboid", half: [t, wh, len / 2] } });
+    out.push({ id: `approach-e:${h}`, body: "fixed", pos: [gap + t, wh, az], rotY: 0, shape: { type: "cuboid", half: [t, wh, len / 2] } });
+    out.push({ id: `approach-end:${h}`, body: "fixed", pos: [0, wh, z1 + len + t], rotY: 0, shape: { type: "cuboid", half: [gap + 2 * t, wh, t] } });
+  }
   out.push({ id: `wall-w:${h}`, body: "fixed", pos: [x0 - t, wh, mz], rotY: 0, shape: { type: "cuboid", half: [t, wh, hz + 2 * t] } });
   out.push({ id: `wall-e:${h}`, body: "fixed", pos: [x1 + t, wh, mz], rotY: 0, shape: { type: "cuboid", half: [t, wh, hz + 2 * t] } });
   return out;

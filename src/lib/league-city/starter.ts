@@ -10,7 +10,8 @@
 
 import { GROW_AT, LOT, MAX_H, START_H, bounds, lotCount } from "./grid";
 import { faceRoad, freeLotsInOrder, lotKey } from "./placement";
-import { TREE_TYPES, type CityOp } from "./types";
+import { TREE_TYPES, type CityObject, type CityOp } from "./types";
+import { APPROACH_LOTS } from "./identity-geometry";
 
 export interface StarterMember {
   developer_id: number;
@@ -30,8 +31,8 @@ export const ENTRANCE: readonly [number, number][] = [
   [0, 0],
   [0, -1],
 ];
-/** The portal stands over the entrance road, at the south edge of the city. */
-export const PORTAL_POS: readonly [number, number] = [0, 4];
+/** The portal stands on the city's south edge, over the entrance road, facing the approach outside. */
+export const PORTAL_POS: readonly [number, number] = [0, LOT / 2];
 
 const PLAZA: [number, number][] = [
   [-1, 0],
@@ -121,4 +122,25 @@ export function starterOps(members: readonly StarterMember[]): StarterCity {
   }
 
   return { h, ops, unplaced };
+}
+
+/**
+ * The approach road lots south of the city (render and drive only), when the
+ * entrance road is there.
+ */
+export function approachRoads(objects: readonly Pick<CityObject, "item_type" | "x" | "z" | "px">[]): CityObject[] {
+  if (!objects.some((o) => o.px === null && o.item_type === "road" && o.x === 0 && o.z === 0)) return [];
+  return Array.from({ length: APPROACH_LOTS }, (_, i) => ({
+    id: `approach:${i + 1}`,
+    kind: "item",
+    item_type: "road",
+    developer_id: null,
+    x: 0,
+    z: i + 1,
+    px: null,
+    pz: null,
+    rot: 0,
+    is_new: false,
+    locked: true,
+  }));
 }

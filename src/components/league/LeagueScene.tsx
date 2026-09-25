@@ -14,7 +14,9 @@ import { InstancedDecorations } from "@/components/city/decorations";
 import type { CityBuilding, CityDecoration } from "@/lib/github";
 import { LOT, bounds, lotToWorld, rotToRadians, terrainBounds, worldBounds } from "@/lib/league-city/grid";
 import type { CityIdentity, CityObject } from "@/lib/league-city/types";
-import type { IntroPath } from "@/lib/league-city/intro";
+import { introPath, type IntroPieces, type IntroStyle } from "@/lib/league-city/intro";
+import { approachRoads } from "@/lib/league-city/starter";
+import { APPROACH_LOTS } from "@/lib/league-city/identity-geometry";
 import IdentityLayer from "./identity/IdentityLayer";
 import TownIntro from "./identity/TownIntro";
 import LeagueToys from "./LeagueToys";
@@ -112,6 +114,17 @@ function LeagueGround({ h, theme }: { h: number; theme: CityTheme }) {
         <meshBasicMaterial color={VOID_COLOR} />
       </mesh>
     </group>
+  );
+}
+
+/** Ground under the approach road, outside the city's south edge. */
+function ApproachGround({ theme }: { theme: CityTheme }) {
+  const len = APPROACH_LOTS * LOT;
+  return (
+    <mesh position={[0, 0, LOT / 2 + len / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[LOT, len]} />
+      <meshStandardMaterial color={theme.groundColor} emissive={theme.groundColor} emissiveIntensity={0.15} roughness={0.95} />
+    </mesh>
   );
 }
 
@@ -320,6 +333,16 @@ function HeroFraming() {
   return null;
 }
 
+// The intro ends on the orbit's own frame for this screen, so nothing jumps.
+function IntroPlayer({ h, intro, onEnd }: { h: number; intro: { pieces: IntroPieces; style: IntroStyle }; onEnd: () => void }) {
+  const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
+  const [path] = useState(() => {
+    const f = cameraFrame(h, aspect);
+    return introPath(intro.pieces, intro.style, { pos: f.position.toArray(), look: f.target.toArray() });
+  });
+  return <TownIntro path={path} onEnd={onEnd} />;
+}
+
 // ─── Scene ───────────────────────────────────────────────────
 
 export type SceneMode = "view" | "edit" | "preview" | "drive";
@@ -333,7 +356,8 @@ export interface LeagueSceneProps {
   /** The portal sign was clicked (report the logo). */
   onPortalClick?: () => void;
   /** First-visit intro; the camera is the intro's until onIntroEnd. */
-  intro?: IntroPath | null;
+  /** n: a new number replays it. */
+  intro?: { pieces: IntroPieces; style: IntroStyle; n?: number } | null;
   onIntroEnd?: () => void;
   objects: CityObject[];
   buildings: CityBuilding[];
@@ -384,6 +408,9 @@ export default function LeagueScene({
   const initial = useMemo(() => cameraFrame(h), [h]);
   const { theme, key: themeKey, fx: skyFx } = townTheme(identity?.sky ?? DEFAULT_SKY);
   const playing = !!intro && mode === "view";
+  // The main street runs on outside the grid to the portal (drawn and driven, never edited).
+  const approach = useMemo(() => approachRoads(objects), [objects]);
+  const withApproach = useMemo(() => (approach.length ? [...objects, ...approach] : objects), [objects, approach]);
   const driveRef = useRef(drive);
   useEffect(() => {
     driveRef.current = drive;
@@ -443,9 +470,10 @@ export default function LeagueScene({
         />
       )}
 
-      {playing && intro && <TownIntro path={intro} onEnd={onIntroEnd ?? (() => {})} />}
+      {playing && intro && <IntroPlayer key={intro.n ?? 0} h={h} intro={intro} onEnd={onIntroEnd ?? (() => {})} />}
       <LeagueGround h={h} theme={theme} />
-      <LeagueRoads objects={objects} markingColor={theme.roadMarkingColor} />
+      {approach.length > 0 && <ApproachGround theme={theme} />}
+      <LeagueRoads objects={withApproach} markingColor={theme.roadMarkingColor} />
       <PlazaSlabs objects={objects} theme={theme} />
       <LeagueToys objects={objects} driving={driving} />
       <InstancedDecorations items={decorations} roadMarkingColor={theme.roadMarkingColor} sidewalkColor={theme.sidewalkColor} />
@@ -478,7 +506,7 @@ export default function LeagueScene({
         focusedBuilding={editing || driving ? null : (focused ?? null)}
         onBuildingClick={editing || driving ? undefined : onBuildingClick}
       />
-      {driving && drive && <DriveWorld objects={objects} buildings={buildings} h={h} {...drive} />}
+      {driving && drive && <DriveWorld objects={withApproach} buildings={buildings} h={h} {...drive} />}
       {children}
     </Canvas>
   );
