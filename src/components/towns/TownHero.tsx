@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import dynamic from "next/dynamic";
 import { generateCityLayout, type CityBuilding, type DeveloperRecord, type LayoutNorms } from "@/lib/github";
 import type { LeagueCity } from "@/lib/league-city/service";
-import { leagueBuildings } from "@/lib/league-city/buildings";
+import { leagueBuildings, scaleTownHeights } from "@/lib/league-city/buildings";
 
 const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), { ssr: false, loading: () => null });
 
@@ -27,7 +27,7 @@ export default function TownHero({
       const b = byLogin.get(d.github_login.toLowerCase());
       if (b) byDevId.set(d.id, b);
     }
-    return leagueBuildings(city.objects, byDevId);
+    return leagueBuildings(city.objects, scaleTownHeights(byDevId));
   }, [city, cityDevs, cityNorms]);
 
   return <LeagueScene embedded size={city.size} objects={city.objects} buildings={buildings} mode="view" />;

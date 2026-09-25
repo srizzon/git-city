@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CityBuilding } from "@/lib/github";
 import { LOT } from "./grid";
-import { MAX_FOOTPRINT, leagueBuildings } from "./buildings";
+import { MAX_FOOTPRINT, TOWN_MAX_HEIGHT, TOWN_MIN_HEIGHT, leagueBuildings, scaleTownHeights, townHeights } from "./buildings";
 import type { CityObject } from "./types";
 
 const b = (login: string, width: number, depth: number) =>
@@ -29,5 +29,26 @@ describe("leagueBuildings", () => {
     const [out] = leagueBuildings([obj(1, 0, 0, 90)], new Map([[1, b("a", 60, 20)]]));
     expect(out.width).toBe(20);
     expect(out.depth).toBe(MAX_FOOTPRINT);
+  });
+});
+
+describe("townHeights", () => {
+  it("maps the town's range onto one to four lots, order kept", () => {
+    const out = townHeights([30, 900, 120, 4000]);
+    expect(out[0]).toBe(TOWN_MIN_HEIGHT);
+    expect(out[3]).toBe(TOWN_MAX_HEIGHT);
+    expect(out[0] < out[2] && out[2] < out[1] && out[1] < out[3]).toBe(true);
+  });
+
+  it("puts a town of equals in the middle", () => {
+    const mid = Math.round((TOWN_MIN_HEIGHT + TOWN_MAX_HEIGHT) / 2);
+    expect(townHeights([500, 500])).toEqual([mid, mid]);
+    expect(townHeights([700])).toEqual([mid]);
+  });
+
+  it("rescales every building and its floors", () => {
+    const out = scaleTownHeights(new Map([[1, b("a", 20, 20)], [2, { ...b("b", 20, 20), height: 800 }]]));
+    expect([out.get(1)?.height, out.get(2)?.height]).toEqual([TOWN_MIN_HEIGHT, TOWN_MAX_HEIGHT]);
+    expect(out.get(2)?.floors).toBe(Math.floor(TOWN_MAX_HEIGHT / 6));
   });
 });

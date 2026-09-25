@@ -15,7 +15,7 @@ import {
 } from "@/lib/github";
 import type { LeaguePageData } from "@/lib/leagues/queries";
 import type { LeagueCity } from "@/lib/league-city/service";
-import { leagueBuildings } from "@/lib/league-city/buildings";
+import { leagueBuildings, scaleTownHeights } from "@/lib/league-city/buildings";
 import LeagueTitle from "@/components/league/hud/LeagueTitle";
 import RaceWidget from "@/components/league/hud/RaceWidget";
 import ActionBar from "@/components/league/hud/ActionBar";
@@ -126,7 +126,7 @@ export default function LeagueClient({
       const b = byLogin.get(d.github_login.toLowerCase());
       if (b) map.set(d.id, b);
     }
-    return map;
+    return scaleTownHeights(map);
   }, [cityDevs, cityNorms]);
 
   const togglePreview = useCallback(
