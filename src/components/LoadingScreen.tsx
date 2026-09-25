@@ -197,9 +197,9 @@ export default function LoadingScreen({
       const devs = () => statsRef.current?.total_developers || FALLBACK_DEVS;
       const contribs = () => statsRef.current?.total_contributions || FALLBACK_CONTRIBS;
 
-      await typeCmd("git clone git@git.city:world/san-francisco.git");
+      await typeCmd("git clone git@git.city:world/bay-area.git");
       await vsleep(150);
-      addLine("out", "Cloning into 'san-francisco'...");
+      addLine("out", "Cloning into 'bay-area'...");
       await vsleep(200);
 
       addLine("remote", `remote: Enumerating buildings: ${fmt(BUILDINGS)}, done.`);
@@ -239,7 +239,7 @@ export default function LoadingScreen({
       await vsleep(180);
       addLine("blank", "");
 
-      await typeCmd("cd san-francisco && npm run city");
+      await typeCmd("cd bay-area && npm run city");
       await vsleep(150);
 
       await task("compiling shaders", 200);
