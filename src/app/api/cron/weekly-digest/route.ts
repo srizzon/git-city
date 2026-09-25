@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { sendNotificationAsync } from "@/lib/notifications";
+import { sendNotification } from "@/lib/notifications";
 import { buildButton, buildStatsTable } from "@/lib/email-template";
+import { mapWithConcurrency } from "@/lib/concurrency";
+
+export const maxDuration = 300;
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+const TIME_BUDGET_MS = 240_000;
+const SEND_CONCURRENCY = 4;
+const ACTIVE_WINDOW_DAYS = 30;
 
 /**
  * Cron: Monday 10:00 UTC - Weekly recap email for active developers.
+ * Audience: active in the last 30 days AND something happened this week.
  */
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -14,21 +21,32 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const started = Date.now();
   const sb = getSupabaseAdmin();
   const now = new Date();
   const weekStart = new Date(now.getTime() - 7 * 86_400_000).toISOString();
   const weekStartDate = weekStart.split("T")[0];
-  const results = { sent: 0, skipped: 0, errors: 0 };
+  const activeSince = new Date(now.getTime() - ACTIVE_WINDOW_DAYS * 86_400_000).toISOString();
+  const today = now.toISOString().split("T")[0];
+  const yesterday = new Date(now.getTime() - 86_400_000).toISOString().split("T")[0];
+  const results = { sent: 0, skipped: 0, errors: 0, timedOut: false };
 
   let offset = 0;
   const batchSize = 50;
 
   while (true) {
+    if (Date.now() - started > TIME_BUDGET_MS) {
+      results.timedOut = true;
+      break;
+    }
+
     const { data: devs } = await sb
       .from("developers")
-      .select("id, github_login, contributions, app_streak, kudos_count, rank")
+      .select("id, github_login, contributions, app_streak, last_checkin_date, kudos_count, rank")
       .eq("claimed", true)
       .not("email", "is", null)
+      .gte("last_active_at", activeSince)
+      .order("id", { ascending: true })
       .range(offset, offset + batchSize - 1);
 
     if (!devs || devs.length === 0) break;
@@ -82,56 +100,73 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const sendResults = await Promise.allSettled(
-      devs.map((dev) => {
-        const weeklyKudos = kudosMap.get(dev.id) ?? 0;
-        const weeklyRaids = raidsMap.get(dev.id);
-        const weeklyAchievements = achievementsMap.get(dev.id) ?? 0;
+    const sendResults = await mapWithConcurrency(devs, SEND_CONCURRENCY, async (dev) => {
+      if (Date.now() - started > TIME_BUDGET_MS) {
+        results.timedOut = true;
+        return "skipped";
+      }
 
-        // Skip devs with zero activity
-        if (weeklyKudos === 0 && !weeklyRaids && weeklyAchievements === 0 && (dev.app_streak ?? 0) === 0) {
-          return Promise.resolve("skipped");
-        }
+      const weeklyKudos = kudosMap.get(dev.id) ?? 0;
+      const weeklyRaids = raidsMap.get(dev.id);
+      const weeklyAchievements = achievementsMap.get(dev.id) ?? 0;
+      // app_streak is only reset on the next check-in, so it's stale unless
+      // the last check-in was today or yesterday.
+      const streakIsCurrent = dev.last_checkin_date === today || dev.last_checkin_date === yesterday;
+      const streak = streakIsCurrent ? (dev.app_streak ?? 0) : 0;
 
-        const stats = [
-          { label: "Current streak", value: `${dev.app_streak ?? 0} days` },
-          { label: "Kudos received", value: weeklyKudos },
-        ];
+      // Skip devs with nothing to report
+      if (weeklyKudos === 0 && !weeklyRaids && weeklyAchievements === 0 && streak === 0) {
+        return "skipped";
+      }
 
-        if (weeklyRaids) {
-          stats.push({ label: "Battles defended", value: `${weeklyRaids.defended}/${weeklyRaids.total}` });
-        }
-        if (weeklyAchievements > 0) {
-          stats.push({ label: "Achievements", value: weeklyAchievements });
-        }
-        if (dev.rank) {
-          stats.push({ label: "City rank", value: `#${dev.rank}` });
-        }
+      const stats: { label: string; value: string | number }[] = [];
+      if (streak > 0) {
+        stats.push({ label: "Current streak", value: `${streak} days` });
+      }
+      stats.push({ label: "Kudos received", value: weeklyKudos });
 
-        sendNotificationAsync({
-          type: "weekly_digest",
-          category: "digest",
-          developerId: dev.id,
-          dedupKey: `weekly_digest:${dev.id}:${weekStartDate}`,
-          title: `Your week in Git City: ${dev.app_streak ?? 0}-day streak, rank #${dev.rank ?? "?"}`,
-          body: `Streak: ${dev.app_streak ?? 0} days. Kudos: ${weeklyKudos}. Check your weekly recap.`,
-          html: `
-            <p style="color: #c8e64a; font-size: 16px;">Your week in Git City</p>
-            ${buildStatsTable(stats)}
-            ${buildButton("Visit Git City", `${BASE_URL}/?user=${dev.github_login}`)}
-          `,
-          actionUrl: `${BASE_URL}/?user=${dev.github_login}`,
-          priority: "high", // Digests are their own batch, don't re-batch
-          channels: ["email"],
-        });
+      if (weeklyRaids) {
+        stats.push({ label: "Battles defended", value: `${weeklyRaids.defended}/${weeklyRaids.total}` });
+      }
+      if (weeklyAchievements > 0) {
+        stats.push({ label: "Achievements", value: weeklyAchievements });
+      }
+      if (dev.rank) {
+        stats.push({ label: "City rank", value: `#${dev.rank}` });
+      }
 
-        return Promise.resolve("sent");
-      }),
-    );
+      const title = streak > 0
+        ? `Your week in Git City: ${streak}-day streak, rank #${dev.rank ?? "?"}`
+        : `Your week in Git City: rank #${dev.rank ?? "?"}`;
+      const body = streak > 0
+        ? `Streak: ${streak} days. Kudos: ${weeklyKudos}. Check your weekly recap.`
+        : `Kudos: ${weeklyKudos}. Check your weekly recap.`;
+
+      const sent = await sendNotification({
+        type: "weekly_digest",
+        category: "digest",
+        developerId: dev.id,
+        dedupKey: `weekly_digest:${dev.id}:${weekStartDate}`,
+        title,
+        body,
+        html: `
+          <p style="color: #c8e64a; font-size: 16px;">Your week in Git City</p>
+          ${buildStatsTable(stats)}
+          ${buildButton("Visit Git City", `${BASE_URL}/?user=${dev.github_login}`)}
+        `,
+        actionUrl: `${BASE_URL}/?user=${dev.github_login}`,
+        priority: "high", // Digests are their own batch, don't re-batch
+        channels: ["email"],
+      });
+
+      if (sent.some((r) => r.success)) return "sent";
+      return sent.some((r) => r.skipped === "resend_error" || r.skipped === "send_error") ? "error" : "skipped";
+    });
 
     for (const r of sendResults) {
       if (r.status === "fulfilled") {
         if (r.value === "skipped") results.skipped++;
+        else if (r.value === "error") results.errors++;
         else results.sent++;
       } else {
         results.errors++;
