@@ -131,8 +131,6 @@ export function generateSFCityLayout(
 
   const { norms, composites } = resolveNorms(devs, baseNorms);
   const { maxContrib, maxStars, maxContribV2 } = norms;
-  const centrality = precomputeCentrality(devs, composites, norms);
-  const score = (login: string) => centrality.get(login) ?? 0;
 
   const DISTRICT_ORDER = [
     'backend', 'frontend', 'fullstack', 'data_ai', 'devops',
@@ -151,7 +149,13 @@ export function generateSFCityLayout(
   const NC = candidates.length;
 
   // ---- size-aware greedy placement (dimensions stay 100% stat-driven) ----
-  const sorted = [...devs].sort((a, b) => score(b.github_login) - score(a.github_login));
+  // Centrality order matters only to the greedy walk and to pinned devs
+  // without a lot; with lots and no pins (every normal load) it's skipped:
+  // on 87k devs it was ~150 ms of scoring and sorting for nothing.
+  const needsOrder = !lotMode || (pinned?.size ?? 0) > 0;
+  const centrality = needsOrder ? precomputeCentrality(devs, composites, norms) : null;
+  const score = (login: string) => centrality?.get(login) ?? 0;
+  const sorted = needsOrder ? [...devs].sort((a, b) => score(b.github_login) - score(a.github_login)) : devs;
   const NF = (F.length / 3) | 0;
   const m = Math.min(sorted.length, NF);
   // Sized off the full city (norms.devCount), not the trimmed subset in hand.
