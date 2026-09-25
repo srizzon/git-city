@@ -326,7 +326,9 @@ export default function RaceWorld({
     if (frozen && serverNow >= r.startsAt) setFrozen(false);
     const c = car.current;
     if (!c) return;
-    hud.driftLevel = c.state.drifting ? turboLevel(c.state.driftCharge) : 0;
+    // What Shift would fire: the banked turbo, or the one this drift is charging.
+    hud.driftLevel = Math.max(c.state.turboStored, c.state.drifting ? turboLevel(c.state.driftCharge) : 0);
+    hud.turboReady = c.state.turboStored > 0;
     hud.turbo = c.state.turboLeft > 0;
     if (c.state.turboFired) {
       hud.turboFlash = { level: c.state.turboFired, at: performance.now() };

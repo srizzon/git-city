@@ -31,12 +31,18 @@ export interface CarState {
   /** Spinning out (oil, a ball hit): seconds left and which way. */
   spinLeft: number;
   spinDir: number;
-  /** Race track: no Shift boost; a drift charges a mini-turbo that fires when it ends. */
+  /** Race track: a drift charges a mini-turbo, banked when it ends; Shift fires it. */
   turbo: boolean;
   /** Seconds drifted in the drift under way (the mini-turbo's charge). */
   driftCharge: number;
-  /** Mini-turbo seconds left. */
+  /** Banked mini-turbo level (0 none … 3), waiting for Shift. */
+  turboStored: number;
+  /** Mini-turbo seconds left, and of its push (the kick, spread out so nothing jolts). */
   turboLeft: number;
+  turboPush: number;
+  pushLevel: number;
+  /** Shift was held last step (a press fires once). */
+  boostHeld: boolean;
   /** Level of the last mini-turbo fired (the HUD clears it once shown). */
   turboFired: number;
   /** Top speed multiplier (the crown holder is slower). */
@@ -57,7 +63,7 @@ export const WHEELS: { x: number; z: number; front: boolean }[] = [
 export function newCarState(): CarState {
   return {
     speed: 0, steer: 0, boosting: false, braking: false, slip: 0,
-    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, turbo: false, driftCharge: 0, turboLeft: 0, turboFired: 0, topMul: 1, lateral: 0, surface: "road",
+    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, turbo: false, driftCharge: 0, turboStored: 0, turboLeft: 0, turboPush: 0, pushLevel: 0, boostHeld: false, turboFired: 0, topMul: 1, lateral: 0, surface: "road",
   };
 }
 
@@ -145,16 +151,9 @@ export function stepCar(
   } else if (s.drifting && (!input.handbrake || speed < DRIFT.endSpeed)) {
     s.drifting = false;
     s.recovering = DRIFT.recoverTime;
-    // Let go of a charged drift: the mini-turbo fires (not when it just died out):
-    // an instant kick along the nose, then a few tenths of boost.
+    // Let go of a charged drift (not one that just died out): the mini-turbo is banked for Shift.
     const level = s.turbo && speed >= DRIFT.endSpeed ? turboLevel(s.driftCharge) : 0;
-    if (level > 0) {
-      s.turboLeft = Math.max(s.turboLeft, TURBO.seconds[level]);
-      s.turboFired = level;
-      const [nx, , nz] = rotate(q, [0, 0, 1]);
-      const v = body.linvel();
-      body.setLinvel({ x: v.x + nx * TURBO.kick[level], y: v.y, z: v.z + nz * TURBO.kick[level] }, true);
-    }
+    if (level > s.turboStored) s.turboStored = level;
     s.driftCharge = 0;
   }
   if (s.drifting && grounded) s.driftCharge += dt;
@@ -175,9 +174,29 @@ export function stepCar(
     }
   });
 
-  // Boost: unlimited while Shift is held in the town; on the race track only a mini-turbo.
+  // Boost: unlimited while Shift is held in the town. On the race track a Shift
+  // press fires the banked mini-turbo: a push along the nose spread over
+  // TURBO.push seconds, then boost for the rest of its time.
+  if (s.turbo && input.boost && !s.boostHeld && s.turboStored > 0) {
+    s.pushLevel = s.turboStored;
+    s.turboLeft = TURBO.seconds[s.turboStored];
+    s.turboPush = TURBO.push;
+    s.turboFired = s.turboStored;
+    s.turboStored = 0;
+  }
+  s.boostHeld = input.boost;
   s.turboLeft = Math.max(0, s.turboLeft - dt);
   s.boosting = s.turbo ? s.turboLeft > 0 : input.boost;
+  if (s.turboPush > 0 && grounded) {
+    const step = Math.min(dt, s.turboPush);
+    s.turboPush -= step;
+    if (speed < BOOST.topSpeed) {
+      const [nx, , nz] = rotate(q, [0, 0, 1]);
+      const add = (TURBO.kick[s.pushLevel] / TURBO.push) * step;
+      const v = body.linvel();
+      body.setLinvel({ x: v.x + nx * add, y: v.y, z: v.z + nz * add }, true);
+    }
+  }
   const top = (s.boosting ? BOOST.topSpeed : rearTop) * s.topMul;
 
   // Throttle, brake and reverse (boost drives even without throttle).

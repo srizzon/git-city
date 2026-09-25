@@ -33,7 +33,8 @@ export type LapFeedItem = LapNews & { at: number };
 
 const CONTROLS: [string, string][] = [
   ["W A S D", "drive"],
-  ["Hold Space + steer", "drift, let go for a turbo"],
+  ["Hold Space + steer", "drift charges a turbo"],
+  ["Shift", "fire the turbo"],
   ["R", "restart"],
   ["C", "camera"],
   ["Esc", "pause"],
@@ -140,7 +141,10 @@ export default function RaceHud({
           p.style.background =
             telemetry.driftLevel > i ? TURBO.colors[telemetry.driftLevel] : "transparent";
       });
-      if (turbo.current) turbo.current.dataset.on = String(telemetry.turbo);
+      if (turbo.current) {
+        turbo.current.dataset.on = String(telemetry.turbo);
+        turbo.current.dataset.ready = String(telemetry.turboReady);
+      }
       if (flash.current) {
         const f = telemetry.turboFlash;
         const age = f ? performance.now() - f.at : Infinity;
@@ -495,13 +499,7 @@ export default function RaceHud({
           </div>
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1.5">
-              <span
-                ref={turbo}
-                data-on="false"
-                className="w-10 text-[9px] text-cream data-[on=true]:text-lime"
-              >
-                Turbo
-              </span>
+              <span className="w-10 text-[9px] text-cream">Turbo</span>
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
@@ -511,9 +509,18 @@ export default function RaceHud({
               ))}
             </div>
             <span className="text-[8px] normal-case text-muted">
-              Drift to charge, let go to fire
+              Drift to charge
             </span>
           </div>
+          {/* Lights up when a turbo is banked: press it. */}
+          <span
+            ref={turbo}
+            data-on="false"
+            data-ready="false"
+            className="border-2 border-border px-2 py-1 text-[10px] text-dim transition-colors data-[ready=true]:animate-pulse data-[ready=true]:border-lime data-[ready=true]:text-lime data-[on=true]:border-lime data-[on=true]:bg-lime data-[on=true]:text-bg"
+          >
+            Shift
+          </span>
         </div>
       )}
 
