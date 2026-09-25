@@ -1,25 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Flag, Volume2, VolumeX, X } from "lucide-react";
+import { Camera, Flag, RotateCcw, Volume2, VolumeX, X } from "lucide-react";
 import { HUD_BOX } from "@/components/league/hud/shared";
 import PauseMenu from "@/components/league/hud/drive/PauseMenu";
 import StartScreen from "@/components/league/hud/drive/StartScreen";
 import CopyLink from "@/components/league/hud/drive/CopyLink";
-import type { DriveCameraMode } from "@/lib/league-city/drive/telemetry";
+import type { RaceCameraMode } from "./RaceCamera";
+import { TURBO } from "@/lib/league-city/drive/tuning";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import type { BoardRow } from "@/lib/league-city/race/board";
+import { MEDALS, MEDAL_COLORS, medalFor } from "@/lib/league-city/race/ghost";
 import { formatLap } from "@/lib/league-city/race/laps";
 import type { RoomBests } from "@/lib/league-city/race/net";
 import { RACE, canStart, inRace, standings } from "@/lib/league-city/race/race";
 import type { LapNews, RaceTelemetry, RaceView } from "@/lib/league-city/race/telemetry";
 import { theTrack } from "@/lib/league-city/race/track";
 
-// Race track HUD. Top left: the lap clock (running, from the telemetry every
-// animation frame), your last and best lap, and in a race your lap and place.
-// Top right: camera, mute, exit. Right: the town's best laps (saved) and this
-// session's. Bottom: speed and the boost tank. Center: the start lights, the
-// wrong-way warning, and the results when a race ends.
+// Race track HUD, after Trackmania. Top center: the lap clock, and under it
+// how you stand against your best lap at each split (green ahead, red
+// behind). Top left: your best, the medals and the town record. Top right:
+// camera, sound, exit, the town's board and who's on track. Bottom: speed and
+// the mini-turbo charge. Center: start lights, wrong way, race results.
 
 const SEG = "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
 const ICON_BTN = `${SEG} w-10 justify-center py-2 text-cream hover:text-lime`;
@@ -29,14 +31,14 @@ export type LapFeedItem = LapNews & { at: number };
 
 const CONTROLS: [string, string][] = [
   ["W A S D", "drive"],
-  ["Space + steer", "drift (fills boost)"],
-  ["Shift", "boost"],
-  ["R", "back to last checkpoint"],
+  ["Hold Space + steer", "drift, let go for a turbo"],
+  ["R", "restart"],
   ["C", "camera"],
   ["Esc", "pause"],
 ];
 
 const who = (name: string) => (name.startsWith("guest-") ? "guest" : `@${name}`);
+const signed = (ms: number) => `${ms < 0 ? "-" : "+"}${(Math.abs(ms) / 1000).toFixed(3)}`;
 
 export default function RaceHud({
   townName,
@@ -53,6 +55,7 @@ export default function RaceHud({
   feed,
   saved,
   signedIn,
+  ghostMs,
   you,
   onStart,
   onResume,
@@ -64,7 +67,7 @@ export default function RaceHud({
   telemetry: RaceTelemetry;
   ready: boolean;
   failed: boolean;
-  camera: DriveCameraMode;
+  camera: RaceCameraMode;
   muted: boolean;
   paused: boolean;
   drivers: DriverInfo[];
@@ -74,7 +77,8 @@ export default function RaceHud({
   feed: LapFeedItem[];
   saved: { ms: number; rank: number; at: number } | null;
   signedIn: boolean;
-  /** Your name in the room. */
+  /** Your best lap in this browser (the ghost's), ms. */
+  ghostMs: number | null;
   you: string;
   onStart: () => void;
   onResume: () => void;
@@ -84,7 +88,9 @@ export default function RaceHud({
 }) {
   const clock = useRef<HTMLSpanElement>(null);
   const speed = useRef<HTMLSpanElement>(null);
-  const tank = useRef<HTMLDivElement>(null);
+  const split = useRef<HTMLSpanElement>(null);
+  const pips = useRef<(HTMLSpanElement | null)[]>([]);
+  const turbo = useRef<HTMLSpanElement>(null);
   const wrong = useRef<HTMLDivElement>(null);
   const [lights, setLights] = useState(0);
   const [go, setGo] = useState(false);
@@ -94,7 +100,7 @@ export default function RaceHud({
 
   useEffect(() => {
     if (!ready) return;
-    const t = setTimeout(() => setHints(false), 8000);
+    const t = setTimeout(() => setHints(false), 10000);
     return () => clearTimeout(t);
   }, [ready]);
 
@@ -107,13 +113,22 @@ export default function RaceHud({
     let raf = 0;
     let lastLights = 0;
     const loop = () => {
-      const now = Date.now() + telemetry.offset;
-      if (clock.current) clock.current.textContent = telemetry.lapStart !== null && now >= telemetry.lapStart ? formatLap(now - telemetry.lapStart) : "-:--.---";
+      const t = Date.now() + telemetry.offset;
+      if (clock.current) clock.current.textContent = telemetry.lapStart !== null && t >= telemetry.lapStart ? formatLap(t - telemetry.lapStart) : "0:00.000";
       if (speed.current) speed.current.textContent = String(Math.round(Math.abs(telemetry.speed) * 3.6));
-      if (tank.current) {
-        tank.current.style.transform = `scaleX(${telemetry.fuel})`;
-        tank.current.dataset.on = String(telemetry.boosting);
+      if (split.current) {
+        const sp = telemetry.split;
+        const on = !!sp && performance.now() - sp.at < 2500;
+        split.current.dataset.on = String(on);
+        if (sp && on) {
+          split.current.textContent = signed(sp.delta);
+          split.current.dataset.ahead = String(sp.delta <= 0);
+        }
       }
+      pips.current.forEach((p, i) => {
+        if (p) p.style.background = telemetry.driftLevel > i ? TURBO.colors[telemetry.driftLevel] : "transparent";
+      });
+      if (turbo.current) turbo.current.dataset.on = String(telemetry.turbo);
       if (wrong.current) wrong.current.dataset.on = String(telemetry.wrongWay);
       if (telemetry.lights !== lastLights) {
         if (lastLights === RACE.lights && telemetry.lights === 0) setGo(true);
@@ -137,9 +152,6 @@ export default function RaceHud({
     return () => clearInterval(id);
   }, []);
 
-  const mine = feed.filter((f) => f.t === "void" || (f.t === "lap" && f.id === me));
-  const lastLap = mine.find((f) => f.t === "lap");
-  const myBest = bests.find(([n]) => n === you.toLowerCase())?.[1] ?? null;
   const serverNow = now + (race?.offset ?? 0);
   const startable = !!r && canStart(r, serverNow);
   const order = r && (r.phase === "live" || r.phase === "over") ? standings(r, race?.progress ?? {}, theTrack().length) : [];
@@ -148,39 +160,83 @@ export default function RaceHud({
   const recent = feed.filter((f) => now - f.at < 8000);
   const voided = recent.find((f) => f.t === "void");
   const justSaved = saved && now - saved.at < 6000 ? saved : null;
+  const roomBest = bests.find(([n]) => n === you.toLowerCase())?.[1] ?? null;
+  const boardBest = board.find((b) => b.login.toLowerCase() === you.toLowerCase())?.best_ms ?? null;
+  const pb = [ghostMs, roomBest, boardBest].reduce<number | null>((a, b) => (b === null ? a : a === null ? b : Math.min(a, b)), null);
+  const medal = medalFor(pb);
+  const record = board[0] ?? null;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
-      {/* Lap clock */}
+      {/* Clock and split */}
       {ready && (
-        <div className={`${HUD_BOX} absolute left-4 top-4 min-w-[220px] px-3 py-2`}>
-          <div className="flex items-baseline justify-between text-[9px] text-muted">
-            <span>{racing ? `Race · lap ${lapNow}/${RACE.laps}` : "Practice"}</span>
-            {racing && place > 0 && r?.phase === "live" && (
-              <span className="text-lime">
-                P{place}/{order.length}
-              </span>
-            )}
-          </div>
-          <span ref={clock} className="mt-1 block text-2xl text-cream tabular-nums">
-            -:--.---
-          </span>
-          <div className="mt-1.5 flex justify-between gap-3 border-t-2 border-border pt-1.5 text-[9px] tabular-nums">
-            <span className="text-muted">
-              Last <span className={lastLap && lastLap.t === "lap" && !lastLap.valid ? "text-dim line-through" : "text-cream"}>{lastLap && lastLap.t === "lap" ? formatLap(lastLap.ms) : "-"}</span>
+        <div className="absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-1.5">
+          <div className={`${HUD_BOX} flex flex-col items-center px-5 py-2`}>
+            <span className="text-[9px] text-muted">
+              {racing ? `Race · lap ${lapNow}/${RACE.laps}` : "Time trial"}
+              {racing && place > 0 && r?.phase === "live" && <span className="text-lime"> · P{place}/{order.length}</span>}
             </span>
-            <span className="text-muted">
-              Best <span className="text-lime">{myBest ? formatLap(myBest) : "-"}</span>
+            <span ref={clock} className="text-3xl text-cream tabular-nums">
+              0:00.000
             </span>
           </div>
-          {voided && <p className="mt-1.5 text-[9px] text-[#ff6b6b]">Lap doesn&apos;t count</p>}
+          <span
+            ref={split}
+            data-on="false"
+            data-ahead="true"
+            className="border-[3px] border-bg px-3 py-1 text-base text-white tabular-nums opacity-0 transition-opacity data-[ahead=false]:bg-[#e0323c] data-[ahead=true]:bg-[#1f9d55] data-[on=true]:opacity-100"
+          />
+          {voided && <span className={`${HUD_BOX} px-3 py-1 text-[10px] text-[#ff6b6b]`}>Lap doesn&apos;t count</span>}
           {justSaved && (
-            <p className="mt-1.5 text-[9px] text-lime">
-              Saved {formatLap(justSaved.ms)} · #{justSaved.rank} in {townName}
+            <span className={`${HUD_BOX} px-3 py-1 text-[10px] text-lime`}>
+              New best {formatLap(justSaved.ms)} · #{justSaved.rank} in {townName}
+            </span>
+          )}
+          {(lights > 0 || go) && (
+            <div className="mt-2 flex gap-2" aria-live="polite">
+              {Array.from({ length: RACE.lights }, (_, i) => (
+                <span
+                  key={i}
+                  className={`h-9 w-9 border-[3px] border-bg ${go ? "bg-[#1a1d24]" : i < lights ? "bg-[#ff2a2a] shadow-[0_0_24px_#ff2a2a]" : "bg-[#2a1416]"}`}
+                />
+              ))}
+            </div>
+          )}
+          {go && <span className="text-4xl text-lime drop-shadow-[0_2px_0_#000]">Go</span>}
+        </div>
+      )}
+
+      {/* Your best and the medals */}
+      {ready && (
+        <section className={`${HUD_BOX} absolute left-4 top-4 w-[210px] px-3 py-2.5`}>
+          <p className="flex items-baseline justify-between text-[9px] text-muted">
+            <span>Your best</span>
+            <span className="text-sm text-cream tabular-nums">{pb !== null ? formatLap(pb) : "-:--.---"}</span>
+          </p>
+          <ul className="mt-2 space-y-1 border-t-2 border-border pt-2">
+            {MEDALS.map(([m, t]) => {
+              const got = pb !== null && pb <= t;
+              return (
+                <li key={m} className={`flex items-center gap-2 text-[10px] ${got ? "text-cream" : "text-dim"}`}>
+                  <span className="h-3 w-3 border-2" style={{ borderColor: MEDAL_COLORS[m], background: got ? MEDAL_COLORS[m] : "transparent" }} aria-hidden />
+                  <span className="flex-1">{m}</span>
+                  <span className="tabular-nums">{formatLap(t)}</span>
+                </li>
+              );
+            })}
+            <li className="flex items-center gap-2 pt-1 text-[10px] text-lime">
+              <Flag size={11} strokeWidth={2.5} aria-hidden />
+              <span className="min-w-0 flex-1 truncate normal-case">{record ? `@${record.login}` : "Town record"}</span>
+              <span className="tabular-nums">{record ? formatLap(record.best_ms) : "-"}</span>
+            </li>
+          </ul>
+          {medal && (
+            <p className="mt-2 text-[9px] normal-case" style={{ color: MEDAL_COLORS[medal] }}>
+              You hold {medal}.
             </p>
           )}
-          {!signedIn && <p className="mt-1.5 max-w-[200px] text-[8px] normal-case text-dim">Sign in to put your laps on the town&apos;s board.</p>}
-        </div>
+          {!signedIn && <p className="mt-2 text-[8px] normal-case text-dim">Sign in to put your laps on the town&apos;s board.</p>}
+        </section>
       )}
 
       {/* Top right */}
@@ -197,14 +253,10 @@ export default function RaceHud({
         </button>
       </div>
 
-      {/* Boards and the race button */}
       {ready && (
-        <div className="absolute right-4 top-20 flex w-[240px] flex-col gap-3">
+        <div className="absolute right-4 top-20 flex w-[230px] flex-col gap-3">
           <section className={`${HUD_BOX} px-3 py-2.5`}>
-            <p className="flex items-center justify-between text-[9px]">
-              <span className="text-cream">{townName} best laps</span>
-              <span className="text-dim">Interlagos</span>
-            </p>
+            <p className="text-[9px] text-cream">{townName} best laps</p>
             <ol className="mt-2 space-y-1">
               {board.slice(0, 8).map((b) => (
                 <li key={b.login} className={`flex items-center gap-2 text-[10px] ${b.login.toLowerCase() === you.toLowerCase() ? "text-lime" : "text-cream"}`}>
@@ -241,21 +293,21 @@ export default function RaceHud({
                 })}
               </ul>
             )}
-            {startable && (
+            {startable && drivers.length > 0 && (
               <button
                 type="button"
                 onClick={onStart}
                 className="pointer-events-auto mt-2.5 flex w-full items-center justify-center gap-2 bg-lime px-3 py-2 text-[10px] text-bg transition-[filter] hover:brightness-110 active:translate-y-px"
               >
                 <Flag {...ICON} aria-hidden />
-                Start a {RACE.laps}-lap race
+                Race them · {RACE.laps} laps
               </button>
             )}
             {r?.phase === "countdown" && <p className="mt-2.5 text-center text-[9px] text-lime">Grid forming…</p>}
             {r?.phase === "live" && !racing && <p className="mt-2.5 text-center text-[9px] text-muted">Race on. Next one after the flag.</p>}
           </section>
 
-          {recent.filter((f) => f.t === "lap").length > 0 && (
+          {recent.some((f) => f.t === "lap") && (
             <ul className={`${HUD_BOX} space-y-1 px-3 py-2 text-[9px]`}>
               {recent.map((f, i) =>
                 f.t === "lap" ? (
@@ -271,25 +323,12 @@ export default function RaceHud({
         </div>
       )}
 
-      {/* Start lights */}
-      {(lights > 0 || go) && (
-        <div className="absolute left-1/2 top-6 flex -translate-x-1/2 gap-3" aria-live="polite">
-          {Array.from({ length: RACE.lights }, (_, i) => (
-            <span
-              key={i}
-              className={`h-10 w-10 border-[3px] border-bg ${go ? "bg-[#1a1d24]" : i < lights ? "bg-[#ff2a2a] shadow-[0_0_24px_#ff2a2a]" : "bg-[#2a1416]"}`}
-            />
-          ))}
-          {go && <span className="absolute left-1/2 top-14 -translate-x-1/2 text-3xl text-lime">Go</span>}
-        </div>
-      )}
-
       {/* Wrong way */}
       {ready && (
         <div
           ref={wrong}
           data-on="false"
-          className="absolute left-1/2 top-[30%] -translate-x-1/2 border-[3px] border-[#ff6b6b] bg-bg/80 px-4 py-2 text-sm text-[#ff6b6b] opacity-0 transition-opacity data-[on=true]:opacity-100"
+          className="absolute left-1/2 top-[40%] -translate-x-1/2 border-[3px] border-[#ff6b6b] bg-bg/80 px-4 py-2 text-sm text-[#ff6b6b] opacity-0 transition-opacity data-[on=true]:opacity-100"
         >
           Wrong way
         </div>
@@ -297,7 +336,7 @@ export default function RaceHud({
 
       {/* Results */}
       {r?.phase === "over" && r.finished.length > 0 && serverNow - r.endsAt < 20_000 && (
-        <section className={`${HUD_BOX} absolute left-1/2 top-[22%] w-[300px] -translate-x-1/2 px-4 py-3`}>
+        <section className={`${HUD_BOX} absolute left-1/2 top-[30%] w-[300px] -translate-x-1/2 px-4 py-3`}>
           <p className="text-center text-[10px] text-lime">Chequered flag</p>
           <ol className="mt-2 space-y-1">
             {r.finished.map((f, i) => (
@@ -321,7 +360,7 @@ export default function RaceHud({
         </section>
       )}
 
-      {/* Speed and boost */}
+      {/* Speed and mini-turbo */}
       {ready && (
         <div className={`${HUD_BOX} absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-4 px-4 py-2`}>
           <div className="flex items-baseline gap-1.5 tabular-nums">
@@ -330,28 +369,31 @@ export default function RaceHud({
             </span>
             <span className="text-[9px] text-muted">km/h</span>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[8px] text-muted">Boost · drift to fill</span>
-            <div className="h-2.5 w-36 border-2 border-border">
-              <div
-                ref={tank}
-                data-on="false"
-                className="h-full origin-left bg-[#7ee8ff] data-[on=true]:bg-white"
-                style={{ transform: "scaleX(0.3)" }}
-              />
-            </div>
+          <div className="flex items-center gap-1.5">
+            <span ref={turbo} data-on="false" className="text-[8px] text-muted data-[on=true]:text-lime">
+              Turbo
+            </span>
+            {[0, 1, 2].map((i) => (
+              <span key={i} ref={(el) => void (pips.current[i] = el)} className="h-3 w-5 border-2 border-border" />
+            ))}
           </div>
         </div>
       )}
 
       {ready && (
-        <div className={`absolute bottom-6 left-6 text-[9px] leading-loose text-muted transition-opacity duration-700 ${hints ? "opacity-100" : "opacity-0"}`}>
+        <div className={`absolute bottom-6 right-6 text-right text-[9px] leading-loose text-muted transition-opacity duration-700 ${hints ? "opacity-100" : "opacity-0"}`}>
           {CONTROLS.map(([k, v]) => (
             <div key={k}>
               <span className="text-cream">{k}</span> {v}
             </div>
           ))}
         </div>
+      )}
+      {ready && !hints && (
+        <p className="absolute bottom-6 right-6 flex items-center gap-1.5 text-[9px] text-muted">
+          <RotateCcw size={11} strokeWidth={2.5} aria-hidden />
+          <span className="text-cream">R</span> restart
+        </p>
       )}
 
       {failed && (
@@ -363,18 +405,10 @@ export default function RaceHud({
         </div>
       )}
 
-      {/* ODbL: the layout comes from OpenStreetMap, so its credit stays on screen. */}
-      <a
-        href="https://www.openstreetmap.org/copyright"
-        target="_blank"
-        rel="noreferrer"
-        className="pointer-events-auto absolute bottom-2 right-3 text-[8px] normal-case text-dim hover:text-muted"
-      >
-        Layout after Interlagos · © OpenStreetMap contributors
-      </a>
-
       <StartScreen ready={ready} />
-      {paused && ready && <PauseMenu camera={camera} muted={muted} onResume={onResume} onCamera={onCamera} onMute={onMute} onExit={onExit} />}
+      {paused && ready && (
+        <PauseMenu camera={camera === "high" ? "top" : "chase"} muted={muted} onResume={onResume} onCamera={onCamera} onMute={onMute} onExit={onExit} />
+      )}
     </div>
   );
 }

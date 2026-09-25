@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { currentSlugFor, getLeagueBySlug, getViewer } from "@/lib/leagues/service";
-import { getCachedCity } from "@/lib/league-city/service";
 import { getLapBoard } from "@/lib/league-city/race/board";
 import { TRACK_ID } from "@/lib/league-city/race/track";
 import { townDisplayName } from "@/lib/towns/names";
@@ -31,16 +30,11 @@ export default async function RacePage({ params }: Props) {
     if (!moved) notFound();
     permanentRedirect(`/town/${moved}/race`);
   }
-  const [viewer, city, board] = await Promise.all([
-    getViewer(),
-    getCachedCity(league.id).catch(() => null),
-    getLapBoard(league.id, TRACK_ID),
-  ]);
+  const [viewer, board] = await Promise.all([getViewer(), getLapBoard(league.id, TRACK_ID)]);
   return (
     <RaceClient
       slug={league.slug}
       townName={townDisplayName(league.name)}
-      sky={city?.identity.sky ?? 1}
       viewerLogin={viewer?.github_login ?? null}
       board={board}
     />

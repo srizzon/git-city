@@ -8,19 +8,20 @@ import { TRACK, WALL_OFFSET, pointAt, type Track } from "@/lib/league-city/race/
 import { along, clearOfTrack, curbRuns, hash, offsetAt, treeSpots, wallSegments } from "@/lib/league-city/race/layout";
 import { RACE } from "@/lib/league-city/race/race";
 
-// The race track as you see it, in city units (1 m = M_TO_UNIT): grass, the
-// asphalt ribbon with its white edges, red and white curbs in the corners,
+// The race track as you see it, in city units (1 m = M_TO_UNIT), made to be
+// read from the high camera in daylight: bright grass, dark asphalt with
+// white edges, red and white curbs and yellow chevron boards in every corner,
 // the walls (the same segments the physics uses), the start line with its
 // checkers, grid boxes and a gantry of five red lights, grandstands with a
-// crowd, the pit building, floodlight towers and trees.
+// crowd, the pit building and trees.
 
 const U = M_TO_UNIT;
-const GRASS = "#1d3527";
-const ASPHALT = "#353a45";
-const LINE = "#e8ecf2";
+const GRASS = "#4f9e3c";
+const ASPHALT = "#454b57";
+const LINE = "#ffffff";
 const CURB_RED = "#e0323c";
 const CURB_WHITE = "#f2f2f2";
-const WALL_A = "#e0323c";
+const WALL_A = "#2f6fe4";
 const WALL_B = "#eef0f4";
 
 /** A flat ribbon from `a` to `b` m left of the centerline over [s0, s1], a quad every `step` m. */
@@ -87,16 +88,16 @@ function Surface({ track }: { track: Track }) {
     <group>
       <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6000, 6000]} />
-        <meshStandardMaterial color={GRASS} emissive={GRASS} emissiveIntensity={0.25} roughness={1} />
+        <meshStandardMaterial color={GRASS} roughness={1} />
       </mesh>
       <mesh geometry={asphalt}>
-        <meshStandardMaterial color={ASPHALT} emissive={ASPHALT} emissiveIntensity={0.3} roughness={0.9} />
+        <meshStandardMaterial color={ASPHALT} roughness={0.9} />
       </mesh>
       <mesh geometry={edges}>
-        <meshStandardMaterial color={LINE} emissive={LINE} emissiveIntensity={0.35} />
+        <meshStandardMaterial color={LINE} emissive={LINE} emissiveIntensity={0.2} />
       </mesh>
       <mesh geometry={curbs}>
-        <meshStandardMaterial vertexColors emissive="#401010" emissiveIntensity={0.4} />
+        <meshStandardMaterial vertexColors />
       </mesh>
     </group>
   );
@@ -189,7 +190,76 @@ function Walls({ track }: { track: Track }) {
       })),
     [track],
   );
-  return <Boxes items={items} emissive={0.35} />;
+  return <Boxes items={items} emissive={0.1} />;
+}
+
+// ─── Corner boards ───────────────────────────────────────────
+
+/** Yellow boards with black chevrons on the outside of every corner, pointing the way it turns. */
+function Chevrons({ track }: { track: Track }) {
+  const tex = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 128;
+    c.height = 64;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#ffd21f";
+    g.fillRect(0, 0, 128, 64);
+    g.fillStyle = "#15171c";
+    for (const x0 of [14, 58]) {
+      g.beginPath();
+      g.moveTo(x0, 8);
+      g.lineTo(x0 + 22, 8);
+      g.lineTo(x0 + 46, 32);
+      g.lineTo(x0 + 22, 56);
+      g.lineTo(x0, 56);
+      g.lineTo(x0 + 24, 32);
+      g.closePath();
+      g.fill();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, []);
+  useDispose(tex);
+  const boards = useMemo(() => {
+    const out: THREE.Matrix4[] = [];
+    const up = new THREE.Vector3(0, 1, 0);
+    for (const [s0, s1] of curbRuns(track)) {
+      const mid = (s0 + s1) / 2;
+      const turn = Math.sign(track.samples[Math.floor((((mid % track.length) + track.length) % track.length) / 2)].k) || 1;
+      const side = -turn; // outside of the turn
+      const len = s1 - s0;
+      const n = Math.max(2, Math.min(6, Math.round(len / 12)));
+      for (let i = 0; i < n; i++) {
+        const s = s0 + ((i + 0.5) * len) / n;
+        const p = offsetAt(track, s, side * (WALL_OFFSET - 0.2));
+        const tangent = new THREE.Vector3(p.tx, 0, p.tz);
+        // Facing the track: the normal points back across it.
+        const normal = new THREE.Vector3(p.tz * -side, 0, -p.tx * -side);
+        const x = new THREE.Vector3().crossVectors(up, normal);
+        const flip = x.dot(tangent) < 0 ? -1 : 1;
+        const m = new THREE.Matrix4().makeBasis(x.multiplyScalar(flip), up, normal);
+        m.scale(new THREE.Vector3(3.2 * U, 1.6 * U, 1));
+        m.setPosition(p.x * U, 2 * U, p.z * U);
+        out.push(m);
+      }
+    }
+    return out;
+  }, [track]);
+  const ref = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const m = ref.current;
+    if (!m) return;
+    boards.forEach((b, i) => m.setMatrixAt(i, b));
+    m.instanceMatrix.needsUpdate = true;
+    m.computeBoundingSphere();
+  }, [boards]);
+  return (
+    <instancedMesh key={boards.length} ref={ref} args={[undefined, undefined, boards.length]}>
+      <planeGeometry args={[1, 1]} />
+      <meshStandardMaterial map={tex} side={THREE.DoubleSide} emissive="#ffffff" emissiveMap={tex} emissiveIntensity={0.25} />
+    </instancedMesh>
+  );
 }
 
 // ─── Start line ──────────────────────────────────────────────
@@ -214,7 +284,7 @@ function StartLine({ track }: { track: Track }) {
     }
     return out;
   }, [track]);
-  return <Boxes items={items} emissive={0.4} />;
+  return <Boxes items={items} emissive={0.1} />;
 }
 
 /** Gantry over the start line with five pairs of red lights. `lit` reads 0–5 every frame. */
@@ -293,9 +363,8 @@ const CROWD = ["#ff5a5f", "#ffb400", "#3ddc97", "#4cc9f0", "#b388ff", "#ff7eb6",
 function Stands({ track }: { track: Track }) {
   const items = useMemo(() => {
     const out: Parameters<typeof Boxes>[0]["items"] = [];
-    const L = track.length;
     // Grandstands on the outside of the main straight, the pits on the inside.
-    const stands = along(track, L - 230, L - 30, 12, -(WALL_OFFSET + 9)).filter((p) => clearOfTrack(track, p.x, p.z, WALL_OFFSET + 5));
+    const stands = along(track, -40, 56, 12, -(WALL_OFFSET + 9)).filter((p) => clearOfTrack(track, p.x, p.z, WALL_OFFSET + 5));
     stands.forEach((p, k) => {
       for (let step = 0; step < 4; step++) {
         const back = -step * 2.2;
@@ -318,7 +387,7 @@ function Stands({ track }: { track: Track }) {
       }
       out.push({ x: p.x - Math.cos(p.rotY) * 8, y: 6.5, z: p.z + Math.sin(p.rotY) * 8, rotY: p.rotY, w: 0.6, h: 13, d: 12, color: "#2b303b" });
     });
-    const pits = along(track, L - 200, L - 50, 10, WALL_OFFSET + 11).filter((p) => clearOfTrack(track, p.x, p.z, WALL_OFFSET + 6));
+    const pits = along(track, -40, 50, 10, WALL_OFFSET + 11).filter((p) => clearOfTrack(track, p.x, p.z, WALL_OFFSET + 6));
     pits.forEach((p, k) => {
       out.push({ x: p.x, y: 2.5, z: p.z, rotY: p.rotY, w: 10, h: 5, d: 9.8, color: "#3b4252" });
       const f = offsetAt(track, p.s, WALL_OFFSET + 5.9);
@@ -326,22 +395,7 @@ function Stands({ track }: { track: Track }) {
     });
     return out;
   }, [track]);
-  return <Boxes items={items} emissive={0.45} />;
-}
-
-function Floodlights({ track }: { track: Track }) {
-  const items = useMemo(() => {
-    const out: Parameters<typeof Boxes>[0]["items"] = [];
-    for (let s = 20, k = 0; s < track.length; s += 110, k++) {
-      const side = k % 2 === 0 ? 1 : -1;
-      const p = offsetAt(track, s, side * (WALL_OFFSET + 4));
-      if (!clearOfTrack(track, p.x, p.z, WALL_OFFSET + 2)) continue;
-      out.push({ x: p.x, y: 9, z: p.z, rotY: 0, w: 0.5, h: 18, d: 0.5, color: "#3a404c" });
-      out.push({ x: p.x, y: 18.5, z: p.z, rotY: Math.atan2(p.tx, p.tz), w: 3.2, h: 1.4, d: 0.6, color: "#fff4cc" });
-    }
-    return out;
-  }, [track]);
-  return <Boxes items={items} emissive={1.2} />;
+  return <Boxes items={items} emissive={0.1} />;
 }
 
 function Trees({ track }: { track: Track }) {
@@ -354,7 +408,7 @@ function Trees({ track }: { track: Track }) {
     });
     return out;
   }, [track]);
-  return <Boxes items={items} emissive={0.2} />;
+  return <Boxes items={items} emissive={0.05} />;
 }
 
 export default function TrackScene({ track, lit, title }: { track: Track; lit: React.MutableRefObject<number>; title: string }) {
@@ -365,7 +419,7 @@ export default function TrackScene({ track, lit, title }: { track: Track; lit: R
       <StartLine track={track} />
       <Gantry track={track} lit={lit} title={title} />
       <Stands track={track} />
-      <Floodlights track={track} />
+      <Chevrons track={track} />
       <Trees track={track} />
     </group>
   );

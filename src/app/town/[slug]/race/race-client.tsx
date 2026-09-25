@@ -6,42 +6,66 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
-import { ThemeLights } from "@/components/city/theme";
-import ThemeSkyFX from "@/components/ThemeSkyFX";
-import { EXPOSURE, townTheme } from "@/components/league/townTheme";
+import { THEMES, ThemeLights, type CityTheme } from "@/components/city/theme";
 import { createRaceTelemetry, type LapNews, type RaceView } from "@/lib/league-city/race/telemetry";
 import RaceHud, { type LapFeedItem } from "@/components/race/RaceHud";
 import { isDesktop } from "@/components/towns/useDesktop";
-import type { DriveCameraMode } from "@/lib/league-city/drive/telemetry";
+import type { RaceCameraMode } from "@/components/race/RaceCamera";
 import type { DriverInfo } from "@/lib/league-city/drive/net";
 import type { RoomBests } from "@/lib/league-city/race/net";
 import type { BoardRow } from "@/lib/league-city/race/board";
 import { pointAt, theTrack } from "@/lib/league-city/race/track";
 import { M_TO_UNIT } from "@/lib/league-city/drive/tuning";
 
-// The town's race track: one Canvas with the town's sky, the track and the
-// race room (RaceWorld, loaded on the client only), and the race HUD.
+// The town's race track: one Canvas in daylight (read at a glance from the
+// high camera), the track and the race room (RaceWorld, loaded on the client
+// only), and the race HUD.
 
 const RaceWorld = dynamic(() => import("@/components/race/RaceWorld"), { ssr: false, loading: () => null });
 
 const MUTE_KEY = "gc:drive-muted";
 
+// A clear afternoon: blue sky, warm sun, soft fill, no fog to speak of.
+const DAY: CityTheme = {
+  ...THEMES[0],
+  sky: [
+    [0, "#2f7fd6"],
+    [0.35, "#6fb2ec"],
+    [0.5, "#cfe7f8"],
+    [0.52, "#e8f3fb"],
+    [1, "#e8f3fb"],
+  ],
+  fogColor: "#cfe7f8",
+  fogNear: 900,
+  fogFar: 4500,
+  ambientColor: "#ffffff",
+  ambientIntensity: 0.55,
+  sunColor: "#fff1d6",
+  sunIntensity: 0.95,
+  sunPos: [300, 400, 200],
+  fillColor: "#bcd8ff",
+  fillIntensity: 0.3,
+  fillPos: [-200, 150, -200],
+  hemiSky: "#cfe7ff",
+  hemiGround: "#5d8a45",
+  hemiIntensity: 0.35,
+};
+const DAY_KEY = 21;
+const EXPOSURE = 1.0;
+
 export default function RaceClient({
   slug,
   townName,
-  sky,
   viewerLogin,
   board: initialBoard,
 }: {
   slug: string;
   townName: string;
-  sky: number;
   viewerLogin: string | null;
   board: BoardRow[];
 }) {
   const router = useRouter();
   const track = useMemo(() => theTrack(), []);
-  const { theme, key: themeKey, fx } = townTheme(sky);
   const [desktop, setDesktop] = useState<boolean | null>(null);
   useEffect(() => {
     // Known only in the browser; null until then, so neither screen flashes.
@@ -52,7 +76,8 @@ export default function RaceClient({
   const [telemetry] = useState(createRaceTelemetry);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [camera, setCamera] = useState<DriveCameraMode>("chase");
+  const [camera, setCamera] = useState<RaceCameraMode>("high");
+  const [ghostMs, setGhostMs] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(false);
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
@@ -85,7 +110,7 @@ export default function RaceClient({
       return !m;
     });
   }, []);
-  const toggleCamera = useCallback(() => setCamera((c) => (c === "chase" ? "top" : "chase")), []);
+  const toggleCamera = useCallback(() => setCamera((c) => (c === "high" ? "close" : "high")), []);
   const exit = useCallback(() => router.push(`/town/${slug}`), [router, slug]);
 
   // Esc pauses; Esc again on the pause menu leaves the track.
@@ -158,9 +183,8 @@ export default function RaceClient({
         gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: EXPOSURE }}
         style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
       >
-        <fog attach="fog" args={[theme.fogColor, theme.fogNear * 2, theme.fogFar * 1.2]} />
-        <ThemeLights theme={theme} themeIndex={themeKey} />
-        <ThemeSkyFX themeIndex={fx} theme={theme} lowSky />
+        <fog attach="fog" args={[DAY.fogColor, DAY.fogNear, DAY.fogFar]} />
+        <ThemeLights theme={DAY} themeIndex={DAY_KEY} />
         {desktop && !failed && (
           <RaceWorld
             track={track}
@@ -180,6 +204,7 @@ export default function RaceClient({
             onBests={setBests}
             onReceipt={onReceipt}
             startRef={startRef}
+            onGhost={setGhostMs}
           />
         )}
       </Canvas>
@@ -198,6 +223,7 @@ export default function RaceClient({
         feed={feed}
         saved={saved}
         signedIn={!!viewerLogin}
+        ghostMs={ghostMs}
         you={name}
         onStart={() => startRef.current?.()}
         onResume={() => setPaused(false)}
