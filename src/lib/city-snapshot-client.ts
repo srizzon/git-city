@@ -37,12 +37,13 @@ async function getGzipJson(url: string): Promise<any | null> {
   return gunzipJson(await res.arrayBuffer());
 }
 
-// San Francisco map asset (baked from OSM). Fetched once, shared by every
+// Bay Area map asset: SF plus the cities around it (baked from OSM, see
+// scripts/bake-bay-map.mjs). Fetched once, shared by every
 // layout recompute. Falls back to undefined (procedural layout) if missing.
 let sfMapPromise: Promise<SFMapAsset | undefined> | null = null;
 export function loadSFMap(): Promise<SFMapAsset | undefined> {
   if (!sfMapPromise) {
-    sfMapPromise = fetch("/maps/sf.json")
+    sfMapPromise = fetch("/maps/bay.json")
       .then((r) => (r.ok ? r.json() : undefined))
       .catch(() => undefined);
   }

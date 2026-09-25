@@ -17,7 +17,7 @@ export default async function HomePage({
   // The city data is the critical path: start both downloads from the HTML
   // head so they run while the JS bundle is still loading.
   preload(snapshotUrl(SNAPSHOT_V2_PATH), { as: "fetch", crossOrigin: "anonymous" });
-  preload("/maps/sf.json", { as: "fetch", crossOrigin: "anonymous" });
+  preload("/maps/bay.json", { as: "fetch", crossOrigin: "anonymous" });
 
   const [pool, sb, sp] = await Promise.all([
     getActivePool(),
