@@ -71,9 +71,10 @@ export default function NewTown({
   const company = kind === "company";
   const step = companyStep(company ? check : null);
   // The org already has a town: you move into that one, the city is already built.
-  const existing = company && check?.town && (step.kind === "move_in" || step.kind === "open" || step.kind === "removed") ? check.town : null;
-  // Only a town about to be built shows the starter cities and settings.
-  const choosing = !company || step.kind === "build";
+  const existing = company && check?.account === "org" && check.town ? check.town : null;
+  // The starter cities and settings show until we know the org's town is
+  // already built: you pick first, and the pick applies when you build it.
+  const choosing = !company || !existing;
   const [name, setName] = useState(startName ?? (viewer ? `${viewer.login}'s Town` : "My Town"));
   const [showSettings, setShowSettings] = useState(true);
   // Settings follow the template until you change one.
@@ -377,6 +378,7 @@ export default function NewTown({
 
         {company && viewer && (
           <CompanyPanel
+            login={viewer.login}
             orgs={orgs}
             input={orgInput}
             onInput={(v) => {

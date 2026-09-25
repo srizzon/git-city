@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { NO_AUTOFILL } from "@/components/league/hud/shared";
 import type { OrgState } from "@/lib/towns/company-orgs";
-import { colleaguesLabel, type CompanyStep, type OrgCheck } from "@/lib/towns/company-step";
+import { colleaguesLabel, normalizeOrgInput, type CompanyStep, type OrgCheck } from "@/lib/towns/company-step";
 
 // The Company tab's org part: which org, what we found out, and what to do
 // about it. Checking only reads; the screen's one button (in NewTown) is what
@@ -12,6 +11,7 @@ import { colleaguesLabel, type CompanyStep, type OrgCheck } from "@/lib/towns/co
 const NOTE = "border-[3px] border-border bg-bg-card px-3 py-3 text-[11px] leading-relaxed text-muted normal-case";
 
 export function CompanyPanel({
+  login,
   orgs,
   input,
   onInput,
@@ -22,6 +22,8 @@ export function CompanyPanel({
   checking,
   notice,
 }: {
+  /** The viewer's GitHub login, for the picture of their row on GitHub. */
+  login: string;
   /** Orgs GitHub listed after the read:org sign-in. */
   orgs: OrgState[];
   input: string;
@@ -40,17 +42,17 @@ export function CompanyPanel({
   return (
     <div className="mt-4 flex flex-col gap-3 px-5" aria-live="polite">
       {picking ? (
-        <OrgPicker orgs={orgs} input={input} onInput={onInput} onCheck={onCheck} checking={checking} check={check} step={step} />
+        <OrgPicker login={login} orgs={orgs} input={input} onInput={onInput} onCheck={onCheck} checking={checking} check={check} step={step} />
       ) : (
-        check && <OrgResult check={check} step={step} onChange={onChange} checking={checking} />
+        check && <OrgResult login={login} check={check} step={step} onChange={onChange} checking={checking} />
       )}
       {notice && <p className="border-[3px] border-lime/60 bg-bg-card px-3 py-2 text-[11px] leading-relaxed text-cream normal-case">{notice}</p>}
-      {(picking || step.kind === "not_member") && <Questions />}
     </div>
   );
 }
 
 function OrgPicker({
+  login,
   orgs,
   input,
   onInput,
@@ -59,6 +61,7 @@ function OrgPicker({
   check,
   step,
 }: {
+  login: string;
   orgs: OrgState[];
   input: string;
   onInput: (v: string) => void;
@@ -85,6 +88,9 @@ function OrgPicker({
               <span className="shrink-0 text-[10px] text-muted">{o.league ? (o.joined ? "You live here" : "Town built") : "No town yet"}</span>
             </button>
           ))}
+          <p className="text-[10px] leading-relaxed text-muted normal-case">
+            Only orgs that allow Git City show up here. Most companies block apps, so if yours is missing, type it below.
+          </p>
         </div>
       )}
 
@@ -100,7 +106,7 @@ function OrgPicker({
             }
           }}
           disabled={checking}
-          placeholder="your-org or github.com/your-org"
+          placeholder="your-org"
           aria-label="GitHub org"
           aria-invalid={step.kind === "no_account" || step.kind === "person"}
           {...NO_AUTOFILL}
@@ -120,22 +126,29 @@ function OrgPicker({
           {`@${check.org} is a person's account, not an org. Company towns belong to GitHub orgs.`}
         </p>
       )}
-      {orgs.length === 0 && !check && (
-        <p className="text-[11px] leading-relaxed text-muted normal-case">
-          It&apos;s the name in your org&apos;s GitHub address. We only check that you&apos;re a member.
-        </p>
-      )}
+      <PublicGuide login={login} org={normalizeOrgInput(input)} again={false} />
 
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- API route, full navigation */}
       <a href="/api/leagues/verify" className="self-start text-[10px] text-muted underline-offset-2 transition-colors hover:text-cream hover:underline">
-        {orgs.length > 0 ? "Refresh my orgs from GitHub" : "Or let GitHub list my orgs"}
+        {orgs.length > 0 ? "Refresh my orgs from GitHub" : "Or let GitHub list the orgs that allow Git City"}
       </a>
     </>
   );
 }
 
-function OrgResult({ check, step, onChange, checking }: { check: OrgCheck; step: CompanyStep; onChange: () => void; checking: boolean }) {
-  const peopleUrl = `https://github.com/orgs/${check.org}/people`;
+function OrgResult({
+  login,
+  check,
+  step,
+  onChange,
+  checking,
+}: {
+  login: string;
+  check: OrgCheck;
+  step: CompanyStep;
+  onChange: () => void;
+  checking: boolean;
+}) {
   return (
     <>
       <div className="flex items-center gap-3 border-[3px] border-lime bg-bg-raised px-3 py-2">
@@ -149,39 +162,20 @@ function OrgResult({ check, step, onChange, checking }: { check: OrgCheck; step:
       {step.kind === "github_down" && <p className={NOTE}>GitHub didn&apos;t answer. Try again in a moment.</p>}
 
       {step.kind === "not_member" && (
-        <div className={`${NOTE} flex flex-col gap-3`}>
-          <p>
+        <>
+          <p className="text-[11px] leading-relaxed text-muted normal-case">
             <span className="text-cream">We can&apos;t see you in @{check.org} yet.</span>{" "}
-            {check.standing === "invited"
-              ? "Your building is already in its town with the lights off. "
-              : ""}
-            Most company orgs keep members private, so show yours on GitHub:
+            {check.standing === "invited" ? "Your building is already in its town with the lights off. " : ""}
+            Your membership is private, or GitHub hasn&apos;t updated yet.
           </p>
-          <ol className="flex flex-col gap-2">
-            <li className="flex gap-2">
-              <span className="text-lime">1</span>
-              <span>
-                Open{" "}
-                <a href={peopleUrl} target="_blank" rel="noopener noreferrer" className="text-cream underline underline-offset-2 hover:text-lime">
-                  github.com/orgs/{check.org}/people ↗
-                </a>
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="text-lime">2</span>
-              <span>
-                Find your name, click <span className="text-cream">Private</span> and pick <span className="text-cream">Public</span>.
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="text-lime">3</span>
-              <span>Come back and check again. GitHub can take a minute to update.</span>
-            </li>
-          </ol>
-          <a href={`/api/leagues/verify?org=${encodeURIComponent(check.org)}`} className="self-start text-[10px] text-muted underline-offset-2 hover:text-cream hover:underline">
+          <PublicGuide login={login} org={check.org} again />
+          <a
+            href={`/api/leagues/verify?org=${encodeURIComponent(check.org)}`}
+            className="self-start text-[10px] text-muted underline-offset-2 hover:text-cream hover:underline"
+          >
             Rather keep it private? Try GitHub org access (works if @{check.org} allows Git City)
           </a>
-        </div>
+        </>
       )}
 
       {step.kind === "build" && (
@@ -220,43 +214,68 @@ function OrgResult({ check, step, onChange, checking }: { check: OrgCheck; step:
   );
 }
 
-const QUESTIONS: { q: string; a: string }[] = [
-  {
-    q: "Does Git City see my company's code?",
-    a: "No. We only check that you're a member of the org. No repos, no code, nothing private.",
-  },
-  {
-    q: "Why make my membership public?",
-    a: "GitHub only tells apps who's in an org when the membership is public, or when the org approved the app. Most company orgs haven't. Public shows the org on your GitHub profile.",
-  },
-  {
-    q: "Can I switch it back to private?",
-    a: "Keep it public while you live in the town. We check once a day, and a private membership moves you out.",
-  },
-  {
-    q: "My company isn't a GitHub org",
-    a: "Then it can't have a company town yet. Build a Friends town and invite your colleagues by their GitHub names.",
-  },
-];
-
-function Questions() {
-  const [open, setOpen] = useState<number | null>(null);
+/**
+ * How to make an org membership public, with a picture of the GitHub row
+ * the dev will see: their name, "Private", and the menu with "Public".
+ */
+function PublicGuide({ login, org, again }: { login: string; org: string | null; again: boolean }) {
+  const peopleUrl = org ? `https://github.com/orgs/${org}/people` : null;
   return (
-    <div className="flex flex-col border-t-2 border-border pt-2">
-      {QUESTIONS.map((x, i) => (
-        <div key={x.q}>
-          <button
-            type="button"
-            onClick={() => setOpen(open === i ? null : i)}
-            aria-expanded={open === i}
-            className="flex w-full items-center justify-between gap-3 py-1.5 text-left text-[10px] text-muted transition-colors hover:text-cream"
-          >
-            <span className="normal-case">{x.q}</span>
-            <span aria-hidden>{open === i ? "−" : "+"}</span>
-          </button>
-          {open === i && <p className="pb-2 text-[11px] leading-relaxed text-muted normal-case">{x.a}</p>}
-        </div>
-      ))}
+    <div className={`${NOTE} flex flex-col gap-3`}>
+      <p className="text-cream">{again ? "Make your membership public" : "Private member? Make it public first"}</p>
+      <ol className="flex flex-col gap-3">
+        <li className="flex gap-2">
+          <span className="text-lime">1</span>
+          <span className="flex min-w-0 flex-col gap-1">
+            <span>Open your org&apos;s people page:</span>
+            {peopleUrl ? (
+              <a href={peopleUrl} target="_blank" rel="noopener noreferrer" className="break-words text-cream underline underline-offset-2 hover:text-lime">
+                github.com/orgs/{org}/people ↗
+              </a>
+            ) : (
+              <span className="break-words text-cream">github.com/orgs/your-org/people</span>
+            )}
+          </span>
+        </li>
+        <li className="flex flex-col gap-2">
+          <span className="flex gap-2">
+            <span className="text-lime">2</span>
+            <span>
+              Find your name, click <span className="text-cream">Private</span> and pick <span className="text-cream">Public</span>:
+            </span>
+          </span>
+          <GitHubRow login={login} />
+        </li>
+        <li className="flex gap-2">
+          <span className="text-lime">3</span>
+          <span>{again ? "Come back and check again. GitHub can take a minute." : "Come back and check your org here."}</span>
+        </li>
+      </ol>
+      <p className="text-[10px] text-dim">We only check that you&apos;re a member. Never your code.</p>
+    </div>
+  );
+}
+
+/** A drawing of the row on GitHub's people page, with the visibility menu open. */
+function GitHubRow({ login }: { login: string }) {
+  return (
+    <div aria-hidden className="ml-4 border border-[#30363d] bg-[#0d1117] px-3 pt-2 pb-3 font-sans text-[12px] normal-case tracking-normal">
+      <div className="flex items-center gap-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={`https://github.com/${login}.png?size=40`} alt="" width={20} height={20} className="h-5 w-5 rounded-full" />
+        <span className="min-w-0 flex-1 truncate text-[#4493f8]">{login}</span>
+        <span className="flex shrink-0 items-center gap-1 text-[#9198a1]">
+          <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" aria-hidden>
+            <path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4Zm1.5 0h5V5a2.5 2.5 0 0 0-5 0v2Z" />
+          </svg>
+          Private ▾
+        </span>
+      </div>
+      <div className="mt-2 ml-auto w-[80%] max-w-[220px] overflow-hidden rounded-md border border-[#3d444d] bg-[#151b23]">
+        <p className="border-b border-[#3d444d] px-2 py-1 text-[11px] font-semibold text-[#f0f6fc]">Organization visibility</p>
+        <p className="bg-[#1f6feb] px-2 py-1 font-semibold text-white">Public</p>
+        <p className="px-2 py-1 text-[#9198a1]">✓ Private</p>
+      </div>
     </div>
   );
 }
