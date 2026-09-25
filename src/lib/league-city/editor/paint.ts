@@ -28,12 +28,12 @@ export function lWalk(from: Lot, to: Lot): Lot[] {
 }
 
 /** New road lots for a drag from `from` to `to`. */
-export function lPath(from: Lot, to: Lot, objects: Iterable<Pick<CityObject, "x" | "z" | "item_type">>, size: number): Lot[] {
+export function lPath(from: Lot, to: Lot, objects: Iterable<Pick<CityObject, "x" | "z" | "item_type">>, h: number): Lot[] {
   const byLot = new Map<string, string | null>();
   for (const o of objects) byLot.set(lotKey(o.x, o.z), o.item_type);
   const out: Lot[] = [];
   for (const [x, z] of lWalk(from, to)) {
-    if (!inBounds(size, x, z)) break;
+    if (!inBounds(h, x, z)) break;
     const k = lotKey(x, z);
     if (byLot.has(k)) {
       if (byLot.get(k) === "road") continue;

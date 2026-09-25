@@ -5,13 +5,17 @@
 // swap (two moves) always reaches the server together.
 //
 // Buildings, roads and plazas own lots. Props (lamps, benches, trees,
-// fountains, ramps) stand anywhere their footprint fits (see props.ts): on plazas,
-// on grass, on a road's sidewalk.
+// fountains, ramps, billboards, flags) stand anywhere their footprint fits
+// (see props.ts): on plazas, on grass, on a road's sidewalk. Planes and blimps
+// fly: only their center must be inside the city. Locked objects (the portal,
+// the entrance road) can't be touched, and catalog limits cap some types.
 
 import { lotKey } from "../placement";
-import { MAX_SIZE, START_SIZE, inBounds, maxLot, minLot } from "../grid";
+import { MAX_H, START_H, inBounds, lotCount } from "../grid";
+import { CATALOG, usage } from "../catalog";
+import { DEFAULT_PROPS } from "../props-schema";
 import { PROP_PROBLEM_TEXT, lotOf, propAt, propProblem, snap } from "../props";
-import { isSurface, type CityObject, type CityOp, type ItemType, type PropType } from "../types";
+import { LOGO_TYPES, isSurface, type CityObject, type CityOp, type ItemType, type ObjectProps, type PropType } from "../types";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -21,7 +25,7 @@ export type Tool =
   | { kind: "road" }
   | { kind: "bulldoze" };
 
-export type HotbarTab = "streets" | "nature" | "plaza" | "stunts" | "buildings";
+export type HotbarTab = "streets" | "nature" | "plaza" | "stunts" | "identity" | "buildings";
 
 /** One user action: what to send, and how to take it back. */
 export interface Edit {
@@ -39,8 +43,10 @@ export interface Notice {
 
 export interface EditorState {
   objects: Map<string, CityObject>;
-  size: number;
+  h: number;
   version: number;
+  /** The league has a logo: billboards, flags and floor logos need one. */
+  hasLogo: boolean;
   tool: Tool;
   hotbarTab: HotbarTab;
   slot: number;
@@ -62,7 +68,7 @@ export interface EditorState {
 }
 
 export interface CitySnapshot {
-  size: number;
+  h: number;
   version: number;
   objects: CityObject[];
 }
@@ -90,6 +96,8 @@ export type EditorAction =
   | ({ type: "drop" } & Spot)
   | { type: "cancel" }
   | { type: "rotate"; id?: string }
+  | { type: "setProps"; id: string; props: ObjectProps }
+  | { type: "setHasLogo"; hasLogo: boolean }
   | { type: "remove"; id: string }
   | ({ type: "removeAt" } & Spot)
   | { type: "dismissNew"; id: string }
@@ -111,7 +119,23 @@ export const HOTBAR: Record<Exclude<HotbarTab, "buildings">, ItemType[]> = {
   nature: ["tree_default", "tree_oak", "tree_fat", "tree_detailed", "tree_palm_tall", "tree_pine_tall_a"],
   plaza: ["plaza", "fountain"],
   stunts: ["ramp", "ramp_big", "boost_pad", "speed_bump", "cone", "crates", "tire_wall"],
+  identity: ["billboard", "flag", "blimp", "plane"],
 };
+
+export const LOCKED_TEXT = "The entrance is fixed.";
+export const NEEDS_LOGO_TEXT = "Upload a logo in settings.";
+
+const LABELS: Partial<Record<ItemType, string>> = { billboard: "billboards", flag: "flags", plane: "planes and blimps", blimp: "planes and blimps", portal: "portals" };
+
+/** Why `t` can't be added to the city right now (limit, logo), or null. */
+export function addProblem(s: { objects: ReadonlyMap<string, CityObject>; hasLogo: boolean }, t: ItemType): string | null {
+  const row = CATALOG[t];
+  if (row.systemOnly) return "Only the town can place that.";
+  if ((LOGO_TYPES as readonly ItemType[]).includes(t) && !s.hasLogo) return NEEDS_LOGO_TEXT;
+  const { used, max } = usage(s.objects.values(), t);
+  if (max !== null && used >= max) return `That's the most ${LABELS[t] ?? "of those"} a town can have (${used}/${max}).`;
+  return null;
+}
 
 // ─── Applying ops locally ───────────────────────────────────
 
@@ -138,16 +162,17 @@ export function applyLocal(objects: ReadonlyMap<string, CityObject>, ops: readon
       case "place": {
         const id = op.id ?? `local-${next.size}`;
         const rot = op.rot ?? 0;
+        const extra = op.kind === "item" ? { props: op.props ?? null, locked: !!op.locked } : {};
         if (op.kind === "building") {
           next.set(id, { id, kind: "building", item_type: null, developer_id: op.developer_id, x: op.x, z: op.z, px: null, pz: null, rot, is_new: false });
         } else if ("px" in op) {
           const [x, z] = lotOf(op.px, op.pz);
-          next.set(id, { id, kind: "item", item_type: op.item_type, developer_id: null, x, z, px: op.px, pz: op.pz, rot, is_new: false });
+          next.set(id, { id, kind: "item", item_type: op.item_type, developer_id: null, x, z, px: op.px, pz: op.pz, rot, is_new: false, ...extra });
         } else if (isSurface(op.item_type)) {
-          next.set(id, { id, kind: "item", item_type: op.item_type, developer_id: null, x: op.x, z: op.z, px: null, pz: null, rot, is_new: false });
+          next.set(id, { id, kind: "item", item_type: op.item_type, developer_id: null, x: op.x, z: op.z, px: null, pz: null, rot, is_new: false, ...extra });
         } else {
           // A lot-only prop op lands at the lot's center (server does the same).
-          next.set(id, { id, kind: "item", item_type: op.item_type, developer_id: null, x: op.x, z: op.z, px: op.x * 48, pz: op.z * 48, rot, is_new: false });
+          next.set(id, { id, kind: "item", item_type: op.item_type, developer_id: null, x: op.x, z: op.z, px: op.x * 48, pz: op.z * 48, rot, is_new: false, ...extra });
         }
         break;
       }
@@ -163,6 +188,11 @@ export function applyLocal(objects: ReadonlyMap<string, CityObject>, ops: readon
       case "rotate": {
         const o = next.get(op.id);
         if (o) next.set(op.id, { ...o, rot: op.rot });
+        break;
+      }
+      case "set_props": {
+        const o = next.get(op.id);
+        if (o) next.set(op.id, { ...o, props: Object.keys(op.props).length > 0 ? op.props : null });
         break;
       }
       case "remove":
@@ -195,8 +225,9 @@ export function objectAtSpot(objects: ReadonlyMap<string, CityObject>, spot: Spo
 
 export function placeOp(o: CityObject): CityOp {
   if (o.kind === "building") return { op: "place", kind: "building", developer_id: o.developer_id!, x: o.x, z: o.z, rot: o.rot, id: o.id };
-  if (o.px !== null && o.pz !== null) return { op: "place", kind: "item", item_type: o.item_type as PropType, px: o.px, pz: o.pz, rot: o.rot, id: o.id };
-  return { op: "place", kind: "item", item_type: o.item_type as "road" | "plaza", x: o.x, z: o.z, rot: o.rot, id: o.id };
+  const props = o.props ? { props: o.props } : {};
+  if (o.px !== null && o.pz !== null) return { op: "place", kind: "item", item_type: o.item_type as PropType, px: o.px, pz: o.pz, rot: o.rot, id: o.id, ...props };
+  return { op: "place", kind: "item", item_type: o.item_type as "road" | "plaza", x: o.x, z: o.z, rot: o.rot, id: o.id, ...props };
 }
 
 /**
@@ -210,7 +241,7 @@ function evictedProps(s: EditorState, ops: CityOp[]): { removes: CityOp[]; resto
   for (const o of after.values()) {
     if (o.px === null || o.pz === null || !o.item_type) continue;
     if (!s.objects.has(o.id)) continue; // placed by this edit: checked by the caller
-    if (propProblem(after.values(), s.size, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id }) === "on_road") {
+    if (propProblem(after.values(), s.h, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id }) === "on_road") {
       removes.push({ op: "remove", id: o.id });
       restores.push(placeOp(s.objects.get(o.id)!));
     }
@@ -219,34 +250,36 @@ function evictedProps(s: EditorState, ops: CityOp[]): { removes: CityOp[]; resto
 }
 
 /** A building landing on a lot must not sit on props there. */
-function propsOnLot(objects: ReadonlyMap<string, CityObject>, x: number, z: number, size: number): boolean {
+function propsOnLot(objects: ReadonlyMap<string, CityObject>, x: number, z: number, h: number): boolean {
   const probe = new Map(objects);
   probe.set("__probe", { id: "__probe", kind: "building", item_type: null, developer_id: 0, x, z, px: null, pz: null, rot: 0, is_new: false });
   for (const o of objects.values()) {
     if (o.px === null || o.pz === null || !o.item_type) continue;
     if (Math.abs(o.x - x) > 1 || Math.abs(o.z - z) > 1) continue;
-    if (propProblem(probe.values(), size, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id }) === "on_building") return true;
+    if (propProblem(probe.values(), h, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id }) === "on_building") return true;
   }
   return false;
 }
 
 // ─── Reducer helpers ────────────────────────────────────────
 
-/** What stands on the outer ring: buildings block a shrink, the rest goes with it. */
-export function ringContents(s: Pick<EditorState, "objects" | "size">): { blocked: boolean; removes: CityOp[]; restores: CityOp[] } {
-  const lo = minLot(s.size);
-  const hi = maxLot(s.size);
-  const smaller = s.size - 2;
+/**
+ * What stands on the strips a shrink takes (the east and west columns and
+ * the two north rows): buildings and locked objects block it, the rest goes
+ * with it.
+ */
+export function ringContents(s: Pick<EditorState, "objects" | "h">): { blocked: boolean; removes: CityOp[]; restores: CityOp[] } {
+  const smaller = s.h - 1;
   const removes: CityOp[] = [];
   const restores: CityOp[] = [];
   let blocked = false;
   for (const o of s.objects.values()) {
     const onRing =
       o.px === null
-        ? o.x === lo || o.x === hi || o.z === lo || o.z === hi
+        ? !inBounds(smaller, o.x, o.z)
         : o.item_type !== null && propProblem([], smaller, { item_type: o.item_type, px: o.px, pz: o.pz ?? 0 }) === "out_of_bounds";
     if (!onRing) continue;
-    if (o.kind === "building") blocked = true;
+    if (o.kind === "building" || o.locked) blocked = true;
     else {
       removes.push({ op: "remove", id: o.id });
       restores.push(placeOp(o));
@@ -255,29 +288,30 @@ export function ringContents(s: Pick<EditorState, "objects" | "size">): { blocke
   return { blocked, removes, restores };
 }
 
-/** How much a list of ops changes the city's size (expand +2, shrink −2). */
-export function sizeDelta(ops: readonly CityOp[]): number {
+/** How much a list of ops changes the city's half-width (expand +1, shrink −1). */
+export function hDelta(ops: readonly CityOp[]): number {
   let d = 0;
   for (const op of ops) {
-    if (op.op === "expand") d += 2;
-    else if (op.op === "shrink") d -= 2;
+    if (op.op === "expand") d += 1;
+    else if (op.op === "shrink") d -= 1;
   }
   return d;
 }
 
-function resized(size: number, ops: readonly CityOp[]): number {
-  return Math.min(MAX_SIZE, Math.max(START_SIZE, size + sizeDelta(ops)));
+function resized(h: number, ops: readonly CityOp[]): number {
+  return Math.min(MAX_H, Math.max(START_H, h + hDelta(ops)));
 }
 
 function normalize(o: CityObject): CityObject {
-  return { ...o, px: o.px ?? null, pz: o.pz ?? null };
+  return { ...o, px: o.px ?? null, pz: o.pz ?? null, props: o.props ?? null, locked: !!o.locked };
 }
 
-export function initEditor(city: CitySnapshot): EditorState {
+export function initEditor(city: CitySnapshot, hasLogo = false): EditorState {
   return {
     objects: new Map(city.objects.map((o) => [o.id, normalize(o)])),
-    size: city.size,
+    h: city.h,
     version: city.version,
+    hasLogo,
     tool: { kind: "select" },
     hotbarTab: "streets",
     slot: 0,
@@ -306,7 +340,7 @@ function commit(s: EditorState, ops: CityOp[], inverse: CityOp[], undoable = tru
     ...s,
     seq: s.seq + 1,
     objects: applyLocal(s.objects, ops),
-    size: resized(s.size, ops),
+    h: resized(s.h, ops),
     pending: [...s.pending, edit],
     undo: undoable ? [...s.undo, edit] : s.undo,
     redo: undoable ? [] : s.redo,
@@ -331,7 +365,7 @@ function replay(s: EditorState, from: "undo" | "redo"): EditorState {
     ...s,
     seq: s.seq + 1,
     objects: applyLocal(s.objects, ops),
-    size: resized(s.size, ops),
+    h: resized(s.h, ops),
     pending: [...s.pending, edit],
     [from]: rest,
   };
@@ -341,18 +375,18 @@ function replay(s: EditorState, from: "undo" | "redo"): EditorState {
 /** True when lot objects don't collide and the props an op touches still stand. */
 function fits(s: EditorState, ops: readonly CityOp[]): boolean {
   const after = applyLocal(s.objects, ops);
-  const size = resized(s.size, ops);
+  const h = resized(s.h, ops);
   const seen = new Set<string>();
   for (const o of after.values()) {
     if (o.px !== null) continue;
     const k = lotKey(o.x, o.z);
-    if (seen.has(k) || !inBounds(size, o.x, o.z)) return false;
+    if (seen.has(k) || !inBounds(h, o.x, o.z)) return false;
     seen.add(k);
   }
   const touched = new Set(ops.flatMap((op) => ("id" in op && op.id ? [op.id] : [])));
   for (const o of after.values()) {
     if (o.px === null || o.pz === null || !o.item_type || !touched.has(o.id)) continue;
-    if (propProblem(after.values(), size, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id })) return false;
+    if (propProblem(after.values(), h, { item_type: o.item_type, px: o.px, pz: o.pz, id: o.id })) return false;
   }
   return true;
 }
@@ -385,21 +419,26 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       if (s.tool.kind !== "place") return s;
       const item = s.tool.item;
 
+      const blocked = addProblem(s, item);
+      if (blocked) return notify(s, "hint", blocked);
+
       if (!isSurface(item)) {
         const [px, pz] = propSpot(a);
-        const problem = propProblem(s.objects.values(), s.size, { item_type: item, px, pz });
+        const problem = propProblem(s.objects.values(), s.h, { item_type: item, px, pz });
         if (problem) return notify(s, "hint", PROP_PROBLEM_TEXT[problem]);
+        const props = DEFAULT_PROPS[item];
         return commit(
           s,
-          [{ op: "place", kind: "item", item_type: item, px, pz, rot: s.placeRot, id: a.id }],
+          [{ op: "place", kind: "item", item_type: item, px, pz, rot: s.placeRot, id: a.id, ...(props ? { props } : {}) }],
           [{ op: "remove", id: a.id }],
         );
       }
 
       // Surfaces own the lot; one on top of another replaces it.
-      if (!inBounds(s.size, a.x, a.z)) return notify(s, "hint", "That's outside the city.");
+      if (!inBounds(s.h, a.x, a.z)) return notify(s, "hint", "That's outside the city.");
       const there = lotObjectAt(s.objects, a.x, a.z);
       if (there?.kind === "building") return notify(s, "hint", "A building is there. Move it first.");
+      if (there?.locked) return notify(s, "hint", LOCKED_TEXT);
       if (there?.item_type === item) return s;
       const place: CityOp = { op: "place", kind: "item", item_type: item, x: a.x, z: a.z, rot: 0, id: a.id };
       const ops: CityOp[] = there ? [{ op: "remove", id: there.id }, place] : [place];
@@ -415,9 +454,9 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       const restores: CityOp[] = [];
       a.lots.forEach(([x, z], i) => {
         const id = a.ids[i];
-        if (!id || !inBounds(s.size, x, z)) return;
+        if (!id || !inBounds(s.h, x, z)) return;
         const there = lotObjectAt(s.objects, x, z);
-        if (there?.kind === "building" || there?.item_type === "road") return;
+        if (there?.kind === "building" || there?.item_type === "road" || there?.locked) return;
         if (there) {
           removes.push({ op: "remove", id: there.id });
           restores.push(placeOp(there));
@@ -432,6 +471,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
 
     case "pickUp": {
       const o = s.objects.get(a.id);
+      if (o?.locked) return notify({ ...s, selection: o.id }, "hint", LOCKED_TEXT);
       return o ? { ...s, held: o.id, heldRot: o.rot, selection: o.id } : s;
     }
 
@@ -454,7 +494,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       if (h.px !== null && h.pz !== null && h.item_type) {
         const [px, pz] = propSpot(a);
         if (px === h.px && pz === h.pz) return put(commit(s, turn.ops, turn.inverse));
-        const problem = propProblem(s.objects.values(), s.size, { item_type: h.item_type, px, pz, id: h.id });
+        const problem = propProblem(s.objects.values(), s.h, { item_type: h.item_type, px, pz, id: h.id });
         if (problem) return notify(s, "hint", PROP_PROBLEM_TEXT[problem]);
         return put(
           commit(s, [{ op: "move", id: h.id, px, pz }, ...turn.ops], [...turn.inverse, { op: "move", id: h.id, px: h.px, pz: h.pz }]),
@@ -462,9 +502,9 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       }
 
       if (h.x === a.x && h.z === a.z) return put(commit(s, turn.ops, turn.inverse));
-      if (!inBounds(s.size, a.x, a.z)) return notify(s, "hint", "That's outside the city.");
+      if (!inBounds(s.h, a.x, a.z)) return notify(s, "hint", "That's outside the city.");
       const there = lotObjectAt(s.objects, a.x, a.z);
-      if (h.kind === "building" && propsOnLot(s.objects, a.x, a.z, s.size)) {
+      if (h.kind === "building" && propsOnLot(s.objects, a.x, a.z, s.h)) {
         return notify(s, "hint", "Move the props off that lot first.");
       }
       if (there) {
@@ -500,6 +540,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       }
       const o = s.objects.get(id);
       if (!o) return s;
+      if (o.locked) return notify(s, "hint", LOCKED_TEXT);
       const step = o.px !== null ? PROP_TURN : 90;
       // In hand: turn the ghost; the turn lands with the drop.
       if (id === s.held) return { ...s, heldRot: (s.heldRot + step) % 360 };
@@ -507,10 +548,19 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       return commit(s, [{ op: "rotate", id: o.id, rot }], [{ op: "rotate", id: o.id, rot: o.rot }]);
     }
 
+    case "setProps": {
+      const o = s.objects.get(a.id);
+      if (!o) return s;
+      if (o.locked) return notify(s, "hint", LOCKED_TEXT);
+      if (o.item_type === "plaza" && a.props.logo_floor && !s.hasLogo) return notify(s, "hint", NEEDS_LOGO_TEXT);
+      return commit(s, [{ op: "set_props", id: o.id, props: a.props }], [{ op: "set_props", id: o.id, props: o.props ?? {} }]);
+    }
+
     case "remove": {
       const o = s.objects.get(a.id);
       if (!o) return s;
       if (o.kind === "building") return notify(s, "hint", "Buildings stay in the city. Remove people in Settings.");
+      if (o.locked) return notify(s, "hint", LOCKED_TEXT);
       const next = commit(s, [{ op: "remove", id: o.id }], [placeOp(o)]);
       return { ...next, selection: next.selection === o.id ? null : next.selection, held: next.held === o.id ? null : next.held };
     }
@@ -527,20 +577,19 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
     }
 
     case "expand":
-      // One more ring of lots. Not undoable: lots may be used right away.
-      if (s.size >= MAX_SIZE) return notify(s, "hint", "The city is at its biggest size.");
+      // One more column east and west, two rows north. Not undoable: lots may be used right away.
+      if (s.h >= MAX_H) return notify(s, "hint", "The city is at its biggest size.");
       return commit(s, [{ op: "expand" }], [], false);
 
     case "shrink": {
-      // Drop the outer ring. Buildings there block it; everything else on the
-      // ring goes in the same edit, and undo brings the ring and them back.
-      if (s.size <= START_SIZE) return notify(s, "hint", "The city is at its smallest size.");
+      // Drop the edge strips. Buildings there block it; everything else on
+      // them goes in the same edit, and undo brings the strips and them back.
+      if (s.h <= START_H) return notify(s, "hint", "The city is at its smallest size.");
       const { blocked, removes, restores } = ringContents(s);
       if (blocked) return notify(s, "hint", "Move the buildings off the edge first.");
-      const smaller = s.size - 2;
       const gone = new Set(removes.flatMap((r) => (r.op === "remove" && "id" in r ? [r.id] : [])));
       const lots = [...s.objects.values()].filter((o) => o.px === null && !gone.has(o.id)).length;
-      if (lots > 0.7 * smaller * smaller) return notify(s, "hint", "The city is too full to shrink.");
+      if (lots > 0.7 * lotCount(s.h - 1)) return notify(s, "hint", "The city is too full to shrink.");
       const next = commit(s, [...removes, { op: "shrink" }], [{ op: "expand" }, ...restores]);
       return removes.length > 0
         ? notify(next, "info", `Removed ${removes.length} item${removes.length === 1 ? "" : "s"} from the edge. ⌘Z brings them back.`)
@@ -574,16 +623,16 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       // it), newest first, and forget their undo/redo entries.
       const rolled = [...(s.inflight ?? []), ...s.pending];
       let objects: Map<string, CityObject> = s.objects;
-      let size = s.size;
+      let h = s.h;
       for (let i = rolled.length - 1; i >= 0; i--) {
         objects = applyLocal(objects, rolled[i].inverse);
-        size -= sizeDelta(rolled[i].ops);
+        h -= hDelta(rolled[i].ops);
       }
       const ids = new Set(rolled.map((e) => e.id));
       const next: EditorState = {
         ...s,
         objects,
-        size: Math.min(MAX_SIZE, Math.max(START_SIZE, size)),
+        h: Math.min(MAX_H, Math.max(START_H, h)),
         inflight: null,
         pending: [],
         undo: dropEntries(s.undo, ids),
@@ -597,12 +646,12 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
     case "resync": {
       // Server truth, with our unsent edits replayed on top where they still apply.
       let objects = new Map(a.city.objects.map((o) => [o.id, normalize(o)]));
-      let size = a.city.size;
+      let h = a.city.h;
       const pending: Edit[] = [];
       for (const e of s.pending) {
         if (!canApply(objects, e.ops)) continue;
         objects = applyLocal(objects, e.ops);
-        size = resized(size, e.ops);
+        h = resized(h, e.ops);
         pending.push(e);
       }
       const undo = s.undo.filter((e) => canApply(objects, e.inverse));
@@ -610,7 +659,7 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
       return {
         ...s,
         objects,
-        size,
+        h,
         version: a.city.version,
         pending,
         undo,
@@ -622,6 +671,9 @@ export function editorReducer(s: EditorState, a: EditorAction): EditorState {
 
     case "notify":
       return notify(s, a.kind, a.message);
+
+    case "setHasLogo":
+      return s.hasLogo === a.hasLogo ? s : { ...s, hasLogo: a.hasLogo };
 
     default:
       return s;

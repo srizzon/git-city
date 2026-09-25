@@ -43,7 +43,7 @@ import { useDriveInput } from "./useDriveInput";
 export interface DriveWorldProps {
   objects: CityObject[];
   buildings: CityBuilding[];
-  size: number;
+  h: number;
   viewerDevId: number | null;
   telemetry: DriveTelemetry;
   camera: DriveCameraMode;
@@ -226,7 +226,7 @@ function DriveAudio(props: Parameters<typeof useDriveAudio>[0]) {
 export default function DriveWorld({
   objects,
   buildings,
-  size,
+  h,
   viewerDevId,
   telemetry,
   camera,
@@ -249,10 +249,10 @@ export default function DriveWorld({
     return () => document.removeEventListener("visibilitychange", on);
   }, []);
 
-  const specs = useMemo(() => buildColliders(objects, buildings, size), [objects, buildings, size]);
+  const specs = useMemo(() => buildColliders(objects, buildings, h), [objects, buildings, h]);
   const fixed = useMemo(() => specs.filter((s) => s.body === "fixed"), [specs]);
   const dynamic = useMemo(() => specs.filter((s) => s.body === "dynamic"), [specs]);
-  const spawn = useMemo(() => spawnPoint(objects, viewerDevId, size), [objects, viewerDevId, size]);
+  const spawn = useMemo(() => spawnPoint(objects, viewerDevId, h), [objects, viewerDevId, h]);
 
   const input = useDriveInput(paused);
   const car = useRef<CarApi | null>(null);
@@ -317,7 +317,7 @@ export default function DriveWorld({
             spawn={spawn}
             objects={objects}
             buildings={buildings}
-            size={size}
+            h={h}
             input={input}
             telemetry={telemetry}
             apiRef={car}

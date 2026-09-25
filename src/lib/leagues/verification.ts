@@ -7,6 +7,7 @@ import { LeagueError } from "./errors";
 import { companyLeagueName, isReservedSlug, LOGIN_RE } from "./names";
 import { inviteJoined } from "./joined";
 import { autoPlace, removeBuilding } from "@/lib/league-city/service";
+import { seedOrgLogo } from "@/lib/league-city/logo";
 
 // ─── Company league verification ────────────────────────────
 // Membership is proven from the OAuth provider_token (read:org) in the auth
@@ -224,7 +225,14 @@ export async function joinCompanyLeague(
   return {
     slug: league.slug as string,
     created,
-    seed: created ? () => seedCompanyLeague(leagueId, org) : null,
+    // A new company town also starts with the org's avatar as its logo.
+    seed: created
+      ? async () => {
+          const n = await seedCompanyLeague(leagueId, org);
+          await seedOrgLogo(leagueId, org);
+          return n;
+        }
+      : null,
   };
 }
 

@@ -9,10 +9,12 @@ import { PixelSelect } from "@/components/ui/PixelSelect";
 import type { JoinRequest, League } from "@/lib/leagues/service";
 import { REQUEST_TTL_DAYS, type JoinMode } from "@/lib/towns/joining";
 import type { LeagueMemberRow } from "@/lib/leagues/queries";
+import type { CityIdentity } from "@/lib/league-city/types";
+import { LOGO_MAX_BYTES, SKY_LABELS, SKY_SWATCHES } from "@/lib/league-city/identity";
 
 type Result = { ok: true } | { ok: false; error: string };
 
-async function send(url: string, method: "PATCH" | "DELETE" | "POST", body?: Record<string, string | boolean>): Promise<Result> {
+async function send(url: string, method: "PATCH" | "DELETE" | "POST", body?: Record<string, string | boolean | number | null>): Promise<Result> {
   try {
     const res = await fetch(url, {
       method,
@@ -47,6 +49,7 @@ export default function SettingsClient({
   inviteLink,
   requests,
   requestTotal,
+  identity,
 }: {
   league: League;
   members: LeagueMemberRow[];
@@ -55,6 +58,7 @@ export default function SettingsClient({
   inviteLink: string | null;
   requests: JoinRequest[];
   requestTotal: number;
+  identity: CityIdentity;
 }) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
@@ -79,6 +83,7 @@ export default function SettingsClient({
           )}
           {league.kind === "custom" && <NameSection api={api} name={league.name} onSaved={refresh} />}
           {league.kind === "custom" && <JoinModeSection api={api} mode={league.join_mode} onSaved={refresh} />}
+          <IdentitySection api={api} identity={identity} onSaved={refresh} />
           {inviteLink && <InviteLinkSection api={api} link={inviteLink} onRotated={refresh} />}
           <ScoringSection api={api} mode={league.scoring_mode} onSaved={refresh} />
           <MembersSection league={league} members={members} viewerLogin={viewerLogin} onChanged={refresh} />
@@ -133,6 +138,137 @@ function NameSection({ api, name, onSaved }: { api: string; name: string; onSave
           {saving ? <Pending label="Saving" /> : saved && !dirty ? "Saved" : "Save"}
         </button>
       </form>
+      <ErrorLine error={error} />
+    </Section>
+  );
+}
+
+// ─── Identity ────────────────────────────────────────────────
+
+function IdentitySection({ api, identity, onSaved }: { api: string; identity: CityIdentity; onSaved: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"preview" | "save" | "remove" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [sky, setSky] = useState(identity.sky);
+  const [skySaving, setSkySaving] = useState<number | null>(null);
+
+  async function upload(f: File, save: boolean): Promise<string | null> {
+    const form = new FormData();
+    form.append("file", f);
+    try {
+      const res = await fetch(`${api}/logo${save ? "" : "?preview=1"}`, { method: "POST", body: form });
+      const json = (await res.json().catch(() => ({}))) as { error?: string; preview?: string };
+      if (!res.ok) {
+        setError(json.error ?? "Couldn't read that image.");
+        return null;
+      }
+      return json.preview ?? "saved";
+    } catch {
+      setError("Network error. Try again.");
+      return null;
+    }
+  }
+
+  async function pick(f: File | undefined) {
+    setError(null);
+    setPreview(null);
+    setFile(null);
+    if (!f) return;
+    if (f.size > LOGO_MAX_BYTES) return setError("Logos can be up to 1 MB.");
+    if (!["image/png", "image/jpeg"].includes(f.type)) return setError("Use a PNG or JPG image.");
+    setBusy("preview");
+    const p = await upload(f, false);
+    setBusy(null);
+    if (p) {
+      setFile(f);
+      setPreview(p);
+    }
+  }
+
+  async function save() {
+    if (!file) return;
+    setBusy("save");
+    const ok = await upload(file, true);
+    setBusy(null);
+    if (!ok) return;
+    setFile(null);
+    setPreview(null);
+    onSaved();
+  }
+
+  async function remove() {
+    setBusy("remove");
+    setError(null);
+    const r = await send(`${api}/logo`, "DELETE");
+    setBusy(null);
+    if (!r.ok) return setError(r.error);
+    onSaved();
+  }
+
+  async function pickSky(i: number) {
+    setSkySaving(i);
+    setError(null);
+    const r = await send(`${api}/identity`, "PATCH", { sky: i });
+    setSkySaving(null);
+    if (!r.ok) return setError(r.error);
+    setSky(i);
+    onSaved();
+  }
+
+  const shown = preview ?? identity.logoUrl;
+  return (
+    <Section title="Identity" hint="Your logo goes on billboards, flags and plaza floors, pixelized to 64×64 with 16 colors.">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center border-2 border-border bg-bg-raised">
+          {shown ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={shown} alt="Town logo" width={96} height={96} className="h-full w-full [image-rendering:pixelated]" />
+          ) : (
+            <span className="px-2 text-center text-[9px] text-dim">No logo</span>
+          )}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          {identity.logoRemoved && !preview && (
+            <p className="text-[11px] text-red-400 normal-case">Your logo was taken down after a report. Upload another.</p>
+          )}
+          {preview && <p className="text-[11px] text-cream normal-case">This is how it looks in the city. Save to use it.</p>}
+          <div className="flex flex-wrap gap-2">
+            <label className="btn-press cursor-pointer border-2 border-border px-3 py-2 text-[10px] text-cream hover:border-lime">
+              {busy === "preview" ? <Pending label="Reading" /> : identity.logoUrl || preview ? "Replace" : "Upload logo"}
+              <input type="file" accept="image/png,image/jpeg" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+            </label>
+            {preview && (
+              <button type="button" onClick={save} disabled={busy !== null} className="btn-press border-2 border-lime px-3 py-2 text-[10px] text-lime disabled:opacity-40">
+                {busy === "save" ? <Pending label="Saving" /> : "Save logo"}
+              </button>
+            )}
+            {identity.logoUrl && !preview && (
+              <button type="button" onClick={remove} disabled={busy !== null} className="btn-press border-2 border-border px-3 py-2 text-[10px] text-muted hover:text-red-400 disabled:opacity-40">
+                {busy === "remove" ? <Pending label="Removing" /> : "Remove"}
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-dim normal-case">PNG or JPG, up to 1 MB.</p>
+        </div>
+      </div>
+
+      <h3 className="mt-5 text-[11px] text-cream">Sky</h3>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {SKY_LABELS.map((label, i) => (
+          <button
+            key={label}
+            type="button"
+            aria-pressed={sky === i}
+            disabled={skySaving !== null || sky === i}
+            onClick={() => pickSky(i)}
+            className={`btn-press flex flex-col border-2 text-[10px] ${sky === i ? "border-lime text-lime" : "border-border text-muted hover:text-cream"}`}
+          >
+            <span className="h-10 w-full" style={{ background: `linear-gradient(${SKY_SWATCHES[i].join(", ")})` }} />
+            <span className="px-2 py-1.5">{skySaving === i ? <Pending label="Saving" /> : label}</span>
+          </button>
+        ))}
+      </div>
       <ErrorLine error={error} />
     </Section>
   );

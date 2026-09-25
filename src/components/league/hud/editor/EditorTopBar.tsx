@@ -47,7 +47,7 @@ export default function EditorTopBar({
   onRedo,
   onPreview,
   onDone,
-  size,
+  h,
   maxSize,
   minSize,
   shrinkNote,
@@ -64,7 +64,8 @@ export default function EditorTopBar({
   onRedo: () => void;
   onPreview: () => void;
   onDone: () => void;
-  size: number;
+  /** City half-width (grid.ts): 2h+1 lots wide, 2h deep. */
+  h: number;
   maxSize: number;
   minSize: number;
   /** What shrinking would do right now (tooltip). */
@@ -84,21 +85,21 @@ export default function EditorTopBar({
         <button
           type="button"
           onClick={onExpand}
-          disabled={size >= maxSize}
-          title={size >= maxSize ? "The city is at its biggest size" : "Add a ring of lots around the city"}
+          disabled={h >= maxSize}
+          title={h >= maxSize ? "The city is at its biggest size" : "Add a column each side and two rows north"}
           className={`${SEG} text-cream`}
         >
           <Expand {...ICON} aria-hidden />
           <span>
-            Expand <span className="text-dim">{size}×{size}</span>
+            Expand <span className="text-dim">{2 * h + 1}×{2 * h}</span>
           </span>
         </button>
         <button
           type="button"
           onClick={onShrink}
-          disabled={size <= minSize}
+          disabled={h <= minSize}
           aria-label="Shrink the city"
-          title={size <= minSize ? "The city is at its smallest size" : shrinkNote}
+          title={h <= minSize ? "The city is at its smallest size" : shrinkNote}
           className={`${SEG} text-cream`}
         >
           <Shrink {...ICON} aria-hidden />

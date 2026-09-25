@@ -67,11 +67,13 @@
     "react-dom": "19.2.3",
     "resend": "^6.9.3",
     "server-only": "^0.0.1",
+    "sharp": "^0.34.5",
     "stripe": "^20.3.1",
     "svix": "^1.89.0",
     "three": "^0.183.0",
     "viem": "^2.48.4",
-    "wagmi": "^2.19.5"
+    "wagmi": "^2.19.5",
+    "zod": "^4.6.5"
   },
   "overrides": {
     "@wagmi/core": "^2.22.1",

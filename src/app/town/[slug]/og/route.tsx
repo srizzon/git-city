@@ -1,15 +1,19 @@
 import { ImageResponse } from "next/og";
+import sharp from "sharp";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { OG } from "@/lib/og/devHero";
 import { getLeagueBySlug } from "@/lib/leagues/service";
 import { getLeagueMembers, type LeagueMemberRow } from "@/lib/leagues/queries";
 import { townDisplayName } from "@/lib/towns/names";
+import { getCachedCity } from "@/lib/league-city/service";
 
-export const alt = "Town in Git City";
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
-export const revalidate = 3600;
+// The town's share card: logo, name, counts and member faces. The page links
+// it as /town/<slug>/og?v=<identity_version>, so a new logo, sky or sign gets
+// a new URL (social caches key on it) and each version can be cached for good.
+
+const size = { width: 1200, height: 630 };
+const LOGO = 132;
 
 const FACES = 9;
 const FACE = 140;
@@ -38,7 +42,20 @@ async function loadFaces(members: LeagueMemberRow[]) {
   return faces.filter((f): f is NonNullable<typeof f> => !!f);
 }
 
-export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
+async function loadLogo(url: string | null): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    // Pixel art: scaled up here without smoothing (the renderer would blur it).
+    const png = await sharp(Buffer.from(await res.arrayBuffer())).resize(LOGO, LOGO, { kernel: "nearest" }).png().toBuffer();
+    return `data:image/png;base64,${png.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const fontData = await readFile(join(process.cwd(), "public/fonts/Silkscreen-Regular.ttf"));
   const fonts = [{ name: "Silkscreen", data: fontData, style: "normal" as const, weight: 400 as const }];
@@ -46,8 +63,35 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const league = await getLeagueBySlug(slug);
   const members = league ? (await getLeagueMembers(league.id)).filter((m) => m.status !== "former") : [];
   const joined = members.filter((m) => m.status === "active").length;
-  const faces = await loadFaces(members);
+  const [faces, city] = await Promise.all([loadFaces(members), league ? getCachedCity(league.id) : Promise.resolve(null)]);
+  const logo = await loadLogo(city?.identity.logoUrl ?? null);
+  const versioned = !!city && new URL(req.url).searchParams.get("v") === String(city.identity.identityVersion);
   const name = league ? townDisplayName(league.name) : "Town not found";
+  return townCard(
+    { name, kind: league?.kind ?? null, found: !!league, buildings: members.length, joined, faces, logo, slug },
+    fonts,
+    versioned ? "public, max-age=86400, s-maxage=31536000, immutable" : "public, s-maxage=3600, stale-while-revalidate=86400",
+  );
+}
+
+export interface TownCardData {
+  name: string;
+  kind: "company" | "custom" | null;
+  found: boolean;
+  buildings: number;
+  joined: number;
+  faces: { id: number; active: boolean; src: string }[];
+  /** Data URL, already pixel-scaled. */
+  logo: string | null;
+  slug: string;
+}
+
+type Fonts = { name: string; data: Buffer; style: "normal"; weight: 400 }[];
+
+export function townCard(d: TownCardData, fonts: Fonts, cacheControl: string): ImageResponse {
+  const { name, faces, logo, slug, joined } = d;
+  const league = d.found ? { kind: d.kind } : null;
+  const members = { length: d.buildings };
   const nameSize = name.length > 26 ? 56 : name.length > 18 ? 68 : 80;
   const cols = Math.min(3, Math.max(1, faces.length));
   const rows = Math.ceil(faces.length / 3);
@@ -77,6 +121,10 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             justifyContent: "center",
           }}
         >
+          {logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logo} width={LOGO} height={LOGO} alt="" style={{ marginBottom: 28, border: `4px solid ${OG.border}` }} />
+          )}
           <div style={{ display: "flex", gap: 20, fontSize: 22, letterSpacing: 6, color: OG.accent }}>
             <span>{league?.kind === "company" ? "COMPANY TOWN" : "GIT CITY TOWN"}</span>
             {league?.kind === "company" && <span>✓ VERIFIED</span>}
@@ -124,6 +172,10 @@ export default async function Image({ params }: { params: Promise<{ slug: string
         )}
       </div>
     ),
-    { ...size, fonts },
+    {
+      ...size,
+      fonts,
+      headers: { "Cache-Control": cacheControl },
+    },
   );
 }

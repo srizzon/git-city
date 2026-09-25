@@ -13,8 +13,11 @@ export default function TownHero({
   city,
   cityDevs,
   cityNorms,
+  name = "",
 }: {
   city: LeagueCity;
+  /** Town name, for the portal and plates. */
+  name?: string;
   cityDevs: Record<string, unknown>[];
   cityNorms: LayoutNorms;
 }) {
@@ -30,5 +33,5 @@ export default function TownHero({
     return leagueBuildings(city.objects, scaleTownHeights(byDevId));
   }, [city, cityDevs, cityNorms]);
 
-  return <LeagueScene embedded size={city.size} objects={city.objects} buildings={buildings} mode="view" />;
+  return <LeagueScene embedded h={city.h} identity={city.identity} name={name} objects={city.objects} buildings={buildings} mode="view" />;
 }

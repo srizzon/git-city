@@ -63,10 +63,10 @@ export function useCityAutosave(
         return "retry";
       }
       if (res.ok) {
-        const json = (await res.json()) as { version: number; size: number };
+        const json = (await res.json()) as { version: number; h: number };
         store.dispatch({ type: "ack", version: json.version });
         // Someone else (an invite, another tab) moved the city: catch up.
-        if (json.version !== base + 1 || json.size !== s.size) await resync();
+        if (json.version !== base + 1 || json.h !== s.h) await resync();
         return "ok";
       }
       if (res.status === 429 || res.status >= 500) return "retry";

@@ -13,7 +13,7 @@ import {
   type League,
   type Viewer,
 } from "@/lib/leagues/service";
-import { getCityNorms, getGlobalWinner, getLeagueCityDevs, getLeaguePageData } from "@/lib/leagues/queries";
+import { getCityNorms, getGlobalRanking, getGlobalWinner, getLeagueCityDevs, getLeaguePageData } from "@/lib/leagues/queries";
 import { isoDay, weekStart } from "@/lib/leagues/scoring";
 import { getCachedCity } from "@/lib/league-city/service";
 import { LOGIN_RE } from "@/lib/leagues/names";
@@ -35,11 +35,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!league) return { title: "Town not found - Git City" };
   const title = `${townDisplayName(league.name)} - Git City`;
   const description = `${townDisplayName(league.name)} in Git City: a skyline built together, a weekly race and a crown for the winner.`;
+  // The card's URL carries identity_version: a new logo or sky is a new URL.
+  const city = await getCachedCity(league.id).catch(() => null);
+  const image = { url: `/town/${league.slug}/og?v=${city?.identity.identityVersion ?? 0}`, width: 1200, height: 630, alt: "Town in Git City" };
   return {
     title,
     description,
-    openGraph: { title, description },
-    twitter: { card: "summary_large_image", title, description },
+    openGraph: { title, description, images: [image] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
     ...(league.hidden ? { robots: { index: false, follow: false } } : {}),
   };
 }
@@ -63,13 +66,19 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   const data = await getLeaguePageData(league, viewer);
   const lastWeek = weekStart(new Date());
   lastWeek.setUTCDate(lastWeek.getUTCDate() - 7);
-  const [city, cityDevs, cityNorms, globalWinner, inviteToken, badges] = await Promise.all([
+  const [city, cityDevs, cityNorms, globalWinner, inviteToken, badges, weeklyRank] = await Promise.all([
     getCachedCity(league.id),
     getLeagueCityDevs(data.members),
     getCityNorms(),
     league.kind === "company" ? getGlobalWinner(isoDay(lastWeek)) : Promise.resolve(null),
     t && league.kind === "custom" ? getInviteToken(league.id) : Promise.resolve(null),
     getTownBadges(league.id).catch(() => ({ townOfWeek: false, milestones: [] })),
+    // The intro's title: this week's place among companies (cached ranking).
+    league.kind === "company"
+      ? getGlobalRanking()
+          .then((r) => r.rows.find((row) => row.league_id === league.id)?.rank ?? null)
+          .catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   // Query params are attacker-written: name only an invited member, pass on
@@ -106,6 +115,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
       pendingRequests={pendingRequests}
       groupLink={groupLink}
       badges={badges}
+      weeklyRank={weeklyRank}
     />
   );
 }

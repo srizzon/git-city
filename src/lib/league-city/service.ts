@@ -2,25 +2,28 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { invalidateLeague, leagueTag } from "@/lib/leagues/cache";
-import { START_SIZE } from "./grid";
+import { START_H } from "./grid";
 import { starterOps } from "./starter";
-import type { CityObject, CityOp } from "./types";
+import { leagueAssetUrl } from "./identity";
+import type { CityIdentity, CityObject, CityOp } from "./types";
 
 // ─── League city service ────────────────────────────────────
-// Every write goes through apply_league_city_ops (migration 126), which locks
-// the league's city, validates the batch and bumps the version.
+// Every write goes through apply_league_city_ops (migration 145), which locks
+// the league's city, validates the batch against the item catalog and bumps
+// the version.
 
 const MAX_OPS = 200;
 
 export interface LeagueCity {
-  size: number;
+  h: number;
   version: number;
   objects: CityObject[];
+  identity: CityIdentity;
 }
 
 export interface OpsResult {
   version: number;
-  size: number;
+  h: number;
   objects_changed: number;
   unplaced: number[];
   skipped?: boolean;
@@ -40,6 +43,10 @@ const MESSAGES: Record<string, [string, number]> = {
   prop_overlap: ["Too close to something else.", 409],
   city_full: ["The city is full.", 409],
   payload_too_large: ["Too many edits in one save.", 413],
+  locked: ["The entrance is fixed.", 409],
+  limit_reached: ["That's the most of those a town can have.", 409],
+  system_only: ["Only the town can place that.", 403],
+  props_too_large: ["Those settings are too long.", 400],
 };
 
 export class CityOpError extends Error {
@@ -75,15 +82,30 @@ export async function applyOps(leagueId: string, actorId: number, ops: CityOp[])
 
 // ─── Reads ──────────────────────────────────────────────────
 
+const EMPTY_IDENTITY: CityIdentity = { sky: 1, signSide: null, logoUrl: null, logoRemoved: false, identityVersion: 0 };
+
+interface CityRow {
+  h: number;
+  version: number;
+  sky: number;
+  sign_side: CityIdentity["signSide"];
+  identity_version: number;
+  logo: { path: string; status: "active" | "removed" } | null;
+}
+
 async function loadCity(leagueId: string): Promise<LeagueCity | null> {
   const sb = getSupabaseAdmin();
-  const { data: city } = await sb.from("league_cities").select("size, version").eq("league_id", leagueId).maybeSingle();
+  const { data: city } = await sb
+    .from("league_cities")
+    .select("h, version, sky, sign_side, identity_version, logo:league_assets!league_cities_logo_asset_id_fkey(path, status)")
+    .eq("league_id", leagueId)
+    .maybeSingle<CityRow>();
   if (!city) return null;
   const objects: CityObject[] = [];
   for (let from = 0; ; from += 1000) {
     const { data } = await sb
       .from("league_objects")
-      .select("id, kind, item_type, developer_id, x, z, px, pz, rot, is_new")
+      .select("id, kind, item_type, developer_id, x, z, px, pz, rot, is_new, props, locked")
       .eq("league_id", leagueId)
       .order("id")
       .range(from, from + 999)
@@ -92,7 +114,19 @@ async function loadCity(leagueId: string): Promise<LeagueCity | null> {
     objects.push(...data);
     if (data.length < 1000) break;
   }
-  return { size: city.size as number, version: Number(city.version), objects };
+  const active = city.logo?.status === "active";
+  return {
+    h: city.h,
+    version: Number(city.version),
+    objects,
+    identity: {
+      sky: city.sky,
+      signSide: city.sign_side,
+      logoUrl: active && city.logo ? leagueAssetUrl(city.logo.path) : null,
+      logoRemoved: city.logo?.status === "removed",
+      identityVersion: Number(city.identity_version),
+    },
+  };
 }
 
 /** The league's city, building the starter city first if it has none yet. */
@@ -100,7 +134,7 @@ export async function getCity(leagueId: string): Promise<LeagueCity> {
   const city = await loadCity(leagueId);
   if (city) return city;
   await ensureCity(leagueId);
-  return (await loadCity(leagueId)) ?? { size: START_SIZE, version: 0, objects: [] };
+  return (await loadCity(leagueId)) ?? { h: START_H, version: 0, objects: [], identity: EMPTY_IDENTITY };
 }
 
 /**

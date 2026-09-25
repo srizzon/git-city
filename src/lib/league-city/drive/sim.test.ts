@@ -20,7 +20,7 @@ beforeAll(async () => {
 function setup(surface: SurfaceGrip["surface"] = "road", rot = 0, objects: CityObject[] = []) {
   const world = new RAPIER.World({ x: 0, y: GRAVITY, z: 0 }) as unknown as World;
   world.createCollider(RAPIER.ColliderDesc.cuboid(2000, 1, 2000).setTranslation(0, -1, 0));
-  for (const c of buildColliders(objects, [], 40)) {
+  for (const c of buildColliders(objects, [], 20)) {
     if (c.shape.type !== "hull") continue;
     world.createCollider(RAPIER.ColliderDesc.convexHull(new Float32Array(c.shape.points))!.setTranslation(...c.pos));
   }

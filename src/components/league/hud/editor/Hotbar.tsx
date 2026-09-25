@@ -2,16 +2,18 @@
 
 import { Hand, Trash2 } from "lucide-react";
 import type { CityBuilding } from "@/lib/github";
-import { HOTBAR, type HotbarTab, type Tool } from "@/lib/league-city/editor/state";
+import { HOTBAR, addProblem, type HotbarTab, type Tool } from "@/lib/league-city/editor/state";
+import { usage } from "@/lib/league-city/catalog";
 import type { CityObject, ItemType } from "@/lib/league-city/types";
 import { Avatar, HUD_BOX } from "../shared";
-import { ITEM_NAMES, ItemIcon } from "./icons";
+import { HillSignIcon, ITEM_NAMES, ItemIcon } from "./icons";
 
 const TABS: { id: HotbarTab; label: string }[] = [
   { id: "streets", label: "Streets" },
   { id: "nature", label: "Nature" },
   { id: "plaza", label: "Plaza" },
   { id: "stunts", label: "Stunts" },
+  { id: "identity", label: "Identity" },
   { id: "buildings", label: "Buildings" },
 ];
 
@@ -35,6 +37,10 @@ export default function Hotbar({
   onPickBuilding,
   onWheel,
   hint,
+  objects,
+  hasLogo,
+  hasHillSign,
+  onHillSign,
 }: {
   tab: HotbarTab;
   slot: number;
@@ -49,6 +55,11 @@ export default function Hotbar({
   onWheel: (dir: 1 | -1) => void;
   /** What a click does right now. */
   hint: string;
+  /** For the Identity tab's counts ("Billboard 2/4") and logo checks. */
+  objects: ReadonlyMap<string, CityObject>;
+  hasLogo: boolean;
+  hasHillSign: boolean;
+  onHillSign: () => void;
 }) {
   const items = tab === "buildings" ? [] : HOTBAR[tab];
   const slotActive = tool.kind === "place" || tool.kind === "road";
@@ -91,17 +102,30 @@ export default function Hotbar({
 
         <div className="flex gap-1 p-1.5">
           {tab !== "buildings" &&
-            items.map((item, i) => (
-              <Slot
-                key={item}
-                index={i}
-                label={ITEM_NAMES[item]}
-                active={slotActive && slot === i}
-                onClick={() => onSlot(i)}
-              >
-                <ItemIcon item={item} size={28} />
-              </Slot>
-            ))}
+            items.map((item, i) => {
+              const { used, max } = usage(objects.values(), item);
+              const blocked = tab === "identity" ? addProblem({ objects, hasLogo }, item) : null;
+              return (
+                <Slot
+                  key={item}
+                  index={i}
+                  label={blocked ? `${ITEM_NAMES[item]}: ${blocked}` : ITEM_NAMES[item]}
+                  active={slotActive && slot === i}
+                  disabled={!!blocked}
+                  count={max !== null ? `${used}/${max}` : undefined}
+                  order={tab === "identity" ? (i < 2 ? i : i + 1) : undefined}
+                  onClick={() => onSlot(i)}
+                >
+                  <ItemIcon item={item} size={28} />
+                </Slot>
+              );
+            })}
+          {tab === "identity" && (
+            // Spec order: Billboard, Flag, Hill sign, Blimp, Plane. The hill sign is a panel, not an item.
+            <Slot index={items.length} label="Hill sign: the town name on a hill" active={false} count={`${hasHillSign ? 1 : 0}/1`} onClick={onHillSign} order={2}>
+              <HillSignIcon size={28} />
+            </Slot>
+          )}
           {tab === "buildings" &&
             (newBuildings.length === 0 ? (
               <p className="flex h-[52px] items-center px-3 text-[9px] text-dim normal-case">
@@ -153,20 +177,44 @@ function ToolButton({
   );
 }
 
-function Slot({ index, label, active, onClick, children }: { index: number; label: string; active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Slot({
+  index,
+  label,
+  active,
+  onClick,
+  children,
+  disabled = false,
+  count,
+  order,
+}: {
+  index: number;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  /** Greyed (at the limit, or needs a logo); still clickable so the reason shows. */
+  disabled?: boolean;
+  /** "2/4" under the icon. */
+  count?: string;
+  /** Visual position among the slots (CSS order). */
+  order?: number;
+}) {
   return (
     <button
       type="button"
       aria-label={`${label} (${index + 1})`}
       aria-pressed={active}
+      aria-disabled={disabled}
       title={label}
       onClick={onClick}
+      style={order !== undefined ? { order } : undefined}
       className={`group relative flex h-[52px] w-[52px] items-center justify-center border-2 transition-colors ${
         active ? "border-lime bg-lime/10" : "border-border bg-bg-raised/60 hover:border-border-light"
-      }`}
+      } ${disabled ? "opacity-40" : ""}`}
     >
       <span className="transition-transform group-active:translate-y-px">{children}</span>
-      <span className={`absolute left-1 top-0.5 text-[8px] ${active ? "text-lime" : "text-dim"}`}>{index + 1}</span>
+      {count === undefined && <span className={`absolute left-1 top-0.5 text-[8px] ${active ? "text-lime" : "text-dim"}`}>{index + 1}</span>}
+      {count !== undefined && <span className={`absolute bottom-0.5 right-1 text-[8px] ${active ? "text-lime" : "text-cream"}`}>{count}</span>}
     </button>
   );
 }

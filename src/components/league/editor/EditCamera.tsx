@@ -51,18 +51,20 @@ const PAN_KEYS: Record<string, [number, number]> = {
 };
 
 export default function EditCamera({
-  size,
+  h,
   onLot,
   apiRef,
   pickables,
 }: {
-  size: number;
+  h: number;
   onLot: (e: LotEvent) => void;
   apiRef?: React.MutableRefObject<EditCameraApi | null>;
   pickables?: React.MutableRefObject<Pickable[]>;
 }) {
   const { camera, gl, invalidate } = useThree();
-  const { cx, cz, width } = terrainBounds(size);
+  const t = terrainBounds(h);
+  const { cx, cz } = t;
+  const width = Math.max(t.width, t.depth);
   const view = useRef({
     center: new THREE.Vector3(cx, 0, cz),
     goal: new THREE.Vector3(cx, 0, cz),

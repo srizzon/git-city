@@ -10,6 +10,7 @@ import {
   openInviteLink,
 } from "@/lib/leagues/service";
 import { getLeagueMembers } from "@/lib/leagues/queries";
+import { getCity } from "@/lib/league-city/service";
 import SettingsClient from "./settings-client";
 import { townDisplayName } from "@/lib/towns/names";
 
@@ -44,6 +45,7 @@ export default async function LeagueSettingsPage({ params }: Props) {
     custom ? listJoinRequests(viewer, league) : Promise.resolve([]),
     custom ? countJoinRequests(league.id) : Promise.resolve(0),
   ]);
+  const { identity } = await getCity(league.id);
   return (
     <SettingsClient
       league={league}
@@ -52,6 +54,7 @@ export default async function LeagueSettingsPage({ params }: Props) {
       inviteLink={inviteLink}
       requests={requests}
       requestTotal={requestTotal}
+      identity={identity}
     />
   );
 }
