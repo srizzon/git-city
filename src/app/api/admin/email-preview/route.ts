@@ -5,12 +5,15 @@ import { wrapInBaseTemplate, buildButton, buildStatsTable } from "@/lib/email-te
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { renderWelcomeEmail } from "@/lib/notification-senders/welcome";
 import { renderRaidEmail } from "@/lib/notification-senders/raid";
+import { sendEmail } from "@/lib/resend";
 
 const PREVIEW_LINKS = { unsubscribeUrl: "https://thegitcity.com/api/unsubscribe?dev=0&cat=all&token=preview" };
 
 /**
  * GET /api/admin/email-preview?template=job-approved
  * Returns rendered HTML for email preview. Admin-only.
+ * Add &send=1 to email that exact render to your own address, to check it in
+ * real mail clients (Gmail, Apple Mail, Outlook) before shipping.
  */
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabase();
@@ -21,6 +24,22 @@ export async function GET(req: NextRequest) {
 
   const template = req.nextUrl.searchParams.get("template") ?? "job-approved";
 
+  const respond = async (email: { subject: string; html: string; text?: string }) => {
+    if (req.nextUrl.searchParams.get("send") !== "1") {
+      return new NextResponse(email.html, { headers: { "Content-Type": "text/html" } });
+    }
+    if (!user.email) return NextResponse.json({ error: "Your account has no email" }, { status: 400 });
+    const { data, error } = await sendEmail({
+      from: "Git City <noreply@thegitcity.com>",
+      to: user.email,
+      subject: `[Test] ${email.subject}`,
+      html: email.html,
+      text: email.text,
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 502 });
+    return NextResponse.json({ sent: true, to: user.email, id: data?.id });
+  };
+
   // Emails on the new layout render through their real sender.
   // ?login= previews it for any developer, with their real rank.
   if (template === "welcome") {
@@ -30,8 +49,7 @@ export async function GET(req: NextRequest) {
       .select("github_login, rank")
       .ilike("github_login", login)
       .maybeSingle();
-    const { html } = renderWelcomeEmail(dev?.github_login ?? login, dev?.rank ?? null, PREVIEW_LINKS);
-    return new NextResponse(html, { headers: { "Content-Type": "text/html" } });
+    return respond(renderWelcomeEmail(dev?.github_login ?? login, dev?.rank ?? null, PREVIEW_LINKS));
   }
 
   // ?raid= previews a real raid from the defender's side; defaults to the latest one.
@@ -45,7 +63,7 @@ export async function GET(req: NextRequest) {
     if (!raid) return NextResponse.json({ error: "Raid not found" }, { status: 404 });
     const { data: devs } = await sb.from("developers").select("id, github_login").in("id", [raid.attacker_id, raid.defender_id]);
     const loginOf = (id: number) => devs?.find((d) => d.id === id)?.github_login ?? "unknown";
-    const { html } = renderRaidEmail(
+    return respond(renderRaidEmail(
       {
         defenderLogin: loginOf(raid.defender_id),
         attackerLogin: loginOf(raid.attacker_id),
@@ -55,8 +73,7 @@ export async function GET(req: NextRequest) {
         defenseScore: raid.defense_score,
       },
       PREVIEW_LINKS,
-    );
-    return new NextResponse(html, { headers: { "Content-Type": "text/html" } });
+    ));
   }
 
   const TEMPLATES: Record<string, { subject: string; html: string }> = {
@@ -136,9 +153,5 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const fullHtml = wrapInBaseTemplate(t.html, PREVIEW_LINKS.unsubscribeUrl);
-
-  return new NextResponse(fullHtml, {
-    headers: { "Content-Type": "text/html" },
-  });
+  return respond({ subject: t.subject, html: wrapInBaseTemplate(t.html, PREVIEW_LINKS.unsubscribeUrl) });
 }
