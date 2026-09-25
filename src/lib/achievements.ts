@@ -1,5 +1,4 @@
 import { getSupabaseAdmin } from "./supabase";
-import { sendAchievementNotification } from "./notification-senders/achievement";
 import { xpForAchievementTier } from "./xp";
 
 // ─── Types ───────────────────────────────────────────────────
@@ -180,21 +179,6 @@ export async function checkAchievements(
         })),
       },
     });
-  }
-
-  // Notify developer of gold/diamond achievements (fire-and-forget)
-  if (actorLogin) {
-    void (async () => {
-      try {
-        sendAchievementNotification(
-          developerId,
-          actorLogin,
-          newUnlocks.map((a) => ({ id: a.id, name: a.name, tier: a.tier })),
-        );
-      } catch (err: unknown) {
-        console.error("[achievements] notification failed", err);
-      }
-    })();
   }
 
   return newUnlocks.map((a) => a.id);
