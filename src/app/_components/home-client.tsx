@@ -246,6 +246,17 @@ const pinnedDevs = new Map<string, DeveloperRecord>();
 const pinDev = (dev: DeveloperRecord) => pinnedDevs.set(dev.github_login.toLowerCase(), dev);
 const pinnedLogins = () => new Set(pinnedDevs.keys());
 
+/** The signed-in player's lot, assigned by the server if they had none. */
+async function fetchOwnLot(): Promise<DeveloperRecord["lot"]> {
+  try {
+    const res = await fetch("/api/city/my-lot", { method: "POST" });
+    if (!res.ok) return null;
+    return (await res.json()).lot ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Milestones that trigger 24h celebration effects
 const CELEBRATION_MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000, 100000];
 
@@ -1993,19 +2004,25 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
       fetchingUserParam.current = true;
       (async () => {
         try {
-          const res = await fetch(`/api/dev/${encodeURIComponent(userParam)}`);
+          const isSelf = !!authLogin && userParam.toLowerCase() === authLogin;
+          // Your own building: make sure the server gave it a lot first.
+          const [res, ownLot] = await Promise.all([
+            fetch(`/api/dev/${encodeURIComponent(userParam)}`),
+            isSelf ? fetchOwnLot() : Promise.resolve(null),
+          ]);
           if (!res.ok) return;
           const devData = await res.json();
 
           // Dev doesn't exist in DB yet (auth callback may have failed) — skip injection
           if (devData.exists === false) return;
 
-          // Already in the data but not placed (the map was full): pin and re-lay out.
+          // Already in the data but not placed (no lot, or the map was full): pin and re-lay out.
           const loaded = rawDevsRef.current.find((d: DeveloperRecord) => d.github_login.toLowerCase() === userParam.toLowerCase());
           // Dedup: another effect may have already injected this dev
           if (loaded && pinnedDevs.has(userParam.toLowerCase())) return;
 
-          const newDev = loaded ?? {
+          const lot = ownLot ?? devData.lot ?? loaded?.lot ?? null;
+          const newDev = loaded ? { ...loaded, lot } : {
             ...devData,
             owned_items: [],
             achievements: [],
@@ -2020,9 +2037,12 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
             rabbit_completed: false,
             xp_total: devData.xp_total ?? 0,
             xp_level: devData.xp_level ?? 1,
+            lot,
           };
           pinDev(newDev);
-          if (!loaded) rawDevsRef.current = [...rawDevsRef.current, newDev];
+          rawDevsRef.current = loaded
+            ? rawDevsRef.current.map((d) => (d === loaded ? newDev : d))
+            : [...rawDevsRef.current, newDev];
           const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current, pinnedLogins());
           mergeDrops(layout.buildings);
           setBuildings(layout.buildings);
@@ -2084,7 +2104,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         prev && prev.login.toLowerCase() === userParam.toLowerCase() ? found : prev
       );
     }
-  }, [userParam, giftedParam, buildings, stats]);
+  }, [userParam, giftedParam, buildings, stats, authLogin]);
 
   // ── Ensure logged-in user's building always appears + claimed status is fresh ──
   // Covers: page reload, new tab, cache expiry, auth callback failure
@@ -2123,7 +2143,10 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
 
     (async () => {
       try {
-        const res = await fetch(`/api/dev/${encodeURIComponent(authLogin)}`);
+        const [res, ownLot] = await Promise.all([
+          fetch(`/api/dev/${encodeURIComponent(authLogin)}`),
+          fetchOwnLot(),
+        ]);
         if (!res.ok) {
           // Transient (429, 5xx): let the effect run again, a few times, backing off.
           ensuringAuthBuilding.current = null;
@@ -2136,12 +2159,13 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         const devData = await res.json();
         if (devData.exists === false) return;
 
-        // Already in the data but not placed (the map was full): pin and re-lay out.
+        // Already in the data but not placed (no lot, or the map was full): pin and re-lay out.
         const loaded = rawDevsRef.current.find((d: DeveloperRecord) => d.github_login.toLowerCase() === authLogin);
         // Dedup: another effect or search may have already injected this dev
         if (loaded && pinnedDevs.has(authLogin)) return;
 
-        const newDev = loaded ?? {
+        const lot = ownLot ?? devData.lot ?? loaded?.lot ?? null;
+        const newDev = loaded ? { ...loaded, lot } : {
           ...devData,
           owned_items: [],
           achievements: [],
@@ -2156,9 +2180,12 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
           rabbit_completed: false,
           xp_total: devData.xp_total ?? 0,
           xp_level: devData.xp_level ?? 1,
+          lot,
         };
         pinDev(newDev);
-        if (!loaded) rawDevsRef.current = [...rawDevsRef.current, newDev];
+        rawDevsRef.current = loaded
+          ? rawDevsRef.current.map((d) => (d === loaded ? newDev : d))
+          : [...rawDevsRef.current, newDev];
         const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current, pinnedLogins());
         mergeDrops(layout.buildings);
         setBuildings(layout.buildings);
@@ -2344,6 +2371,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         rabbit_completed: devData.rabbit_completed ?? existingDev?.rabbit_completed ?? false,
         xp_total: devData.xp_total ?? existingDev?.xp_total ?? 0,
         xp_level: devData.xp_level ?? existingDev?.xp_level ?? 1,
+        lot: devData.lot ?? existingDev?.lot ?? null,
       };
       // Replace on the raw data, not on `existedBefore`: an unplaced dev is in
       // the data without a building, and appending it would duplicate it.
@@ -2512,6 +2540,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
       rabbit_completed: devData.rabbit_completed ?? existingDev?.rabbit_completed ?? false,
       xp_total: devData.xp_total ?? existingDev?.xp_total ?? 0,
       xp_level: devData.xp_level ?? existingDev?.xp_level ?? 1,
+      lot: devData.lot ?? existingDev?.lot ?? null,
     };
     pinDev(syncedDev);
     rawDevsRef.current = existedBefore
