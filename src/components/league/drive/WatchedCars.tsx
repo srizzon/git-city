@@ -3,12 +3,12 @@
 import { Suspense, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { FLAG_BRAKE, WATCH_INTERP_MS, emptySnapshot, type DriverInfo } from "@/lib/league-city/drive/net";
+import { FLAG_BRAKE, WATCH_INTERP_MS, emptySnapshot } from "@/lib/league-city/drive/net";
 import { M_TO_UNIT, WHEEL } from "@/lib/league-city/drive/tuning";
 import { WHEELS } from "@/lib/league-city/drive/vehicle";
 import CarModel from "./CarModel";
 import Lights from "./Lights";
-import type { RemoteDriver } from "./useDrivePresence";
+import type { CarFeed } from "./useDrivePresence";
 
 // Other people's cars for someone who's only looking at the city: the same
 // car and brake lights as in drive mode, placed straight from the network
@@ -20,7 +20,7 @@ const _spin = new THREE.Quaternion();
 const _axisX = new THREE.Vector3(1, 0, 0);
 const _axisY = new THREE.Vector3(0, 1, 0);
 
-function WatchedCar({ remote }: { remote: RemoteDriver }) {
+function WatchedCar({ remote }: { remote: CarFeed }) {
   const group = useRef<THREE.Group>(null);
   const wheelRefs = useRef<(THREE.Object3D | null)[]>([]);
   const snap = useRef(emptySnapshot());
@@ -57,20 +57,14 @@ function WatchedCar({ remote }: { remote: RemoteDriver }) {
   );
 }
 
-export default function WatchedCars({
-  remotes,
-  drivers,
-}: {
-  remotes: React.MutableRefObject<Map<string, RemoteDriver>>;
-  drivers: DriverInfo[];
-}) {
-  if (drivers.length === 0) return null;
+/** People driving the town and its bots, as seen from outside the car. */
+export default function WatchedCars({ cars }: { cars: CarFeed[] }) {
+  if (cars.length === 0) return null;
   return (
     <Suspense fallback={null}>
-      {drivers.map((d) => {
-        const r = remotes.current.get(d.id);
-        return r ? <WatchedCar key={d.id} remote={r} /> : null;
-      })}
+      {cars.map((c) => (
+        <WatchedCar key={c.id} remote={c} />
+      ))}
     </Suspense>
   );
 }

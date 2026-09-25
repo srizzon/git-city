@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import PartySocket from "partysocket";
 import { SnapshotBuffer, carColor, decodeState, type DriverInfo, type ServerMsg } from "@/lib/league-city/drive/net";
 import { partyHost, type RemoteDriver } from "./useDrivePresence";
+import { syncBotClock } from "@/lib/league-city/drive/bots";
 
 // Watches the league city's drive room without driving (?watch=1): who's in
 // the car right now and where, batched by the server a few times a second.
@@ -47,6 +48,7 @@ export function useDriveWatch(slug: string, enabled: boolean) {
           if (r && s) r.buffer.push(now, s);
         }
       } else if (msg.t === "welcome") {
+        syncBotClock(msg.now);
         const now = performance.now();
         for (const d of msg.drivers) {
           add(d.id, d.name);
