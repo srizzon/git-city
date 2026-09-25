@@ -1985,7 +1985,18 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
   // *reports* sustained frame drops so the HUD can suggest switching to low;
   // the user makes the call via the perf toggle.
   const lowPerf = perfMode === "low";
-  const dpr = lowPerf ? 0.75 : 1.25;
+  // Graphics A/B flags for measuring phones (?logdepth=0, ?dpr=1, ?bloom=0, ?smaa=0).
+  const gfx = useMemo(() => {
+    const q = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
+    const dprParam = Number(q?.get("dpr"));
+    return {
+      logDepth: q?.get("logdepth") !== "0",
+      dpr: Number.isFinite(dprParam) && dprParam > 0 ? Math.min(3, dprParam) : null,
+      bloom: q?.get("bloom") !== "0",
+      smaa: q?.get("smaa") !== "0",
+    };
+  }, []);
+  const dpr = gfx.dpr ?? (lowPerf ? 0.75 : 1.25);
   const flyPosRef = useRef(new THREE.Vector3());
 
   const cityRadius = useMemo(() => {
@@ -2013,7 +2024,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       shadows={false}
       camera={{ position: sfHome ? sfHome.camPos : [-400, 450, -600], fov: 55, near: sfHome ? 6 : 0.5, far: sfHome ? 16000 : 15000 }}
       dpr={dpr}
-      gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3, logarithmicDepthBuffer: true }}
+      gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3, logarithmicDepthBuffer: gfx.logDepth }}
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
@@ -2292,19 +2303,21 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         </>
       )}
 
-      {!lowPerf && (
+      {!lowPerf && (gfx.bloom || gfx.smaa) && (
         <EffectComposer multisampling={0}>
           {/* NOTE: N8AO removed — it reconstructs positions from the depth buffer
               and does not support the renderer's logarithmicDepthBuffer (needed for
               the huge near:0.5 / far:15000 range), which produced warped windows. */}
           {/* Glow for the lit contribution cells — the signature pop/halo. */}
-          <Bloom
-            mipmapBlur
-            luminanceThreshold={0.5}
-            luminanceSmoothing={0.45}
-            intensity={1.5 * Math.max(0.25, cityEnergy ?? 1)}
-          />
-          <SMAA />
+          {gfx.bloom ? (
+            <Bloom
+              mipmapBlur
+              luminanceThreshold={0.5}
+              luminanceSmoothing={0.45}
+              intensity={1.5 * Math.max(0.25, cityEnergy ?? 1)}
+            />
+          ) : <></>}
+          {gfx.smaa ? <SMAA /> : <></>}
         </EffectComposer>
       )}
     </Canvas>
