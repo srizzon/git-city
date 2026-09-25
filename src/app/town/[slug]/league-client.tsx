@@ -7,6 +7,7 @@ import PixelSpinner from "@/components/leagues/PixelSpinner";
 import { useTownVisit } from "@/components/towns/useTownVisit";
 import { isDesktop } from "@/components/towns/useDesktop";
 import type { TownBadges } from "@/lib/towns/milestones";
+import type { JoinAction } from "@/lib/towns/joining";
 import {
   generateCityLayout,
   type CityBuilding,
@@ -78,6 +79,10 @@ export default function LeagueClient({
   refLogin,
   startEditing = false,
   startDriving = false,
+  startJoin = false,
+  joinAction,
+  pendingRequests,
+  groupLink,
   badges,
 }: {
   data: LeaguePageData;
@@ -93,12 +98,20 @@ export default function LeagueClient({
   startEditing?: boolean;
   /** ?drive=1 (Surprise me, Discover's Drive): straight into the car on desktop. */
   startDriving?: boolean;
+  /** ?join=1: back from sign-in, reopen the join panel. */
+  startJoin?: boolean;
+  joinAction: JoinAction;
+  /** Admin: open join requests. */
+  pendingRequests: number;
+  /** Members: the link for a group chat. */
+  groupLink: string | null;
   badges: TownBadges;
 }) {
   const { league, members, viewer } = data;
   const isMember = viewer?.status === "active";
   const showJoinCta = !isMember && (!!invite || !!inviteToken || viewer?.status === "invited");
-  const [panel, setPanel] = useState<PanelId>(showJoinCta ? "join" : null);
+  const joinKind = joinAction === "join" || joinAction === "ask" || joinAction === "pending" ? joinAction : null;
+  const [panel, setPanel] = useState<PanelId>(showJoinCta || (startJoin && joinKind) ? "join" : null);
   const [focused, setFocused] = useState<CityBuilding | null>(null);
   const router = useRouter();
   const isAdmin = !!viewer?.is_admin;
@@ -535,6 +548,18 @@ export default function LeagueClient({
                 onEdit={isAdmin ? enterEdit : undefined}
                 onDrive={enterDrive}
                 onLeave={isMember ? leave : undefined}
+                join={
+                  joinKind
+                    ? {
+                        kind: joinKind,
+                        onClick: () => {
+                          setFocused(null);
+                          setPanel("join");
+                        },
+                      }
+                    : undefined
+                }
+                requests={pendingRequests}
               />
             </div>
           </div>
@@ -548,6 +573,10 @@ export default function LeagueClient({
           slug={league.slug}
           viewerLogin={viewer.login}
           pending={members.filter((m) => m.status === "invited")}
+          groupLink={groupLink}
+          kind={league.kind}
+          joinMode={league.join_mode}
+          isAdmin={isAdmin}
           onClose={close}
         />
       )}
@@ -563,7 +592,7 @@ export default function LeagueClient({
       {panel === "join" && (
         <JoinPanel
           leagueSlug={league.slug}
-          leagueKind={league.kind}
+          action={joinAction === "member" || joinAction === "none" ? "join" : joinAction}
           signedIn={!!viewer}
           invitee={invite}
           refLogin={refLogin}
