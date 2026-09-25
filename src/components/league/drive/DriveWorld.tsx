@@ -21,6 +21,8 @@ import { spawnPoint } from "@/lib/league-city/drive/spawn";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
 import Car, { type CarApi } from "./Car";
+import { RACE_GATE } from "../RaceGate";
+import { carHeading } from "@/lib/league-city/drive/vehicle";
 import DriveCamera from "./DriveCamera";
 import Battle from "./Battle";
 import CrownMode, { type CrownApi, type CrownView } from "./CrownMode";
@@ -68,6 +70,8 @@ export interface DriveWorldProps {
   crownApi: React.MutableRefObject<CrownApi | null>;
   /** Crown Rush state for the HUD. */
   onCrown: (v: CrownView) => void;
+  /** Drove out through the race gate on the approach road (RaceGate): off to the track. */
+  onRaceGate?: () => void;
 }
 
 /** A bump carries this share of the hitter's relative velocity, plus a small hop (m/s). */
@@ -192,6 +196,23 @@ function DynamicProp({ spec }: { spec: ColliderSpec }) {
   );
 }
 
+/** Drives out through the race gate: past its line, heading out of town, and moving. Once. */
+function GateWatch({ car, onEnter }: { car: React.MutableRefObject<CarApi | null>; onEnter: () => void }) {
+  const done = useRef(false);
+  useFrame(() => {
+    const c = car.current;
+    if (!c || done.current) return;
+    const p = c.body.translation();
+    const x = p.x * M_TO_UNIT;
+    const z = p.z * M_TO_UNIT;
+    if (z < RACE_GATE.z || z > RACE_GATE.z + 16 || Math.abs(x) > RACE_GATE.halfX) return;
+    if (c.body.linvel().z < 2 || Math.cos(carHeading(c.body)) < 0.5) return;
+    done.current = true;
+    onEnter();
+  });
+  return null;
+}
+
 // ─── World ───────────────────────────────────────────────────
 
 export default function DriveWorld({
@@ -212,6 +233,7 @@ export default function DriveWorld({
   onHonk,
   crownApi,
   onCrown,
+  onRaceGate,
 }: DriveWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -337,6 +359,7 @@ export default function DriveWorld({
           <BoostTrail sources={fx} />
           <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} />
           <DriveCamera mode={camera} car={car} impact={impact} />
+          {onRaceGate && <GateWatch car={car} onEnter={onRaceGate} />}
           <CameraKey input={input} onToggle={onCameraToggle} />
           <Ready onReady={onReady} />
         </Physics>
