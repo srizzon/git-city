@@ -43,7 +43,7 @@ import { keyToAction } from "@/lib/league-city/editor/shortcuts";
 import { MAX_H, START_H } from "@/lib/league-city/grid";
 import { isAir } from "@/lib/league-city/catalog";
 import { introSeenKey } from "@/lib/league-city/identity";
-import { introPath, type IntroPath } from "@/lib/league-city/intro";
+import type { IntroPieces, IntroStyle } from "@/lib/league-city/intro";
 import type { CityIdentity, ObjectProps, SignSide } from "@/lib/league-city/types";
 import { HillSignPanel, PlazaPanel, SkyPanel } from "@/components/league/hud/editor/IdentityPanel";
 import ReportPanel from "@/components/league/hud/ReportPanel";
@@ -90,6 +90,7 @@ export default function LeagueClient({
   pendingRequests,
   groupLink,
   badges,
+  introStyle = "reveal",
 }: {
   data: LeaguePageData;
   city: LeagueCity;
@@ -112,6 +113,8 @@ export default function LeagueClient({
   /** Members: the link for a group chat. */
   groupLink: string | null;
   badges: TownBadges;
+  /** Which intro plays (see lib/league-city/intro). */
+  introStyle?: IntroStyle;
 }) {
   const { league, members, viewer } = data;
   const isMember = viewer?.status === "active";
@@ -403,42 +406,22 @@ export default function LeagueClient({
   // First visit to each town (localStorage, like the home), the ▶ button
   // replays it. Click or Esc skips. Lands on your building, else this
   // week's leader.
-  const [intro, setIntro] = useState<IntroPath | null>(null);
-  const buildIntro = useCallback((): IntroPath => {
-    const objs = [...store.getState().objects.values()];
-    const leaderLogin = data.week.standings[0]?.login?.toLowerCase() ?? null;
-    const landingDev =
-      viewerDevId ?? (leaderLogin ? (members.find((m) => m.login.toLowerCase() === leaderLogin)?.developer_id ?? null) : null);
-    const landingObj = landingDev !== null ? objs.find((o) => o.kind === "building" && o.developer_id === landingDev) : undefined;
-    const landingB = landingObj && landingObj.developer_id !== null ? byDevId.get(landingObj.developer_id) : undefined;
-    const portal = objs.find((o) => o.item_type === "portal");
-    const plaza = objs.filter((o) => o.item_type === "plaza" && o.px === null).sort((a, b) => b.z - a.z || Math.abs(a.x) - Math.abs(b.x))[0];
-    return introPath({
-      h: store.getState().h,
-      portal: portal && portal.px !== null && portal.pz !== null ? [portal.px, portal.pz] : null,
-      plaza: plaza ? [plaza.x * 48, plaza.z * 48] : null,
-      billboards: objs.flatMap((o) => (o.item_type === "billboard" && o.px !== null && o.pz !== null ? [[o.px, o.pz] as [number, number]] : [])),
-      sky: objs.flatMap((o) => (isAir(o.item_type) && o.px !== null && o.pz !== null ? [{ x: o.px, z: o.pz, alt: Number(o.props?.alt ?? 160) }] : [])),
-      signSide: identity.signSide,
-      landing: landingObj && landingB ? { x: landingObj.x * 48, z: landingObj.z * 48, top: landingB.height } : null,
-      tallest: Math.max(0, ...[...byDevId.values()].map((b) => b.height)),
-    });
-  }, [store, data.week.standings, viewerDevId, members, byDevId, identity.signSide]);
-  const landingLogin = useRef<string | null>(null);
+  const [intro, setIntro] = useState<{ pieces: IntroPieces; style: IntroStyle; n: number } | null>(null);
   const playIntro = useCallback(() => {
     setFocused(null);
     setPanel(null);
-    const leader = data.week.standings[0]?.login ?? null;
-    const mine = viewer && viewerDevId !== null ? viewer.login : null;
-    landingLogin.current = (mine ?? leader)?.toLowerCase() ?? null;
-    setIntro(buildIntro());
-  }, [buildIntro, data.week.standings, viewer, viewerDevId]);
-  const endIntro = useCallback(() => {
-    setIntro(null);
-    const login = landingLogin.current;
-    const b = login ? [...byDevId.values()].find((x) => x.loginLower === login) : undefined;
-    if (b) setFocused(b);
-  }, [byDevId]);
+    const portal = [...store.getState().objects.values()].find((o) => o.item_type === "portal");
+    setIntro((prev) => ({
+      pieces: {
+        h: store.getState().h,
+        portal: portal && portal.px !== null && portal.pz !== null ? [portal.px, portal.pz] : null,
+        tallest: Math.max(0, ...[...byDevId.values()].map((b) => b.height)),
+      },
+      style: introStyle,
+      n: (prev?.n ?? 0) + 1,
+    }));
+  }, [store, byDevId, introStyle]);
+  const endIntro = useCallback(() => setIntro(null), []);
   const skipIntro = useCallback(() => setIntro(null), []);
   const introChecked = useRef(false);
   useEffect(() => {

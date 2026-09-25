@@ -1,32 +1,27 @@
 // ─── Town intro ─────────────────────────────────────────────
-// First-visit fly-in, same choreography in every town, filled with the town's
-// own pieces (camera positions and look targets for a CatmullRom path, like
-// the home city's IntroFlyover):
-//   1. open sky, descending toward the south edge
-//   2. low along the entrance road, through the portal, across the plaza
-//   3. climb over the city past the nearest billboard, then a plane or blimp
-//   4. one turn over the middle, the hill sign in the background
-//   5. land on the viewer's building (or this week's leader)
-// Missing pieces drop their segment.
+// First-visit camera move, filled with the town's own pieces. Three calm
+// styles, few waypoints, constant speed, and every one ends exactly on the
+// scene's normal camera frame, so the orbit takes over without a jump:
+//   arrival  drop from the sky toward the gate, through the portal, rise to the view
+//   reveal   start on the portal sign, pull back and up until the town fits
+//   orbit    one slow half turn around the town while descending
 
 import { LOT, terrainBounds, worldBounds } from "./grid";
-import type { SignSide } from "./types";
 
 export type Vec3 = [number, number, number];
+export type IntroStyle = "arrival" | "reveal" | "orbit";
+export const INTRO_STYLES: readonly IntroStyle[] = ["arrival", "reveal", "orbit"];
 
 export interface IntroPieces {
   h: number;
   portal: [number, number] | null;
-  /** Center of the plaza the entrance road crosses first. */
-  plaza: [number, number] | null;
-  billboards: [number, number][];
-  /** Planes and blimps: center and altitude. */
-  sky: { x: number; z: number; alt: number }[];
-  signSide: SignSide | null;
-  /** The building to land on: position and top. */
-  landing: { x: number; z: number; top: number } | null;
-  /** Tallest building: the climb and the turn stay above it. */
+  /** Tallest building: moves over the city stay above it. */
   tallest?: number;
+}
+
+export interface IntroFrame {
+  pos: Vec3;
+  look: Vec3;
 }
 
 export interface IntroPath {
@@ -36,13 +31,14 @@ export interface IntroPath {
   duration: number;
 }
 
-export const INTRO_SECONDS = 8;
+export const INTRO_SECONDS: Record<IntroStyle, number> = { arrival: 11, reveal: 8, orbit: 10 };
 
-export function introPath(p: IntroPieces): IntroPath {
+export function introPath(p: IntroPieces, style: IntroStyle, end: IntroFrame): IntroPath {
   const w = worldBounds(p.h);
   const t = terrainBounds(p.h);
   const span = Math.max(t.width, t.depth);
-  const south = w.maxZ;
+  const gateZ = p.portal?.[1] ?? w.maxZ;
+  const ceiling = (p.tallest ?? 0) + 60;
   const pos: Vec3[] = [];
   const look: Vec3[] = [];
   const add = (a: Vec3, b: Vec3) => {
@@ -50,49 +46,27 @@ export function introPath(p: IntroPieces): IntroPath {
     look.push(b);
   };
 
-  // 1. Open sky, descending toward the south edge.
-  add([0, 260 + span * 0.35, south + 260 + span * 0.5], [0, 30, south]);
-  add([0, 90, south + 180], [0, 20, south - LOT]);
-
-  // 2. Low along the entrance road, through the portal, across the plaza.
-  const portalZ = p.portal?.[1] ?? south - LOT / 2;
-  add([0, 16, south + 60], [0, 18, portalZ]);
-  add([0, 11, portalZ - 12], [0, 10, portalZ - 2 * LOT]);
-  if (p.plaza) add([p.plaza[0] * 0.4, 20, p.plaza[1] - LOT * 0.4], [p.plaza[0], 4, p.plaza[1] - LOT]);
-
-  // 3. Climb over the city, past the nearest billboard and a plane or blimp.
-  const ceiling = (p.tallest ?? 0) + 40;
-  const board = [...p.billboards].sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]))[0];
-  if (board) add([board[0] + 34, 34, board[1] + 30], [board[0], 18, board[1]]);
-  // Straight up from the last low point before flying over the rooftops.
-  const low = pos[pos.length - 1];
-  add([low[0], ceiling + 20, low[2] + 40], [t.cx, 40, t.cz]);
-  const air = p.sky[0];
-  if (air) add([air.x + 70, Math.max(air.alt + 10, ceiling), air.z + 90], [air.x, air.alt, air.z]);
-
-  // 4. One turn over the middle, ending on the far side from the hill sign,
-  //    looking across the city at it.
-  const r = span * 0.55;
-  const y = Math.max(140 + span * 0.12, ceiling);
-  const hillDir = p.signSide === "east" ? 0 : p.signSide === "west" ? Math.PI : -Math.PI / 2;
-  const end = hillDir + Math.PI;
-  const center: Vec3 = [t.cx, 30, t.cz];
-  for (let i = 0; i < 4; i++) {
-    const a = end + (i - 3) * (Math.PI / 2);
-    const target: Vec3 = p.signSide && i === 3 ? [t.cx + Math.cos(hillDir) * span * 0.6, 30, t.cz + Math.sin(hillDir) * span * 0.6] : center;
-    add([t.cx + Math.cos(a) * r, y, t.cz + Math.sin(a) * r], target);
+  if (style === "arrival") {
+    add([0, 220 + span * 0.3, gateZ + 420 + span * 0.4], [0, 20, gateZ]);
+    add([0, 60, gateZ + 170], [0, 24, gateZ]);
+    add([0, 16, gateZ + 55], [0, 26, gateZ]);
+    add([0, 13, gateZ - 40], [0, 14, gateZ - 3 * LOT]);
+    // Straight up over the main street (the only lane with no towers), then out to the view.
+    add([0, ceiling, gateZ - 70], [0, 20, gateZ - 4 * LOT]);
+  } else if (style === "reveal") {
+    add([0, 33, gateZ + 34], [0, 34, gateZ]);
+    add([0, 70, gateZ + 150], [0, 30, gateZ - LOT]);
+  } else {
+    const r = Math.hypot(end.pos[0] - t.cx, end.pos[2] - t.cz);
+    const a1 = Math.atan2(end.pos[2] - t.cz, end.pos[0] - t.cx);
+    const y1 = end.pos[1];
+    for (let i = 0; i < 4; i++) {
+      const k = i / 4;
+      const a = a1 + Math.PI * (1 - k);
+      add([t.cx + Math.cos(a) * r, y1 * (1.8 - 0.8 * k), t.cz + Math.sin(a) * r], [t.cx, 30, t.cz]);
+    }
   }
 
-  // 5. Land on the building.
-  if (p.landing) {
-    const { x, z, top } = p.landing;
-    let dx = x - t.cx;
-    let dz = z - t.cz;
-    const len = Math.hypot(dx, dz) || 1;
-    dx /= len;
-    dz /= len;
-    add([x + dx * 180, top + 120, z + dz * 180], [x, top + 15, z]);
-  }
-
-  return { pos, look, duration: INTRO_SECONDS };
+  add(end.pos, end.look);
+  return { pos, look, duration: INTRO_SECONDS[style] };
 }
