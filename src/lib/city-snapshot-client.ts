@@ -12,7 +12,7 @@
  * callers fall back to their existing per-page paths when null.
  */
 import { decodeSnapshotV2, SNAPSHOT_V2_PATH, type SnapshotV2 } from "./city-snapshot-format";
-import type { CityLayout, LayoutNorms, SFMapAsset } from "./github";
+import type { CityLayout, DeveloperRecord, LayoutNorms, SFMapAsset } from "./github";
 import type { CityWorkerRequest } from "./city-load.worker";
 import type { MapGeometryArrays } from "./map-geometry.worker";
 
@@ -106,6 +106,8 @@ export async function fetchCitySnapshot(): Promise<any | null> {
 }
 
 export interface HomeSnapshot {
+  /** Developer records in the snapshot (from the worker: decoded on first read). */
+  count?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   developers: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -140,13 +142,34 @@ function buildInWorker(snapshot: ArrayBuffer, sf: SFMapAsset): Promise<HomeSnaps
     const worker = new Worker(new URL("./city-load.worker.ts", import.meta.url));
     const done = () => { clearTimeout(timer); worker.terminate(); };
     const timer = setTimeout(() => { done(); reject(new Error("city worker timeout")); }, WORKER_TIMEOUT_MS);
+    const loadoutOverride = readLoadoutOverride();
     worker.onmessage = (e) => {
       done();
-      if (e.data?.ok) resolve({ ...e.data.snapshot, layout: e.data.layout });
-      else reject(new Error(e.data?.error ?? "city worker failed"));
+      if (!e.data?.ok) return reject(new Error(e.data?.error ?? "city worker failed"));
+      // The layout comes back built; the developer records stay as the
+      // snapshot text and decode only when something reads them.
+      const text: string = e.data.text;
+      let developers: DeveloperRecord[] | null = null;
+      resolve({
+        ...e.data.meta,
+        layout: e.data.layout,
+        get developers() {
+          if (!developers) {
+            developers = decodeSnapshotV2(JSON.parse(text) as SnapshotV2).developers as DeveloperRecord[];
+            if (loadoutOverride) {
+              const dev = developers.find((d) => d.id === loadoutOverride.developerId);
+              if (dev) dev.loadout = loadoutOverride.loadout;
+            }
+          }
+          return developers;
+        },
+      });
     };
     worker.onerror = (e) => { done(); reject(new Error(e.message || "city worker error")); };
-    const msg: CityWorkerRequest = { snapshot, sf, loadoutOverride: readLoadoutOverride() };
+    // The worker lays out on lots and only reads parks and the map's frame
+    // from the asset: sending the roads and land mask was a clone for nothing.
+    const slim: SFMapAsset = { ...sf, roads: [], coast: [], market: null, landMask: undefined };
+    const msg: CityWorkerRequest = { snapshot, sf: slim, loadoutOverride };
     worker.postMessage(msg, [snapshot]);
   });
 }

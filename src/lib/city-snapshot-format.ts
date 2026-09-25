@@ -93,8 +93,15 @@ const toDay = (v: unknown): number | null => {
   const t = Date.parse(v);
   return Number.isFinite(t) ? Math.floor(t / DAY_MS) : null;
 };
-const fromDay = (d: number | null): string | null =>
-  d == null ? null : new Date(d * DAY_MS).toISOString();
+// A snapshot has ~260k timestamps over a few thousand distinct days: cache
+// the ISO string per day instead of building a Date for each (~300 ms on 87k).
+const dayIso = new Map<number, string>();
+const fromDay = (d: number | null): string | null => {
+  if (d == null) return null;
+  let iso = dayIso.get(d);
+  if (iso === undefined) { iso = new Date(d * DAY_MS).toISOString(); dayIso.set(d, iso); }
+  return iso;
+};
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 const list = (v: unknown): string[] | 0 => (Array.isArray(v) && v.length > 0 ? (v as string[]) : 0);
 
