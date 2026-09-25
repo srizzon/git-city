@@ -967,7 +967,10 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     camPos.current.x += (_idealCamPos.x - camPos.current.x) * lerpXZ;
     camPos.current.z += (_idealCamPos.z - camPos.current.z) * lerpXZ;
     camPos.current.y += (_idealCamPos.y - camPos.current.y) * lerpY;
-    camLook.current.lerp(_idealLook, 4.0 * dt);
+    // The look point must follow at least as tightly as the position: with a
+    // fixed rate it trailed ~speed/4 units, past the camera itself at boost
+    // speed, and the camera turned to face the plane's back.
+    camLook.current.lerp(_idealLook, 1 - Math.exp(-(4.0 + follow * 2) * dt));
 
     // Apply transition blend if coming back from free-cam
     if (wasJustUnpaused.current && transitionProgress.current < 1) {
