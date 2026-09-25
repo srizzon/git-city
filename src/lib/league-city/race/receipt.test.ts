@@ -3,7 +3,7 @@ import { signLapReceipt } from "../../../../party/lapToken";
 import { verifyLapReceipt } from "./receipt";
 
 const SECRET = "x".repeat(40);
-const lap = { room: "acme", track: "interlagos", dln: "alice", ms: 61234, exp: Date.now() + 60_000, nonce: "n1" };
+const lap = { room: "acme", track: "sprint", dln: "alice", ms: 61234, exp: Date.now() + 60_000, nonce: "n1" };
 
 describe("lap receipts", () => {
   beforeEach(() => {

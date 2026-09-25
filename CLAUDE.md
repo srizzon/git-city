@@ -72,7 +72,6 @@ supabase/
 - **Kenney Car Kit** (`public/models/cars/*.glb`): the sedan body and a wheel from [Kenney](https://kenney.nl/assets/car-kit) Car Kit (CC0). These ARE in the repo.
 - **Drive sounds** (`public/sounds/drive/*.ogg`): `engine`, `skid` and `impact` from [KenneyNL/Starter-Kit-Racing](https://github.com/KenneyNL/Starter-Kit-Racing) (CC0; the skid sound is by Landeplage, also CC0). The horn is synthesized in code, no file.
 - **San Francisco map** (`public/maps/sf.json`): baked from [OpenStreetMap](https://www.openstreetmap.org/copyright) data. OSM data is **ODbL** — the "© OpenStreetMap contributors" credit MUST stay visible on the SF map (rendered in `home-client.tsx`). The committed `public/maps/sf.json` is what ships; the bake script lives under the gitignored `scripts/` folder and is not in the repo.
-- **Race track** (`src/lib/league-city/race/track.ts`): the Interlagos layout traced from [OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL), scaled and smoothed. The "© OpenStreetMap contributors" credit MUST stay visible on the race page (rendered in `RaceHud.tsx`).
 
 ## Key files
 

@@ -19,9 +19,9 @@ function drive(st: LapState, s0: number, meters: number, speed: number, t0: numb
 }
 
 describe("track", () => {
-  it("is a closed loop about 1.6 km long", () => {
-    expect(track.length).toBeGreaterThan(1400);
-    expect(track.length).toBeLessThan(1800);
+  it("is a closed sprint loop of about 750 m", () => {
+    expect(track.length).toBeGreaterThan(650);
+    expect(track.length).toBeLessThan(850);
     const a = track.samples[0];
     const b = track.samples[track.samples.length - 1];
     expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeLessThan(3);
@@ -142,5 +142,21 @@ describe("race", () => {
     expect(standings(s, { c: 100 }, track.length)).toEqual(["b", "a", "c"]);
     tickRace(s, s.endsAt);
     expect(s.phase).toBe("over");
+  });
+});
+
+describe("ghost", () => {
+  it("records a lap and plays it back between frames", async () => {
+    const { GhostRecorder, ghostAt, medalFor } = await import("./ghost");
+    const r = new GhostRecorder();
+    r.begin(1000);
+    for (let t = 1000; t <= 2000; t += 50) r.push(t, (t - 1000) / 10, 0, 0);
+    r.checkpoint(1, 1500);
+    const run = r.finish(1000)!;
+    expect(run.splits[1]).toBe(500);
+    expect(ghostAt(run, 525)!.x).toBeCloseTo(52.5, 1);
+    expect(ghostAt(run, 5000)).toBeNull();
+    expect(medalFor(30_000)).toBe("gold");
+    expect(medalFor(99_000)).toBeNull();
   });
 });

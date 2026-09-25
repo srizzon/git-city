@@ -49,12 +49,17 @@ export interface LapState {
   valid: boolean;
   /** Recent (time, distance driven) for the speed check. */
   trail: { at: number; d: number }[];
-  /** Driving the wrong way right now. */
+  /** Meters driven backwards since the car last went forward. */
+  back: number;
+  /** Driving the wrong way right now (more than WRONG_WAY m backwards). */
   wrongWay: boolean;
 }
 
+/** A slide or a bump isn't the wrong way; this much driving backwards is (m). */
+const WRONG_WAY = 10;
+
 export function newLapState(): LapState {
-  return { s: null, at: 0, next: 0, lapStart: null, valid: true, trail: [], wrongWay: false };
+  return { s: null, at: 0, next: 0, lapStart: null, valid: true, trail: [], back: 0, wrongWay: false };
 }
 
 /** Back to "not started": the next start-line crossing begins a lap (race start, a reset to the grid). */
@@ -108,7 +113,9 @@ export function stepLaps(t: Track, st: LapState, x: number, z: number, now: numb
   }
 
   const ds = arcDelta(t, st.s, spot.s);
-  st.wrongWay = ds < -0.5 && dt < 1;
+  if (ds > 0.5) st.back = 0;
+  else if (ds < 0 && dt < 1) st.back -= ds;
+  st.wrongWay = st.back > WRONG_WAY;
 
   // Speed over the window: distance driven forward vs time.
   if (ds > 0) {
