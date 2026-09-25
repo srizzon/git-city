@@ -1,4 +1,4 @@
-import { getResend } from "./resend";
+import { sendEmail } from "./resend";
 import {
   wrapInBaseTemplate,
   escapeHtml,
@@ -13,6 +13,12 @@ export interface AdStats {
   impressions: number;
   clicks: number;
   countries?: number;
+}
+
+/** Throws on a Resend error so the cron doesn't mark the ad as notified. */
+async function send(payload: { to: string; subject: string; html: string }) {
+  const { error } = await sendEmail({ from: FROM, ...payload });
+  if (error) throw new Error(`Resend error: ${error.message}`);
 }
 
 function formatCtr(impressions: number, clicks: number): string {
@@ -77,9 +83,7 @@ export async function sendAdExpiringEmail(
     `;
   }
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await send({
     to: email,
     subject: hasStats
       ? `${formatNumber(stats.impressions)} impressions and counting — your ad ends in ${daysLeft} day${plural}`
@@ -113,14 +117,12 @@ export async function sendAdExpiredEmail(
   const body = `
     <h2 style="margin: 0 0 16px; font-size: 22px; color: #111;">Your "${brand}" results are in</h2>
     ${buildStatsTable(rows)}
-    ${muted("Average display ad CTR is 0.1-0.5%. Your campaign landed at ${ctr}.")}
+    ${muted(`Average display ad CTR is 0.1-0.5%. Your campaign landed at ${ctr}.`)}
     ${p("Every impression was a real GitHub developer, not a bot.")}
-    ${buildButton("Run another ad", escapeHtml(advertiseUrl))}
+    ${buildButton("Run another ad", advertiseUrl)}
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await send({
     to: email,
     subject: `Your ad results: ${formatNumber(stats.clicks)} clicks, ${ctr} CTR`,
     html: wrapInBaseTemplate(body),
@@ -146,9 +148,7 @@ export async function sendAdFollowup7dEmail(
     ${buildButton("Get back in front of them", ADVERTISE_URL)}
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await send({
     to: email,
     subject: `${formatNumber(cityDevs)} developers in Git City — and growing`,
     html: wrapInBaseTemplate(body),
@@ -180,9 +180,7 @@ export async function sendAdFollowup30dEmail(
     ${buildButton("See ad options", ADVERTISE_URL)}
   `;
 
-  const resend = getResend();
-  await resend.emails.send({
-    from: FROM,
+  await send({
     to: email,
     subject: `${formatNumber(newDevs)} new developers joined since your last ad`,
     html: wrapInBaseTemplate(body),

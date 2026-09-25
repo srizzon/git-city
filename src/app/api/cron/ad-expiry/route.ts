@@ -108,18 +108,23 @@ export async function GET(request: NextRequest) {
     results.errors++;
   }
 
+  // Expired ads are flipped to active=false by pg_cron every 15 min
+  // (deactivate_expired_ads), so steps 2-4 must not filter on active. Each step
+  // only looks at a recent ends_at window so old ads never get a late email.
+
   // ── 2. Ads already expired (send final stats) ──
   try {
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+    // expiry_notified is NULL (never notified) or "expiring"; .neq() alone drops NULLs.
     const { data: expiredAds } = await sb
       .from("sky_ads")
       .select("id, brand, purchaser_email, ends_at, expiry_notified")
-      .eq("active", true)
       .not("ends_at", "is", null)
       .not("purchaser_email", "is", null)
       .lt("ends_at", now.toISOString())
-      .neq("expiry_notified", "expired")
-      .neq("expiry_notified", "followup_7d")
-      .neq("expiry_notified", "followup_30d");
+      .gte("ends_at", threeDaysAgo.toISOString())
+      .or("expiry_notified.is.null,expiry_notified.eq.expiring");
 
     if (expiredAds) {
       for (const ad of expiredAds) {
@@ -153,15 +158,16 @@ export async function GET(request: NextRequest) {
   // ── 3. 7-day follow-up ──
   try {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
 
     const { data: followupAds } = await sb
       .from("sky_ads")
       .select("id, brand, purchaser_email, ends_at")
-      .eq("active", true)
       .eq("expiry_notified", "expired")
       .not("ends_at", "is", null)
       .not("purchaser_email", "is", null)
-      .lt("ends_at", sevenDaysAgo.toISOString());
+      .lt("ends_at", sevenDaysAgo.toISOString())
+      .gte("ends_at", tenDaysAgo.toISOString());
 
     if (followupAds) {
       const cityDevs = await getCityDevs();
@@ -197,15 +203,16 @@ export async function GET(request: NextRequest) {
   // ── 4. 30-day win-back ──
   try {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const thirtyThreeDaysAgo = new Date(now.getTime() - 33 * 24 * 60 * 60 * 1000);
 
     const { data: winbackAds } = await sb
       .from("sky_ads")
       .select("id, brand, purchaser_email, ends_at")
-      .eq("active", true)
       .eq("expiry_notified", "followup_7d")
       .not("ends_at", "is", null)
       .not("purchaser_email", "is", null)
-      .lt("ends_at", thirtyDaysAgo.toISOString());
+      .lt("ends_at", thirtyDaysAgo.toISOString())
+      .gte("ends_at", thirtyThreeDaysAgo.toISOString());
 
     if (winbackAds) {
       const cityDevs = await getCityDevs();
