@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string; join?: string }>;
+  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string; join?: string; new?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -51,6 +51,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   const { slug } = await params;
   const query = await searchParams;
   const { invite, ref, t, edit, drive, join } = query;
+  const justCreated = query.new === "1";
   const league = await getLeagueBySlug(slug);
   if (!league) {
     // A renamed town: send old links (invites included) to its new address.
@@ -111,6 +112,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
       startEditing={edit === "1" && data.viewer?.is_admin === true}
       startDriving={drive === "1"}
       startJoin={join === "1"}
+      startQuest={justCreated && data.viewer?.is_admin === true}
       joinAction={joinAction}
       pendingRequests={pendingRequests}
       groupLink={groupLink}

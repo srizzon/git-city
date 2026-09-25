@@ -30,37 +30,13 @@ import type { CarApi } from "./Car";
 import type { BattleEvent, RemoteDriver } from "./useDrivePresence";
 import type { DriveInputRef } from "./useDriveInput";
 import { Bomb, Bursts, Crate, FIRE, Missile, SHOCK_COLORS, type VoxelBursts } from "./Voxels";
+import { chime } from "@/lib/sfx/chime";
 
 // Item boxes and attacks, in voxels. The server says which box slots are up
 // and relays every attack; this draws them, takes a box when you drive
 // through one, fires what you hold on F, and applies what catches *your*
 // car: a shockwave, a bomb you drive over, a missile that reaches you. Every
 // blast throws the car up and tumbling, and knocks the crown off its holder.
-
-// A short rising two-note chime, synthesized like the horn (no sound file).
-let chimeCtx: AudioContext | null = null;
-function chime() {
-  try {
-    chimeCtx ??= new AudioContext();
-    const ctx = chimeCtx;
-    const t0 = ctx.currentTime;
-    [880, 1318.5].forEach((f, i) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "square";
-      o.frequency.value = f;
-      const t = t0 + i * 0.07;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.12, t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
-      o.connect(g).connect(ctx.destination);
-      o.start(t);
-      o.stop(t + 0.18);
-    });
-  } catch {
-    // no audio
-  }
-}
 
 interface Fx {
   id: number;

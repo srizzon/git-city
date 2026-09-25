@@ -50,6 +50,9 @@ import { MobileActionBar, MobileTownHeader } from "@/components/league/hud/Mobil
 import IntroOverlay, { OUTRO_MS } from "@/components/league/hud/IntroOverlay";
 import { carIntro } from "@/lib/league-city/intro";
 import { townDisplayName } from "@/lib/towns/names";
+import TownQuest from "@/components/league/hud/TownQuest";
+import { freshQuest, nextStep, parseQuest, questKey, questSteps, type QuestState, type QuestStep } from "@/lib/towns/quest";
+import { chime } from "@/lib/sfx/chime";
 import {
   HOTBAR,
   initEditor,
@@ -89,6 +92,7 @@ export default function LeagueClient({
   startEditing = false,
   startDriving = false,
   startJoin = false,
+  startQuest = false,
   joinAction,
   pendingRequests,
   groupLink,
@@ -110,6 +114,8 @@ export default function LeagueClient({
   startDriving?: boolean;
   /** ?join=1: back from sign-in, reopen the join panel. */
   startJoin?: boolean;
+  /** ?new=1 from /towns/new: the admin's first steps start. */
+  startQuest?: boolean;
   joinAction: JoinAction;
   /** Admin: open join requests. */
   pendingRequests: number;
@@ -477,6 +483,72 @@ export default function LeagueClient({
     return () => window.removeEventListener("keydown", onKey);
   }, [intro, skipIntro]);
 
+  // ─── First steps ───────────────────────────────────────────
+  // A new town's quest (lib/towns/quest): each step ticks itself when it
+  // happens, with a chime; done, it says so and goes away.
+  const [quest, setQuest] = useState<QuestState | null>(null);
+  const questRef = useRef<QuestState | null>(null);
+  const [questDesktop, setQuestDesktop] = useState(true);
+  const steps = useMemo(() => questSteps(questDesktop), [questDesktop]);
+  const saveQuest = useCallback(
+    (q: QuestState | null) => {
+      questRef.current = q;
+      setQuest(q);
+      try {
+        localStorage.setItem(questKey(league.slug), q ? JSON.stringify(q) : "done");
+      } catch {
+        // storage blocked: the quest lasts this visit
+      }
+    },
+    [league.slug],
+  );
+  const markQuest = useCallback(
+    (step: QuestStep) => {
+      const q = questRef.current;
+      if (!q || q[step]) return;
+      saveQuest({ ...q, [step]: true });
+      chime();
+    },
+    [saveQuest],
+  );
+  // From a callback after the first paint, like the intro: storage is client-only.
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setQuestDesktop(isDesktop());
+      if (!isAdmin) return;
+      if (startQuest) {
+        saveQuest(freshQuest());
+        const url = new URL(window.location.href);
+        url.searchParams.delete("new");
+        window.history.replaceState(null, "", url.pathname + url.search);
+        return;
+      }
+      let stored: string | null = null;
+      try {
+        stored = localStorage.getItem(questKey(league.slug));
+      } catch {
+        // storage blocked
+      }
+      const q = parseQuest(stored);
+      questRef.current = q;
+      setQuest(q);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [isAdmin, startQuest, league.slug, saveQuest]);
+  useEffect(() => {
+    if (mode === "drive") markQuest("drive");
+    if (mode === "edit") markQuest("build");
+  }, [mode, markQuest]);
+  useEffect(() => {
+    if (mode === "edit" && es.undo.length > 0) markQuest("place");
+  }, [mode, es.undo.length, markQuest]);
+  const questComplete = !!quest && nextStep(quest, steps) === null;
+  useEffect(() => {
+    if (!questComplete) return;
+    const id = window.setTimeout(() => saveQuest(null), 2600);
+    return () => window.clearTimeout(id);
+  }, [questComplete, saveQuest]);
+
   // ─── Identity panels (editor) ──────────────────────────────
   const [hillPanel, setHillPanel] = useState(false);
   const [hillSaving, setHillSaving] = useState(false);
@@ -527,6 +599,14 @@ export default function LeagueClient({
   const verifyHref =
     !isMember && !showJoinCta && viewer && league.kind === "company" ? "/towns/verify" : null;
   const close = () => setPanel(null);
+  const questStep = (step: QuestStep) => {
+    if (step === "drive") enterDrive();
+    else if (step === "invite") {
+      setFocused(null);
+      setPanel("invite");
+    } else enterEdit();
+  };
+  const questCard = quest ? <TownQuest state={quest} steps={steps} onStep={questStep} onDismiss={() => saveQuest(null)} /> : null;
   // No card: the invite panel stays open with the link to send.
   const onInviteePlaced = useCallback((login: string) => {
     setFocused(null);
@@ -670,8 +750,9 @@ export default function LeagueClient({
       {/* HUD: the wrappers ignore the pointer so the city stays draggable. */}
       {!editing && !driving && !intro && outro === null && (
         <>
-          <div className="pointer-events-none fixed left-4 top-4 z-30 max-sm:hidden" style={hudEnter ? { animation: "fade-in 0.45s ease-out both" } : undefined}>
+          <div className="pointer-events-none fixed left-4 top-4 z-30 flex flex-col gap-3 max-sm:hidden" style={hudEnter ? { animation: "fade-in 0.45s ease-out both" } : undefined}>
             <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} badges={badges} pendingRequests={pendingRequests} />
+            {questCard}
           </div>
           {/* Phones: one compact header row. */}
           <div
@@ -685,6 +766,7 @@ export default function LeagueClient({
               pendingRequests={pendingRequests}
               onRace={() => setPanel("standings")}
             />
+            {questCard && !panel && <div className="mt-2">{questCard}</div>}
           </div>
           {/* The lo-fi player's spot: above the bar on phones, bottom left on desktop. */}
           <div
@@ -809,6 +891,7 @@ export default function LeagueClient({
             if (b) setFocused(b);
           }}
           onPlaced={onInviteePlaced}
+          onShared={() => markQuest("invite")}
           onClose={close}
         />
       )}
