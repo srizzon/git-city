@@ -17,8 +17,8 @@ import type { CityWorkerRequest } from "./city-load.worker";
 
 const STORAGE_PREFIX = "storage/v1/object/public/city-data";
 
-// Aligned with the cron cadence (changes every 5 min) for CDN cache reuse.
-const cacheBucket = () => Math.floor(Date.now() / 300_000);
+// Aligned with the cron cadence (vercel.json: every 10 min) for CDN cache reuse.
+const cacheBucket = () => Math.floor(Date.now() / 600_000);
 
 export function snapshotUrl(path: string, cacheBust: number = cacheBucket()): string {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/${STORAGE_PREFIX}/${path}?v=${cacheBust}`;
