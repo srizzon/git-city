@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { renderWelcomeEmail } from "@/lib/notification-senders/welcome";
 import { renderRaidEmail } from "@/lib/notification-senders/raid";
 import { sendEmail } from "@/lib/resend";
+import { EMAIL_PREVIEWS } from "@/lib/email/previews";
 import { RECAP_DEV_COLUMNS, loadRecapContext, loadWeeklyRecaps, renderWeeklyRecapEmail } from "@/lib/notification-senders/weekly-recap";
 
 const PREVIEW_LINKS = { unsubscribeUrl: "https://thegitcity.com/api/unsubscribe?dev=0&cat=all&token=preview" };
@@ -40,6 +41,10 @@ export async function GET(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 502 });
     return NextResponse.json({ sent: true, to: user.email, id: data?.id });
   };
+
+  // Sample renders registered per area in src/lib/email/previews/.
+  const preview = EMAIL_PREVIEWS[template];
+  if (preview) return respond(await preview());
 
   // Emails on the new layout render through their real sender.
   // ?login= previews it for any developer, with their real rank.
@@ -158,7 +163,7 @@ export async function GET(req: NextRequest) {
   const t = TEMPLATES[template];
   if (!t) {
     return NextResponse.json(
-      { error: "Unknown template", available: ["welcome", "raid", "recap", ...Object.keys(TEMPLATES)] },
+      { error: "Unknown template", available: ["welcome", "raid", "recap", ...Object.keys(EMAIL_PREVIEWS), ...Object.keys(TEMPLATES)] },
       { status: 400 },
     );
   }

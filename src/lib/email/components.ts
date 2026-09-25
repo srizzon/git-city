@@ -7,6 +7,7 @@ export const EMAIL_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegit
 export const COLORS = {
   bg: "#0d0d0f",
   raised: "#161618",
+  red: "#ef4444",
   border: "#2a2a30",
   cream: "#e8dcc8",
   warm: "#d4cfc4",
@@ -61,8 +62,36 @@ export function heading(text: string, highlight?: string, after = ""): string {
   return gmailSafe(`<h1 class="h1" style="margin:0 0 12px; font-family:${FONT}; font-size:28px; line-height:1.2; font-weight:700; color:${COLORS.cream};">${escapeHtml(text)}${hl}${escapeHtml(after)}</h1>`);
 }
 
-export function paragraph(text: string): string {
-  return gmailSafe(`<p style="margin:0 0 20px; font-family:${FONT}; font-size:16px; line-height:1.6; color:${COLORS.warm};">${escapeHtml(text)}</p>`);
+export function paragraph(text: string, opts: { muted?: boolean } = {}): string {
+  const size = opts.muted ? 14 : 16;
+  const color = opts.muted ? COLORS.muted : COLORS.warm;
+  return gmailSafe(`<p style="margin:0 0 20px; font-family:${FONT}; font-size:${size}px; line-height:1.6; color:${color};">${escapeHtml(text)}</p>`);
+}
+
+/** Label / value rows, e.g. a receipt or a job listing's details. */
+export function detailRows(rows: { label: string; value: string }[]): string {
+  const trs = rows
+    .map(
+      (r, i) => `<tr>
+    <td valign="top" style="padding:10px 12px 10px 0; ${i ? `border-top:1px solid ${COLORS.border};` : ""}">${gmailSafe(`<div style="font-family:${FONT}; font-size:14px; line-height:1.4; color:${COLORS.muted};">${escapeHtml(r.label)}</div>`)}</td>
+    <td valign="top" align="right" style="padding:10px 0; ${i ? `border-top:1px solid ${COLORS.border};` : ""}">${gmailSafe(`<div style="font-family:${FONT}; font-size:14px; line-height:1.4; font-weight:600; color:${COLORS.cream}; font-variant-numeric:tabular-nums;">${escapeHtml(r.value)}</div>`)}</td>
+  </tr>`,
+    )
+    .join("\n");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px; padding:4px 16px; background-color:${COLORS.raised}; background-image:linear-gradient(${COLORS.raised},${COLORS.raised});">
+  ${trs}
+</table>`;
+}
+
+/** A boxed note with a colored left edge, e.g. a rejection reason or a warning. */
+export function callout(text: string, tone: "info" | "warn" = "info"): string {
+  const edge = tone === "warn" ? COLORS.red : COLORS.lime;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+  <tr>
+    <td width="4" style="background-color:${edge}; font-size:0; line-height:0;">&nbsp;</td>
+    <td style="padding:14px 16px; background-color:${COLORS.raised}; background-image:linear-gradient(${COLORS.raised},${COLORS.raised});">${gmailSafe(`<div style="font-family:${FONT}; font-size:15px; line-height:1.6; color:${COLORS.warm};">${escapeHtml(text)}</div>`)}</td>
+  </tr>
+</table>`;
 }
 
 /** Small uppercase label above a group, e.g. "Three ways to climb". */

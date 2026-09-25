@@ -4,7 +4,18 @@ import { COLORS, EMAIL_BASE_URL, FONT, escapeHtml, gmailSafe } from "./component
 export const CONTACT_EMAIL = "samuel@thegitcity.com";
 
 export interface EmailLinks {
-  unsubscribeUrl: string;
+  /** One-click unsubscribe for this email's category. Omit for mail that has none (e.g. sign-in links). */
+  unsubscribeUrl?: string;
+  /** Where the reader manages email. Defaults to the player settings page; null hides it. */
+  settingsUrl?: string | null;
+}
+
+function footerLinks(links: EmailLinks): { label: string; url: string }[] {
+  const settings = links.settingsUrl === undefined ? `${EMAIL_BASE_URL}/settings` : links.settingsUrl;
+  return [
+    settings ? { label: "Email settings", url: settings } : null,
+    links.unsubscribeUrl ? { label: "Unsubscribe", url: links.unsubscribeUrl } : null,
+  ].filter((l): l is { label: string; url: string } => l !== null);
 }
 
 export interface LayoutOptions {
@@ -29,6 +40,9 @@ export function renderLayout(opts: LayoutOptions): string {
     ? `<tr><td class="px" style="padding:0 20px;">${opts.hero}</td></tr>`
     : "";
   const bodyTop = opts.hero ? 32 : 8;
+  const footer = footerLinks(opts.links)
+    .map((l) => `<a href="${escapeHtml(l.url)}" style="color:${COLORS.muted}; text-decoration:underline;">${l.label}</a>`)
+    .join(" &nbsp;&middot;&nbsp; ");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -64,7 +78,7 @@ export function renderLayout(opts: LayoutOptions): string {
       <div style="height:1px; line-height:1px; font-size:0; background-color:${COLORS.border}; background-image:linear-gradient(${COLORS.border},${COLORS.border});">&nbsp;</div>
       <div style="padding-top:20px;">${gmailSafe(`<div style="font-family:${FONT}; font-size:13px; line-height:1.6; color:${COLORS.muted};">
         ${escapeHtml(opts.reason)}<br>
-        <a href="${EMAIL_BASE_URL}/settings" style="color:${COLORS.muted}; text-decoration:underline;">Email settings</a> &nbsp;&middot;&nbsp; <a href="${escapeHtml(opts.links.unsubscribeUrl)}" style="color:${COLORS.muted}; text-decoration:underline;">Unsubscribe</a><br>
+        ${footer ? `${footer}<br>` : ""}
         ${LEGAL_NAME} &middot; CNPJ ${LEGAL_CNPJ} &middot; ${CONTACT_EMAIL}
       </div>`)}</div>
     </td></tr>
@@ -82,8 +96,7 @@ export function renderText(opts: { lines: string[]; reason: string; links: Email
     "",
     "--",
     opts.reason,
-    `Email settings: ${EMAIL_BASE_URL}/settings`,
-    `Unsubscribe: ${opts.links.unsubscribeUrl}`,
+    ...footerLinks(opts.links).map((l) => `${l.label}: ${l.url}`),
     `${LEGAL_NAME} · CNPJ ${LEGAL_CNPJ} · ${CONTACT_EMAIL}`,
   ].join("\n");
 }
