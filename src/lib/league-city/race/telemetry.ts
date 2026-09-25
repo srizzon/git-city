@@ -5,6 +5,7 @@
 import type { DriveTelemetry } from "../drive/telemetry";
 import type { RaceServerMsg } from "./net";
 import type { RaceState } from "./race";
+import type { Launch } from "./trial";
 
 /** What the HUD reads every frame, without re-rendering. */
 export interface RaceTelemetry extends DriveTelemetry {
@@ -31,10 +32,16 @@ export interface RaceTelemetry extends DriveTelemetry {
   /** Time trial: the lap you're on (1…RUN_LAPS) and when the run started (server ms). */
   runLap: number;
   runStart: number | null;
+  /** Time trial countdown: 3, 2, 1, 0 at GO, null outside it. */
+  countdown: number | null;
+  /** When GO showed, the launch it judged, and when the final lap began (performance.now). */
+  goAt: number;
+  launch: { kind: Launch; at: number } | null;
+  finalLapAt: number;
 }
 
 export function createRaceTelemetry(): RaceTelemetry {
-  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, driftLevel: 0, turbo: false, turboReady: false, split: null, turboFlash: null, pos: null, ghostPos: null, others: [], lapStart: null, offset: 0, wrongWay: false, lights: 0, runLap: 1, runStart: null };
+  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, driftLevel: 0, turbo: false, turboReady: false, split: null, turboFlash: null, pos: null, ghostPos: null, others: [], lapStart: null, offset: 0, wrongWay: false, lights: 0, runLap: 1, runStart: null, countdown: null, goAt: 0, launch: null, finalLapAt: 0 };
 }
 
 /** Laps in a time trial run (like Mario Kart's time trials). */
@@ -45,6 +52,9 @@ export interface RunResult {
   /** First crossing of the line to the last (ms). */
   total: number;
 }
+
+/** A finished run with how it stands against your best run here (this browser). */
+export type TrialResult = RunResult & { prevBest: number | null; record: boolean };
 
 export interface RaceView {
   race: RaceState;
