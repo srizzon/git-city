@@ -4,14 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 // Everything over the town intro, in the home city intro's language (its
 // letterbox bars, text in the lower bar, the accent word, the confetti):
-//   start      the bars grow in from the edges
-//   approach   one line: who built this town
-//   crossing   "Welcome to <town>", the name in the sky's accent, the logo
-//              beside it and this week's race under it; confetti. Held over
-//              the reveal of the city.
+//   approach   nothing but Skip: the car, the road and the arch have the frame
+//   crossing   the bars grow in from the edges with "Welcome to <town>", the
+//              name in the sky's accent, the logo beside it and this week's
+//              race under it; confetti. Held over the reveal of the city.
 //   outro      the text fades and the bars shrink back; then the HUD comes in
-// Lines change on the intro's own clock (not wall time), so a slow frame rate
-// can't separate them from the car; the fades are CSS, like the home's.
+// The welcome lands on the intro's own clock (not wall time), so a slow frame
+// rate can't separate it from the car; the fades are CSS, like the home's.
 
 export const OUTRO_MS = 1000;
 
@@ -34,8 +33,6 @@ export interface IntroOverlayProps {
   crossAt: number;
   /** The scene is done: fade the text, shrink the bars. */
   outro: boolean;
-  /** "18 developers built this town". */
-  story: string;
   /** Town name as shown in the HUD. */
   name: string;
   /** "#3 among companies this week", "@dev3 leads this week", or null. */
@@ -47,24 +44,17 @@ export interface IntroOverlayProps {
   onSkip: () => void;
 }
 
-export default function IntroOverlay({ clock, crossAt, outro, story, name, race, logoUrl, accent, shadow, onSkip }: IntroOverlayProps) {
-  // -1 before the first line, 0 the story line, 1 the welcome.
+export default function IntroOverlay({ clock, crossAt, outro, name, race, logoUrl, accent, shadow, onSkip }: IntroOverlayProps) {
+  // -1 on the approach, 1 the welcome (from the crossing).
   const [phase, setPhase] = useState(-1);
-  const [barsIn, setBarsIn] = useState(false);
   const [confetti, setConfetti] = useState(false);
   const phaseRef = useRef(-1);
-
-  // Bars grow in on the first frame after mount, so the transition runs.
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setBarsIn(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
 
   useEffect(() => {
     let raf = 0;
     const tick = () => {
       const t = clock.current;
-      const next = t >= crossAt ? 1 : t >= 0.6 && t < crossAt - 0.35 ? 0 : t >= crossAt - 0.35 ? -2 : -1;
+      const next = t >= crossAt ? 1 : -1;
       if (next !== phaseRef.current) {
         phaseRef.current = next;
         setPhase(next);
@@ -76,7 +66,7 @@ export default function IntroOverlay({ clock, crossAt, outro, story, name, race,
     return () => cancelAnimationFrame(raf);
   }, [clock, crossAt]);
 
-  const bars = barsIn && !outro;
+  const bars = phase === 1 && !outro;
   const text = outro ? -1 : phase;
 
   // Same burst as the home intro, in the sky's colors; fixed per mount.
@@ -112,18 +102,6 @@ export default function IntroOverlay({ clock, crossAt, outro, story, name, race,
 
       {/* Text in the lower bar */}
       <div className="absolute inset-x-0 bottom-0 flex items-center justify-center px-4" style={{ height: "18%" }}>
-        <p
-          className="absolute text-center font-pixel normal-case text-cream"
-          style={{
-            fontSize: "clamp(0.85rem, 3vw, 1.5rem)",
-            letterSpacing: "0.05em",
-            opacity: text === 0 ? 1 : 0,
-            transition: "opacity 0.7s ease-in-out",
-          }}
-        >
-          {story}
-        </p>
-
         <div
           className="absolute flex max-w-[calc(100vw-2rem)] items-center gap-3 sm:gap-5"
           style={{

@@ -773,13 +773,6 @@ export default function LeagueClient({
           clock={introClock}
           crossAt={introCrossAt}
           outro={!intro}
-          story={
-            data.counts.joined === 1
-              ? "One developer built this town"
-              : league.kind === "company" && league.github_org
-                ? `${data.counts.joined} developers from @${league.github_org} built this town`
-                : `${data.counts.joined} developers built this town`
-          }
           name={townDisplayName(league.name)}
           race={
             weeklyRank !== null
