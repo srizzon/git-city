@@ -363,6 +363,16 @@ export default function RaceHud({
         </div>
       )}
 
+      {/* ODbL: the layout comes from OpenStreetMap, so its credit stays on screen. */}
+      <a
+        href="https://www.openstreetmap.org/copyright"
+        target="_blank"
+        rel="noreferrer"
+        className="pointer-events-auto absolute bottom-2 right-3 text-[8px] normal-case text-dim hover:text-muted"
+      >
+        Layout after Interlagos · © OpenStreetMap contributors
+      </a>
+
       <StartScreen ready={ready} />
       {paused && ready && <PauseMenu camera={camera} muted={muted} onResume={onResume} onCamera={onCamera} onMute={onMute} onExit={onExit} />}
     </div>
