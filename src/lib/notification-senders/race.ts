@@ -89,7 +89,7 @@ export function renderRaceChallengeEmail(d: RaceChallengeEmailData, links: Email
   const intro = `They sent you their best lap on the ${town} race track. Beat their ghost.`;
   const tiles = [
     { value: formatLap(d.theirMs), label: `@${d.challengerLogin}` },
-    { value: d.yourMs === null ? "-" : formatLap(d.yourMs), label: "Your best" },
+    { value: d.yourMs === null ? "No lap yet" : formatLap(d.yourMs), label: "Your best" },
   ];
   const reason = `You're getting this because you're a member of ${town} in Git City.`;
   const html = renderLayout({
