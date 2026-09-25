@@ -18,8 +18,8 @@ type Vec3 = [number, number, number];
 
 /** Chase view, city units (drive mode's chase: 7 m back, 2.8 m up). */
 const BACK = 18;
-const UP = 8;
-const AHEAD = 14;
+const UP = 5.5;
+const AHEAD = 60;
 /** The opening shot: pulled back and up, looking down at the car. */
 const WIDE_BACK = 48;
 const WIDE_UP = 32;
@@ -45,7 +45,7 @@ function chase(x: number, z: number, pos: THREE.Vector3, look: THREE.Vector3, fa
   const up = UP + (WIDE_UP - UP) * wide;
   pos.set(x, up * far, z + back * far);
   // Wide: aim a little past the car, so it sits low in frame with the arch and city above.
-  look.set(x, 4 - 4 * wide, z - AHEAD - 30 * wide);
+  look.set(x, 6 - 6 * wide, z - AHEAD - 16 * wide);
 }
 
 export default function TownIntro({
