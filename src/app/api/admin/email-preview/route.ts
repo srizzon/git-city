@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { isAdminUser } from "@/lib/auth-identity";
 import { wrapInBaseTemplate, buildButton, buildStatsTable } from "@/lib/email-template";
+import { getSupabaseAdmin } from "@/lib/supabase";
+import { renderWelcomeEmail } from "@/lib/notification-senders/welcome";
+
+const PREVIEW_LINKS = { unsubscribeUrl: "https://thegitcity.com/api/unsubscribe?dev=0&cat=all&token=preview" };
 
 /**
  * GET /api/admin/email-preview?template=job-approved
@@ -15,6 +19,19 @@ export async function GET(req: NextRequest) {
   }
 
   const template = req.nextUrl.searchParams.get("template") ?? "job-approved";
+
+  // Emails on the new layout render through their real sender.
+  // ?login= previews it for any developer, with their real rank.
+  if (template === "welcome") {
+    const login = req.nextUrl.searchParams.get("login") ?? "srizzon";
+    const { data: dev } = await getSupabaseAdmin()
+      .from("developers")
+      .select("github_login, rank")
+      .ilike("github_login", login)
+      .maybeSingle();
+    const { html } = renderWelcomeEmail(dev?.github_login ?? login, dev?.rank ?? null, PREVIEW_LINKS);
+    return new NextResponse(html, { headers: { "Content-Type": "text/html" } });
+  }
 
   const TEMPLATES: Record<string, { subject: string; html: string }> = {
     "job-approved": {
@@ -88,12 +105,12 @@ export async function GET(req: NextRequest) {
   const t = TEMPLATES[template];
   if (!t) {
     return NextResponse.json(
-      { error: "Unknown template", available: Object.keys(TEMPLATES) },
+      { error: "Unknown template", available: ["welcome", ...Object.keys(TEMPLATES)] },
       { status: 400 },
     );
   }
 
-  const fullHtml = wrapInBaseTemplate(t.html, "https://thegitcity.com/api/unsubscribe?dev=0&cat=all&token=preview");
+  const fullHtml = wrapInBaseTemplate(t.html, PREVIEW_LINKS.unsubscribeUrl);
 
   return new NextResponse(fullHtml, {
     headers: { "Content-Type": "text/html" },
