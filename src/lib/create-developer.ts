@@ -21,7 +21,8 @@ export async function createDeveloperFromGitHub(login: string): Promise<{ id: nu
       {
         ...data,
         fetched_at: new Date().toISOString(),
-        claimed: false,
+        // No `claimed` here: new rows default to false, and an existing row
+        // (a town invite racing a login) must keep its claim.
       },
       { onConflict: "github_login" },
     )
