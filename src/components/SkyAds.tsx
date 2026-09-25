@@ -275,6 +275,7 @@ export function BannerPlane({
     <group ref={groupRef}>
       {/* Invisible hitbox for pointer guard (click-only, no hover events) */}
       <mesh
+        visible={false}
         ref={hitboxRef}
         position={[0, bannerY / 2, (ROPE_GAP + BANNER_LENGTH) / 2]}
         onClick={handleClick}
@@ -429,6 +430,7 @@ export function Blimp({
     <group ref={groupRef}>
       {/* Invisible hitbox for pointer guard (click-only, no hover events) */}
       <mesh
+        visible={false}
         ref={blimpHitboxRef}
         position={[0, -2, 0]}
         onClick={handleClick}

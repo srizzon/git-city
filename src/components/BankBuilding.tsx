@@ -239,8 +239,8 @@ export default function BankBuilding({ onClick }: BankBuildingProps) {
 
   return (
     <group ref={groupRef} position={BANK_POSITION} scale={BANK_SCALE} userData={{ isLandmark: true }}>
-      {/* Invisible raycast hitbox covering the whole tower */}
-      <mesh position={[0, BODY_Y, 0]}>
+      {/* Invisible raycast hitbox covering the whole tower (visible=false: raycasts, never draws) */}
+      <mesh position={[0, BODY_Y, 0]} visible={false}>
         <boxGeometry args={[D + 40, H + 80, W + 40]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
