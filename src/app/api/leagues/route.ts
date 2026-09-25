@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createCustomLeague, getViewer } from "@/lib/leagues/service";
 import { getGlobalRanking } from "@/lib/leagues/queries";
 import { assertSameOrigin, leagueErrorResponse, readJson } from "@/lib/leagues/http";
+import { DEFAULT_TEMPLATE, isTemplateId } from "@/lib/league-city/templates";
+import { isJoinMode } from "@/lib/towns/joining";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +19,7 @@ export async function GET() {
   }
 }
 
-// POST: create a custom league { name }.
+// POST: create a custom league { name, template?, scoring?, join? }.
 export async function POST(req: Request) {
   const bad = assertSameOrigin(req);
   if (bad) return bad;
@@ -27,7 +29,15 @@ export async function POST(req: Request) {
 
   const body = await readJson(req);
   try {
-    const league = await createCustomLeague(viewer, typeof body.name === "string" ? body.name : "");
+    const league = await createCustomLeague(
+      viewer,
+      typeof body.name === "string" ? body.name : "",
+      isTemplateId(body.template) ? body.template : DEFAULT_TEMPLATE,
+      {
+        scoring: body.scoring === "xp" || body.scoring === "contributions" ? body.scoring : undefined,
+        join: isJoinMode(body.join) ? body.join : undefined,
+      },
+    );
     return NextResponse.json({ league });
   } catch (err) {
     return leagueErrorResponse(err);

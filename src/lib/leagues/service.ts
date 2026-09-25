@@ -6,6 +6,7 @@ import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import type { ScoringMode } from "./scoring";
 import { inviteJoined } from "./joined";
 import { autoPlace, ensureCity, removeBuilding } from "@/lib/league-city/service";
+import { DEFAULT_TEMPLATE, templateFor, type TemplateId } from "@/lib/league-city/templates";
 import { cleanLeagueName, isReservedSlug, LOGIN_RE } from "./names";
 import { LeagueError, dbError } from "./errors";
 import { customJoinDecision, newInviteToken, tokenMatches } from "./invite-token";
@@ -174,7 +175,16 @@ async function uniqueSlug(base: string): Promise<string> {
 
 // ─── Create / join ──────────────────────────────────────────
 
-export async function createCustomLeague(viewer: Viewer, rawName: string): Promise<League> {
+/**
+ * A new custom league, its starter city built from `template`. `settings`
+ * (the template's, or what the creator changed) apply before the city.
+ */
+export async function createCustomLeague(
+  viewer: Viewer,
+  rawName: string,
+  template: TemplateId = DEFAULT_TEMPLATE,
+  settings: { scoring?: ScoringMode; join?: JoinMode } = {},
+): Promise<League> {
   const name = cleanLeagueName(rawName);
 
   // /league/<org> stays reserved for the org's company league, and app paths
@@ -200,9 +210,15 @@ export async function createCustomLeague(viewer: Viewer, rawName: string): Promi
     throw dbError("create_failed", error, "Could not create town.");
   }
 
+  const t = templateFor(template);
+  const scoring = settings.scoring ?? t.scoring;
+  const join = settings.join ?? t.join;
+  const { error: setErr } = await sb.from("leagues").update({ scoring_mode: scoring, join_mode: join }).eq("id", id as string);
+  if (setErr) console.error("[towns] template settings failed", setErr);
+
   const { data: league } = await sb.from("leagues").select(LEAGUE_COLUMNS).eq("id", id as string).single();
   if (!league) throw new LeagueError("create_failed", "Could not create town.", 500);
-  await ensureCity(league.id).catch((err) => console.error("[league-city] starter city failed", err));
+  await ensureCity(league.id, template).catch((err) => console.error("[league-city] starter city failed", err));
   return league as unknown as League;
 }
 
