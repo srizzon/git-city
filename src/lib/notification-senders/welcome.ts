@@ -5,7 +5,7 @@ import { renderLayout, renderText, type EmailLinks } from "../email/layout";
 
 const STEPS = [
   { lead: "Check in every day.", text: "Your streak keeps the windows lit and unlocks items." },
-  { lead: "Raid a rival.", text: "Pick a building, win the fight, take their XP." },
+  { lead: "Raid a rival.", text: "Win the fight and leave your tag on their building." },
   { lead: "Start a town.", text: "Bring friends and race them every week." },
 ];
 
