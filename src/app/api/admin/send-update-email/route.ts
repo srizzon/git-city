@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendEmail } from "@/lib/resend";
 import { getDeveloperEmail } from "@/lib/notification-helpers";
 import { buildUnsubscribeUrl } from "@/lib/notifications";
+import { withUnsubscribeFooter } from "@/lib/admin-emails";
 
 const FROM = "Git City <noreply@thegitcity.com>";
 
@@ -10,7 +11,8 @@ const FROM = "Git City <noreply@thegitcity.com>";
  * POST /api/admin/send-update-email
  * Send a product update email to all claimed developers with email.
  * Sends the provided HTML as-is (no wrapInBaseTemplate) so custom
- * email designs are preserved exactly as authored.
+ * email designs are preserved exactly as authored; only the unsubscribe
+ * footer is added.
  * Protected by CRON_SECRET.
  *
  * Body: { subject: string, html: string, slug: string }
@@ -77,11 +79,7 @@ export async function POST(request: NextRequest) {
 
       const unsubUrl = buildUnsubscribeUrl(dev.id, "marketing");
 
-      // Inject unsubscribe link before closing </body>
-      const finalHtml = html.replace(
-        "</body>",
-        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0a0a0e;"><tr><td align="center" style="padding: 0 20px 48px;"><span style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #3a3a44;"><a href="${unsubUrl}" style="color: #3a3a44; text-decoration: underline; font-family: 'Silkscreen', monospace; font-size: 11px;">unsubscribe</a></span></td></tr></table></body>`,
-      );
+      const finalHtml = withUnsubscribeFooter(html, unsubUrl);
 
       const { error } = await sendEmail({
         from: FROM,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendEmail } from "@/lib/resend";
 import { rateLimit } from "@/lib/rate-limit";
-import { escapeHtml, wrapInBaseTemplate } from "@/lib/email-template";
+import { renderSponsorshipInquiryEmail } from "@/lib/admin-emails";
 
 const TO = "samuel@thegitcity.com";
 const FROM = "Git City <noreply@thegitcity.com>";
@@ -77,40 +77,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const roleRow = role
-    ? `<tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase;">Role</td><td style="padding: 8px 0; color: #111; font-size: 14px;">${escapeHtml(role)}</td></tr>`
-    : "";
-  const budgetRow = budget
-    ? `<tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase;">Budget</td><td style="padding: 8px 0; color: #111; font-size: 14px;">${escapeHtml(budget)}</td></tr>`
-    : "";
-
-  const html = wrapInBaseTemplate(`
-    <h2 style="margin: 0 0 16px; font-size: 22px; color: #111;">New Sponsorship inquiry</h2>
-    <p style="font-size: 15px; color: #333; line-height: 1.6;">
-      Someone wants to sponsor Git City.
-    </p>
-    <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; margin-top: 16px; border-collapse: collapse;">
-      <tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase; width: 140px;">Name</td><td style="padding: 8px 0; color: #111; font-size: 14px;">${escapeHtml(name)}</td></tr>
-      <tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase;">Email</td><td style="padding: 8px 0; color: #111; font-size: 14px;"><a href="mailto:${escapeHtml(email)}" style="color: #111;">${escapeHtml(email)}</a></td></tr>
-      <tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase;">Company</td><td style="padding: 8px 0; color: #111; font-size: 14px;">${escapeHtml(company)}</td></tr>
-      ${roleRow}
-      <tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase;">Website</td><td style="padding: 8px 0; color: #111; font-size: 14px;"><a href="${escapeHtml(website)}" style="color: #111;">${escapeHtml(website)}</a></td></tr>
-      <tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase;">Format interest</td><td style="padding: 8px 0; color: #111; font-size: 14px;">${escapeHtml(formatInterest)}</td></tr>
-      ${budgetRow}
-    </table>
-    <div style="margin-top: 20px; padding: 16px; background-color: #f6f6f6; border-radius: 4px;">
-      <p style="margin: 0 0 8px; color: #999; font-size: 12px; text-transform: uppercase;">Message</p>
-      <p style="margin: 0; color: #111; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(message)}</p>
-    </div>
-  `);
+  const { subject, html, text } = renderSponsorshipInquiryEmail({ name, email, company, role, website, formatInterest, budget, message });
 
   try {
     const { error } = await sendEmail({
       from: FROM,
       to: TO,
       replyTo: email,
-      subject: `Sponsorship inquiry, ${company} (${name}), ${formatInterest}`,
+      subject,
       html,
+      text,
     });
     if (error) throw new Error(error.message);
   } catch (err) {
