@@ -4,6 +4,7 @@ import { isAdminUser } from "@/lib/auth-identity";
 import { wrapInBaseTemplate, buildButton, buildStatsTable } from "@/lib/email-template";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { renderWelcomeEmail } from "@/lib/notification-senders/welcome";
+import { renderRaidEmail } from "@/lib/notification-senders/raid";
 
 const PREVIEW_LINKS = { unsubscribeUrl: "https://thegitcity.com/api/unsubscribe?dev=0&cat=all&token=preview" };
 
@@ -30,6 +31,31 @@ export async function GET(req: NextRequest) {
       .ilike("github_login", login)
       .maybeSingle();
     const { html } = renderWelcomeEmail(dev?.github_login ?? login, dev?.rank ?? null, PREVIEW_LINKS);
+    return new NextResponse(html, { headers: { "Content-Type": "text/html" } });
+  }
+
+  // ?raid= previews a real raid from the defender's side; defaults to the latest one.
+  if (template === "raid") {
+    const sb = getSupabaseAdmin();
+    const raidParam = req.nextUrl.searchParams.get("raid");
+    const query = sb.from("raids").select("id, success, attack_score, defense_score, attacker_id, defender_id");
+    const { data: raid } = raidParam
+      ? await query.eq("id", raidParam).maybeSingle()
+      : await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (!raid) return NextResponse.json({ error: "Raid not found" }, { status: 404 });
+    const { data: devs } = await sb.from("developers").select("id, github_login").in("id", [raid.attacker_id, raid.defender_id]);
+    const loginOf = (id: number) => devs?.find((d) => d.id === id)?.github_login ?? "unknown";
+    const { html } = renderRaidEmail(
+      {
+        defenderLogin: loginOf(raid.defender_id),
+        attackerLogin: loginOf(raid.attacker_id),
+        raidId: raid.id,
+        success: raid.success,
+        attackScore: raid.attack_score,
+        defenseScore: raid.defense_score,
+      },
+      PREVIEW_LINKS,
+    );
     return new NextResponse(html, { headers: { "Content-Type": "text/html" } });
   }
 
@@ -105,7 +131,7 @@ export async function GET(req: NextRequest) {
   const t = TEMPLATES[template];
   if (!t) {
     return NextResponse.json(
-      { error: "Unknown template", available: ["welcome", ...Object.keys(TEMPLATES)] },
+      { error: "Unknown template", available: ["welcome", "raid", ...Object.keys(TEMPLATES)] },
       { status: 400 },
     );
   }
