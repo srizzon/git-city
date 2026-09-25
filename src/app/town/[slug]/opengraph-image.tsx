@@ -1,20 +1,42 @@
-import { Fragment } from "react";
 import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { OG, building } from "@/lib/og/devHero";
+import { OG } from "@/lib/og/devHero";
 import { getLeagueBySlug } from "@/lib/leagues/service";
-import { getLeagueMembers } from "@/lib/leagues/queries";
+import { getLeagueMembers, type LeagueMemberRow } from "@/lib/leagues/queries";
 import { townDisplayName } from "@/lib/towns/names";
 
-export const alt = "Town skyline - Git City";
+export const alt = "Town in Git City";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const revalidate = 3600;
 
-const MAX_BUILDINGS = 12;
-// Invited members who haven't joined: the accent at low opacity.
-const INVITED = "rgba(200, 230, 74, 0.28)";
+const FACES = 9;
+const FACE = 140;
+const GAP = 16;
+
+/** Avatars as data URLs, so a slow GitHub CDN drops a face instead of the image. */
+async function loadFaces(members: LeagueMemberRow[]) {
+  const picked = [...members]
+    .filter((m) => m.avatar_url)
+    // Joined members first, then the biggest buildings.
+    .sort((a, b) => Number(b.status === "active") - Number(a.status === "active") || b.contributions - a.contributions)
+    .slice(0, FACES);
+  const faces = await Promise.all(
+    picked.map(async (m) => {
+      try {
+        const url = m.avatar_url as string;
+        const res = await fetch(`${url}${url.includes("?") ? "&" : "?"}s=160`, { signal: AbortSignal.timeout(3000) });
+        if (!res.ok) return null;
+        const type = res.headers.get("content-type") ?? "image/png";
+        return { id: m.developer_id, active: m.status === "active", src: `data:${type};base64,${Buffer.from(await res.arrayBuffer()).toString("base64")}` };
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return faces.filter((f): f is NonNullable<typeof f> => !!f);
+}
 
 export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -23,22 +45,12 @@ export default async function Image({ params }: { params: Promise<{ slug: string
 
   const league = await getLeagueBySlug(slug);
   const members = league ? (await getLeagueMembers(league.id)).filter((m) => m.status !== "former") : [];
-  const invitedCount = members.filter((m) => m.status === "invited").length;
-
-  // Tallest buildings, laid out tallest-in-the-middle like a skyline.
-  const top = [...members].sort((a, b) => b.contributions - a.contributions).slice(0, MAX_BUILDINGS);
-  const skyline: typeof top = [];
-  top.forEach((m, i) => (i % 2 === 0 ? skyline.push(m) : skyline.unshift(m)));
-  const maxC = Math.max(1, ...top.map((m) => m.contributions));
-
-  const groundY = 560;
-  const areaLeft = 60;
-  const areaWidth = 1080;
-  const gap = 12;
-  const n = Math.max(1, skyline.length);
-  const bw = Math.min(150, Math.floor((areaWidth - gap * (n - 1)) / n));
-  const totalW = bw * n + gap * (n - 1);
-  const startX = areaLeft + Math.floor((areaWidth - totalW) / 2);
+  const joined = members.filter((m) => m.status === "active").length;
+  const faces = await loadFaces(members);
+  const name = league ? townDisplayName(league.name) : "Town not found";
+  const nameSize = name.length > 26 ? 56 : name.length > 18 ? 68 : 80;
+  const cols = Math.min(3, Math.max(1, faces.length));
+  const rows = Math.ceil(faces.length / 3);
 
   return new ImageResponse(
     (
@@ -51,37 +63,65 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           backgroundColor: OG.bg,
           fontFamily: "Silkscreen",
           color: OG.cream,
-          border: `6px solid ${OG.border}`,
         }}
       >
-        <div style={{ position: "absolute", left: 60, top: 48, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", fontSize: 22, color: OG.accent, letterSpacing: 2 }}>
-            {league?.kind === "company" ? "COMPANY TOWN" : "TOWN"}
+        <div
+          style={{
+            position: "absolute",
+            left: 72,
+            top: 0,
+            bottom: 0,
+            width: faces.length > 0 ? 560 : 1056,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <div style={{ display: "flex", gap: 20, fontSize: 22, letterSpacing: 6, color: OG.accent }}>
+            <span>{league?.kind === "company" ? "COMPANY TOWN" : "GIT CITY TOWN"}</span>
+            {league?.kind === "company" && <span>✓ VERIFIED</span>}
           </div>
-          <div style={{ display: "flex", fontSize: 64, lineHeight: 1 }}>{league ? townDisplayName(league.name) : "Town not found"}</div>
+          <div style={{ display: "flex", marginTop: 20, fontSize: nameSize, lineHeight: 1.05, color: OG.cream }}>{name}</div>
           {league && (
-            <div style={{ display: "flex", fontSize: 26, color: OG.muted }}>
-              {`${members.length} buildings, ${invitedCount} invited`}
+            <div style={{ display: "flex", marginTop: 36, gap: 48 }}>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", fontSize: 64, color: OG.accent }}>{String(members.length)}</div>
+                <div style={{ display: "flex", fontSize: 20, color: OG.muted }}>{members.length === 1 ? "BUILDING" : "BUILDINGS"}</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", fontSize: 64, color: OG.cream }}>{String(joined)}</div>
+                <div style={{ display: "flex", fontSize: 20, color: OG.muted }}>{joined === 1 ? "MEMBER" : "MEMBERS"}</div>
+              </div>
             </div>
           )}
+          <div style={{ display: "flex", marginTop: 40, fontSize: 18, color: OG.dim }}>{`thegitcity.com/town/${slug}`}</div>
         </div>
 
-        {skyline.map((m, i) => (
-          <Fragment key={m.developer_id}>
-            {building({
-              left: startX + i * (bw + gap),
-              groundY,
-              height: Math.round(90 + (m.contributions / maxC) * 250),
-              width: bw,
-              color: m.status === "invited" ? INVITED : OG.accent,
-            })}
-          </Fragment>
-        ))}
-
-        <div style={{ position: "absolute", left: 0, right: 0, top: groundY, height: 4, backgroundColor: OG.border, display: "flex" }} />
-        <div style={{ position: "absolute", right: 60, bottom: 26, display: "flex", fontSize: 20, color: OG.dim }}>
-          {`thegitcity.com/league/${slug}`}
-        </div>
+        {faces.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              right: 72,
+              top: (630 - (rows * FACE + (rows - 1) * GAP)) / 2,
+              width: cols * FACE + (cols - 1) * GAP,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: GAP,
+            }}
+          >
+            {faces.map((f) => (
+               
+              <img
+                key={f.id}
+                src={f.src}
+                width={FACE}
+                height={FACE}
+                alt=""
+                style={{ border: `4px solid ${f.active ? OG.accent : OG.border}` }}
+              />
+            ))}
+          </div>
+        )}
       </div>
     ),
     { ...size, fonts },
