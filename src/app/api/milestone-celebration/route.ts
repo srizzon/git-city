@@ -1,23 +1,21 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { sendCommunityMilestoneNotifications } from "@/lib/notification-senders/community-milestone";
 
 // Milestones to celebrate (every 5k after 10k)
 const MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000, 100000];
 
-export async function POST(req: Request) {
-  const { total_developers } = await req.json().catch(() => ({ total_developers: 0 }));
-  if (!total_developers || typeof total_developers !== "number") {
-    return NextResponse.json({ error: "missing total_developers" }, { status: 400 });
-  }
+// Public and unauthenticated: the count comes from city_stats, never from the
+// request body, so a caller can only record a milestone the city really crossed.
+export async function POST() {
+  const sb = getSupabaseAdmin();
+  const { data: stats } = await sb.from("city_stats").select("total_developers").eq("id", 1).single();
+  const totalDevelopers = stats?.total_developers ?? 0;
 
   // Find the highest milestone that's been crossed
-  const milestone = [...MILESTONES].reverse().find((m) => total_developers >= m);
+  const milestone = [...MILESTONES].reverse().find((m) => totalDevelopers >= m);
   if (!milestone) {
     return NextResponse.json({ celebrated: false });
   }
-
-  const sb = getSupabaseAdmin();
 
   // Idempotent: only insert if this milestone hasn't been recorded yet
   const { data, error } = await sb
@@ -29,11 +27,6 @@ export async function POST(req: Request) {
   if (error && !error.message.includes("duplicate")) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  // Send community milestone notifications (fire-and-forget, batch of 50)
-  sendCommunityMilestoneNotifications(milestone).catch((err) => {
-    console.error("[milestone] Notification send error:", err);
-  });
 
   return NextResponse.json({ celebrated: true, milestone, reached_at: data?.reached_at });
 }
