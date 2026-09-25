@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import PixelSpinner, { Pending } from "@/components/leagues/PixelSpinner";
 import Panel from "./Panel";
@@ -34,6 +34,7 @@ export default function InvitePanel({
   isAdmin,
   inCity,
   onShow,
+  onPlaced,
   onClose,
 }: {
   slug: string;
@@ -48,6 +49,8 @@ export default function InvitePanel({
   inCity: (login: string) => boolean;
   /** Close the panel and fly to that building. */
   onShow: (login: string) => void;
+  /** The invitee's building just showed up: point the camera at it. */
+  onPlaced: (login: string) => void;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -131,6 +134,15 @@ export default function InvitePanel({
       // cancelled
     }
   }
+
+  // Once per invite, the moment their building is in the scene.
+  const placedLogin = state.kind === "done" && inCity(state.login) ? state.login : null;
+  const announced = useRef<string | null>(null);
+  useEffect(() => {
+    if (!placedLogin || announced.current === placedLogin) return;
+    announced.current = placedLogin;
+    onPlaced(placedLogin);
+  }, [placedLogin, onPlaced]);
 
   const justInvited = state.kind === "done" ? state.login.toLowerCase() : null;
   const others = pending.filter((m) => m.login.toLowerCase() !== justInvited);

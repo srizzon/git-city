@@ -113,6 +113,8 @@ export default function LeagueClient({
   const joinKind = joinAction === "join" || joinAction === "ask" || joinAction === "pending" ? joinAction : null;
   const [panel, setPanel] = useState<PanelId>(showJoinCta || (startJoin && joinKind) ? "join" : null);
   const [focused, setFocused] = useState<CityBuilding | null>(null);
+  // The camera looks at a building without opening its card (a new invitee's).
+  const [peek, setPeek] = useState<string | null>(null);
   const router = useRouter();
   const isAdmin = !!viewer?.is_admin;
 
@@ -398,6 +400,11 @@ export default function LeagueClient({
   const verifyHref =
     !isMember && !showJoinCta && viewer && league.kind === "company" ? "/towns/verify" : null;
   const close = () => setPanel(null);
+  // No card: the invite panel stays open with the link to send.
+  const onInviteePlaced = useCallback((login: string) => {
+    setFocused(null);
+    setPeek(login);
+  }, []);
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-bg font-pixel uppercase text-warm">
@@ -405,9 +412,10 @@ export default function LeagueClient({
         size={sceneSize}
         objects={sceneObjects}
         buildings={buildings}
-        focused={focused?.login ?? null}
+        focused={focused?.login ?? peek}
         onBuildingClick={(b) => {
           setPanel(null);
+          setPeek(null);
           setFocused(b);
         }}
         mode={mode}
@@ -581,8 +589,10 @@ export default function LeagueClient({
           onShow={(login) => {
             const b = buildings.find((x) => x.loginLower === login.toLowerCase());
             setPanel(null);
+            setPeek(null);
             if (b) setFocused(b);
           }}
+          onPlaced={onInviteePlaced}
           onClose={close}
         />
       )}
