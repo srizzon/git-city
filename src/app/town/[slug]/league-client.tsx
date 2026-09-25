@@ -25,7 +25,6 @@ import StandingsPanel from "@/components/league/hud/StandingsPanel";
 import InvitePanel from "@/components/league/hud/InvitePanel";
 import JoinPanel from "@/components/league/hud/JoinPanel";
 import BuildingCard from "@/components/league/hud/BuildingCard";
-import { HUD_BOX } from "@/components/league/hud/shared";
 import EditorTopBar from "@/components/league/hud/editor/EditorTopBar";
 import Hotbar, { CameraHints, toolForSlot } from "@/components/league/hud/editor/Hotbar";
 import EditorToasts from "@/components/league/hud/editor/EditorToasts";
@@ -47,6 +46,7 @@ import { carColor } from "@/lib/league-city/drive/net";
 import type { CityIdentity, ObjectProps, SignSide } from "@/lib/league-city/types";
 import { HillSignPanel, PlazaPanel, SkyPanel } from "@/components/league/hud/editor/IdentityPanel";
 import ReportPanel from "@/components/league/hud/ReportPanel";
+import { MobileActionBar, MobileTownHeader } from "@/components/league/hud/MobileTownHud";
 import IntroOverlay, { OUTRO_MS } from "@/components/league/hud/IntroOverlay";
 import { carIntro } from "@/lib/league-city/intro";
 import { townDisplayName } from "@/lib/towns/names";
@@ -432,6 +432,13 @@ export default function LeagueClient({
   // HUD comes in piece by piece (hudEnter).
   const [outro, setOutro] = useState<number | null>(null);
   const outroTimer = useRef<number | undefined>(undefined);
+  // The lo-fi player stays out of the cutscene.
+  const cutscene = !!intro || outro !== null;
+  useEffect(() => {
+    const detail = { hidden: cutscene };
+    (window as unknown as Record<string, unknown>).__gcRadioMode = detail;
+    window.dispatchEvent(new CustomEvent("gc:radio-mode", { detail }));
+  }, [cutscene]);
   useEffect(() => () => window.clearTimeout(outroTimer.current), []);
   const endIntro = useCallback(() => {
     setIntro((cur) => {
@@ -663,9 +670,28 @@ export default function LeagueClient({
       {/* HUD: the wrappers ignore the pointer so the city stays draggable. */}
       {!editing && !driving && !intro && outro === null && (
         <>
-          <div className="pointer-events-none fixed left-4 top-4 z-30" style={hudEnter ? { animation: "fade-in 0.45s ease-out both" } : undefined}>
+          <div className="pointer-events-none fixed left-4 top-4 z-30 max-sm:hidden" style={hudEnter ? { animation: "fade-in 0.45s ease-out both" } : undefined}>
             <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} badges={badges} pendingRequests={pendingRequests} />
           </div>
+          {/* Phones: one compact header row. */}
+          <div
+            className={`pointer-events-none fixed inset-x-3 top-3 z-30 sm:hidden ${focused ? "hidden" : ""}`}
+            style={hudEnter ? { animation: "fade-in 0.45s ease-out both" } : undefined}
+          >
+            <MobileTownHeader
+              data={data}
+              badges={badges}
+              logoUrl={identity.logoUrl}
+              pendingRequests={pendingRequests}
+              onRace={() => setPanel("standings")}
+            />
+          </div>
+          {/* The lo-fi player's spot: above the bar on phones, bottom left on desktop. */}
+          <div
+            id="gc-radio-slot"
+            className={`pointer-events-auto fixed bottom-[68px] left-3 z-30 sm:bottom-4 sm:left-4 ${focused ? "max-sm:hidden" : ""}`}
+            style={hudEnter ? { animation: "slide-up 0.45s ease-out 0.3s both" } : undefined}
+          />
 
           <div
             className={`pointer-events-none fixed right-4 top-4 z-30 hidden transition-opacity duration-200 sm:block ${focused || panel ? "opacity-0" : ""}`}
@@ -679,19 +705,37 @@ export default function LeagueClient({
           </div>
 
           <div
-            className={`pointer-events-none fixed inset-x-4 bottom-4 z-30 flex flex-col items-center gap-2 ${focused ? "max-sm:hidden" : ""}`}
+            className={`pointer-events-none fixed inset-x-3 bottom-3 z-30 flex flex-col items-center gap-2 sm:inset-x-4 sm:bottom-4 ${focused ? "max-sm:hidden" : ""}`}
             style={hudEnter ? { animation: "slide-up 0.45s ease-out 0.24s both" } : undefined}
           >
-            <div className="pointer-events-none flex w-full items-end justify-center gap-2">
-              <div className="sm:hidden">
-                <button
-                  type="button"
-                  onClick={() => setPanel("standings")}
-                  className={`${HUD_BOX} btn-press px-3 py-2 text-[10px] text-cream`}
-                >
-                  Race
-                </button>
-              </div>
+            {/* Phones: one full-width bar, the main action first. */}
+            <div className="pointer-events-none w-full sm:hidden">
+              <MobileActionBar
+                slug={league.slug}
+                canInvite={isMember}
+                isAdmin={isAdmin}
+                verifyHref={verifyHref}
+                onInvite={() => {
+                  setFocused(null);
+                  setPanel("invite");
+                }}
+                onLeave={isMember ? leave : undefined}
+                join={
+                  joinKind
+                    ? {
+                        kind: joinKind,
+                        onClick: () => {
+                          setFocused(null);
+                          setPanel("join");
+                        },
+                      }
+                    : undefined
+                }
+                requests={pendingRequests}
+                onReplay={playIntro}
+              />
+            </div>
+            <div className="pointer-events-none flex w-full items-end justify-center gap-2 max-sm:hidden">
               <ActionBar
                 slug={league.slug}
                 canInvite={isMember}
