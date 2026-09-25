@@ -1,7 +1,7 @@
 import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
-import { buildButton, escapeHtml } from "@/lib/email-template";
-
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+import { COMPANY_DASHBOARD_URL, COMPANY_LINKS, plural } from "@/lib/jobs/email-blocks";
+import { bulletList, button, heading, label, paragraph, statTiles, trackedUrl } from "@/lib/email/components";
+import { renderLayout, renderText, type EmailLinks } from "@/lib/email/layout";
 
 interface ListingStats {
   title: string;
@@ -11,96 +11,91 @@ interface ListingStats {
   status: string;
 }
 
-interface WeeklyReport {
+type Totals = { views: number; applies: number; profileViews: number };
+
+export interface WeeklyReport {
   companyName: string;
   companyEmail: string;
   listings: ListingStats[];
-  totals: { views: number; applies: number; profileViews: number };
-  prevTotals: { views: number; applies: number; profileViews: number };
+  totals: Totals;
+  prevTotals: Totals;
 }
 
-function pctLabel(current: number, prev: number): string {
-  if (prev === 0) return current > 0 ? "+100%" : "-";
-  const pct = ((current - prev) / prev) * 100;
-  return `${pct > 0 ? "+" : ""}${pct.toFixed(0)}%`;
+const STATUS_NOTE: Record<string, string> = { paused: "paused", filled: "filled", expired: "ended" };
+
+const fmt = (n: number) => n.toLocaleString("en-US");
+
+/** Short week-over-week change for a tile label: "+12%", "-5%", "flat", or null with nothing to compare. */
+function change(current: number, prev: number): string | null {
+  if (prev === 0) return null;
+  const pct = Math.round(((current - prev) / prev) * 100);
+  return pct === 0 ? "flat" : `${pct > 0 ? "+" : ""}${pct}%`;
 }
 
-function changeColor(current: number, prev: number): string {
-  if (prev === 0) return current > 0 ? "#22c55e" : "#999999";
-  return current >= prev ? "#22c55e" : "#ef4444";
+function tile(value: number, name: string, prev: number) {
+  const c = change(value, prev);
+  return { value: fmt(value), label: c ? `${name} · ${c}` : name, text: `${name}: ${fmt(value)}${c ? ` (${c} vs last week)` : ""}` };
 }
 
-function fmtNum(n: number): string {
-  return n.toLocaleString();
-}
+export function renderJobPerformanceReportEmail(r: WeeklyReport, links: EmailLinks = COMPANY_LINKS) {
+  const { totals, prevTotals } = r;
+  const subject = `${plural(totals.views, "view")} on your listings this week`;
+  const viewPct = prevTotals.views > 0 ? Math.round(((totals.views - prevTotals.views) / prevTotals.views) * 100) : null;
+  const trend = viewPct === null ? "Here's how the week went." : viewPct === 0 ? "Views held steady." : `Views ${viewPct > 0 ? "up" : "down"} ${Math.abs(viewPct)}% on last week.`;
+  const preheader = `${plural(totals.applies, "application")} too. ${trend}`;
+  const dashboardUrl = trackedUrl(COMPANY_DASHBOARD_URL, "job_weekly_report");
 
-export async function sendJobWeeklyPerformanceReport(report: WeeklyReport) {
-  const viewsChange = pctLabel(report.totals.views, report.prevTotals.views);
-  const appliesChange = pctLabel(report.totals.applies, report.prevTotals.applies);
-  const profileChange = pctLabel(report.totals.profileViews, report.prevTotals.profileViews);
+  const tiles = [tile(totals.views, "Views", prevTotals.views), tile(totals.applies, "Applications", prevTotals.applies)];
+  // Only shown once the metric is being recorded, so it never reads as a dead zero.
+  if (totals.profileViews > 0 || prevTotals.profileViews > 0) {
+    tiles.push(tile(totals.profileViews, "Profile views", prevTotals.profileViews));
+  }
 
-  const summaryCard = (label: string, value: string, change: string, color: string) => `
-    <td style="padding:16px; border:1px solid #eeeeee; text-align:center; width:33%;">
-      <p style="margin:0 0 4px; font-size:10px; color:#999999; font-family:Helvetica,Arial,sans-serif; text-transform:uppercase; letter-spacing:0.5px;">${label}</p>
-      <p style="margin:0; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${value}</p>
-      <p style="margin:4px 0 0; font-size:11px; color:${color}; font-family:Helvetica,Arial,sans-serif;">${change}</p>
-    </td>`;
-
-  const summaryHtml = `
-    <table style="width:100%; border-collapse:collapse; margin:20px 0;">
-      <tr>
-        ${summaryCard("Views", fmtNum(report.totals.views), viewsChange, changeColor(report.totals.views, report.prevTotals.views))}
-        ${summaryCard("Applications", fmtNum(report.totals.applies), appliesChange, changeColor(report.totals.applies, report.prevTotals.applies))}
-        ${summaryCard("Profile Views", fmtNum(report.totals.profileViews), profileChange, changeColor(report.totals.profileViews, report.prevTotals.profileViews))}
-      </tr>
-    </table>`;
-
-  const listingRows = report.listings
+  const rows = [...r.listings]
     .sort((a, b) => b.views - a.views)
-    .map((l) => `
-      <tr>
-        <td style="padding:10px 12px; border-bottom:1px solid #eeeeee; color:#111111; font-family:Helvetica,Arial,sans-serif; font-size:13px; font-weight:600;">${escapeHtml(l.title)}</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #eeeeee; color:#333333; font-family:Helvetica,Arial,sans-serif; font-size:13px; text-align:right;">${fmtNum(l.views)}</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #eeeeee; color:#333333; font-family:Helvetica,Arial,sans-serif; font-size:13px; text-align:right;">${fmtNum(l.applies)}</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #eeeeee; color:#333333; font-family:Helvetica,Arial,sans-serif; font-size:13px; text-align:right;">${fmtNum(l.profileViews)}</td>
-      </tr>`)
-    .join("");
+    .map((l) => ({
+      lead: STATUS_NOTE[l.status] ? `${l.title} (${STATUS_NOTE[l.status]}):` : `${l.title}:`,
+      text: `${plural(l.views, "view")}, ${fmt(l.applies)} applied`,
+    }));
 
-  const listingTableHtml = report.listings.length > 0 ? `
-    <table style="width:100%; border-collapse:collapse; margin:8px 0 20px;">
-      <tr>
-        <td style="padding:8px 12px; border-bottom:2px solid #eeeeee; color:#999999; font-family:Helvetica,Arial,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Listing</td>
-        <td style="padding:8px 12px; border-bottom:2px solid #eeeeee; color:#999999; font-family:Helvetica,Arial,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; text-align:right;">Views</td>
-        <td style="padding:8px 12px; border-bottom:2px solid #eeeeee; color:#999999; font-family:Helvetica,Arial,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; text-align:right;">Applies</td>
-        <td style="padding:8px 12px; border-bottom:2px solid #eeeeee; color:#999999; font-family:Helvetica,Arial,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; text-align:right;">Profiles</td>
-      </tr>
-      ${listingRows}
-    </table>` : "";
+  const subjectOfIntro = r.listings.length === 1 ? `your ${r.listings[0].title} listing` : `${r.companyName}'s listings`;
+  const intro = `Here's how ${subjectOfIntro} did over the last 7 days${prevTotals.views > 0 ? ", compared with the week before" : ""}.`;
+  const reason = "You're getting this weekly report because you have listings on Git City Jobs.";
 
-  const bodyHtml = `
-    <h2 style="margin-top:0; font-family:'Silkscreen', monospace; color:#111111;">
-      Weekly Jobs Report
-    </h2>
-    <p style="color:#555555; font-family:Helvetica,Arial,sans-serif; font-size:14px; line-height:1.6;">
-      Here's how your listings performed this week, ${escapeHtml(report.companyName)}.
-    </p>
-    ${summaryHtml}
-    ${listingTableHtml}
-    ${buildButton("View Full Dashboard", `${BASE_URL}/jobs/dashboard`)}
-    <p style="margin-top:24px; color:#999999; font-family:Helvetica,Arial,sans-serif; font-size:12px;">
-      You're receiving this because you have active job listings on Git City.
-    </p>
-  `;
-
-  const listingLines = report.listings
-    .sort((a, b) => b.views - a.views)
-    .map((l) => `- ${l.title}: ${fmtNum(l.views)} views, ${fmtNum(l.applies)} applies, ${fmtNum(l.profileViews)} profile views`)
-    .join("\n");
-
-  await sendCompanyEmail({
-    to: report.companyEmail,
-    subject: `Your Git City jobs: ${fmtNum(report.totals.views)} views this week`,
-    html: bodyHtml,
-    text: `Weekly Jobs Report\n\nHere's how your listings performed this week, ${report.companyName}.\n\nViews: ${fmtNum(report.totals.views)} (${viewsChange})\nApplications: ${fmtNum(report.totals.applies)} (${appliesChange})\nProfile Views: ${fmtNum(report.totals.profileViews)} (${profileChange})\n\n${listingLines}\n\nView Full Dashboard: ${BASE_URL}/jobs/dashboard`,
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading("Your week on Git City Jobs"),
+      paragraph(intro),
+      statTiles(tiles),
+      rows.length > 1 ? label("By listing") + bulletList(rows) : "",
+      button("Open your dashboard", dashboardUrl),
+    ].join("\n"),
+    reason,
+    links,
   });
+
+  const text = renderText({
+    lines: [
+      "Your week on Git City Jobs",
+      "",
+      intro,
+      "",
+      ...tiles.map((t) => t.text),
+      ...(rows.length > 1 ? ["", "By listing:", ...rows.map((row) => `- ${row.lead} ${row.text}`)] : []),
+      "",
+      `Open your dashboard: ${dashboardUrl}`,
+    ],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** Weekly report to each company with listing activity in the last 7 days. */
+export async function sendJobWeeklyPerformanceReport(report: WeeklyReport) {
+  const { subject, html, text } = renderJobPerformanceReportEmail(report);
+  await sendCompanyEmail({ to: report.companyEmail, subject, html, text, type: "job_weekly_report" });
 }

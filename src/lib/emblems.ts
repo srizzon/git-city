@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "./supabase";
-import { sendEmblemNotification } from "./notification-senders/emblem";
+import { sendEmblemNotification, type EmblemInfo } from "./notification-senders/emblem";
 
 // ─── Types ───────────────────────────────────────────────────
 // The emblems honor layer. `evaluateEmblems` is the data-driven replacement for
@@ -40,6 +40,8 @@ interface CandidateEmblem {
   name: string;
   tier: string;
   criteria: ThresholdCriteria | null;
+  description: string | null;
+  xp_reward: number | null;
 }
 
 interface GrantResult {
@@ -69,7 +71,7 @@ export async function evaluateEmblems(
   const [emblemsRes, grantsRes] = await Promise.all([
     sb
       .from("emblems")
-      .select("id, name, tier, criteria")
+      .select("id, name, tier, criteria, description, xp_reward")
       .eq("active", true)
       .not("criteria", "is", null),
     sb.from("emblem_grants").select("emblem_id").eq("developer_id", developerId),
@@ -92,7 +94,7 @@ export async function evaluateEmblems(
 
   // Grant through the chokepoint, sequentially (grant_emblem takes a per-dev
   // advisory lock; parallel calls would just serialize on it anyway).
-  const newlyEarned: { id: string; name: string; tier: string }[] = [];
+  const newlyEarned: EmblemInfo[] = [];
   for (const e of qualifying) {
     const { data, error } = await sb.rpc("grant_emblem", {
       p_developer_id: developerId,
@@ -106,7 +108,7 @@ export async function evaluateEmblems(
       continue;
     }
     if ((data as GrantResult | null)?.granted) {
-      newlyEarned.push({ id: e.id, name: e.name, tier: e.tier });
+      newlyEarned.push({ id: e.id, name: e.name, tier: e.tier, description: e.description, xpReward: e.xp_reward });
     }
   }
 

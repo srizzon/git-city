@@ -244,7 +244,7 @@ export async function POST() {
     // A12: Streak rewards - grant free items at milestones
     streakReward = await grantStreakReward(sb, dev.id, checkinResult.streak);
 
-    // Streak milestone notifications (7, 30, 100, 365)
+    // Streak milestone notifications (7, 30, 100, 365; only 30+ are emailed)
     if ([7, 30, 100, 365].includes(checkinResult.streak)) {
       sendStreakMilestoneNotification(
         dev.id,

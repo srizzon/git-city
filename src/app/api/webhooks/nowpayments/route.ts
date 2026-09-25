@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyIpnSignature } from "@/lib/nowpayments";
 import { autoEquipIfSolo } from "@/lib/items";
-import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
+import { paidPrice, sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notification-senders/purchase";
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import { getPostHogClient } from "@/lib/posthog-server";
 
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         // Find pending purchase by provider_tx_id (invoice ID stored at checkout)
         const { data: purchase } = await sb
           .from("purchases")
-          .select("id, status, developer_id, item_id, gifted_to")
+          .select("id, status, developer_id, item_id, gifted_to, amount_cents, currency")
           .eq("provider", "nowpayments")
           .eq("status", "pending")
           .eq("provider_tx_id", orderId)
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
               item_id: purchase.item_id,
             },
           });
-          sendGiftSentNotification(purchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", purchase.id, purchase.item_id);
+          sendGiftSentNotification(purchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", purchase.id, purchase.item_id, paidPrice(purchase));
           sendGiftReceivedNotification(purchase.gifted_to, dev?.github_login ?? "someone", receiver?.github_login ?? "unknown", purchase.id, purchase.item_id);
         } else {
           await sb.from("activity_feed").insert({
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
             actor_id: purchase.developer_id,
             metadata: { login: dev?.github_login, item_id: purchase.item_id },
           });
-          sendPurchaseNotification(purchase.developer_id, dev?.github_login ?? "", purchase.id, purchase.item_id);
+          sendPurchaseNotification(purchase.developer_id, dev?.github_login ?? "", purchase.id, purchase.item_id, paidPrice(purchase));
         }
 
         const phCrypto = getPostHogClient();

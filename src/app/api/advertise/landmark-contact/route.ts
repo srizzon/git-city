@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
 import { rateLimit } from "@/lib/rate-limit";
-import { escapeHtml, wrapInBaseTemplate } from "@/lib/email-template";
+import { renderLandmarkInquiryEmail } from "@/lib/admin-emails";
+import { FROM_NOTIFY } from "@/lib/email/senders";
 
 const TO = "samuel@thegitcity.com";
-const FROM = "Git City <noreply@thegitcity.com>";
+const FROM = FROM_NOTIFY;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
@@ -59,32 +60,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const html = wrapInBaseTemplate(`
-    <h2 style="margin: 0 0 16px; font-size: 22px; color: #111;">New Landmark inquiry</h2>
-    <p style="font-size: 15px; color: #333; line-height: 1.6;">
-      Someone wants a Landmark building in Git City.
-    </p>
-    <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; margin-top: 16px; border-collapse: collapse;">
-      <tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase; width: 110px;">Name</td><td style="padding: 8px 0; color: #111; font-size: 14px;">${escapeHtml(name)}</td></tr>
-      <tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase;">Email</td><td style="padding: 8px 0; color: #111; font-size: 14px;"><a href="mailto:${escapeHtml(email)}" style="color: #111;">${escapeHtml(email)}</a></td></tr>
-      <tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase;">Company</td><td style="padding: 8px 0; color: #111; font-size: 14px;">${escapeHtml(company)}</td></tr>
-      <tr><td style="padding: 8px 0; color: #999; font-size: 12px; text-transform: uppercase;">Website</td><td style="padding: 8px 0; color: #111; font-size: 14px;"><a href="${escapeHtml(website)}" style="color: #111;">${escapeHtml(website)}</a></td></tr>
-    </table>
-    <div style="margin-top: 20px; padding: 16px; background-color: #f6f6f6; border-radius: 4px;">
-      <p style="margin: 0 0 8px; color: #999; font-size: 12px; text-transform: uppercase;">Message</p>
-      <p style="margin: 0; color: #111; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(message)}</p>
-    </div>
-  `);
+  const { subject, html, text } = renderLandmarkInquiryEmail({ name, email, company, website, message });
 
   try {
-    const resend = getResend();
-    await resend.emails.send({
+    const { error } = await sendEmail({
       from: FROM,
       to: TO,
       replyTo: email,
-      subject: `Landmark inquiry — ${company} (${name})`,
+      subject,
       html,
+      text,
     });
+    if (error) throw new Error(error.message);
   } catch (err) {
     console.error("[landmark-contact] failed to send email", err);
     return NextResponse.json(

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   // Grab all pending queue items (oldest first, cap at 500)
   const { data: items } = await admin
     .from("job_application_email_queue")
-    .select("id, listing_id, developer_login, has_profile")
+    .select("id, listing_id, developer_login, has_profile, created_at")
     .order("created_at", { ascending: true })
     .limit(500);
 
@@ -42,7 +42,13 @@ export async function GET(req: NextRequest) {
     byListing.set(item.listing_id, existing);
   }
 
+  // Queue items to delete: sent, or skipped for good. A failed send stays
+  // queued for the next run (dropped after a day so it can't loop forever).
+  const handledIds: (typeof items)[number]["id"][] = [];
+  const dayAgo = Date.now() - 86_400_000;
+
   for (const [listingId, applications] of byListing) {
+    const handle = () => handledIds.push(...applications.map((a) => a.id));
     try {
       // Get listing + company email
       const { data: listing } = await admin
@@ -53,12 +59,14 @@ export async function GET(req: NextRequest) {
 
       if (!listing) {
         results.skipped += applications.length;
+        handle();
         continue;
       }
 
       const comp = listing.company as unknown as { advertiser_id: string | null };
       if (!comp.advertiser_id) {
         results.skipped += applications.length;
+        handle();
         continue;
       }
 
@@ -70,6 +78,7 @@ export async function GET(req: NextRequest) {
 
       if (!advertiser?.email) {
         results.skipped += applications.length;
+        handle();
         continue;
       }
 
@@ -116,6 +125,7 @@ export async function GET(req: NextRequest) {
         await sendJobApplicationsBatchEmail(
           advertiser.email,
           listing.title,
+          listingId,
           applications.map((a) => {
             const devId = devMap.get(a.developer_login);
             const profile = devId ? profileMap.get(devId) : null;
@@ -130,14 +140,17 @@ export async function GET(req: NextRequest) {
       }
 
       results.sent++;
+      handle();
     } catch (err) {
       console.error(`[jobs-flush-app-emails] Failed for listing ${listingId}:`, err);
       results.errors++;
     }
   }
 
-  // Delete all processed items
-  const processedIds = items.map((i) => i.id);
+  const staleIds = items.filter((i) => Date.parse(i.created_at) < dayAgo).map((i) => i.id);
+  const processedIds = [...new Set([...handledIds, ...staleIds])];
+  if (processedIds.length === 0) return NextResponse.json({ ok: true, ...results });
+
   await admin
     .from("job_application_email_queue")
     .delete()

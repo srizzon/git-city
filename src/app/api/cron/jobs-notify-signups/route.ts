@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendJobNotifySignupFulfilled } from "@/lib/notification-senders/job-notify-signup";
+import { sendOutcome } from "@/lib/notifications";
+
+export const maxDuration = 300;
 
 /**
  * Fulfills job notification signups: when active jobs exist,
@@ -56,7 +59,12 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      sendJobNotifySignupFulfilled(signup.developer_id, activeJobs);
+      const outcome = sendOutcome(await sendJobNotifySignupFulfilled(signup.developer_id, activeJobs));
+      if (outcome === "error") {
+        // Leave notified_at null so the next run retries it
+        results.errors++;
+        continue;
+      }
 
       await admin
         .from("job_notification_signups")

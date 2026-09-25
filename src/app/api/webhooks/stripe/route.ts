@@ -8,8 +8,10 @@ import { sendPurchaseNotification, sendGiftSentNotification } from "@/lib/notifi
 import { sendGiftReceivedNotification } from "@/lib/notification-senders/gift";
 import type Stripe from "stripe";
 import { sendJobPendingReviewEmail } from "@/lib/notification-senders/job-pending-review";
-import { getResend } from "@/lib/resend";
+import { sendEmail } from "@/lib/resend";
+import { renderAdSaleEmail } from "@/lib/admin-emails";
 import { getPostHogClient } from "@/lib/posthog-server";
+import { FROM_NOTIFY } from "@/lib/email/senders";
 
 // Disable body parsing — Stripe needs raw body for signature verification
 export const dynamic = "force-dynamic";
@@ -275,29 +277,26 @@ export async function POST(request: Request) {
           const isLandmark = pkg?.landmark === true;
 
           try {
-            const resend = getResend();
-            await resend.emails.send({
-              from: "Git City Ads <ads@thegitcity.com>",
-              to: "samuelrizzondev@gmail.com",
-              subject: isLandmark
-                ? `[ACTION REQUIRED] New Landmark sale — ${totalFormatted}/mo`
-                : `New ${pkg?.label ?? packageId} sale — ${totalFormatted}/mo`,
-              html: `
-                <h2>${isLandmark ? "🏗️ New Landmark Package — Custom building needed" : `New ${pkg?.label ?? packageId} Package Sale`}</h2>
-                <table style="border-collapse:collapse;font-family:monospace;">
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Package</td><td><strong>${pkg?.label ?? packageId}</strong></td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Amount</td><td><strong>${totalFormatted}/mo</strong></td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Currency</td><td>${(session.currency ?? "usd").toUpperCase()}</td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Customer</td><td>${purchaserEmail ?? "unknown"}</td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Vehicles</td><td>${adIds.length} ads (${pkg?.vehicles.join(", ") ?? "?"})</td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Ad IDs</td><td>${adIds.join(", ")}</td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Subscription</td><td>${subscriptionId ?? "none"}</td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Starts</td><td>${now.toISOString()}</td></tr>
-                  <tr><td style="padding:4px 12px 4px 0;color:#888;">Ends</td><td>${endsAt.toISOString()}</td></tr>
-                </table>
-                ${isLandmark ? "<p style='margin-top:16px;color:#c8e64a;'><strong>⚠️ This is a Landmark package. You need to create a custom 3D building and post on Instagram/X.</strong></p>" : ""}
-              `,
+            const saleEmail = renderAdSaleEmail({
+              packageLabel: pkg?.label ?? packageId,
+              isLandmark,
+              total: totalFormatted,
+              currency: session.currency ?? "usd",
+              customerEmail: purchaserEmail,
+              vehicles: pkg?.vehicles ?? [],
+              adIds,
+              subscriptionId: subscriptionId ?? null,
+              startsAt: now,
+              endsAt,
             });
+            const { error: emailError } = await sendEmail({
+              from: FROM_NOTIFY,
+              to: "samuelrizzondev@gmail.com",
+              subject: saleEmail.subject,
+              html: saleEmail.html,
+              text: saleEmail.text,
+            });
+            if (emailError) throw new Error(emailError.message);
           } catch (emailErr) {
             console.error("Failed to send admin ad sale email:", emailErr);
           }
@@ -490,6 +489,7 @@ export async function POST(request: Request) {
 
           // Insert feed event + send notifications
           const githubLogin = session.metadata?.github_login;
+          const paid = session.amount_total != null && session.currency ? { amountCents: session.amount_total, currency: session.currency } : null;
           if (giftedTo) {
             const { data: receiver } = await sb
               .from("developers")
@@ -508,7 +508,7 @@ export async function POST(request: Request) {
             });
 
             // Gift notifications: receipt to buyer, alert to receiver
-            sendGiftSentNotification(Number(developerId), githubLogin ?? "", receiver?.github_login ?? "unknown", pending.id, itemId);
+            sendGiftSentNotification(Number(developerId), githubLogin ?? "", receiver?.github_login ?? "unknown", pending.id, itemId, paid);
             sendGiftReceivedNotification(Number(giftedTo), githubLogin ?? "someone", receiver?.github_login ?? "unknown", pending.id, itemId);
           } else {
             await sb.from("activity_feed").insert({
@@ -518,7 +518,7 @@ export async function POST(request: Request) {
             });
 
             // Purchase receipt notification
-            sendPurchaseNotification(Number(developerId), githubLogin ?? "", pending.id, itemId);
+            sendPurchaseNotification(Number(developerId), githubLogin ?? "", pending.id, itemId, paid);
           }
 
           const phItem = getPostHogClient();

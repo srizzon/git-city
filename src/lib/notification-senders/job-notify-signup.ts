@@ -1,37 +1,57 @@
-import { sendNotificationAsync } from "../notifications";
-import { buildButton } from "../email-template";
+import { sendNotification } from "../notifications";
+import { EMAIL_BASE_URL, bulletList, button, heading, paragraph, trackedUrl } from "../email/components";
+import { renderLayout, renderText, type EmailLinks } from "../email/layout";
+import { plural } from "../jobs/email-blocks";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+function notifyHeader(jobCount: number) {
+  return {
+    subject: "Jobs are live on Git City",
+    preheader: `${plural(jobCount, "role is", "roles are")} open right now. You asked us to tell you.`,
+  };
+}
 
-/**
- * Notification sent to developers who signed up for job notifications
- * when the first jobs become available.
- */
-export function sendJobNotifySignupFulfilled(
-  devId: number,
-  jobCount: number,
-) {
-  sendNotificationAsync({
+const PROFILE_PERKS = [
+  { lead: "Apply in one click.", text: "Companies get your profile and contact details straight away." },
+  { lead: "Get weekly matches.", text: "We email you new roles that fit the skills on your profile." },
+];
+
+export function renderJobNotifySignupEmail(jobCount: number, links: EmailLinks) {
+  const { subject, preheader } = notifyHeader(jobCount);
+  const jobsUrl = trackedUrl("/jobs", "job_notify_signup");
+  const intro = `The Git City job board is open, with ${plural(jobCount, "role")} from companies hiring developers right now.`;
+  const profile = "Set up a career profile to:";
+  const reason = "You're getting this because you asked to hear when jobs launched on Git City.";
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [heading("Jobs are live"), paragraph(intro), paragraph(profile), bulletList(PROFILE_PERKS), button("Browse jobs", jobsUrl)].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: ["Jobs are live", "", intro, "", profile, ...PROFILE_PERKS.map((p) => `- ${p.lead} ${p.text}`), "", `Browse jobs: ${jobsUrl}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** One-shot email to developers who signed up to hear when jobs launch (and have no career profile yet). */
+export async function sendJobNotifySignupFulfilled(devId: number, jobCount: number) {
+  const { subject, preheader } = notifyHeader(jobCount);
+
+  return sendNotification({
     type: "job_notify_fulfilled",
     category: "transactional",
     developerId: devId,
     dedupKey: `job_notify_fulfilled:${devId}`,
-    title: `Jobs are here!`,
-    body: `${jobCount} job${jobCount > 1 ? "s" : ""} just landed on Git City. You asked to be notified.`,
-    html: `
-      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">You asked, we delivered</p>
-      <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">Jobs are here!</h1>
-      <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-        ${jobCount} job listing${jobCount > 1 ? "s are" : " is"} now live on Git City.
-        You signed up to be the first to know.
-      </p>
-      <p style="margin:0 0 24px; font-size:14px; color:#555555; line-height:1.6;">
-        Create a career profile to get matched with the best opportunities and stand out to employers.
-      </p>
-      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 24px;" />
-      ${buildButton("Browse Jobs", `${BASE_URL}/jobs`)}
-    `,
-    actionUrl: `${BASE_URL}/jobs`,
+    title: subject,
+    body: preheader,
+    render: (links) => renderJobNotifySignupEmail(jobCount, links),
+    actionUrl: `${EMAIL_BASE_URL}/jobs`,
     priority: "high",
     forceSend: true,
     channels: ["email"],

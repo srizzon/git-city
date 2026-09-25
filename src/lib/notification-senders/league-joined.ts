@@ -1,36 +1,81 @@
 import { sendNotificationAsync } from "../notifications";
-import { buildButton, escapeHtml } from "../email-template";
+import { EMAIL_BASE_URL, button, heading, paragraph, trackedUrl } from "../email/components";
+import { renderLayout, renderText, type EmailLinks } from "../email/layout";
 import { townDisplayName } from "../towns/names";
+import { townHero } from "./town-email";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+export interface LeagueJoinedEmailData {
+  inviteeLogin: string;
+  leagueSlug: string;
+  leagueName: string;
+  /** The invite counted toward the inviter's Town Builder emblem (invitee's GitHub account is 30+ days old). */
+  countsForBuilder: boolean;
+}
 
-/** "Pedro joined your town" email to the colleague who invited them. */
+function leagueJoinedHeader(d: LeagueJoinedEmailData) {
+  const town = townDisplayName(d.leagueName);
+  return {
+    town,
+    subject: `@${d.inviteeLogin} joined ${town}`,
+    preheader: "They took your invite. Their building now races with the town every week.",
+  };
+}
+
+export function renderLeagueJoinedEmail(d: LeagueJoinedEmailData, links: EmailLinks) {
+  const { town, subject, preheader } = leagueJoinedHeader(d);
+  const townUrl = trackedUrl(`/town/${d.leagueSlug}`, "league_joined");
+  const intro = `Your invite worked. Their building is on the town's skyline, and every contribution they push this week scores in the race.${d.countsForBuilder ? " It also counts toward your Town Builder emblem." : ""}`;
+  const reason = `You're getting this because you invited @${d.inviteeLogin} to ${town} on Git City.`;
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    hero: townHero(d.leagueSlug, town, townUrl),
+    body: [
+      heading("", `@${d.inviteeLogin}`, ` joined ${town}`),
+      paragraph(intro),
+      button("See your town", townUrl),
+    ].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: [subject, "", intro, "", `See your town: ${townUrl}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** "@pedro joined Acme Town" email to whoever invited them. */
 export function sendLeagueJoinedNotification(opts: {
   inviterId: number;
   inviteeId: number;
   inviteeLogin: string;
+  leagueId: string;
   leagueSlug: string;
   leagueName: string;
+  countsForBuilder: boolean;
 }) {
-  const url = `${BASE_URL}/town/${opts.leagueSlug}`;
-  const town = townDisplayName(opts.leagueName);
-  const title = `@${opts.inviteeLogin} joined ${town}`;
-  const body = `@${opts.inviteeLogin} joined ${town} from your invite. Their building is on the skyline and scoring this week.`;
+  const data: LeagueJoinedEmailData = {
+    inviteeLogin: opts.inviteeLogin,
+    leagueSlug: opts.leagueSlug,
+    leagueName: opts.leagueName,
+    countsForBuilder: opts.countsForBuilder,
+  };
+  const { subject, preheader } = leagueJoinedHeader(data);
 
   sendNotificationAsync({
     type: "league_joined",
     category: "leagues",
     developerId: opts.inviterId,
-    dedupKey: `league_joined:${opts.inviterId}:${opts.inviteeId}`,
-    title,
-    body,
-    html: `
-      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">${escapeHtml(town)}</p>
-      <h1 style="margin:0 0 8px; font-size:24px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${escapeHtml(title)}</h1>
-      <p style="margin:0 0 28px; font-size:15px; color:#555555; line-height:1.6;">${escapeHtml(body)}</p>
-      ${buildButton("See your town", url)}
-    `,
-    actionUrl: url,
+    dedupKey: `league_joined:${opts.leagueId}:${opts.inviterId}:${opts.inviteeId}`,
+    title: subject,
+    body: preheader,
+    render: (links) => renderLeagueJoinedEmail(data, links),
+    actionUrl: `${EMAIL_BASE_URL}/town/${opts.leagueSlug}`,
     priority: "normal",
     channels: ["email"],
   });

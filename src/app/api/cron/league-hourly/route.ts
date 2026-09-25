@@ -4,6 +4,7 @@ import { fetchWeekContributionDays } from "@/lib/github-api";
 import { detectOvertakes, isoDay, weekDays, weekStart } from "@/lib/leagues/scoring";
 import { loadStandings } from "@/lib/leagues/standings";
 import { sendLeagueOvertakenNotification } from "@/lib/notification-senders/league-overtaken";
+import { mapWithConcurrency } from "@/lib/concurrency";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -112,15 +113,22 @@ export async function GET(request: NextRequest) {
   let overtakes = 0;
   if (fetched > 0) {
     const after = await loadStandings(leagues, start, sb);
+    const toNotify: Parameters<typeof sendLeagueOvertakenNotification>[0][] = [];
     for (const league of leagues) {
       const prev = before.get(league.id);
       const next = after.get(league.id);
       if (!prev || !next || next.standings.length < 2) continue;
       for (const o of detectOvertakes(prev.standings, next.standings)) {
-        sendLeagueOvertakenNotification({ ...o, leagueSlug: league.slug, leagueName: league.name });
-        overtakes++;
+        toNotify.push({ ...o, leagueSlug: league.slug, leagueName: league.name, scoringMode: next.mode });
       }
     }
+    overtakes = toNotify.length;
+    // Awaited: a serverless function can be frozen once the response is sent.
+    // Stops short of maxDuration; skipped ones are lost (max one per dev per day anyway).
+    await mapWithConcurrency(toNotify, 4, async (n) => {
+      if (Date.now() - started > 285_000) return;
+      await sendLeagueOvertakenNotification(n);
+    });
   }
 
   return NextResponse.json({

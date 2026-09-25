@@ -431,6 +431,7 @@ export async function inviteMember(
       inviteeId: dev.id,
       inviterLogin: viewer.github_login,
       leagueId: league.id,
+      leagueSlug: league.slug,
       leagueName: league.name,
       link: inviteLink(league.slug, viewer.github_login, dev.github_login),
     });
