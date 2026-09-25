@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { THEMES, ThemeLights, type CityTheme } from "@/components/city/theme";
-import { createRaceTelemetry, type LapNews, type RaceView } from "@/lib/league-city/race/telemetry";
+import { createRaceTelemetry, type LapNews, type RaceView, type RunResult } from "@/lib/league-city/race/telemetry";
 import RaceHud, { type LapFeedItem } from "@/components/race/RaceHud";
 import { isDesktop } from "@/components/towns/useDesktop";
 import type { RaceCameraMode } from "@/components/race/RaceCamera";
@@ -78,6 +78,7 @@ export default function RaceClient({
   const [failed, setFailed] = useState(false);
   const [camera, setCamera] = useState<RaceCameraMode>("high");
   const [ghostMs, setGhostMs] = useState<number | null>(null);
+  const [run, setRun] = useState<RunResult | null>(null);
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(false);
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
@@ -113,6 +114,16 @@ export default function RaceClient({
   }, []);
   const toggleCamera = useCallback(() => setCamera((c) => (c === "high" ? "close" : "high")), []);
   const exit = useCallback(() => router.push(`/town/${slug}`), [router, slug]);
+
+  // The car is stopped on the results, so R comes from here.
+  useEffect(() => {
+    if (!run) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === "KeyR" && !e.repeat) restartRef.current?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [run]);
 
   // Esc pauses; Esc again on the pause menu leaves the track.
   useEffect(() => {
@@ -207,6 +218,7 @@ export default function RaceClient({
             startRef={startRef}
             onGhost={setGhostMs}
             restartRef={restartRef}
+            onRun={setRun}
           />
         )}
       </Canvas>
@@ -226,6 +238,7 @@ export default function RaceClient({
         saved={saved}
         signedIn={!!viewerLogin}
         ghostMs={ghostMs}
+        run={run}
         you={name}
         onStart={() => startRef.current?.()}
         onRestart={() => restartRef.current?.()}

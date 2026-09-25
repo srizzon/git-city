@@ -15,7 +15,13 @@ import { MEDALS, MEDAL_COLORS, medalFor } from "@/lib/league-city/race/ghost";
 import { formatLap } from "@/lib/league-city/race/laps";
 import type { RoomBests } from "@/lib/league-city/race/net";
 import { RACE, canStart, inRace, standings } from "@/lib/league-city/race/race";
-import type { LapNews, RaceTelemetry, RaceView } from "@/lib/league-city/race/telemetry";
+import {
+  RUN_LAPS,
+  type LapNews,
+  type RaceTelemetry,
+  type RaceView,
+  type RunResult,
+} from "@/lib/league-city/race/telemetry";
 import { theTrack } from "@/lib/league-city/race/track";
 
 // Race track HUD, after Trackmania. Top center: the lap clock, and under it
@@ -59,6 +65,7 @@ export default function RaceHud({
   saved,
   signedIn,
   ghostMs,
+  run,
   you,
   onStart,
   onRestart,
@@ -83,6 +90,8 @@ export default function RaceHud({
   signedIn: boolean;
   /** Your best lap in this browser (the ghost's), ms. */
   ghostMs: number | null;
+  /** The time trial run that just ended, or null while driving one. */
+  run: RunResult | null;
   you: string;
   onStart: () => void;
   onRestart: () => void;
@@ -92,6 +101,8 @@ export default function RaceHud({
   onExit: () => void;
 }) {
   const clock = useRef<HTMLSpanElement>(null);
+  const runLabel = useRef<HTMLSpanElement>(null);
+  const total = useRef<HTMLSpanElement>(null);
   const speed = useRef<HTMLSpanElement>(null);
   const split = useRef<HTMLSpanElement>(null);
   const pips = useRef<(HTMLSpanElement | null)[]>([]);
@@ -120,6 +131,12 @@ export default function RaceHud({
     let lastLights = 0;
     const loop = () => {
       const t = Date.now() + telemetry.offset;
+      if (runLabel.current) runLabel.current.textContent = `Lap ${telemetry.runLap}/${RUN_LAPS}`;
+      if (total.current)
+        total.current.textContent =
+          telemetry.runStart !== null && t >= telemetry.runStart
+            ? `Total ${formatLap(t - telemetry.runStart)}`
+            : "";
       if (clock.current)
         clock.current.textContent =
           telemetry.lapStart !== null && t >= telemetry.lapStart
@@ -204,7 +221,11 @@ export default function RaceHud({
         <div className="absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-1.5">
           <div className={`${HUD_BOX} flex flex-col items-center px-5 py-2`}>
             <span className="text-[9px] text-muted">
-              {racing ? `Race · lap ${lapNow}/${RACE.laps}` : "Time trial"}
+              {racing ? (
+                `Race · lap ${lapNow}/${RACE.laps}`
+              ) : (
+                <span ref={runLabel}>Lap 1/{RUN_LAPS}</span>
+              )}
               {racing && place > 0 && r?.phase === "live" && (
                 <span className="text-lime">
                   {" "}
@@ -215,6 +236,7 @@ export default function RaceHud({
             <span ref={clock} className="text-3xl text-cream tabular-nums">
               0:00.000
             </span>
+            {!racing && <span ref={total} className="text-[9px] text-muted tabular-nums" />}
           </div>
           <span
             ref={split}
@@ -432,6 +454,71 @@ export default function RaceHud({
         </div>
       )}
 
+      {/* Time trial finished */}
+      {run && !racing && (
+        <section
+          className={`${HUD_BOX} pointer-events-auto absolute left-1/2 top-1/2 w-[320px] -translate-x-1/2 -translate-y-1/2 px-5 py-4`}
+        >
+          <p className="text-center text-[10px] text-lime">Finish</p>
+          <p className="mt-1 text-center text-3xl text-cream tabular-nums">
+            {formatLap(run.total)}
+          </p>
+          <ol className="mt-3 space-y-1 border-t-2 border-border pt-3">
+            {run.laps.map((l, i) => {
+              const fastest =
+                l.valid && l.ms === Math.min(...run.laps.filter((x) => x.valid).map((x) => x.ms));
+              return (
+                <li key={i} className="flex items-center justify-between text-[11px] tabular-nums">
+                  <span className="text-muted">Lap {i + 1}</span>
+                  <span
+                    className={
+                      !l.valid ? "text-dim line-through" : fastest ? "text-lime" : "text-cream"
+                    }
+                  >
+                    {formatLap(l.ms)}
+                    {!l.valid && <span className="ml-2 text-[8px] no-underline">void</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          {(() => {
+            const bestLap = Math.min(...run.laps.filter((x) => x.valid).map((x) => x.ms));
+            const m = Number.isFinite(bestLap) ? medalFor(bestLap) : null;
+            const isPb = Number.isFinite(bestLap) && ghostMs !== null && bestLap <= ghostMs;
+            return (
+              <div className="mt-3 flex items-center justify-center gap-3 text-[10px]">
+                {m ? (
+                  <span className="flex items-center gap-1.5" style={{ color: MEDAL_COLORS[m] }}>
+                    <span className="h-3 w-3" style={{ background: MEDAL_COLORS[m] }} aria-hidden />
+                    {m}
+                  </span>
+                ) : (
+                  <span className="text-dim normal-case">No medal yet</span>
+                )}
+                {isPb && <span className="text-lime">New best lap</span>}
+              </div>
+            );
+          })()}
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onRestart}
+              className="flex items-center justify-center gap-2 bg-lime px-3 py-2 text-[10px] text-bg transition-[filter] hover:brightness-110 active:translate-y-px"
+            >
+              <span className="border-2 border-bg px-1">R</span> Again
+            </button>
+            <button
+              type="button"
+              onClick={onExit}
+              className="border-2 border-border px-3 py-2 text-[10px] text-cream transition-colors hover:text-lime"
+            >
+              Back to town
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Wrong way */}
       {ready && (
         <div
@@ -508,9 +595,7 @@ export default function RaceHud({
                 />
               ))}
             </div>
-            <span className="text-[8px] normal-case text-muted">
-              Drift to charge
-            </span>
+            <span className="text-[8px] normal-case text-muted">Drift to charge</span>
           </div>
           {/* Lights up when a turbo is banked: press it. */}
           <span

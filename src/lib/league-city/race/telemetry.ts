@@ -28,10 +28,22 @@ export interface RaceTelemetry extends DriveTelemetry {
   wrongWay: boolean;
   /** Lights lit (0–5). */
   lights: number;
+  /** Time trial: the lap you're on (1…RUN_LAPS) and when the run started (server ms). */
+  runLap: number;
+  runStart: number | null;
 }
 
 export function createRaceTelemetry(): RaceTelemetry {
-  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, driftLevel: 0, turbo: false, turboReady: false, split: null, turboFlash: null, pos: null, ghostPos: null, others: [], lapStart: null, offset: 0, wrongWay: false, lights: 0 };
+  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, driftLevel: 0, turbo: false, turboReady: false, split: null, turboFlash: null, pos: null, ghostPos: null, others: [], lapStart: null, offset: 0, wrongWay: false, lights: 0, runLap: 1, runStart: null };
+}
+
+/** Laps in a time trial run (like Mario Kart's time trials). */
+export const RUN_LAPS = 3;
+
+export interface RunResult {
+  laps: { ms: number; valid: boolean }[];
+  /** First crossing of the line to the last (ms). */
+  total: number;
 }
 
 export interface RaceView {
