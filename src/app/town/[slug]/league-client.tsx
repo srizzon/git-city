@@ -43,7 +43,7 @@ import { keyToAction } from "@/lib/league-city/editor/shortcuts";
 import { MAX_H, START_H } from "@/lib/league-city/grid";
 import { isAir } from "@/lib/league-city/catalog";
 import { introSeenKey } from "@/lib/league-city/identity";
-import type { IntroPieces, IntroStyle } from "@/lib/league-city/intro";
+import type { IntroPieces } from "@/lib/league-city/intro";
 import type { CityIdentity, ObjectProps, SignSide } from "@/lib/league-city/types";
 import { HillSignPanel, PlazaPanel, SkyPanel } from "@/components/league/hud/editor/IdentityPanel";
 import ReportPanel from "@/components/league/hud/ReportPanel";
@@ -90,7 +90,6 @@ export default function LeagueClient({
   pendingRequests,
   groupLink,
   badges,
-  introStyle = "reveal",
 }: {
   data: LeaguePageData;
   city: LeagueCity;
@@ -113,8 +112,6 @@ export default function LeagueClient({
   /** Members: the link for a group chat. */
   groupLink: string | null;
   badges: TownBadges;
-  /** Which intro plays (see lib/league-city/intro). */
-  introStyle?: IntroStyle;
 }) {
   const { league, members, viewer } = data;
   const isMember = viewer?.status === "active";
@@ -406,7 +403,7 @@ export default function LeagueClient({
   // First visit to each town (localStorage, like the home), the ▶ button
   // replays it. Click or Esc skips. Lands on your building, else this
   // week's leader.
-  const [intro, setIntro] = useState<{ pieces: IntroPieces; style: IntroStyle; n: number } | null>(null);
+  const [intro, setIntro] = useState<{ pieces: IntroPieces; n: number } | null>(null);
   const playIntro = useCallback(() => {
     setFocused(null);
     setPanel(null);
@@ -417,10 +414,9 @@ export default function LeagueClient({
         portal: portal && portal.px !== null && portal.pz !== null ? [portal.px, portal.pz] : null,
         tallest: Math.max(0, ...[...byDevId.values()].map((b) => b.height)),
       },
-      style: introStyle,
       n: (prev?.n ?? 0) + 1,
     }));
-  }, [store, byDevId, introStyle]);
+  }, [store, byDevId]);
   const endIntro = useCallback(() => setIntro(null), []);
   const skipIntro = useCallback(() => setIntro(null), []);
   const introChecked = useRef(false);

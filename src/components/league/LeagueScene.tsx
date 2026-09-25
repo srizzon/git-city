@@ -14,7 +14,7 @@ import { InstancedDecorations } from "@/components/city/decorations";
 import type { CityBuilding, CityDecoration } from "@/lib/github";
 import { LOT, bounds, lotToWorld, rotToRadians, terrainBounds, worldBounds } from "@/lib/league-city/grid";
 import type { CityIdentity, CityObject } from "@/lib/league-city/types";
-import { introPath, type IntroPieces, type IntroStyle } from "@/lib/league-city/intro";
+import { introPath, type IntroPieces } from "@/lib/league-city/intro";
 import { approachRoads } from "@/lib/league-city/starter";
 import { APPROACH_LOTS } from "@/lib/league-city/identity-geometry";
 import IdentityLayer from "./identity/IdentityLayer";
@@ -334,11 +334,11 @@ function HeroFraming() {
 }
 
 // The intro ends on the orbit's own frame for this screen, so nothing jumps.
-function IntroPlayer({ h, intro, onEnd }: { h: number; intro: { pieces: IntroPieces; style: IntroStyle }; onEnd: () => void }) {
+function IntroPlayer({ h, intro, onEnd }: { h: number; intro: { pieces: IntroPieces }; onEnd: () => void }) {
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
   const [path] = useState(() => {
     const f = cameraFrame(h, aspect);
-    return introPath(intro.pieces, intro.style, { pos: f.position.toArray(), look: f.target.toArray() });
+    return introPath(intro.pieces, { pos: f.position.toArray(), look: f.target.toArray() });
   });
   return <TownIntro path={path} onEnd={onEnd} />;
 }
@@ -357,7 +357,7 @@ export interface LeagueSceneProps {
   onPortalClick?: () => void;
   /** First-visit intro; the camera is the intro's until onIntroEnd. */
   /** n: a new number replays it. */
-  intro?: { pieces: IntroPieces; style: IntroStyle; n?: number } | null;
+  intro?: { pieces: IntroPieces; n?: number } | null;
   onIntroEnd?: () => void;
   objects: CityObject[];
   buildings: CityBuilding[];
