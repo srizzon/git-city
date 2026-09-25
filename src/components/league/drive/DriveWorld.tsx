@@ -22,12 +22,14 @@ import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/te
 import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
 import Car, { type CarApi } from "./Car";
 import DriveCamera from "./DriveCamera";
+import Battle from "./Battle";
+import CrownMode, { type CrownApi, type CrownView } from "./CrownMode";
 import HonkFlash from "./HonkFlash";
 import Lights from "./Lights";
 import { BoostTrail, Smoke } from "./Particles";
 import SkidMarks from "./SkidMarks";
 import { useDriveAudio } from "./useDriveAudio";
-import { useDrivePresence } from "./useDrivePresence";
+import { useDrivePresence, type BattleEvent } from "./useDrivePresence";
 import RemoteCars from "./RemoteCars";
 import type { FxSource, FxSources } from "./fx";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
@@ -61,6 +63,10 @@ export interface DriveWorldProps {
   onDrivers: (drivers: DriverInfo[]) => void;
   /** Honked at a teammate's building. */
   onHonk: (b: CityBuilding) => void;
+  /** Crown Rush: the HUD's Start button calls into this. */
+  crownApi: React.MutableRefObject<CrownApi | null>;
+  /** Crown Rush state for the HUD. */
+  onCrown: (v: CrownView) => void;
 }
 
 /** A bump carries this share of the hitter's relative velocity, plus a small hop (m/s). */
@@ -233,6 +239,8 @@ export default function DriveWorld({
   name,
   onDrivers,
   onHonk,
+  crownApi,
+  onCrown,
 }: DriveWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -258,7 +266,15 @@ export default function DriveWorld({
   // Crashes with other drivers. Whoever sees the contact tells the other one
   // how to move; a bump for a crash you already felt locally is dropped.
   const contacts = useRef(new Map<string, number>());
-  const { remotes, drivers, sendBump } = useDrivePresence({
+  const battleSink = useRef<(e: BattleEvent) => void>(() => {});
+  const crownSink = useRef<(e: BattleEvent) => void>(() => {});
+  const crownHit = useRef<(id: string) => void>(() => {});
+  const crownKnock = useRef<() => void>(() => {});
+  const telemetryRef = useRef(telemetry);
+  useEffect(() => {
+    telemetryRef.current = telemetry;
+  }, [telemetry]);
+  const { remotes, drivers, sendBump, send, selfId } = useDrivePresence({
     slug,
     name,
     car,
@@ -269,8 +285,10 @@ export default function DriveWorld({
       c.body.applyImpulse({ x: x * CHASSIS.mass, y: BUMP_HOP * CHASSIS.mass, z: z * CHASSIS.mass }, true);
       impact.current = { strength: Math.min(1, Math.hypot(x, z) / 12), at: performance.now() };
     },
+    onBattle: (e) => (e.t === "crown" ? crownSink.current(e) : battleSink.current(e)),
   });
   const onRemoteHit = (id: string, other: RapierRigidBody) => {
+    crownHit.current(id);
     const c = car.current;
     const now = performance.now();
     const last = contacts.current.get(id) ?? 0;
@@ -312,6 +330,31 @@ export default function DriveWorld({
           </Car>
           <LocalFx car={car} sources={fx} />
           <RemoteCars remotes={remotes} drivers={drivers} sources={fx} localCar={car} muted={muted || paused} />
+          <Battle
+            objects={objects}
+            car={car}
+            remotes={remotes}
+            input={input}
+            send={send}
+            selfId={selfId}
+            sinkRef={battleSink}
+            impactRef={impact}
+            telemetryRef={telemetryRef}
+            onKnocked={() => crownKnock.current()}
+            muted={muted || paused}
+          />
+          <CrownMode
+            objects={objects}
+            carRef={car}
+            remotes={remotes}
+            send={send}
+            selfId={selfId}
+            sinkRef={crownSink}
+            apiRef={crownApi}
+            hitRef={crownHit}
+            knockRef={crownKnock}
+            onView={onCrown}
+          />
           {flash && <HonkFlash key={flash.at} building={flash.b} at={flash.at} />}
           <SkidMarks sources={fx} />
           <Smoke sources={fx} />

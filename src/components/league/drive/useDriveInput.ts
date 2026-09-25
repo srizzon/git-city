@@ -8,10 +8,10 @@ import { readInput, type DriveInput, type GamepadLike } from "@/lib/league-city/
 // every frame. `input` is the level; `pressed` holds this frame's presses
 // (camera, reset, horn). Off while a text field has focus.
 
-const NONE: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false, boost: false, horn: false, camera: false, reset: false };
+const NONE: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false, boost: false, horn: false, camera: false, reset: false, fire: false };
 const DRIVE_KEYS = new Set([
   "KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
-  "Space", "ShiftLeft", "ShiftRight", "KeyH", "KeyC", "KeyR",
+  "Space", "ShiftLeft", "ShiftRight", "KeyH", "KeyC", "KeyR", "KeyF",
 ]);
 
 function typing(): boolean {
@@ -21,14 +21,14 @@ function typing(): boolean {
 
 export interface DriveInputRef {
   input: DriveInput;
-  pressed: { camera: boolean; reset: boolean; horn: boolean };
+  pressed: { camera: boolean; reset: boolean; horn: boolean; fire: boolean };
 }
 
 export function useDriveInput(paused = false): React.MutableRefObject<DriveInputRef> {
   const keys = useRef(new Set<string>());
   // Keys pressed since the last frame: a tap shorter than a frame still counts once.
   const taps = useRef(new Set<string>());
-  const ref = useRef<DriveInputRef>({ input: NONE, pressed: { camera: false, reset: false, horn: false } });
+  const ref = useRef<DriveInputRef>({ input: NONE, pressed: { camera: false, reset: false, horn: false, fire: false } });
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -70,6 +70,7 @@ export function useDriveInput(paused = false): React.MutableRefObject<DriveInput
       camera: next.camera && !prev.camera,
       reset: next.reset && !prev.reset,
       horn: next.horn && !prev.horn,
+      fire: next.fire && !prev.fire,
     };
     ref.current.input = next;
   });

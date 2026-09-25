@@ -4,9 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Volume2, VolumeX, X } from "lucide-react";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
+import { ITEM_NAMES, isItem } from "@/lib/league-city/drive/battle";
 import { HUD_BOX } from "../shared";
 import PauseMenu, { CONTROLS } from "./PauseMenu";
 import StartScreen from "./StartScreen";
+import CrownPanel from "./CrownPanel";
+import CopyLink from "./CopyLink";
+import type { CrownState } from "@/lib/league-city/drive/crown";
 
 // Drive mode HUD: speed and a boost light (bottom), camera, mute and exit (top
 // right), a controls hint that fades after 6 s, the start screen while Rapier
@@ -25,6 +29,8 @@ export default function DriveHud({
   muted,
   paused,
   drivers,
+  crown,
+  onStartCrown,
   onResume,
   onCamera,
   onMute,
@@ -37,6 +43,9 @@ export default function DriveHud({
   paused: boolean;
   /** Everyone else driving in this city right now. */
   drivers: DriverInfo[];
+  /** Crown Rush state from the drive room. */
+  crown: { crown: CrownState; offset: number; you: string | null } | null;
+  onStartCrown: () => void;
   onResume: () => void;
   onCamera: () => void;
   onMute: () => void;
@@ -45,6 +54,7 @@ export default function DriveHud({
   const speed = useRef<HTMLSpanElement>(null);
   const boostTag = useRef<HTMLSpanElement>(null);
   const honk = useRef<HTMLDivElement>(null);
+  const itemSlot = useRef<HTMLSpanElement>(null);
   const honkName = useRef<HTMLSpanElement>(null);
   const [hints, setHints] = useState(true);
 
@@ -59,6 +69,11 @@ export default function DriveHud({
     const tick = () => {
       if (speed.current) speed.current.textContent = String(Math.round(Math.abs(telemetry.speed) * 3.6));
       if (boostTag.current) boostTag.current.dataset.on = String(telemetry.boosting);
+      if (itemSlot.current) {
+        const held = isItem(telemetry.held) ? telemetry.held : null;
+        itemSlot.current.textContent = held ? `F  ${ITEM_NAMES[held]}` : "No attack";
+        itemSlot.current.dataset.state = !held ? "empty" : performance.now() - telemetry.gotAt < 900 ? "new" : "held";
+      }
       if (honk.current && honkName.current) {
         honk.current.dataset.on = String(!!telemetry.near);
         if (telemetry.near) honkName.current.textContent = `@${telemetry.near}`;
@@ -79,7 +94,10 @@ export default function DriveHud({
             {drivers.length + 1} driving now
           </p>
           {drivers.length === 0 ? (
-            <p className="max-w-[180px] text-dim normal-case">Share the link to race your team here.</p>
+            <div className="flex max-w-[180px] flex-col items-start gap-1.5">
+              <p className="text-dim normal-case">Share the link to race your team here.</p>
+              <CopyLink />
+            </div>
           ) : (
             <ul className="flex flex-col gap-1">
               {drivers.slice(0, 6).map((d) => (
@@ -145,6 +163,13 @@ export default function DriveHud({
           >
             Shift boost
           </span>
+          <span
+            ref={itemSlot}
+            data-state="empty"
+            className="min-w-[128px] whitespace-pre border-2 border-border px-2 py-0.5 text-center text-[9px] text-dim transition-colors data-[state=held]:border-[#ff5ad8] data-[state=held]:text-[#ff9be8] data-[state=new]:border-[#ff5ad8] data-[state=new]:bg-[#ff5ad8] data-[state=new]:text-bg"
+          >
+            No attack
+          </span>
         </div>
       )}
 
@@ -160,6 +185,8 @@ export default function DriveHud({
           <div className="normal-case">Gamepad works too</div>
         </div>
       )}
+
+      {ready && <CrownPanel crown={crown?.crown ?? null} offset={crown?.offset ?? 0} you={crown?.you ?? null} drivers={drivers} onStart={onStartCrown} />}
 
       {/* Last, so they blur and cover the rest of the HUD. */}
       <StartScreen ready={ready} />

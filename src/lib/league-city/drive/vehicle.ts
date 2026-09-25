@@ -28,6 +28,11 @@ export interface CarState {
   driftDir: number;
   /** Seconds of grip recovery left after a drift. */
   recovering: number;
+  /** Spinning out (oil, a ball hit): seconds left and which way. */
+  spinLeft: number;
+  spinDir: number;
+  /** Top speed multiplier (the crown holder is slower). */
+  topMul: number;
   /** Sideways speed, m/s. */
   lateral: number;
   /** Surface under the rear wheels. */
@@ -44,7 +49,7 @@ export const WHEELS: { x: number; z: number; front: boolean }[] = [
 export function newCarState(): CarState {
   return {
     speed: 0, steer: 0, boosting: false, braking: false, slip: 0,
-    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, lateral: 0, surface: "road",
+    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, topMul: 1, lateral: 0, surface: "road",
   };
 }
 
@@ -81,6 +86,17 @@ export function capFade(speed: number, top: number): number {
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
+/** Spin rate (rad/s) while spun out, and how fast the car slows meanwhile (1/s). */
+const SPIN_RATE = 7;
+const SPIN_DRAG = 1.2;
+
+/** Start a spin-out: the car loses grip and turns in circles for `seconds`. */
+export function spinOut(s: CarState, seconds: number, dir: number = Math.random() < 0.5 ? -1 : 1): void {
+  s.spinLeft = Math.max(s.spinLeft, seconds);
+  s.spinDir = dir < 0 ? -1 : 1;
+  s.drifting = false;
+}
+
 /**
  * One physics step: reads input, sets wheel forces, grip and steering, then
  * updates the controller. Call before world.step with the same dt.
@@ -100,8 +116,14 @@ export function stepCar(
   s.speed = speed;
   const grounded = c.wheelIsInContact(2) || c.wheelIsInContact(3);
 
+  const spinning = s.spinLeft > 0;
+  if (spinning) {
+    s.spinLeft = Math.max(0, s.spinLeft - dt);
+    if (s.spinLeft === 0) s.recovering = DRIFT.recoverTime;
+  }
+
   // Drift: hold Space while steering at speed; it ends when Space lets go.
-  if (!s.drifting && input.handbrake && input.steer !== 0 && speed > DRIFT.minSpeed && grounded) {
+  if (!spinning && !s.drifting && input.handbrake && input.steer !== 0 && speed > DRIFT.minSpeed && grounded) {
     s.drifting = true;
     s.driftDir = Math.sign(input.steer);
   } else if (s.drifting && (!input.handbrake || speed < DRIFT.endSpeed)) {
@@ -126,16 +148,18 @@ export function stepCar(
 
   // Boost: unlimited while held.
   s.boosting = input.boost;
-  const top = s.boosting ? BOOST.topSpeed : rearTop;
+  const top = (s.boosting ? BOOST.topSpeed : rearTop) * s.topMul;
 
   // Throttle, brake and reverse (boost drives even without throttle).
   const throttle = s.boosting ? 1 : input.throttle;
   let engine = 0;
   let brake = 0;
   if (throttle > 0 && speed < -ENGINE.reverseBelow) {
-    brake = ENGINE.brake * throttle;
+    brake = ENGINE.switchBrake * throttle;
   } else if (throttle > 0) {
-    engine = ENGINE.force * throttle * (s.boosting ? BOOST.engineMul : 1) * capFade(speed, top);
+    // Pulls hard off the line (after a crash, a flip, a stop), easing out with speed.
+    const launch = 1 + ENGINE.launch * Math.max(0, 1 - Math.max(0, speed) / ENGINE.launchUntil);
+    engine = ENGINE.force * throttle * launch * (s.boosting ? BOOST.engineMul : 1) * capFade(speed, top);
   } else if (input.brake > 0 && speed > ENGINE.reverseBelow) {
     brake = ENGINE.brake * input.brake;
   } else if (input.brake > 0) {
@@ -153,7 +177,7 @@ export function stepCar(
   s.steer += Math.max(-step, Math.min(step, target - s.steer));
 
   // While sliding, the tires let go: the drift below steers the car.
-  const sliding = s.drifting && grounded;
+  const sliding = (s.drifting || spinning) && grounded;
   for (let i = 0; i < 4; i++) {
     const front = WHEELS[i].front;
     c.setWheelSteering(i, front ? s.steer : 0);
@@ -171,7 +195,13 @@ export function stepCar(
   const [fx, , fz] = rotate(q, [0, 0, 1]);
   const heading = Math.atan2(fx, fz);
 
-  if (sliding) {
+  if (spinning && grounded) {
+    // Spun out: turning in circles, sliding on, slowing down.
+    const w = body.angvel();
+    body.setAngvel({ x: w.x, y: s.spinDir * SPIN_RATE * Math.min(1, s.spinLeft / 0.4 + 0.2), z: w.z }, true);
+    const k = Math.max(0, 1 - SPIN_DRAG * dt);
+    body.setLinvel({ x: v0.x * k, y: v.y, z: v0.z * k }, true);
+  } else if (sliding) {
     // The direction of travel arcs around the turn; the nose leads it into the turn.
     const into = input.steer * s.driftDir; // +1 steering into the drift, -1 countersteering
     const turn = Math.max(0.2, DRIFT.turn + DRIFT.turnSteer * into);

@@ -7,11 +7,11 @@ import { LOT } from "../grid";
 import type { CityObject } from "../types";
 import { buildColliders } from "./colliders";
 import { CHASSIS, GRAVITY, SURFACE } from "./tuning";
-import { carHeading, createVehicle, headingFromRot, newCarState, placeCar, stepCar } from "./vehicle";
+import { carHeading, createVehicle, headingFromRot, newCarState, placeCar, spinOut, stepCar } from "./vehicle";
 
 type World = RapierContext["world"];
 const DT = 1 / 60;
-const idle: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false, boost: false, horn: false, camera: false, reset: false };
+const idle: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false, boost: false, horn: false, camera: false, reset: false, fire: false };
 
 beforeAll(async () => {
   await RAPIER.init();
@@ -94,6 +94,27 @@ describe("vehicle (headless rapier)", () => {
     expect(st.lateral).toBeLessThan(2); // gripping, not sliding
   });
 
+  it("gets back up to speed fast: off the line, and from reversing to forward", () => {
+    const off = setup();
+    off.run({}, 1);
+    let t = 0;
+    while (off.s.speed < 15 && t < 5) {
+      off.run({ throttle: 1 }, 1 / 60);
+      t += 1 / 60;
+    }
+    expect(t).toBeLessThan(2.2);
+
+    const back = setup();
+    back.run({ brake: 1 }, 3);
+    expect(back.s.speed).toBeLessThan(-6);
+    t = 0;
+    while (back.s.speed < 10 && t < 5) {
+      back.run({ throttle: 1 }, 1 / 60);
+      t += 1 / 60;
+    }
+    expect(t).toBeLessThan(1.6);
+  });
+
   it("reverses with the brake from rest", () => {
     const { s, run } = setup();
     run({ brake: 1 }, 3);
@@ -143,6 +164,27 @@ describe("vehicle (headless rapier)", () => {
     expect(st.boosting).toBe(false);
   });
 
+  it("spins out: turns in circles, slows down, then drives on", () => {
+    const { body, s: st, run } = setup();
+    run({ throttle: 1 }, 5);
+    const before = st.speed;
+    let turned = 0;
+    let h = carHeading(body);
+    spinOut(st, 1.2, 1);
+    for (let i = 0; i < 72; i++) {
+      run({ throttle: 1 }, 1 / 60);
+      const nh = carHeading(body);
+      turned += Math.abs(Math.atan2(Math.sin(nh - h), Math.cos(nh - h)));
+      h = nh;
+    }
+    expect(turned).toBeGreaterThan(Math.PI * 1.5);
+    const v = body.linvel();
+    expect(Math.hypot(v.x, v.z)).toBeLessThan(before);
+    run({ throttle: 1 }, 1.5);
+    expect(st.spinLeft).toBe(0);
+    expect(st.lateral).toBeLessThan(1);
+  });
+
   it("launches off a ramp it drives up", () => {
     // A ramp facing north, 2 lots north of the car; the car faces north too.
     const ramp: CityObject = { id: "ramp", kind: "item", item_type: "ramp", developer_id: null, x: 0, z: -2, px: 0, pz: -2 * LOT, rot: 0, is_new: false };
@@ -161,7 +203,7 @@ describe("vehicle (headless rapier)", () => {
     const { body, run } = setup();
     body.setTranslation({ x: 0, y: 2, z: 0 }, true);
     body.setRotation({ x: 0, y: 0, z: 1, w: 0 }, true); // 180° about z
-    run({}, 4);
+    run({}, 1.6);
     const q = body.rotation();
     const upY = 1 - 2 * (q.x * q.x + q.z * q.z);
     expect(upY).toBeGreaterThan(0.9);

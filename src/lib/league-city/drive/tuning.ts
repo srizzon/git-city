@@ -81,6 +81,11 @@ export const ENGINE = {
   idleBrake: 3 / 60,
   /** Below this forward speed (m/s) the brake key reverses. */
   reverseBelow: 1,
+  /** Extra pull off the line: engine × (1 + launch) at rest, fading out by `launchUntil` m/s. */
+  launch: 3,
+  launchUntil: 16,
+  /** Throttle while rolling backward: a firm brake so you're going forward again fast. */
+  switchBrake: 4500 / 60,
 };
 
 export const STEER = {
@@ -119,7 +124,7 @@ export const BOOST = {
 
 export const RESPAWN = {
   /** Upside down this long → auto-right. */
-  flippedFor: 3,
+  flippedFor: 1,
   rightingImpulse: 5000,
   rightingTorque: 2500,
   /** Knocked props go back to their spot this long after the hit. */
