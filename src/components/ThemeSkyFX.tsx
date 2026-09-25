@@ -15,6 +15,8 @@ type ThemeLike = {
 type Props = {
     themeIndex: 0 | 1 | 2 | 3;
     theme: ThemeLike;
+    /** Low sky for cameras that look down (towns): moon near the horizon, stars from it upward. */
+    lowSky?: boolean;
 };
 
 // ─── Tunables ─────────────────────────────────────────────────
@@ -494,7 +496,7 @@ type Streak = {
 
 // ─── Component ────────────────────────────────────────────────
 
-export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
+export default memo(function ThemeSkyFX({ themeIndex, theme, lowSky = false }: Props) {
     const { camera } = useThree();
     const rootRef = useRef<THREE.Group>(null);
 
@@ -586,13 +588,14 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         const col = new Float32Array(count * 3);
 
         const dist = STAR_DIST[themeIndex] || SKY_RADIUS;
-        const minElev = STAR_MIN_ELEV[themeIndex] || 6;
+        const minElev = lowSky ? 1 : STAR_MIN_ELEV[themeIndex] || 6;
+        const maxElev = lowSky ? 30 : 78;
         // Push stars near camera.far so they render behind all city geometry
         const scaledDist = skyD(dist);
 
         for (let i = 0; i < count; i++) {
             // Upper hemisphere only — no underground stars
-            const dir = sampleUpperHemisphereDir(rng, minElev, 78);
+            const dir = sampleUpperHemisphereDir(rng, minElev, maxElev);
             pos[i * 3] = dir.x * scaledDist;
             pos[i * 3 + 1] = dir.y * scaledDist;
             pos[i * 3 + 2] = dir.z * scaledDist;
@@ -613,7 +616,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
         geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
         return geo;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- skyD depends on camera.far, intentionally omitted
-    }, [themeIndex]);
+    }, [themeIndex, lowSky]);
 
     const starMat = useMemo(() => {
         if (!STAR_COUNTS[themeIndex]) return null;
@@ -886,7 +889,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
     // from the initial view instead of hiding behind the camera.
     const discPos = useMemo(() => {
         const cfg = DISC_CFG[themeIndex];
-        const elevRad = (cfg.elevDeg * Math.PI) / 180;
+        const elevRad = ((lowSky ? 4 : cfg.elevDeg) * Math.PI) / 180;
         const azRad = -Math.PI * 0.18; // slightly off-centre, in front of initial camera
         const d = skyD(cfg.dist); // always near camera.far → behind buildings
         return new THREE.Vector3(
@@ -894,7 +897,7 @@ export default memo(function ThemeSkyFX({ themeIndex, theme }: Props) {
             Math.sin(elevRad) * d,
             -Math.sin(azRad) * Math.cos(elevRad) * d
         );
-    }, [themeIndex, skyScale]);
+    }, [themeIndex, skyScale, lowSky]);
 
     // Runtime disc scale (angular size preserved as depth changes)
     const discDisplayScale = skyD(discScale);

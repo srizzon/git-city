@@ -8,7 +8,8 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import CityScene from "@/components/CityScene";
-import { THEMES, ThemeLights } from "@/components/city/theme";
+import { THEMES, ThemeLights, type CityTheme } from "@/components/city/theme";
+import ThemeSkyFX from "@/components/ThemeSkyFX";
 import { InstancedDecorations } from "@/components/city/decorations";
 import type { CityBuilding, CityDecoration } from "@/lib/github";
 import { LOT, lotToWorld, maxLot, minLot, rotToRadians, terrainBounds } from "@/lib/league-city/grid";
@@ -28,8 +29,37 @@ const KNOCKABLE = new Set(["lamp", "bench", "fountain", "cone", "crates"]);
 // Full-screen league city: one Canvas, midnight theme, the league's lots with
 // roads, trees, decorations and member buildings (invited ones faded).
 
-const THEME_INDEX = 1; // Midnight
-const theme = THEMES[THEME_INDEX];
+// Towns use Midnight with more light: brighter ambient and sky, a lighter
+// ground and sidewalks, so the city reads at a glance. Same buildings and
+// window colors as the main city.
+const MIDNIGHT = THEMES[1];
+const theme: CityTheme = {
+  ...MIDNIGHT,
+  fogColor: "#10203a",
+  fogNear: 700,
+  fogFar: 5000,
+  ambientColor: "#6a88d0",
+  ambientIntensity: 1.0,
+  sunColor: "#a8c0f0",
+  sunIntensity: 1.15,
+  fillColor: "#5068b0",
+  fillIntensity: 0.55,
+  hemiSky: "#7aa0d0",
+  hemiGround: "#34404e",
+  hemiIntensity: 0.95,
+  groundColor: "#2f3b50",
+  grid1: "#465670",
+  grid2: "#3a4860",
+  roadMarkingColor: "#b8c4d4",
+  sidewalkColor: "#646a7c",
+};
+// Keys the theme's lights and sky (a value of its own, apart from the main city's).
+const THEME_INDEX = 11;
+const EXPOSURE = 1.65;
+/** The grass-less world around the terrain; the fog fades it into the horizon. */
+const VOID_COLOR = "#0b1422";
+/** Under 1 lowers the orbit camera so the horizon, sky and moon stay in view. */
+const CAMERA_LIFT = 0.62;
 
 // ─── Ground ──────────────────────────────────────────────────
 
@@ -63,7 +93,7 @@ function LeagueGround({ size }: { size: number }) {
       {/* Void around the terrain, lost in the fog */}
       <mesh position={[cx, -2, cz]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[width * 12, width * 12]} />
-        <meshStandardMaterial color="#0c1018" roughness={1} />
+        <meshBasicMaterial color={VOID_COLOR} />
       </mesh>
     </group>
   );
@@ -118,7 +148,7 @@ function cameraFrame(size: number, aspect = 1.6, zoom = 1, tallest = 0) {
   const dist = Math.max((width * 0.95 + 120) * Math.max(1, 1.3 / aspect) ** 0.55 * zoom, tallest * 1.9);
   return {
     target: new THREE.Vector3(cx, Math.max(30, tallest * 0.35), cz),
-    position: new THREE.Vector3(cx - dist * 0.55, dist * 0.6, cz + dist * 0.65),
+    position: new THREE.Vector3(cx - dist * 0.55, dist * 0.6 * CAMERA_LIFT, cz + dist * 0.65),
     max: width * 2.4 + 400,
   };
 }
@@ -347,7 +377,7 @@ export default function LeagueScene({
       frameloop={editing ? "demand" : "always"}
       dpr={[1, 1.5]}
       camera={{ position: initial.position.toArray(), fov: 50, near: 1, far: 12000 }}
-      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: EXPOSURE }}
       style={
         embedded
           ? { position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }
@@ -363,6 +393,8 @@ export default function LeagueScene({
     >
       <fog attach="fog" args={[theme.fogColor, theme.fogNear * 2, theme.fogFar * 1.2]} />
       <ThemeLights theme={theme} themeIndex={THEME_INDEX} />
+      {/* Moon and stars from the main city's Midnight sky (its index there is 0). */}
+      <ThemeSkyFX themeIndex={0} theme={theme} lowSky />
       {embedded && <HeroFraming />}
       {editing ? (
         <EditCamera size={size} onLot={onLot ?? (() => {})} apiRef={editApiRef} pickables={editPickables} />
