@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import MergedStatic from "./MergedStatic";
 import * as THREE from "three";
 
 // ─── Constants ───────────────────────────────────────────────
@@ -294,189 +295,192 @@ export default function EArcadeLandmark({
         <meshBasicMaterial />
       </mesh>
 
-      {/* ── Ground plaza ── */}
-      <mesh position={[0, 1, 0]}>
-        <boxGeometry args={[base.w + 40, 2, base.d + 40]} />
-        <meshStandardMaterial color={shellColor} roughness={0.5} metalness={0.4} />
-      </mesh>
+      {/* Static shell: one draw call per look instead of one per box */}
+      <MergedStatic>
+        {/* ── Ground plaza ── */}
+        <mesh position={[0, 1, 0]}>
+          <boxGeometry args={[base.w + 40, 2, base.d + 40]} />
+          <meshStandardMaterial color={shellColor} roughness={0.5} metalness={0.4} />
+        </mesh>
 
-      {/* ── Stepped tower sections ── */}
-      {SECTIONS.map((sec, i) => {
-        const hw = sec.w / 2;
-        const hd = sec.d / 2;
+        {/* ── Stepped tower sections ── */}
+        {SECTIONS.map((sec, i) => {
+          const hw = sec.w / 2;
+          const hd = sec.d / 2;
 
-        return (
-          <group key={i}>
-            {/* Section body */}
-            <mesh position={[0, sec.y, 0]}>
-              <boxGeometry args={[sec.w, sec.h, sec.d]} />
-              <meshStandardMaterial
-                color={shellColor}
-                roughness={0.25}
-                metalness={0.8}
-              />
-            </mesh>
+          return (
+            <group key={i}>
+              {/* Section body */}
+              <mesh position={[0, sec.y, 0]}>
+                <boxGeometry args={[sec.w, sec.h, sec.d]} />
+                <meshStandardMaterial
+                  color={shellColor}
+                  roughness={0.25}
+                  metalness={0.8}
+                />
+              </mesh>
 
-            {/* Glass facade - front */}
-            <mesh position={[0, sec.y, hd + 0.3]}>
-              <planeGeometry args={[sec.w - 4, sec.h - 4]} />
-              <meshStandardMaterial
-                map={glassFront}
-                emissive={themeWindowLit[0] ?? "#fff"}
-                emissiveMap={glassFront}
-                emissiveIntensity={0.7}
-                toneMapped={false}
-                transparent
-              />
-            </mesh>
-            {/* Glass facade - back */}
-            <mesh position={[0, sec.y, -hd - 0.3]} rotation={[0, Math.PI, 0]}>
-              <planeGeometry args={[sec.w - 4, sec.h - 4]} />
-              <meshStandardMaterial
-                map={glassFront}
-                emissive={themeWindowLit[0] ?? "#fff"}
-                emissiveMap={glassFront}
-                emissiveIntensity={0.7}
-                toneMapped={false}
-                transparent
-              />
-            </mesh>
-            {/* Glass facade - right */}
-            <mesh position={[hw + 0.3, sec.y, 0]} rotation={[0, Math.PI / 2, 0]}>
-              <planeGeometry args={[sec.d - 4, sec.h - 4]} />
-              <meshStandardMaterial
-                map={glassSide}
-                emissive={themeWindowLit[0] ?? "#fff"}
-                emissiveMap={glassSide}
-                emissiveIntensity={0.7}
-                toneMapped={false}
-                transparent
-              />
-            </mesh>
-            {/* Glass facade - left */}
-            <mesh position={[-hw - 0.3, sec.y, 0]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[sec.d - 4, sec.h - 4]} />
-              <meshStandardMaterial
-                map={glassSide}
-                emissive={themeWindowLit[0] ?? "#fff"}
-                emissiveMap={glassSide}
-                emissiveIntensity={0.7}
-                toneMapped={false}
-                transparent
-              />
-            </mesh>
+              {/* Glass facade - front */}
+              <mesh position={[0, sec.y, hd + 0.3]}>
+                <planeGeometry args={[sec.w - 4, sec.h - 4]} />
+                <meshStandardMaterial
+                  map={glassFront}
+                  emissive={themeWindowLit[0] ?? "#fff"}
+                  emissiveMap={glassFront}
+                  emissiveIntensity={0.7}
+                  toneMapped={false}
+                  transparent
+                />
+              </mesh>
+              {/* Glass facade - back */}
+              <mesh position={[0, sec.y, -hd - 0.3]} rotation={[0, Math.PI, 0]}>
+                <planeGeometry args={[sec.w - 4, sec.h - 4]} />
+                <meshStandardMaterial
+                  map={glassFront}
+                  emissive={themeWindowLit[0] ?? "#fff"}
+                  emissiveMap={glassFront}
+                  emissiveIntensity={0.7}
+                  toneMapped={false}
+                  transparent
+                />
+              </mesh>
+              {/* Glass facade - right */}
+              <mesh position={[hw + 0.3, sec.y, 0]} rotation={[0, Math.PI / 2, 0]}>
+                <planeGeometry args={[sec.d - 4, sec.h - 4]} />
+                <meshStandardMaterial
+                  map={glassSide}
+                  emissive={themeWindowLit[0] ?? "#fff"}
+                  emissiveMap={glassSide}
+                  emissiveIntensity={0.7}
+                  toneMapped={false}
+                  transparent
+                />
+              </mesh>
+              {/* Glass facade - left */}
+              <mesh position={[-hw - 0.3, sec.y, 0]} rotation={[0, -Math.PI / 2, 0]}>
+                <planeGeometry args={[sec.d - 4, sec.h - 4]} />
+                <meshStandardMaterial
+                  map={glassSide}
+                  emissive={themeWindowLit[0] ?? "#fff"}
+                  emissiveMap={glassSide}
+                  emissiveIntensity={0.7}
+                  toneMapped={false}
+                  transparent
+                />
+              </mesh>
 
-            {/* Ledge/setback at top of each section */}
-            <mesh position={[0, sec.y + sec.h / 2 + 1, 0]}>
-              <boxGeometry args={[sec.w + 3, 2, sec.d + 3]} />
-              <meshStandardMaterial color={shellColor} roughness={0.3} metalness={0.7} />
-            </mesh>
+              {/* Ledge/setback at top of each section */}
+              <mesh position={[0, sec.y + sec.h / 2 + 1, 0]}>
+                <boxGeometry args={[sec.w + 3, 2, sec.d + 3]} />
+                <meshStandardMaterial color={shellColor} roughness={0.3} metalness={0.7} />
+              </mesh>
 
-            {/* Accent trim at setback */}
-            <mesh position={[0, sec.y + sec.h / 2 + 2.5, 0]}>
-              <boxGeometry args={[sec.w + 4, 0.5, sec.d + 4]} />
+              {/* Accent trim at setback */}
+              <mesh position={[0, sec.y + sec.h / 2 + 2.5, 0]}>
+                <boxGeometry args={[sec.w + 4, 0.5, sec.d + 4]} />
+                <meshStandardMaterial
+                  color={themeAccent}
+                  emissive={themeAccent}
+                  emissiveIntensity={1}
+                  toneMapped={false}
+                />
+              </mesh>
+            </group>
+          );
+        })}
+
+        {/* ── Giant "E" logo on upper front face ── */}
+        <mesh position={[0, SECTIONS[2].y + 20, SECTIONS[2].d / 2 + 0.5]}>
+          <planeGeometry args={[45, 45]} />
+          <meshStandardMaterial
+            map={logoTex}
+            emissive="#ffffff"
+            emissiveMap={logoTex}
+            emissiveIntensity={2.5}
+            toneMapped={false}
+            transparent
+            alphaTest={0.1}
+          />
+        </mesh>
+        {/* Logo on back */}
+        <mesh
+          position={[0, SECTIONS[2].y + 20, -SECTIONS[2].d / 2 - 0.5]}
+          rotation={[0, Math.PI, 0]}
+        >
+          <planeGeometry args={[45, 45]} />
+          <meshStandardMaterial
+            map={logoTex}
+            emissive="#ffffff"
+            emissiveMap={logoTex}
+            emissiveIntensity={2.5}
+            toneMapped={false}
+            transparent
+            alphaTest={0.1}
+          />
+        </mesh>
+
+        {/* Logo glow */}
+        <pointLight
+          ref={signGlowRef}
+          position={[0, SECTIONS[2].y + 20, SECTIONS[2].d / 2 + 20]}
+          color={themeAccent}
+          intensity={50}
+          distance={120}
+          decay={2}
+        />
+
+        {/* ── "E.ARCADE" text sign (front) ── */}
+        <mesh position={[0, SECTIONS[2].y - 30, SECTIONS[2].d / 2 + 0.5]}>
+          <planeGeometry args={[50, 8]} />
+          <meshStandardMaterial
+            map={signTex}
+            emissive="#ffffff"
+            emissiveMap={signTex}
+            emissiveIntensity={1.5}
+            toneMapped={false}
+            transparent
+            alphaTest={0.1}
+          />
+        </mesh>
+
+        {/* ── Vertical accent strips (left & right faces only) ── */}
+        {SECTIONS.map((sec, i) => (
+          <group key={`strips-${i}`}>
+            {/* Right face */}
+            <mesh position={[sec.w / 2 + 0.4, sec.y, 0]}>
+              <boxGeometry args={[0.3, sec.h, 2]} />
               <meshStandardMaterial
                 color={themeAccent}
                 emissive={themeAccent}
-                emissiveIntensity={1}
+                emissiveIntensity={1.2}
+                toneMapped={false}
+              />
+            </mesh>
+            {/* Left face */}
+            <mesh position={[-sec.w / 2 - 0.4, sec.y, 0]}>
+              <boxGeometry args={[0.3, sec.h, 2]} />
+              <meshStandardMaterial
+                color={themeAccent}
+                emissive={themeAccent}
+                emissiveIntensity={1.2}
                 toneMapped={false}
               />
             </mesh>
           </group>
-        );
-      })}
+        ))}
 
-      {/* ── Giant "E" logo on upper front face ── */}
-      <mesh position={[0, SECTIONS[2].y + 20, SECTIONS[2].d / 2 + 0.5]}>
-        <planeGeometry args={[45, 45]} />
-        <meshStandardMaterial
-          map={logoTex}
-          emissive="#ffffff"
-          emissiveMap={logoTex}
-          emissiveIntensity={2.5}
-          toneMapped={false}
-          transparent
-          alphaTest={0.1}
-        />
-      </mesh>
-      {/* Logo on back */}
-      <mesh
-        position={[0, SECTIONS[2].y + 20, -SECTIONS[2].d / 2 - 0.5]}
-        rotation={[0, Math.PI, 0]}
-      >
-        <planeGeometry args={[45, 45]} />
-        <meshStandardMaterial
-          map={logoTex}
-          emissive="#ffffff"
-          emissiveMap={logoTex}
-          emissiveIntensity={2.5}
-          toneMapped={false}
-          transparent
-          alphaTest={0.1}
-        />
-      </mesh>
+        {/* ── Rooftop structure ── */}
+        <mesh position={[0, TOTAL_H + 4, 0]}>
+          <boxGeometry args={[30, 8, 24]} />
+          <meshStandardMaterial color={shellColor} roughness={0.3} metalness={0.7} />
+        </mesh>
 
-      {/* Logo glow */}
-      <pointLight
-        ref={signGlowRef}
-        position={[0, SECTIONS[2].y + 20, SECTIONS[2].d / 2 + 20]}
-        color={themeAccent}
-        intensity={50}
-        distance={120}
-        decay={2}
-      />
-
-      {/* ── "E.ARCADE" text sign (front) ── */}
-      <mesh position={[0, SECTIONS[2].y - 30, SECTIONS[2].d / 2 + 0.5]}>
-        <planeGeometry args={[50, 8]} />
-        <meshStandardMaterial
-          map={signTex}
-          emissive="#ffffff"
-          emissiveMap={signTex}
-          emissiveIntensity={1.5}
-          toneMapped={false}
-          transparent
-          alphaTest={0.1}
-        />
-      </mesh>
-
-      {/* ── Vertical accent strips (left & right faces only) ── */}
-      {SECTIONS.map((sec, i) => (
-        <group key={`strips-${i}`}>
-          {/* Right face */}
-          <mesh position={[sec.w / 2 + 0.4, sec.y, 0]}>
-            <boxGeometry args={[0.3, sec.h, 2]} />
-            <meshStandardMaterial
-              color={themeAccent}
-              emissive={themeAccent}
-              emissiveIntensity={1.2}
-              toneMapped={false}
-            />
-          </mesh>
-          {/* Left face */}
-          <mesh position={[-sec.w / 2 - 0.4, sec.y, 0]}>
-            <boxGeometry args={[0.3, sec.h, 2]} />
-            <meshStandardMaterial
-              color={themeAccent}
-              emissive={themeAccent}
-              emissiveIntensity={1.2}
-              toneMapped={false}
-            />
-          </mesh>
-        </group>
-      ))}
-
-      {/* ── Rooftop structure ── */}
-      <mesh position={[0, TOTAL_H + 4, 0]}>
-        <boxGeometry args={[30, 8, 24]} />
-        <meshStandardMaterial color={shellColor} roughness={0.3} metalness={0.7} />
-      </mesh>
-
-      {/* ── Antenna ── */}
-      <mesh position={[0, TOTAL_H + 35, 0]}>
-        <cylinderGeometry args={[0.5, 2, 60, 6]} />
-        <meshStandardMaterial color={shellColor} roughness={0.2} metalness={0.9} />
-      </mesh>
+        {/* ── Antenna ── */}
+        <mesh position={[0, TOTAL_H + 35, 0]}>
+          <cylinderGeometry args={[0.5, 2, 60, 6]} />
+          <meshStandardMaterial color={shellColor} roughness={0.2} metalness={0.9} />
+        </mesh>
+      </MergedStatic>
 
       {/* ── Top beacon ── */}
       <mesh ref={beaconRef} position={[0, TOTAL_H + 68, 0]}>

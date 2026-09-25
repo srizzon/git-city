@@ -4,6 +4,7 @@ import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { mergeStaticChildren } from "@/lib/three-merge";
+import MergedStatic from "@/components/MergedStatic";
 import type { SponsorBuildingProps } from "../registry";
 import {
   HEART_BM,
@@ -465,75 +466,78 @@ export default function SponsorCityBuilding(_props: SponsorBuildingProps) {
 
   return (
     <group>
-      {/* ── Platform ── */}
-      <mesh position={[0, 1.5, 0]}>
-        <boxGeometry args={[BW + 20, 3, BD + 20]} />
-        <primitive object={shellMatLight} attach="material" />
-      </mesh>
-      <mesh position={[0, 3.5, 0]}>
-        <boxGeometry args={[BW + 22, 1, BD + 22]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.5} toneMapped={false} />
-      </mesh>
+      {/* Static tower: one draw call per look instead of one per box */}
+      <MergedStatic>
+        {/* ── Platform ── */}
+        <mesh position={[0, 1.5, 0]}>
+          <boxGeometry args={[BW + 20, 3, BD + 20]} />
+          <primitive object={shellMatLight} attach="material" />
+        </mesh>
+        <mesh position={[0, 3.5, 0]}>
+          <boxGeometry args={[BW + 22, 1, BD + 22]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.5} toneMapped={false} />
+        </mesh>
 
-      {/* ── Base section ("SPONSOR") ── */}
-      <BoxSection
-        w={BW} h={BH} d={BD} y={B_Y}
-        shellMat={shellMat} glassFront={bFront} glassSide={bSide}
-        emColor={emC} accent={accent}
-      />
+        {/* ── Base section ("SPONSOR") ── */}
+        <BoxSection
+          w={BW} h={BH} d={BD} y={B_Y}
+          shellMat={shellMat} glassFront={bFront} glassSide={bSide}
+          emColor={emC} accent={accent}
+        />
 
-      <mesh position={[0, BH + 4, 0]}>
-        <boxGeometry args={[BW + 2, 1.5, BD + 2]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.8} toneMapped={false} />
-      </mesh>
+        <mesh position={[0, BH + 4, 0]}>
+          <boxGeometry args={[BW + 2, 1.5, BD + 2]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.8} toneMapped={false} />
+        </mesh>
 
-      {/* ── Mid section (beating heart) ── */}
-      <mesh position={[0, M_Y, 0]}>
-        <boxGeometry args={[MW, MH, MD]} />
-        <primitive object={shellMat} attach="material" />
-      </mesh>
-      <HeartFacade tex={heartFront} w={MW} h={MH} pos={[0, M_Y, MD / 2 + 0.3]} rotY={0} phaseOffset={0} />
-      <HeartFacade tex={heartBack} w={MW} h={MH} pos={[0, M_Y, -MD / 2 - 0.3]} rotY={Math.PI} phaseOffset={0} />
-      <HeartFacade tex={heartRight} w={MD} h={MH} pos={[MW / 2 + 0.3, M_Y, 0]} rotY={Math.PI / 2} phaseOffset={0} />
-      <HeartFacade tex={heartLeft} w={MD} h={MH} pos={[-MW / 2 - 0.3, M_Y, 0]} rotY={-Math.PI / 2} phaseOffset={0} />
-      <CornerStrips w={MW} d={MD} h={MH} yC={M_Y} accent={accent} />
+        {/* ── Mid section (beating heart) ── */}
+        <mesh position={[0, M_Y, 0]}>
+          <boxGeometry args={[MW, MH, MD]} />
+          <primitive object={shellMat} attach="material" />
+        </mesh>
+        <HeartFacade tex={heartFront} w={MW} h={MH} pos={[0, M_Y, MD / 2 + 0.3]} rotY={0} phaseOffset={0} />
+        <HeartFacade tex={heartBack} w={MW} h={MH} pos={[0, M_Y, -MD / 2 - 0.3]} rotY={Math.PI} phaseOffset={0} />
+        <HeartFacade tex={heartRight} w={MD} h={MH} pos={[MW / 2 + 0.3, M_Y, 0]} rotY={Math.PI / 2} phaseOffset={0} />
+        <HeartFacade tex={heartLeft} w={MD} h={MH} pos={[-MW / 2 - 0.3, M_Y, 0]} rotY={-Math.PI / 2} phaseOffset={0} />
+        <CornerStrips w={MW} d={MD} h={MH} yC={M_Y} accent={accent} />
 
-      <pointLight ref={heartLightFront} position={[0, M_Y, MD / 2 + 22]} color={accent} intensity={45} distance={110} decay={2} />
-      <pointLight ref={heartLightBack} position={[0, M_Y, -MD / 2 - 22]} color={accent} intensity={45} distance={110} decay={2} />
-      <pointLight position={[MW / 2 + 22, M_Y, 0]} color={accent} intensity={30} distance={90} decay={2} />
-      <pointLight position={[-MW / 2 - 22, M_Y, 0]} color={accent} intensity={30} distance={90} decay={2} />
+        <pointLight ref={heartLightFront} position={[0, M_Y, MD / 2 + 22]} color={accent} intensity={45} distance={110} decay={2} />
+        <pointLight ref={heartLightBack} position={[0, M_Y, -MD / 2 - 22]} color={accent} intensity={45} distance={110} decay={2} />
+        <pointLight position={[MW / 2 + 22, M_Y, 0]} color={accent} intensity={30} distance={90} decay={2} />
+        <pointLight position={[-MW / 2 - 22, M_Y, 0]} color={accent} intensity={30} distance={90} decay={2} />
 
-      <mesh position={[0, BH + MH + 4, 0]}>
-        <boxGeometry args={[MW + 2, 1.5, MD + 2]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.8} toneMapped={false} />
-      </mesh>
+        <mesh position={[0, BH + MH + 4, 0]}>
+          <boxGeometry args={[MW + 2, 1.5, MD + 2]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.8} toneMapped={false} />
+        </mesh>
 
-      {/* ── Top section ── */}
-      <BoxSection
-        w={TW} h={TH} d={TD} y={T_Y}
-        shellMat={shellMat} glassFront={tFront} glassSide={tSide}
-        emColor={emC} accent={accent}
-      />
+        {/* ── Top section ── */}
+        <BoxSection
+          w={TW} h={TH} d={TD} y={T_Y}
+          shellMat={shellMat} glassFront={tFront} glassSide={tSide}
+          emColor={emC} accent={accent}
+        />
 
-      <mesh position={[0, topY, 0]}>
-        <boxGeometry args={[TW + 4, 1.2, TD + 4]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1} toneMapped={false} />
-      </mesh>
+        <mesh position={[0, topY, 0]}>
+          <boxGeometry args={[TW + 4, 1.2, TD + 4]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1} toneMapped={false} />
+        </mesh>
 
-      <mesh position={[0, topY + 1.5, 0]}>
-        <boxGeometry args={[TW - 8, 2, TD - 8]} />
-        <primitive object={shellMatLight} attach="material" />
-      </mesh>
-      <mesh position={[0, topY + 3, 0]}>
-        <boxGeometry args={[TW - 6, 0.6, TD - 6]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.6} toneMapped={false} />
-      </mesh>
+        <mesh position={[0, topY + 1.5, 0]}>
+          <boxGeometry args={[TW - 8, 2, TD - 8]} />
+          <primitive object={shellMatLight} attach="material" />
+        </mesh>
+        <mesh position={[0, topY + 3, 0]}>
+          <boxGeometry args={[TW - 6, 0.6, TD - 6]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.6} toneMapped={false} />
+        </mesh>
 
-      {/* ── Antenna ── */}
-      <mesh position={[0, antennaY, 0]}>
-        <cylinderGeometry args={[0.5, 1.5, 42, 4]} />
-        <meshStandardMaterial color={shellColor} roughness={0.2} metalness={0.9} />
-      </mesh>
+        {/* ── Antenna ── */}
+        <mesh position={[0, antennaY, 0]}>
+          <cylinderGeometry args={[0.5, 1.5, 42, 4]} />
+          <meshStandardMaterial color={shellColor} roughness={0.2} metalness={0.9} />
+        </mesh>
+      </MergedStatic>
 
       {/* ── Beating voxel heart on top ── */}
       <group position={[0, antennaY + 40, 0]} scale={1.7}>

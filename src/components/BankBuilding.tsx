@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import MergedStatic from "./MergedStatic";
 import * as THREE from "three";
 
 /**
@@ -245,49 +246,52 @@ export default function BankBuilding({ onClick }: BankBuildingProps) {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Stepped base + glowing blue rim */}
-      <mesh position={[0, BASE_H / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[D + 90, BASE_H, W + 90]} />
-        <meshStandardMaterial color={DEEP} emissive="#0a1c44" emissiveIntensity={0.35} roughness={0.5} metalness={0.3} />
-      </mesh>
-      <mesh position={[0, BASE_H + 1, 0]}>
-        <boxGeometry args={[D + 100, 7, W + 100]} />
-        <meshStandardMaterial color={BASE_HOT} emissive={BASE_HOT} emissiveIntensity={0.9} roughness={0.3} metalness={0.5} toneMapped={false} />
-      </mesh>
-
-      {/* Main tower body */}
-      <mesh position={[0, BODY_Y, 0]} castShadow>
-        <boxGeometry args={[D, H, W]} />
-        <meshStandardMaterial color={DEEP} emissive="#0a1c44" emissiveIntensity={0.35} roughness={0.5} metalness={0.3} />
-      </mesh>
-
-      {/* Faint blue ledger lines on the front face */}
-      {ledgerLines.map((y, i) => (
-        <mesh key={`l${i}`} position={[D / 2 + 1, y, 0]}>
-          <boxGeometry args={[4, 3, W - 20]} />
-          <meshStandardMaterial color={BASE_HOT} emissive={BASE_HOT} emissiveIntensity={0.7} roughness={0.3} metalness={0.5} toneMapped={false} />
+      {/* Static shell: one draw call per look instead of one per box */}
+      <MergedStatic>
+        {/* Stepped base + glowing blue rim */}
+        <mesh position={[0, BASE_H / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[D + 90, BASE_H, W + 90]} />
+          <meshStandardMaterial color={DEEP} emissive="#0a1c44" emissiveIntensity={0.35} roughness={0.5} metalness={0.3} />
         </mesh>
-      ))}
+        <mesh position={[0, BASE_H + 1, 0]}>
+          <boxGeometry args={[D + 100, 7, W + 100]} />
+          <meshStandardMaterial color={BASE_HOT} emissive={BASE_HOT} emissiveIntensity={0.9} roughness={0.3} metalness={0.5} toneMapped={false} />
+        </mesh>
 
-      {/* Glowing blue edge pillars on the four vertical corners */}
-      {[-1, 1].map((sx) =>
-        [-1, 1].map((sz) => (
-          <mesh key={`p${sx}${sz}`} position={[(sx * D) / 2, BODY_Y, (sz * W) / 2]}>
-            <boxGeometry args={[14, H, 14]} />
-            <meshStandardMaterial color={BASE} emissive={BASE} emissiveIntensity={1.25} roughness={0.25} metalness={0.4} toneMapped={false} />
+        {/* Main tower body */}
+        <mesh position={[0, BODY_Y, 0]} castShadow>
+          <boxGeometry args={[D, H, W]} />
+          <meshStandardMaterial color={DEEP} emissive="#0a1c44" emissiveIntensity={0.35} roughness={0.5} metalness={0.3} />
+        </mesh>
+
+        {/* Faint blue ledger lines on the front face */}
+        {ledgerLines.map((y, i) => (
+          <mesh key={`l${i}`} position={[D / 2 + 1, y, 0]}>
+            <boxGeometry args={[4, 3, W - 20]} />
+            <meshStandardMaterial color={BASE_HOT} emissive={BASE_HOT} emissiveIntensity={0.7} roughness={0.3} metalness={0.5} toneMapped={false} />
           </mesh>
-        )),
-      )}
+        ))}
 
-      {/* Blue cornice + dark roof slab */}
-      <mesh position={[0, CORNICE_Y, 0]} castShadow>
-        <boxGeometry args={[D + 34, 32, W + 34]} />
-        <meshStandardMaterial color={BASE} emissive={BASE} emissiveIntensity={1.0} roughness={0.25} metalness={0.4} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, CORNICE_Y + 22, 0]}>
-        <boxGeometry args={[D - 6, 14, W - 6]} />
-        <meshStandardMaterial color={DEEP} emissive="#0a1c44" emissiveIntensity={0.35} roughness={0.5} metalness={0.3} />
-      </mesh>
+        {/* Glowing blue edge pillars on the four vertical corners */}
+        {[-1, 1].map((sx) =>
+          [-1, 1].map((sz) => (
+            <mesh key={`p${sx}${sz}`} position={[(sx * D) / 2, BODY_Y, (sz * W) / 2]}>
+              <boxGeometry args={[14, H, 14]} />
+              <meshStandardMaterial color={BASE} emissive={BASE} emissiveIntensity={1.25} roughness={0.25} metalness={0.4} toneMapped={false} />
+            </mesh>
+          )),
+        )}
+
+        {/* Blue cornice + dark roof slab */}
+        <mesh position={[0, CORNICE_Y, 0]} castShadow>
+          <boxGeometry args={[D + 34, 32, W + 34]} />
+          <meshStandardMaterial color={BASE} emissive={BASE} emissiveIntensity={1.0} roughness={0.25} metalness={0.4} toneMapped={false} />
+        </mesh>
+        <mesh position={[0, CORNICE_Y + 22, 0]}>
+          <boxGeometry args={[D - 6, 14, W - 6]} />
+          <meshStandardMaterial color={DEEP} emissive="#0a1c44" emissiveIntensity={0.35} roughness={0.5} metalness={0.3} />
+        </mesh>
+      </MergedStatic>
 
       {/* Base mark — front (+X) and back (−X) */}
       <mesh geometry={markGeo} material={markMat} position={[D / 2 + 8, MARK_Y, 0]} rotation={[0, Math.PI / 2, 0]} castShadow />

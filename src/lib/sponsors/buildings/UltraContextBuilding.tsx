@@ -4,6 +4,7 @@ import { useRef, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { mergeStaticChildren } from "@/lib/three-merge";
+import MergedStatic from "@/components/MergedStatic";
 import type { SponsorBuildingProps } from "../registry";
 
 // ─── Building dimensions ────────────────────────────────
@@ -414,87 +415,90 @@ export default function UltraContextBuilding({
 
   return (
     <group>
-      {/* ── Platform ── */}
-      <mesh position={[0, 1.5, 0]}>
-        <boxGeometry args={[BW + 20, 3, BD + 20]} />
-        <primitive object={shellMatLight} attach="material" />
-      </mesh>
-      <mesh position={[0, 3.5, 0]}>
-        <boxGeometry args={[BW + 22, 1, BD + 22]} />
-        <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={0.5} toneMapped={false} />
-      </mesh>
+      {/* Static tower: one draw call per look instead of one per box */}
+      <MergedStatic>
+        {/* ── Platform ── */}
+        <mesh position={[0, 1.5, 0]}>
+          <boxGeometry args={[BW + 20, 3, BD + 20]} />
+          <primitive object={shellMatLight} attach="material" />
+        </mesh>
+        <mesh position={[0, 3.5, 0]}>
+          <boxGeometry args={[BW + 22, 1, BD + 22]} />
+          <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={0.5} toneMapped={false} />
+        </mesh>
 
-      {/* ── Base section ── */}
-      <BoxSection
-        w={BW} h={BH} d={BD} y={B_Y}
-        shellMat={shellMat} glassFront={bFront} glassSide={bSide}
-        emColor={emC} accent={themeAccent}
-      />
+        {/* ── Base section ── */}
+        <BoxSection
+          w={BW} h={BH} d={BD} y={B_Y}
+          shellMat={shellMat} glassFront={bFront} glassSide={bSide}
+          emColor={emC} accent={themeAccent}
+        />
 
-      <mesh position={[0, BH + 4, 0]}>
-        <boxGeometry args={[BW + 2, 1.5, BD + 2]} />
-        <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={0.8} toneMapped={false} />
-      </mesh>
+        <mesh position={[0, BH + 4, 0]}>
+          <boxGeometry args={[BW + 2, 1.5, BD + 2]} />
+          <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={0.8} toneMapped={false} />
+        </mesh>
 
-      {/* ── Mid section (logo) ── */}
-      <mesh position={[0, M_Y, 0]}>
-        <boxGeometry args={[MW, MH, MD]} />
-        <primitive object={shellMat} attach="material" />
-      </mesh>
-      <AnimatedLogoFacade
-        frames={logoFront}
-        w={MW} h={MH} pos={[0, M_Y, MD / 2 + 0.3]} rotY={0} emColor={emC} phaseOffset={0}
-      />
-      <AnimatedLogoFacade
-        frames={logoBack}
-        w={MW} h={MH} pos={[0, M_Y, -MD / 2 - 0.3]} rotY={Math.PI} emColor={emC} phaseOffset={0.7}
-      />
-      <AnimatedLogoFacade
-        frames={logoRight}
-        w={MD} h={MH} pos={[MW / 2 + 0.3, M_Y, 0]} rotY={Math.PI / 2} emColor={emC} phaseOffset={1.4}
-      />
-      <AnimatedLogoFacade
-        frames={logoLeft}
-        w={MD} h={MH} pos={[-MW / 2 - 0.3, M_Y, 0]} rotY={-Math.PI / 2} emColor={emC} phaseOffset={2.1}
-      />
-      <CornerStrips w={MW} d={MD} h={MH} yC={M_Y} accent={themeAccent} />
+        {/* ── Mid section (logo) ── */}
+        <mesh position={[0, M_Y, 0]}>
+          <boxGeometry args={[MW, MH, MD]} />
+          <primitive object={shellMat} attach="material" />
+        </mesh>
+        <AnimatedLogoFacade
+          frames={logoFront}
+          w={MW} h={MH} pos={[0, M_Y, MD / 2 + 0.3]} rotY={0} emColor={emC} phaseOffset={0}
+        />
+        <AnimatedLogoFacade
+          frames={logoBack}
+          w={MW} h={MH} pos={[0, M_Y, -MD / 2 - 0.3]} rotY={Math.PI} emColor={emC} phaseOffset={0.7}
+        />
+        <AnimatedLogoFacade
+          frames={logoRight}
+          w={MD} h={MH} pos={[MW / 2 + 0.3, M_Y, 0]} rotY={Math.PI / 2} emColor={emC} phaseOffset={1.4}
+        />
+        <AnimatedLogoFacade
+          frames={logoLeft}
+          w={MD} h={MH} pos={[-MW / 2 - 0.3, M_Y, 0]} rotY={-Math.PI / 2} emColor={emC} phaseOffset={2.1}
+        />
+        <CornerStrips w={MW} d={MD} h={MH} yC={M_Y} accent={themeAccent} />
 
-      <pointLight ref={logoLightFront} position={[0, M_Y, MD / 2 + 22]} color={themeAccent} intensity={38} distance={100} decay={2} />
-      <pointLight ref={logoLightBack} position={[0, M_Y, -MD / 2 - 22]} color={themeAccent} intensity={38} distance={100} decay={2} />
-      <pointLight position={[MW / 2 + 22, M_Y, 0]} color={themeAccent} intensity={26} distance={80} decay={2} />
-      <pointLight position={[-MW / 2 - 22, M_Y, 0]} color={themeAccent} intensity={26} distance={80} decay={2} />
+        <pointLight ref={logoLightFront} position={[0, M_Y, MD / 2 + 22]} color={themeAccent} intensity={38} distance={100} decay={2} />
+        <pointLight ref={logoLightBack} position={[0, M_Y, -MD / 2 - 22]} color={themeAccent} intensity={38} distance={100} decay={2} />
+        <pointLight position={[MW / 2 + 22, M_Y, 0]} color={themeAccent} intensity={26} distance={80} decay={2} />
+        <pointLight position={[-MW / 2 - 22, M_Y, 0]} color={themeAccent} intensity={26} distance={80} decay={2} />
 
-      <mesh position={[0, BH + MH + 4, 0]}>
-        <boxGeometry args={[MW + 2, 1.5, MD + 2]} />
-        <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={0.8} toneMapped={false} />
-      </mesh>
+        <mesh position={[0, BH + MH + 4, 0]}>
+          <boxGeometry args={[MW + 2, 1.5, MD + 2]} />
+          <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={0.8} toneMapped={false} />
+        </mesh>
 
-      {/* ── Top section ── */}
-      <BoxSection
-        w={TW} h={TH} d={TD} y={T_Y}
-        shellMat={shellMat} glassFront={tFront} glassSide={tSide}
-        emColor={emC} accent={themeAccent}
-      />
+        {/* ── Top section ── */}
+        <BoxSection
+          w={TW} h={TH} d={TD} y={T_Y}
+          shellMat={shellMat} glassFront={tFront} glassSide={tSide}
+          emColor={emC} accent={themeAccent}
+        />
 
-      <mesh position={[0, topY, 0]}>
-        <boxGeometry args={[TW + 4, 1.2, TD + 4]} />
-        <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={1} toneMapped={false} />
-      </mesh>
+        <mesh position={[0, topY, 0]}>
+          <boxGeometry args={[TW + 4, 1.2, TD + 4]} />
+          <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={1} toneMapped={false} />
+        </mesh>
 
-      <mesh position={[0, topY + 1.5, 0]}>
-        <boxGeometry args={[TW - 8, 2, TD - 8]} />
-        <primitive object={shellMatLight} attach="material" />
-      </mesh>
-      <mesh position={[0, topY + 3, 0]}>
-        <boxGeometry args={[TW - 6, 0.6, TD - 6]} />
-        <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={0.6} toneMapped={false} />
-      </mesh>
+        <mesh position={[0, topY + 1.5, 0]}>
+          <boxGeometry args={[TW - 8, 2, TD - 8]} />
+          <primitive object={shellMatLight} attach="material" />
+        </mesh>
+        <mesh position={[0, topY + 3, 0]}>
+          <boxGeometry args={[TW - 6, 0.6, TD - 6]} />
+          <meshStandardMaterial color={themeAccent} emissive={themeAccent} emissiveIntensity={0.6} toneMapped={false} />
+        </mesh>
 
-      {/* ── Antenna pole ── */}
-      <mesh position={[0, antennaY, 0]}>
-        <cylinderGeometry args={[0.5, 1.5, 42, 4]} />
-        <meshStandardMaterial color={shellColor} roughness={0.2} metalness={0.9} />
-      </mesh>
+        {/* ── Antenna pole ── */}
+        <mesh position={[0, antennaY, 0]}>
+          <cylinderGeometry args={[0.5, 1.5, 42, 4]} />
+          <meshStandardMaterial color={shellColor} roughness={0.2} metalness={0.9} />
+        </mesh>
+      </MergedStatic>
 
       {/* ── Antenna crown: orbiting brackets around central beacon ── */}
       <group position={[0, antennaY + 38, 0]}>
