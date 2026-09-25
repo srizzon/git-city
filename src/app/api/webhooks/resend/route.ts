@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Resend webhook handler for email delivery events.
- * Verifies Svix signature, then handles bounces, complaints, delivery, opens, clicks.
+ * Verifies Svix signature, then handles bounces, complaints, delivery, opens, clicks,
+ * failures, suppressions and delays. Returns 500 when a DB write fails so Resend retries.
  */
 export async function POST(request: Request) {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
@@ -41,90 +42,118 @@ export async function POST(request: Request) {
 
   const sb = getSupabaseAdmin();
   const now = new Date().toISOString();
+  const email = (body.data.to as string[] | undefined)?.[0];
+  const emailId = body.data.email_id as string | undefined;
+
+  // Supabase returns errors instead of throwing; throw so the catch answers 500.
+  const run = async (query: PromiseLike<{ error: { message: string } | null }>) => {
+    const { error } = await query;
+    if (error) throw new Error(error.message);
+  };
+  const suppress = (reason: "bounce" | "complaint") =>
+    email
+      ? run(
+          sb
+            .from("notification_suppressions")
+            .upsert(
+              { identifier: email, channel: "email", reason, created_at: now },
+              { onConflict: "identifier,channel" },
+            ),
+        )
+      : Promise.resolve();
+  const updateLog = (fields: Record<string, unknown>) =>
+    emailId ? run(sb.from("notification_log").update(fields).eq("provider_id", emailId)) : Promise.resolve();
 
   try {
     switch (body.type) {
       case "email.bounced": {
-        const email = (body.data.to as string[])?.[0];
-        const emailId = body.data.email_id as string;
+        const bounce = body.data.bounce as { type?: string; subType?: string; message?: string } | undefined;
+        const reason = [bounce?.type, bounce?.subType].filter(Boolean).join(":") || "bounced";
 
-        if (email) {
-          await sb
-            .from("notification_suppressions")
-            .upsert(
-              { identifier: email, channel: "email", reason: "bounce", created_at: now },
-              { onConflict: "identifier,channel" },
-            );
-        }
-
-        if (emailId) {
-          await sb
-            .from("notification_log")
-            .update({ status: "bounced", failed_at: now, failure_reason: "bounced" })
-            .eq("provider_id", emailId);
+        // Only a hard (permanent) bounce suppresses the address; soft/transient
+        // bounces (mailbox full, greylisting) just get logged.
+        if (bounce?.type === "Permanent") {
+          await suppress("bounce");
+          await updateLog({ status: "bounced", failed_at: now, failure_reason: reason });
+        } else {
+          console.warn(`[webhook:resend] Soft bounce for ${emailId}: ${reason}`);
+          await updateLog({ status: "soft_bounced", failure_reason: reason });
         }
         break;
       }
 
       case "email.complained": {
-        const email = (body.data.to as string[])?.[0];
-        const emailId = body.data.email_id as string;
+        await suppress("complaint");
+        await updateLog({ status: "complained", failed_at: now, failure_reason: "spam_complaint" });
+        break;
+      }
 
-        if (email) {
-          await sb
-            .from("notification_suppressions")
-            .upsert(
-              { identifier: email, channel: "email", reason: "complaint", created_at: now },
-              { onConflict: "identifier,channel" },
-            );
-        }
+      case "email.failed": {
+        const failed = body.data.failed as { reason?: string } | undefined;
+        await updateLog({ status: "failed", failed_at: now, failure_reason: failed?.reason ?? "failed" });
+        break;
+      }
 
+      case "email.suppressed": {
+        // Resend refused to send: the address is on its suppression list
+        // (earlier hard bounce or complaint). Mirror it so we stop trying.
+        const suppressed = body.data.suppressed as { type?: string; message?: string } | undefined;
+        await suppress(suppressed?.type === "complaint" ? "complaint" : "bounce");
+        await updateLog({
+          status: "suppressed",
+          failed_at: now,
+          failure_reason: suppressed?.message ?? suppressed?.type ?? "suppressed",
+        });
+        break;
+      }
+
+      case "email.delivery_delayed": {
         if (emailId) {
-          await sb
-            .from("notification_log")
-            .update({ status: "complained", failed_at: now, failure_reason: "spam_complaint" })
-            .eq("provider_id", emailId);
+          await run(
+            sb
+              .from("notification_log")
+              .update({ status: "delivery_delayed" })
+              .eq("provider_id", emailId)
+              .eq("status", "sent"),
+          );
         }
         break;
       }
 
       case "email.delivered": {
-        const emailId = body.data.email_id as string;
-        if (emailId) {
-          await sb
-            .from("notification_log")
-            .update({ status: "delivered", delivered_at: now })
-            .eq("provider_id", emailId);
-        }
+        await updateLog({ status: "delivered", delivered_at: now });
         break;
       }
 
       case "email.opened": {
-        const emailId = body.data.email_id as string;
         if (emailId) {
-          await sb
-            .from("notification_log")
-            .update({ opened_at: now })
-            .eq("provider_id", emailId)
-            .is("opened_at", null);
+          await run(
+            sb
+              .from("notification_log")
+              .update({ opened_at: now })
+              .eq("provider_id", emailId)
+              .is("opened_at", null),
+          );
         }
         break;
       }
 
       case "email.clicked": {
-        const emailId = body.data.email_id as string;
         if (emailId) {
-          await sb
-            .from("notification_log")
-            .update({ clicked_at: now })
-            .eq("provider_id", emailId)
-            .is("clicked_at", null);
+          await run(
+            sb
+              .from("notification_log")
+              .update({ clicked_at: now })
+              .eq("provider_id", emailId)
+              .is("clicked_at", null),
+          );
         }
         break;
       }
     }
   } catch (err) {
     console.error("[webhook:resend] Error processing event:", err);
+    return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });
