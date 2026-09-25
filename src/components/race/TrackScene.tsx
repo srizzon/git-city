@@ -5,7 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { M_TO_UNIT } from "@/lib/league-city/drive/tuning";
 import { TRACK, WALL_OFFSET, pointAt, type Track } from "@/lib/league-city/race/track";
-import { along, clearOfTrack, curbRuns, hash, offsetAt, treeSpots, wallSegments } from "@/lib/league-city/race/layout";
+import { along, clearOfTrack, curbRuns, hash, offsetAt, treeSpots } from "@/lib/league-city/race/layout";
 import { RACE } from "@/lib/league-city/race/race";
 
 // The race track as you see it, in city units (1 m = M_TO_UNIT), made to be
@@ -59,12 +59,12 @@ function useDispose<T extends { dispose: () => void }>(v: T): T {
 }
 
 function Surface({ track }: { track: Track }) {
-  const asphalt = useDispose(useMemo(() => ribbon(track, 0, track.length, TRACK.width / 2, -TRACK.width / 2, 0.08), [track]));
+  const asphalt = useDispose(useMemo(() => ribbon(track, 0, track.length, TRACK.width / 2, -TRACK.width / 2, 0.05), [track]));
   const edges = useDispose(
     useMemo(() => {
       const w = TRACK.width / 2;
-      const l = ribbon(track, 0, track.length, w - 0.3, w - 0.8, 0.12);
-      const r = ribbon(track, 0, track.length, -w + 0.8, -w + 0.3, 0.12);
+      const l = ribbon(track, 0, track.length, w - 0.3, w - 0.8, 0.1);
+      const r = ribbon(track, 0, track.length, -w + 0.8, -w + 0.3, 0.1);
       const g = mergeFlat([l, r]);
       l.dispose();
       r.dispose();
@@ -76,8 +76,8 @@ function Surface({ track }: { track: Track }) {
       const colors: [THREE.Color, THREE.Color] = [new THREE.Color(CURB_RED), new THREE.Color(CURB_WHITE)];
       const w = TRACK.width / 2;
       const parts = curbRuns(track).flatMap(([s0, s1]) => [
-        ribbon(track, s0, s1, w + TRACK.curb, w, 0.14, 1, { every: 2.5, colors }),
-        ribbon(track, s0, s1, -w, -w - TRACK.curb, 0.14, 1, { every: 2.5, colors }),
+        ribbon(track, s0, s1, w + TRACK.curb, w, 0.1, 1, { every: 2.5, colors }),
+        ribbon(track, s0, s1, -w, -w - TRACK.curb, 0.1, 1, { every: 2.5, colors }),
       ]);
       const g = mergeFlat(parts);
       parts.forEach((p) => p.dispose());
@@ -86,18 +86,19 @@ function Surface({ track }: { track: Track }) {
   );
   return (
     <group>
-      <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* Flat layers a few cm apart: polygon offset keeps them from flickering at a distance. */}
+      <mesh position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6000, 6000]} />
         <meshStandardMaterial color={GRASS} roughness={1} />
       </mesh>
       <mesh geometry={asphalt}>
-        <meshStandardMaterial color={ASPHALT} roughness={0.9} />
-      </mesh>
-      <mesh geometry={edges}>
-        <meshStandardMaterial color={LINE} emissive={LINE} emissiveIntensity={0.2} />
+        <meshStandardMaterial color={ASPHALT} roughness={0.9} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
       </mesh>
       <mesh geometry={curbs}>
-        <meshStandardMaterial vertexColors />
+        <meshStandardMaterial vertexColors polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+      </mesh>
+      <mesh geometry={edges}>
+        <meshStandardMaterial color={LINE} emissive={LINE} emissiveIntensity={0.2} polygonOffset polygonOffsetFactor={-3} polygonOffsetUnits={-3} />
       </mesh>
     </group>
   );
@@ -175,22 +176,57 @@ function tintEmissive(shader: THREE.WebGLProgramParametersWithUniforms, k: numbe
   );
 }
 
+/**
+ * The walls as one continuous strip per side (inner face, top, outer face),
+ * striped every WALL_STRIPE m. Physics uses overlapping boxes; drawn that way
+ * their shared faces flickered.
+ */
+const WALL_STRIPE = 6;
+const WALL_H = 1.2;
+
 function Walls({ track }: { track: Track }) {
-  const items = useMemo(
-    () =>
-      wallSegments(track).map((w) => ({
-        x: w.x,
-        y: 0.6,
-        z: w.z,
-        rotY: w.rotY,
-        w: TRACK.wallThickness,
-        h: 1.2,
-        d: w.len,
-        color: w.i % 2 === 0 ? WALL_A : WALL_B,
-      })),
-    [track],
+  const geo = useDispose(
+    useMemo(() => {
+      const pos: number[] = [];
+      const col: number[] = [];
+      const a = new THREE.Color(WALL_A);
+      const b = new THREE.Color(WALL_B);
+      const h = WALL_H * U;
+      const t = TRACK.wallThickness / 2;
+      const n = Math.round(track.length / 2);
+      for (const side of [1, -1]) {
+        for (let i = 0; i < n; i++) {
+          const s0 = (i * track.length) / n;
+          const s1 = ((i + 1) * track.length) / n;
+          const c = Math.floor(s0 / WALL_STRIPE) % 2 === 0 ? a : b;
+          const in0 = offsetAt(track, s0, side * (WALL_OFFSET - t));
+          const in1 = offsetAt(track, s1, side * (WALL_OFFSET - t));
+          const out0 = offsetAt(track, s0, side * (WALL_OFFSET + t));
+          const out1 = offsetAt(track, s1, side * (WALL_OFFSET + t));
+          const P = (p: { x: number; z: number }, y: number) => [p.x * U, y, p.z * U];
+          const quads = [
+            [P(in0, 0), P(in1, 0), P(in1, h), P(in0, h)],
+            [P(in0, h), P(in1, h), P(out1, h), P(out0, h)],
+            [P(out0, h), P(out1, h), P(out1, 0), P(out0, 0)],
+          ];
+          for (const [p0, p1, p2, p3] of quads) {
+            for (const p of [p0, p1, p2, p0, p2, p3]) pos.push(...p);
+            for (let k = 0; k < 6; k++) col.push(c.r, c.g, c.b);
+          }
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+      g.computeVertexNormals();
+      return g;
+    }, [track]),
   );
-  return <Boxes items={items} emissive={0.1} />;
+  return (
+    <mesh geometry={geo}>
+      <meshStandardMaterial vertexColors side={THREE.DoubleSide} roughness={0.7} />
+    </mesh>
+  );
 }
 
 // ─── Corner boards ───────────────────────────────────────────
@@ -232,7 +268,8 @@ function Chevrons({ track }: { track: Track }) {
       const n = Math.max(2, Math.min(6, Math.round(len / 12)));
       for (let i = 0; i < n; i++) {
         const s = s0 + ((i + 0.5) * len) / n;
-        const p = offsetAt(track, s, side * (WALL_OFFSET - 0.2));
+        // Standing just in front of the wall's inner face, above it.
+        const p = offsetAt(track, s, side * (WALL_OFFSET - TRACK.wallThickness / 2 - 0.3));
         const tangent = new THREE.Vector3(p.tx, 0, p.tz);
         // Facing the track: the normal points back across it.
         const normal = new THREE.Vector3(p.tz * -side, 0, -p.tx * -side);
@@ -240,7 +277,7 @@ function Chevrons({ track }: { track: Track }) {
         const flip = x.dot(tangent) < 0 ? -1 : 1;
         const m = new THREE.Matrix4().makeBasis(x.multiplyScalar(flip), up, normal);
         m.scale(new THREE.Vector3(3.2 * U, 1.6 * U, 1));
-        m.setPosition(p.x * U, 2 * U, p.z * U);
+        m.setPosition(p.x * U, 2.1 * U, p.z * U);
         out.push(m);
       }
     }
@@ -293,15 +330,33 @@ function Gantry({ track, lit, title }: { track: Track; lit: React.MutableRefObje
   const rotY = Math.atan2(p.tx, p.tz);
   const span = TRACK.width / 2 + 1.5;
   const lamps = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
+  const group = useRef<THREE.Group>(null);
+  const mats = useRef<THREE.Material[] | null>(null);
   const banner = useMemo(() => bannerTexture(title), [title]);
   useDispose(banner);
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const n = lit.current;
     lamps.current.forEach((m, i) => m?.color.set(Math.floor(i / 2) < n ? "#ff2a2a" : "#2a1416"));
+    // The high camera passes right through the gantry: it goes see-through up close.
+    const g = group.current;
+    if (!g) return;
+    if (!mats.current) {
+      mats.current = [];
+      g.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if (m) {
+          m.transparent = true;
+          mats.current!.push(m);
+        }
+      });
+    }
+    const d = Math.hypot(camera.position.x - g.position.x, camera.position.z - g.position.z) / U;
+    const opacity = Math.min(1, Math.max(0.2, (d - 14) / 16));
+    for (const m of mats.current) m.opacity = opacity;
   });
   const H = 7;
   return (
-    <group position={[p.x * U, 0, p.z * U]} rotation={[0, rotY, 0]}>
+    <group ref={group} position={[p.x * U, 0, p.z * U]} rotation={[0, rotY, 0]}>
       {[-span, span].map((x) => (
         <mesh key={x} position={[x * U, (H / 2) * U, 0]}>
           <boxGeometry args={[0.6 * U, H * U, 0.6 * U]} />
@@ -387,11 +442,12 @@ function Stands({ track }: { track: Track }) {
       }
       out.push({ x: p.x - Math.cos(p.rotY) * 8, y: 6.5, z: p.z + Math.sin(p.rotY) * 8, rotY: p.rotY, w: 0.6, h: 13, d: 12, color: "#2b303b" });
     });
-    const pits = along(track, -40, 50, 10, WALL_OFFSET + 11).filter((p) => clearOfTrack(track, p.x, p.z, WALL_OFFSET + 6));
+    // Low and set back, so the high camera sees over them.
+    const pits = along(track, -40, 50, 10, WALL_OFFSET + 14).filter((p) => clearOfTrack(track, p.x, p.z, WALL_OFFSET + 8));
     pits.forEach((p, k) => {
-      out.push({ x: p.x, y: 2.5, z: p.z, rotY: p.rotY, w: 10, h: 5, d: 9.8, color: "#3b4252" });
-      const f = offsetAt(track, p.s, WALL_OFFSET + 5.9);
-      out.push({ x: f.x, y: 1.8, z: f.z, rotY: p.rotY, w: 0.2, h: 3.2, d: 7, color: k % 3 === 0 ? "#c8ff3a" : "#7a8499" });
+      out.push({ x: p.x, y: 1.5, z: p.z, rotY: p.rotY, w: 10, h: 3, d: 9.8, color: "#5b6272" });
+      const f = offsetAt(track, p.s, WALL_OFFSET + 8.9);
+      out.push({ x: f.x, y: 1.1, z: f.z, rotY: p.rotY, w: 0.2, h: 2.2, d: 7, color: k % 3 === 0 ? "#c8ff3a" : "#9aa3b5" });
     });
     return out;
   }, [track]);

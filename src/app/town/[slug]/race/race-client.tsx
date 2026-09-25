@@ -87,6 +87,7 @@ export default function RaceClient({
   const [feed, setFeed] = useState<LapFeedItem[]>([]);
   const [saved, setSaved] = useState<{ ms: number; rank: number; improved: boolean; at: number } | null>(null);
   const startRef = useRef<(() => void) | null>(null);
+  const restartRef = useRef<(() => void) | null>(null);
   const [guest] = useState(() => `guest-${Math.random().toString(36).slice(2, 6).padEnd(4, "0")}`);
   const name = viewerLogin ?? guest;
 
@@ -176,8 +177,8 @@ export default function RaceClient({
         camera={{
           position: [(start.x - start.tx * 10) * M_TO_UNIT, 40, (start.z - start.tz * 10) * M_TO_UNIT],
           fov: 60,
-          near: 1,
-          far: 12000,
+          near: 2,
+          far: 8000,
         }}
         onCreated={({ camera: c }) => c.lookAt(look.x * M_TO_UNIT, 0, look.z * M_TO_UNIT)}
         gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: EXPOSURE }}
@@ -205,6 +206,7 @@ export default function RaceClient({
             onReceipt={onReceipt}
             startRef={startRef}
             onGhost={setGhostMs}
+            restartRef={restartRef}
           />
         )}
       </Canvas>
@@ -226,6 +228,7 @@ export default function RaceClient({
         ghostMs={ghostMs}
         you={name}
         onStart={() => startRef.current?.()}
+        onRestart={() => restartRef.current?.()}
         onResume={() => setPaused(false)}
         onCamera={toggleCamera}
         onMute={toggleMute}

@@ -61,7 +61,14 @@ export function curbRuns(t: Track): [number, number][] {
       open = null;
     }
   }
-  return runs;
+  // Padded runs that touch become one, so no two curbs lie on the same spot.
+  const merged: [number, number][] = [];
+  for (const r of runs) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([...r]);
+  }
+  return merged;
 }
 
 /** Deterministic 0…1 noise. */
