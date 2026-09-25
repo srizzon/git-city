@@ -2,6 +2,7 @@ import { renderGiftReceivedEmail } from "../../notification-senders/gift";
 import { renderLeagueInvitedEmail } from "../../notification-senders/league-invited";
 import { renderLeagueJoinedEmail } from "../../notification-senders/league-joined";
 import { renderLeagueOvertakenEmail } from "../../notification-senders/league-overtaken";
+import { renderRaceChallengeEmail, renderRacePassedEmail } from "../../notification-senders/race";
 import { renderJoinRequestEmail, renderRequestApprovedEmail } from "../../notification-senders/league-requests";
 import { renderLeagueWeeklyEmail, type LeagueWeeklyEmailData } from "../../notification-senders/league-weekly";
 import { renderGiftSentEmail, renderPurchaseEmail } from "../../notification-senders/purchase";
@@ -36,6 +37,12 @@ export const TOWNS_PREVIEWS: EmailPreviews = {
       { ...TOWN, overtakerLogin: "kristoferborges", gap: 1, newRank: 4, scoringMode: "contributions", hoursLeft: 5 },
       PREVIEW_LINKS,
     ),
+  "race-passed": () =>
+    renderRacePassedEmail({ ...TOWN, passerLogin: "pyromains", theirMs: 22_912, yourMs: 23_443, newRank: 3 }, PREVIEW_LINKS),
+  "race-challenge": () =>
+    renderRaceChallengeEmail({ ...TOWN, challengerLogin: "kristoferborges", theirMs: 23_104, yourMs: 27_880 }, PREVIEW_LINKS),
+  "race-challenge-first": () =>
+    renderRaceChallengeEmail({ ...TOWN, challengerLogin: "kristoferborges", theirMs: 23_104, yourMs: null }, PREVIEW_LINKS),
   "town-weekly-won": () =>
     renderLeagueWeeklyEmail(
       { ...WEEK, me: { rank: 1, login: "pyromains", total: 385 }, globalLine: "Ship City finished 4th of 12 companies (up from 6th)." },
