@@ -18,7 +18,7 @@ export default function TownCard({ card }: { card: Card }) {
       <div className="relative aspect-[1200/630] overflow-hidden border-b-[3px] border-border bg-bg">
         {/* The town's OG skyline (cached 1 h): the page's only 3D is the hero. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/town/${card.slug}/opengraph-image`} alt="" loading="lazy" className="h-full w-full object-cover" />
+        <img src={`/town/${card.slug}/og`} alt="" loading="lazy" className="h-full w-full object-cover" />
         {card.tag && (
           <span className="absolute bottom-2 right-2 bg-lime px-2 py-1 text-xs text-bg">
             {card.tag === "trending" ? "↑ Trending" : "New"}
