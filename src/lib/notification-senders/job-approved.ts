@@ -1,50 +1,70 @@
 import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
-import { buildButton, escapeHtml } from "@/lib/email-template";
+import { COMPANY_LINKS } from "@/lib/jobs/email-blocks";
+import { EXPIRY_WARNING_DAYS } from "@/lib/jobs/constants";
+import { bulletList, button, detailRows, heading, label, paragraph, trackedUrl } from "@/lib/email/components";
+import { renderLayout, renderText, type EmailLinks } from "@/lib/email/layout";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+export interface JobApprovedData {
+  listingTitle: string;
+  listingId: string;
+  expiresAt: string;
+}
 
-/**
- * Email sent to the company when their job listing is approved by admin.
- * Sent directly via Resend (not through notification engine, since advertiser != developer).
- */
-export async function sendJobApprovedEmail(
-  email: string,
-  listingTitle: string,
-  listingId: string,
-  expiresAt: string,
-) {
-  const expiresDate = new Date(expiresAt).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
+const NEXT_STEPS = [
+  { lead: "Developers find it.", text: "It's on the job board and in the weekly matches we send developers whose skills fit." },
+  { lead: "Candidates come to you.", text: "When someone applies on Git City, we email you and add them to your dashboard." },
+  { lead: "No surprise endings.", text: `We'll remind you ${EXPIRY_WARNING_DAYS} days before the listing expires.` },
+];
+
+export function renderJobApprovedEmail(d: JobApprovedData, links: EmailLinks = COMPANY_LINKS) {
+  const until = new Date(d.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const subject = `Your listing is live: ${d.listingTitle}`;
+  const preheader = `Developers can apply until ${until}. Here's what happens next.`;
+  const listingUrl = trackedUrl(`/jobs/${d.listingId}`, "job_approved");
+  const intro = "We reviewed your listing and it's now on the Git City job board.";
+  const reason = "You're getting this because you posted a listing on Git City Jobs.";
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading("Your listing is live"),
+      paragraph(intro),
+      detailRows([
+        { label: "Listing", value: d.listingTitle },
+        { label: "Live until", value: until },
+      ]),
+      label("What happens next"),
+      bulletList(NEXT_STEPS),
+      button("View your listing", listingUrl),
+    ].join("\n"),
+    reason,
+    links,
   });
 
-  const bodyHtml = `
-    <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">Your listing is live</p>
-    <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${escapeHtml(listingTitle)}</h1>
-    <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-      Your job listing has been approved and is now visible to developers on Git City.
-    </p>
-    <p style="margin:0 0 24px; font-size:14px; color:#555555; line-height:1.6;">
-      It will remain active until <strong>${expiresDate}</strong>. You'll receive a reminder before it expires.
-    </p>
-    <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 24px;" />
-    <p style="margin:0 0 8px; font-size:13px; color:#999999;">What happens next:</p>
-    <ul style="margin:0 0 28px; padding-left:20px; font-size:14px; color:#555555; line-height:1.8;">
-      <li>You'll be notified when developers apply</li>
-      <li>Review candidates and their profiles in your dashboard</li>
-      <li>Mark candidates as hired to track your results</li>
-    </ul>
-    ${buildButton("View Dashboard", `${BASE_URL}/jobs/dashboard`)}
-    <p style="margin:20px 0 0; font-size:12px; color:#999999;">
-      You can also <a href="${BASE_URL}/jobs/${listingId}" style="color:#5a8a00; text-decoration:underline;">view your listing</a> as candidates see it.
-    </p>
-  `;
-
-  await sendCompanyEmail({
-    to: email,
-    subject: `Your listing is live: ${listingTitle}`,
-    html: bodyHtml,
-    text: `Your listing is live: ${listingTitle}\n\nYour job listing has been approved and is now visible to developers on Git City.\n\nIt will remain active until ${expiresDate}. You'll receive a reminder before it expires.\n\nWhat happens next:\n- You'll be notified when developers apply\n- Review candidates and their profiles in your dashboard\n- Mark candidates as hired to track your results\n\nView Dashboard: ${BASE_URL}/jobs/dashboard\nView your listing: ${BASE_URL}/jobs/${listingId}`,
+  const text = renderText({
+    lines: [
+      "Your listing is live",
+      "",
+      intro,
+      "",
+      `Listing: ${d.listingTitle}`,
+      `Live until: ${until}`,
+      "",
+      "What happens next:",
+      ...NEXT_STEPS.map((s) => `- ${s.lead} ${s.text}`),
+      "",
+      `View your listing: ${listingUrl}`,
+    ],
+    reason,
+    links,
   });
+
+  return { subject, preheader, html, text };
+}
+
+/** Sent to the company when an admin approves their listing. */
+export async function sendJobApprovedEmail(email: string, listingTitle: string, listingId: string, expiresAt: string) {
+  const { subject, html, text } = renderJobApprovedEmail({ listingTitle, listingId, expiresAt });
+  await sendCompanyEmail({ to: email, subject, html, text, type: "job_approved" });
 }

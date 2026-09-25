@@ -1,66 +1,80 @@
 import { sendCompanyEmail } from "@/lib/jobs/send-company-email";
-import { buildButton, escapeHtml } from "@/lib/email-template";
 import { getAdminNotificationEmail } from "@/lib/jobs/admin-email";
+import { ADMIN_LINKS, COMPANY_DASHBOARD_URL, COMPANY_LINKS, JOBS_SUPPORT_EMAIL } from "@/lib/jobs/email-blocks";
+import { EMAIL_BASE_URL, button, detailRows, heading, paragraph, trackedUrl } from "@/lib/email/components";
+import { renderLayout, renderText, type EmailLinks } from "@/lib/email/layout";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+export function renderJobReportedEmail(d: { listingTitle: string }, links: EmailLinks = COMPANY_LINKS) {
+  const subject = `Listing paused: ${d.listingTitle}`;
+  const preheader = "Several developers reported it. Our team is looking at it now.";
+  const dashboardUrl = trackedUrl(COMPANY_DASHBOARD_URL, "job_reported");
+  const intro = `${d.listingTitle} was reported by several developers, so we've taken it off the job board while our team reviews it.`;
+  const next = "If it checks out, we'll put it back up. If something needs to change, we'll email you with the details. Think it's a mistake? Reply to this email.";
+  const reason = "You're getting this because you have a listing on Git City Jobs.";
 
-/**
- * Email sent to the company when their listing is auto-paused due to reports.
- */
-export async function sendJobReportedEmail(
-  companyEmail: string,
-  listingTitle: string,
-) {
-  const bodyHtml = `
-    <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#f59e0b; letter-spacing:1px; text-transform:uppercase;">Listing paused for review</p>
-    <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${escapeHtml(listingTitle)}</h1>
-    <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-      Your listing has been temporarily paused after receiving multiple reports from the community.
-    </p>
-    <p style="margin:0 0 24px; font-size:14px; color:#555555; line-height:1.6;">
-      Our team will review it shortly. If everything checks out, it will be reactivated automatically.
-      If changes are needed, we'll reach out with details.
-    </p>
-    ${buildButton("View Dashboard", `${BASE_URL}/jobs/dashboard`)}
-    <p style="margin:20px 0 0; font-size:12px; color:#999999;">
-      If you think this was a mistake, reply to this email.
-    </p>
-  `;
-
-  await sendCompanyEmail({
-    to: companyEmail,
-    subject: `Your listing was paused for review: ${listingTitle}`,
-    html: bodyHtml,
-    text: `Your listing was paused for review: ${listingTitle}\n\nYour listing has been temporarily paused after receiving multiple reports from the community.\n\nOur team will review it shortly. If everything checks out, it will be reactivated automatically. If changes are needed, we'll reach out with details.\n\nView Dashboard: ${BASE_URL}/jobs/dashboard\n\nIf you think this was a mistake, reply to this email.`,
-    replyTo: "support@thegitcity.com",
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [heading("Your listing is paused"), paragraph(intro), paragraph(next), button("Open your dashboard", dashboardUrl)].join("\n"),
+    reason,
+    links,
   });
+
+  const text = renderText({
+    lines: ["Your listing is paused", "", intro, "", next, "", `Open your dashboard: ${dashboardUrl}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
 }
 
-/**
- * Email sent to admin when a listing is auto-paused due to reports.
- */
-export async function sendJobReportedAdminEmail(
-  listingTitle: string,
-  companyName: string,
-  reportCount: number,
-  listingId: string,
-) {
+/** Sent to the company when their listing is auto-paused after too many reports. */
+export async function sendJobReportedEmail(companyEmail: string, listingTitle: string) {
+  const { subject, html, text } = renderJobReportedEmail({ listingTitle });
+  await sendCompanyEmail({ to: companyEmail, subject, html, text, type: "job_reported", replyTo: JOBS_SUPPORT_EMAIL });
+}
+
+export interface JobReportedAdminData {
+  listingTitle: string;
+  companyName: string;
+  reportCount: number;
+  listingId: string;
+}
+
+export function renderJobReportedAdminEmail(d: JobReportedAdminData, links: EmailLinks = ADMIN_LINKS) {
+  const subject = `Auto-paused: ${d.listingTitle} (${d.reportCount} reports)`;
+  const preheader = `${d.companyName}'s listing hit ${d.reportCount} reports and is off the board until you review it.`;
+  const adminUrl = `${EMAIL_BASE_URL}/admin/jobs`;
+  const intro = `${d.companyName}'s listing reached ${d.reportCount} reports and was paused automatically. It stays off the job board until it's resumed.`;
+  const reason = "You're getting this because you moderate Git City Jobs.";
+  const rows = [
+    { label: "Listing", value: d.listingTitle },
+    { label: "Company", value: d.companyName },
+    { label: "Reports", value: String(d.reportCount) },
+  ];
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [heading("Listing auto-paused"), paragraph(intro), detailRows(rows), button("Review in admin", adminUrl)].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: ["Listing auto-paused", "", intro, "", ...rows.map((r) => `${r.label}: ${r.value}`), "", `Review in admin: ${adminUrl}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** Sent to the admin when a listing is auto-paused after too many reports. */
+export async function sendJobReportedAdminEmail(listingTitle: string, companyName: string, reportCount: number, listingId: string) {
   const adminEmail = await getAdminNotificationEmail();
   if (!adminEmail) return;
-
-  const bodyHtml = `
-    <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#ef4444; letter-spacing:1px; text-transform:uppercase;">Moderation alert</p>
-    <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${escapeHtml(listingTitle)}</h1>
-    <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-      Listing by <strong>${escapeHtml(companyName)}</strong> was auto-paused after <strong>${reportCount} reports</strong>.
-    </p>
-    ${buildButton("Review in Admin", `${BASE_URL}/admin/jobs`)}
-  `;
-
-  await sendCompanyEmail({
-    to: adminEmail,
-    subject: `[Moderation] Job auto-paused: ${listingTitle} (${reportCount} reports)`,
-    html: bodyHtml,
-    text: `[Moderation] Job auto-paused: ${listingTitle} (${reportCount} reports)\n\nListing by ${companyName} was auto-paused after ${reportCount} reports.\n\nReview in Admin: ${BASE_URL}/admin/jobs`,
-  });
+  const { subject, html, text } = renderJobReportedAdminEmail({ listingTitle, companyName, reportCount, listingId });
+  await sendCompanyEmail({ to: adminEmail, subject, html, text, type: "job_reported_admin" });
 }

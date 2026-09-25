@@ -125,6 +125,7 @@ export async function GET(req: NextRequest) {
         await sendJobApplicationsBatchEmail(
           advertiser.email,
           listing.title,
+          listingId,
           applications.map((a) => {
             const devId = devMap.get(a.developer_login);
             const profile = devId ? profileMap.get(devId) : null;

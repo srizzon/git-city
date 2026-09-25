@@ -1,35 +1,65 @@
 import { sendNotificationAsync } from "../notifications";
-import { buildButton, escapeHtml } from "../email-template";
+import { EMAIL_BASE_URL, button, heading, heroImage, paragraph, trackedUrl } from "../email/components";
+import { renderLayout, renderText, type EmailLinks } from "../email/layout";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
+/** XP granted with the City Recruiter emblem (see /api/jobs/[id]/approve). */
+const REFERRAL_XP = 1000;
 
-/**
- * Notification sent to a developer when their referral code is used
- * and the referred company posts a job.
- */
-export function sendJobReferralConvertedNotification(
-  devId: number,
-  login: string,
-  companyName: string,
-) {
+export interface JobReferralConvertedData {
+  login: string;
+  companyName: string;
+}
+
+function referralHeader(d: JobReferralConvertedData) {
+  return {
+    subject: `${d.companyName} posted a job through you`,
+    preheader: `You earned ${REFERRAL_XP.toLocaleString("en-US")} XP and the City Recruiter emblem.`,
+  };
+}
+
+export function renderJobReferralConvertedEmail(d: JobReferralConvertedData, links: EmailLinks) {
+  const { subject, preheader } = referralHeader(d);
+  const buildingUrl = trackedUrl(`/?user=${encodeURIComponent(d.login)}`, "job_referral_converted");
+  const intro = `${d.companyName} signed up with your referral link, and their first listing just went live on the Git City job board.`;
+  const reward = `That earned you ${REFERRAL_XP.toLocaleString("en-US")} XP and the City Recruiter emblem.`;
+  const reason = "You're getting this because a company you referred posted a job on Git City.";
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    hero: heroImage({
+      src: `${EMAIL_BASE_URL}/dev/${encodeURIComponent(d.login)}/opengraph-image`,
+      href: buildingUrl,
+      alt: `@${d.login}'s building in Git City`,
+    }),
+    body: [heading("Your referral paid off,", `@${d.login}`), paragraph(intro), paragraph(reward), button("Visit your building", buildingUrl)].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: [`Your referral paid off, @${d.login}`, "", intro, "", reward, "", `Visit your building: ${buildingUrl}`],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** Sent to a developer when a company they referred gets its first listing approved. */
+export function sendJobReferralConvertedNotification(devId: number, login: string, companyName: string) {
+  const data: JobReferralConvertedData = { login, companyName };
+  const { subject, preheader } = referralHeader(data);
+
   sendNotificationAsync({
     type: "job_referral_converted",
     category: "jobs_updates",
     developerId: devId,
     dedupKey: `job_referral:${devId}:${companyName}`,
-    title: `Your referral posted a job!`,
-    body: `${companyName} posted a job through your referral. You earned 1,000 XP!`,
-    html: `
-      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">Referral converted</p>
-      <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">Your referral posted a job!</h1>
-      <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-        <strong>${escapeHtml(companyName)}</strong> just posted a job listing through your referral link.
-        You've earned <strong>1,000 XP</strong> and the "City Recruiter" achievement!
-      </p>
-      <hr style="border:none; border-top:1px solid #eeeeee; margin:0 0 24px;" />
-      ${buildButton("View Your Profile", `${BASE_URL}/?user=${login}`)}
-    `,
-    actionUrl: `${BASE_URL}/?user=${login}`,
+    title: subject,
+    body: preheader,
+    render: (links) => renderJobReferralConvertedEmail(data, links),
+    actionUrl: `${EMAIL_BASE_URL}/?user=${login}`,
     priority: "high",
     channels: ["email"],
   });

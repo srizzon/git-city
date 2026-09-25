@@ -1,10 +1,10 @@
 import { sendNotification } from "../notifications";
-import { buildButton, escapeHtml } from "../email-template";
+import { EMAIL_BASE_URL, button, heading, paragraph, trackedUrl } from "../email/components";
+import { renderLayout, renderText, type EmailLinks } from "../email/layout";
 import { SENIORITY_LABELS, LOCATION_TYPE_LABELS } from "../jobs/constants";
+import { formatSalary, jobCards, plural } from "../jobs/email-blocks";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
-
-interface MatchingJob {
+export interface MatchingJob {
   id: string;
   title: string;
   companyName: string;
@@ -16,76 +16,87 @@ interface MatchingJob {
   matchedSkills: string[];
 }
 
-/**
- * Weekly job digest notification for developers.
- * Sends matching jobs based on career profile preferences.
- */
-export async function sendJobDigestNotification(
-  devId: number,
-  login: string,
-  jobs: MatchingJob[],
-) {
+const SHOWN = 8;
+
+function digestHeader(jobs: MatchingJob[]) {
+  const [top] = jobs;
+  const rest = jobs.length - 1;
+  return {
+    subject: jobs.length === 1 ? "1 new job matches your skills" : `${jobs.length} new jobs match your skills`,
+    preheader: `${top.title} at ${top.companyName}${rest > 0 ? ` and ${plural(rest, "more", "more")}` : ""}, posted this week.`,
+  };
+}
+
+export function renderJobDigestEmail(jobs: MatchingJob[], links: EmailLinks) {
+  const { subject, preheader } = digestHeader(jobs);
+  const jobsUrl = trackedUrl("/jobs", "job_digest");
+  const intro = "Posted on the Git City job board this week and picked for your skills.";
+  const cards = jobs.slice(0, SHOWN).map((job) => ({
+    title: job.title,
+    href: trackedUrl(`/jobs/${job.id}`, "job_digest"),
+    meta: [
+      job.companyName,
+      SENIORITY_LABELS[job.seniority] ?? job.seniority,
+      LOCATION_TYPE_LABELS[job.locationType] ?? job.locationType,
+      formatSalary(job.salaryMin, job.salaryMax, job.currency),
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    note: job.matchedSkills.length ? `Matches ${job.matchedSkills.join(", ")}` : undefined,
+  }));
+  const more = jobs.length > SHOWN ? `And ${plural(jobs.length - SHOWN, "more match", "more matches")} on the job board.` : null;
+  const tip = "Add skills to your career profile to sharpen these matches.";
+  const reason = "You're getting this weekly because new jobs on Git City match your skills.";
+
+  const html = renderLayout({
+    title: subject,
+    preheader,
+    body: [
+      heading(subject),
+      paragraph(intro),
+      jobCards(cards),
+      `<div style="height:16px; line-height:16px; font-size:0;">&nbsp;</div>`,
+      more ? paragraph(more, { muted: true }) : "",
+      paragraph(tip, { muted: true }),
+      button("Browse all jobs", jobsUrl),
+    ].join("\n"),
+    reason,
+    links,
+  });
+
+  const text = renderText({
+    lines: [
+      subject,
+      "",
+      intro,
+      "",
+      ...cards.flatMap((c) => [c.title, c.meta, ...(c.note ? [c.note] : []), c.href, ""]),
+      ...(more ? [more, ""] : []),
+      tip,
+      "",
+      `Browse all jobs: ${jobsUrl}`,
+    ],
+    reason,
+    links,
+  });
+
+  return { subject, preheader, html, text };
+}
+
+/** Weekly email with new jobs that match a developer's skills. */
+export async function sendJobDigestNotification(devId: number, login: string, jobs: MatchingJob[]) {
   if (jobs.length === 0) return [];
-
-  const jobListHtml = jobs
-    .slice(0, 8)
-    .map((job) => {
-      const seniorityLabel = SENIORITY_LABELS[job.seniority] || job.seniority;
-      const locationLabel = LOCATION_TYPE_LABELS[job.locationType] || job.locationType;
-
-      let salaryLine = "";
-      if (job.salaryMin && job.salaryMax && job.currency) {
-        salaryLine = `<span style="color:#059669; font-weight:600;">${job.currency} ${job.salaryMin.toLocaleString()}-${job.salaryMax.toLocaleString()}</span> &middot; `;
-      }
-
-      const skillsLine = job.matchedSkills.length > 0
-        ? `<p style="margin:4px 0 0; font-size:12px; color:#5a8a00;">Matches: ${job.matchedSkills.map((s) => escapeHtml(s)).join(", ")}</p>`
-        : "";
-
-      return `
-        <tr>
-          <td style="padding:16px; border-bottom:1px solid #eeeeee;">
-            <a href="${BASE_URL}/jobs/${job.id}" style="color:#111111; text-decoration:none; font-size:15px; font-weight:600; font-family:Helvetica,Arial,sans-serif;">${escapeHtml(job.title)}</a>
-            <p style="margin:4px 0 0; font-size:13px; color:#555555; font-family:Helvetica,Arial,sans-serif;">
-              ${escapeHtml(job.companyName)} &middot; ${salaryLine}${seniorityLabel} &middot; ${locationLabel}
-            </p>
-            ${skillsLine}
-          </td>
-        </tr>`;
-    })
-    .join("");
-
-  const moreText = jobs.length > 8
-    ? `<p style="color:#999999; font-size:13px; margin:12px 0;">...and ${jobs.length - 8} more matching jobs</p>`
-    : "";
-
-  const title = jobs.length === 1
-    ? `1 new job matches your profile`
-    : `${jobs.length} new jobs match your profile`;
+  const { subject, preheader } = digestHeader(jobs);
 
   return sendNotification({
     type: "job_digest",
     category: "jobs_digest",
     developerId: devId,
     dedupKey: `job_digest:${devId}:${new Date().toISOString().slice(0, 10)}`,
-    title,
-    body: `${jobs.length} new job${jobs.length > 1 ? "s" : ""} matching your skills on Git City.`,
-    html: `
-      <p style="margin:0 0 4px; font-size:12px; font-weight:bold; color:#5a8a00; letter-spacing:1px; text-transform:uppercase;">Weekly jobs</p>
-      <h1 style="margin:0 0 8px; font-size:22px; font-weight:bold; color:#111111; font-family:Helvetica,Arial,sans-serif;">${title}</h1>
-      <p style="margin:0 0 20px; font-size:15px; color:#555555; line-height:1.6;">
-        Based on your career profile, here are this week's top matches:
-      </p>
-      <table style="width:100%; border-collapse:collapse; margin:0 0 16px;">
-        ${jobListHtml}
-      </table>
-      ${moreText}
-      ${buildButton("Browse All Jobs", `${BASE_URL}/jobs`)}
-      <p style="margin:20px 0 0; font-size:12px; color:#999999;">
-        Update your <a href="${BASE_URL}/hire/edit" style="color:#5a8a00; text-decoration:underline;">career profile</a> to improve matches.
-      </p>
-    `,
-    actionUrl: `${BASE_URL}/jobs`,
+    title: subject,
+    body: preheader,
+    render: (links) => renderJobDigestEmail(jobs, links),
+    actionUrl: `${EMAIL_BASE_URL}/jobs`,
     priority: "high",
     channels: ["email"],
   });
