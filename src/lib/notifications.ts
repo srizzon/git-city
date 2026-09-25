@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "./supabase";
 import { getResend } from "./resend";
 import { getDeveloperEmail, isRecentlyActive } from "./notification-helpers";
 import { wrapInBaseTemplate } from "./email-template";
+import type { EmailLinks } from "./email/layout";
 
 // ── Types ──
 
@@ -32,6 +33,7 @@ export interface NotificationPayload {
   title: string;                         // email subject, push title
   body: string;                          // push body, email preview text
   html?: string;                         // rich email body (wrapped in base template)
+  render?: (links: EmailLinks) => { html: string; text: string }; // full email in the new layout; wins over html
   actionUrl?: string;                    // CTA link / deep link
   iconUrl?: string;                      // push notification icon
   data?: Record<string, unknown>;        // structured data for push/in_app deep links
@@ -414,8 +416,16 @@ async function dispatchEmail(
   const unsubUrl = buildUnsubscribeUrl(payload.developerId, unsubCategory);
 
   // Build final HTML
-  const bodyHtml = payload.html || `<p>${escapeBasicHtml(payload.body)}</p>`;
-  const fullHtml = wrapInBaseTemplate(bodyHtml, unsubUrl);
+  let fullHtml: string;
+  let text = payload.body;
+  if (payload.render) {
+    const rendered = payload.render({ unsubscribeUrl: unsubUrl });
+    fullHtml = rendered.html;
+    text = rendered.text;
+  } else {
+    const bodyHtml = payload.html || `<p>${escapeBasicHtml(payload.body)}</p>`;
+    fullHtml = wrapInBaseTemplate(bodyHtml, unsubUrl);
+  }
 
   // Send via Resend
   const resend = getResend();
@@ -424,7 +434,7 @@ async function dispatchEmail(
     to: email,
     subject: payload.title,
     html: fullHtml,
-    text: payload.body,
+    text,
     headers: {
       "List-Unsubscribe": `<${unsubUrl}>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
