@@ -28,11 +28,11 @@ import HonkFlash from "./HonkFlash";
 import Lights from "./Lights";
 import { BoostTrail, Smoke } from "./Particles";
 import SkidMarks from "./SkidMarks";
-import { useDriveAudio } from "./useDriveAudio";
 import { useDrivePresence, type BattleEvent } from "./useDrivePresence";
 import RemoteCars from "./RemoteCars";
 import { useTownBots } from "./useTownBots";
-import type { FxSource, FxSources } from "./fx";
+import type { FxSource } from "./fx";
+import { CameraKey, DriveAudio, LocalFx } from "./carFx";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { useDriveInput } from "./useDriveInput";
 
@@ -190,36 +190,6 @@ function DynamicProp({ spec }: { spec: ColliderSpec }) {
       </group>
     </>
   );
-}
-
-function CameraKey({ input, onToggle }: { input: ReturnType<typeof useDriveInput>; onToggle: () => void }) {
-  useFrame(() => {
-    if (input.current.pressed.camera) onToggle();
-  });
-  return null;
-}
-
-/** Your car as an effects source (tire marks, smoke, boost trail). */
-function LocalFx({ car, sources }: { car: React.MutableRefObject<CarApi | null>; sources: FxSources }) {
-  const entry = useRef<FxSource | null>(null);
-  useFrame(() => {
-    const c = car.current;
-    if (!c) return;
-    entry.current ??= { group: c.group, rearWheels: [], slip: 0, boosting: false, grounded: true };
-    const e = entry.current;
-    e.group = c.group;
-    e.rearWheels = c.wheels.slice(2, 4);
-    e.slip = c.state.slip;
-    e.boosting = c.state.boosting;
-    e.grounded = c.controller.wheelIsInContact(2) || c.controller.wheelIsInContact(3);
-    sources.current.set("local", e);
-  });
-  return null;
-}
-
-function DriveAudio(props: Parameters<typeof useDriveAudio>[0]) {
-  useDriveAudio(props);
-  return null;
 }
 
 // ─── World ───────────────────────────────────────────────────

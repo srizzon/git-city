@@ -31,6 +31,8 @@ export interface CarState {
   /** Spinning out (oil, a ball hit): seconds left and which way. */
   spinLeft: number;
   spinDir: number;
+  /** Boost left, 0…1, filled by drifting; null = unlimited (the town). */
+  boostFuel: number | null;
   /** Top speed multiplier (the crown holder is slower). */
   topMul: number;
   /** Sideways speed, m/s. */
@@ -49,7 +51,7 @@ export const WHEELS: { x: number; z: number; front: boolean }[] = [
 export function newCarState(): CarState {
   return {
     speed: 0, steer: 0, boosting: false, braking: false, slip: 0,
-    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, topMul: 1, lateral: 0, surface: "road",
+    flippedFor: 0, drifting: false, driftDir: 0, recovering: 0, spinLeft: 0, spinDir: 1, boostFuel: null, topMul: 1, lateral: 0, surface: "road",
   };
 }
 
@@ -146,8 +148,13 @@ export function stepCar(
     }
   });
 
-  // Boost: unlimited while held.
-  s.boosting = input.boost;
+  // Boost: unlimited while held, or from the tank a drift fills (the race track).
+  const fuel = s.boostFuel;
+  s.boosting = input.boost && (fuel === null || fuel > 0);
+  if (fuel !== null) {
+    const fill = s.drifting && grounded ? BOOST.driftFill : 0;
+    s.boostFuel = Math.min(1, Math.max(0, fuel + (fill - (s.boosting ? BOOST.drain : 0)) * dt));
+  }
   const top = (s.boosting ? BOOST.topSpeed : rearTop) * s.topMul;
 
   // Throttle, brake and reverse (boost drives even without throttle).
