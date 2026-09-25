@@ -23,11 +23,8 @@ export default function LeagueTitle({
   return (
     <div className="pointer-events-none flex max-w-[calc(100vw-2rem)] flex-col items-start gap-2 sm:max-w-sm">
       <div className="pointer-events-auto flex gap-2 text-[10px]">
-        <Link href="/" className={`${HUD_BOX} btn-press px-2.5 py-1 text-muted transition-colors hover:text-cream`}>
-          &larr; City
-        </Link>
         <Link href="/towns" className={`${HUD_BOX} btn-press px-2.5 py-1 text-muted transition-colors hover:text-cream`}>
-          Towns
+          &larr; Towns
         </Link>
       </div>
       <div className={`${HUD_BOX} px-4 py-3`}>

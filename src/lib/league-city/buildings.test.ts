@@ -40,6 +40,19 @@ describe("townHeights", () => {
     expect(out[0] < out[2] && out[2] < out[1] && out[1] < out[3]).toBe(true);
   });
 
+  it("spreads close raw heights across the whole range", () => {
+    const out = townHeights([500, 505, 510, 515, 520]);
+    expect(out[0]).toBe(TOWN_MIN_HEIGHT);
+    expect(out[4]).toBe(TOWN_MAX_HEIGHT);
+    // Most stay low: the middle building is under the halfway height.
+    expect(out[2]).toBeLessThan((TOWN_MIN_HEIGHT + TOWN_MAX_HEIGHT) / 2);
+  });
+
+  it("keeps equal heights equal", () => {
+    const out = townHeights([100, 300, 100]);
+    expect(out[0]).toBe(out[2]);
+  });
+
   it("puts a town of equals in the middle", () => {
     const mid = Math.round((TOWN_MIN_HEIGHT + TOWN_MAX_HEIGHT) / 2);
     expect(townHeights([500, 500])).toEqual([mid, mid]);
