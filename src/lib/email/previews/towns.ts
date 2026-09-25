@@ -38,7 +38,7 @@ export const TOWNS_PREVIEWS: EmailPreviews = {
     ),
   "town-weekly-won": () =>
     renderLeagueWeeklyEmail(
-      { ...WEEK, me: { rank: 1, login: "pyromains", total: 385 }, globalLine: "Ship City Town finished 4th of 12 companies (up from 6th)." },
+      { ...WEEK, me: { rank: 1, login: "pyromains", total: 385 }, globalLine: "Ship City finished 4th of 12 companies (up from 6th)." },
       PREVIEW_LINKS,
     ),
   "town-weekly-lost": () => renderLeagueWeeklyEmail(WEEK, PREVIEW_LINKS),
@@ -53,7 +53,7 @@ export const TOWNS_PREVIEWS: EmailPreviews = {
       { ...TOWN, inviterLogin: "srizzon", link: "https://thegitcity.com/town/ship-city?ref=srizzon&invite=pedrohenrique" },
       PREVIEW_LINKS,
     ),
-  "town-join-request": () => renderJoinRequestEmail({ ...TOWN, requesterLogin: "pedrohenrique" }, PREVIEW_LINKS),
+  "town-join-request": () => renderJoinRequestEmail({ ...TOWN, requesterLogin: "mrousavy" }, PREVIEW_LINKS),
   "town-request-approved": () => renderRequestApprovedEmail({ ...TOWN, adminLogin: "srizzon" }, PREVIEW_LINKS),
   "purchase-card": () =>
     renderPurchaseEmail({ login: "srizzon", itemId: "neon_outline", price: { amountCents: 499, currency: "usd" }, date: DATE }, PREVIEW_LINKS),
