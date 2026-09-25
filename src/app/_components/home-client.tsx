@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo, useSyncExternalStore, Suspense, type ComponentProps } from "react";
 import { Menu, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { BenchOverlay, benchCount, padBuildings } from "@/components/CityBench";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
@@ -546,6 +547,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
   const searchParams = useSearchParams();
   const userParam = searchParams.get("user");
   const giftedParam = searchParams.get("gifted");
+  const bench = benchCount(searchParams.get("bench"));
 
   // Real live event fetched from the server (the production path).
   // Polls /api/events/active so the boss appears/disappears with the
@@ -2759,8 +2761,12 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
 
   // Feature 3: First-Flight Controls Overlay — user-dismissed only (no auto-dismiss)
 
+  // ?bench=N: draw the city padded to N buildings (render only; nothing else sees the copies).
+  const canvasBuildings = useMemo(() => (bench ? padBuildings(buildings, bench) : buildings), [buildings, bench]);
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-bg font-pixel uppercase text-warm">
+      {bench > 0 && <BenchOverlay count={canvasBuildings.length} />}
       {/* Boss Invasion HUD overlay (only when live event mode) */}
       {bossPreview?.mode === "live" && <BossEventHUD flyMode={flyMode} accentColor={theme.accent} shadowColor={theme.shadow} leaderboard={liveLeaderboard} participants={liveEvent?.participants ?? 0} selfLogin={authLogin} />}
 
@@ -2787,7 +2793,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         onPerfDecline={handlePerfDecline}
         bossPreview={bossPreview}
         onCompareCinematicEnd={() => setCompareCinematicPlaying(false)}
-        buildings={buildings}
+        buildings={canvasBuildings}
         plazas={plazas}
         decorations={decorations}
         river={river}
