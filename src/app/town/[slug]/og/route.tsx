@@ -74,7 +74,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   );
 }
 
-export interface TownCardData {
+interface TownCardData {
   name: string;
   kind: "company" | "custom" | null;
   found: boolean;
@@ -88,7 +88,7 @@ export interface TownCardData {
 
 type Fonts = { name: string; data: Buffer; style: "normal"; weight: 400 }[];
 
-export function townCard(d: TownCardData, fonts: Fonts, cacheControl: string): ImageResponse {
+function townCard(d: TownCardData, fonts: Fonts, cacheControl: string): ImageResponse {
   const { name, faces, logo, slug, joined } = d;
   const league = d.found ? { kind: d.kind } : null;
   const members = { length: d.buildings };
