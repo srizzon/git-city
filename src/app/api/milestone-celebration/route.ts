@@ -22,13 +22,14 @@ export async function POST() {
     .from("milestone_celebrations")
     .upsert({ milestone, reached_at: new Date().toISOString() }, { onConflict: "milestone", ignoreDuplicates: true })
     .select()
-    .single();
+    .maybeSingle();
 
-  if (error && !error.message.includes("duplicate")) {
+  if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ celebrated: true, milestone, reached_at: data?.reached_at });
+  // No row back means this milestone was already recorded
+  return NextResponse.json({ celebrated: !!data, milestone, reached_at: data?.reached_at });
 }
 
 // GET: return all celebrated milestones
