@@ -286,8 +286,13 @@ export interface CityLayout {
   sfMap?: SFRenderMap;
 }
 
-export function generateCityLayout(devs: DeveloperRecord[], sfMap?: SFMapAsset, baseNorms?: LayoutNorms): CityLayout {
-  if (sfMap) return generateSFCityLayout(devs, sfMap, baseNorms);
+export function generateCityLayout(
+  devs: DeveloperRecord[],
+  sfMap?: SFMapAsset,
+  baseNorms?: LayoutNorms,
+  pinned?: ReadonlySet<string>,
+): CityLayout {
+  if (sfMap) return generateSFCityLayout(devs, sfMap, baseNorms, pinned);
   const buildings: CityBuilding[] = [];
   const plazas: CityPlaza[] = [];
   const decorations: CityDecoration[] = [];

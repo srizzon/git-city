@@ -238,6 +238,14 @@ interface CityStats {
   total_contributions: number;
 }
 
+// Devs added to the city this session (deep link, search, the signed-in
+// player), by lowercase login. They always get a lot in the layout, and a
+// reload keeps them while the snapshot doesn't carry them yet. Module-level so
+// it survives client navigation, like the city cache.
+const pinnedDevs = new Map<string, DeveloperRecord>();
+const pinDev = (dev: DeveloperRecord) => pinnedDevs.set(dev.github_login.toLowerCase(), dev);
+const pinnedLogins = () => new Set(pinnedDevs.keys());
+
 // Milestones that trigger 24h celebration effects
 const CELEBRATION_MILESTONES = [10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000, 100000];
 
@@ -1702,6 +1710,13 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
       }
     } catch { }
 
+    // Keep devs added this session that the snapshot doesn't carry yet.
+    if (pinnedDevs.size > 0) {
+      const have = new Set(allDevs.map((d) => String(d.github_login).toLowerCase()));
+      for (const [login, dev] of pinnedDevs) if (!have.has(login)) allDevs.push(dev);
+      prebuilt = undefined; // the worker's layout knows nothing about pins
+    }
+
     rawDevsRef.current = allDevs;
     if (dropsPayload.length > 0) dropsPayloadRef.current = dropsPayload;
     setStats(cityStats);
@@ -1709,7 +1724,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
     sfMapRef.current = sf;
     const layout = prebuilt && sf
       ? { ...prebuilt, sfMap: sfRenderMap(sf) }
-      : generateCityLayout(allDevs, sf, layoutNormsRef.current);
+      : generateCityLayout(allDevs, sf, layoutNormsRef.current, pinnedLogins());
     mergeDrops(layout.buildings);
 
     setBuildings(layout.buildings);
@@ -1793,7 +1808,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         // Try pre-computed snapshot first (single file from Supabase CDN).
         // Self-heals on a fresh environment: builds the snapshot, then retries.
         const snapshot = await loadHomeSnapshot();
-        const prebuilt = snapshot?.layout;
+        let prebuilt = snapshot?.layout;
         if (snapshot) {
           allDevs = snapshot.developers;
           cityStats = snapshot.stats;
@@ -1845,6 +1860,13 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         setLoadProgress(45);
         await new Promise((r) => setTimeout(r, 0)); // yield to browser
 
+        // Keep devs added earlier this session that the snapshot doesn't carry yet.
+        if (pinnedDevs.size > 0) {
+          const have = new Set(allDevs.map((d: DeveloperRecord) => d.github_login.toLowerCase()));
+          for (const [login, dev] of pinnedDevs) if (!have.has(login)) allDevs.push(dev);
+          prebuilt = undefined; // the worker's layout knows nothing about pins
+        }
+
         rawDevsRef.current = allDevs;
         if (dropsPayload.length > 0) dropsPayloadRef.current = dropsPayload;
         setStats(cityStats);
@@ -1853,7 +1875,7 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         // v2 snapshots arrive already laid out by the worker.
         const finalLayout = prebuilt && sfInit
           ? { ...prebuilt, sfMap: sfRenderMap(sfInit) }
-          : generateCityLayout(allDevs, sfInit, layoutNormsRef.current);
+          : generateCityLayout(allDevs, sfInit, layoutNormsRef.current, pinnedLogins());
         mergeDrops(finalLayout.buildings);
         performance.mark("city:layout");
 
@@ -1978,10 +2000,12 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
           // Dev doesn't exist in DB yet (auth callback may have failed) — skip injection
           if (devData.exists === false) return;
 
+          // Already in the data but not placed (the map was full): pin and re-lay out.
+          const loaded = rawDevsRef.current.find((d: DeveloperRecord) => d.github_login.toLowerCase() === userParam.toLowerCase());
           // Dedup: another effect may have already injected this dev
-          if (rawDevsRef.current.some((d: DeveloperRecord) => d.github_login.toLowerCase() === userParam.toLowerCase())) return;
+          if (loaded && pinnedDevs.has(userParam.toLowerCase())) return;
 
-          const newDev = {
+          const newDev = loaded ?? {
             ...devData,
             owned_items: [],
             achievements: [],
@@ -1997,8 +2021,9 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
             xp_total: devData.xp_total ?? 0,
             xp_level: devData.xp_level ?? 1,
           };
-          rawDevsRef.current = [...rawDevsRef.current, newDev];
-          const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
+          pinDev(newDev);
+          if (!loaded) rawDevsRef.current = [...rawDevsRef.current, newDev];
+          const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current, pinnedLogins());
           mergeDrops(layout.buildings);
           setBuildings(layout.buildings);
           setPlazas(layout.plazas);
@@ -2101,10 +2126,12 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         const devData = await res.json();
         if (devData.exists === false) return;
 
+        // Already in the data but not placed (the map was full): pin and re-lay out.
+        const loaded = rawDevsRef.current.find((d: DeveloperRecord) => d.github_login.toLowerCase() === authLogin);
         // Dedup: another effect or search may have already injected this dev
-        if (rawDevsRef.current.some((d: DeveloperRecord) => d.github_login.toLowerCase() === authLogin)) return;
+        if (loaded && pinnedDevs.has(authLogin)) return;
 
-        const newDev = {
+        const newDev = loaded ?? {
           ...devData,
           owned_items: [],
           achievements: [],
@@ -2120,8 +2147,9 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
           xp_total: devData.xp_total ?? 0,
           xp_level: devData.xp_level ?? 1,
         };
-        rawDevsRef.current = [...rawDevsRef.current, newDev];
-        const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
+        pinDev(newDev);
+        if (!loaded) rawDevsRef.current = [...rawDevsRef.current, newDev];
+        const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current, pinnedLogins());
         mergeDrops(layout.buildings);
         setBuildings(layout.buildings);
         setPlazas(layout.plazas);
@@ -2307,13 +2335,16 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
         xp_total: devData.xp_total ?? existingDev?.xp_total ?? 0,
         xp_level: devData.xp_level ?? existingDev?.xp_level ?? 1,
       };
-      rawDevsRef.current = existedBefore
+      // Replace on the raw data, not on `existedBefore`: an unplaced dev is in
+      // the data without a building, and appending it would duplicate it.
+      pinDev(syncedDev);
+      rawDevsRef.current = existingDev
         ? rawDevsRef.current.map((d) =>
           d.github_login?.toLowerCase() === refreshedLogin ? syncedDev : d
         )
         : [...rawDevsRef.current, syncedDev];
 
-      const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
+      const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current, pinnedLogins());
       mergeDrops(layout.buildings);
       setBuildings(layout.buildings);
       setPlazas(layout.plazas);
@@ -2472,13 +2503,14 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
       xp_total: devData.xp_total ?? existingDev?.xp_total ?? 0,
       xp_level: devData.xp_level ?? existingDev?.xp_level ?? 1,
     };
+    pinDev(syncedDev);
     rawDevsRef.current = existedBefore
       ? rawDevsRef.current.map((d) =>
         d.github_login?.toLowerCase() === refreshedLogin ? syncedDev : d
       )
       : [...rawDevsRef.current, syncedDev];
 
-    const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current);
+    const layout = generateCityLayout(rawDevsRef.current, sfMapRef.current, layoutNormsRef.current, pinnedLogins());
     mergeDrops(layout.buildings);
     setBuildings(layout.buildings);
     setPlazas(layout.plazas);

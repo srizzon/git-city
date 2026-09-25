@@ -115,7 +115,17 @@ function getSFIndex(asset: SFMapAsset) {
   return index;
 }
 
-export function generateSFCityLayout(devs: DeveloperRecord[], asset: SFMapAsset, baseNorms?: LayoutNorms): CityLayout {
+/**
+ * `pinned` (lowercase logins) always get a lot: the signed-in player and devs
+ * added this session. When the map is full, a pinned dev takes the lot of the
+ * weakest placed building instead of being dropped.
+ */
+export function generateSFCityLayout(
+  devs: DeveloperRecord[],
+  asset: SFMapAsset,
+  baseNorms?: LayoutNorms,
+  pinned?: ReadonlySet<string>,
+): CityLayout {
   const buildings: CityBuilding[] = [];
   const districtZones: DistrictZone[] = [];
 
@@ -169,6 +179,28 @@ export function generateSFCityLayout(devs: DeveloperRecord[], asset: SFMapAsset,
     const k = `${gx},${gz}`;
     (pgrid.get(k) ?? pgrid.set(k, []).get(k)!).push({ x, z, r: chalf });
     di++;
+  }
+
+  // ---- pinned devs the map had no room for take the weakest lots ----
+  // `placed` runs in centrality order, so its tail holds the weakest buildings.
+  if (pinned && pinned.size > 0) {
+    const isPinned = (dev: DeveloperRecord) => pinned.has(dev.github_login.toLowerCase());
+    const placedLogins = new Set(placed.map((p) => p.dev.github_login.toLowerCase()));
+    let vi = placed.length - 1;
+    for (const dev of sorted) {
+      if (!isPinned(dev) || placedLogins.has(dev.github_login.toLowerCase())) continue;
+      while (vi >= 0 && isPinned(placed[vi].dev)) vi--;
+      if (vi < 0) break;
+      const lot = placed[vi];
+      const dctx = dev.district ?? inferDistrict(dev.primary_language);
+      // Never bigger than the lot it takes, so it can't overlap a neighbour.
+      placed[vi] = {
+        dev, x: lot.x, z: lot.z,
+        w: Math.min(statW(dev), lot.w), d: Math.min(statD(dev), lot.d),
+        did: DISTRICT_ORDER.includes(dctx) ? dctx : inferDistrict(dev.primary_language),
+      };
+      vi--;
+    }
   }
 
   // ---- build CityBuilding objects ----
