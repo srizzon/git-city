@@ -19,7 +19,7 @@ export default async function UnsubscribePage({
     jobs_performance: "job performance reports",
     jobs_digest: "weekly job digest",
     jobs_updates: "job status updates",
-    leagues: "league emails",
+    leagues: "town emails",
   };
 
   return (

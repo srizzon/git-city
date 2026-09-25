@@ -1,6 +1,7 @@
 import { sendNotification } from "../notifications";
 import { buildButton, buildStatsTable, escapeHtml } from "../email-template";
 import type { ClosedLeague } from "../leagues/close";
+import { townDisplayName } from "../towns/names";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thegitcity.com";
 
@@ -11,7 +12,7 @@ function ordinal(n: number): string {
 }
 
 /**
- * Monday results email to every active member of a closed league. Awaited
+ * Monday results email to every active member of a closed town. Awaited
  * (not fire-and-forget) so the close cron finishes its sends.
  */
 export async function sendLeagueWeeklyResults(closed: ClosedLeague, previousGlobalRank: number | null): Promise<number> {
@@ -19,8 +20,9 @@ export async function sendLeagueWeeklyResults(closed: ClosedLeague, previousGlob
   const standings = week.standings;
   const winner = standings.find((s) => s.developer_id === closed.winnerId) ?? null;
   const podiumScore = standings[Math.min(2, standings.length - 1)]?.total ?? 0;
-  const url = `${BASE_URL}/league/${league.slug}`;
-  const name = escapeHtml(league.name);
+  const url = `${BASE_URL}/town/${league.slug}`;
+  const town = townDisplayName(league.name);
+  const name = escapeHtml(town);
 
   let globalLine = "";
   if (league.kind === "company" && closed.globalRank) {
@@ -30,7 +32,7 @@ export async function sendLeagueWeeklyResults(closed: ClosedLeague, previousGlob
           ? ` (down from ${ordinal(previousGlobalRank)})`
           : ` (up from ${ordinal(previousGlobalRank)})`
         : "";
-    globalLine = `${league.name} finished ${ordinal(closed.globalRank)} of ${closed.globalTotal} companies${moved}.`;
+    globalLine = `${town} finished ${ordinal(closed.globalRank)} of ${closed.globalTotal} companies${moved}.`;
   }
 
   let sent = 0;
@@ -38,10 +40,10 @@ export async function sendLeagueWeeklyResults(closed: ClosedLeague, previousGlob
     const isWinner = me.developer_id === closed.winnerId;
     const gap = me.rank > 3 ? podiumScore - me.total : 0;
     const headline = isWinner
-      ? `You won ${league.name} this week`
+      ? `You won ${town} this week`
       : winner
-        ? `@${winner.login} won ${league.name} this week`
-        : `${league.name}: the week is closed`;
+        ? `@${winner.login} won ${town} this week`
+        : `${town}: the week is closed`;
     const yourLine = isWinner
       ? "Your building wears the crown for 7 days. +100 XP."
       : `You finished ${ordinal(me.rank)} of ${standings.length}${gap > 0 ? `, ${gap} points off the podium` : ""}.`;
@@ -60,7 +62,7 @@ export async function sendLeagueWeeklyResults(closed: ClosedLeague, previousGlob
         ${buildStatsTable(
           standings.slice(0, 3).map((s) => ({ label: `${ordinal(s.rank)} · @${s.login}`, value: s.total })),
         )}
-        ${buildButton("See the league", url)}
+        ${buildButton("See the town", url)}
       `,
       actionUrl: url,
       priority: "normal",

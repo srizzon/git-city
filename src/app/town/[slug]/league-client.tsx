@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import PixelSpinner from "@/components/leagues/PixelSpinner";
+import { useTownVisit } from "@/components/towns/useTownVisit";
+import { isDesktop } from "@/components/towns/useDesktop";
+import type { TownBadges } from "@/lib/towns/milestones";
 import {
   generateCityLayout,
   type CityBuilding,
@@ -12,7 +15,7 @@ import {
 } from "@/lib/github";
 import type { LeaguePageData } from "@/lib/leagues/queries";
 import type { LeagueCity } from "@/lib/league-city/service";
-import { leagueBuildings } from "@/lib/league-city/buildings";
+import { leagueBuildings, scaleTownHeights } from "@/lib/league-city/buildings";
 import LeagueTitle from "@/components/league/hud/LeagueTitle";
 import RaceWidget from "@/components/league/hud/RaceWidget";
 import ActionBar from "@/components/league/hud/ActionBar";
@@ -74,6 +77,8 @@ export default function LeagueClient({
   inviteToken,
   refLogin,
   startEditing = false,
+  startDriving = false,
+  badges,
 }: {
   data: LeaguePageData;
   city: LeagueCity;
@@ -86,6 +91,9 @@ export default function LeagueClient({
   inviteToken: string | null;
   refLogin: string | null;
   startEditing?: boolean;
+  /** ?drive=1 (Surprise me, Discover's Drive): straight into the car on desktop. */
+  startDriving?: boolean;
+  badges: TownBadges;
 }) {
   const { league, members, viewer } = data;
   const isMember = viewer?.status === "active";
@@ -99,6 +107,7 @@ export default function LeagueClient({
   const [mode, setMode] = useState<SceneMode>(startEditing && isAdmin ? "edit" : "view");
   const editing = mode === "edit" || mode === "preview";
   const driving = mode === "drive";
+  useTownVisit(league.slug, !!viewer && viewer.status !== "active" && viewer.status !== "invited", driving);
   const [store] = useState(() => createEditorStore(initEditor(city)));
   const cameraApi = useRef<EditCameraApi | null>(null);
   const pickables = useRef<Pickable[]>([]);
@@ -118,7 +127,7 @@ export default function LeagueClient({
       const b = byLogin.get(d.github_login.toLowerCase());
       if (b) map.set(d.id, b);
     }
-    return map;
+    return scaleTownHeights(map);
   }, [cityDevs, cityNorms]);
 
   const togglePreview = useCallback(
@@ -136,7 +145,7 @@ export default function LeagueClient({
 
   const onForbidden = useCallback(() => {
     setMode("view");
-    window.history.replaceState(null, "", `/league/${league.slug}`);
+    window.history.replaceState(null, "", `/town/${league.slug}`);
     setViewNotice({
       kind: "error",
       message: "You're no longer the admin, so the editor closed.",
@@ -165,14 +174,14 @@ export default function LeagueClient({
     setPanel(null);
     if (city.version > store.getState().version) store.dispatch({ type: "resync", city });
     setMode("edit");
-    window.history.replaceState(null, "", `/league/${league.slug}?edit=1`);
+    window.history.replaceState(null, "", `/town/${league.slug}?edit=1`);
   };
   const done = async () => {
     setLeaving(true);
     await autosave.drain();
     setLeaving(false);
     setMode("view");
-    window.history.replaceState(null, "", `/league/${league.slug}`);
+    window.history.replaceState(null, "", `/town/${league.slug}`);
     router.refresh();
   };
 
@@ -276,6 +285,14 @@ export default function LeagueClient({
     }
     setMode("drive");
   };
+  const autoDrove = useRef(false);
+  useEffect(() => {
+    if (!startDriving || autoDrove.current) return;
+    autoDrove.current = true;
+    window.history.replaceState(null, "", `/town/${league.slug}`);
+    // After the first paint, from a callback: the scene mounts in view mode first.
+    if (isDesktop()) window.setTimeout(enterDrive, 0);
+  }, [startDriving, league.slug]);
   const exitDrive = useCallback(() => {
     setMode((m) => (m === "drive" ? "view" : m));
     setDrivers([]);
@@ -366,7 +383,7 @@ export default function LeagueClient({
   };
 
   const verifyHref =
-    !isMember && !showJoinCta && viewer && league.kind === "company" ? "/leagues/verify" : null;
+    !isMember && !showJoinCta && viewer && league.kind === "company" ? "/towns/verify" : null;
   const close = () => setPanel(null);
 
   return (
@@ -480,7 +497,7 @@ export default function LeagueClient({
       {!editing && !driving && (
         <>
           <div className="pointer-events-none fixed left-4 top-4 z-30">
-            <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} />
+            <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} badges={badges} />
           </div>
 
           <div

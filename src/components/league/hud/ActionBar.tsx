@@ -69,7 +69,7 @@ export default function ActionBar({
   }, [driveHint]);
 
   async function share() {
-    const url = `${window.location.origin}/league/${slug}`;
+    const url = `${window.location.origin}/town/${slug}`;
     if (coarse && navigator.share) {
       try {
         await navigator.share({ url });
@@ -177,7 +177,7 @@ export default function ActionBar({
         </span>
       )}
       {isAdmin && (
-        <Link href={`/league/${slug}/settings`} aria-label="League settings" className={`${ICON_BTN} text-cream hover:text-lime`}>
+        <Link href={`/town/${slug}/settings`} aria-label="Town settings" className={`${ICON_BTN} text-cream hover:text-lime`}>
           <Settings {...ICON} aria-hidden />
         </Link>
       )}
@@ -185,8 +185,8 @@ export default function ActionBar({
         <button
           type="button"
           onClick={() => setLeave("confirm")}
-          aria-label="Leave league"
-          title="Leave league"
+          aria-label="Leave town"
+          title="Leave town"
           className={`${ICON_BTN} text-muted hover:text-red-400`}
         >
           <LogOut {...ICON} aria-hidden />

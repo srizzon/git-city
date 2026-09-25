@@ -24,12 +24,12 @@ export default function CreateLeague({ signedIn, defaultOpen = false }: { signed
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error ?? "Couldn't create the league.");
+        setError(json.error ?? "Couldn't create the town.");
         setBusy(false);
         return;
       }
       // Keep the pending state until the league page loads.
-      window.location.href = `/league/${json.league.slug}`;
+      window.location.href = `/town/${json.league.slug}`;
     } catch {
       setError("Network error. Try again.");
       setBusy(false);
@@ -46,12 +46,12 @@ export default function CreateLeague({ signedIn, defaultOpen = false }: { signed
           setBusy(true);
           signInWithGitHub(
             createBrowserSupabase(),
-            `${window.location.origin}/auth/callback?next=${encodeURIComponent("/leagues?create=1")}`,
+            `${window.location.origin}/auth/callback?next=${encodeURIComponent("/towns?create=1")}`,
           );
         }}
         className="btn-press bg-lime px-4 py-3 text-[11px] tracking-widest text-bg"
       >
-        {busy ? <Pending label="Opening GitHub" /> : "Sign in to create a league"}
+        {busy ? <Pending label="Opening GitHub" /> : "Sign in to create a town"}
       </button>
     );
   }
@@ -59,7 +59,7 @@ export default function CreateLeague({ signedIn, defaultOpen = false }: { signed
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="btn-press bg-lime px-4 py-3 text-[11px] tracking-widest text-bg">
-        Create league
+        Create town
       </button>
     );
   }
@@ -73,8 +73,8 @@ export default function CreateLeague({ signedIn, defaultOpen = false }: { signed
           onChange={(e) => setName(e.target.value)}
           maxLength={40}
           disabled={busy}
-          placeholder="League name"
-          aria-label="League name"
+          placeholder="Town name"
+          aria-label="Town name"
           {...NO_AUTOFILL}
           className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-lime sm:text-xs"
         />

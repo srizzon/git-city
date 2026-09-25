@@ -16,13 +16,13 @@ function originOf(request: Request): string {
 async function start(request: Request) {
   const origin = originOf(request);
   const viewer = await getViewer();
-  if (!viewer) return NextResponse.redirect(`${origin}/api/auth/github?redirect=${encodeURIComponent("/leagues/verify")}`);
+  if (!viewer) return NextResponse.redirect(`${origin}/api/auth/github?redirect=${encodeURIComponent("/towns/verify")}`);
 
   // Local Supabase can't produce a provider token: use DEV_MOCK_ORGS.
   if (isLocalSupabase()) {
     const { seed } = await syncOrgVerifications(viewer.id, mockOrgs(), { verify: true });
     if (seed) after(() => seed().then(() => {}));
-    return NextResponse.redirect(`${origin}/leagues/verify`);
+    return NextResponse.redirect(`${origin}/towns/verify`);
   }
 
   const supabase = await createServerSupabase();
@@ -30,10 +30,10 @@ async function start(request: Request) {
     provider: "github",
     options: {
       scopes: "read:org",
-      redirectTo: `${origin}/auth/callback?verify=org&next=${encodeURIComponent("/leagues/verify")}`,
+      redirectTo: `${origin}/auth/callback?verify=org&next=${encodeURIComponent("/towns/verify")}`,
     },
   });
-  if (error || !data.url) return NextResponse.redirect(`${origin}/leagues/verify?error=oauth_failed`);
+  if (error || !data.url) return NextResponse.redirect(`${origin}/towns/verify?error=oauth_failed`);
   return NextResponse.redirect(data.url);
 }
 

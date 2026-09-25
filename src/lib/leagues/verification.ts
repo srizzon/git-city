@@ -5,7 +5,7 @@ import { createDeveloperFromGitHub } from "@/lib/create-developer";
 import { reassignAdmin, slugify } from "./service";
 import { LeagueError } from "./errors";
 import { companyLeagueName, isReservedSlug, LOGIN_RE } from "./names";
-import { notifyJoined } from "./joined";
+import { inviteJoined } from "./joined";
 import { autoPlace, removeBuilding } from "@/lib/league-city/service";
 
 // ─── Company league verification ────────────────────────────
@@ -152,7 +152,7 @@ export async function joinCompanyLeague(
   if (!league) {
     const info = await fetchOrgInfo(org);
     const orgSlug = slugify(org);
-    const base = isReservedSlug(orgSlug) ? `${orgSlug}-league` : orgSlug;
+    const base = isReservedSlug(orgSlug) ? `${orgSlug}-town` : orgSlug;
     const { data: clash } = await sb.from("leagues").select("id").eq("slug", base).maybeSingle();
     const slug = clash ? `${base}-${Date.now().toString(36).slice(-4)}` : base;
     // The org's display name is org-controlled text: same rules as a custom name.
@@ -171,7 +171,7 @@ export async function joinCompanyLeague(
       created = true;
     }
   }
-  if (!league) throw new Error(`Could not create company league for ${org}`);
+  if (!league) throw new Error(`Could not create company town for ${org}`);
 
   const { data: row } = await sb
     .from("league_members")
@@ -180,7 +180,7 @@ export async function joinCompanyLeague(
     .eq("developer_id", devId)
     .maybeSingle();
   if (row?.status === "former" && row.removed_by !== null) {
-    throw new LeagueError("removed", "The league admin removed you. Ask them for a new invite.", 403);
+    throw new LeagueError("removed", "The town admin removed you. Ask them for a new invite.", 403);
   }
 
   const previous = await activeCompanyLeagueId(devId);
@@ -212,7 +212,7 @@ export async function joinCompanyLeague(
   await autoPlace(league.id, devId);
   if (row?.status === "invited") {
     const { data: dev } = await sb.from("developers").select("github_login").eq("id", devId).single();
-    if (dev) await notifyJoined(league.id, devId, dev.github_login, row.invited_by);
+    if (dev) await inviteJoined(league.id, devId, dev.github_login, row.invited_by);
   }
 
   const leagueId = league.id as string;

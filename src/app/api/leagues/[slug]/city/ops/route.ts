@@ -9,8 +9,8 @@ import { CityOpError } from "@/lib/league-city/service";
 export const dynamic = "force-dynamic";
 
 const ROUTE_ERRORS: Record<string, [string, number]> = {
-  league_not_found: ["League not found.", 404],
-  not_admin: ["Only the league admin can edit the city.", 403],
+  league_not_found: ["Town not found.", 404],
+  not_admin: ["Only the town admin can edit the city.", 403],
   rate_limit: ["Too many edits. Wait a few minutes.", 429],
   ring_not_empty: ["Clear the edge of the city before shrinking it.", 409],
   too_full: ["The city is too full to shrink.", 409],

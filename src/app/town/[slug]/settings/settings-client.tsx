@@ -59,13 +59,13 @@ export default function SettingsClient({
     <main className="min-h-screen bg-bg font-pixel uppercase text-warm">
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="flex items-center justify-between">
-          <Link href={`/league/${league.slug}`} className="text-xs text-muted transition-colors hover:text-cream">
+          <Link href={`/town/${league.slug}`} className="text-xs text-muted transition-colors hover:text-cream">
             &larr; Back to the city
           </Link>
           {refreshing && <PixelSpinner size={4} />}
         </div>
         <h1 className="mt-6 text-2xl text-cream normal-case">{league.name}</h1>
-        <p className="mt-1 text-[11px] text-muted">League settings</p>
+        <p className="mt-1 text-[11px] text-muted">Town settings</p>
 
         <div className="mt-6 space-y-4">
           {league.kind === "custom" && <NameSection api={api} name={league.name} onSaved={refresh} />}
@@ -111,7 +111,7 @@ function NameSection({ api, name, onSaved }: { api: string; name: string; onSave
             setSaved(false);
           }}
           maxLength={40}
-          aria-label="League name"
+          aria-label="Town name"
           {...NO_AUTOFILL}
           className="min-w-0 flex-1 border-2 border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-lime sm:text-xs"
         />
@@ -262,7 +262,7 @@ function MembersSection({
   const sorted = [...members].sort((a, b) => (a.status === b.status ? a.login.localeCompare(b.login) : a.status === "active" ? -1 : 1));
 
   async function copyLink(login: string) {
-    const url = `${window.location.origin}/league/${league.slug}?ref=${encodeURIComponent(viewerLogin)}&invite=${encodeURIComponent(login)}`;
+    const url = `${window.location.origin}/town/${league.slug}?ref=${encodeURIComponent(viewerLogin)}&invite=${encodeURIComponent(login)}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(login);
@@ -382,7 +382,7 @@ function TransferSection({
       return setError(r.error);
     }
     // No longer admin: back to the city.
-    router.push(`/league/${league.slug}`);
+    router.push(`/town/${league.slug}`);
   }
 
   return (
@@ -434,11 +434,11 @@ function DeleteSection({ api, name }: { api: string; name: string }) {
       setDeleting(false);
       return setError(r.error);
     }
-    router.push("/leagues");
+    router.push("/towns");
   }
 
   return (
-    <Section title="Delete league" hint="Removes the city, the members and the hall of fame. This can't be undone." danger>
+    <Section title="Delete town" hint="Removes the city, the members and the hall of fame. This can't be undone." danger>
       <form onSubmit={del} className="flex flex-wrap gap-2">
         <input
           value={value}
@@ -456,7 +456,7 @@ function DeleteSection({ api, name }: { api: string; name: string }) {
           {deleting ? <Pending label="Deleting" /> : "Delete"}
         </button>
       </form>
-      <p className="mt-2 text-[10px] text-dim normal-case">Type the league name to confirm.</p>
+      <p className="mt-2 text-[10px] text-dim normal-case">Type the town name to confirm.</p>
       <ErrorLine error={error} />
     </Section>
   );

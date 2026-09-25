@@ -3,6 +3,7 @@ import { weekStart } from "@/lib/leagues/scoring";
 import { closeWeek } from "@/lib/leagues/close";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeagueWeeklyResults } from "@/lib/notification-senders/league-weekly";
+import { closeTownWeek, type TownWeekResult } from "@/lib/towns/weekly";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -48,8 +49,18 @@ export async function GET(request: NextRequest) {
         console.error(`[league-close] emails for ${c.league.slug}:`, err);
       }
     }
+    // Visits rollup and Town of the week. A failure here doesn't undo the race.
+    let towns: TownWeekResult | { error: string };
+    try {
+      towns = await closeTownWeek(start);
+    } catch (err) {
+      console.error("[league-close] town week:", err);
+      towns = { error: String(err) };
+    }
+
     return NextResponse.json({
       ok: true,
+      towns,
       week_start: start.toISOString().slice(0, 10),
       closed: closed.length,
       winners: closed.filter((c) => c.winnerId).length,

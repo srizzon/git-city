@@ -21,7 +21,7 @@ type Ctx = { params: Promise<{ slug: string }> };
 export async function GET(_req: Request, { params }: Ctx) {
   const { slug } = await params;
   const league = await getLeagueBySlug(slug);
-  if (!league) return NextResponse.json({ error: "League not found." }, { status: 404 });
+  if (!league) return NextResponse.json({ error: "Town not found." }, { status: 404 });
   try {
     const viewer = await getViewer();
     return NextResponse.json(await getLeaguePageData(league, viewer));
@@ -39,7 +39,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const viewer = await getViewer();
   if (!viewer) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   const league = await getLeagueBySlug(slug);
-  if (!league) return NextResponse.json({ error: "League not found." }, { status: 404 });
+  if (!league) return NextResponse.json({ error: "Town not found." }, { status: 404 });
 
   const body = await readJson(req);
   try {
@@ -67,7 +67,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
   const viewer = await getViewer();
   if (!viewer) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   const league = await getLeagueBySlug(slug);
-  if (!league) return NextResponse.json({ error: "League not found." }, { status: 404 });
+  if (!league) return NextResponse.json({ error: "Town not found." }, { status: 404 });
 
   const body = await readJson(req);
   try {

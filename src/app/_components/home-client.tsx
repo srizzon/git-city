@@ -4042,11 +4042,11 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
               <Link
-                href="/leagues"
+                href="/towns"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
               >
-                <span className="text-sm text-cream">Leagues</span>
+                <span className="text-sm text-cream">Towns</span>
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </Link>
             </div>
@@ -4549,11 +4549,11 @@ function HomeContent({ resolvedSponsors, serverIsAdmin }: HomeContentProps) {
                   &#9819; Leaderboard
                 </Link>
                 <Link
-                  href="/leagues"
+                  href="/towns"
                   className="btn-press border-[3px] border-border bg-bg/80 px-4 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
                   style={{ color: theme.accent }}
                 >
-                  &#9873; Leagues
+                  &#9873; Towns
                 </Link>
               </div>
               <div className="hidden sm:flex items-center justify-center gap-2">

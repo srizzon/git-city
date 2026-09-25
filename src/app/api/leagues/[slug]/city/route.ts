@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const league = await getLeagueBySlug(slug);
-  if (!league) return NextResponse.json({ error: "League not found." }, { status: 404 });
+  if (!league) return NextResponse.json({ error: "Town not found." }, { status: 404 });
 
   // ?fresh=1 is never stored by the CDN, signed in or not, so an anonymous
   // hit can't park a stale copy where the editor reads.

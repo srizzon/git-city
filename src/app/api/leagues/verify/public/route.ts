@@ -37,6 +37,6 @@ export async function POST(req: Request) {
   } catch (err) {
     if (err instanceof LeagueError) return leagueErrorResponse(err);
     console.error("[leagues:verify:public]", err);
-    return NextResponse.json({ error: "Couldn't join that league. Try again." }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't join that town. Try again." }, { status: 500 });
   }
 }

@@ -111,12 +111,13 @@ function toDecorations(objects: CityObject[], driving: boolean): CityDecoration[
 
 // ─── Camera ──────────────────────────────────────────────────
 
-function cameraFrame(size: number, aspect = 1.6) {
+function cameraFrame(size: number, aspect = 1.6, zoom = 1, tallest = 0) {
   const { cx, cz, width } = terrainBounds(size);
   // Portrait screens are narrow: back off so the terrain still fits across.
-  const dist = (width * 0.95 + 120) * Math.max(1, 1.3 / aspect) ** 0.55;
+  // `tallest` (hero only) keeps the camera above and back from the towers.
+  const dist = Math.max((width * 0.95 + 120) * Math.max(1, 1.3 / aspect) ** 0.55 * zoom, tallest * 1.9);
   return {
-    target: new THREE.Vector3(cx, 30, cz),
+    target: new THREE.Vector3(cx, Math.max(30, tallest * 0.35), cz),
     position: new THREE.Vector3(cx - dist * 0.55, dist * 0.6, cz + dist * 0.65),
     max: width * 2.4 + 400,
   };
@@ -132,16 +133,21 @@ function LeagueCamera({
   focus,
   spin = true,
   driving = false,
+  zoom = 1,
+  tallest = 0,
 }: {
   size: number;
   focus: CityBuilding | null;
   spin?: boolean;
   /** The drive camera owns the view; on exit this eases back to the orbit. */
   driving?: boolean;
+  /** Under 1 moves the orbit closer (Discover's hero crops the ground). */
+  zoom?: number;
+  tallest?: number;
 }) {
   const camera = useThree((s) => s.camera);
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
-  const frame = useMemo(() => cameraFrame(size, aspect), [size, aspect]);
+  const frame = useMemo(() => cameraFrame(size, aspect, zoom, tallest), [size, aspect, zoom, tallest]);
   const controls = useRef<OrbitControlsImpl>(null);
   const [rotate, setRotate] = useState(true);
   const fly = useRef({ t: 1, toPos: new THREE.Vector3(), toLook: new THREE.Vector3() });
@@ -251,6 +257,21 @@ function LeagueCamera({
   );
 }
 
+// Discover's hero: on wide screens the copy sits on the left, so the picture
+// shifts right to keep the town clear of it.
+function HeroFraming() {
+  const camera = useThree((s) => s.camera);
+  const width = useThree((s) => s.size.width);
+  const height = useThree((s) => s.size.height);
+  useEffect(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera)) return;
+    if (width >= 1024) camera.setViewOffset(width, height, -width * 0.26, 0, width, height);
+    else camera.clearViewOffset();
+    return () => camera.clearViewOffset();
+  }, [camera, width, height]);
+  return null;
+}
+
 // ─── Scene ───────────────────────────────────────────────────
 
 export type SceneMode = "view" | "edit" | "preview" | "drive";
@@ -271,6 +292,8 @@ export interface LeagueSceneProps {
   children?: React.ReactNode;
   /** Drive mode: the car and its world. */
   drive?: Omit<DriveWorldProps, "objects" | "buildings" | "size">;
+  /** Fill the parent box instead of the viewport, and ignore the pointer (Discover's hero). */
+  embedded?: boolean;
 }
 
 export default function LeagueScene({
@@ -285,6 +308,7 @@ export default function LeagueScene({
   editPickables,
   children,
   drive,
+  embedded = false,
 }: LeagueSceneProps) {
   const editing = mode === "edit";
   const driving = mode === "drive" && !!drive;
@@ -294,6 +318,7 @@ export default function LeagueScene({
   );
   const [lost, setLost] = useState(false);
   const decorations = useMemo(() => toDecorations(objects, driving), [objects, driving]);
+  const tallest = useMemo(() => buildings.reduce((m, b) => Math.max(m, b.height), 0), [buildings]);
   const initial = useMemo(() => cameraFrame(size), [size]);
   const driveRef = useRef(drive);
   useEffect(() => {
@@ -302,7 +327,7 @@ export default function LeagueScene({
 
   if (lost) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center gap-4 bg-bg font-pixel uppercase">
+      <div className={`${embedded ? "absolute" : "fixed"} inset-0 flex flex-col items-center justify-center gap-4 bg-bg font-pixel uppercase`}>
         <p className="text-xs text-muted">The city stopped drawing.</p>
         <button
           type="button"
@@ -323,7 +348,11 @@ export default function LeagueScene({
       dpr={[1, 1.5]}
       camera={{ position: initial.position.toArray(), fov: 50, near: 1, far: 12000 }}
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
-      style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
+      style={
+        embedded
+          ? { position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }
+          : { position: "fixed", inset: 0, width: "100vw", height: "100vh" }
+      }
       onCreated={({ gl }) => {
         gl.domElement.addEventListener("webglcontextlost", (e) => {
           e.preventDefault();
@@ -334,10 +363,18 @@ export default function LeagueScene({
     >
       <fog attach="fog" args={[theme.fogColor, theme.fogNear * 2, theme.fogFar * 1.2]} />
       <ThemeLights theme={theme} themeIndex={THEME_INDEX} />
+      {embedded && <HeroFraming />}
       {editing ? (
         <EditCamera size={size} onLot={onLot ?? (() => {})} apiRef={editApiRef} pickables={editPickables} />
       ) : (
-        <LeagueCamera size={size} focus={mode === "view" ? focusedBuilding : null} spin={mode === "view"} driving={driving} />
+        <LeagueCamera
+          size={size}
+          focus={mode === "view" ? focusedBuilding : null}
+          spin={mode === "view"}
+          driving={driving}
+          zoom={embedded ? 0.85 : 1}
+          tallest={embedded ? tallest : 0}
+        />
       )}
 
       <LeagueGround size={size} />

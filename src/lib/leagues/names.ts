@@ -14,7 +14,7 @@ const INVISIBLE_RE = /[​-‏‪-‮⁦-⁩﻿]/g;
 export function cleanLeagueName(raw: string): string {
   const name = raw.normalize("NFKC").replace(INVISIBLE_RE, "").trim().replace(/\s+/g, " ");
   if (name.length < 2 || name.length > 40) {
-    throw new LeagueError("invalid_name", "League name must be 2 to 40 characters.");
+    throw new LeagueError("invalid_name", "Town name must be 2 to 40 characters.");
   }
   if (checkProfanity(name, { languages: LANGUAGES, detectLeetspeak: true }).containsProfanity) {
     throw new LeagueError("invalid_name", "Pick a different name.");

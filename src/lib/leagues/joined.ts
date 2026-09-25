@@ -3,18 +3,40 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeagueJoinedNotification } from "@/lib/notification-senders/league-joined";
 import { isPublicOrgMember, VERIFICATION_DAYS } from "./verification";
 import { autoPlace } from "@/lib/league-city/service";
+import { earnPixels } from "@/lib/pixels";
+import { oldEnoughForInviteReward } from "@/lib/towns/invites";
 
-/** Emails whoever invited `devId` into a league the dev just joined. */
-export async function notifyJoined(leagueId: string, devId: number, login: string, invitedBy: number | null) {
+/**
+ * An invite became a member: email whoever invited `devId`, give the invitee
+ * the welcome pixels and the inviter a Town Builder count. Both rewards need
+ * a 30+ day old GitHub account and are once per invitee.
+ */
+export async function inviteJoined(leagueId: string, devId: number, login: string, invitedBy: number | null) {
   if (!invitedBy || invitedBy === devId) return;
-  const { data: league } = await getSupabaseAdmin().from("leagues").select("slug, name").eq("id", leagueId).single();
+  const sb = getSupabaseAdmin();
+  const { data: league } = await sb.from("leagues").select("slug, name").eq("id", leagueId).single();
   if (!league) return;
+  await rewardInvite(leagueId, devId, invitedBy).catch((err) => console.error("[towns] invite reward failed:", err));
   sendLeagueJoinedNotification({
     inviterId: invitedBy,
     inviteeId: devId,
     inviteeLogin: login,
     leagueSlug: league.slug,
     leagueName: league.name,
+  });
+}
+
+async function rewardInvite(leagueId: string, devId: number, invitedBy: number) {
+  const sb = getSupabaseAdmin();
+  const { data: dev } = await sb.from("developers").select("account_created_at").eq("id", devId).single();
+  if (!oldEnoughForInviteReward(dev?.account_created_at as string | null | undefined)) return;
+  await earnPixels(devId, "town_welcome", leagueId, `town_welcome:${devId}`);
+  await sb.rpc("grant_emblem", {
+    p_developer_id: invitedBy,
+    p_emblem_id: "town_builder",
+    p_claim_key: `town_builder:${devId}`,
+    p_meta: { league_id: leagueId, invitee_id: devId },
+    p_source: "town",
   });
 }
 
@@ -68,7 +90,7 @@ export async function activateOnClaim(devId: number, login: string): Promise<num
     if (error) continue;
     joined++;
     await autoPlace(row.league_id, devId);
-    await notifyJoined(row.league_id, devId, login, row.invited_by);
+    await inviteJoined(row.league_id, devId, login, row.invited_by);
   }
   return joined;
 }

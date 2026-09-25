@@ -43,7 +43,7 @@ export default function VerifyClient({
         return;
       }
       // Keep the pending state until the league page loads.
-      window.location.assign(`/league/${json.slug}`);
+      window.location.assign(`/town/${json.slug}`);
     } catch {
       setMessage("Network error. Try again.");
       setBusy(null);
@@ -53,7 +53,7 @@ export default function VerifyClient({
   if (!signedIn) {
     return (
       <a
-        href={`/api/auth/github?redirect=${encodeURIComponent("/leagues/verify")}`}
+        href={`/api/auth/github?redirect=${encodeURIComponent("/towns/verify")}`}
         className="btn-press mt-8 block bg-lime px-4 py-3 text-center text-[11px] tracking-widest text-bg"
       >
         Sign in with GitHub
@@ -88,11 +88,11 @@ export default function VerifyClient({
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-xs text-cream normal-case">@{o.login}</div>
                   <div className="text-[9px] text-muted">
-                    {o.league ? (o.joined ? "You're in" : "League exists") : "No league yet"}
+                    {o.league ? (o.joined ? "You're in" : "Town exists") : "No town yet"}
                   </div>
                 </div>
                 {o.joined && o.league ? (
-                  <Link href={`/league/${o.league.slug}`} className="text-[10px] text-lime">
+                  <Link href={`/town/${o.league.slug}`} className="text-[10px] text-lime">
                     Open &rarr;
                   </Link>
                 ) : (
@@ -102,7 +102,7 @@ export default function VerifyClient({
                     onClick={() => post("/api/leagues/verify/join", o.login)}
                     className="btn-press border-2 border-lime px-3 py-1.5 text-[10px] text-lime disabled:opacity-40"
                   >
-                    {busy === o.login ? <Pending label={o.league ? "Joining" : "Starting"} /> : o.league ? "Join" : "Start league"}
+                    {busy === o.login ? <Pending label={o.league ? "Joining" : "Starting"} /> : o.league ? "Join" : "Start town"}
                   </button>
                 )}
               </li>

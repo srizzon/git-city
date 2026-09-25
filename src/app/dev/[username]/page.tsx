@@ -265,12 +265,12 @@ export default async function DevPage({ params }: Props) {
           <div className="mt-5 grid gap-5 md:grid-cols-2">
             {leagues.length > 0 && (
               <section className="border-[3px] border-border bg-bg-raised p-4 sm:p-6 md:col-span-2">
-                <h2 className="text-sm text-cream">Leagues</h2>
+                <h2 className="text-sm text-cream">Towns</h2>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {leagues.map((l) => (
                     <Link
                       key={l.slug}
-                      href={`/league/${l.slug}`}
+                      href={`/town/${l.slug}`}
                       className="border-2 border-border px-2.5 py-1.5 text-[10px] text-muted transition-colors hover:border-border-light hover:text-cream"
                     >
                       {l.kind === "company" && <span style={{ color: accent }}>◆ </span>}

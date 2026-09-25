@@ -133,7 +133,7 @@ export async function provisionDeveloperOnLogin(
 
       // Leagues: an invited member becomes active on their first claim.
       if (claimedNow) {
-        await activateOnClaim(dev.id, githubLogin).catch((err) => console.error("League join on claim failed:", err));
+        await activateOnClaim(dev.id, githubLogin).catch((err) => console.error("Town join on claim failed:", err));
       }
 
       // Process referral (from ?ref= param forwarded by client)

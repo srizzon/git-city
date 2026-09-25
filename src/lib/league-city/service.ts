@@ -29,7 +29,7 @@ export interface OpsResult {
 const MESSAGES: Record<string, [string, number]> = {
   lot_taken: ["That lot is taken.", 409],
   out_of_bounds: ["That's outside the city.", 400],
-  not_member: ["That developer isn't in this league.", 400],
+  not_member: ["That developer isn't in this town.", 400],
   too_many_ops: ["Too many changes at once.", 400],
   already_placed: ["That building is already in the city.", 409],
   forbidden: ["Buildings can't be removed from the city.", 403],
