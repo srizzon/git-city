@@ -3,14 +3,16 @@
 // frame and read in requestAnimationFrame, so driving never re-renders React.
 
 import type { DriveTelemetry } from "../drive/telemetry";
-import { BOOST } from "../drive/tuning";
 import type { RaceServerMsg } from "./net";
 import type { RaceState } from "./race";
 
 /** What the HUD reads every frame, without re-rendering. */
 export interface RaceTelemetry extends DriveTelemetry {
-  /** Boost tank 0…1. */
-  fuel: number;
+  /** Mini-turbo charge of the drift under way (0 none … 3 purple), and a turbo firing. */
+  driftLevel: number;
+  turbo: boolean;
+  /** Latest split vs your best lap: delta (ms, negative is faster) and when it came (performance.now). */
+  split: { delta: number; at: number } | null;
   /** Server-clock ms when the lap under way started, or null. */
   lapStart: number | null;
   /** serverNow = Date.now() + offset. */
@@ -21,7 +23,7 @@ export interface RaceTelemetry extends DriveTelemetry {
 }
 
 export function createRaceTelemetry(): RaceTelemetry {
-  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, fuel: BOOST.startFuel, lapStart: null, offset: 0, wrongWay: false, lights: 0 };
+  return { speed: 0, boosting: false, near: null, held: null, gotAt: 0, driftLevel: 0, turbo: false, split: null, lapStart: null, offset: 0, wrongWay: false, lights: 0 };
 }
 
 export interface RaceView {

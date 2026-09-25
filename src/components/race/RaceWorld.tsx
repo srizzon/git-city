@@ -4,7 +4,6 @@ import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState,
 import { useFrame } from "@react-three/fiber";
 import { CuboidCollider, Physics, RigidBody, type RapierRigidBody } from "@react-three/rapier";
 import Car, { type CarApi } from "@/components/league/drive/Car";
-import DriveCamera from "@/components/league/drive/DriveCamera";
 import Lights from "@/components/league/drive/Lights";
 import { BoostTrail, Smoke } from "@/components/league/drive/Particles";
 import RemoteCars from "@/components/league/drive/RemoteCars";
@@ -15,9 +14,8 @@ import { useDriveInput } from "@/components/league/drive/useDriveInput";
 import { useDrivePresence } from "@/components/league/drive/useDrivePresence";
 import type { Spawn } from "@/lib/league-city/drive/spawn";
 import type { SurfaceGrip } from "@/lib/league-city/drive/surface";
-import type { DriveCameraMode } from "@/lib/league-city/drive/telemetry";
-import { BOOST, CHASSIS, GRAVITY, M_TO_UNIT, SURFACE, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
-import { placeCar } from "@/lib/league-city/drive/vehicle";
+import { CHASSIS, GRAVITY, M_TO_UNIT, SURFACE, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
+import { carHeading, placeCar, turboLevel } from "@/lib/league-city/drive/vehicle";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { TRACK, locate, pointAt, type Track } from "@/lib/league-city/race/track";
 import { curbRuns, wallSegments } from "@/lib/league-city/race/layout";
@@ -25,6 +23,9 @@ import { newLapState, restartLaps, stepLaps } from "@/lib/league-city/race/laps"
 import { idleRace, inRace, litLights, type RaceState } from "@/lib/league-city/race/race";
 import type { RaceServerMsg, RaceWelcome, RoomBests } from "@/lib/league-city/race/net";
 import TrackScene from "./TrackScene";
+import RaceCamera, { type RaceCameraMode } from "./RaceCamera";
+import { DriftSparks, Ghost } from "./Ghost";
+import { GhostRecorder, loadGhost, saveGhost, type GhostRun } from "@/lib/league-city/race/ghost";
 import type { LapNews, RaceTelemetry, RaceView } from "@/lib/league-city/race/telemetry";
 
 // The race track's physics world and game: the walls, your car (boost from a
@@ -38,7 +39,7 @@ export interface RaceWorldProps {
   title: string;
   name: string;
   telemetry: RaceTelemetry;
-  camera: DriveCameraMode;
+  camera: RaceCameraMode;
   onCameraToggle: () => void;
   muted: boolean;
   paused: boolean;
@@ -52,6 +53,8 @@ export interface RaceWorldProps {
   onReceipt: (token: string) => void;
   /** The HUD's Start race button calls this. */
   startRef: React.MutableRefObject<(() => void) | null>;
+  /** Your best lap in this browser changed (ms). */
+  onGhost: (ms: number | null) => void;
 }
 
 const BUMP_SHARE = 0.7;
@@ -141,6 +144,7 @@ export default function RaceWorld({
   onBests,
   onReceipt,
   startRef,
+  onGhost,
 }: RaceWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -150,7 +154,7 @@ export default function RaceWorld({
   }, []);
 
   const surface = useMemo(() => trackSurface(track), [track]);
-  // Practice start: a random grid slot, so two arrivals don't stack.
+  // Your start spot: a random grid slot, so two arrivals don't stack. R in practice brings you back here.
   const [spawn] = useState(() => {
     const g = track.grid[Math.floor(Math.random() * track.grid.length)];
     return spotSpawn(g.x, g.z, g.heading);
@@ -170,10 +174,17 @@ export default function RaceWorld({
   const placedFor = useRef(0);
   const contacts = useRef(new Map<string, number>());
 
-  const cb = useRef({ onRace, onLap, onBests, onReceipt });
+  const cb = useRef({ onRace, onLap, onBests, onReceipt, onGhost });
   useEffect(() => {
-    cb.current = { onRace, onLap, onBests, onReceipt };
+    cb.current = { onRace, onLap, onBests, onReceipt, onGhost };
   });
+  // Your best lap here: the ghost, its splits and time.
+  const best = useRef<GhostRun | null>(null);
+  const recorder = useRef(new GhostRecorder());
+  useEffect(() => {
+    best.current = loadGhost(slug);
+    cb.current.onGhost(best.current?.ms ?? null);
+  }, [slug]);
 
   const tel = useRef(telemetry);
   useEffect(() => {
@@ -196,7 +207,8 @@ export default function RaceWorld({
     const g = track.grid[slot];
     placedFor.current = r.startsAt;
     placeCar(c.body, g.x, g.z, g.heading);
-    Object.assign(c.state, { drifting: false, spinLeft: 0, recovering: 0, boostFuel: BOOST.startFuel });
+    Object.assign(c.state, { drifting: false, spinLeft: 0, recovering: 0, driftCharge: 0, turboLeft: 0 });
+    recorder.current.clear();
     respawnAt.current = spotSpawn(g.x, g.z, g.heading);
     restartLaps(laps.current);
     laps.current.s = null;
@@ -263,6 +275,22 @@ export default function RaceWorld({
     sendBump(id, (mine.x - theirs.x) * BUMP_SHARE, (mine.z - theirs.z) * BUMP_SHARE);
   };
 
+  const racingNow = () => {
+    const r = race.current;
+    const me = selfRef.current;
+    return !!me && (r.phase === "countdown" || r.phase === "live") && inRace(r, me);
+  };
+  // R. In a race: back to the last checkpoint (Car does it). In practice: a
+  // fresh attempt from your start spot; the server's lap starts over too.
+  const onReset = () => {
+    if (racingNow()) return;
+    send({ t: "restart" });
+    restartLaps(laps.current);
+    recorder.current.clear();
+    tel.current.lapStart = null;
+    tel.current.split = null;
+  };
+
   // Local lap logic, the lights and the HUD's numbers.
   const lastStep = useRef(0);
   useFrame(() => {
@@ -278,7 +306,8 @@ export default function RaceWorld({
     if (frozen && serverNow >= r.startsAt) setFrozen(false);
     const c = car.current;
     if (!c) return;
-    hud.fuel = c.state.boostFuel ?? 1;
+    hud.driftLevel = c.state.drifting ? turboLevel(c.state.driftCharge) : 0;
+    hud.turbo = c.state.turboLeft > 0;
     // The grid slot, in case the race news came before the car existed.
     if (r.phase === "countdown") takeSlot();
     const now = performance.now();
@@ -286,17 +315,37 @@ export default function RaceWorld({
     lastStep.current = now;
     const p = c.body.translation();
     const l = laps.current;
+    const racing = racingNow();
+    const rec = recorder.current;
+    rec.push(serverNow, p.x, p.z, carHeading(c.body));
     for (const e of stepLaps(track, l, p.x, p.z, serverNow)) {
       if (e.t === "start" || e.t === "lap" || e.t === "checkpoint") {
-        // R brings you back to the checkpoint you last crossed, facing the right way.
+        // In a race R brings you back to the checkpoint you last crossed, facing the right way.
         const s = e.t === "checkpoint" ? track.checkpoints[e.k] : 0;
         const q = pointAt(track, s);
-        respawnAt.current = spotSpawn(q.x, q.z, Math.atan2(q.tx, q.tz));
+        respawnAt.current = racing ? spotSpawn(q.x, q.z, Math.atan2(q.tx, q.tz)) : spawn;
       }
+      if (e.t === "checkpoint") {
+        rec.checkpoint(e.k, e.at);
+        const pb = best.current?.splits[e.k];
+        if (TRACK.splits.includes(e.k) && pb !== undefined && l.lapStart !== null && l.valid) {
+          hud.split = { delta: Math.round(e.at - l.lapStart - pb), at: performance.now() };
+        }
+      }
+      if (e.t === "lap") {
+        const run = rec.finish(e.ms);
+        if (e.valid && run && (!best.current || e.ms < best.current.ms)) {
+          best.current = run;
+          saveGhost(slug, run);
+          cb.current.onGhost(run.ms);
+        }
+        if (best.current) hud.split = { delta: e.ms - best.current.ms, at: performance.now() };
+      }
+      if (e.t === "start" || e.t === "lap") rec.begin(e.at);
     }
+    if (!racing && !respawnAt.current) respawnAt.current = spawn;
     // In a race the clock runs from lights out; otherwise it's the lap under way.
-    const racing = r.phase === "live" && !!selfRef.current && inRace(r, selfRef.current);
-    hud.lapStart = racing ? r.startsAt : l.lapStart;
+    hud.lapStart = racing && r.phase === "live" ? r.startsAt : l.lapStart;
     hud.wrongWay = l.wrongWay;
   });
 
@@ -319,7 +368,8 @@ export default function RaceWorld({
             impact={impact}
             surface={surface}
             respawnAt={respawnAt}
-            tank
+            onReset={onReset}
+            turbo
           >
             <Lights braking={() => !!car.current?.state.braking} />
           </Car>
@@ -329,7 +379,9 @@ export default function RaceWorld({
           <Smoke sources={fx} />
           <BoostTrail sources={fx} />
           <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} />
-          <DriveCamera mode={camera} car={car} impact={impact} />
+          <DriftSparks car={car} />
+          <Ghost run={best} lapStart={() => laps.current.lapStart} offset={() => offset.current} show={() => !racingNow()} />
+          <RaceCamera mode={camera} car={car} />
           <CameraKey input={input} onToggle={onCameraToggle} />
           <Ready onReady={onReady} />
         </Physics>
