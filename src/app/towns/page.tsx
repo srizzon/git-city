@@ -53,7 +53,7 @@ export default async function TownsPage({ searchParams }: { searchParams: Promis
               id={r.id}
               title={r.title}
               cards={discover.rows[r.id]}
-              action={r.id === "companies" ? { href: "/towns/verify", label: "Verify your company" } : undefined}
+              action={r.id === "companies" ? { href: "/towns/new?kind=company", label: "Start your company\u2019s town" } : undefined}
             />
           ) : null,
         )}

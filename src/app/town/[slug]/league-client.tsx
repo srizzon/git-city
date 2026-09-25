@@ -597,7 +597,7 @@ export default function LeagueClient({
   };
 
   const verifyHref =
-    !isMember && !showJoinCta && viewer && league.kind === "company" ? "/towns/verify" : null;
+    !isMember && !showJoinCta && viewer && league.kind === "company" ? `/towns/new?kind=company&org=${encodeURIComponent(league.github_org ?? "")}` : null;
   const close = () => setPanel(null);
   const questStep = (step: QuestStep) => {
     if (step === "drive") enterDrive();
@@ -912,6 +912,7 @@ export default function LeagueClient({
           invitee={invite}
           refLogin={refLogin}
           inviteToken={inviteToken}
+          org={league.github_org}
           onClose={close}
         />
       )}
