@@ -72,6 +72,8 @@ export type ClientMsg =
   /** Race track only (party/race.ts). */
   | { t: "race_start" }
   | { t: "restart" }
+  /** Race track: past the finish the car drives itself; the room stops timing it. */
+  | { t: "auto" }
   | ["s", ...number[]];
 // Server → client
 export type ServerMsg =

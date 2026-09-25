@@ -48,6 +48,8 @@ interface Driver {
   lastBump: number;
   laps: LapState;
   joined: number;
+  /** Past the finish with the car on autopilot: its laps aren't timed. */
+  auto: boolean;
 }
 
 const track = theTrack();
@@ -129,7 +131,7 @@ export default class RaceServer implements Party.Server {
         this.room.getConnection(id)?.send(JSON.stringify({ t: "void", reason: e.reason } satisfies RaceServerMsg));
         continue;
       }
-      if (e.t !== "lap") continue;
+      if (e.t !== "lap" || d.auto) continue;
       const key = d.name.toLowerCase();
       const prev = this.bests.get(key);
       const pb = e.valid && (prev === undefined || e.ms < prev);
@@ -196,7 +198,10 @@ export default class RaceServer implements Party.Server {
         const g = track.grid[i];
         this.slots.set(id, { x: g.x, z: g.z, placed: false });
         const d = this.drivers.get(id);
-        if (d) restartLaps(d.laps);
+        if (d) {
+          restartLaps(d.laps);
+          d.auto = false;
+        }
       });
       this.sendRace();
       this.runRaceClock();
@@ -206,7 +211,17 @@ export default class RaceServer implements Party.Server {
     // R in practice: back behind the line, the lap starts over. Never in a race.
     if (t === "restart") {
       const d = this.drivers.get(sender.id);
-      if (d && !inRace(this.race, sender.id)) restartLaps(d.laps);
+      if (d && !inRace(this.race, sender.id)) {
+        restartLaps(d.laps);
+        d.auto = false;
+      }
+      return;
+    }
+
+    // Past the finish: the car drives itself, so nothing it does is a lap.
+    if (t === "auto") {
+      const d = this.drivers.get(sender.id);
+      if (d) d.auto = true;
       return;
     }
 
@@ -228,7 +243,7 @@ export default class RaceServer implements Party.Server {
       sender.send(JSON.stringify({ t: "full" } satisfies ServerMsg));
       return;
     }
-    this.drivers.set(sender.id, { name, state: null, lastState: 0, lastBump: 0, laps: newLapState(), joined: Date.now() });
+    this.drivers.set(sender.id, { name, state: null, lastState: 0, lastBump: 0, laps: newLapState(), joined: Date.now(), auto: false });
     this.room.broadcast(JSON.stringify({ t: "join", id: sender.id, name } satisfies ServerMsg), [sender.id]);
   }
 
