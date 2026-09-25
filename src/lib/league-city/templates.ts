@@ -27,6 +27,8 @@ export const TEMPLATES: readonly TownTemplate[] = [
 ];
 
 export const DEFAULT_TEMPLATE: TemplateId = "crew";
+/** A company town's starter city unless its creator picks another. */
+export const COMPANY_TEMPLATE: TemplateId = "hq";
 
 export function isTemplateId(v: unknown): v is TemplateId {
   return typeof v === "string" && (TEMPLATE_IDS as readonly string[]).includes(v);

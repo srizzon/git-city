@@ -4,11 +4,12 @@ import { getViewer } from "@/lib/leagues/service";
 import { isPublicOrgMember, joinCompanyLeague } from "@/lib/leagues/verification";
 import { assertSameOrigin, leagueErrorResponse, readJson } from "@/lib/leagues/http";
 import { LeagueError } from "@/lib/leagues/service";
+import { startFrom } from "@/lib/towns/company-start";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// POST { org }: fallback for orgs that restrict OAuth app access. The dev makes
+// POST { org, template?, scoring? }: fallback for orgs that restrict OAuth app access. The dev makes
 // their membership public on GitHub, then we check the public API.
 export async function POST(req: Request) {
   const bad = assertSameOrigin(req);
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { slug, seed } = await joinCompanyLeague(viewer.id, org, "public");
+    const { slug, seed } = await joinCompanyLeague(viewer.id, org, "public", startFrom(body));
     if (seed) after(() => seed().then(() => {}));
     return NextResponse.json({ slug });
   } catch (err) {
