@@ -3,6 +3,8 @@ import { getViewer } from "@/lib/leagues/service";
 import { getCityNorms, getLeagueCityDevs, type LeagueMemberRow } from "@/lib/leagues/queries";
 import { isTemplateId } from "@/lib/league-city/templates";
 import { loadOrgStates } from "@/lib/towns/company-orgs";
+import { checkCompanyOrg } from "@/lib/towns/company-check";
+import { normalizeOrgInput } from "@/lib/towns/company-step";
 import NewTown from "./new-town";
 
 export const dynamic = "force-dynamic";
@@ -33,10 +35,14 @@ export default async function NewTownPage({ searchParams }: { searchParams: Prom
         invited_by: null,
       }
     : null;
-  const [cityDevs, cityNorms, orgs] = await Promise.all([
+  // A colleague's link (or the way back from GitHub) names the org: check it
+  // here so the screen opens already knowing. Read-only, like every check.
+  const startOrg = typeof org === "string" ? normalizeOrgInput(org) : null;
+  const [cityDevs, cityNorms, orgs, startCheck] = await Promise.all([
     me ? getLeagueCityDevs([me]).catch(() => []) : Promise.resolve([]),
     getCityNorms(),
     viewer ? loadOrgStates(viewer.id).catch(() => []) : Promise.resolve([]),
+    viewer && startOrg && kind === "company" ? checkCompanyOrg(viewer, startOrg).catch(() => null) : Promise.resolve(null),
   ]);
 
   return (
@@ -48,7 +54,8 @@ export default async function NewTownPage({ searchParams }: { searchParams: Prom
       startTemplate={isTemplateId(template) ? template : null}
       startName={typeof name === "string" ? name.slice(0, 40) : null}
       orgs={orgs}
-      startOrg={typeof org === "string" ? org : null}
+      startOrg={startOrg}
+      startCheck={startCheck}
       verifyFailed={!!error}
     />
   );

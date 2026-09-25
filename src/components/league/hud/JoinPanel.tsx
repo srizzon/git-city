@@ -96,9 +96,11 @@ export default function JoinPanel({
   if (action === "verify") {
     return (
       <Panel title="Work here?" onClose={onClose}>
-        <p className="text-[11px] text-muted normal-case">Company towns are for the org&apos;s members. Verify on GitHub to move in.</p>
+        <p className="text-[11px] text-muted normal-case">
+          Company towns are for {org ? `@${org}` : "the org"}&apos;s members. Show you&apos;re in the org on GitHub and your building moves in.
+        </p>
         <Link href={`/towns/new?kind=company${org ? `&org=${encodeURIComponent(org)}` : ""}`} className={PRIMARY}>
-          Verify your company
+          Check my membership
         </Link>
       </Panel>
     );

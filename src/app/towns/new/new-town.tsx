@@ -15,6 +15,8 @@ import { COMPANY_TEMPLATE, DEFAULT_TEMPLATE, JOIN_LABEL, SCORING_LABEL, TEMPLATE
 import type { CityIdentity, CityObject } from "@/lib/league-city/types";
 import type { LeagueCity } from "@/lib/league-city/service";
 import type { OrgState } from "@/lib/towns/company-orgs";
+import { companyStep, normalizeOrgInput, type OrgCheck } from "@/lib/towns/company-step";
+import { CompanyPanel } from "./company-panel";
 import type { ScoringMode } from "@/lib/leagues/scoring";
 import { JOIN_MODES, type JoinMode } from "@/lib/towns/joining";
 
@@ -43,6 +45,7 @@ export default function NewTown({
   startName,
   orgs,
   startOrg,
+  startCheck,
   verifyFailed,
 }: {
   viewer: { id: number; login: string; claimed: boolean } | null;
@@ -54,21 +57,23 @@ export default function NewTown({
   /** Orgs the viewer verified on GitHub, with their towns. */
   orgs: OrgState[];
   startOrg: string | null;
+  /** The server's check of `startOrg`, so the screen opens already knowing. */
+  startCheck: OrgCheck | null;
   verifyFailed: boolean;
 }) {
   const [kind, setKind] = useState<TownKind>(startKind);
   const [template, setTemplate] = useState<TemplateId>(startTemplate ?? (startKind === "company" ? COMPANY_TEMPLATE : DEFAULT_TEMPLATE));
-  const [org, setOrg] = useState<string | null>(
-    orgs.find((o) => o.login === startOrg?.toLowerCase())?.login ?? orgs.find((o) => !o.joined)?.login ?? orgs[0]?.login ?? null,
-  );
-  const [publicOrg, setPublicOrg] = useState("");
-  const [showPublic, setShowPublic] = useState(false);
+  // Company tab: the org being looked at and what the server found out about it.
+  const [orgInput, setOrgInput] = useState(startCheck ? "" : (startOrg ?? ""));
+  const [check, setCheck] = useState<OrgCheck | null>(startCheck);
+  const [checking, setChecking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const company = kind === "company";
-  const picked = company ? (orgs.find((o) => o.login === org) ?? null) : null;
-  // The org already has a town: you join that one, the city is already built.
-  const existing = picked?.league ?? null;
-  // Company tab before there's an org to build for: only the way to get one shows.
-  const noOrg = company && !picked;
+  const step = companyStep(company ? check : null);
+  // The org already has a town: you move into that one, the city is already built.
+  const existing = company && check?.town && (step.kind === "move_in" || step.kind === "open" || step.kind === "removed") ? check.town : null;
+  // Only a town about to be built shows the starter cities and settings.
+  const choosing = !company || step.kind === "build";
   const [name, setName] = useState(startName ?? (viewer ? `${viewer.login}'s Town` : "My Town"));
   const [showSettings, setShowSettings] = useState(true);
   // Settings follow the template until you change one.
@@ -116,6 +121,11 @@ export default function NewTown({
   function switchKind(k: TownKind) {
     if (k === kind) return;
     setKind(k);
+    window.history.replaceState(
+      null,
+      "",
+      k === "company" ? `/towns/new?kind=company${check ? `&org=${encodeURIComponent(check.org)}` : ""}` : "/towns/new",
+    );
     setTemplate(k === "company" ? COMPANY_TEMPLATE : DEFAULT_TEMPLATE);
     setScoring(null);
     setJoin(null);
@@ -146,7 +156,7 @@ export default function NewTown({
   // Arrow keys walk the templates when you're not typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (busy || existing || (e.target instanceof HTMLElement && e.target.closest("input, textarea"))) return;
+      if (busy || !choosing || (e.target instanceof HTMLElement && e.target.closest("input, textarea"))) return;
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
       e.preventDefault();
       const i = TEMPLATES.findIndex((x) => x.id === template);
@@ -158,18 +168,25 @@ export default function NewTown({
   });
 
   /** POSTs, then pushes in and hands over to the town page (which plays its intro). */
-  async function go(url: string, body: Record<string, unknown>, slugOf: (json: Record<string, unknown>) => string) {
+  async function go(
+    url: string,
+    body: Record<string, unknown>,
+    slugOf: (json: Record<string, unknown>) => string,
+    onRefused?: (json: Record<string, unknown>, status: number) => boolean,
+  ) {
     setBusy(true);
     setError(null);
+    setNotice(null);
     setLeaving(true);
     const started = Date.now();
     try {
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const json = (await res.json()) as Record<string, unknown>;
       if (!res.ok) {
-        setError(typeof json.error === "string" ? json.error : "Couldn't create the town.");
         setLeaving(false);
         setBusy(false);
+        if (onRefused?.(json, res.status)) return;
+        setError(typeof json.error === "string" ? json.error : "Couldn't create the town.");
         return;
       }
       await new Promise((r) => setTimeout(r, Math.max(0, LEAVE_MS - (Date.now() - started))));
@@ -181,55 +198,124 @@ export default function NewTown({
     }
   }
 
-  const companyStart = { template, scoring: scoring ?? t.scoring };
+  /** Asks the server about an org. Read-only: nothing is built or joined. */
+  async function runCheck(raw?: string): Promise<OrgCheck | null> {
+    const org = normalizeOrgInput(raw ?? orgInput);
+    if (!org) {
+      setError(raw ?? orgInput ? "That isn't a GitHub org name. Try the name in its address: github.com/name." : "Type your org's GitHub name.");
+      return null;
+    }
+    setChecking(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/leagues/verify/check?org=${encodeURIComponent(org)}`, { cache: "no-store" });
+      const json = (await res.json()) as OrgCheck & { error?: string };
+      if (!res.ok) {
+        setError(json.error ?? "Couldn't check that org. Try again.");
+        return null;
+      }
+      setCheck(json);
+      setOrgInput(json.org);
+      // The address follows the org, so a reload or a shared link lands here again.
+      window.history.replaceState(null, "", `/towns/new?kind=company&org=${encodeURIComponent(json.org)}`);
+      return json;
+    } catch {
+      setError("Network error. Try again.");
+      return null;
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  function changeOrg() {
+    setCheck(null);
+    setError(null);
+    setNotice(null);
+    window.history.replaceState(null, "", "/towns/new?kind=company");
+  }
+
   const slugOfJoin = (j: Record<string, unknown>) => String(j.slug);
 
   async function build(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || checking) return;
     if (!viewer) {
       setBusy(true);
-      const back = company ? `/towns/new?kind=company&template=${template}` : `/towns/new?template=${template}&name=${encodeURIComponent(name)}`;
+      const org = normalizeOrgInput(orgInput);
+      const back = company
+        ? `/towns/new?kind=company&template=${template}${org ? `&org=${encodeURIComponent(org)}` : ""}`
+        : `/towns/new?template=${template}&name=${encodeURIComponent(name)}`;
       signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=${encodeURIComponent(back)}`);
       return;
     }
-    if (company) {
-      if (!picked) {
-        // Second GitHub sign-in that asks for read:org, back to this tab.
-        setBusy(true);
-        window.location.href = "/api/leagues/verify";
-        return;
-      }
-      if (picked.joined && existing) {
-        window.location.href = `/town/${existing.slug}`;
-        return;
-      }
-      return go("/api/leagues/verify/join", { org: picked.login, ...companyStart }, slugOfJoin);
+    if (!company) {
+      return go("/api/leagues", { name, template, scoring: scoring ?? t.scoring, join: join ?? t.join }, (j) =>
+        String((j.league as { slug: string }).slug),
+      );
     }
-    return go("/api/leagues", { name, template, scoring: scoring ?? t.scoring, join: join ?? t.join }, (j) =>
-      String((j.league as { slug: string }).slug),
+    if (!check || step.kind === "no_account" || step.kind === "person" || step.kind === "github_down" || step.kind === "not_member") {
+      await runCheck(check && step.kind !== "no_account" && step.kind !== "person" ? check.org : undefined);
+      return;
+    }
+    if (step.kind === "open") {
+      setBusy(true);
+      window.location.href = `/town/${step.slug}`;
+      return;
+    }
+    if (step.kind === "removed") return;
+    const expect = step.kind === "build" ? "create" : "join";
+    return go(
+      "/api/leagues/verify/join",
+      { org: check.org, expect, template, scoring: scoring ?? t.scoring },
+      slugOfJoin,
+      (json) => {
+        // The town changed since the check (someone built it first, or the
+        // membership went private): look again and say why the screen moved.
+        if (json.code !== "town_exists" && json.code !== "no_town" && json.code !== "not_member") return false;
+        void runCheck(check.org).then((fresh) => {
+          if (fresh && typeof json.error === "string" && json.code !== "not_member") setNotice(json.error);
+        });
+        return true;
+      },
     );
   }
 
-  function checkPublic() {
-    const o = publicOrg.trim().replace(/^@/, "");
-    if (!o || busy) return;
-    void go("/api/leagues/verify/public", { org: o, ...companyStart }, slugOfJoin);
-  }
-
   const nameOk = company || name.trim().length >= 2;
+  const inputOk = !!orgInput.trim();
   const action = !viewer
     ? "Sign in to build"
     : !company
       ? "Build town"
-      : !picked
-        ? "Verify with GitHub"
-        : picked.joined
-          ? "Open town"
-          : existing
-            ? "Join town"
-            : `Build @${picked.login} town`;
-  const pending = !viewer || (company && !picked) ? "Opening GitHub" : existing ? "Joining" : "Building";
+      : step.kind === "none" || step.kind === "no_account" || step.kind === "person"
+        ? "Check org"
+        : step.kind === "github_down" || step.kind === "not_member"
+          ? "Check again"
+          : step.kind === "open"
+            ? `Open ${check?.townLabel ?? "town"}`
+            : step.kind === "removed"
+              ? "Removed by the admin"
+              : step.kind === "move_in"
+                ? step.leaving
+                  ? `Move to ${check?.townLabel ?? "town"}`
+                  : "Move in"
+                : `Build ${check?.townLabel ?? "town"}`;
+  const pending = !viewer
+    ? "Opening GitHub"
+    : checking
+      ? "Checking"
+      : step.kind === "open"
+        ? "Opening"
+        : step.kind === "move_in"
+          ? "Moving in"
+          : "Building";
+  const actionDisabled =
+    busy ||
+    checking ||
+    !nameOk ||
+    (!!viewer && !viewer.claimed) ||
+    (company && !!viewer && step.kind === "removed") ||
+    (company && !!viewer && (step.kind === "none" || step.kind === "no_account" || step.kind === "person") && !inputOk);
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-bg font-pixel uppercase text-warm" style={{ animation: "fade-in 0.5s ease-out both" }}>
@@ -239,7 +325,7 @@ export default function NewTown({
           embedded
           h={city.h}
           identity={IDENTITY}
-          name={company ? (existing?.name ?? picked?.login ?? "Your company") : name.trim() || "Your town"}
+          name={company ? (check && step.kind !== "no_account" && step.kind !== "person" ? check.townLabel : "Your company") : name.trim() || "Your town"}
           objects={city.objects}
           buildings={buildings}
           mode="view"
@@ -282,32 +368,31 @@ export default function NewTown({
           ))}
         </div>
         <p className="px-5 pt-3 text-xs leading-relaxed text-muted normal-case">
-          {company ? "One town per GitHub org. Members join by verifying on GitHub." : "Pick a starter city. You can change everything later."}
+          {!company
+            ? "Pick a starter city. You can change everything later."
+            : viewer
+              ? "One town per GitHub org. Your colleagues' buildings come in with it."
+              : "One town per GitHub org. Your colleagues' buildings come in with it. Sign in with GitHub, then tell us your org."}
         </p>
 
         {company && viewer && (
-          <CompanyOrgs
+          <CompanyPanel
             orgs={orgs}
-            org={org}
-            onPick={(o) => {
-              setOrg(o);
+            input={orgInput}
+            onInput={(v) => {
+              setOrgInput(v);
               setError(null);
             }}
-            busy={busy}
-            showPublic={showPublic}
-            onShowPublic={() => setShowPublic(true)}
-            publicOrg={publicOrg}
-            onPublicOrg={setPublicOrg}
-            onCheckPublic={checkPublic}
+            onCheck={(o) => void runCheck(o)}
+            onChange={changeOrg}
+            check={check}
+            step={step}
+            checking={checking}
+            notice={notice}
           />
         )}
 
-        {noOrg ? null : existing ? (
-          <p className="mx-5 mt-4 border-[3px] border-border bg-bg-card px-3 py-3 text-[11px] leading-relaxed text-muted normal-case">
-            <span className="text-cream">{existing.name}</span> is already built.{" "}
-            {picked?.joined ? "You live there." : "Join and your building moves in."}
-          </p>
-        ) : (
+        {choosing && (
           /* Templates: a column on wide screens, a swipe row on phones. */
           <div
             role="radiogroup"
@@ -338,7 +423,7 @@ export default function NewTown({
           </div>
         )}
 
-        <div className="mt-auto flex flex-col gap-3 border-t-[3px] border-border px-5 pt-4 lg:mt-5">
+        <div className={`mt-auto flex flex-col gap-3 px-5 lg:mt-5 ${choosing ? "border-t-[3px] border-border pt-4" : "pt-2"}`}>
           {!company && (
             <label className="flex flex-col gap-1.5">
               <span className="text-[11px] text-muted">Name</span>
@@ -354,7 +439,7 @@ export default function NewTown({
             </label>
           )}
 
-          {!existing && !noOrg && (
+          {choosing && (
             <>
               <button
                 type="button"
@@ -381,7 +466,7 @@ export default function NewTown({
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[11px] text-muted">Who can join</span>
                       <p className="text-[11px] text-cream normal-case">
-                        {picked ? `Members of @${picked.login}` : "Org members"}, verified on GitHub
+                        {check ? `Members of @${check.org}` : "Org members"}, verified on GitHub
                       </p>
                     </div>
                   ) : (
@@ -406,10 +491,10 @@ export default function NewTown({
         <div className="sticky bottom-0 bg-bg px-5 pt-3 pb-4">
           <button
             type="submit"
-            disabled={busy || !nameOk || (!!viewer && !viewer.claimed)}
+            disabled={actionDisabled}
             className="btn-press w-full bg-lime px-4 py-3 text-sm tracking-widest text-bg disabled:opacity-40"
           >
-            {busy ? <Pending label={pending} /> : action}
+            {busy || checking ? <Pending label={pending} /> : action}
           </button>
         </div>
       </form>
@@ -495,115 +580,5 @@ function MiniMap({ id, on }: { id: TemplateId; on: boolean }) {
         );
       })}
     </svg>
-  );
-}
-
-/** Your verified orgs to pick from, and the public-membership check for orgs that block OAuth apps. */
-function CompanyOrgs({
-  orgs,
-  org,
-  onPick,
-  busy,
-  showPublic,
-  onShowPublic,
-  publicOrg,
-  onPublicOrg,
-  onCheckPublic,
-}: {
-  orgs: OrgState[];
-  org: string | null;
-  onPick: (org: string) => void;
-  busy: boolean;
-  showPublic: boolean;
-  onShowPublic: () => void;
-  publicOrg: string;
-  onPublicOrg: (v: string) => void;
-  onCheckPublic: () => void;
-}) {
-  return (
-    <div className="mt-4 flex flex-col gap-2 px-5">
-      {orgs.length > 0 && (
-        <div role="radiogroup" aria-label="Your GitHub org" className="flex flex-col gap-1.5">
-          {orgs.map((o) => {
-            const on = o.login === org;
-            return (
-              <button
-                key={o.login}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => onPick(o.login)}
-                className={`btn-press flex items-center gap-3 border-[3px] px-3 py-2 text-left transition-colors ${
-                  on ? "border-lime bg-bg-raised" : "border-border bg-bg-card hover:border-muted"
-                }`}
-              >
-                {o.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={o.avatar_url} alt="" width={24} height={24} className="h-6 w-6 shrink-0" />
-                ) : (
-                  <span className="h-6 w-6 shrink-0 bg-bg-raised" />
-                )}
-                <span className={`min-w-0 flex-1 truncate text-xs normal-case ${on ? "text-lime" : "text-cream"}`}>@{o.login}</span>
-                <span className="shrink-0 text-[10px] text-muted">{o.league ? (o.joined ? "You're in" : "Town exists") : "No town yet"}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {orgs.length === 0 && (
-        <p className="border-[3px] border-border bg-bg-card px-3 py-3 text-[11px] leading-relaxed text-muted normal-case">
-          <span className="text-cream">First, show us your orgs.</span> GitHub asks you to share your org list. We read it once and never store your
-          token.
-        </p>
-      )}
-      <div className="flex items-center justify-between gap-3 text-[10px]">
-        {orgs.length > 0 ? (
-          // eslint-disable-next-line @next/next/no-html-link-for-pages -- API route, full navigation
-          <a href="/api/leagues/verify" className="text-muted transition-colors hover:text-cream">
-            Check my orgs again
-          </a>
-        ) : (
-          <span />
-        )}
-        {!showPublic && (
-          <button type="button" onClick={onShowPublic} className="shrink-0 text-muted transition-colors hover:text-cream">
-            Org not listed?
-          </button>
-        )}
-      </div>
-      {showPublic && (
-        <div className="flex flex-col gap-1.5 border-t-2 border-border pt-3">
-          <p className="text-[10px] leading-relaxed text-muted normal-case">
-            Some orgs block apps. Make your membership public on GitHub (org → People → your name → Public), then check it here.
-          </p>
-          <div className="flex gap-2">
-            <input
-              value={publicOrg}
-              onChange={(e) => onPublicOrg(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  onCheckPublic();
-                }
-              }}
-              placeholder="org name, e.g. vercel"
-              aria-label="GitHub org"
-              {...NO_AUTOFILL}
-              autoCapitalize="off"
-              spellCheck={false}
-              className="min-w-0 flex-1 border-[3px] border-border bg-bg-raised px-3 py-2 text-base text-cream normal-case outline-none focus:border-lime sm:text-xs"
-            />
-            <button
-              type="button"
-              onClick={onCheckPublic}
-              disabled={busy || !publicOrg.trim()}
-              className="btn-press border-[3px] border-border px-3 py-2 text-[10px] text-cream disabled:opacity-40"
-            >
-              Check
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
