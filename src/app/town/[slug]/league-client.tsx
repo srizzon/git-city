@@ -47,6 +47,9 @@ import { carColor } from "@/lib/league-city/drive/net";
 import type { CityIdentity, ObjectProps, SignSide } from "@/lib/league-city/types";
 import { HillSignPanel, PlazaPanel, SkyPanel } from "@/components/league/hud/editor/IdentityPanel";
 import ReportPanel from "@/components/league/hud/ReportPanel";
+import IntroOverlay, { OUTRO_MS } from "@/components/league/hud/IntroOverlay";
+import { carIntro } from "@/lib/league-city/intro";
+import { townDisplayName } from "@/lib/towns/names";
 import {
   HOTBAR,
   initEditor,
@@ -90,6 +93,7 @@ export default function LeagueClient({
   pendingRequests,
   groupLink,
   badges,
+  weeklyRank = null,
 }: {
   data: LeaguePageData;
   city: LeagueCity;
@@ -112,6 +116,8 @@ export default function LeagueClient({
   /** Members: the link for a group chat. */
   groupLink: string | null;
   badges: TownBadges;
+  /** Company towns: this week's place in the global company ranking (null when unranked). */
+  weeklyRank?: number | null;
 }) {
   const { league, members, viewer } = data;
   const isMember = viewer?.status === "active";
@@ -401,16 +407,46 @@ export default function LeagueClient({
 
   // ─── Intro ─────────────────────────────────────────────────
   // First visit to each town (localStorage, like the home), the ▶ button
-  // replays it. Click or Esc skips. Lands on your building, else this
-  // week's leader.
+  // replays it, Esc or the Skip button skips. A car drives in through the
+  // portal (TownIntro); the overlay adds the fade, letterbox and title.
   const [intro, setIntro] = useState<{ n: number; color: string } | null>(null);
+  const [hudEnter, setHudEnter] = useState(false);
+  // Seconds into the intro, from the scene: the title follows it.
+  const introClock = useRef(0);
+  // When the intro car passes under the arch: the title's beat.
+  const introCrossAt = useMemo(
+    () => carIntro([...es.objects.values()].find((o) => o.item_type === "portal")?.pz ?? undefined).crossAt,
+    [es.objects],
+  );
+  const onIntroTick = useCallback((t: number) => {
+    introClock.current = t;
+  }, []);
   const playIntro = useCallback(() => {
     setFocused(null);
     setPanel(null);
+    introClock.current = 0;
+    setHudEnter(false);
     setIntro((prev) => ({ n: (prev?.n ?? 0) + 1, color: carColor(driverName) }));
   }, [driverName]);
-  const endIntro = useCallback(() => setIntro(null), []);
-  const skipIntro = useCallback(() => setIntro(null), []);
+  // After the scene: the title fades and the bars pull back (outro), then the
+  // HUD comes in piece by piece (hudEnter).
+  const [outro, setOutro] = useState<number | null>(null);
+  const outroTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(outroTimer.current), []);
+  const endIntro = useCallback(() => {
+    setIntro((cur) => {
+      if (cur) {
+        setOutro(cur.n);
+        window.clearTimeout(outroTimer.current);
+        outroTimer.current = window.setTimeout(() => {
+          setOutro(null);
+          setHudEnter(true);
+        }, OUTRO_MS);
+      }
+      return null;
+    });
+  }, []);
+  const skipIntro = endIntro;
   const introChecked = useRef(false);
   useEffect(() => {
     if (introChecked.current || startEditing || startDriving || showJoinCta) return;
@@ -491,13 +527,14 @@ export default function LeagueClient({
   }, []);
 
   return (
-    <main className="fixed inset-0 overflow-hidden bg-bg font-pixel uppercase text-warm" onPointerDown={intro ? skipIntro : undefined}>
+    <main className="fixed inset-0 overflow-hidden bg-bg font-pixel uppercase text-warm">
       <LeagueScene
         h={es.h}
         identity={identity}
         name={league.name}
         intro={intro}
         onIntroEnd={endIntro}
+        onIntroTick={onIntroTick}
         onPortalClick={!isMember ? () => {
           setFocused(null);
           setPanel("report");
@@ -624,14 +661,15 @@ export default function LeagueClient({
       )}
 
       {/* HUD: the wrappers ignore the pointer so the city stays draggable. */}
-      {!editing && !driving && !intro && (
+      {!editing && !driving && !intro && outro === null && (
         <>
-          <div className="pointer-events-none fixed left-4 top-4 z-30">
+          <div className="pointer-events-none fixed left-4 top-4 z-30" style={hudEnter ? { animation: "fade-in 0.45s ease-out both" } : undefined}>
             <LeagueTitle data={data} topCompanyLastWeek={topCompanyLastWeek} badges={badges} pendingRequests={pendingRequests} />
           </div>
 
           <div
             className={`pointer-events-none fixed right-4 top-4 z-30 hidden transition-opacity duration-200 sm:block ${focused || panel ? "opacity-0" : ""}`}
+            style={hudEnter ? { animation: "fade-in 0.45s ease-out 0.12s both" } : undefined}
           >
             <RaceWidget
               data={data}
@@ -642,6 +680,7 @@ export default function LeagueClient({
 
           <div
             className={`pointer-events-none fixed inset-x-4 bottom-4 z-30 flex flex-col items-center gap-2 ${focused ? "max-sm:hidden" : ""}`}
+            style={hudEnter ? { animation: "slide-up 0.45s ease-out 0.24s both" } : undefined}
           >
             <div className="pointer-events-none flex w-full items-end justify-center gap-2">
               <div className="sm:hidden">
@@ -684,14 +723,24 @@ export default function LeagueClient({
         </>
       )}
 
-      {intro && (
-        <button
-          type="button"
-          onClick={skipIntro}
-          className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 bg-bg/70 px-3 py-1.5 text-[9px] text-muted backdrop-blur-sm hover:text-cream"
-        >
-          Click or Esc to skip
-        </button>
+      {(intro || outro !== null) && (
+        <IntroOverlay
+          key={intro?.n ?? outro ?? 0}
+          clock={introClock}
+          crossAt={introCrossAt}
+          outro={!intro}
+          label={league.kind === "company" && league.github_org ? `@${league.github_org}` : "Git City town"}
+          name={townDisplayName(league.name)}
+          buildings={data.counts.total}
+          race={
+            weeklyRank !== null
+              ? `#${weeklyRank} this week`
+              : data.week.standings[0]
+                ? `@${data.week.standings[0].login} leads this week`
+                : null
+          }
+          onSkip={skipIntro}
+        />
       )}
       {panel === "report" && (
         <ReportPanel slug={league.slug} name={league.name} logoUrl={identity.logoUrl} signedIn={!!viewer} onClose={close} />

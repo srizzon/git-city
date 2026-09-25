@@ -30,9 +30,9 @@ const _axisY = new THREE.Vector3(0, 1, 0);
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
 
-/** Chase camera behind a car heading north (−z) at (x, z). */
-function chase(x: number, z: number, pos: THREE.Vector3, look: THREE.Vector3) {
-  pos.set(x, UP, z + BACK);
+/** Chase camera behind a car heading north (−z) at (x, z). Portrait screens sit further back. */
+function chase(x: number, z: number, pos: THREE.Vector3, look: THREE.Vector3, far = 1) {
+  pos.set(x, UP * far, z + BACK * far);
   look.set(x, 4, z - AHEAD);
 }
 
@@ -42,6 +42,7 @@ export default function TownIntro({
   color,
   ceiling,
   onEnd,
+  onTick,
 }: {
   intro: CarIntro;
   end: { pos: Vec3; look: Vec3 };
@@ -49,8 +50,12 @@ export default function TownIntro({
   /** Height that clears every building: the camera goes up to it before swinging out. */
   ceiling: number;
   onEnd: () => void;
+  /** Seconds into the intro, every frame (the title follows this clock). */
+  onTick?: (t: number) => void;
 }) {
   const camera = useThree((s) => s.camera);
+  const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
+  const far = aspect < 1 ? 1.6 : 1;
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   const car = useRef<THREE.Group>(null);
   const wheelRefs = useRef<(THREE.Object3D | null)[]>([]);
@@ -60,22 +65,26 @@ export default function TownIntro({
   const endLook = useMemo(() => new THREE.Vector3(...end.look), [end]);
 
   useEffect(() => {
-    chase(intro.x, intro.startZ, _want, _look);
+    chase(intro.x, intro.startZ, _want, _look, far);
     camera.position.copy(_want);
     camera.lookAt(_look);
     cam.current.look.copy(_look);
     // The camera lets go of the car here.
-    chase(intro.x, intro.switchZ, cam.current.fromPos, cam.current.fromLook);
-  }, [camera, intro]);
+    chase(intro.x, intro.switchZ, cam.current.fromPos, cam.current.fromLook, far);
+  }, [camera, intro, far]);
 
-  // Skipped: hand the controls whatever the camera looks at now.
+  // Skipped: cut straight to the city frame, as games do.
   useEffect(
     () => () => {
-      if (state.current.ended || !controls) return;
-      controls.target.copy(cam.current.look);
-      controls.update();
+      if (state.current.ended) return;
+      camera.position.copy(endPos);
+      camera.lookAt(endLook);
+      if (controls) {
+        controls.target.copy(endLook);
+        controls.update();
+      }
     },
-    [controls],
+    [camera, controls, endPos, endLook],
   );
 
   useFrame((_, delta) => {
@@ -83,6 +92,7 @@ export default function TownIntro({
     if (st.ended) return;
     const dt = Math.min(delta, 0.05);
     st.t += dt;
+    onTick?.(st.t);
     const { z, speed } = carAt(intro, st.t);
 
     // The car, heading north; wheels roll with its speed.
@@ -103,7 +113,7 @@ export default function TownIntro({
 
     const c = cam.current;
     if (st.t <= intro.cruise) {
-      chase(intro.x, z, _want, c.look);
+      chase(intro.x, z, _want, c.look, far);
       camera.position.copy(_want);
       camera.lookAt(c.look);
       return;

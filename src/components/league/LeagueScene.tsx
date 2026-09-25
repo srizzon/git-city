@@ -335,14 +335,14 @@ function HeroFraming() {
 
 // The intro car drives in through the city's portal; it ends on the orbit's own frame
 // for this screen, so nothing jumps.
-function IntroPlayer({ h, objects, color, tallest, onEnd }: { h: number; objects: CityObject[]; color: string; tallest: number; onEnd: () => void }) {
+function IntroPlayer({ h, objects, color, tallest, onEnd, onTick }: { h: number; objects: CityObject[]; color: string; tallest: number; onEnd: () => void; onTick?: (t: number) => void }) {
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
   const [plan] = useState(() => {
     const f = cameraFrame(h, aspect);
     const portal = objects.find((o) => o.item_type === "portal");
     return { intro: carIntro(portal?.pz ?? undefined), end: { pos: f.position.toArray(), look: f.target.toArray() } };
   });
-  return <TownIntro intro={plan.intro} end={plan.end} color={color} ceiling={tallest + 60} onEnd={onEnd} />;
+  return <TownIntro intro={plan.intro} end={plan.end} color={color} ceiling={tallest + 60} onEnd={onEnd} onTick={onTick} />;
 }
 
 // ─── Scene ───────────────────────────────────────────────────
@@ -361,6 +361,8 @@ export interface LeagueSceneProps {
   /** n: a new number replays it. color: the intro car's paint. */
   intro?: { n: number; color: string } | null;
   onIntroEnd?: () => void;
+  /** Seconds into the intro, every frame. */
+  onIntroTick?: (t: number) => void;
   objects: CityObject[];
   buildings: CityBuilding[];
   focused?: string | null;
@@ -386,6 +388,7 @@ export default function LeagueScene({
   onPortalClick,
   intro = null,
   onIntroEnd,
+  onIntroTick,
   objects,
   buildings,
   focused,
@@ -472,7 +475,7 @@ export default function LeagueScene({
         />
       )}
 
-      {playing && intro && <IntroPlayer key={intro.n} h={h} objects={objects} color={intro.color} tallest={tallest} onEnd={onIntroEnd ?? (() => {})} />}
+      {playing && intro && <IntroPlayer key={intro.n} h={h} objects={objects} color={intro.color} tallest={tallest} onEnd={onIntroEnd ?? (() => {})} onTick={onIntroTick} />}
       <LeagueGround h={h} theme={theme} />
       {approach.length > 0 && <ApproachGround theme={theme} />}
       <LeagueRoads objects={withApproach} markingColor={theme.roadMarkingColor} />

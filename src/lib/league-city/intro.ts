@@ -29,6 +29,8 @@ export interface CarIntro {
   stopZ: number;
   /** Seconds at cruise before the switch. */
   cruise: number;
+  /** Seconds until the car passes under the arch (the title's beat). */
+  crossAt: number;
   rise: number;
 }
 
@@ -38,7 +40,7 @@ export function carIntro(gateZ = LOT / 2): CarIntro {
   const switchZ = gateZ - PAST_ARCH;
   // Braking from cruise to zero over the rise covers cruise × rise / 2.
   const stopZ = switchZ - (CRUISE * RISE) / 2;
-  return { x: LANE, startZ, switchZ, stopZ, cruise: (startZ - switchZ) / CRUISE, rise: RISE };
+  return { x: LANE, startZ, switchZ, stopZ, cruise: (startZ - switchZ) / CRUISE, crossAt: (startZ - gateZ) / CRUISE, rise: RISE };
 }
 
 /** The car's z at time t (seconds), and its speed. */

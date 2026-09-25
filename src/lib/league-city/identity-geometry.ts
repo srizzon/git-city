@@ -21,7 +21,7 @@ export const FLAG = { poleH: 30, pole: 0.45, clothW: 15, clothH: 10 } as const;
  * many lots, outside the grid, so the portal reads as a way in. Drawn and
  * driven only; the editor and the SQL never see these lots.
  */
-export const APPROACH_LOTS = 7;
+export const APPROACH_LOTS = 4;
 
 /** Where the car starts when you have no building: on the approach, facing north through the portal. */
 export const ENTRANCE_SPAWN = { x: 0, z: 48 * 1.4, rot: 0 } as const;

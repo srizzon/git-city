@@ -6,7 +6,7 @@ describe("carIntro", () => {
   const c = carIntro();
 
   it("starts far out on the approach, well before the arch", () => {
-    expect(c.startZ - LOT / 2).toBeGreaterThan(5 * LOT);
+    expect(c.startZ - LOT / 2).toBeGreaterThan(3 * LOT);
   });
 
   it("switches a little past the arch and stops up the main street", () => {
@@ -23,10 +23,12 @@ describe("carIntro", () => {
     expect(carAt(c, c.cruise + c.rise).z).toBeCloseTo(c.stopZ);
     expect(carAt(c, c.cruise + c.rise).speed).toBeCloseTo(0);
     expect(carAt(c, 99).z).toBeCloseTo(c.stopZ);
+    expect(carAt(c, c.crossAt).z).toBeCloseTo(LOT / 2);
+    expect(c.crossAt).toBeLessThan(c.cruise);
   });
 
   it("lasts about 10 seconds", () => {
-    expect(introSeconds(c)).toBeGreaterThan(8);
+    expect(introSeconds(c)).toBeGreaterThan(6);
     expect(introSeconds(c)).toBeLessThan(13);
   });
 });
