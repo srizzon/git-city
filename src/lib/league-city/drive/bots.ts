@@ -32,6 +32,10 @@ const HALF = LOT / 2;
 /** Right-hand lane: this far right of the road's center line (city units). */
 const LANE = 6.5;
 const V_MAX = 13; // m/s
+/** Floor for U-turns at dead ends (m/s). */
+const U_TURN_V = 7;
+/** How much less often a bot turns into a dead end than into a street that goes on. */
+const DEAD_END_WEIGHT = 0.15;
 const A_LAT = 0.4 * 9.81;
 const WHEELBASE = 1.74;
 /** Samples per piece for arc length and curvature. */
@@ -160,6 +164,8 @@ function piece(x: number, z: number, din: Dir, dout: Dir): Piece {
   pc.len = pc.arc[N];
   pc.k = curvature(pc, 0.5);
   if (kmax > 1e-4) pc.vmax = Math.min(V_MAX, Math.sqrt(A_LAT / kmax));
+  // A U-turn is a quick swing, not a crawl.
+  if (din[0] === -dout[0] && din[1] === -dout[1]) pc.vmax = Math.max(pc.vmax, U_TURN_V);
   return pc;
 }
 
@@ -194,6 +200,16 @@ function pathToGate(g: RoadGraph, from: [number, number]): [number, number][] | 
     }
   }
   return null;
+}
+
+function pickWeighted<T>(items: T[], weight: (t: T) => number, rnd: () => number): T {
+  const w = items.map(weight);
+  let r = rnd() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < items.length; i++) {
+    r -= w[i];
+    if (r <= 0) return items[i];
+  }
+  return items[items.length - 1];
 }
 
 /** Pieces for a lot path (every lot but the ends), timed with speeds easing between them. */
@@ -248,7 +264,10 @@ export function planSlot(g: RoadGraph, seed: string, speedScale = 1): BotPlan | 
     } else {
       const din = back ? dirOf(back, cur) : g.gate ? ([0, -1] as Dir) : null;
       const straight = din ? options.find((n) => n[0] - cur[0] === din[0] && n[1] - cur[1] === din[1]) : undefined;
-      nextLot = straight && rnd() < 0.5 ? straight : options[Math.floor(rnd() * options.length)];
+      nextLot =
+        straight && rnd() < 0.5
+          ? straight
+          : pickWeighted(options, (n) => ((g.next.get(lotKey(n[0], n[1]))?.length ?? 0) <= 1 ? DEAD_END_WEIGHT : 1), rnd);
     }
     walk.push(nextLot);
   }
