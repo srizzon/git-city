@@ -433,6 +433,8 @@ const MAX_ALT = 900;
 // Speed reads through the lens, not the camera distance: the field of view
 // widens with speed (arcade flight / racing convention) plus a slight shake.
 const BASE_FOV = 55;
+// Projectile speed every client uses (ProjectileSwarm, BossEvent, BossMinions).
+const PROJECTILE_BASE_SPEED = 1200;
 // Sky coins spawn within this distance of downtown.
 const COIN_RADIUS = 8000;
 
@@ -756,7 +758,11 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
       const spawnX = pos.current.x + dirX * 30;
       const spawnY = pos.current.y + dirY * 30;
       const spawnZ = pos.current.z + dirZ * 30;
-      handler(spawnX, spawnY, spawnZ, dirX, dirY, dirZ);
+      // Shots inherit the plane's speed: every client moves a projectile at
+      // dir * 1200 u/s, so scaling dir adds the plane's velocity and a shot
+      // fired at boost speed still leaves ahead of the nose.
+      const inherit = 1 + curSpeed.current / PROJECTILE_BASE_SPEED;
+      handler(spawnX, spawnY, spawnZ, dirX * inherit, dirY * inherit, dirZ * inherit);
     };
 
     const startAutofire = () => {
