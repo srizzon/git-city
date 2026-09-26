@@ -58,7 +58,7 @@ export function GridTownCard({ town }: { town: GridTown }) {
         )}
         {town.cover && town.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={town.logoUrl} alt="" width={32} height={32} className="absolute top-2 left-2 h-8 w-8 border-2 border-bg [image-rendering:pixelated]" />
+          <img src={town.logoUrl} alt="" width={32} height={32} className="absolute top-2 left-2 h-8 w-8 [image-rendering:pixelated] drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
         )}
         {tags.length > 0 && (
           <div className="absolute top-2 right-2 flex gap-1">

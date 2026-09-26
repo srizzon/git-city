@@ -2,47 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Pending } from "@/components/leagues/PixelSpinner";
 import { NO_AUTOFILL } from "@/components/league/hud/shared";
 import type { TownCard } from "@/lib/towns/rows";
-import { isDesktop } from "./useDesktop";
 import { TownMeta } from "./TownCard";
 
 const BTN = "btn-press flex items-center justify-center gap-2 border-[3px] px-4 py-2.5 text-xs whitespace-nowrap";
 
 export default function DiscoverHeader() {
-  const [surprising, setSurprising] = useState(false);
-
-  async function surprise() {
-    setSurprising(true);
-    try {
-      const res = await fetch("/api/towns/surprise");
-      const { slug } = (await res.json()) as { slug: string | null };
-      if (slug) {
-        window.location.href = `/town/${slug}${isDesktop() ? "?drive=1" : ""}`;
-        return;
-      }
-    } catch {
-      // fall through to the new towns row
-    }
-    setSurprising(false);
-    document.getElementById("row-new")?.scrollIntoView({ behavior: "smooth" });
-  }
-
   return (
     <header className="mx-auto max-w-6xl px-4 pt-6 pb-8 sm:px-6">
       <nav className="flex items-center justify-between gap-3">
-        <Link href="/" className="text-sm text-muted transition-colors hover:text-cream">
+        <Link href="/" className="shrink-0 whitespace-nowrap text-sm text-muted transition-colors hover:text-cream">
           &larr; City
         </Link>
-        <div className="flex gap-2">
-          <button type="button" onClick={surprise} disabled={surprising} className={`${BTN} border-border text-cream hover:border-lime`}>
-            {surprising ? <Pending label="Picking" /> : "🎲 Surprise me"}
-          </button>
-          <Link href="/towns/new" className={`${BTN} border-lime bg-lime text-bg`}>
-            + Create a town
-          </Link>
-        </div>
+        <Link href="/towns/new" className={`${BTN} border-lime bg-lime text-bg`}>
+          + Create a town
+        </Link>
       </nav>
 
       <div className="mt-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
