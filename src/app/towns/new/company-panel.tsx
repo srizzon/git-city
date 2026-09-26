@@ -162,6 +162,7 @@ export function CityStepNote({ check, step }: { check: OrgCheck; step: CompanySt
               : "Pick its starter city. It's just you for now: colleagues move in when they check the org."}
         </p>
       )}
+      {step.kind === "open" && <p className="text-[11px] leading-relaxed text-muted normal-case">You already live here.</p>}
       {step.kind === "move_in" && (
         <p className="text-[11px] leading-relaxed text-muted normal-case">
           {step.invited ? "Your building is already there with the lights off. Move in to turn them on." : "Move in and your building joins its skyline."}

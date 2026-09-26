@@ -73,8 +73,8 @@ export default function NewTown({
   // A check only counts while the input still names its org.
   const check = company && lastCheck && lastCheck.org === normalizeOrgInput(orgInput) ? lastCheck : null;
   const step = companyStep(check);
-  // Step 2 is only for an org you can build or move into.
-  const cityStage = company && stage === "city" && (step.kind === "build" || step.kind === "move_in");
+  // Step 2 is for an org whose town you can build, move into or already live in.
+  const cityStage = company && stage === "city" && (step.kind === "build" || step.kind === "move_in" || step.kind === "open");
   // The org already has a town: the preview shows it, the city is already built.
   const existing = check?.account === "org" && check.town ? check.town : null;
   // Starter cities and settings: always for friends, step 2 of a new company town.
@@ -265,15 +265,10 @@ export default function NewTown({
       );
     }
     if (!cityStage) {
-      // Step 1 never builds: it moves on, opens your town, or checks again.
-      if (step.kind === "build" || step.kind === "move_in") {
+      // Step 1 never builds: it moves on to step 2, or checks again.
+      if (step.kind === "build" || step.kind === "move_in" || step.kind === "open") {
         setNotice(null);
         setStage("city");
-        return;
-      }
-      if (step.kind === "open") {
-        setBusy(true);
-        window.location.href = `/town/${step.slug}`;
         return;
       }
       if (step.kind === "removed") return;
@@ -281,6 +276,11 @@ export default function NewTown({
       return;
     }
     if (!check) return;
+    if (step.kind === "open") {
+      setBusy(true);
+      window.location.href = `/town/${step.slug}`;
+      return;
+    }
     const expect = step.kind === "build" ? "create" : "join";
     return go(
       "/api/leagues/verify/join",
@@ -308,18 +308,16 @@ export default function NewTown({
       : cityStage
         ? step.kind === "build"
           ? `Build ${check?.townLabel ?? "town"}`
-          : step.kind === "move_in" && step.leaving
-            ? `Move to ${check?.townLabel ?? "town"}`
-            : "Move in"
-        : step.kind === "open"
-          ? `Open ${check?.townLabel ?? "town"}`
-          : step.kind === "removed"
-            ? "Removed by the admin"
-            : step.kind === "not_member"
-              ? "Check again"
-              : step.kind === "github_down"
-                ? "Try again"
-                : "Continue";
+          : step.kind === "open"
+            ? `Open ${check?.townLabel ?? "town"}`
+            : step.kind === "move_in" && step.leaving
+              ? `Move to ${check?.townLabel ?? "town"}`
+              : "Move in"
+        : step.kind === "not_member"
+          ? "Check again"
+          : step.kind === "github_down"
+            ? "Try again"
+            : "Continue";
   const pending = !viewer
     ? "Opening GitHub"
     : checking
