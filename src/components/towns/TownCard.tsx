@@ -73,7 +73,7 @@ export function GridTownCard({ town }: { town: GridTown }) {
       <div className="flex flex-col gap-1.5 px-4 py-3">
         <p className="truncate text-sm text-cream normal-case">{town.name}</p>
         <p className="flex gap-3 text-[11px] text-muted">
-          <span className={town.kind === "company" ? "text-lime" : ""}>{town.kind === "company" ? "✓ Company" : "Friends"}</span>
+          <span className={town.kind === "company" ? "text-lime" : ""}>{town.kind === "company" ? "✓ Company" : town.country ? "Country" : "Group"}</span>
           {town.buildings !== null && <span>{town.buildings.toLocaleString("en-US")} buildings</span>}
         </p>
       </div>

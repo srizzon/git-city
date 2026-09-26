@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { GridTown } from "@/lib/towns/discover";
 import { GridTownCard } from "./TownCard";
 
-type Filter = "all" | "yours" | "company" | "custom";
+type Filter = "all" | "yours" | "country" | "company" | "custom";
 
 // Every town once, in one grid. Chips filter it instead of rows repeating it.
 export default function TownGrid({ towns }: { towns: GridTown[] }) {
@@ -13,10 +13,21 @@ export default function TownGrid({ towns }: { towns: GridTown[] }) {
   const chips: { id: Filter; label: string; n: number }[] = [
     { id: "all", label: "All", n: towns.length },
     { id: "yours", label: "Yours", n: towns.filter((t) => t.yours).length },
+    { id: "country", label: "Countries", n: towns.filter((t) => t.country).length },
     { id: "company", label: "Companies", n: towns.filter((t) => t.kind === "company").length },
-    { id: "custom", label: "Friends", n: towns.filter((t) => t.kind === "custom").length },
+    { id: "custom", label: "Groups", n: towns.filter((t) => t.kind === "custom" && !t.country).length },
   ];
-  const shown = towns.filter((t) => filter === "all" || (filter === "yours" ? t.yours : t.kind === filter));
+  const shown = towns.filter((t) =>
+    filter === "all"
+      ? true
+      : filter === "yours"
+        ? t.yours
+        : filter === "country"
+          ? !!t.country
+          : filter === "company"
+            ? t.kind === "company"
+            : t.kind === "custom" && !t.country,
+  );
   return (
     <section id="towns" className="mt-12 scroll-mt-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
