@@ -56,7 +56,7 @@ export async function checkCompanyOrg(viewer: { id: number; github_login: string
       .eq("org_login", org)
       .gte("verified_at", since)
       .maybeSingle(),
-    sb.from("leagues").select("id, slug, name").eq("kind", "company").eq("github_org", org).maybeSingle(),
+    sb.from("leagues").select("id, slug, name, scoring_mode, admin_id").eq("kind", "company").eq("github_org", org).maybeSingle(),
     sb
       .from("league_members")
       .select("league_id, leagues!inner(slug, name, kind)")
@@ -90,7 +90,13 @@ export async function checkCompanyOrg(viewer: { id: number; github_login: string
         .eq("developer_id", viewer.id)
         .maybeSingle(),
     ]);
-    town = { slug: league.slug as string, name: townDisplayName(league.name as string), buildings: count ?? 0 };
+    town = {
+      slug: league.slug as string,
+      name: townDisplayName(league.name as string),
+      buildings: count ?? 0,
+      scoring: league.scoring_mode === "contributions" ? "contributions" : "xp",
+      isAdmin: league.admin_id === viewer.id,
+    };
     if (row?.status === "active") standing = "member";
     else if (row?.status === "invited") standing = "invited";
     else if (row?.status === "former" && row.removed_by !== null) standing = "removed";

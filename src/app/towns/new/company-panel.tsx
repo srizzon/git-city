@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { SCORING_LABEL } from "@/lib/league-city/templates";
 import { NO_AUTOFILL } from "@/components/league/hud/shared";
 import type { OrgState } from "@/lib/towns/company-orgs";
 import { colleaguesLabel, type CompanyStep, type OrgCheck } from "@/lib/towns/company-step";
@@ -162,10 +164,29 @@ export function CityStepNote({ check, step }: { check: OrgCheck; step: CompanySt
               : "Pick its starter city. It's just you for now: colleagues move in when they check the org."}
         </p>
       )}
-      {step.kind === "open" && <p className="text-[11px] leading-relaxed text-muted normal-case">You already live here.</p>}
+      {check.town && (step.kind === "open" || step.kind === "move_in") && <TownFacts town={check.town} org={check.org} />}
+      {step.kind === "open" && (
+        <p className="text-[11px] leading-relaxed text-muted normal-case">
+          {check.town?.isAdmin
+            ? "You live here and run it. The city was picked when it was built: change it in the editor, and the race in settings."
+            : "You already live here. Its city and settings are set by the town's admin."}
+        </p>
+      )}
+      {step.kind === "open" && check.town?.isAdmin && (
+        <div className="flex gap-2">
+          <Link href={`/town/${check.town.slug}?edit=1`} className="btn-press flex-1 border-[3px] border-border px-3 py-2 text-center text-[10px] text-cream hover:border-muted">
+            Edit the city
+          </Link>
+          <Link href={`/town/${check.town.slug}/settings`} className="btn-press flex-1 border-[3px] border-border px-3 py-2 text-center text-[10px] text-cream hover:border-muted">
+            Settings
+          </Link>
+        </div>
+      )}
       {step.kind === "move_in" && (
         <p className="text-[11px] leading-relaxed text-muted normal-case">
-          {step.invited ? "Your building is already there with the lights off. Move in to turn them on." : "Move in and your building joins its skyline."}
+          {step.invited
+            ? "It's already built, so its city and settings come as they are. Your building is there with the lights off: move in to turn them on."
+            : "It's already built, so its city and settings come as they are. Move in and your building joins its skyline."}
         </p>
       )}
       {(step.kind === "build" || step.kind === "move_in") && step.leaving && (
@@ -174,6 +195,25 @@ export function CityStepNote({ check, step }: { check: OrgCheck; step: CompanySt
         </p>
       )}
     </div>
+  );
+}
+
+/** What an existing town already has: its size, how its race scores, who can join. */
+function TownFacts({ town, org }: { town: NonNullable<OrgCheck["town"]>; org: string }) {
+  const rows: [string, string][] = [
+    ["Buildings", String(town.buildings)],
+    ["Weekly race by", SCORING_LABEL[town.scoring]],
+    ["Who can join", `Members of @${org}`],
+  ];
+  return (
+    <dl className="flex flex-col border-[3px] border-border">
+      {rows.map(([k, v], i) => (
+        <div key={k} className={`flex items-center justify-between gap-3 px-3 py-2 text-[10px] ${i > 0 ? "border-t-2 border-border" : ""}`}>
+          <dt className="text-muted">{k}</dt>
+          <dd className="text-cream normal-case tabular-nums">{v}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

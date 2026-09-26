@@ -43,8 +43,8 @@ export interface OrgCheck {
    * null when neither shows it.
    */
   proof: "private" | "public" | null;
-  /** The org's company town, if it has one. */
-  town: { slug: string; name: string; buildings: number } | null;
+  /** The org's company town, if it has one, with how its race scores and whether the viewer runs it. */
+  town: { slug: string; name: string; buildings: number; scoring: "xp" | "contributions"; isAdmin: boolean } | null;
   standing: TownStanding;
   /** Another company town the viewer lives in (one per dev). */
   otherTown: { slug: string; name: string } | null;
