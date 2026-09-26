@@ -11,15 +11,17 @@ import {
   type ServerMsg,
 } from "../src/lib/league-city/drive/net";
 import { TRACK_ID, theTrack } from "../src/lib/league-city/race/track";
-import { newLapState, restartLaps, stepLaps, type LapState } from "../src/lib/league-city/race/laps";
+import { newLapState, restartLaps, startRaceLaps, stepLaps, type LapState } from "../src/lib/league-city/race/laps";
 import {
   RACE,
-  canStart,
   idleRace,
   inRace,
   jumpStart,
   leaveRace,
+  lobbyDue,
   raceLap,
+  roomChanged,
+  setReady,
   startRace,
   tickRace,
 } from "../src/lib/league-city/race/race";
@@ -38,8 +40,9 @@ import { randomNonce, signLapReceipt } from "./lapToken";
 // so a made-up name gets nothing. Guests race and show up in the room's
 // bests, never on the town's board.
 //
-// Races: see race.ts. Broadcast on every change and twice a second while one
-// runs, with each racer's distance for the standings.
+// Races: see race.ts. Drivers ready up; the lobby starts it with the ready
+// ones only. Broadcast on every change and twice a second while a lobby or a
+// race runs, with each racer's distance for the standings.
 
 interface Driver {
   name: string;
@@ -85,26 +88,60 @@ export default class RaceServer implements Party.Server {
     this.room.broadcast(JSON.stringify(msg));
   }
 
+  /** Everyone connected, in the order they came (the grid's tiebreak). */
+  private room_ids(): string[] {
+    return [...this.drivers.entries()].sort((a, b) => a[1].joined - b[1].joined).map(([id]) => id);
+  }
+
+  /** The lobby's time is up: the ready drivers line up. */
+  private startNow(now: number) {
+    const ready = new Set(this.race.ready);
+    const drivers = [...this.drivers.entries()]
+      .filter(([id]) => ready.has(id))
+      .sort((a, b) => a[1].joined - b[1].joined)
+      .map(([id, d]) => ({ id, name: d.name }));
+    if (!startRace(this.race, drivers, Object.fromEntries(this.bests), now, Math.random())) return;
+    this.slots.clear();
+    this.race.grid.forEach((id, i) => {
+      const g = track.grid[i];
+      this.slots.set(id, { x: g.x, z: g.z, placed: false });
+      const d = this.drivers.get(id);
+      if (d) {
+        restartLaps(d.laps);
+        d.auto = false;
+      }
+    });
+  }
+
   private runRaceClock() {
     if (this.raceTimer) return;
     let last = 0;
     this.raceTimer = setInterval(() => {
       const now = Date.now();
-      const changed = tickRace(this.race, now);
-      if (changed && this.race.phase === "live") {
-        // Lights out: the first crossing of the line starts everyone's lap 1.
-        for (const id of this.race.grid) {
-          const d = this.drivers.get(id);
-          if (d) restartLaps(d.laps);
+      let changed = false;
+      if (lobbyDue(this.race, now)) {
+        this.startNow(now);
+        changed = true;
+      }
+      if (tickRace(this.race, now)) {
+        changed = true;
+        if (this.race.phase === "live") {
+          // Lights out. On the grid, the first crossing of the line starts lap 1;
+          // a car that ended up past the line starts it now (laps.ts).
+          for (const id of this.race.grid) {
+            const d = this.drivers.get(id);
+            if (d) startRaceLaps(track, d.laps, this.race.startsAt);
+          }
+          this.slots.clear();
         }
-        this.slots.clear();
       }
       if (changed || now - last >= 500) {
         last = now;
         this.sendRace();
       }
-      if (this.race.phase === "over" || this.race.phase === "idle") {
-        if (this.raceTimer) clearInterval(this.raceTimer);
+      const busy = this.race.phase === "countdown" || this.race.phase === "live" || this.race.lobbyStartsAt > 0;
+      if (!busy && this.raceTimer) {
+        clearInterval(this.raceTimer);
         this.raceTimer = null;
       }
     }, 100);
@@ -188,23 +225,14 @@ export default class RaceServer implements Party.Server {
     if (!msg || typeof msg !== "object") return;
     const { t, name, to, x, z } = msg as Record<string, unknown>;
 
-    if (t === "race_start") {
-      const now = Date.now();
-      if (!this.drivers.has(sender.id) || !canStart(this.race, now)) return;
-      const drivers = [...this.drivers.entries()].sort((a, b) => a[1].joined - b[1].joined).map(([id, d]) => ({ id, name: d.name }));
-      if (!startRace(this.race, drivers, Object.fromEntries(this.bests), now, Math.random())) return;
-      this.slots.clear();
-      this.race.grid.forEach((id, i) => {
-        const g = track.grid[i];
-        this.slots.set(id, { x: g.x, z: g.z, placed: false });
-        const d = this.drivers.get(id);
-        if (d) {
-          restartLaps(d.laps);
-          d.auto = false;
-        }
-      });
-      this.sendRace();
-      this.runRaceClock();
+    // In (or out) for the next race. Nobody goes to a grid without saying so.
+    if (t === "ready") {
+      const on = (msg as Record<string, unknown>).on === true;
+      if (!this.drivers.has(sender.id)) return;
+      if (setReady(this.race, sender.id, on, this.room_ids(), Date.now())) {
+        this.sendRace();
+        this.runRaceClock();
+      }
       return;
     }
 
@@ -245,12 +273,16 @@ export default class RaceServer implements Party.Server {
     }
     this.drivers.set(sender.id, { name, state: null, lastState: 0, lastBump: 0, laps: newLapState(), joined: Date.now(), auto: false });
     this.room.broadcast(JSON.stringify({ t: "join", id: sender.id, name } satisfies ServerMsg), [sender.id]);
+    // A newcomer isn't ready yet; the lobby keeps its time.
+    if (roomChanged(this.race, this.room_ids(), Date.now())) this.sendRace();
   }
 
   onClose(conn: Connection) {
     if (!this.drivers.delete(conn.id)) return;
     this.slots.delete(conn.id);
-    if (leaveRace(this.race, conn.id)) this.sendRace();
+    const left = leaveRace(this.race, conn.id);
+    const lobby = roomChanged(this.race, this.room_ids(), Date.now());
+    if (left || lobby) this.sendRace();
     this.room.broadcast(JSON.stringify({ t: "leave", id: conn.id } satisfies ServerMsg));
   }
 }

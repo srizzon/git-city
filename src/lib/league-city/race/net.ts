@@ -1,6 +1,6 @@
 // ─── Race room protocol ─────────────────────────────────────
 // The race party (party/race.ts) speaks the drive room's protocol for cars
-// (hello, "s" states, bumps, and race_start; see drive/net.ts) plus these
+// (hello, "s" states, bumps, and ready; see drive/net.ts) plus these
 // messages.
 // Relative imports only (the PartyKit party bundles this file).
 

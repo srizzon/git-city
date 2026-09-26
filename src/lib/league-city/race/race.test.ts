@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TRACK, WALL_OFFSET, arcDelta, locate, locateNear, pointAt, theTrack } from "./track";
-import { formatLap, minLapMs, newLapState, stepLaps, type LapEvent, type LapState } from "./laps";
-import { RACE, idleRace, jumpStart, litLights, raceLap, standings, startRace, tickRace } from "./race";
+import { formatLap, minLapMs, newLapState, startRaceLaps, stepLaps, type LapEvent, type LapState } from "./laps";
+import { RACE, idleRace, jumpStart, litLights, lobbyDue, raceLap, roomChanged, setReady, standings, startRace, tickRace } from "./race";
 
 const track = theTrack();
 
@@ -158,5 +158,76 @@ describe("ghost", () => {
     expect(ghostAt(run, 5000)).toBeNull();
     expect(medalFor(30_000)).toBe("gold");
     expect(medalFor(99_000)).toBeNull();
+  });
+});
+
+describe("lobby", () => {
+  const room = ["a", "b", "c"];
+  it("needs two ready, then waits the lobby", () => {
+    const s = idleRace();
+    expect(setReady(s, "a", true, room, 1000)).toBe(true);
+    expect(s.lobbyStartsAt).toBe(0);
+    setReady(s, "b", true, room, 2000);
+    expect(s.lobbyStartsAt).toBe(2000 + RACE.lobbyMs);
+    expect(lobbyDue(s, 2000 + RACE.lobbyMs - 1)).toBe(false);
+    expect(lobbyDue(s, 2000 + RACE.lobbyMs)).toBe(true);
+  });
+
+  it("starts sooner once everyone in the room is ready, never later", () => {
+    const s = idleRace();
+    setReady(s, "a", true, room, 0);
+    setReady(s, "b", true, room, 0);
+    setReady(s, "c", true, room, 1000);
+    expect(s.lobbyStartsAt).toBe(1000 + RACE.allReadyMs);
+  });
+
+  it("cancels when it drops under two, and forgets who left", () => {
+    const s = idleRace();
+    setReady(s, "a", true, room, 0);
+    setReady(s, "b", true, room, 0);
+    roomChanged(s, ["a", "c"], 500);
+    expect(s.ready).toEqual(["a"]);
+    expect(s.lobbyStartsAt).toBe(0);
+  });
+
+  it("waits out the last race's results", () => {
+    const s = idleRace();
+    s.phase = "over";
+    s.endsAt = 10_000;
+    setReady(s, "a", true, room, 10_500);
+    setReady(s, "b", true, room, 10_500);
+    setReady(s, "c", true, room, 10_500);
+    expect(s.lobbyStartsAt).toBe(10_000 + RACE.over);
+  });
+
+  it("takes no ready during a race, and a race clears the list", () => {
+    const s = idleRace();
+    setReady(s, "a", true, room, 0);
+    setReady(s, "b", true, room, 0);
+    startRace(s, [{ id: "a", name: "a" }, { id: "b", name: "b" }], {}, RACE.lobbyMs, 0);
+    expect(s.ready).toEqual([]);
+    expect(setReady(s, "c", true, room, RACE.lobbyMs + 1)).toBe(false);
+  });
+});
+
+describe("startRaceLaps", () => {
+  it("keeps the grid's first crossing as the start", () => {
+    const st = newLapState();
+    const g = track.grid[3];
+    stepLaps(track, st, g.x, g.z, 0);
+    startRaceLaps(track, st, 100);
+    expect(st.lapStart).toBeNull();
+    const { events } = drive(st, st.s!, 20, 20, 200);
+    expect(events.some((e) => e.t === "start")).toBe(true);
+  });
+
+  it("counts lap 1 from lights out for a car shoved over the line", () => {
+    const st = newLapState();
+    const p = pointAt(track, 15);
+    stepLaps(track, st, p.x, p.z, 0);
+    startRaceLaps(track, st, 100);
+    expect(st.lapStart).toBe(100);
+    const { events } = drive(st, 15, track.length, 25, 200);
+    expect(events.filter((e) => e.t === "lap")).toHaveLength(1);
   });
 });

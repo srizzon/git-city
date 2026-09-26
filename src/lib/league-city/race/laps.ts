@@ -72,6 +72,19 @@ export function restartLaps(st: LapState): void {
   st.wrongWay = false;
 }
 
+/**
+ * Lights out for a car on the grid. Short of the line (where the grid is):
+ * the first crossing starts lap 1, as ever. Already past it (shoved over
+ * before the start): lap 1 runs from lights out and the checkpoints count
+ * from where the car is, so nobody loses a lap to where they stood.
+ */
+export function startRaceLaps(t: Track, st: LapState, at: number): void {
+  restartLaps(st);
+  if (st.s === null || arcDelta(t, st.s, 0) > 0) return;
+  st.lapStart = at;
+  st.next = nextCheckpoint(t, st.s);
+}
+
 /** The fastest lap any car could drive (ms). */
 export function minLapMs(t: Track): number {
   return Math.floor((t.length / LAP_RULES.maxSpeed) * 1000);

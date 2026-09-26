@@ -3,8 +3,11 @@
 // machine and times every lap itself (laps.ts); clients render it.
 // Relative imports only (the PartyKit party bundles this file).
 //
-// - Anyone on the track starts one. The grid is set by the best lap each
-//   driver has done in this room (no lap: to the back, in the order they came).
+// - Drivers opt in with Ready. With RACE.minRacers ready, a short lobby
+//   counts down (shorter once everyone in the room is ready), then only the
+//   ready drivers go to the grid; everyone else keeps practicing. The grid is
+//   set by the best lap each driver has done in this room (no lap: to the
+//   back, in the order they came).
 // - Everyone on the grid is placed on their slot and held there; five red
 //   lights come on one a second, then go out after a short random wait.
 // - Moving off your slot before the lights go out is a jump start: +5 s.
@@ -29,6 +32,13 @@ export const RACE = {
   /** Farther than this (m) from your slot before lights out: jump start. */
   jumpStart: 4,
   penaltyMs: 5_000,
+  /** Ready drivers needed for a race. */
+  minRacers: 2,
+  /** The lobby's wait once enough are ready (ms), and once everyone in the room is. */
+  lobbyMs: 10_000,
+  allReadyMs: 3_000,
+  /** Cars pass through each other this long after lights out (ms), so the grid gets away clean. */
+  startGraceMs: 3_000,
 } as const;
 
 export type RacePhase = "idle" | "countdown" | "live" | "over";
@@ -59,10 +69,58 @@ export interface RaceState {
   finished: Finisher[];
   /** Racers who left before finishing. */
   out: string[];
+  /** Idle or over: who's ready for the next race, and when it starts (server ms, 0 = not yet). */
+  ready: string[];
+  lobbyStartsAt: number;
 }
 
 export function idleRace(): RaceState {
-  return { phase: "idle", lightsAt: 0, startsAt: 0, endsAt: 0, grid: [], names: {}, laps: {}, penalty: {}, finished: [], out: [] };
+  return { phase: "idle", lightsAt: 0, startsAt: 0, endsAt: 0, grid: [], names: {}, laps: {}, penalty: {}, finished: [], out: [], ready: [], lobbyStartsAt: 0 };
+}
+
+/**
+ * A driver says they're in (or out) for the next race. Only between races.
+ * `room`: everyone connected, in the order they came. Returns true when it changed.
+ */
+export function setReady(s: RaceState, id: string, on: boolean, room: readonly string[], now: number): boolean {
+  if (s.phase === "countdown" || s.phase === "live") return false;
+  if (!room.includes(id) && on) return false;
+  const had = s.ready.includes(id);
+  if (had === on) return false;
+  s.ready = on ? [...s.ready, id] : s.ready.filter((r) => r !== id);
+  relobby(s, room, now);
+  return true;
+}
+
+/** Someone came or went: drop who's gone from the ready list and re-time the lobby. */
+export function roomChanged(s: RaceState, room: readonly string[], now: number): boolean {
+  if (s.phase === "countdown" || s.phase === "live") return false;
+  const before = `${s.ready.join()}|${s.lobbyStartsAt}`;
+  s.ready = s.ready.filter((id) => room.includes(id));
+  relobby(s, room, now);
+  return `${s.ready.join()}|${s.lobbyStartsAt}` !== before;
+}
+
+/**
+ * The lobby's clock. Under RACE.minRacers ready: none. Enough: lobbyMs from
+ * when it filled, never later once set; everyone ready: allReadyMs. Never
+ * before the last race's results have had their RACE.over.
+ */
+function relobby(s: RaceState, room: readonly string[], now: number): void {
+  if (s.ready.length < RACE.minRacers) {
+    s.lobbyStartsAt = 0;
+    return;
+  }
+  const earliest = s.phase === "over" ? s.endsAt + RACE.over : now;
+  const all = room.length > 0 && room.every((id) => s.ready.includes(id));
+  const want = Math.max(earliest, now + (all ? RACE.allReadyMs : RACE.lobbyMs));
+  s.lobbyStartsAt = s.lobbyStartsAt ? Math.min(s.lobbyStartsAt, want) : want;
+  if (s.lobbyStartsAt < earliest) s.lobbyStartsAt = earliest;
+}
+
+/** The lobby's time is up: start the race with the ready drivers. */
+export function lobbyDue(s: RaceState, now: number): boolean {
+  return (s.phase === "idle" || s.phase === "over") && s.lobbyStartsAt > 0 && now >= s.lobbyStartsAt && s.ready.length >= RACE.minRacers;
 }
 
 export function canStart(s: RaceState, now: number): boolean {
