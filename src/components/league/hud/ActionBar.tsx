@@ -15,6 +15,8 @@ const ICON_BTN = `${SEG} w-10 justify-center py-2`;
 const PRIMARY_BTN =
   "flex items-center gap-2 bg-lime px-3 py-2 text-[10px] text-bg transition-[filter] hover:brightness-110 sm:px-4 [&>*]:transition-transform active:[&>*]:translate-y-px";
 const ICON = { size: 14, strokeWidth: 2.5 } as const;
+// The race track stays reachable by URL; the button is hidden for now.
+const SHOW_RACE = false;
 
 export default function ActionBar({
   slug,
@@ -162,7 +164,7 @@ export default function ActionBar({
           )}
         </button>
       )}
-      {onDrive && desktop && (
+      {SHOW_RACE && onDrive && desktop && (
         <Link
           href={`/town/${slug}/race`}
           onClick={(e) => {
