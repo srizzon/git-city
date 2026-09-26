@@ -128,7 +128,9 @@ export default function RaceClient({
   const introSeen = useRef(false);
   const [feed, setFeed] = useState<LapFeedItem[]>([]);
   const [saved, setSaved] = useState<{ ms: number; rank: number; improved: boolean; at: number } | null>(null);
-  const startRef = useRef<(() => void) | null>(null);
+  const startRef = useRef<((on: boolean) => void) | null>(null);
+  // "Race again" opens the menu on the live race.
+  const [menuFocus, setMenuFocus] = useState<"trial" | "live">("trial");
   const restartRef = useRef<(() => void) | null>(null);
   const [guest] = useState(() => `guest-${Math.random().toString(36).slice(2, 6).padEnd(4, "0")}`);
   const name = viewerLogin ?? guest;
@@ -183,10 +185,17 @@ export default function RaceClient({
   useEffect(() => router.prefetch(`/town/${slug}`), [router, slug]);
 
   // Past the line the autopilot has the car, so R (again) and M (menu) come from here.
+  // The last live race's results stay up (with their own keys) until you pick what's next.
+  const [closedRace, setClosedRace] = useState(0);
+  const raceFinish =
+    !!race?.you &&
+    race.race.grid.includes(race.you) &&
+    (race.race.phase === "live" || race.race.phase === "over") &&
+    closedRace !== race.race.startsAt;
   useEffect(() => {
     if (trial.stage !== "finish") return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.repeat) return;
+      if (e.repeat || raceFinish) return;
       if (e.code === "KeyR") restartRef.current?.();
       if (e.code === "KeyM") menuRef.current?.();
     };
@@ -198,7 +207,7 @@ export default function RaceClient({
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [trial.stage]);
+  }, [trial.stage, raceFinish]);
 
   // Time trial from the menu: the flyover the first time (any key skips it), then straight to 3-2-1.
   const begin = useCallback(() => {
@@ -216,6 +225,12 @@ export default function RaceClient({
   );
   const toMenu = useCallback(() => {
     setPaused(false);
+    setMenuFocus("trial");
+    menuRef.current?.();
+  }, []);
+  const toLobby = useCallback(() => {
+    setPaused(false);
+    setMenuFocus("live");
     menuRef.current?.();
   }, []);
   useEffect(() => {
@@ -414,7 +429,11 @@ export default function RaceClient({
         members={members}
         rival={rival ? { login: rival.login, ms: rival.run.ms } : null}
         you={name}
-        onStart={() => startRef.current?.()}
+        onReady={(on) => startRef.current?.(on)}
+        onLobby={toLobby}
+        closedRace={closedRace}
+        onCloseRace={setClosedRace}
+        menuFocus={menuFocus}
         onRestart={() => restartRef.current?.()}
         onResume={() => setPaused(false)}
         onCamera={toggleCamera}

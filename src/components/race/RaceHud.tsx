@@ -9,6 +9,7 @@ import CopyLink from "@/components/league/hud/drive/CopyLink";
 import type { RaceCameraMode } from "./RaceCamera";
 import Minimap from "./Minimap";
 import RaceMenu from "./RaceMenu";
+import { LobbyStatus, RaceResults } from "./RaceLobby";
 import TransitScreen from "@/components/league/hud/TransitScreen";
 import { TURBO } from "@/lib/league-city/drive/tuning";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
@@ -16,7 +17,7 @@ import type { BoardRow } from "@/lib/league-city/race/board";
 import { MEDALS, MEDAL_COLORS, medalFor } from "@/lib/league-city/race/ghost";
 import { formatLap } from "@/lib/league-city/race/laps";
 import type { RoomBests } from "@/lib/league-city/race/net";
-import { RACE, canStart, inRace, standings } from "@/lib/league-city/race/race";
+import { RACE, inRace, standings } from "@/lib/league-city/race/race";
 import {
   RUN_LAPS,
   type LapNews,
@@ -78,6 +79,7 @@ export default function RaceHud({
   run,
   stage,
   finishBeat,
+  menuFocus = "trial",
   onBegin,
   onMenu,
   onRaceGhost,
@@ -87,7 +89,10 @@ export default function RaceHud({
   members,
   rival,
   you,
-  onStart,
+  onReady,
+  onLobby,
+  closedRace,
+  onCloseRace,
   onRestart,
   onResume,
   onCamera,
@@ -118,6 +123,8 @@ export default function RaceHud({
   stage: TrialStage;
   /** After the line: 0 FINISH, 1 banner gone, 2 results in. */
   finishBeat: number;
+  /** Which menu item opens first (the live race after "Race again"). */
+  menuFocus?: "trial" | "live";
   onBegin: () => void;
   onMenu: () => void;
   onRaceGhost: (login: string) => void;
@@ -127,7 +134,13 @@ export default function RaceHud({
   members: { login: string; avatar_url: string | null }[];
   rival: { login: string; ms: number } | null;
   you: string;
-  onStart: () => void;
+  /** In or out for the next live race. */
+  onReady: (on: boolean) => void;
+  /** Back to the menu, on the live race's panel. */
+  onLobby: () => void;
+  /** The race whose results were closed (its startsAt), and closing one. */
+  closedRace: number;
+  onCloseRace: (startsAt: number) => void;
   onRestart: () => void;
   onResume: () => void;
   onCamera: () => void;
@@ -248,7 +261,11 @@ export default function RaceHud({
   }, []);
 
   const serverNow = now + (race?.offset ?? 0);
-  const startable = !!r && canStart(r, serverNow);
+  // The last race's results, until you pick what's next.
+  const wasOnGrid = !!(r && me && r.grid.includes(me) && (r.phase === "live" || r.phase === "over") && closedRace !== r.startsAt);
+  const iFinished = !!(r && me && r.finished.some((f) => f.id === me));
+  const showResults =
+    !!r && wasOnGrid && (r.phase === "over" || (iFinished && stage === "finish" && finishBeat === 2));
   const order =
     r && (r.phase === "live" || r.phase === "over")
       ? standings(r, race?.progress ?? {}, theTrack().length)
@@ -437,50 +454,15 @@ export default function RaceHud({
           </section>
 
           <section className={`${HUD_BOX} px-3 py-2.5`}>
-            <p className="flex items-center gap-2 text-[9px] text-cream">
+            <p className="mb-2 flex items-center gap-2 text-[9px] text-cream">
               <span className="h-1.5 w-1.5 animate-pulse bg-lime" aria-hidden />
-              {drivers.length + 1} on track
+              {drivers.length + 1} on track · live race
             </p>
-            {drivers.length === 0 ? (
-              <div className="mt-2 flex flex-col items-start gap-1.5">
-                <p className="text-[9px] normal-case text-dim">Share the link to race your team.</p>
+            <LobbyStatus race={r} me={me} you={you} drivers={drivers} serverNow={serverNow} onReady={onReady} />
+            {drivers.length === 0 && (
+              <div className="mt-2">
                 <CopyLink />
               </div>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {drivers.slice(0, 6).map((d) => {
-                  const b = bests.find(([n]) => n === d.name.toLowerCase())?.[1];
-                  return (
-                    <li key={d.id} className="flex items-center gap-1.5 text-[9px] text-muted">
-                      <span
-                        className="h-2 w-2"
-                        style={{ background: carColor(d.name) }}
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1 truncate normal-case">{who(d.name)}</span>
-                      {b && <span className="tabular-nums text-cream">{formatLap(b)}</span>}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {startable && drivers.length > 0 && (
-              <button
-                type="button"
-                onClick={onStart}
-                className="pointer-events-auto mt-2.5 flex w-full items-center justify-center gap-2 bg-lime px-3 py-2 text-[10px] text-bg transition-[filter] hover:brightness-110 active:translate-y-px"
-              >
-                <Flag {...ICON} aria-hidden />
-                Race them · {RACE.laps} laps
-              </button>
-            )}
-            {r?.phase === "countdown" && (
-              <p className="mt-2.5 text-center text-[9px] text-lime">Grid forming…</p>
-            )}
-            {r?.phase === "live" && !racing && (
-              <p className="mt-2.5 text-center text-[9px] text-muted">
-                Race on. Next one after the flag.
-              </p>
             )}
           </section>
 
@@ -554,11 +536,13 @@ export default function RaceHud({
           members={members}
           drivers={drivers}
           rival={rival}
-          startable={startable}
-          raceOn={r?.phase === "live" || r?.phase === "countdown"}
+          race={r}
+          me={me}
+          serverNow={serverNow}
+          focus={menuFocus}
           onBegin={onBegin}
           onRaceGhost={onRaceGhost}
-          onStartRace={onStart}
+          onReady={onReady}
           onExit={onExit}
         />
       )}
@@ -613,7 +597,7 @@ export default function RaceHud({
       )}
 
       {/* Time trial results, over the car driving itself */}
-      {run && !racing && stage === "finish" && finishBeat === 2 && (
+      {run && !racing && !wasOnGrid && stage === "finish" && finishBeat === 2 && (
         <TrialCard
           run={run}
           ghostMs={ghostMs}
@@ -636,43 +620,22 @@ export default function RaceHud({
         </div>
       )}
 
-      {/* Results */}
-      {((r?.phase === "over" && r.finished.length > 0 && serverNow - r.endsAt < 20_000) ||
-        (r && racing && stage === "finish" && finishBeat === 2)) && (
-        <section
-          className={`${HUD_BOX} absolute left-1/2 top-[30%] w-[300px] -translate-x-1/2 px-4 py-3`}
-        >
-          <p className="text-center text-[10px] text-lime">Chequered flag</p>
-          {r.phase === "over" && (
-            <p className="mt-1 text-center text-[9px] text-muted">
-              <span className="text-cream">R</span> to drive again
-            </p>
-          )}
-          <ol className="mt-2 space-y-1">
-            {r.finished.map((f, i) => (
-              <li
-                key={f.id}
-                className={`flex items-center gap-2 text-[10px] ${f.id === me ? "text-lime" : "text-cream"}`}
-              >
-                <span className="w-5 text-muted">P{i + 1}</span>
-                <span className="min-w-0 flex-1 truncate normal-case">{who(f.name)}</span>
-                {r.penalty[f.id] ? <span className="text-[8px] text-[#ff6b6b]">+5s</span> : null}
-                <span className="tabular-nums">{formatLap(f.ms)}</span>
-              </li>
-            ))}
-            {r.grid
-              .filter((id) => !r.finished.some((f) => f.id === id))
-              .map((id) => (
-                <li key={id} className="flex items-center gap-2 text-[10px] text-dim">
-                  <span className="w-5">-</span>
-                  <span className="min-w-0 flex-1 truncate normal-case">
-                    {who(r.names[id] ?? id)}
-                  </span>
-                  <span>{r.phase === "over" ? "DNF" : "Racing…"}</span>
-                </li>
-              ))}
-          </ol>
-        </section>
+      {/* Results: everyone who was on the grid, until they pick what's next */}
+      {showResults && r && (
+        <RaceResults
+          race={r}
+          me={me}
+          serverNow={serverNow}
+          onAgain={() => {
+            onCloseRace(r.startsAt);
+            onReady(true);
+            onLobby();
+          }}
+          onMenu={() => {
+            onCloseRace(r.startsAt);
+            onMenu();
+          }}
+        />
       )}
 
       {/* Mini-turbo fired */}

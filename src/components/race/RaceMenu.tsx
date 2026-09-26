@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flag, Ghost as GhostIcon, Swords } from "lucide-react";
+import { Ghost as GhostIcon, Swords } from "lucide-react";
 import { HUD_BOX } from "@/components/league/hud/shared";
 import CopyLink from "@/components/league/hud/drive/CopyLink";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import type { BoardRow } from "@/lib/league-city/race/board";
 import { MEDALS, MEDAL_COLORS, medalFor } from "@/lib/league-city/race/ghost";
 import { formatLap } from "@/lib/league-city/race/laps";
-import { RACE } from "@/lib/league-city/race/race";
+import { RACE, type RaceState } from "@/lib/league-city/race/race";
+import { LobbyStatus } from "./RaceLobby";
 import { RUN_LAPS } from "@/lib/league-city/race/telemetry";
 
 // The race track's menu, over the hero shot between the letterbox bars, after
@@ -23,7 +24,6 @@ type Tab = "week" | "all";
 
 const signed = (ms: number) => `${ms < 0 ? "-" : "+"}${(Math.abs(ms) / 1000).toFixed(3)}`;
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-const who = (name: string) => (name.startsWith("guest-") ? "guest" : `@${name}`);
 
 export interface RaceMenuProps {
   slug: string;
@@ -39,12 +39,16 @@ export interface RaceMenuProps {
   members: { login: string; avatar_url: string | null }[];
   drivers: DriverInfo[];
   rival: { login: string; ms: number } | null;
-  /** A live race can start now; one is under way. */
-  startable: boolean;
-  raceOn: boolean;
+  /** The room's race and lobby, your connection id and the server's clock. */
+  race: RaceState | null;
+  me: string | null;
+  serverNow: number;
+  /** The item selected when the menu opens. */
+  focus?: "trial" | "live";
   onBegin: () => void;
   onRaceGhost: (login: string) => void;
-  onStartRace: () => void;
+  /** In or out for the next live race. */
+  onReady: (on: boolean) => void;
   onExit: () => void;
 }
 
@@ -56,7 +60,7 @@ export default function RaceMenu(p: RaceMenuProps) {
     { id: "drivers", label: "Drivers" },
     { id: "exit", label: "Back to town" },
   ];
-  const [sel, setSel] = useState(0);
+  const [sel, setSel] = useState(p.focus === "live" ? 1 : 0);
   const [tab, setTab] = useState<Tab>("week");
   const cur = items[sel].id;
 
@@ -64,7 +68,8 @@ export default function RaceMenu(p: RaceMenuProps) {
   useEffect(() => {
     act.current = (id) => {
       if (id === "trial") p.onBegin();
-      else if (id === "live" && p.startable && p.drivers.length > 0) p.onStartRace();
+      else if (id === "live" && p.drivers.length > 0 && p.race?.phase !== "countdown" && p.race?.phase !== "live")
+        p.onReady(!(p.me && p.race?.ready.includes(p.me)));
       else if (id === "exit") p.onExit();
     };
   });
@@ -210,39 +215,18 @@ function TrialPanel({ pb, board, week, you, rival, onBegin, signedIn }: RaceMenu
   );
 }
 
-function LivePanel({ drivers, you, startable, raceOn, onStartRace }: RaceMenuProps) {
+function LivePanel({ drivers, you, race, me, serverNow, onReady }: RaceMenuProps) {
   return (
     <>
       <PanelTitle>Live race · {RACE.laps} laps</PanelTitle>
-      <p className="text-[11px] normal-case text-muted">Everyone on the track lines up on the grid. Lights out, first to the flag wins.</p>
-      <ul className="mt-4 space-y-1.5">
-        <li className="flex items-center gap-2 text-xs text-lime">
-          <span className="h-2.5 w-2.5" style={{ background: carColor(you) }} aria-hidden />
-          <span className="normal-case">{who(you)} (you)</span>
-        </li>
-        {drivers.map((d) => (
-          <li key={d.id} className="flex items-center gap-2 text-xs text-cream">
-            <span className="h-2.5 w-2.5" style={{ background: carColor(d.name) }} aria-hidden />
-            <span className="normal-case">{who(d.name)}</span>
-          </li>
-        ))}
-      </ul>
-      {raceOn ? (
-        <p className="mt-5 text-center text-[11px] text-muted">Race on. Next one after the flag.</p>
-      ) : drivers.length === 0 ? (
-        <div className="mt-5 flex flex-col items-start gap-2">
-          <p className="text-[11px] normal-case text-dim">Nobody else on the track. Share the link to race your team.</p>
+      <p className="mb-4 text-[11px] normal-case text-muted">
+        Ready up and the race starts once {RACE.minRacers} of you are. Only the ready ones line up; lights out, first to the flag wins.
+      </p>
+      <LobbyStatus race={race} me={me} you={you} drivers={drivers} serverNow={serverNow} onReady={onReady} big />
+      {drivers.length === 0 && (
+        <div className="mt-3">
           <CopyLink />
         </div>
-      ) : (
-        <button
-          type="button"
-          disabled={!startable}
-          onClick={onStartRace}
-          className="mt-5 flex items-center justify-center gap-2 bg-lime px-4 py-3 text-xs text-bg transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40"
-        >
-          <Flag size={13} strokeWidth={2.5} aria-hidden /> Race them
-        </button>
       )}
     </>
   );
