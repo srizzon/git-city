@@ -1,4 +1,5 @@
 import "server-only";
+import { isAdminGithubLogin } from "@/lib/admin";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getAuthedDeveloper } from "@/lib/auth-identity";
 import { FETCH_TIMEOUT_MS, GitHubFetchError, ghHeaders } from "@/lib/github-api";
@@ -58,6 +59,8 @@ export interface Viewer {
 export const MAX_CUSTOM_LEAGUES = 5;
 /** Every invite counts, found or not, so the GitHub lookups behind them are capped too. */
 export const MAX_INVITES_PER_DAY = 20;
+/** Site admins (ADMIN_GITHUB_LOGINS) seed the launch towns: their town and invite caps are this high instead. */
+const STAFF_CAP = 1000;
 export const MAX_LEAGUES_CREATED_PER_DAY = 5;
 
 /** Every league column except invite_token, which only the admin may read. */
@@ -193,13 +196,15 @@ export async function createCustomLeague(
   const slug = await uniqueSlug(isReservedSlug(base) || (await isGithubOrg(base)) ? `${base}-town` : base);
 
   // Limits and inserts in one locked call, so parallel creates can't slip past.
+  // Site admins seed the launch towns, so their caps are off.
+  const staff = isAdminGithubLogin(viewer.github_login);
   const sb = getSupabaseAdmin();
   const { data: id, error } = await sb.rpc("league_create_custom", {
     p_dev_id: viewer.id,
     p_slug: slug,
     p_name: name,
-    p_max_per_day: MAX_LEAGUES_CREATED_PER_DAY,
-    p_max_memberships: MAX_CUSTOM_LEAGUES,
+    p_max_per_day: staff ? STAFF_CAP : MAX_LEAGUES_CREATED_PER_DAY,
+    p_max_memberships: staff ? STAFF_CAP : MAX_CUSTOM_LEAGUES,
   });
   if (error) {
     if (error.message === "limit") throw new LeagueError("limit", `You can be in up to ${MAX_CUSTOM_LEAGUES} custom towns.`, 403);
@@ -270,7 +275,7 @@ export async function joinLeague(
 
   // The count is locked, but the upsert below runs after the lock is gone, so
   // two joins at the same instant could go one league over. Harmless.
-  if (!(await takeQuota(viewer.id, "membership", MAX_CUSTOM_LEAGUES))) {
+  if (!isAdminGithubLogin(viewer.github_login) && !(await takeQuota(viewer.id, "membership", MAX_CUSTOM_LEAGUES))) {
     throw new LeagueError("limit", `You can be in up to ${MAX_CUSTOM_LEAGUES} custom towns.`, 403);
   }
 
@@ -390,8 +395,8 @@ export async function inviteMember(
   const me = await getMembership(league.id, viewer.id);
   if (me?.status !== "active") throw new LeagueError("not_member", "Only town members can invite.", 403);
 
-  // Counted before the GitHub lookup, whatever the outcome.
-  if (!(await takeQuota(viewer.id, "invite", MAX_INVITES_PER_DAY))) {
+  // Counted before the GitHub lookup, whatever the outcome. Site admins seeding towns skip it.
+  if (!isAdminGithubLogin(viewer.github_login) && !(await takeQuota(viewer.id, "invite", MAX_INVITES_PER_DAY))) {
     throw new LeagueError("invite_limit", `You can send ${MAX_INVITES_PER_DAY} invites a day. Try again tomorrow.`, 429);
   }
 
