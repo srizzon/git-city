@@ -24,12 +24,24 @@ describe("canPlace", () => {
 });
 
 describe("freeLotsInOrder", () => {
-  it("puts road-touching lots first, nearest the entrance", () => {
+  it("puts road-touching lots first, nearest the middle of the city", () => {
     const roads = new Set([lotKey(3, -3)]);
     const lots = freeLotsInOrder(new Set(roads), roads, bounds(6));
-    expect(lots[0]).toEqual([3, -2]);
     expect(lots.slice(0, 4).every(([x, z]) => Math.abs(x - 3) + Math.abs(z + 3) === 1)).toBe(true);
-    expect(lots[4]).toEqual([0, 0]);
+    expect(lots[0]).toEqual([2, -3]);
+    // Then the lots around the center (z between -6 and -5 on a 12-deep grid), not the gate.
+    const [x, z] = lots[4];
+    expect(Math.abs(x)).toBeLessThanOrEqual(1);
+    expect(z === -6 || z === -5).toBe(true);
+  });
+
+  it("starts a town with a main street at its center, not at the gate", () => {
+    const b = bounds(6);
+    const roads = new Set<string>();
+    for (let z = b.z0; z <= b.z1; z++) roads.add(lotKey(0, z));
+    const [x, z] = freeLotsInOrder(new Set(roads), roads, b)[0];
+    expect(Math.abs(x)).toBe(1);
+    expect(Math.abs(2 * z - (b.z0 + b.z1))).toBeLessThanOrEqual(1);
   });
 });
 

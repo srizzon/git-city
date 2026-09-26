@@ -17,7 +17,7 @@ type InviteState =
 
 /** What happens to whoever opens the group link, by who shares it and the town's setting. */
 function groupHint(kind: "company" | "custom", mode: JoinMode, isAdmin: boolean): string {
-  if (kind === "company") return "Colleagues open it and verify on GitHub to move in.";
+  if (kind === "company") return "Colleagues open it, show they're in the org on GitHub and move in. It takes a minute.";
   if (isAdmin) return "Anyone who opens it moves straight in. Make a new one in settings to turn it off.";
   if (mode === "open") return "Anyone who opens it can join.";
   if (mode === "request") return "People who open it can ask to join. The admin lets them in.";

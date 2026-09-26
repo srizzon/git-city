@@ -74,18 +74,13 @@ async function activeCompanyLeagueId(devId: number): Promise<string | null> {
 /**
  * Called from the auth callback with the orgs the token proved.
  *
- * - Stores the org list (for /leagues/verify and later renewals).
+ * - Stores the org list (for the Company tab and later renewals).
  * - Renews the dev's active company membership when its org is still listed.
- * - Only with `verify` (the explicit "Verify company" flow), when the dev has
- *   no company league yet: joins the first existing company league of one of
- *   their orgs, or with a single org that has no league yet, creates it with
- *   this dev as admin. An ordinary sign-in never joins a league.
+ *
+ * It never creates or joins a town: that only happens when the dev presses
+ * the Company tab's button, after seeing the town they get.
  */
-export async function syncOrgVerifications(
-  devId: number,
-  orgs: VerifiedOrg[],
-  opts: { verify?: boolean } = {},
-): Promise<{ joined: string | null; created: string | null; seed: (() => Promise<number>) | null }> {
+export async function syncOrgVerifications(devId: number, orgs: VerifiedOrg[]): Promise<void> {
   const sb = getSupabaseAdmin();
   const now = new Date().toISOString();
 
@@ -95,7 +90,7 @@ export async function syncOrgVerifications(
       .from("developer_orgs")
       .insert(orgs.map((o) => ({ developer_id: devId, org_login: o.login, avatar_url: o.avatar_url, verified_at: now })));
   }
-  if (orgs.length === 0) return { joined: null, created: null, seed: null };
+  if (orgs.length === 0) return;
 
   const { data: leagues } = await sb
     .from("leagues")
@@ -105,33 +100,13 @@ export async function syncOrgVerifications(
 
   const currentId = await activeCompanyLeagueId(devId);
   const current = (leagues ?? []).find((l) => l.id === currentId);
-  if (current) {
-    // Silent renewal. Don't downgrade a public verification.
-    await sb
-      .from("league_members")
-      .update({ verified_until: verifiedUntil() })
-      .eq("league_id", current.id)
-      .eq("developer_id", devId);
-    return { joined: null, created: null, seed: null };
-  }
-  if (currentId) return { joined: null, created: null, seed: null }; // in a company league whose org isn't listed; the cron decides
-  if (!opts.verify) return { joined: null, created: null, seed: null };
-
-  try {
-    const existing = leagues?.[0];
-    if (existing) {
-      await joinCompanyLeague(devId, existing.github_org as string, "private");
-      return { joined: existing.slug as string, created: null, seed: null };
-    }
-    if (orgs.length === 1) {
-      const { slug, created, seed } = await joinCompanyLeague(devId, orgs[0].login, "private");
-      return { joined: slug, created: created ? slug : null, seed };
-    }
-  } catch (err) {
-    // Removed by the admin: the org list is stored, the verify page explains.
-    if (!(err instanceof LeagueError)) throw err;
-  }
-  return { joined: null, created: null, seed: null };
+  if (!current) return; // no company town, or one whose org isn't listed: the cron decides
+  // Silent renewal. Don't downgrade a public verification.
+  await sb
+    .from("league_members")
+    .update({ verified_until: verifiedUntil() })
+    .eq("league_id", current.id)
+    .eq("developer_id", devId);
 }
 
 /**
@@ -145,18 +120,28 @@ export async function syncOrgVerifications(
  * Joins (or creates) the org's company town. The one who creates it picks the
  * starter city and the race's scoring (`start`); later joiners get the town
  * as it is.
+ *
+ * `start.expect` is what the dev's screen showed. When the town appeared (or
+ * vanished) since, nothing happens and a 409 tells the screen to catch up:
+ * nobody lands in a town with a starter city they never saw.
  */
 export async function joinCompanyLeague(
   devId: number,
   rawOrg: string,
   verification: "public" | "private",
-  start: { template?: TemplateId; scoring?: ScoringMode } = {},
+  start: { template?: TemplateId; scoring?: ScoringMode; expect?: "create" | "join" } = {},
 ): Promise<{ slug: string; created: boolean; seed: (() => Promise<number>) | null }> {
   const sb = getSupabaseAdmin();
   const org = rawOrg.toLowerCase();
   const now = new Date().toISOString();
 
   let { data: league } = await sb.from("leagues").select("id, slug, admin_id").eq("github_org", org).maybeSingle();
+  if (league && start.expect === "create") {
+    throw new LeagueError("town_exists", `Someone from @${org} just built its town. Move in instead.`, 409);
+  }
+  if (!league && start.expect === "join") {
+    throw new LeagueError("no_town", `@${org} has no town anymore. You can build it.`, 409);
+  }
   let created = false;
   if (!league) {
     const info = await fetchOrgInfo(org);
@@ -176,7 +161,10 @@ export async function joinCompanyLeague(
       .select("id, slug, admin_id")
       .single();
     if (error || !inserted) {
-      // Lost a creation race: use the winner's row.
+      // Lost a creation race: the winner's town has a city this dev never saw.
+      if (start.expect === "create") {
+        throw new LeagueError("town_exists", `Someone from @${org} just built its town. Move in instead.`, 409);
+      }
       const { data: raced } = await sb.from("leagues").select("id, slug, admin_id").eq("github_org", org).single();
       league = raced;
     } else {

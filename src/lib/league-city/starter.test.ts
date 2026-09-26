@@ -42,10 +42,14 @@ describe("starterOps", () => {
     }
   });
 
-  it("puts the biggest building nearest the entrance, facing a road", () => {
-    const { places } = placed(5);
+  it("puts the biggest building nearest the middle of the city, facing a road", () => {
+    const { city, places } = placed(5);
+    const b = bounds(city.h);
     const biggest = places.find((o) => o.kind === "building" && o.developer_id === 5);
-    expect(biggest && "x" in biggest && Math.abs(biggest.x) + Math.abs(biggest.z)).toBeLessThanOrEqual(3);
+    const d = (o: { x: number; z: number }) => (2 * o.x - (b.x0 + b.x1)) ** 2 + (2 * o.z - (b.z0 + b.z1)) ** 2;
+    const others = places.filter((o): o is typeof o & { x: number; z: number } => o.kind === "building" && "x" in o && o.developer_id !== 5);
+    expect(biggest && "x" in biggest).toBe(true);
+    if (biggest && "x" in biggest) for (const o of others) expect(d(biggest)).toBeLessThanOrEqual(d(o));
     expect(biggest?.rot).toBeDefined();
   });
 
