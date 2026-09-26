@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getDevLeagues, getGlobalRanking } from "@/lib/leagues/queries";
 import type { Viewer } from "@/lib/leagues/service";
+import { leagueAssetUrl } from "@/lib/league-city/identity";
 import {
   pickFeatured,
   selectRows,
@@ -21,10 +22,39 @@ export interface FeaturedTown extends TownCard {
   reason: FeaturedReason;
 }
 
+/** A card in the one Discover grid: the town, its picture, and what it is to the viewer. */
+export interface GridTown extends TownCard {
+  kind: "company" | "custom";
+  /** The photo of the city (see lib/towns/cover); null until one is taken. */
+  cover: string | null;
+  logoUrl: string | null;
+  yours: boolean;
+}
+
 export interface Discover {
   featured: FeaturedTown | null;
   yours: TownCard[];
   rows: Record<RowId, TownCard[]>;
+  /** Every listed town, each once: biggest first. */
+  all: GridTown[];
+}
+
+/** Each town's cover photo and logo, for the grid's cards. */
+async function loadCovers(ids: string[]): Promise<Map<string, { cover: string | null; logoUrl: string | null }>> {
+  const out = new Map<string, { cover: string | null; logoUrl: string | null }>();
+  if (ids.length === 0) return out;
+  const { data } = await getSupabaseAdmin()
+    .from("league_cities")
+    .select("league_id, cover_path, logo:league_assets!league_cities_logo_asset_id_fkey(path, status)")
+    .in("league_id", ids)
+    .returns<{ league_id: string; cover_path: string | null; logo: { path: string; status: string } | null }[]>();
+  for (const c of data ?? []) {
+    out.set(c.league_id, {
+      cover: c.cover_path ? leagueAssetUrl(c.cover_path) : null,
+      logoUrl: c.logo?.status === "active" ? leagueAssetUrl(c.logo.path) : null,
+    });
+  }
+  return out;
 }
 
 async function loadCatalog(): Promise<TownEntry[]> {
@@ -81,14 +111,23 @@ const getSharedRows = unstable_cache(
     const staff = process.env.TOWN_OF_WEEK_OVERRIDE?.trim().toLowerCase() || null;
     const pick = pickFeatured(towns, now, staff);
     const companies = ranking.rows.filter((r) => r.rank !== null).map((r) => r.league_id);
+    const rest = towns
+      .filter((t) => t.buildings > 0)
+      .sort((a, b) => b.buildings - a.buildings || b.visitors_7d - a.visitors_7d || a.slug.localeCompare(b.slug))
+      .slice(0, 60);
+    const covers = await loadCovers(rest.map((t) => t.id)).catch((err) => {
+      console.error("[towns] covers failed:", err);
+      return new Map<string, { cover: string | null; logoUrl: string | null }>();
+    });
     return {
       featured: pick
         ? { ...toCard(pick.town, now), id: pick.town.id, totalBuildings: pick.town.buildings, reason: pick.reason }
         : null,
       rows: selectRows(towns, { now, featuredId: pick?.town.id ?? null, companies }),
+      all: rest.map((t) => ({ ...toCard(t, now), kind: t.kind, cover: covers.get(t.id)?.cover ?? null, logoUrl: covers.get(t.id)?.logoUrl ?? null })),
     };
   },
-  ["towns-discover"],
+  ["towns-discover-v3"],
   { revalidate: 300 },
 );
 
@@ -104,7 +143,8 @@ export async function getDiscover(viewer: Viewer | null): Promise<Discover> {
     .map((m) => bySlug.get(m.slug))
     .filter((t): t is TownEntry => !!t)
     .map((t) => toCard(t, now));
-  return { ...shared, yours };
+  const mySlugs = new Set(yours.map((c) => c.slug));
+  return { ...shared, yours, all: shared.all.map((c) => ({ ...c, yours: mySlugs.has(c.slug) })) };
 }
 
 /** Town name or GitHub org, case-insensitive, up to 10. */

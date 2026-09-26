@@ -5,10 +5,9 @@ import { getViewer } from "@/lib/leagues/service";
 import { getCityNorms, getLeagueCityDevs, getLeagueMembers } from "@/lib/leagues/queries";
 import { getCachedCity } from "@/lib/league-city/service";
 import { getDiscover, type FeaturedTown } from "@/lib/towns/discover";
-import type { RowId, TownCard as Card } from "@/lib/towns/rows";
 import DiscoverHeader from "@/components/towns/DiscoverHeader";
-import TownCard from "@/components/towns/TownCard";
 import TownHero from "@/components/towns/TownHero";
+import TownGrid from "@/components/towns/TownGrid";
 import HeroDrive from "./hero-drive";
 
 export const dynamic = "force-dynamic";
@@ -21,14 +20,6 @@ export const metadata: Metadata = {
     description: "Towns are groups' own places in Git City: built together, visited and driven by anyone.",
   },
 };
-
-const ROWS: { id: RowId; title: string }[] = [
-  { id: "trending", title: "🔥 Trending" },
-  { id: "new", title: "✨ New towns" },
-  { id: "updated", title: "🛠 Recently updated" },
-  { id: "companies", title: "🏢 Companies" },
-  { id: "biggest", title: "🏆 Biggest towns" },
-];
 
 export default async function TownsPage({ searchParams }: { searchParams: Promise<{ create?: string }> }) {
   const { create } = await searchParams;
@@ -44,20 +35,7 @@ export default async function TownsPage({ searchParams }: { searchParams: Promis
 
       {discover.featured && hero ? <Hero featured={discover.featured} hero={hero} /> : <NoTowns />}
 
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        {discover.yours.length > 0 && <Row id="yours" title="Your towns" cards={discover.yours} />}
-        {ROWS.map((r) =>
-          discover.rows[r.id].length > 0 ? (
-            <Row
-              key={r.id}
-              id={r.id}
-              title={r.title}
-              cards={discover.rows[r.id]}
-              action={r.id === "companies" ? { href: "/towns/new?kind=company", label: "Start your company\u2019s town" } : undefined}
-            />
-          ) : null,
-        )}
-      </div>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">{discover.all.length > 0 && <TownGrid towns={discover.all} />}</div>
     </main>
   );
 }
@@ -124,34 +102,4 @@ async function loadHero(featured: FeaturedTown) {
     console.error("[towns] hero failed:", err);
     return null;
   }
-}
-
-function Row({
-  id,
-  title,
-  cards,
-  action,
-}: {
-  id: string;
-  title: string;
-  cards: Card[];
-  action?: { href: string; label: string };
-}) {
-  return (
-    <section id={`row-${id}`} className="mt-14 scroll-mt-6">
-      <div className="mb-5 flex items-end justify-between gap-4">
-        <h2 className="text-xl text-cream sm:text-2xl">{title}</h2>
-        {action && (
-          <Link href={action.href} className="shrink-0 text-xs text-lime transition-colors hover:text-cream">
-            {action.label} &rarr;
-          </Link>
-        )}
-      </div>
-      <div className="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:scroll-px-6 sm:px-6">
-        {cards.map((c) => (
-          <TownCard key={c.slug} card={c} />
-        ))}
-      </div>
-    </section>
-  );
 }
