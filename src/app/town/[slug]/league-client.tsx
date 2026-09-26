@@ -33,7 +33,7 @@ import EditorOverlay from "@/components/league/editor/EditorOverlay";
 import type { EditCameraApi, Pickable } from "@/components/league/editor/EditCamera";
 import { useEditorController } from "@/components/league/editor/useEditorController";
 import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
-import type { SceneMode } from "@/components/league/LeagueScene";
+import type { CoverApi, SceneMode } from "@/components/league/LeagueScene";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import type { DriverInfo } from "@/lib/league-city/drive/net";
 import type { CrownApi, CrownView } from "@/components/league/drive/CrownMode";
@@ -103,8 +103,11 @@ export default function LeagueClient({
   badges,
   weeklyRank = null,
   raceRecord = null,
+  coverDue = false,
 }: {
   data: LeaguePageData;
+  /** A member's page takes the town's automatic Discover cover now. */
+  coverDue?: boolean;
   /** The race track's record, for the race gate and the Race button. */
   raceRecord?: { login: string; best_ms: number } | null;
   city: LeagueCity;
@@ -168,6 +171,7 @@ export default function LeagueClient({
   );
   useEffect(() => store.dispatch({ type: "setHasLogo", hasLogo: !!city.identity.logoUrl }), [city.identity.logoUrl, store]);
   const cameraApi = useRef<EditCameraApi | null>(null);
+  const coverApi = useRef<CoverApi | null>(null);
   const pickables = useRef<Pickable[]>([]);
   const [leaving, setLeaving] = useState(false);
   const [viewNotice, setViewNotice] = useState<Notice | null>(null);
@@ -442,6 +446,43 @@ export default function LeagueClient({
   // portal (TownIntro); the overlay adds the fade, letterbox and title.
   const [intro, setIntro] = useState<{ n: number; color: string } | null>(null);
   const [hudEnter, setHudEnter] = useState(false);
+
+  // ─── Cover ─────────────────────────────────────────────────
+  // The Discover card's picture: taken here, like a game's world icon, once
+  // the city has drawn and nothing is moving in front of it. The server says
+  // when it's due (a first one, or a day-old one of a changed city).
+  const coverTaken = useRef(false);
+  const sendCover = useCallback(
+    async (framed: boolean, pinned: boolean): Promise<boolean> => {
+      const blob = await coverApi.current?.take(framed);
+      if (!blob) return false;
+      const form = new FormData();
+      form.append("file", blob, "cover.jpg");
+      if (pinned) form.append("pinned", "1");
+      try {
+        const res = await fetch(`/api/leagues/${league.slug}/cover`, { method: "POST", body: form });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    },
+    [league.slug],
+  );
+  // Dev only: lets a local script photograph any town it has open.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    (window as unknown as { __townCover?: () => Promise<Blob | null> }).__townCover = () => coverApi.current?.take(true) ?? Promise.resolve(null);
+  }, []);
+  useEffect(() => {
+    if (!coverDue || coverTaken.current || intro || mode !== "view") return;
+    // Trees and buildings stream in: give them a few seconds, then shoot.
+    const id = window.setTimeout(() => {
+      if (document.visibilityState !== "visible" || coverTaken.current) return;
+      coverTaken.current = true;
+      void sendCover(true, false);
+    }, 6000);
+    return () => window.clearTimeout(id);
+  }, [coverDue, intro, mode, sendCover]);
   // Seconds into the intro, from the scene: the title follows it.
   const introClock = useRef(0);
   // When the intro car passes under the arch: the title's beat.
@@ -666,6 +707,7 @@ export default function LeagueClient({
         editPickables={pickables}
         drive={driveProps}
         watching={watchedCars}
+        coverRef={coverApi}
       >
         {mode === "edit" && (
           <EditorOverlay
@@ -855,6 +897,7 @@ export default function LeagueClient({
                   setPanel("invite");
                 }}
                 onEdit={isAdmin ? enterEdit : undefined}
+                onCover={isAdmin ? () => sendCover(false, true) : undefined}
                 onDrive={enterDrive}
                 onRace={goRace}
                 raceRecord={raceRecord ? `Record @${raceRecord.login} ${formatLap(raceRecord.best_ms)}` : null}

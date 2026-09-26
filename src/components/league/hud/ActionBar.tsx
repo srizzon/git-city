@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Car, Check, Clock, Flag, LogIn, LogOut, Pencil, Play, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { Camera, Car, Check, Clock, Flag, LogIn, LogOut, Pencil, Play, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
 import { Pending } from "@/components/leagues/PixelSpinner";
 import { HUD_BOX } from "./shared";
 
@@ -23,6 +23,7 @@ export default function ActionBar({
   verifyHref,
   onInvite,
   onEdit,
+  onCover,
   onDrive,
   onRace,
   raceRecord = null,
@@ -38,6 +39,8 @@ export default function ActionBar({
   verifyHref: string | null;
   onInvite: () => void;
   onEdit?: () => void;
+  /** Admin: this view on screen becomes the town's Discover cover. Resolves to whether it saved. */
+  onCover?: () => Promise<boolean>;
   onDrive?: () => void;
   /** The town's race track (with a screen over the load). */
   onRace?: () => void;
@@ -55,6 +58,7 @@ export default function ActionBar({
   drivingNow?: number;
 }) {
   const [shared, setShared] = useState(false);
+  const [cover, setCover] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [coarse, setCoarse] = useState(false);
   const [editHint, setEditHint] = useState(false);
   const [driveHint, setDriveHint] = useState(false);
@@ -106,6 +110,14 @@ export default function ActionBar({
     } catch {
       setShared(false);
     }
+  }
+
+  async function takeCover() {
+    if (!onCover || cover === "saving") return;
+    setCover("saving");
+    const ok = await onCover();
+    setCover(ok ? "saved" : "failed");
+    setTimeout(() => setCover("idle"), 2200);
   }
 
   async function confirmLeave() {
@@ -237,6 +249,27 @@ export default function ActionBar({
               className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 animate-[fade-in_0.15s_ease-out] whitespace-nowrap border-2 border-border bg-bg px-2 py-1 text-[9px] text-muted"
             >
               {editLabel}
+            </span>
+          )}
+        </span>
+      )}
+      {isAdmin && onCover && (
+        <span className="relative flex">
+          <button
+            type="button"
+            onClick={takeCover}
+            aria-label="Use this view as the town's cover"
+            title="Use this view as the town's cover on Discover"
+            className={`${ICON_BTN} ${cover === "saved" ? "text-lime" : cover === "failed" ? "text-red-400" : "text-cream hover:text-lime"}`}
+          >
+            {cover === "saved" ? <Check {...ICON} aria-hidden /> : <Camera {...ICON} aria-hidden />}
+          </button>
+          {cover !== "idle" && (
+            <span
+              role="status"
+              className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 animate-[fade-in_0.15s_ease-out] whitespace-nowrap border-2 border-border bg-bg px-2 py-1 text-[9px] text-muted"
+            >
+              {cover === "saving" ? "Taking the picture…" : cover === "saved" ? "Cover saved" : "Couldn't save the cover"}
             </span>
           )}
         </span>
