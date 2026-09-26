@@ -28,6 +28,8 @@ export interface GridTown extends TownCard {
   /** The photo of the city (see lib/towns/cover); null until one is taken. */
   cover: string | null;
   logoUrl: string | null;
+  /** The town's sky (THEMES index), for the card before it has a photo. */
+  sky: number;
   yours: boolean;
 }
 
@@ -40,18 +42,21 @@ export interface Discover {
 }
 
 /** Each town's cover photo and logo, for the grid's cards. */
-async function loadCovers(ids: string[]): Promise<Map<string, { cover: string | null; logoUrl: string | null }>> {
-  const out = new Map<string, { cover: string | null; logoUrl: string | null }>();
+type CoverInfo = { cover: string | null; logoUrl: string | null; sky: number };
+
+async function loadCovers(ids: string[]): Promise<Map<string, CoverInfo>> {
+  const out = new Map<string, CoverInfo>();
   if (ids.length === 0) return out;
   const { data } = await getSupabaseAdmin()
     .from("league_cities")
-    .select("league_id, cover_path, logo:league_assets!league_cities_logo_asset_id_fkey(path, status)")
+    .select("league_id, sky, cover_path, logo:league_assets!league_cities_logo_asset_id_fkey(path, status)")
     .in("league_id", ids)
-    .returns<{ league_id: string; cover_path: string | null; logo: { path: string; status: string } | null }[]>();
+    .returns<{ league_id: string; sky: number; cover_path: string | null; logo: { path: string; status: string } | null }[]>();
   for (const c of data ?? []) {
     out.set(c.league_id, {
       cover: c.cover_path ? leagueAssetUrl(c.cover_path) : null,
       logoUrl: c.logo?.status === "active" ? leagueAssetUrl(c.logo.path) : null,
+      sky: c.sky,
     });
   }
   return out;
@@ -117,17 +122,20 @@ const getSharedRows = unstable_cache(
       .slice(0, 60);
     const covers = await loadCovers(rest.map((t) => t.id)).catch((err) => {
       console.error("[towns] covers failed:", err);
-      return new Map<string, { cover: string | null; logoUrl: string | null }>();
+      return new Map<string, CoverInfo>();
     });
     return {
       featured: pick
         ? { ...toCard(pick.town, now), id: pick.town.id, totalBuildings: pick.town.buildings, reason: pick.reason }
         : null,
       rows: selectRows(towns, { now, featuredId: pick?.town.id ?? null, companies }),
-      all: rest.map((t) => ({ ...toCard(t, now), kind: t.kind, cover: covers.get(t.id)?.cover ?? null, logoUrl: covers.get(t.id)?.logoUrl ?? null })),
+      all: rest.map((t) => {
+        const c = covers.get(t.id);
+        return { ...toCard(t, now), kind: t.kind, cover: c?.cover ?? null, logoUrl: c?.logoUrl ?? null, sky: c?.sky ?? 1 };
+      }),
     };
   },
-  ["towns-discover-v3"],
+  ["towns-discover-v5"],
   { revalidate: 300 },
 );
 

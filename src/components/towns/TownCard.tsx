@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { TownCard as Card } from "@/lib/towns/rows";
 import type { GridTown } from "@/lib/towns/discover";
+import { SKY_SWATCHES } from "@/lib/league-city/identity";
 
 export function TownMeta({ card, className = "" }: { card: Card; className?: string }) {
   const parts: React.ReactNode[] = [];
@@ -39,15 +40,23 @@ export function GridTownCard({ town }: { town: GridTown }) {
   return (
     <Link href={`/town/${town.slug}`} className="group flex flex-col border-[3px] border-border bg-bg-card transition-[border-color,transform] hover:-translate-y-0.5 hover:border-lime">
       <div className="relative aspect-[16/10] overflow-hidden border-b-[3px] border-border bg-bg">
-        {/* The city's own photo; the OG card until the town page has taken one. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={town.cover ?? `/town/${town.slug}/og`}
-          alt=""
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-        />
-        {town.logoUrl && (
+        {town.cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={town.cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+        ) : (
+          // Before the town page has photographed it: its sky, its logo, its name.
+          <div
+            className="flex h-full w-full flex-col items-center justify-center gap-3 px-4"
+            style={{ background: `linear-gradient(180deg, ${(SKY_SWATCHES[town.sky] ?? SKY_SWATCHES[1]).join(", ")})` }}
+          >
+            {town.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={town.logoUrl} alt="" width={64} height={64} className="h-16 w-16 [image-rendering:pixelated]" />
+            )}
+            <span className="text-center text-lg leading-tight text-cream normal-case [text-wrap:balance]">{town.name}</span>
+          </div>
+        )}
+        {town.cover && town.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={town.logoUrl} alt="" width={32} height={32} className="absolute top-2 left-2 h-8 w-8 border-2 border-bg [image-rendering:pixelated]" />
         )}

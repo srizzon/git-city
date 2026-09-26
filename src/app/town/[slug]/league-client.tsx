@@ -468,6 +468,11 @@ export default function LeagueClient({
     },
     [league.slug],
   );
+  // Dev only: lets a local script photograph any town it has open.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    (window as unknown as { __townCover?: () => Promise<Blob | null> }).__townCover = () => coverApi.current?.take(true) ?? Promise.resolve(null);
+  }, []);
   useEffect(() => {
     if (!coverDue || coverTaken.current || intro || mode !== "view") return;
     // Trees and buildings stream in: give them a few seconds, then shoot.
