@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
-import { CuboidCollider, RigidBody, useBeforePhysicsStep, type RapierRigidBody } from "@react-three/rapier";
+import { CuboidCollider, RigidBody, useBeforePhysicsStep, type RapierCollider, type RapierRigidBody } from "@react-three/rapier";
 import { Howl, Howler } from "howler";
 import * as THREE from "three";
 import { FLAG_BOOST, FLAG_BRAKE, FLAG_HORN, INTERP_MS, emptySnapshot, type CarSnapshot } from "@/lib/league-city/drive/net";
@@ -36,6 +36,8 @@ function falloff(d: number): number {
 const FOLLOW = 10;
 const TURN_FOLLOW = 12;
 const SNAP_DIST = 6;
+/** A car that just jumped (joined, respawned, lined up on a grid) passes through others this long (ms): no launching whoever it lands on. */
+const SNAP_GHOST_MS = 1500;
 
 // ─── Bots take hits ──────────────────────────────────────────
 // A person's car is pushed by its owner (bump messages). A bot has no owner:
@@ -85,6 +87,7 @@ function RemoteCar({
   muted,
   botTargets,
   bursts,
+  solid,
 }: {
   remote: CarFeed;
   sources: FxSources;
@@ -92,9 +95,14 @@ function RemoteCar({
   muted: boolean;
   botTargets?: BotTargets;
   bursts?: React.MutableRefObject<VoxelBursts | null>;
+  /** Whether this car can be hit right now (a race turns contact off on the grid). Default: always. */
+  solid?: (id: string) => boolean;
 }) {
   const group = useRef<THREE.Group>(null);
   const body = useRef<RapierRigidBody>(null);
+  const collider = useRef<RapierCollider>(null);
+  const ghostUntil = useRef(0);
+  const ghosted = useRef(false);
   const anchor = useRef<THREE.Object3D>(null);
   const target = useRef<CarSnapshot>(emptySnapshot());
   const before = useRef<CarSnapshot>(emptySnapshot());
@@ -201,6 +209,12 @@ function RemoteCar({
       b.setGravityScale(0, true);
     }
     if (remote.bot && hp.current <= 0 && wall >= wreckedUntil.current) hp.current = BOT_HP;
+    // Contact on or off: a race's rules, and a moment after any jump.
+    const pass = wall < ghostUntil.current || (solid ? !solid(remote.id) : false);
+    if (collider.current && pass !== ghosted.current) {
+      collider.current.setSensor(pass);
+      ghosted.current = pass;
+    }
     const now = wall - INTERP_MS;
     const t = remote.buffer.sample(now, target.current);
     const p0 = remote.buffer.sample(now - 50, before.current);
@@ -217,6 +231,7 @@ function RemoteCar({
     const ez = t.z - pos.z;
     if (!placed.current || Math.hypot(ex, ey, ez) > (remote.bot ? BOT_SNAP_DIST : SNAP_DIST)) {
       placed.current = true;
+      if (!remote.bot) ghostUntil.current = wall + SNAP_GHOST_MS;
       b.setTranslation({ x: t.x, y: t.y, z: t.z }, true);
       b.setRotation({ x: t.qx, y: t.qy, z: t.qz, w: t.qw }, true);
       b.setLinvel({ x: (t.x - p0.x) / 0.05, y: 0, z: (t.z - p0.z) / 0.05 }, true);
@@ -298,7 +313,7 @@ function RemoteCar({
         userData={{ remoteCar: remote.id }}
       >
         <object3D ref={anchor} />
-        <CuboidCollider args={CHASSIS.half} position={[0, CHASSIS.colliderY, 0]} friction={0.3} massProperties={MASS} />
+        <CuboidCollider ref={collider} args={CHASSIS.half} position={[0, CHASSIS.colliderY, 0]} friction={0.3} massProperties={MASS} />
       </RigidBody>
       <group ref={group} visible={false}>
         <CarModel color={remote.color} wheelRefs={wheelRefs}>
@@ -324,18 +339,21 @@ export default function RemoteCars({
   localCar,
   muted,
   botTargets,
+  solid,
 }: {
   cars: CarFeed[];
   sources: FxSources;
   localCar: React.MutableRefObject<CarApi | null>;
   muted: boolean;
   botTargets?: BotTargets;
+  /** Whether a car can be hit right now (see RemoteCar). */
+  solid?: (id: string) => boolean;
 }) {
   const bursts = useRef<VoxelBursts | null>(null);
   return (
     <>
       {cars.map((c) => (
-        <RemoteCar key={c.id} remote={c} sources={sources} localCar={localCar} muted={muted} botTargets={botTargets} bursts={bursts} />
+        <RemoteCar key={c.id} remote={c} sources={sources} localCar={localCar} muted={muted} botTargets={botTargets} bursts={bursts} solid={solid} />
       ))}
       {botTargets && <Bursts ref={bursts} />}
     </>

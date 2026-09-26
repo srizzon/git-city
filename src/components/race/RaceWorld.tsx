@@ -34,7 +34,7 @@ import {
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { TRACK, locate, pointAt, type Track } from "@/lib/league-city/race/track";
 import { curbRuns, wallSegments } from "@/lib/league-city/race/layout";
-import { newLapState, restartLaps, stepLaps } from "@/lib/league-city/race/laps";
+import { newLapState, restartLaps, startRaceLaps, stepLaps } from "@/lib/league-city/race/laps";
 import { RACE, idleRace, inRace, litLights, type RaceState } from "@/lib/league-city/race/race";
 import type { RaceServerMsg, RaceWelcome, RoomBests } from "@/lib/league-city/race/net";
 import TrackScene from "./TrackScene";
@@ -87,7 +87,8 @@ export interface RaceWorldProps {
   /** A signed receipt for your valid lap. */
   onReceipt: (token: string) => void;
   /** The HUD's Start race button calls this. */
-  startRef: React.MutableRefObject<(() => void) | null>;
+  /** In or out for the next live race. */
+  startRef: React.MutableRefObject<((on: boolean) => void) | null>;
   /** Your best lap in this browser changed (ms). */
   onGhost: (ms: number | null) => void;
   /** The HUD's Restart button calls this (R does the same). */
@@ -262,6 +263,12 @@ export default function RaceWorld({
   const offset = useRef(0);
   const placedFor = useRef(0);
   const contacts = useRef(new Map<string, number>());
+  // Your slot while the lights are on: the car is held on it, nothing can move it.
+  const slotAt = useRef<{ x: number; z: number; heading: number } | null>(null);
+  // Lights out handled for this race (its startsAt).
+  const launchedFor = useRef(0);
+  // Right after you're put somewhere (the grid, R), nobody can hit you (performance.now()).
+  const ghostUntil = useRef(0);
 
   const cb = useRef({ onRace, onLap, onBests, onReceipt, onGhost, onRun, onStage });
   useEffect(() => {
@@ -305,6 +312,8 @@ export default function RaceWorld({
     const g = track.grid[slot];
     placedFor.current = r.startsAt;
     placeCar(c.body, g.x, g.z, g.heading);
+    slotAt.current = { x: g.x, z: g.z, heading: g.heading };
+    ghostUntil.current = performance.now() + 1500;
     Object.assign(c.state, {
       drifting: false,
       spinLeft: 0,
@@ -381,9 +390,21 @@ export default function RaceWorld({
   const cars = drivers.flatMap((d) => remotes.current.get(d.id) ?? []);
 
   useEffect(() => {
-    startRef.current = () => send({ t: "race_start" });
+    startRef.current = (on: boolean) => send({ t: "ready", on });
     return () => void (startRef.current = null);
   }, [send, startRef]);
+
+  // Who you can hit: only other racers, in a live race, once the grid has had
+  // RACE.startGraceMs to get away, and not for a moment after you're put
+  // somewhere. Time trials, the grid, finishers on autopilot and anyone not in
+  // the race pass through (like Trackmania): nobody's lap gets shoved.
+  const solid = useCallback((id: string) => {
+    if (performance.now() < ghostUntil.current) return false;
+    const r = race.current;
+    const me = selfRef.current;
+    if (r.phase !== "live" || !me || !inRace(r, me) || !inRace(r, id)) return false;
+    return Date.now() + offset.current >= r.startsAt + RACE.startGraceMs;
+  }, []);
 
   const onRemoteHit = (id: string, other: RapierRigidBody) => {
     const c = car.current;
@@ -404,6 +425,7 @@ export default function RaceWorld({
   // R. In a race: back to the last checkpoint (Car does it). In practice: a
   // fresh attempt from your start spot; the server's lap starts over too.
   const onReset = () => {
+    ghostUntil.current = performance.now() + 1500;
     if (racingNow()) return;
     send({ t: "restart" });
     restartLaps(laps.current);
@@ -445,6 +467,7 @@ export default function RaceWorld({
       if (c) {
         placeCar(c.body, spawn.x * UNIT_TO_M, spawn.z * UNIT_TO_M, headingFromRot(spawn.rot));
         Object.assign(c.state, newCarState(), { turbo: true });
+        ghostUntil.current = performance.now() + 1500;
       }
       send({ t: "restart" });
       restartLaps(laps.current);
@@ -472,6 +495,21 @@ export default function RaceWorld({
     if (frozen && serverNow >= r.startsAt) setFrozen(false);
     const c = car.current;
     if (!c) return;
+    // Held on the slot until lights out: a nudge (or a car landing next to
+    // you) can't cost you the start or a jump-start penalty.
+    const slot = slotAt.current;
+    if (slot && frozen && serverNow < r.startsAt) {
+      const q = c.body.translation();
+      if (Math.hypot(q.x - slot.x, q.z - slot.z) > 0.25) placeCar(c.body, slot.x, slot.z, slot.heading);
+      else c.body.setLinvel({ x: 0, y: c.body.linvel().y, z: 0 }, true);
+    }
+    // Lights out: lap 1 from where the car really is, the same rule as the room's.
+    if ((r.phase === "countdown" || r.phase === "live") && r.startsAt && serverNow >= r.startsAt && launchedFor.current !== r.startsAt && racingNow()) {
+      launchedFor.current = r.startsAt;
+      slotAt.current = null;
+      startRaceLaps(track, laps.current, r.startsAt);
+      raceLaps.current = 0;
+    }
     const now = performance.now();
     const sg = stageRef.current;
     hud.countdown = null;
@@ -658,7 +696,7 @@ export default function RaceWorld({
             <Lights braking={() => !!car.current?.state.braking} />
           </Car>
           <LocalFx car={car} sources={fx} />
-          <RemoteCars cars={cars} sources={fx} localCar={car} muted={muted || paused} />
+          <RemoteCars cars={cars} sources={fx} localCar={car} muted={muted || paused} solid={solid} />
           <SkidMarks sources={fx} />
           <Smoke sources={fx} />
           <BoostTrail sources={fx} />
