@@ -68,6 +68,8 @@ export function restartLaps(st: LapState): void {
   st.lapStart = null;
   st.valid = true;
   st.trail = [];
+  st.back = 0;
+  st.wrongWay = false;
 }
 
 /** The fastest lap any car could drive (ms). */

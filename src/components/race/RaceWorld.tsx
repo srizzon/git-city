@@ -623,7 +623,8 @@ export default function RaceWorld({
             : l.lapStart;
     hud.runLap = Math.min(RUN_LAPS, run.current.laps.length + 1);
     hud.runStart = racing || run.current.done ? null : run.current.start;
-    hud.wrongWay = l.wrongWay;
+    // Only while the player drives: on the menu, intro and finish the autopilot has the car.
+    hud.wrongWay = l.wrongWay && (sg.stage === "run" || sg.stage === "countdown");
   });
 
   return (
