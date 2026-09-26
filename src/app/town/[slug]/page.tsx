@@ -23,6 +23,7 @@ import { tokenMatches } from "@/lib/leagues/invite-token";
 import LeagueClient from "./league-client";
 import { townDisplayName } from "@/lib/towns/names";
 import { getTownBadges } from "@/lib/towns/badges";
+import { isCoverDue } from "@/lib/towns/cover";
 
 export const dynamic = "force-dynamic";
 
@@ -99,10 +100,12 @@ export default async function LeaguePage({ params, searchParams }: Props) {
 
   const isAdmin = data.viewer?.is_admin === true;
   const isMember = data.viewer?.status === "active";
-  const [joinAction, pendingRequests, groupLink] = await Promise.all([
+  const [joinAction, pendingRequests, groupLink, coverDue] = await Promise.all([
     getJoinAction(league, viewer, !!token),
     isAdmin && league.kind === "custom" ? countJoinRequests(league.id).catch(() => 0) : Promise.resolve(0),
     viewer && isMember ? groupInviteLink(league, viewer, isAdmin) : Promise.resolve(null),
+    // Members' pages photograph the city for its Discover card when it's due.
+    isMember ? isCoverDue(league.id) : Promise.resolve(false),
   ]);
 
   return (
@@ -125,6 +128,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
       groupLink={groupLink}
       badges={badges}
       weeklyRank={weeklyRank}
+      coverDue={coverDue}
     />
   );
 }

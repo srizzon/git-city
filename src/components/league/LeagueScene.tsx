@@ -338,6 +338,59 @@ function Rise({ k, delay, children }: { k?: string; delay: number; children: Rea
 
 export type SceneMode = "view" | "edit" | "preview" | "drive";
 
+/** Photographs the city for the town's Discover card (a 16:10 JPEG). */
+export interface CoverApi {
+  /** framed: the standard overview camera (the automatic cover); else the view on screen (the admin's pick). */
+  take: (framed: boolean) => Promise<Blob | null>;
+}
+
+const COVER_ASPECT = 1.6;
+const COVER_OUT = { w: 960, h: 600 };
+
+// Renders one frame on purpose and copies the canvas in the same task, before
+// the browser clears it: no preserveDrawingBuffer, no HUD in the picture.
+function CoverShot({ apiRef, h, tallest }: { apiRef: React.MutableRefObject<CoverApi | null>; h: number; tallest: number }) {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  useEffect(() => {
+    apiRef.current = {
+      take: (framed) =>
+        new Promise((resolve) => {
+          const canvas = gl.domElement;
+          const W = canvas.width;
+          const H = canvas.height;
+          let cam: THREE.Camera = camera;
+          if (framed) {
+            const f = cameraFrame(h, W / Math.max(1, H), 0.75, tallest);
+            const c = new THREE.PerspectiveCamera(50, W / Math.max(1, H), 1, 12000);
+            c.position.copy(f.position);
+            c.lookAt(f.target);
+            cam = c;
+          }
+          gl.render(scene, cam);
+          let sw = W;
+          let sh = W / COVER_ASPECT;
+          if (sh > H) {
+            sh = H;
+            sw = H * COVER_ASPECT;
+          }
+          const out = document.createElement("canvas");
+          out.width = COVER_OUT.w;
+          out.height = COVER_OUT.h;
+          const ctx = out.getContext("2d");
+          if (!ctx) return resolve(null);
+          ctx.drawImage(canvas, (W - sw) / 2, (H - sh) / 2, sw, sh, 0, 0, COVER_OUT.w, COVER_OUT.h);
+          out.toBlob((b) => resolve(b), "image/jpeg", 0.85);
+        }),
+    };
+    return () => {
+      apiRef.current = null;
+    };
+  }, [apiRef, gl, scene, camera, h, tallest]);
+  return null;
+}
+
 export interface LeagueSceneProps {
   h: number;
   /** Sky, logo, hill sign. */
@@ -376,6 +429,8 @@ export interface LeagueSceneProps {
   watching?: CarFeed[];
   /** Embedded: orbit distance (default 0.85) and how far right the picture shifts on wide screens, in px (default 26% of the width). */
   framing?: { zoom: number; shiftPx: number };
+  /** Filled with the cover camera (the town page's automatic photo and the admin's "set cover"). */
+  coverRef?: React.MutableRefObject<CoverApi | null>;
 }
 
 export default function LeagueScene({
@@ -401,6 +456,7 @@ export default function LeagueScene({
   push = false,
   framing,
   watching,
+  coverRef,
 }: LeagueSceneProps) {
   const editing = mode === "edit";
   const driving = mode === "drive" && !!drive;
@@ -522,6 +578,7 @@ export default function LeagueScene({
       </Rise>
       {watching && mode === "view" && !playing && watching.length > 0 && <WatchedCars cars={watching} />}
       {driving && drive && <DriveWorld objects={withApproach} buildings={buildings} h={h} {...drive} />}
+      {coverRef && <CoverShot apiRef={coverRef} h={h} tallest={tallest} />}
       {children}
     </Canvas>
   );
