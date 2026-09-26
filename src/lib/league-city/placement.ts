@@ -18,24 +18,24 @@ export function canPlace(objects: readonly Lot[], h: number, x: number, z: numbe
   return { ok: true };
 }
 
-/** Free lots in the order auto-placement picks them: touching a road first, then nearest the entrance. */
+/**
+ * Free lots in the order auto-placement picks them: touching a road first,
+ * then nearest the middle of the city, so a town grows from its center out
+ * instead of piling up at the gate. Mirrors apply_league_city_ops (153).
+ */
 export function freeLotsInOrder(occupied: ReadonlySet<string>, roads: ReadonlySet<string>, b: LotBounds): [number, number][] {
   const touchesRoad = (x: number, z: number) =>
     roads.has(lotKey(x, z - 1)) || roads.has(lotKey(x + 1, z)) || roads.has(lotKey(x, z + 1)) || roads.has(lotKey(x - 1, z));
-  const lots: { x: number; z: number; road: boolean }[] = [];
+  // Doubled so the half-lot center stays an integer: (2x - (x0 + x1))² + (2z - (z0 + z1))².
+  const cx = b.x0 + b.x1;
+  const cz = b.z0 + b.z1;
+  const lots: { x: number; z: number; road: boolean; d: number }[] = [];
   for (let x = b.x0; x <= b.x1; x++) {
     for (let z = b.z0; z <= b.z1; z++) {
-      if (!occupied.has(lotKey(x, z))) lots.push({ x, z, road: touchesRoad(x, z) });
+      if (!occupied.has(lotKey(x, z))) lots.push({ x, z, road: touchesRoad(x, z), d: (2 * x - cx) ** 2 + (2 * z - cz) ** 2 });
     }
   }
-  lots.sort(
-    (a, b) =>
-      Number(b.road) - Number(a.road) ||
-      a.x * a.x + a.z * a.z - (b.x * b.x + b.z * b.z) ||
-      Math.abs(a.z) - Math.abs(b.z) ||
-      a.z - b.z ||
-      a.x - b.x,
-  );
+  lots.sort((a, b) => Number(b.road) - Number(a.road) || a.d - b.d || a.z - b.z || a.x - b.x);
   return lots.map((l) => [l.x, l.z]);
 }
 
