@@ -42,21 +42,23 @@ export async function saveCover(leagueId: string, bytes: Uint8Array, pinned: boo
   if (!current) throw new CoverError("This town has no city yet.");
   if (!pinned && !coverDue(current.state, current.cityVersion, new Date())) return false;
 
-  let webp: Buffer;
+  // PNG with a palette: the bucket takes PNG only (under 1 MB), and 256 colors
+  // hold a night city fine.
+  let png: Buffer;
   try {
-    webp = await sharp(bytes, { limitInputPixels: 4096 * 4096 })
+    png = await sharp(bytes, { limitInputPixels: 4096 * 4096 })
       .resize(COVER_W, COVER_H, { fit: "cover" })
-      .webp({ quality: 80 })
+      .png({ palette: true, colors: 256, quality: 90, compressionLevel: 9 })
       .toBuffer();
   } catch {
     throw new CoverError("That isn't an image.");
   }
 
   const sb = getSupabaseAdmin();
-  const path = `covers/${leagueId}/${crypto.randomUUID()}.webp`;
+  const path = `covers/${leagueId}/${crypto.randomUUID()}.png`;
   const { error: upErr } = await sb.storage
     .from(LEAGUE_ASSETS_BUCKET)
-    .upload(path, webp, { contentType: "image/webp", cacheControl: "31536000", upsert: false });
+    .upload(path, png, { contentType: "image/png", cacheControl: "31536000", upsert: false });
   if (upErr) throw new Error(`cover upload failed: ${upErr.message}`);
   const { error } = await sb
     .from("league_cities")

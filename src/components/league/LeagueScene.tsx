@@ -362,7 +362,7 @@ function CoverShot({ apiRef, h, tallest }: { apiRef: React.MutableRefObject<Cove
           const H = canvas.height;
           let cam: THREE.Camera = camera;
           if (framed) {
-            const f = cameraFrame(h, COVER_ASPECT, 1.05, tallest);
+            const f = cameraFrame(h, COVER_ASPECT, 0.86, tallest);
             const c = new THREE.PerspectiveCamera(50, W / Math.max(1, H), 1, 12000);
             c.position.copy(f.position);
             c.lookAt(f.target);
