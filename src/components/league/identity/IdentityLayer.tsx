@@ -8,7 +8,7 @@ import type { SkyAd } from "@/lib/skyAds";
 import { terrainBounds, worldBounds } from "@/lib/league-city/grid";
 import type { CityIdentity, CityObject, SignSide } from "@/lib/league-city/types";
 import { Billboard, Flag, FloorLogo, HillSign, Portal } from "./IdentityPieces";
-import { Balloon, Clawd, CodexCloud, ContextWindow, Sandbox, type MascotSize } from "./RivalryPieces";
+import { Clawd, CodexCloud, ContextWindow, Sandbox, type MascotSize } from "./RivalryPieces";
 import { beamTexture, clothTexture, hillLettersTexture, loadLogoImage, logoTexture, wideTexture, type LogoImage } from "./logoTexture";
 
 // Everything that makes a town recognizable: the portal, billboards, flags,
@@ -114,7 +114,6 @@ export default function IdentityLayer({
       floors: [] as CityObject[],
       planes: [] as CityObject[],
       blimps: [] as CityObject[],
-      balloons: [] as CityObject[],
       rivalry: [] as CityObject[],
     };
     for (const o of objects) {
@@ -124,7 +123,6 @@ export default function IdentityLayer({
       else if (o.item_type === "plaza" && o.props?.logo_floor === true) out.floors.push(o);
       else if (o.item_type === "plane") out.planes.push(o);
       else if (o.item_type === "blimp") out.blimps.push(o);
-      else if (o.item_type === "balloon") out.balloons.push(o);
       else if (o.item_type === "clawd" || o.item_type === "codex_cloud" || o.item_type === "context_window" || o.item_type === "sandbox") out.rivalry.push(o);
     }
     return out;
@@ -152,19 +150,6 @@ export default function IdentityLayer({
         if (o.item_type === "codex_cloud") return <CodexCloud key={o.id} position={at} rot={o.rot} size={size} phase={i * 0.7} />;
         if (o.item_type === "context_window") return <ContextWindow key={o.id} position={at} rot={o.rot} />;
         return <Sandbox key={o.id} position={at} rot={o.rot} />;
-      })}
-      {pieces.balloons.map((o, i) => {
-        const p = o.props ?? {};
-        return (
-          <Balloon
-            key={`${o.id}:${String(p.text)}`}
-            text={String(p.text ?? name)}
-            color={String(p.color ?? "#ffd23f")}
-            bg={String(p.bg ?? "#4a1010")}
-            path={{ cx: o.px ?? 0, cz: o.pz ?? 0, r: Number(p.orbit ?? 260), altitude: Number(p.alt ?? 150) }}
-            phase={i * 2.1}
-          />
-        );
       })}
       {hill && <HillSign at={hill.at} facing={hill.facing} letters={tex.hill.tex} aspect={tex.hill.aspect} hillColor={hillColor} />}
       <Suspense fallback={null}>

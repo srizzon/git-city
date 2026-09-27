@@ -10,7 +10,7 @@
 //                     boost pads down the avenue, a big plaza with the sandbox
 //                     and a giant `>_` cloud hovering over it.
 //
-// Both skies carry their own jokes plus one balloon from the other side.
+// Both skies carry their own jokes.
 
 import { LOT } from "./grid";
 import { lotKey } from "./placement";
@@ -64,7 +64,7 @@ function spaced(props: Plan["props"]): Plan["props"] {
 
 const uniqueLots = (lots: Lot[]): Lot[] => [...new Map(lots.map((l) => [lotKey(l[0], l[1]), l])).values()];
 
-const sky = (item_type: "plane" | "blimp" | "balloon", px: number, pz: number, props: ObjectProps) => ({ item_type, px, pz, props });
+const sky = (item_type: "plane" | "blimp", px: number, pz: number, props: ObjectProps) => ({ item_type, px, pz, props });
 
 interface Style {
   tree: PropType;
@@ -190,10 +190,6 @@ function claude(): Plan {
       sky("plane", 0, sq, { text: "You're absolutely right!", color: C.yellow, bg: C.red, alt: 250, orbit: 320 }),
       sky("plane", 0, sq, { text: "Compacting conversation…", color: C.white, bg: C.red, alt: 190, orbit: 520 }),
       sky("blimp", 0, sq, { text: "Welcome, Claude Coders", color: C.yellow, bg: C.red, alt: 215 }),
-      sky("balloon", -200, sq, { text: "ultrathink", color: C.yellow, bg: C.red, alt: 150, orbit: 240 }),
-      sky("balloon", 200, W(-26), { text: "Let me make a comprehensive plan", color: C.white, bg: C.purple, alt: 175, orbit: 280 }),
-      // The other side's balloon, drifting over enemy ground.
-      sky("balloon", 0, W(-8), { text: "Codex was here. Claude hit the usage limit", color: C.cyan, bg: C.blue, alt: 130, orbit: 420 }),
     ],
   });
 }
@@ -214,9 +210,6 @@ function codex(): Plan {
       sky("plane", 0, sq, { text: "Tests passed, probably", color: C.pink, bg: C.navy, alt: 250, orbit: 320 }),
       sky("plane", 0, sq, { text: "PR ready: 47 files changed", color: C.cyan, bg: C.navy, alt: 190, orbit: 520 }),
       sky("blimp", 0, sq, { text: "Welcome to Codex", color: C.cyan, bg: C.navy, alt: 215 }),
-      sky("balloon", -200, sq, { text: "Running in sandbox…", color: C.cyan, bg: C.blue, alt: 150, orbit: 240 }),
-      sky("balloon", 200, W(-8), { text: "yolo mode: on", color: C.pink, bg: C.navy, alt: 175, orbit: 280 }),
-      sky("balloon", 0, W(-26), { text: "You're absolutely right! Codex was wrong", color: C.yellow, bg: C.red, alt: 130, orbit: 420 }),
     ],
   });
 }

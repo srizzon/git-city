@@ -51,7 +51,6 @@ describe.each(["claude-code-town", "codex-town"] as const)("%s map", (slug) => {
     const types = replay(slug).objects.map((o) => o.item_type);
     expect(types).toContain(slug === "claude-code-town" ? "context_window" : "sandbox");
     expect(types).toContain(slug === "claude-code-town" ? "clawd" : "codex_cloud");
-    expect(types.filter((t) => t === "balloon")).toHaveLength(3);
   });
 
   it("has room for hundreds of buildings, each on a free lot", () => {

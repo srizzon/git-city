@@ -60,9 +60,7 @@ export const CATALOG: Record<ItemType, ItemTypeRow> = {
   flag: prop(2, { max: 12 }),
   plane: air,
   blimp: air,
-  // Rivalry towns only (system placed): balloons fly beside the sky limit,
-  // mascots and landmarks stand on plazas.
-  balloon: { footprint: "air", radius: 0, max: 3, group: null, systemOnly: true, onRoad: false },
+  // Rivalry towns only (system placed): mascots and landmarks stand on plazas.
   clawd: prop(10, { systemOnly: true }),
   codex_cloud: prop(10, { systemOnly: true }),
   context_window: prop(40, { max: 1, systemOnly: true }),

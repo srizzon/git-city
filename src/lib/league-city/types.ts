@@ -23,7 +23,6 @@ export const ITEM_TYPES = [
   "plane",
   "blimp",
   // Claude Code vs Codex, placed by the system only (towns/rivalry.ts).
-  "balloon",
   "clawd",
   "codex_cloud",
   "context_window",

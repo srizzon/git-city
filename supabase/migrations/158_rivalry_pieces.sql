@@ -1,8 +1,6 @@
--- Claude Code vs Codex town pieces (src/lib/league-city/catalog.ts): hot-air
--- balloons, the two mascots and one landmark per side. All system placed.
--- Balloons have their own limit, so a rivalry town keeps its 3 planes/blimps.
+-- Claude Code vs Codex town pieces (src/lib/league-city/catalog.ts): the two
+-- mascots and one landmark per side. All system placed.
 INSERT INTO public.league_item_types (item_type, footprint, radius, max_per_city, limit_group, system_only, on_road) VALUES
-  ('balloon',        'air',  0,  3,    NULL, true, false),
   ('clawd',          'prop', 10, NULL, NULL, true, false),
   ('codex_cloud',    'prop', 10, NULL, NULL, true, false),
   ('context_window', 'prop', 40, 1,    NULL, true, false),

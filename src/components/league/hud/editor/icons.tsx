@@ -398,23 +398,6 @@ const SPRITES: Record<ItemType, Sprite> = {
     ],
     palette: { w: "#f4f1e8", r: "#8a93a6", l: "#c8e64a" },
   },
-  balloon: {
-    rows: [
-      "...oooooo...",
-      "..owowowoo..",
-      ".oowowowooo.",
-      ".oowowowooo.",
-      ".oowowowooo.",
-      "..owowowoo..",
-      "...oowooo...",
-      "....r..r....",
-      "....r..r....",
-      "....bbbb....",
-      "....bbbb....",
-      "............",
-    ],
-    palette: { o: "#e07a4f", w: "#ffd23f", r: "#8a93a6", b: "#8a5a2b" },
-  },
   clawd: {
     rows: [
       "............",
@@ -539,7 +522,6 @@ export const ITEM_NAMES: Record<ItemType, string> = {
   flag: "Flag",
   plane: "Plane",
   blimp: "Blimp",
-  balloon: "Balloon",
   clawd: "Clawd",
   codex_cloud: "Codex cloud",
   context_window: "Context window",

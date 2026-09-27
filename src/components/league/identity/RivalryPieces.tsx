@@ -3,11 +3,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { createLedTexture, SCROLL_SPEED } from "@/components/SkyAds";
 
-// Claude Code vs Codex: the two mascots, one landmark per side and hot-air
-// balloons. Voxel boxes like the rest of the town; faces glow a little so
-// they read at night.
+// Claude Code vs Codex: the two mascots and one landmark per side. Voxel
+// boxes like the rest of the town; faces glow a little so they read at night.
 
 const CLAWD = "#d97757";
 const CLAWD_DARK = "#b85c3d";
@@ -91,9 +89,11 @@ export function Clawd({ position, rot, size, phase = 0 }: { position: [number, n
   const body = useRef<THREE.Group>(null);
   const eyes = useRef<THREE.Group>(null);
   const u = 1.6 * SCALE[size];
+  // The giant stands on its plinth: the hop starts from the top step, not the ground.
+  const base = size === "giant" ? PLINTH_STEP * 3 : 0;
   useFrame(({ clock }) => {
     const t = clock.elapsedTime + phase;
-    if (body.current) body.current.position.y = Math.abs(Math.sin(t * 2.2)) * u * 0.25;
+    if (body.current) body.current.position.y = base + Math.abs(Math.sin(t * 2.2)) * u * 0.25;
     // A blink every ~4s.
     if (eyes.current) eyes.current.scale.y = t % 4 < 0.12 ? 0.15 : 1;
   });
@@ -105,7 +105,7 @@ export function Clawd({ position, rot, size, phase = 0 }: { position: [number, n
         [0, 1, 2].map((i) => (
           <Box key={i} at={[0, PLINTH_STEP * (i + 0.5), 0]} size={[(12 - i * 1.6) * u, PLINTH_STEP, (8 - i * 1.2) * u]} color={i % 2 ? "#4a3028" : "#3a2a24"} glow={0.12} />
         ))}
-      <group ref={body} position={[0, size === "giant" ? PLINTH_STEP * 3 : 0, 0]}>
+      <group ref={body} position={[0, base, 0]}>
         {[-3.2, -1.2, 1.2, 3.2].map((x) => (
           <Box key={x} at={[x * u, legH / 2, 0]} size={[1 * u, legH, 1.2 * u]} color={CLAWD_DARK} />
         ))}
@@ -267,89 +267,6 @@ export function Sandbox({ position, rot }: { position: [number, number]; rot: nu
       <Box at={[0, 7, S / 2 + 1]} size={[26, 8, 1]} color="#1a2a6c" glow={0.2} />
       <Sign map={sign} w={24} h={6} at={[0, 7, S / 2 + 1.6]} />
       <Sign map={note} w={30} h={3.6} at={[0, 1.8, S / 2 + 1.6]} />
-    </group>
-  );
-}
-
-// ─── Balloon ─────────────────────────────────────────────────
-
-/**
- * A hot-air balloon on a slow, wide loop, its banner hanging under the basket.
- * Envelope in the banner's two colors, striped.
- */
-export function Balloon({
-  text,
-  color,
-  bg,
-  path,
-  phase = 0,
-}: {
-  text: string;
-  color: string;
-  bg: string;
-  path: { cx: number; cz: number; r: number; altitude: number };
-  phase?: number;
-}) {
-  const group = useRef<THREE.Group>(null);
-  const { tex, needsScroll } = useMemo(() => createLedTexture(text, color, bg), [text, color, bg]);
-  const stripes = useMemo(() => {
-    const c = document.createElement("canvas");
-    c.width = 64;
-    c.height = 8;
-    const ctx = c.getContext("2d")!;
-    for (let i = 0; i < 8; i++) {
-      ctx.fillStyle = i % 2 === 0 ? bg : color;
-      ctx.fillRect(i * 8, 0, 8, 8);
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.magFilter = THREE.NearestFilter;
-    return t;
-  }, [color, bg]);
-  useEffect(
-    () => () => {
-      tex.dispose();
-      stripes.dispose();
-    },
-    [tex, stripes],
-  );
-  const angle = useRef(phase);
-  // The banner scrolls by moving its texture, kept in a ref for the frame loop.
-  const led = useRef(tex);
-  useEffect(() => {
-    led.current = tex;
-  }, [tex]);
-  useFrame(({ clock }, delta) => {
-    angle.current += (6 / path.r) * Math.min(delta, 0.05);
-    const a = angle.current;
-    if (group.current) {
-      group.current.position.set(path.cx + path.r * Math.cos(a), path.altitude + Math.sin(clock.elapsedTime * 0.5 + phase) * 4, path.cz + path.r * Math.sin(a));
-      group.current.rotation.y = -a;
-    }
-    if (needsScroll) led.current.offset.x = (clock.elapsedTime * SCROLL_SPEED) % 1;
-  });
-  return (
-    <group ref={group}>
-      <mesh position={[0, 16, 0]} scale={[1, 1.2, 1]}>
-        <sphereGeometry args={[14, 16, 12]} />
-        <meshStandardMaterial map={stripes} emissiveMap={stripes} emissive="#ffffff" emissiveIntensity={0.35} flatShading />
-      </mesh>
-      <mesh position={[0, -0.5, 0]}>
-        <cylinderGeometry args={[6, 3, 5, 12]} />
-        <meshStandardMaterial map={stripes} emissiveMap={stripes} emissive="#ffffff" emissiveIntensity={0.3} flatShading />
-      </mesh>
-      {[-1, 1].map((sx) =>
-        [-1, 1].map((sz) => <Box key={`${sx}${sz}`} at={[sx * 2.4, -5.5, sz * 2.4]} size={[0.25, 6, 0.25]} color="#8a93a6" glow={0.1} />),
-      )}
-      <Box at={[0, -10, 0]} size={[6, 4, 6]} color="#8a5a2b" glow={0.15} />
-      {/* Banner under the basket: one face each way, so both read left to right. */}
-      {[0, Math.PI].map((ry) => (
-        <mesh key={ry} position={[0, -18, 0]} rotation={[0, ry, 0]}>
-          <planeGeometry args={[34, 6.4]} />
-          <meshStandardMaterial color="#000000" emissiveMap={tex} emissive="#ffffff" emissiveIntensity={1.2} toneMapped={false} />
-        </mesh>
-      ))}
-      <Box at={[0, -14.6, 0]} size={[0.2, 1.6, 0.2]} color="#8a93a6" />
     </group>
   );
 }
