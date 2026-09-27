@@ -137,6 +137,8 @@ function town(style: Style): Plan {
       small(-48, -24),
       small(48, -24),
       { item_type: style.landmark, px: lm.x, pz: lm.z },
+      { item_type: "fountain", px: -110, pz: lm.z },
+      { item_type: "fountain", px: 110, pz: lm.z },
       // Flags down the square's sides, billboards at the landmark's corners.
       ...[-2, -1, 0, 1, 2].flatMap((dz) => [
         { item_type: "flag" as const, px: -edge, pz: sq.z + W(dz) },
@@ -166,6 +168,45 @@ function town(style: Style): Plan {
   };
 }
 
+
+// ─── Drive features ─────────────────────────────────────────
+// Ramps face north at rot 0 (a car heading north launches), 90 east, 180
+// south, 270 west. Speed bumps span a north-south street at rot 0.
+
+type Props = Plan["props"];
+
+const ramp = (x: number, z: number, rot: number, big = false): Props[number] => ({ item_type: big ? "ramp_big" : "ramp", px: W(x), pz: W(z), rot });
+
+/** Cones weaving down a north-south street, from lot z0 to z1. */
+function slalom(x: number, z0: number, z1: number): Props {
+  const out: Props = [];
+  for (let pz = W(z0), i = 0; pz >= W(z1); pz -= 18, i++) out.push({ item_type: "cone", px: W(x) + (i % 2 ? 7 : -7), pz });
+  return out;
+}
+
+const bumps = (x: number, zs: number[]): Props => zs.map((z) => ({ item_type: "speed_bump" as const, px: W(x), pz: W(z) }));
+
+/** Tire walls on the outside of the outer ring's four corners. */
+function cornerWalls(): Props {
+  const e = 16;
+  return [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ].map(([sx, sz]) => ({ item_type: "tire_wall" as const, px: W(sx * e) + sx * 20, pz: W(sz === 1 ? -4 : -32) }));
+}
+
+/** In every park: crates to dodge and benches to sit on. */
+function parkStuff(parks: Lot[]): Props {
+  return parks.flatMap(([cx, cz]) => [
+    { item_type: "crates" as const, px: W(cx) - 34, pz: W(cz) },
+    { item_type: "crates" as const, px: W(cx) + 34, pz: W(cz) },
+    { item_type: "bench" as const, px: W(cx), pz: W(cz) - 34 },
+    { item_type: "bench" as const, px: W(cx), pz: W(cz) + 34 },
+  ]);
+}
+
 const PARKS: Lot[] = [
   [-10, -10],
   [10, -10],
@@ -185,7 +226,23 @@ function claude(): Plan {
     landmark: "context_window",
     lampEvery: 2,
     parks: PARKS,
-    extras: [],
+    // Token Run: one jump down the avenue straight at the giant Clawd, a loop
+    // of ramps round the outer ring, a cone slalom and rate-limit bumps.
+    extras: [
+      ramp(0, -11, 0, true),
+      ramp(-16, -10, 0),
+      ramp(-16, -22, 0),
+      ramp(-8, -32, 90),
+      ramp(8, -32, 90),
+      ramp(16, -22, 180),
+      ramp(16, -10, 180),
+      ramp(10, -4, 270),
+      ramp(-10, -4, 270),
+      ...slalom(-8, -5, -11),
+      ...bumps(8, [-6, -10, -14, -18]),
+      ...cornerWalls(),
+      ...parkStuff(PARKS),
+    ],
     sky: [
       sky("plane", 0, sq, { text: "You're absolutely right!", color: C.yellow, bg: C.red, alt: 250, orbit: 320 }),
       sky("plane", 0, sq, { text: "Compacting conversation…", color: C.white, bg: C.red, alt: 190, orbit: 520 }),
@@ -204,8 +261,25 @@ function codex(): Plan {
     landmark: "sandbox",
     lampEvery: 1,
     parks: PARKS,
-    // Ship fast: boost pads down the avenue.
-    extras: [-2, -6, -10].map((z) => ({ item_type: "boost_pad" as const, px: 0, pz: W(z) })),
+    // Speedrun Lane: boost pads down the avenue into a big jump, boost strips
+    // on the ring's long straights, ramps along the back street, and the
+    // rate limits and tests (cones) in the way.
+    extras: [
+      ...[-2, -6, -10].map((z) => ({ item_type: "boost_pad" as const, px: 0, pz: W(z) })),
+      ramp(0, -11, 0, true),
+      ...[-8, -14, -20, -26].flatMap((z) => [
+        { item_type: "boost_pad" as const, px: W(-16), pz: W(z) },
+        { item_type: "boost_pad" as const, px: W(16), pz: W(z) },
+      ]),
+      ramp(-12, -32, 90),
+      ramp(-4, -32, 90),
+      ramp(4, -32, 90),
+      ramp(12, -32, 90),
+      ...bumps(-8, [-6, -10, -14, -18]),
+      ...slalom(8, -5, -11),
+      ...cornerWalls(),
+      ...parkStuff(PARKS),
+    ],
     sky: [
       sky("plane", 0, sq, { text: "Tests passed, probably", color: C.pink, bg: C.navy, alt: 250, orbit: 320 }),
       sky("plane", 0, sq, { text: "PR ready: 47 files changed", color: C.cyan, bg: C.navy, alt: 190, orbit: 520 }),
