@@ -22,6 +22,12 @@ export const ITEM_TYPES = [
   "flag",
   "plane",
   "blimp",
+  // Claude Code vs Codex, placed by the system only (towns/rivalry.ts).
+  "balloon",
+  "clawd",
+  "codex_cloud",
+  "context_window",
+  "sandbox",
 ] as const;
 export type ItemType = (typeof ITEM_TYPES)[number];
 

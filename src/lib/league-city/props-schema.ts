@@ -50,6 +50,10 @@ export const PROPS_SCHEMAS: Partial<Record<ItemType, z.ZodType<ObjectProps>>> = 
   plaza: z.strictObject({ logo_floor: z.boolean().optional() }),
   plane: z.strictObject({ ...sky, orbit: z.number().int().min(ORBIT_MIN).max(ORBIT_MAX) }),
   blimp: z.strictObject(sky),
+  balloon: z.strictObject({ ...sky, orbit: z.number().int().min(ORBIT_MIN).max(ORBIT_MAX) }),
+  // A mascot statue: giant in the square, small along the streets.
+  clawd: z.strictObject({ size: z.enum(["small", "giant"]) }),
+  codex_cloud: z.strictObject({ size: z.enum(["small", "giant"]) }),
 };
 
 export const DEFAULT_PROPS: Partial<Record<ItemType, ObjectProps>> = {
