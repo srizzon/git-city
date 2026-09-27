@@ -9,6 +9,7 @@ import { terrainBounds, worldBounds } from "@/lib/league-city/grid";
 import type { CityIdentity, CityObject, SignSide } from "@/lib/league-city/types";
 import { Billboard, Flag, FloorLogo, HillSign, Portal } from "./IdentityPieces";
 import { Clawd, CodexCloud, ContextWindow, Sandbox, type MascotSize } from "./RivalryPieces";
+import { mascotSize } from "@/lib/league-city/rivalry-geometry";
 import { beamTexture, clothTexture, hillLettersTexture, loadLogoImage, logoTexture, wideTexture, type LogoImage } from "./logoTexture";
 
 // Everything that makes a town recognizable: the portal, billboards, flags,
@@ -145,7 +146,7 @@ export default function IdentityLayer({
       {tex.logo && pieces.floors.map((o) => <FloorLogo key={o.id} lot={[o.x, o.z]} map={tex.logo!} />)}
       {pieces.rivalry.map((o, i) => {
         const at: [number, number] = [o.px ?? 0, o.pz ?? 0];
-        const size: MascotSize = o.props?.size === "giant" ? "giant" : "small";
+        const size: MascotSize = mascotSize(o.props);
         if (o.item_type === "clawd") return <Clawd key={o.id} position={at} rot={o.rot} size={size} phase={i * 0.7} />;
         if (o.item_type === "codex_cloud") return <CodexCloud key={o.id} position={at} rot={o.rot} size={size} phase={i * 0.7} />;
         if (o.item_type === "context_window") return <ContextWindow key={o.id} position={at} rot={o.rot} />;

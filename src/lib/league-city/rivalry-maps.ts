@@ -226,9 +226,23 @@ function claude(): Plan {
     landmark: "context_window",
     lampEvery: 2,
     parks: PARKS,
-    // Token Run: one jump down the avenue straight at the giant Clawd, a loop
-    // of ramps round the outer ring, a cone slalom and rate-limit bumps.
+    // Token Run: a boosted jump down the avenue straight at the giant Clawd, a
+    // loop of boosted ramps round the outer ring, a cone slalom and rate-limit bumps.
     extras: [
+      // Boosts into every jump: down the avenue, and before each ring ramp.
+      ...[-3, -7].map((z) => ({ item_type: "boost_pad" as const, px: 0, pz: W(z) })),
+      ...[
+        [-16, -7],
+        [-16, -19],
+        [16, -25],
+        [16, -13],
+      ].map(([x, z]) => ({ item_type: "boost_pad" as const, px: W(x), pz: W(z) })),
+      ...[
+        [-12, -32],
+        [4, -32],
+        [13, -4],
+        [-7, -4],
+      ].map(([x, z]) => ({ item_type: "boost_pad" as const, px: W(x), pz: W(z), rot: 90 })),
       ramp(0, -11, 0, true),
       ramp(-16, -10, 0),
       ramp(-16, -22, 0),

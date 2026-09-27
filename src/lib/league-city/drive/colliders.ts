@@ -13,6 +13,7 @@ import { LOT } from "../grid";
 import { RAMP, RAMP_BIG, rampCorners, type RampSize } from "../ramp";
 import { CONE, SPEED_BUMP, TIRE_WALL_HEIGHT, TIRE_WALL_WIDTH, TIRE, crateLayout, toWorld, CRATE } from "../toys";
 import { TREE_TYPES, type CityObject } from "../types";
+import { CLAWD, CLOUD, CONTEXT_WINDOW, SANDBOX, clawdBase, clawdUnit, cloudUnit, mascotSize } from "../rivalry-geometry";
 import { PROPS, TOYS, UNIT_TO_M, WALL } from "./tuning";
 
 export type DynamicProp = "lamp" | "bench" | "fountain" | "cone" | "crate";
@@ -103,8 +104,68 @@ function propColliders(o: CityObject): ColliderSpec[] {
     const half: [number, number, number] = [(TIRE_WALL_WIDTH / 2) * U, (TIRE_WALL_HEIGHT / 2) * U, (TIRE.width / 2) * U];
     return [{ id: o.id, body: "fixed", pos: [o.px * U, half[1], o.pz * U], rotY, shape: { type: "cuboid", half }, restitution: TOYS.tireRestitution }];
   }
+  if (o.item_type === "clawd" || o.item_type === "codex_cloud" || o.item_type === "context_window" || o.item_type === "sandbox") {
+    return rivalryColliders(o, rotY);
+  }
   const one = propCollider(o);
   return one ? [one] : [];
+}
+
+/** A fixed box at local offset (lx, y, lz) from the object, turned with it. */
+function box(o: CityObject, i: number | string, rotY: number, lx: number, y: number, lz: number, half: [number, number, number]): ColliderSpec {
+  const [wx, wz] = toWorld(o.px!, o.pz!, o.rot, lx, lz);
+  return { id: `${o.id}:${i}`, body: "fixed", pos: [wx * U, y * U, wz * U], rotY, shape: { type: "cuboid", half: [half[0] * U, half[1] * U, half[2] * U] } };
+}
+
+// Claude Code vs Codex pieces (sizes in rivalry-geometry.ts).
+function rivalryColliders(o: CityObject, rotY: number): ColliderSpec[] {
+  const size = mascotSize(o.props);
+  if (o.item_type === "clawd") {
+    const u = clawdUnit(size);
+    const base = clawdBase(size);
+    const steps =
+      size === "giant"
+        ? Array.from({ length: CLAWD.plinthSteps }, (_, i) =>
+            box(o, `step${i}`, rotY, 0, CLAWD.plinthStep * (i + 0.5), 0, [
+              ((CLAWD.plinthW - i * CLAWD.plinthShrinkW) * u) / 2,
+              CLAWD.plinthStep / 2,
+              ((CLAWD.plinthD - i * CLAWD.plinthShrinkD) * u) / 2,
+            ]),
+          )
+        : [];
+    const tall = (CLAWD.legH + CLAWD.bodyH) * u;
+    return [...steps, box(o, "body", rotY, 0, base + tall / 2, 0, [CLAWD.reach * u, tall / 2, (CLAWD.bodyD * u) / 2])];
+  }
+  if (o.item_type === "codex_cloud") {
+    const u = cloudUnit(size);
+    const pad = { id: `${o.id}:pad`, body: "fixed" as const, pos: [o.px! * U, (CLOUD.padH / 2) * U, o.pz! * U] as [number, number, number], rotY: 0, shape: { type: "cylinder" as const, radius: CLOUD.padR * u * U, halfHeight: (CLOUD.padH / 2) * U } };
+    const hover = CLOUD.hover[size];
+    const top = CLOUD.top * u;
+    const cx = ((CLOUD.x0 + CLOUD.x1) / 2) * u;
+    return [pad, box(o, "cloud", rotY, cx, hover + top / 2, 0, [((CLOUD.x1 - CLOUD.x0) * u) / 2, top / 2, CLOUD.halfD * u])];
+  }
+  if (o.item_type === "context_window") {
+    const { w, h, base, leg, legX, depth } = CONTEXT_WINDOW;
+    return [
+      box(o, "legL", rotY, -legX, base / 2, 0, [leg / 2, base / 2, leg / 2]),
+      box(o, "legR", rotY, legX, base / 2, 0, [leg / 2, base / 2, leg / 2]),
+      box(o, "screen", rotY, 0, base + h / 2, 0, [(w + 3) / 2, (h + 3) / 2, depth / 2]),
+    ];
+  }
+  // Sandbox: the fence all round and the castle; the sand itself is flat.
+  const k = SANDBOX.scale;
+  const half = (SANDBOX.size / 2) * k;
+  const fh = (SANDBOX.fenceH * k) / 2;
+  const t = 0.8 * k;
+  return [
+    box(o, "fenceN", rotY, 0, fh, -half, [half, fh, t]),
+    box(o, "fenceS", rotY, 0, fh, half, [half, fh, t]),
+    box(o, "fenceW", rotY, -half, fh, 0, [t, fh, half]),
+    box(o, "fenceE", rotY, half, fh, 0, [t, fh, half]),
+    box(o, "castle", rotY, 0, (SANDBOX.castleH * k) / 2, SANDBOX.castleZ * k, [(SANDBOX.castleW * k) / 2, (SANDBOX.castleH * k) / 2, (SANDBOX.castleD * k) / 2]),
+    // The sign stands just outside the front fence, from the ground up.
+    box(o, "sign", rotY, 0, (11 * k) / 2, half + 1 * k, [13 * k, (11 * k) / 2, 0.5 * k]),
+  ];
 }
 
 function propCollider(o: CityObject): ColliderSpec | null {

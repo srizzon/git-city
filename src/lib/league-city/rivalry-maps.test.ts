@@ -60,3 +60,17 @@ describe.each(["claude-code-town", "codex-town"] as const)("%s map", (slug) => {
     expect(lots - taken.size).toBeGreaterThan(450);
   });
 });
+
+describe("rivalry pieces are solid", () => {
+  it("every mascot and landmark gets colliders", async () => {
+    const { buildColliders } = await import("./drive/colliders");
+    const { objects } = replay("claude-code-town");
+    const cx = replay("codex-town").objects;
+    const ids = new Set(buildColliders([...objects, ...cx], [], RIVALRY_H).map((c) => c.id.split(":")[0]));
+    for (const o of [...objects, ...cx]) {
+      if (o.item_type === "clawd" || o.item_type === "codex_cloud" || o.item_type === "context_window" || o.item_type === "sandbox") {
+        expect(ids.has(o.id), `${o.item_type} ${o.id}`).toBe(true);
+      }
+    }
+  });
+});

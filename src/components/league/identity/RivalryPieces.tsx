@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { CLAWD as CLAWD_SIZE, CLOUD as CLOUD_SIZE, CONTEXT_WINDOW, SANDBOX, clawdBase, clawdUnit, cloudUnit, type MascotSize } from "@/lib/league-city/rivalry-geometry";
 
 // Claude Code vs Codex: the two mascots and one landmark per side. Voxel
 // boxes like the rest of the town; faces glow a little so they read at night.
@@ -74,12 +75,11 @@ function Sign({ map, w, h, at, rotY = 0 }: { map: THREE.Texture; w: number; h: n
   );
 }
 
-const SCALE = { small: 1, giant: 7 } as const;
-export type MascotSize = keyof typeof SCALE;
+export type { MascotSize };
 
 // ─── Clawd ───────────────────────────────────────────────────
 
-const PLINTH_STEP = 12;
+const PLINTH_STEP = CLAWD_SIZE.plinthStep;
 
 /**
  * Claude Code's crab: a wide orange block, two black eyes, stubby arms and
@@ -88,9 +88,9 @@ const PLINTH_STEP = 12;
 export function Clawd({ position, rot, size, phase = 0 }: { position: [number, number]; rot: number; size: MascotSize; phase?: number }) {
   const body = useRef<THREE.Group>(null);
   const eyes = useRef<THREE.Group>(null);
-  const u = 1.6 * SCALE[size];
+  const u = clawdUnit(size);
   // The giant stands on its plinth: the hop starts from the top step, not the ground.
-  const base = size === "giant" ? PLINTH_STEP * 3 : 0;
+  const base = clawdBase(size);
   useFrame(({ clock }) => {
     const t = clock.elapsedTime + phase;
     if (body.current) body.current.position.y = base + Math.abs(Math.sin(t * 2.2)) * u * 0.25;
@@ -129,8 +129,8 @@ export function Clawd({ position, rot, size, phase = 0 }: { position: [number, n
 export function CodexCloud({ position, rot, size, phase = 0 }: { position: [number, number]; rot: number; size: MascotSize; phase?: number }) {
   const cloud = useRef<THREE.Group>(null);
   const cursor = useRef<THREE.Mesh>(null);
-  const u = 1.5 * SCALE[size];
-  const hover = size === "giant" ? 30 : 4;
+  const u = cloudUnit(size);
+  const hover = CLOUD_SIZE.hover[size];
   useFrame(({ clock }) => {
     const t = clock.elapsedTime + phase;
     if (cloud.current) cloud.current.position.y = hover + Math.sin(t * 1.3) * u * 0.6;
@@ -182,9 +182,7 @@ export function ContextWindow({ position, rot }: { position: [number, number]; r
   const title = useTextTexture("CONTEXT WINDOW", "#ffd23f", "#2a1410", 512, 64);
   const msg = useTextTexture("Compacting conversation…", "#ffd23f", "#140a08", 512, 96);
   const said = useTextTexture("> You're absolutely right!", "#f4e3d7", "#140a08", 512, 96);
-  const W = 110;
-  const H = 66;
-  const base = 46;
+  const { w: W, h: H, base } = CONTEXT_WINDOW;
   useFrame(({ clock }) => {
     const p = (clock.elapsedTime % FILL_S) / FILL_S;
     const full = p > 0.85;
@@ -226,18 +224,21 @@ export function ContextWindow({ position, rot }: { position: [number, number]; r
 
 // ─── Sandbox (Codex landmark) ────────────────────────────────
 
+const FENCE_POSTS: [number, number][] = (() => {
+  const S = SANDBOX.size;
+  const out: [number, number][] = [];
+  for (let i = -S / 2; i <= S / 2; i += 6) out.push([i, -S / 2], [i, S / 2], [-S / 2, i], [S / 2, i]);
+  return out;
+})();
+
 /** A literal sandbox: sand pit, fence, a sand castle, a bucket and a sign. */
 export function Sandbox({ position, rot }: { position: [number, number]; rot: number }) {
   const sign = useTextTexture("SANDBOX", CYAN, "#0b0f19", 256, 64);
   const note = useTextTexture("network: off  ·  yolo: on", "#e8f1ff", "#0b0f19", 512, 64);
-  const S = 62;
-  const posts = useMemo(() => {
-    const out: [number, number][] = [];
-    for (let i = -S / 2; i <= S / 2; i += 6) out.push([i, -S / 2], [i, S / 2], [-S / 2, i], [S / 2, i]);
-    return out;
-  }, []);
+  const S = SANDBOX.size;
+  const posts = FENCE_POSTS;
   return (
-    <group position={[position[0], 0, position[1]]} rotation={[0, (-rot * Math.PI) / 180, 0]} scale={1.4}>
+    <group position={[position[0], 0, position[1]]} rotation={[0, (-rot * Math.PI) / 180, 0]} scale={SANDBOX.scale}>
       <Box at={[0, 0.8, 0]} size={[S, 1.6, S]} color="#e8c98a" glow={0.12} />
       {posts.map(([x, z], i) => (
         <Box key={i} at={[x, 2.6, z]} size={[1.2, 4, 1.2]} color="#5b8def" glow={0.4} />
