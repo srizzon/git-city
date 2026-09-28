@@ -46,7 +46,9 @@ export type ShotKind =
   | "arrival"
   | "aerial"
   | "invasion"
-  | "finale";
+  | "finale"
+  | "rise"
+  | "missileout";
 
 export type Shot = FilmShot<Stage, ShotKind>;
 

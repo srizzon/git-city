@@ -21,9 +21,8 @@ import {
   MISSILE_HIT,
   momentOf,
   BLASTS,
-  COLLAPSE,
   LOT,
-  shotFor,
+  shotFor as teaserShotFor,
   type SmashRun,
   type Stage,
 } from "@/lib/trailer/towns/teaser";
@@ -66,7 +65,7 @@ const FLIP_UP = 30;
 const FLIP_G = 70;
 const FLIP_AIR = 0.85;
 /** Implosion: one floor off every column this often (s). */
-const FLOOR_EVERY = 0.07;
+const FLOOR_EVERY = 0.04;
 
 const _pos = new THREE.Vector3();
 const _look = new THREE.Vector3();
@@ -118,6 +117,8 @@ export default function TownsRig({
   homeColor,
   rivalColor,
   attacker,
+  shotFor = teaserShotFor,
+  blasts = BLASTS,
 }: {
   stage: Stage;
   clock: FilmClock;
@@ -134,6 +135,10 @@ export default function TownsRig({
   rivalColor: string;
   /** Planted on the rubble when the tower falls. */
   attacker: string;
+  /** The film's shot under way at a beat (the teaser's by default). */
+  shotFor?: typeof teaserShotFor;
+  /** The film's flash beats (the teaser's by default). */
+  blasts?: readonly number[];
 }) {
   const camera = useThree((s) => s.camera);
   const home = useRef<THREE.Group>(null);
@@ -556,7 +561,14 @@ export default function TownsRig({
       _look.set(0, 3.5, z - 30);
       lens = 50 + 26 * (t < hit ? 0 : Math.exp(-u * 1.5) * (1 - Math.exp(-u * 12)));
       st.current.amp = 0.5;
-    } else if (shot.kind === "missile") {
+    } else if (shot.kind === "missile" || shot.kind === "missileout") {
+      // "missile": this town's car fires on the visitor; "missileout": the
+      // visitor fires on this town's car.
+      const out = shot.kind === "missileout";
+      const shooter = out ? rival.current : home.current;
+      const shooterWheels = out ? rivalWheels.current : homeWheels.current;
+      const victim = out ? home.current : rival.current;
+      const victimWheels = out ? homeWheels.current : rivalWheels.current;
       // The blue car fires on the orange one up the street: a missile with a
       // smoke tail, a fireball on the hit, and the orange car flips through
       // the air. The camera rides behind and beside the shooter.
@@ -567,8 +579,8 @@ export default function TownsRig({
       const xb = -5;
       const fire = 1 * BEAT;
       const hit = MISSILE_HIT * BEAT;
-      pose(home.current, homeWheels.current, xb, zb, MISSILE_SPEED, dt);
-      if (t < fire) pose(rival.current, rivalWheels.current, xo, zo, MISSILE_SPEED, dt);
+      pose(shooter, shooterWheels, xb, zb, MISSILE_SPEED, dt);
+      if (t < fire) pose(victim, victimWheels, xo, zo, MISSILE_SPEED, dt);
       if (t >= fire && t < hit && missile.current) {
         const u = (t - fire) / (hit - fire);
         const sx = xb,
@@ -590,7 +602,7 @@ export default function TownsRig({
         });
       }
       if (t < hit) {
-        if (t >= fire) pose(rival.current, rivalWheels.current, xo, zo, MISSILE_SPEED, dt);
+        if (t >= fire) pose(victim, victimWheels, xo, zo, MISSILE_SPEED, dt);
       } else {
         // Blown up and over: up, forward, tumbling, down on its roof.
         const u = t - hit;
@@ -601,10 +613,10 @@ export default function TownsRig({
           zHit -
           MISSILE_SPEED * 0.6 * air -
           12 * Math.max(0, u - FLIP_AIR) * Math.exp(-(u - FLIP_AIR) * 3);
-        pose(rival.current, rivalWheels.current, xo + 4 * air, zf, 0, dt, 30, y);
-        if (rival.current) {
+        pose(victim, victimWheels, xo + 4 * air, zf, 0, dt, 30, y);
+        if (victim) {
           const spin = Math.min(u, FLIP_AIR) / FLIP_AIR;
-          rival.current.rotation.set(-Math.PI * spin, Math.PI + 0.6 * spin, 0.9 * spin);
+          victim.rotation.set(-Math.PI * spin, Math.PI + 0.6 * spin, 0.9 * spin);
         }
         if (crossed(momentOf(shot, MISSILE_HIT))) {
           fx?.burst(xo, 2, zHit, {
@@ -657,7 +669,7 @@ export default function TownsRig({
       pose(rival.current, rivalWheels.current, run.x, z, INVADE_SPEED, dt);
       if (beat >= shot.start) {
         smash(run.x, z, 3.2, 2, 220, false);
-        for (const b of BLASTS) {
+        for (const b of blasts) {
           if (b < shot.start || b >= shot.end || !crossed(b)) continue;
           smash(run.x, z - 6, 24, 7, 0, true);
           fx?.burst(run.x, 6, z - 6, {
@@ -677,12 +689,34 @@ export default function TownsRig({
       _pos.set(run.x - 112 + 12 * push, 12, b0 + 26 - 6 * push);
       _look.set(run.x, 30, b0 - 10);
       lens = 42;
+    } else if (shot.kind === "rise") {
+      // Commits building the town: every building starts as rubble inside
+      // its ghost outline and gains a band of floors on every beat, popping
+      // up in a tenth of a second, until the town stands whole on the take's
+      // last beat.
+      const beats = shot.end - shot.start + shot.trim;
+      const n = Math.floor(t / BEAT);
+      const pop = Math.min(1, (t - n * BEAT) / 0.1);
+      const now = Date.now();
+      store.targets.forEach((target, i) => {
+        const at = (k: number) => Math.round((target.floors * Math.min(beats, k)) / beats);
+        const rows = Math.round(at(n) + (at(n + 1) - at(n)) * pop);
+        store.setRows(i, store.rowsOf(i).map(() => rows), now, undefined, false);
+      });
+      // Low on the main street, looking up it past the run of buildings to
+      // the mascot, pushing in slowly.
+      const push = smooth(Math.min(1, t / (beats * BEAT)));
+      const z0 = run ? run.zs[0] : 0;
+      const z1 = run ? run.zs[run.zs.length - 1] : cityZ;
+      const x = run ? run.x : 0;
+      _pos.set(-LANE, 5, z0 + 90 - 20 * push);
+      _look.set(x * 0.35, 45, z1);
+      lens = 50;
     } else if (shot.kind === "finale" && run && tower !== undefined) {
-      // Known limit: the smash store takes floors from the bottom and lets the
-      // rest fall with gravity, so an implosion this fast floats the tower up
-      // out of frame before it lands. It needs a "sink" mode in the store to
-      // read as a demolition; the teaser doesn't use this take.
+      // The rival's car rams the tallest building of the run and it comes down.
       const tz = run.zs[run.zs.length - 1];
+      // The car hits and the tower starts to come down on the take's third beat.
+      const COLLAPSE = shot.start + 2;
       const hitAt = (COLLAPSE - shot.start) * BEAT;
       const z = tz + 24 + INVADE_SPEED * Math.max(0, hitAt - t);
       pose(rival.current, rivalWheels.current, run.x, z, t < hitAt ? INVADE_SPEED : 0, dt);
@@ -697,32 +731,33 @@ export default function TownsRig({
           life: 1.2,
         });
       }
-      // Implosion: floor after floor off the bottom, the tower sinking into its own dust.
-      if (beat >= COLLAPSE && store.standing(tower) > 0) {
+      // Implosion: the tower sinks straight down into its own dust, a floor
+      // every FLOOR_EVERY, as a function of the clock (setRows without the
+      // fall, so nothing floats up), and the rival's flag goes up on the rubble.
+      if (beat >= COLLAPSE) {
         const target = store.targets[tower];
         const due = Math.floor(((beat - COLLAPSE) * BEAT) / FLOOR_EVERY);
-        const cols = store.rowsOf(tower).map((_, c) => c);
-        let taken = target.floors - Math.max(...store.rowsOf(tower));
-        while (taken < due && store.standing(tower) > 0) {
-          store.hitColumns(tower, cols, 1, Date.now(), attacker);
-          taken++;
-          fx?.burst(target.x, 2, target.z, {
+        const left = Math.max(0, target.floors - due);
+        const was = store.standing(tower);
+        store.setRows(tower, store.rowsOf(tower).map(() => left), Date.now(), undefined, false);
+        if (left === 0) store.setBy(tower, attacker);
+        if (fx && store.standing(tower) < was)
+          fx.burst(target.x, 2, target.z, {
             count: 16,
             speed: 30,
             colors: DEBRIS,
             size: 2.4,
             life: 1.2,
           });
-        }
-        st.current.shake = Math.max(st.current.shake, 0.4);
+        if (left > 0) st.current.shake = Math.max(st.current.shake, 0.4);
       }
       // Square on to the tower from across the avenue, nothing in between,
       // low and looking up: the top sinks into frame as the floors go. It
       // creeps in.
       const push = smooth(Math.min(1, t / 3.2));
-      _pos.set(run.x + side * (114 - 14 * push), 6, tz + 14);
-      _look.set(run.x, 52, tz);
-      lens = 50;
+      _pos.set(run.x + side * (140 - 14 * push), 5, tz + 10);
+      _look.set(run.x, 45, tz);
+      lens = 58;
     } else return;
 
     const k = st.current.shake;
