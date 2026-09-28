@@ -4,11 +4,14 @@
 //   soon  the Towns teaser: 1 bar intro, 3 bars of drop, silence on the
 //         freeze, then the end card's hits (Git City: src/lib/trailer/towns/teaser)
 //   demo  the kit's demo film, the same shape a bar shorter (Git City: src/lib/trailer/demo/film)
+//   launch the Towns launch trailer: a two-bar build, a burnout bar, the drop,
+//         a breakdown, the drop again, a roll, silence on the freeze, then the
+//         end card's hits (Git City: src/lib/trailer/towns/launch)
 // Everything is a function of beats, so changing BPM retimes it all; the
 // film's timeline must use the same BPM. Tweak the arrangement at the bottom.
 // Bar 1: the burnout (engine rev rising, a hit on beat 4 when the cars launch).
 // Bars 2-9: the drop. 10-13: lead melody. 14-15: build. 16: final hit.
-// Usage: node music.mjs <out.wav> [full|soon|demo]
+// Usage: node music.mjs <out.wav> [full|soon|demo|launch]
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -21,7 +24,10 @@ const BAR = BEAT * 4;
 const MODE = process.argv[3] ?? "full";
 const CUTS = { soon: { freeze: 16, card: 18 }, demo: { freeze: 12, card: 14 } };
 const TEASER = CUTS[MODE];
-const BARS = TEASER ? Math.ceil((TEASER.card + 10) / 4) : 16;
+// The launch cut, in beats: the freeze and the cut to black.
+const LAUNCH = MODE === "launch" ? { freeze: 38, card: 40 } : null;
+const GATE = TEASER ?? LAUNCH;
+const BARS = LAUNCH ? Math.ceil((LAUNCH.card + 12) / 4) : TEASER ? Math.ceil((TEASER.card + 10) / 4) : 16;
 const LEN = Math.ceil((BARS * BAR + 2.5) * SR);
 const L = new Float32Array(LEN);
 const R = new Float32Array(LEN);
@@ -231,7 +237,7 @@ function impact(t, gain = 1) {
 
 // ─── Arrangement ───
 // Bars 0-1: burnouts. Engine revs beats 0-3, launch hit on beat 3 (the 4th beat).
-for (const b of [0]) {
+for (const b of LAUNCH ? [] : [0]) {
   kick(at(b, 0), 0.8);
   engine(at(b, 0), at(b, 3), 0.24);
   riser(at(b, 1.5), at(b, 3), 0.18);
@@ -298,12 +304,11 @@ function groove(bar, { hats = true, arp = true, pad = true, bassBusy = true, dro
   if (drop) crash(at(bar), 0.9);
 }
 
-if (TEASER) {
-  for (let b = 1; b * 4 < TEASER.freeze; b++) groove(b, { drop: b === 1 });
-  // The end card (beats after the cut to black): an echo on the cut, an
-  // 8-bit kick and crunch as the name stamps on (+1), a thud on the stamp
-  // (+3), a chord stab on the line (+5) and a held note under the hold.
-  const C = TEASER.card * BEAT;
+// The end card (beats after the cut to black): an echo on the cut, an
+// 8-bit kick and crunch as the name stamps on (+1), a thud on the stamp
+// (+3), a chord stab on the line (+5) and a held note under the hold.
+function cardHits(card) {
+  const C = card * BEAT;
   tone(C, 0.9, 28, {
     wave: "sine",
     gain: 0.25,
@@ -352,6 +357,44 @@ if (TEASER) {
     detune: 10,
     sc: false,
   });
+}
+
+if (LAUNCH) {
+  // Bars 0-1, the town rising: a kick on every beat under a low drone and
+  // the pad, a riser into bar 2.
+  for (const b of [0, 1]) {
+    for (let q = 0; q < 4; q++) kick(at(b, q), 0.55 + 0.1 * b);
+    tone(at(b), BAR, 28, { wave: "saw", gain: 0.1, cutoff: 200 + 150 * b, env: [0.05, 0.2, 0.8, 0.1], sc: false });
+    for (const n of CHORDS[0].notes)
+      tone(at(b), BAR, n - 12, { wave: "saw", gain: 0.04, cutoff: 900 + 500 * b, env: [0.3, 0.4, 0.7, 0.2], detune: 14, pan: n % 2 ? 0.4 : -0.4 });
+  }
+  riser(at(1), at(2), 0.14);
+  // Bar 2, the burnout: engine revs, the launch on beat 3, the drop on bar 3.
+  kick(at(2, 0), 0.8);
+  engine(at(2, 0), at(2, 3), 0.24);
+  riser(at(2, 1.5), at(3), 0.18);
+  tone(at(2), BAR, 28, { wave: "saw", gain: 0.12, cutoff: 220, env: [0.02, 0.2, 0.8, 0.1], sc: false });
+  impact(at(3), 1.1);
+  // Bars 3-5, the blue town: the drop.
+  for (const b of [3, 4, 5]) groove(b, { drop: b === 3 });
+  // Bar 6, they build back: the drums drop out, pad and lead alone.
+  for (const n of CHORDS[1].notes)
+    tone(at(6), BAR, n - 12, { wave: "saw", gain: 0.06, cutoff: 1400, env: [0.05, 0.4, 0.7, 0.2], detune: 14, sc: false });
+  [67, 0, 72, 71, 67, 0, 64, 67].forEach((m, e) => m && lead(at(6, e / 2), (BEAT / 2) * 0.9, m));
+  riser(at(6, 2), at(7), 0.2);
+  // Bars 7-8, hitting back: the drop again, then a snare roll into the freeze.
+  groove(7, { drop: true });
+  groove(8);
+  for (let s = 0; s < 16; s++) snare(at(8, s / 4), 0.3 + 0.03 * s);
+  // Bar 9: two beats more, then silence from the freeze (the gate below).
+  kick(at(9, 0), 1);
+  kick(at(9, 1), 1);
+  snare(at(9, 1), 0.9);
+  crash(at(9, 0), 0.8);
+  cardHits(LAUNCH.card);
+} else if (TEASER) {
+  for (let b = 1; b * 4 < TEASER.freeze; b++) groove(b, { drop: b === 1 });
+  cardHits(TEASER.card);
 } else {
   for (let b = 1; b < 9; b++) groove(b, { drop: b === 1 || b === 5 });
 
@@ -416,10 +459,10 @@ for (let i = dly; i < LEN; i++) {
   R[i] += echoR[i - dly] * 0.6;
 }
 
-// The teaser's freeze: hard silence from the freeze until the cut to black.
-if (TEASER) {
-  const s0 = Math.floor(TEASER.freeze * BEAT * SR),
-    s1 = Math.floor(TEASER.card * BEAT * SR) - 40;
+// The freeze: hard silence from the freeze until the cut to black.
+if (GATE) {
+  const s0 = Math.floor(GATE.freeze * BEAT * SR),
+    s1 = Math.floor(GATE.card * BEAT * SR) - 40;
   for (let i = s0; i < s1 && i < LEN; i++) {
     const k = i < s0 + 220 ? 1 - (i - s0) / 220 : 0;
     L[i] *= k;

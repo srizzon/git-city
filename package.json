@@ -34,7 +34,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "trailer:export": "node .claude/skills/gg/kit/tools/export.mjs",
-    "trailer:audio": "node .claude/skills/gg/kit/tools/music.mjs public/trailer/towns-teaser.wav soon && node .claude/skills/gg/kit/tools/music.mjs public/trailer/demo.wav demo && node .claude/skills/gg/kit/tools/sfx.mjs public/trailer/sfx"
+    "trailer:audio": "node .claude/skills/gg/kit/tools/music.mjs public/trailer/towns-teaser.wav soon && node .claude/skills/gg/kit/tools/music.mjs public/trailer/towns-launch.wav launch && node .claude/skills/gg/kit/tools/music.mjs public/trailer/demo.wav demo && node .claude/skills/gg/kit/tools/sfx.mjs public/trailer/sfx"
   },
   "dependencies": {
     "@pmndrs/detect-gpu": "^6.0.8",

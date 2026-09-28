@@ -50,6 +50,8 @@ export interface EndCardProps {
    */
   button?: ReactNode;
   at?: CardBeats;
+  /** The name's size (cqw, the stage's width in hundredths). A longer name wants it smaller. */
+  size?: number;
 }
 
 /** The name's letters land this many beats apart. */
@@ -74,6 +76,7 @@ export default function EndCard({
   line,
   button,
   at = CARD_BEATS,
+  size = 10.5,
 }: EndCardProps) {
   // Beats since the cut to black.
   const beat = useCallback(() => beatOf(clock) - start, [clock, start]);
@@ -134,8 +137,8 @@ export default function EndCard({
               position: "relative",
               display: "flex",
               alignItems: "flex-end",
-              gap: "3.2cqw",
-              fontSize: "10.5cqw",
+              gap: `${size * 0.3}cqw`,
+              fontSize: `${size}cqw`,
               lineHeight: 1,
             }}
           >
@@ -158,7 +161,7 @@ export default function EndCard({
                           transformOrigin: hit ? "left bottom" : "center",
                         }}
                       >
-                        {ch}
+                        {ch === " " ? "\u00a0" : ch}
                       </span>
                     );
                   })}
