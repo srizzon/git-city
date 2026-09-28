@@ -712,6 +712,7 @@ export default function LeagueScene({
           onBuildingClick={editing || driving ? undefined : onBuildingClick}
           smash={smash}
           ghostColor={smashTown?.color}
+          noLabels={cinematic}
         />
       </Rise>
       {smashTown && !editing && <RubbleFlags store={smashTown.store} logoUrl={smashTown.rivalLogoUrl} />}

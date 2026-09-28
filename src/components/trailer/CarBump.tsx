@@ -37,9 +37,21 @@ export interface CarBumpProps {
   color: string;
   /** Where its nose stops: against the last letter (% of the card's width). */
   stopX: number;
+  /** The baseline its wheels roll on (% of the card's height), and its size (1 = the Git City name's). */
+  baseY?: number;
+  scale?: number;
 }
 
-function Car({ clock, beat: secondsPerBeat, from, bump, color, stopX }: CarBumpProps) {
+function Car({
+  clock,
+  beat: secondsPerBeat,
+  from,
+  bump,
+  color,
+  stopX,
+  baseY = BASE_Y,
+  scale = 1,
+}: CarBumpProps) {
   const car = useRef<THREE.Group>(null);
   const wheels = useRef<(THREE.Object3D | null)[]>([]);
   const spin = useRef(0);
@@ -61,7 +73,7 @@ function Car({ clock, beat: secondsPerBeat, from, bump, color, stopX }: CarBumpP
     const tHit = bump * secondsPerBeat;
     // In at speed, braking into the letter; a bounce back off it, then still.
     const x0 = 118;
-    const stop = stopX + CAR_LEN / 2;
+    const stop = stopX + (CAR_LEN * scale) / 2;
     let x: number;
     let speed: number;
     if (t < tHit) {
@@ -78,9 +90,9 @@ function Car({ clock, beat: secondsPerBeat, from, bump, color, stopX }: CarBumpP
     const pitch = since > 0 ? -0.12 * Math.exp(-since * 7) * Math.cos(since * 30) : 0;
     const honk =
       since > 0.16 && since < 0.4 ? Math.abs(Math.sin((since - 0.16) * Math.PI * 8)) * 0.35 : 0;
-    g.position.set(x - W / 2, -(BASE_Y / 100) * H + H / 2 + honk, 0);
+    g.position.set(x - W / 2, -(baseY / 100) * H + H / 2 + honk * scale, 0);
     g.rotation.set(0, -Math.PI / 2 + 0.28, pitch);
-    spin.current += (speed * dt) / (WHEEL.radius * M_TO_UNIT * CAR_SCALE);
+    spin.current += (speed * dt) / (WHEEL.radius * M_TO_UNIT * CAR_SCALE * scale);
     WHEELS.forEach((w, i) => {
       const o = wheels.current[i];
       if (!o) return;
@@ -95,7 +107,7 @@ function Car({ clock, beat: secondsPerBeat, from, bump, color, stopX }: CarBumpP
     });
   });
   return (
-    <group ref={car} scale={CAR_SCALE} visible={false}>
+    <group ref={car} scale={CAR_SCALE * scale} visible={false}>
       <Suspense fallback={null}>
         <CarModel color={color} wheelRefs={wheels} />
       </Suspense>

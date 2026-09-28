@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import {
   generateCityLayout,
@@ -14,8 +14,8 @@ import { LOT } from "@/lib/league-city/grid";
 import { leagueBuildings, scaleTownHeights } from "@/lib/league-city/buildings";
 import { smashStoreFor } from "@/lib/league-city/smash";
 import { Transport } from "@trailer-kit/clock";
-import type { Frame } from "@trailer-kit/film";
-import { FILM, smashRun, type Stage } from "@/lib/trailer/towns/teaser";
+import type { Film, Frame } from "@trailer-kit/film";
+import { BLASTS, FILM, shotFor, smashRun, type Stage } from "@/lib/trailer/towns/teaser";
 import Studio from "@trailer-kit/Studio";
 import TownsRig from "@/components/trailer/towns/TownsRig";
 import EndCard from "@/components/trailer/towns/EndCard";
@@ -86,12 +86,31 @@ function plainStreet(objects: readonly CityObject[]): number {
   return -2 * LOT;
 }
 
+/** Another film in the same towns (the launch trailer): its data, its shots, and its end card. */
+export interface TownsCut {
+  film: Film<Stage>;
+  shotFor: typeof shotFor;
+  blasts: readonly number[];
+  endCard: (clock: Transport) => ReactNode;
+  /** The studio's title. */
+  title?: string;
+}
+
+const TEASER: TownsCut = {
+  film: FILM,
+  shotFor,
+  blasts: BLASTS,
+  endCard: (clock) => <EndCard clock={clock} />,
+};
+
 export default function TownsFilm({
   sides,
   cityNorms,
+  cut = TEASER,
 }: {
   sides: [TownSide, TownSide];
   cityNorms: LayoutNorms;
+  cut?: TownsCut;
 }) {
   const [claudeSide, codexSide] = sides;
   // A new take (or a loop, or a seek back) rebuilds the smash stores, so every building is back up.
@@ -99,7 +118,7 @@ export default function TownsFilm({
   const reset = useCallback(() => setGen((g) => g + 1), []);
   const claude = useTown(claudeSide, cityNorms, gen);
   const codex = useTown(codexSide, cityNorms, gen);
-  const [clock] = useState(() => new Transport(FILM.beat));
+  const [clock] = useState(() => new Transport(cut.film.beat));
 
   const town = (stage: Stage, frame: Frame<Stage>) => {
     const side = stage === "claude" ? claudeSide : codexSide;
@@ -145,6 +164,8 @@ export default function TownsFilm({
               homeColor={side.color}
               rivalColor={other.color}
               attacker={other.name}
+              shotFor={cut.shotFor}
+              blasts={cut.blasts}
             />
           </LeagueScene>
         </div>
@@ -153,13 +174,13 @@ export default function TownsFilm({
   };
 
   return (
-    <Studio film={FILM} clock={clock} onReset={reset} title="Towns teaser">
+    <Studio film={cut.film} clock={clock} onReset={reset} title={cut.title ?? "Towns teaser"}>
       {(frame) => (
         <>
           {town("claude", frame)}
           {town("codex", frame)}
           {frame.kind === "black" && <div className="absolute inset-0 bg-black" />}
-          <EndCard clock={clock} />
+          {cut.endCard(clock)}
         </>
       )}
     </Studio>

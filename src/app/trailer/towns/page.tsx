@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import { getLeagueBySlug } from "@/lib/leagues/service";
-import { getCityNorms, getLeagueCityDevs, getLeagueMembers } from "@/lib/leagues/queries";
-import { getCachedCity } from "@/lib/league-city/service";
+import { getCityNorms } from "@/lib/leagues/queries";
 import { RIVALRY } from "@/lib/towns/rivalry";
-import { townDisplayName } from "@/lib/towns/names";
 import TownsFilm, { type TownSide } from "./towns-film";
+import { loadSide } from "./load-side";
 
 // The Git City Towns teaser in the trailer studio (.claude/skills/gg/kit/README.md):
 // played live in the engine so the film is one screen recording. Not linked
@@ -22,22 +20,6 @@ export default async function TownsTeaserPage() {
   // A fork without the rivalry towns gets told what the example needs, not a bare 404.
   if (sides.some((s) => !s)) return <MissingTowns />;
   return <TownsFilm sides={sides as [TownSide, TownSide]} cityNorms={norms} />;
-}
-
-async function loadSide(r: (typeof RIVALRY)[number]): Promise<TownSide | null> {
-  const league = await getLeagueBySlug(r.slug);
-  if (!league) return null;
-  const [members, city] = await Promise.all([
-    getLeagueMembers(league.id),
-    getCachedCity(league.id),
-  ]);
-  return {
-    slug: r.slug,
-    name: townDisplayName(league.name),
-    color: r.color,
-    city,
-    cityDevs: await getLeagueCityDevs(members),
-  };
 }
 
 function MissingTowns() {

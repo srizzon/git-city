@@ -104,6 +104,8 @@ interface CitySceneProps {
   /** Drive-through destruction (rival towns, see lib/league-city/smash). */
   smash?: SmashStore;
   ghostColor?: string;
+  /** No name tags over the buildings (the trailer films). */
+  noLabels?: boolean;
 }
 
 // Tells the loading screen the city is on screen: two rendered frames after
@@ -129,6 +131,7 @@ export default function CityScene({
   onFocusInfo,
   introMode,
   flyMode,
+  noLabels,
   ghostPreviewLogin,
   holdRise,
   liveByLogin,
@@ -230,13 +233,13 @@ export default function CityScene({
       )}
 
       {/* All labels: single instanced draw call with billboard shader */}
-      <InstancedLabels
+      {!noLabels && <InstancedLabels
         buildings={buildings}
         introMode={introMode}
         flyMode={flyMode}
         focusedBuilding={focusedBuilding}
         focusedBuildingB={focusedBuildingB}
-      />
+      />}
 
       {/* Effects: React components only for nearby buildings with items (?fx=0 turns them off to measure phones) */}
       {!NO_FX && <EffectsLayer
