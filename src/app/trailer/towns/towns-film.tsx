@@ -19,6 +19,7 @@ import { BLASTS, FILM, shotFor, smashRun, type Stage } from "@/lib/trailer/towns
 import Studio from "@trailer-kit/Studio";
 import TownsRig from "@/components/trailer/towns/TownsRig";
 import EndCard from "@/components/trailer/towns/EndCard";
+import type { MonumentTown } from "@/components/towns/TownMonument";
 
 const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
   ssr: false,
@@ -52,7 +53,16 @@ function useTown(side: TownSide, cityNorms: LayoutNorms, gen: number) {
     const run = real.length ? smashRun(side.city.objects, side.city.h, real[0]) : null;
     const buildings = run ? [...real, ...run.buildings] : real;
     const portal = side.city.objects.find((o) => o.item_type === "portal");
-    return { buildings, run, gateZ: portal?.pz ?? 24, revZ: plainStreet(side.city.objects) };
+    const giant = side.city.objects.find(
+      (o) => (o.item_type === "clawd" || o.item_type === "codex_cloud") && (o.props as { size?: string } | null)?.size === "giant",
+    );
+    const facts: TownFacts = {
+      side,
+      tallest: [...real].sort((a, b) => b.height - a.height).map((b) => b.loginLower),
+      faces: devs.filter((d) => d.avatar_url).map((d) => ({ login: d.github_login, avatar_url: d.avatar_url })),
+      mascot: giant ? [giant.px ?? giant.x * LOT, giant.pz ?? giant.z * LOT] : undefined,
+    };
+    return { buildings, run, gateZ: portal?.pz ?? 24, revZ: plainStreet(side.city.objects), facts };
   }, [side, cityNorms]);
   // A fresh store puts every building back up (a new take, a loop, a seek back).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,6 +96,24 @@ function plainStreet(objects: readonly CityObject[]): number {
   return -2 * LOT;
 }
 
+/** What a cut hands each town's rig beyond the teaser's (see TownsRig). */
+export interface RigExtras {
+  hero?: string;
+  mascot?: [number, number];
+  monument?: MonumentTown | null;
+  riseFrom?: number;
+}
+
+/** What a cut can read about each town: its side, the logins by height, the giant mascot. */
+export interface TownFacts {
+  side: TownSide;
+  /** Real members' buildings, tallest first. */
+  tallest: string[];
+  /** Members' logins and avatars. */
+  faces: { login: string; avatar_url: string | null }[];
+  mascot?: [number, number];
+}
+
 /** Another film in the same towns (the launch trailer): its data, its shots, and its end card. */
 export interface TownsCut {
   film: Film<Stage>;
@@ -94,6 +122,10 @@ export interface TownsCut {
   endCard: (clock: Transport) => ReactNode;
   /** The studio's title. */
   title?: string;
+  /** Extra props for a town's rig. */
+  rig?: (stage: Stage, town: TownFacts) => RigExtras;
+  /** A DOM layer over the pictures (under the titles), on the same clock. */
+  overlay?: (clock: Transport, towns: [TownFacts, TownFacts]) => ReactNode;
 }
 
 const TEASER: TownsCut = {
@@ -166,6 +198,7 @@ export default function TownsFilm({
               attacker={other.name}
               shotFor={cut.shotFor}
               blasts={cut.blasts}
+              {...cut.rig?.(stage, t.facts)}
             />
           </LeagueScene>
         </div>
@@ -180,6 +213,7 @@ export default function TownsFilm({
           {town("claude", frame)}
           {town("codex", frame)}
           {frame.kind === "black" && <div className="absolute inset-0 bg-black" />}
+          {cut.overlay?.(clock, [claude.facts, codex.facts])}
           {cut.endCard(clock)}
         </>
       )}

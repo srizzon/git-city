@@ -10,6 +10,8 @@ import { WHEELS } from "@/lib/league-city/drive/vehicle";
 import { LANE } from "@/lib/league-city/intro";
 import { RAMP_BIG } from "@/lib/league-city/ramp";
 import type { SmashStore } from "@/lib/league-city/smash";
+import LeagueCrown3D from "@/components/LeagueCrown3D";
+import TownMonument, { type MonumentTown } from "@/components/towns/TownMonument";
 import {
   BEAT,
   BOOST_HIT,
@@ -66,6 +68,10 @@ const FLIP_G = 70;
 const FLIP_AIR = 0.85;
 /** Implosion: one floor off every column this often (s). */
 const FLOOR_EVERY = 0.04;
+/** The monument, scaled to the town (its plaza size is far bigger), its height, and how far in front of the mascot it stands. */
+const MONUMENT_SIZE = 0.16;
+const MONUMENT_H = 100;
+const MONUMENT_AHEAD = 150;
 
 const _pos = new THREE.Vector3();
 const _look = new THREE.Vector3();
@@ -119,6 +125,10 @@ export default function TownsRig({
   attacker,
   shotFor = teaserShotFor,
   blasts = BLASTS,
+  hero,
+  mascot,
+  monument = null,
+  riseFrom = 0,
 }: {
   stage: Stage;
   clock: FilmClock;
@@ -139,6 +149,14 @@ export default function TownsRig({
   shotFor?: typeof teaserShotFor;
   /** The film's flash beats (the teaser's by default). */
   blasts?: readonly number[];
+  /** The building the floor, grow and crown shots are about (a login). */
+  hero?: string;
+  /** Where the giant mascot stands (world x, z). */
+  mascot?: [number, number];
+  /** The town the monument shot shows winning, if any. */
+  monument?: MonumentTown | null;
+  /** Rise: the share of its floors every building starts from. */
+  riseFrom?: number;
 }) {
   const camera = useThree((s) => s.camera);
   const home = useRef<THREE.Group>(null);
@@ -148,6 +166,9 @@ export default function TownsRig({
   const bursts = useRef<VoxelBursts | null>(null);
   const missile = useRef<THREE.Group>(null);
   const st = useRef({ last: -1, shake: 0, spin: 0, amp: 1 });
+  const crown = useRef<THREE.Group>(null);
+  const monumentRef = useRef<THREE.Group>(null);
+  const heroIndex = useMemo(() => (hero ? store.index.get(hero.toLowerCase()) : undefined), [hero, store]);
 
   // The tower is the run's last (tallest) building.
   const tower = useMemo(
@@ -237,6 +258,8 @@ export default function TownsRig({
     if (home.current) home.current.visible = false;
     if (rival.current) rival.current.visible = false;
     if (missile.current) missile.current.visible = false;
+    if (crown.current) crown.current.visible = false;
+    if (monumentRef.current) monumentRef.current.visible = false;
     st.current.shake = Math.max(0, st.current.shake - dt * 2.2);
 
     st.current.amp = 1;
@@ -660,10 +683,10 @@ export default function TownsRig({
       _look.set(LANE, 9, z - 70);
     } else if (shot.kind === "aerial") {
       // Slow orbit, the two towns turned toward each other across the split.
-      const a = (stage === "claude" ? -0.75 : 0.75) + (stage === "claude" ? 1 : -1) * 0.05 * t;
-      const r = width * 0.92;
-      _look.set(0, 25, cityZ);
-      _pos.set(Math.sin(a) * r, r * 0.62, cityZ + Math.cos(a) * r);
+      const a = (stage === "claude" ? -0.75 : 0.75) + (stage === "claude" ? 1 : -1) * 0.12 * t;
+      const r = width * 0.5;
+      _look.set(0, 30, cityZ);
+      _pos.set(Math.sin(a) * r, r * 0.38, cityZ + Math.cos(a) * r);
     } else if (shot.kind === "invasion" && run) {
       const z = run.zs[0] + LOT * 0.9 - INVADE_SPEED * t;
       pose(rival.current, rivalWheels.current, run.x, z, INVADE_SPEED, dt);
@@ -689,6 +712,97 @@ export default function TownsRig({
       _pos.set(run.x - 112 + 12 * push, 12, b0 + 26 - 6 * push);
       _look.set(run.x, 30, b0 - 10);
       lens = 42;
+    } else if (shot.kind === "floor" || shot.kind === "grow" || shot.kind === "crown") {
+      // One building and its roof. "floor": the town stands low and a commit
+      // slams a band of floors onto this one (the second take picks up where
+      // the first left off). "grow": a dev's building gains two bands, a beat
+      // apart. "crown": the building stands whole and the week's crown drops
+      // onto it. The camera sits above the neighbours' roofs, looking at its top.
+      if (heroIndex === undefined) return;
+      const b = store.targets[heroIndex];
+      const now = Date.now();
+      const n = Math.floor(t / BEAT);
+      const pop = Math.min(1, (t - n * BEAT) / 0.08);
+      let frac = 1;
+      if (shot.kind === "floor") {
+        const second = shot.name.endsWith("2");
+        const from = second ? 0.45 : 0.3;
+        frac = from + 0.15 * pop;
+        store.targets.forEach((_, i) => {
+          if (i === heroIndex) return;
+          const rows = Math.round(store.targets[i].floors * riseFrom);
+          store.setRows(i, store.rowsOf(i).map(() => rows), now, undefined, false);
+        });
+      } else if (shot.kind === "grow") {
+        frac = n < 1 ? 0.7 + 0.15 * pop : 0.85 + 0.15 * pop;
+      }
+      const rows = Math.max(1, Math.round(b.floors * frac));
+      store.setRows(heroIndex, store.rowsOf(heroIndex).map(() => rows), now, undefined, false);
+      const top = rows * b.floorH;
+      if (fx && pop < 1 && shot.kind !== "crown")
+        fx.burst(b.x, top, b.z, { count: 3, speed: 14, colors: DEBRIS, size: 1.4, life: 0.5 });
+      if (pop < 0.5 && shot.kind !== "crown") st.current.shake = Math.max(st.current.shake, 0.5);
+      if (shot.kind === "crown" && crown.current) {
+        // It drops from high above in a quarter beat, bounces once, then floats.
+        const land = 0.5 * BEAT;
+        const u = Math.min(1, t / land);
+        const bounce = t > land ? 6 * Math.exp(-(t - land) * 8) * Math.abs(Math.sin((t - land) * 18)) : 0;
+        crown.current.visible = true;
+        crown.current.position.set(b.x, 220 * (1 - u) * (1 - u) + bounce, b.z);
+        if (crossed(shot.start + 0.5)) {
+          st.current.shake = 1;
+          fx?.burst(b.x, top + 20, b.z, { count: 40, speed: 30, colors: ["#ffd24a", "#ffe9a8", "#ffb800"], size: 1.6, life: 0.9 });
+        }
+      }
+      // Above the neighbours, off one corner, looking at the roof; the crown
+      // take cranes up with it.
+      const crowned = shot.kind === "crown";
+      const crane = crowned ? smooth(Math.min(1, t / (4 * BEAT))) : 0;
+      const r = Math.max(60, b.w * 2.2) * (crowned ? 1.8 : 1);
+      _pos.set(b.x + r * 0.75, top + (crowned ? 5 : 10) + 20 * crane, b.z + r);
+      _look.set(b.x, top + (crowned ? 26 : -8) + 6 * crane, b.z);
+      lens = shot.kind === "crown" ? 46 : 42;
+      st.current.amp = 0.4;
+    } else if (shot.kind === "mascot" && mascot) {
+      // The town's giant mascot from low in its square, every building up,
+      // the camera easing in.
+      store.targets.forEach((target, i) =>
+        store.setRows(i, store.rowsOf(i).map(() => target.floors), Date.now(), undefined, false),
+      );
+      const push = smooth(Math.min(1, t / (8 * BEAT)));
+      const [mx, mz] = mascot;
+      _pos.set(mx + 40, 22, mz + 340 - 40 * push);
+      _look.set(mx, 75, mz);
+      lens = 44;
+    } else if (shot.kind === "regrow" && run && tower !== undefined) {
+      // They code too: the fallen tower comes back a band a beat, lit.
+      const target = store.targets[tower];
+      const n = Math.floor(t / BEAT);
+      const pop = Math.min(1, (t - n * BEAT) / 0.08);
+      const frac = Math.min(0.8, 0.2 * (n + pop));
+      const rows = Math.round(target.floors * frac);
+      store.setRows(tower, store.rowsOf(tower).map(() => rows), Date.now(), undefined, false);
+      if (fx && pop < 1)
+        fx.burst(target.x, rows * target.floorH, target.z, { count: 4, speed: 12, colors: ["#8fa3c7", "#ffffff"], size: 1.4, life: 0.5 });
+      const tz = run.zs[run.zs.length - 1];
+      _pos.set(run.x + side * 126, 5, tz + 10);
+      _look.set(run.x, 45, tz);
+      lens = 58;
+    } else if (shot.kind === "monument" && mascot && monumentRef.current) {
+      // The week's monument goes up in the square in front of the mascot, in
+      // two steps on the beat, seen from low in front.
+      const [mx, mz] = mascot;
+      const n = Math.min(2, Math.floor(t / BEAT) + 1);
+      const pop = Math.min(1, (t - (n - 1) * BEAT) / 0.1);
+      const up = Math.min(1, (n - 1 + pop) / 2);
+      const g = monumentRef.current;
+      g.visible = true;
+      g.position.set(mx, -MONUMENT_H * (1 - up), mz + MONUMENT_AHEAD);
+      if (pop < 0.5) st.current.shake = Math.max(st.current.shake, 0.6);
+      const push = smooth(Math.min(1, t / (4 * BEAT)));
+      _pos.set(mx + 50, 60, mz + MONUMENT_AHEAD + 230 - 25 * push);
+      _look.set(mx, 58, mz + MONUMENT_AHEAD);
+      lens = 50;
     } else if (shot.kind === "rise") {
       // Commits building the town: every building starts as rubble inside
       // its ghost outline and gains a band of floors on every beat, popping
@@ -699,7 +813,8 @@ export default function TownsRig({
       const pop = Math.min(1, (t - n * BEAT) / 0.1);
       const now = Date.now();
       store.targets.forEach((target, i) => {
-        const at = (k: number) => Math.round((target.floors * Math.min(beats, k)) / beats);
+        const at = (k: number) =>
+          Math.round(target.floors * (riseFrom + ((1 - riseFrom) * Math.min(beats, k)) / beats));
         const rows = Math.round(at(n) + (at(n + 1) - at(n)) * pop);
         store.setRows(i, store.rowsOf(i).map(() => rows), now, undefined, false);
       });
@@ -790,6 +905,23 @@ export default function TownsRig({
       <group ref={missile} visible={false}>
         <Missile />
       </group>
+      {heroIndex !== undefined && (
+        <group ref={crown} visible={false}>
+          <LeagueCrown3D
+            width={store.targets[heroIndex].w}
+            height={store.targets[heroIndex].floors * store.targets[heroIndex].floorH}
+            depth={store.targets[heroIndex].d}
+          />
+        </group>
+      )}
+      {monument && (
+        <group ref={monumentRef} visible={false}>
+          {/* Its front faces the home camera; turn it to face south, toward the entrance. */}
+          <group rotation={[0, -Math.atan2(-500, 850) - Math.PI, 0]} scale={MONUMENT_SIZE}>
+            <TownMonument town={monument} variant="gate" />
+          </group>
+        </group>
+      )}
       <Bursts ref={bursts} />
     </>
   );

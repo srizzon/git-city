@@ -48,7 +48,14 @@ export type ShotKind =
   | "invasion"
   | "finale"
   | "rise"
-  | "missileout";
+  | "missileout"
+  | "ui"
+  | "floor"
+  | "grow"
+  | "mascot"
+  | "regrow"
+  | "crown"
+  | "monument";
 
 export type Shot = FilmShot<Stage, ShotKind>;
 
