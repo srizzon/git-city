@@ -55,7 +55,8 @@ export type ShotKind =
   | "mascot"
   | "regrow"
   | "crown"
-  | "monument";
+  | "monument"
+  | "arrivalout";
 
 export type Shot = FilmShot<Stage, ShotKind>;
 
@@ -249,6 +250,7 @@ export function smashRun(
   objects: readonly CityObject[],
   h: number,
   model: CityBuilding,
+  heights: readonly number[] = EXTRA_HEIGHTS,
 ): SmashRun | null {
   const taken = new Set(objects.map((o) => `${o.x},${o.z}`));
   for (const col of [1, -1, 3, -3]) {
@@ -259,7 +261,7 @@ export function smashRun(
     const [x] = lotToWorld(col, rows[0]);
     const zs = rows.map((z) => lotToWorld(col, z)[1]);
     const buildings = zs.map((z, i) => {
-      const height = EXTRA_HEIGHTS[i];
+      const height = heights[i];
       const w = 36 + ((i * 7) % 9);
       const login = `teaser-${col}-${i}`;
       return {

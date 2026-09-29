@@ -9,7 +9,6 @@
 
 import {
   buildShots,
-  momentOf,
   shotFor as filmShotFor,
   type Film,
   type Frame,
@@ -17,32 +16,29 @@ import {
   type Take,
   type TitleCue,
 } from "@trailer-kit/film";
-import { BEAT, CORNER_HIT, DRIFT_ARC, DRIFT_IN, type Shot, type ShotKind, type Stage } from "./teaser";
+import { BEAT, type Shot, type ShotKind, type Stage } from "./teaser";
 
 /** The takes: [name, stage, kind, beats long, trim, freeze] (see @trailer-kit/film). "ui" takes are the DOM layer on black. */
 const TAKES: Take<Stage, ShotKind>[] = [
-  // The hook: a commit, a floor; a push, a floor; a roll, the whole town.
-  ["Type commit", "claude", "ui", 3, 0],
+  // The hook: a commit, a floor; a push, a floor; one more, the whole town.
+  ["Type commit", "claude", "ui", 4, 0],
   ["Floor", "claude", "floor", 2, 0],
   ["Type push", "claude", "ui", 2, 0],
   ["Floor 2", "claude", "floor", 2, 0],
-  ["Type roll", "claude", "ui", 1, 0],
-  ["Rise", "claude", "rise", 6, 0],
+  ["Type win", "claude", "ui", 5, 0],
+  ["Rise", "claude", "rise", 5, 0],
   // Pick a side.
   ["Sides", "both", "mascot", 8, 0],
-  // Code all week: a day a bar, two beats in a town, two on the board.
-  ["Board", "claude", "ui", 2, 0],
-  ["Mon", "claude", "grow", 2, 0],
-  ["Board Mon", "claude", "ui", 2, 0],
-  ["Tue", "codex", "grow", 2, 0],
-  ["Board Tue", "claude", "ui", 2, 0],
-  ["Wed", "codex", "grow", 2, 0],
-  ["Board Wed", "claude", "ui", 4, 0],
-  // It gets personal: into their town, and they build back.
-  ["Thu", "codex", "cornersmash", 4, 1.6],
-  ["Tower", "codex", "finale", 5, 1],
+  // Code all week: a bar a day, one take each, the building growing on the
+  // left while the board beside it counts the day in.
+  ["Mon", "claude", "grow", 4, 0],
+  ["Tue", "codex", "grow", 4, 0],
+  ["Wed", "codex", "grow", 4, 0],
+  // It gets personal: through their arch, their tallest tower down, and on
+  // Friday, from its rubble under Claude's flag, they build it back.
+  ["Thu", "codex", "arrivalout", 4, 0],
+  ["Tower", "codex", "finale", 4, 0],
   ["Fri", "codex", "regrow", 4, 0],
-  ["Board Fri", "claude", "ui", 3, 0],
   // Sunday: the cuts shorten toward midnight.
   ["Sun", "claude", "aerial", 2, 0],
   ["Sun 2", "codex", "aerial", 2, 0],
@@ -103,16 +99,17 @@ export function perDev(side: Side, days: number): number {
   return sum;
 }
 
-/** The takes that show the board, the terminal, or the Sunday clock. */
+/** The takes that show the terminal, the board (beside a day's take, or full at midnight), or the Sunday clock. */
 export const UI = {
-  terminal: ["Type commit", "Type push", "Type roll"].map(take),
-  board: ["Board", "Board Mon", "Board Tue", "Board Wed", "Board Fri", "Midnight"].map(take),
+  terminal: ["Type commit", "Type push", "Type win"].map(take),
+  panel: ["Mon", "Tue", "Wed", "Fri"].map(take),
+  midnight: take("Midnight"),
   sides: take("Sides"),
-  sunday: [take("Sun").start, take("Midnight").end] as [number, number],
+  sunday: [take("Sun").start, take("Midnight").start] as [number, number],
 };
 
-/** Days on the board at each board take's start, rolled in over its first beat. */
-const BOARD_DAYS = [0, 1, 2, 3, 5, 7];
+/** The day each panel take counts in (Thursday passes off the board), rolled in over its second beat, when its building pops. */
+const PANEL_DAYS = [1, 2, 3, 5];
 
 /** How many days are in at a beat (0 to 7), as the board shows them. */
 export function daysAt(beat: number): number {
@@ -120,19 +117,19 @@ export function daysAt(beat: number): number {
   if (beat >= FREEZE) return 7;
   if (beat >= sun) return 6 + (beat - sun) / (FREEZE - sun);
   let days = 0;
-  UI.board.forEach((s, i) => {
-    if (i === BOARD_DAYS.length - 1 || beat < s.start) return;
-    const from = i === 0 ? 0 : BOARD_DAYS[i - 1];
-    days = from + (BOARD_DAYS[i] - from) * Math.min(1, beat - s.start);
+  UI.panel.forEach((s, i) => {
+    if (beat < s.start) return;
+    const from = i === 0 ? 0 : PANEL_DAYS[i - 1];
+    days = from + (PANEL_DAYS[i] - from) * Math.max(0, Math.min(1, beat - s.start - 1));
   });
   return days;
 }
 
 /** What each typed take types. */
-export const TYPED = ['git commit -m "ship it"', "git push", 'git commit -am "one more"'];
+export const TYPED = ['git commit -m "ship it"', "git push", 'git commit -m "win the week"'];
 
-/** Beats that flash the screen: the corner hit, the tower. */
-export const BLASTS: number[] = [momentOf(take("Thu"), CORNER_HIT), take("Tower").start + 1];
+/** Beats that flash the screen: the tower hit. */
+export const BLASTS: number[] = [take("Tower").start + 2];
 
 const SKID = "/sounds/drive/skid.ogg";
 const IMPACT = "/sounds/drive/impact.ogg";
@@ -141,9 +138,12 @@ const KEY = "/trailer/sfx/key.wav";
 const WHOOSH = "/trailer/sfx/whoosh.wav";
 const HORN = "/trailer/sfx/horn.wav";
 
-/** When the typed take's `k`-th character lands (the last quarter beat is the Enter's). */
+/** Beats per typed character: fast typing, slow enough to read. */
+const KEY_EVERY = 0.125;
+
+/** When the typed take's `k`-th character lands; the whole line then holds until the Enter on the take's end. */
 export function keyBeat(s: Shot, i: number, k: number): number {
-  return s.start + (k / TYPED[i].length) * (s.end - s.start - 0.25);
+  return s.start + 0.25 + k * KEY_EVERY;
 }
 
 /** A key click for every character typed, and the Enter. */
@@ -164,24 +164,23 @@ export const SOUNDS: SoundCue[] = [
   ...typing(),
   // A floor slams down on each Enter; the town rises a band a beat.
   ...["Floor", "Floor 2"].map((n) => ({ beat: take(n).start, src: IMPACT, gain: 1, rate: 0.7 })),
-  ...Array.from({ length: 6 }, (_, i) => ({
+  ...Array.from({ length: take("Rise").end - take("Rise").start }, (_, i) => ({
     beat: take("Rise").start + i,
     src: IMPACT,
     gain: 0.4 + 0.08 * i,
     rate: 0.75 + 0.05 * i,
   })),
-  // Growing buildings pop on their beats.
+  // Each day's building pops twice, a beat apart, as the board counts it in.
   ...["Mon", "Tue", "Wed"].flatMap((n) => [
-    { beat: take(n).start, src: IMPACT, gain: 0.5, rate: 1.1 },
-    { beat: take(n).start + 1, src: IMPACT, gain: 0.6, rate: 1.2 },
+    { beat: take(n).start + 1, src: IMPACT, gain: 0.6, rate: 1.1 },
+    { beat: take(n).start + 2, src: IMPACT, gain: 0.7, rate: 1.2 },
   ]),
-  // Thursday.
-  { beat: momentOf(take("Thu"), DRIFT_IN / BEAT), src: SKID, gain: 0.8, dur: DRIFT_ARC },
-  { beat: momentOf(take("Thu"), CORNER_HIT), src: IMPACT, gain: 1 },
-  { beat: momentOf(take("Thu"), CORNER_HIT), src: BOOM, gain: 0.6, rate: 1.2 },
-  { beat: take("Tower").start + 1, src: IMPACT, gain: 1 },
-  { beat: take("Tower").start + 1, src: BOOM, gain: 1, rate: 0.7 },
-  { beat: take("Tower").start + 2.5, src: BOOM, gain: 0.7, rate: 0.5 },
+  // Thursday: through their arch, into their tallest tower.
+  { beat: take("Thu").start + 1, src: WHOOSH, gain: 0.6, rate: 0.8 },
+  { beat: take("Tower").start + 1.5, src: SKID, gain: 0.6, dur: 0.4 },
+  { beat: take("Tower").start + 2, src: IMPACT, gain: 1 },
+  { beat: take("Tower").start + 2, src: BOOM, gain: 1, rate: 0.7 },
+  { beat: take("Tower").start + 3.5, src: BOOM, gain: 0.7, rate: 0.5 },
   // Friday: their floors come back, a beat each.
   ...Array.from({ length: 4 }, (_, i) => ({ beat: take("Fri").start + i, src: IMPACT, gain: 0.45, rate: 1.3 })),
   // The crown slams down; the monument rises in two steps.
@@ -202,7 +201,7 @@ export const LIME = "#c8e64a";
 /** The four cards, each for one bar from its take's start. */
 const CARDS: [string, string, string][] = [
   ["Sides", "PICK A SIDE.", LIME],
-  ["Board", "CODE ALL WEEK.", LIME],
+  ["Mon", "CODE ALL WEEK.", LIME],
   ["Thu", "IT GETS PERSONAL.", ORANGE],
   ["Crown", "TOP TOWN WINS.", LIME],
 ];
@@ -218,8 +217,8 @@ const TITLES: TitleCue[] = CARDS.map(([name, text, color]) => ({
 /** The acts, for the studio's scene list. */
 const SCENES = [
   { name: "Hook", start: 0, end: take("Sides").start },
-  { name: "Pick a side", start: take("Sides").start, end: take("Board").start },
-  { name: "Code all week", start: take("Board").start, end: take("Thu").start },
+  { name: "Pick a side", start: take("Sides").start, end: take("Mon").start },
+  { name: "Code all week", start: take("Mon").start, end: take("Thu").start },
   { name: "It gets personal", start: take("Thu").start, end: take("Sun").start },
   { name: "Sunday", start: take("Sun").start, end: take("Crown").start },
   { name: "Top town wins", start: take("Crown").start, end: END },

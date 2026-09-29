@@ -59,8 +59,8 @@ export default function LaunchOverlay({ clock, towns }: { clock: FilmClock; town
   const typed = UI.terminal.findIndex((s) => inside(b, s));
   if (typed >= 0) return <Terminal b={b} i={typed} />;
   if (inside(b, UI.sides)) return <Pickers b={b - UI.sides.start} towns={towns} />;
-  const board = UI.board.find((s) => inside(b, s));
-  if (board) return <Board b={b} towns={towns} />;
+  if (UI.panel.some((s) => inside(b, s))) return <Board b={b} towns={towns} panel />;
+  if (inside(b, UI.midnight)) return <Board b={b} towns={towns} />;
   if (b >= UI.sunday[0] && b < UI.sunday[1]) return <SundayClock b={b} />;
   return null;
 }
@@ -96,12 +96,15 @@ function Terminal({ b, i }: { b: number; i: number }) {
 
 // ─── Pick a side ────────────────────────────────────────────
 
-/** A face pops in every half beat, alternating sides. */
+/** Faces that fit on one line of a half. */
+const FACES = 8;
+
+/** A face pops in every half beat on each side. */
 function Pickers({ b, towns }: { b: number; towns: [TownFacts, TownFacts] }) {
   return (
     <div className="absolute inset-0 flex">
       {towns.map((town, side) => {
-        const faces = town.faces;
+        const faces = town.faces.slice(0, FACES);
         const shown = Math.max(0, Math.min(faces.length, Math.floor((b - 0.5) * 2) + 1));
         return (
           <div key={side} className="relative flex-1">
@@ -112,14 +115,14 @@ function Pickers({ b, towns }: { b: number; towns: [TownFacts, TownFacts] }) {
               <span className="shrink-0" style={{ color: town.side.color, fontSize: "2.6cqw" }}>
                 {town.side.name}
               </span>
-              <span className="flex min-w-0 flex-1 flex-wrap justify-end gap-[0.5cqw]">
+              <span className="flex min-w-0 flex-1 flex-nowrap justify-end gap-[0.5cqw] overflow-hidden">
                 {faces.slice(0, shown).map((f, k) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={f.login}
                     src={f.avatar_url ?? ""}
                     alt=""
-                    className="border-2 border-border"
+                    className="shrink-0 border-2 border-border"
                     style={{
                       width: "3cqw",
                       height: "3cqw",
@@ -138,94 +141,95 @@ function Pickers({ b, towns }: { b: number; towns: [TownFacts, TownFacts] }) {
 
 // ─── The board ──────────────────────────────────────────────
 
-function Squares({ side, days, size }: { side: Side; days: number; size: string }) {
-  const today = Math.min(6, Math.floor(days));
+function Squares({ side, days, size, today }: { side: Side; days: number; size: string; today: number }) {
   return (
-    <span className="flex gap-[0.4cqw]">
+    <span className="flex" style={{ gap: `calc(${size} / 5)` }}>
       {WEEK[side].map((n, d) => {
         const lit = days - d;
         const future = lit <= 0;
         return (
           <span
             key={d}
-            className={`block ${future ? "border-2 border-dashed border-border" : ""}`}
+            className={`flex items-center justify-center ${future ? "border-2 border-dashed border-border text-dim" : "text-bg"}`}
             style={{
               width: size,
               height: size,
+              fontSize: `calc(${size} / 2)`,
               background: future ? "transparent" : DAY_COLORS[dayLevel(n * Math.min(1, lit))],
               outline: d === today ? "2px solid rgba(232,220,200,0.6)" : undefined,
               outlineOffset: 2,
             }}
-          />
+          >
+            {DAY_LETTERS[d]}
+          </span>
         );
       })}
     </span>
   );
 }
 
-function Board({ b, towns }: { b: number; towns: [TownFacts, TownFacts] }) {
+/**
+ * The town ranking: the two sides' lanes, their bars against the leader,
+ * their week in day squares, per dev. Full screen at midnight; as a panel on
+ * the right beside a day's take (`panel`), counting that day in.
+ */
+function Board({ b, towns, panel = false }: { b: number; towns: [TownFacts, TownFacts]; panel?: boolean }) {
   const days = daysAt(b);
   const final = b >= FREEZE;
   const score: Record<Side, number> = { claude: perDev("claude", days), codex: perDev("codex", days) };
   const order: Side[] = score.codex > score.claude ? ["codex", "claude"] : ["claude", "codex"];
   const max = Math.max(score.claude, score.codex, 1);
-  const today = Math.min(6, Math.floor(days));
+  const today = Math.min(6, Math.max(0, Math.ceil(days) - 1));
   const lead = towns[0].tallest[0];
-  const clock = b >= COUNT_FROM;
+  const k = panel ? 0.72 : 1;
+  const u = (n: number) => `${n * k}cqw`;
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-bg font-pixel text-cream">
-      <div className="flex flex-col gap-[2cqw]" style={{ width: "70cqw" }}>
-        <div className="flex items-center justify-between" style={{ fontSize: "1.8cqw" }}>
+    <div
+      className={`absolute font-pixel text-cream ${panel ? "inset-y-0 right-0 flex items-center border-l-2 border-border bg-bg" : "inset-0 flex items-center justify-center bg-bg"}`}
+      style={panel ? { width: "40cqw", padding: "0 2.6cqw" } : undefined}
+    >
+      <div className="flex w-full flex-col" style={{ gap: u(2.2), width: panel ? "100%" : "64cqw" }}>
+        <div className="flex items-center justify-between" style={{ fontSize: u(1.9) }}>
           <span className="text-muted">{final ? "FINAL" : "THIS WEEK"}</span>
-          <span className="flex items-center gap-[0.8cqw]">
-            <TrophyIcon size={22} className="text-lime" />
-            {clock ? (
-              <span className="tabular-nums text-lime">SUN {midnight(b)}</span>
-            ) : (
-              "#1 takes the monument"
-            )}
+          <span className="flex items-center" style={{ gap: u(0.8) }}>
+            <TrophyIcon size={panel ? 14 : 22} className="text-lime" />
+            {b >= COUNT_FROM ? <span className="tabular-nums text-lime">SUN {midnight(b)}</span> : <span>#1 WINS</span>}
           </span>
         </div>
-        <div className="flex justify-end gap-[0.4cqw] pr-[13cqw] text-muted" style={{ fontSize: "1.4cqw" }}>
-          {DAY_LETTERS.map((l, i) => (
-            <span key={i} className={`text-center ${i === today ? "text-cream" : ""}`} style={{ width: "2.6cqw" }}>
-              {l}
-            </span>
-          ))}
-        </div>
-        <ol className="flex flex-col gap-[1.2cqw]">
+        <ol className="flex flex-col" style={{ gap: u(2.4) }}>
           {order.map((side, rank) => {
             const won = final && rank === 0;
             return (
-              <li key={side} className="flex items-center gap-[1.4cqw]" style={{ fontSize: "2.4cqw" }}>
-                <span className={`w-[2.6cqw] text-right tabular-nums ${rank === 0 ? "text-lime" : "text-muted"}`}>{rank + 1}</span>
-                <div
-                  className="relative min-w-0 flex-1 border-2 bg-bg-card"
-                  style={{ height: "5.4cqw", borderColor: won ? "#c8e64a" : rank === 0 ? COLOR[side] : "var(--color-border, #2a2a33)" }}
-                >
-                  <div className="h-full" style={{ width: `${Math.max(4, (score[side] / max) * 100)}%`, background: `${COLOR[side]}55` }} />
-                  <span className="absolute inset-y-0 left-[1.2cqw] flex items-center normal-case" style={{ color: COLOR[side] }}>
-                    {NAMES[side]}
+              <li key={side} className="flex flex-col" style={{ gap: u(0.9) }}>
+                <div className="flex items-center" style={{ gap: u(1.4), fontSize: u(2.6) }}>
+                  <span className={`text-right tabular-nums ${rank === 0 ? "text-lime" : "text-muted"}`} style={{ width: u(2.4) }}>
+                    {rank + 1}
                   </span>
-                  <span className="absolute inset-y-0 right-[1.2cqw] flex items-center">
-                    <Squares side={side} days={days} size="2.6cqw" />
-                  </span>
+                  <div
+                    className="relative min-w-0 flex-1 border-2 bg-bg-card"
+                    style={{ height: u(5.6), borderColor: won ? "#c8e64a" : rank === 0 ? COLOR[side] : "#2a2a33" }}
+                  >
+                    <div className="h-full" style={{ width: `${Math.max(3, (score[side] / max) * 100)}%`, background: `${COLOR[side]}55` }} />
+                    <span className="absolute inset-y-0 flex items-center whitespace-nowrap normal-case" style={{ left: u(1.2), color: COLOR[side] }}>
+                      {NAMES[side]}
+                    </span>
+                    <span className="absolute inset-y-0 flex items-center tabular-nums" style={{ right: u(1.2), fontSize: u(3) }}>
+                      {Math.round(score[side])}
+                    </span>
+                  </div>
                 </div>
-                <span className="w-[11cqw] text-right tabular-nums" style={{ fontSize: "3.2cqw" }}>
-                  {Math.round(score[side])}
-                </span>
+                <div className="flex items-center" style={{ gap: u(1.4), paddingLeft: u(3.8) }}>
+                  <Squares side={side} days={days} size={u(2.4)} today={today} />
+                </div>
               </li>
             );
           })}
         </ol>
-        <div className="flex items-center justify-between text-muted" style={{ fontSize: "1.5cqw" }}>
-          <span className="flex items-center gap-[0.8cqw] normal-case">
-            <Crown size={18} strokeWidth={2.5} className="text-lime" />
-            <span>
-              @{lead} leads {NAMES.claude}
-            </span>
+        <div className="flex items-center justify-between text-muted" style={{ fontSize: u(1.6), paddingLeft: u(3.8) }}>
+          <span className="flex items-center whitespace-nowrap normal-case" style={{ gap: u(0.8) }}>
+            <Crown size={panel ? 12 : 18} strokeWidth={2.5} className="text-lime" />@{lead} leads {NAMES.claude}
           </span>
-          <span>per dev</span>
+          <span className="whitespace-nowrap">per dev</span>
         </div>
       </div>
     </div>

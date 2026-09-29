@@ -25,7 +25,7 @@ const MODE = process.argv[3] ?? "full";
 const CUTS = { soon: { freeze: 16, card: 18 }, demo: { freeze: 12, card: 14 } };
 const TEASER = CUTS[MODE];
 // The launch cut, in beats: the freeze, the payoff after the silence, and the cut to black.
-const LAUNCH = MODE === "launch" ? { freeze: 70, resume: 72, card: 80 } : null;
+const LAUNCH = MODE === "launch" ? { freeze: 66, resume: 68, card: 76 } : null;
 const GATE = TEASER ?? (LAUNCH && { freeze: LAUNCH.freeze, card: LAUNCH.resume });
 const BARS = LAUNCH ? Math.ceil((LAUNCH.card + 12) / 4) : TEASER ? Math.ceil((TEASER.card + 10) / 4) : 16;
 const LEN = Math.ceil((BARS * BAR + 2.5) * SR);
@@ -362,48 +362,49 @@ function cardHits(card) {
 if (LAUNCH) {
   // Beats as `at(0, beat)`: the timeline of src/lib/trailer/towns/launch.
   const B = (beat) => at(0, beat);
-  // The hook (0-16): a low drone under the typing, a hit on each Enter (3, 7,
-  // 10), then the town rising a band a beat with a riser into the drop.
-  tone(B(0), 10 * BEAT, 28, { wave: "saw", gain: 0.08, cutoff: 220, env: [0.3, 0.2, 0.8, 0.2], sc: false });
+  // The hook (0-20): a low drone under the typing, a hit on each Enter (4, 8,
+  // 15), then the town rising a band a beat with a riser into the drop.
+  tone(B(0), 15 * BEAT, 28, { wave: "saw", gain: 0.08, cutoff: 220, env: [0.3, 0.2, 0.8, 0.2], sc: false });
   for (const n of CHORDS[0].notes)
-    tone(B(0), 10 * BEAT, n - 12, { wave: "saw", gain: 0.03, cutoff: 800, env: [0.6, 0.4, 0.7, 0.2], detune: 14, pan: n % 2 ? 0.4 : -0.4 });
-  for (const e of [3, 7]) {
+    tone(B(0), 15 * BEAT, n - 12, { wave: "saw", gain: 0.03, cutoff: 800, env: [0.6, 0.4, 0.7, 0.2], detune: 14, pan: n % 2 ? 0.4 : -0.4 });
+  for (const e of [4, 8]) {
     kick(B(e), 1);
     tone(B(e), 0.3, 28, { wave: "sine", gain: 0.35, cutoff: 300, env: [0.002, 0.25, 0.1, 0.2], sc: false, glideFrom: 36 });
   }
-  impact(B(10), 0.9);
-  for (let q = 10; q < 16; q++) kick(B(q), 0.7 + 0.05 * (q - 10));
-  tone(B(10), 6 * BEAT, 28, { wave: "saw", gain: 0.12, cutoff: 300, env: [0.05, 0.2, 0.8, 0.1], sc: false });
-  riser(B(12), B(16), 0.22);
-  // Pick a side, and the week (16-48): the drop, the groove, the lead from Wednesday.
-  impact(B(16), 1.1);
-  for (let bar = 4; bar < 12; bar++) groove(bar, { drop: bar === 4 || bar === 10 });
+  impact(B(15), 0.9);
+  for (let q = 15; q < 20; q++) kick(B(q), 0.7 + 0.05 * (q - 15));
+  tone(B(15), 5 * BEAT, 28, { wave: "saw", gain: 0.12, cutoff: 300, env: [0.05, 0.2, 0.8, 0.1], sc: false });
+  riser(B(16), B(20), 0.22);
+  // Pick a side, and the week (20-48): the drop, the groove, the lead over
+  // Wednesday, the drop again on Thursday.
+  impact(B(20), 1.1);
+  for (let bar = 5; bar < 12; bar++) groove(bar, { drop: bar === 5 || bar === 10 });
   const MEL = [
     [71, 71, 76, 74, 71, 69, 67, 69],
     [67, 67, 72, 71, 67, 64, 67, 69],
   ];
   MEL.forEach((m, i) => m.forEach((n, e) => n && lead(at(8 + i, e / 2), (BEAT / 2) * 0.9, n)));
-  // Friday (48-56): lighter, no kick, the bass and hats.
-  for (const bar of [12, 13]) groove(bar, { arp: false, bassBusy: false });
-  // Sunday (56-70): a snare roll that doubles, the bass on quarters, a riser to midnight.
-  for (let bar = 14; bar < 18; bar++) {
+  // Friday (48-52): lighter, the bass and hats.
+  groove(12, { arp: false, bassBusy: false });
+  // Sunday (52-66): a snare roll that doubles, the bass on quarters, a riser to midnight.
+  for (let bar = 13; bar < 17; bar++) {
     const c = CHORDS[bar % 4];
     for (let q = 0; q < 4; q++) {
       if (bar * 4 + q >= LAUNCH.freeze) break;
       kick(at(bar, q), 0.9);
-      tone(at(bar, q), BEAT * 0.9, c.root + 12, { wave: "saw", gain: 0.18, cutoff: 700 + (bar - 14) * 500 + q * 150, env: [0.003, 0.1, 0.6, 0.05], detune: 8 });
+      tone(at(bar, q), BEAT * 0.9, c.root + 12, { wave: "saw", gain: 0.18, cutoff: 700 + (bar - 13) * 500 + q * 150, env: [0.003, 0.1, 0.6, 0.05], detune: 8 });
     }
-    const div = bar < 16 ? 4 : 8;
+    const div = bar < 15 ? 4 : 8;
     for (let k = 0; k < div * 4; k++) {
       const beat = bar * 4 + k / div;
-      if (beat < LAUNCH.freeze) snare(at(0, beat), 0.3 + (0.5 * (beat - 56)) / 14);
+      if (beat < LAUNCH.freeze) snare(at(0, beat), 0.3 + (0.5 * (beat - 52)) / 14);
     }
   }
-  riser(B(62), B(LAUNCH.freeze), 0.3);
-  // The payoff (72-80): the crown's hit, the groove once more, a last crash.
+  riser(B(60), B(LAUNCH.freeze), 0.3);
+  // The payoff (68-76): the crown's hit, the groove once more, a last crash.
   impact(B(LAUNCH.resume), 1.2);
+  groove(17, { drop: true });
   groove(18, { drop: true });
-  groove(19, { drop: true });
   cardHits(LAUNCH.card);
 } else if (TEASER) {
   for (let b = 1; b * 4 < TEASER.freeze; b++) groove(b, { drop: b === 1 });

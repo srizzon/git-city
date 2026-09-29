@@ -67,7 +67,7 @@ const FLIP_UP = 30;
 const FLIP_G = 70;
 const FLIP_AIR = 0.85;
 /** Implosion: one floor off every column this often (s). */
-const FLOOR_EVERY = 0.04;
+const FLOOR_EVERY = 0.025;
 /** The monument, scaled to the town (its plaza size is far bigger), its height, and how far in front of the mascot it stands. */
 const MONUMENT_SIZE = 0.16;
 const MONUMENT_H = 100;
@@ -264,6 +264,22 @@ export default function TownsRig({
 
     st.current.amp = 1;
     let lens = BASE_FOV;
+    /** Every building whole but `except` (a take that shows the town up, whatever came before it). */
+    const wholeTown = (...except: (number | undefined)[]) => {
+      const now = Date.now();
+      store.targets.forEach((target, i) => {
+        if (except.includes(i)) return;
+        store.setRows(i, store.rowsOf(i).map(() => target.floors), now, undefined, false);
+      });
+    };
+    /** Aims right of the subject by `k` of the distance, so it sits left of centre. */
+    const leaveRight = (k: number) => {
+      const dx = _look.x - _pos.x;
+      const dz = _look.z - _pos.z;
+      const d = Math.hypot(dx, dz) || 1;
+      _look.x += (-dz / d) * d * k;
+      _look.z += (dx / d) * d * k;
+    };
     if (shot.kind === "rev") {
       // Burnout, seen from the side on a long lens: the car waits on the main
       // street facing the exit, the rear wheel spins up in its own smoke and
@@ -674,15 +690,19 @@ export default function TownsRig({
       _look.set(1, 2.2, zo + 4);
       lens = 44;
       st.current.amp = 0.5;
-    } else if (shot.kind === "arrival") {
+    } else if (shot.kind === "arrival" || shot.kind === "arrivalout") {
+      if (shot.kind === "arrivalout") wholeTown();
+      // Under the town's arch: its own car coming home, or ("arrivalout") the visitor coming in.
       const z = gateZ + ARRIVAL_SPEED * (CROSS - t);
-      pose(home.current, homeWheels.current, LANE, z, ARRIVAL_SPEED, dt);
+      if (shot.kind === "arrival") pose(home.current, homeWheels.current, LANE, z, ARRIVAL_SPEED, dt);
+      else pose(rival.current, rivalWheels.current, LANE, z, ARRIVAL_SPEED, dt);
       // Low behind the car, pushing in a little, the arch and the town above it.
       const back = 30 - 6 * smooth(Math.min(1, t / 1.4));
       _pos.set(LANE - 5, 6.5, z + back);
       _look.set(LANE, 9, z - 70);
     } else if (shot.kind === "aerial") {
       // Slow orbit, the two towns turned toward each other across the split.
+      wholeTown();
       const a = (stage === "claude" ? -0.75 : 0.75) + (stage === "claude" ? 1 : -1) * 0.12 * t;
       const r = width * 0.5;
       _look.set(0, 30, cityZ);
@@ -720,6 +740,7 @@ export default function TownsRig({
       // onto it. The camera sits above the neighbours' roofs, looking at its top.
       if (heroIndex === undefined) return;
       const b = store.targets[heroIndex];
+      if (shot.kind !== "floor") wholeTown(heroIndex);
       const now = Date.now();
       const n = Math.floor(t / BEAT);
       const pop = Math.min(1, (t - n * BEAT) / 0.08);
@@ -734,14 +755,16 @@ export default function TownsRig({
           store.setRows(i, store.rowsOf(i).map(() => rows), now, undefined, false);
         });
       } else if (shot.kind === "grow") {
-        frac = n < 1 ? 0.7 + 0.15 * pop : 0.85 + 0.15 * pop;
+        // Two pops, on the take's second and third beats.
+        frac = n < 1 ? 0.7 : n < 2 ? 0.7 + 0.15 * pop : n < 3 ? 0.85 + 0.15 * pop : 1;
       }
       const rows = Math.max(1, Math.round(b.floors * frac));
       store.setRows(heroIndex, store.rowsOf(heroIndex).map(() => rows), now, undefined, false);
       const top = rows * b.floorH;
-      if (fx && pop < 1 && shot.kind !== "crown")
+      const popping = shot.kind === "floor" || (shot.kind === "grow" && n >= 1 && n < 3);
+      if (fx && pop < 1 && popping)
         fx.burst(b.x, top, b.z, { count: 3, speed: 14, colors: DEBRIS, size: 1.4, life: 0.5 });
-      if (pop < 0.5 && shot.kind !== "crown") st.current.shake = Math.max(st.current.shake, 0.5);
+      if (pop < 0.5 && popping) st.current.shake = Math.max(st.current.shake, 0.5);
       if (shot.kind === "crown" && crown.current) {
         // It drops from high above in a quarter beat, bounces once, then floats.
         const land = 0.5 * BEAT;
@@ -763,34 +786,40 @@ export default function TownsRig({
       _look.set(b.x, top + (crowned ? 26 : -8) + 6 * crane, b.z);
       lens = shot.kind === "crown" ? 46 : 42;
       st.current.amp = 0.4;
+      // A day's take shares the frame with the board on the right: the building keeps to the left.
+      if (shot.kind === "grow") leaveRight(0.4);
     } else if (shot.kind === "mascot" && mascot) {
       // The town's giant mascot from low in its square, every building up,
       // the camera easing in.
-      store.targets.forEach((target, i) =>
-        store.setRows(i, store.rowsOf(i).map(() => target.floors), Date.now(), undefined, false),
-      );
+      wholeTown();
       const push = smooth(Math.min(1, t / (8 * BEAT)));
       const [mx, mz] = mascot;
-      _pos.set(mx + 40, 22, mz + 340 - 40 * push);
-      _look.set(mx, 75, mz);
-      lens = 44;
+      // Inside the square (seven lots across), so no building stands in between.
+      _pos.set(mx + 25, 10, mz + 160 - 20 * push);
+      _look.set(mx, 70, mz);
+      lens = 62;
     } else if (shot.kind === "regrow" && run && tower !== undefined) {
-      // They code too: the fallen tower comes back a band a beat, lit.
+      // They code too: the fallen tower lies in its rubble under the flag for
+      // a beat, then comes back a band a beat, lit.
+      wholeTown(tower);
       const target = store.targets[tower];
       const n = Math.floor(t / BEAT);
       const pop = Math.min(1, (t - n * BEAT) / 0.08);
-      const frac = Math.min(0.8, 0.2 * (n + pop));
+      const frac = n < 1 ? 0 : Math.min(0.75, 0.25 * (n - 1 + pop));
       const rows = Math.round(target.floors * frac);
       store.setRows(tower, store.rowsOf(tower).map(() => rows), Date.now(), undefined, false);
-      if (fx && pop < 1)
+      if (rows === 0) store.setBy(tower, attacker);
+      if (fx && pop < 1 && rows > 0)
         fx.burst(target.x, rows * target.floorH, target.z, { count: 4, speed: 12, colors: ["#8fa3c7", "#ffffff"], size: 1.4, life: 0.5 });
       const tz = run.zs[run.zs.length - 1];
-      _pos.set(run.x + side * 126, 5, tz + 10);
-      _look.set(run.x, 45, tz);
-      lens = 58;
+      _pos.set(run.x + side * 110, 5, tz + 16);
+      _look.set(run.x, 55, tz);
+      lens = 55;
+      leaveRight(0.35);
     } else if (shot.kind === "monument" && mascot && monumentRef.current) {
       // The week's monument goes up in the square in front of the mascot, in
       // two steps on the beat, seen from low in front.
+      wholeTown();
       const [mx, mz] = mascot;
       const n = Math.min(2, Math.floor(t / BEAT) + 1);
       const pop = Math.min(1, (t - (n - 1) * BEAT) / 0.1);
@@ -800,8 +829,9 @@ export default function TownsRig({
       g.position.set(mx, -MONUMENT_H * (1 - up), mz + MONUMENT_AHEAD);
       if (pop < 0.5) st.current.shake = Math.max(st.current.shake, 0.6);
       const push = smooth(Math.min(1, t / (4 * BEAT)));
-      _pos.set(mx + 50, 60, mz + MONUMENT_AHEAD + 230 - 25 * push);
-      _look.set(mx, 58, mz + MONUMENT_AHEAD);
+      // From up the main avenue, over its ramp, the street's buildings framing it.
+      _pos.set(mx, 50, mz + MONUMENT_AHEAD + 240 - 30 * push);
+      _look.set(mx, 50, mz + MONUMENT_AHEAD);
       lens = 50;
     } else if (shot.kind === "rise") {
       // Commits building the town: every building starts as rubble inside
@@ -832,6 +862,7 @@ export default function TownsRig({
       const tz = run.zs[run.zs.length - 1];
       // The car hits and the tower starts to come down on the take's third beat.
       const COLLAPSE = shot.start + 2;
+      wholeTown(beat >= COLLAPSE ? tower : undefined);
       const hitAt = (COLLAPSE - shot.start) * BEAT;
       const z = tz + 24 + INVADE_SPEED * Math.max(0, hitAt - t);
       pose(rival.current, rivalWheels.current, run.x, z, t < hitAt ? INVADE_SPEED : 0, dt);
@@ -870,9 +901,9 @@ export default function TownsRig({
       // low and looking up: the top sinks into frame as the floors go. It
       // creeps in.
       const push = smooth(Math.min(1, t / 3.2));
-      _pos.set(run.x + side * (140 - 14 * push), 5, tz + 10);
-      _look.set(run.x, 45, tz);
-      lens = 58;
+      _pos.set(run.x + side * (110 - 10 * push), 5, tz + 16);
+      _look.set(run.x, 60, tz);
+      lens = 55;
     } else return;
 
     const k = st.current.shake;

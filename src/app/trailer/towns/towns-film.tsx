@@ -11,7 +11,7 @@ import {
 import type { LeagueCity } from "@/lib/league-city/service";
 import type { CityObject } from "@/lib/league-city/types";
 import { LOT } from "@/lib/league-city/grid";
-import { leagueBuildings, scaleTownHeights } from "@/lib/league-city/buildings";
+import { TOWN_MAX_HEIGHT, leagueBuildings, scaleTownHeights } from "@/lib/league-city/buildings";
 import { smashStoreFor } from "@/lib/league-city/smash";
 import { Transport } from "@trailer-kit/clock";
 import type { Film, Frame } from "@trailer-kit/film";
@@ -37,11 +37,15 @@ export interface TownSide {
   color: string;
   city: LeagueCity;
   cityDevs: Record<string, unknown>[];
+  /** Other real Git City devs to fill the empty lots with, in a film that wants a full town. */
+  fill?: Record<string, unknown>[];
 }
 
-function useTown(side: TownSide, cityNorms: LayoutNorms, gen: number) {
+function useTown(side: TownSide, cityNorms: LayoutNorms, gen: number, runHeights?: number[]) {
   const base = useMemo(() => {
-    const devs = side.cityDevs as unknown as DeveloperRecord[];
+    const members = side.cityDevs as unknown as DeveloperRecord[];
+    const fill = (side.fill ?? []) as unknown as DeveloperRecord[];
+    const devs = [...members, ...fill];
     const layout = generateCityLayout(devs, undefined, cityNorms);
     const byLogin = new Map(layout.buildings.map((b) => [b.loginLower, b]));
     const byDevId = new Map<number, CityBuilding>();
@@ -49,25 +53,78 @@ function useTown(side: TownSide, cityNorms: LayoutNorms, gen: number) {
       const b = byLogin.get(d.github_login.toLowerCase());
       if (b) byDevId.set(d.id, b);
     }
-    const real = leagueBuildings(side.city.objects, scaleTownHeights(byDevId));
-    const run = real.length ? smashRun(side.city.objects, side.city.h, real[0]) : null;
+    const scaled = scaleTownHeights(byDevId);
+    const first = leagueBuildings(side.city.objects, scaled);
+    const run = first.length ? smashRun(side.city.objects, side.city.h, first[0], runHeights) : null;
+    // The fill goes on the free lots nearest the main street, leaving the run's.
+    const objects = [...side.city.objects, ...fillLots(side.city.objects, side.city.h, run, fill)];
+    // No real crowns: the film drops its own. With a fill, the town's top
+    // member stands tallest, so the crown shot has the sky behind it.
+    const top = members.length ? [...members].sort((a, b) => (byDevId.get(b.id)?.height ?? 0) - (byDevId.get(a.id)?.height ?? 0))[0] : null;
+    const real = leagueBuildings(objects, scaled).map((b) => {
+      const out = { ...b, active_league_crown: null };
+      if (fill.length && top && b.loginLower === top.github_login.toLowerCase())
+        return { ...out, height: TOWN_MAX_HEIGHT, floors: Math.floor(TOWN_MAX_HEIGHT / 6) };
+      return out;
+    });
     const buildings = run ? [...real, ...run.buildings] : real;
+    const memberLogins = new Set(members.map((d) => d.github_login.toLowerCase()));
     const portal = side.city.objects.find((o) => o.item_type === "portal");
     const giant = side.city.objects.find(
       (o) => (o.item_type === "clawd" || o.item_type === "codex_cloud") && (o.props as { size?: string } | null)?.size === "giant",
     );
     const facts: TownFacts = {
       side,
-      tallest: [...real].sort((a, b) => b.height - a.height).map((b) => b.loginLower),
+      tallest: real
+        .filter((b) => memberLogins.has(b.loginLower))
+        .sort((a, b) => b.height - a.height)
+        .map((b) => b.loginLower),
       faces: devs.filter((d) => d.avatar_url).map((d) => ({ login: d.github_login, avatar_url: d.avatar_url })),
       mascot: giant ? [giant.px ?? giant.x * LOT, giant.pz ?? giant.z * LOT] : undefined,
     };
     return { buildings, run, gateZ: portal?.pz ?? 24, revZ: plainStreet(side.city.objects), facts };
-  }, [side, cityNorms]);
+  }, [side, cityNorms, runHeights]);
   // A fresh store puts every building back up (a new take, a loop, a seek back).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const store = useMemo(() => smashStoreFor(base.buildings), [base, gen]);
   return { ...base, store };
+}
+
+/** Building objects for the fill devs on the free lots nearest the main street (not the run's). */
+function fillLots(
+  objects: readonly CityObject[],
+  h: number,
+  run: ReturnType<typeof smashRun>,
+  fill: readonly DeveloperRecord[],
+): CityObject[] {
+  if (!fill.length) return [];
+  const taken = new Set(objects.map((o) => `${o.x},${o.z}`));
+  if (run) {
+    const col = Math.round(run.x / LOT);
+    for (const z of run.zs) taken.add(`${col},${Math.round(z / LOT)}`);
+    // The tower stands alone against the sky, and the tower shots look at it
+    // from across the main street: keep its surroundings and that view clear.
+    const tz = Math.round(run.zs[run.zs.length - 1] / LOT);
+    const dir = col > 0 ? -1 : 1;
+    for (let x = col - 2; x <= col + 2; x++) for (let z = tz - 3; z <= tz + 2; z++) taken.add(`${x},${z}`);
+    for (let x = col + dir; Math.abs(x - col) <= 4; x += dir)
+      for (let z = tz - 1; z <= tz + 2; z++) taken.add(`${x},${z}`);
+  }
+  const free: [number, number][] = [];
+  for (let x = -h; x <= h; x++) for (let z = -2 * h + 1; z <= 0; z++) if (!taken.has(`${x},${z}`)) free.push([x, z]);
+  free.sort((a, b) => Math.abs(a[0]) + Math.abs(a[1] + h) * 0.6 - (Math.abs(b[0]) + Math.abs(b[1] + h) * 0.6));
+  return fill.slice(0, free.length).map((d, i) => ({
+    id: `fill-${d.id}`,
+    kind: "building" as const,
+    item_type: null,
+    developer_id: d.id,
+    x: free[i][0],
+    z: free[i][1],
+    px: null,
+    pz: null,
+    rot: 0,
+    is_new: false,
+  }));
 }
 
 /** Props on the road that would sit in the burnout shot (pads, bumps, ramps). */
@@ -124,6 +181,8 @@ export interface TownsCut {
   title?: string;
   /** Extra props for a town's rig. */
   rig?: (stage: Stage, town: TownFacts) => RigExtras;
+  /** The heights of the run of extra buildings the car smashes (the teaser's by default), tallest last. */
+  runHeights?: number[];
   /** A DOM layer over the pictures (under the titles), on the same clock. */
   overlay?: (clock: Transport, towns: [TownFacts, TownFacts]) => ReactNode;
 }
@@ -148,8 +207,8 @@ export default function TownsFilm({
   // A new take (or a loop, or a seek back) rebuilds the smash stores, so every building is back up.
   const [gen, setGen] = useState(0);
   const reset = useCallback(() => setGen((g) => g + 1), []);
-  const claude = useTown(claudeSide, cityNorms, gen);
-  const codex = useTown(codexSide, cityNorms, gen);
+  const claude = useTown(claudeSide, cityNorms, gen, cut.runHeights);
+  const codex = useTown(codexSide, cityNorms, gen, cut.runHeights);
   const [clock] = useState(() => new Transport(cut.film.beat));
 
   const town = (stage: Stage, frame: Frame<Stage>) => {
