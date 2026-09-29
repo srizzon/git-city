@@ -56,7 +56,9 @@ export type ShotKind =
   | "regrow"
   | "crown"
   | "monument"
-  | "arrivalout";
+  | "arrivalout"
+  | "week"
+  | "ram";
 
 export type Shot = FilmShot<Stage, ShotKind>;
 

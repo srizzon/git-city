@@ -102,6 +102,8 @@ function fillLots(
   if (run) {
     const col = Math.round(run.x / LOT);
     for (const z of run.zs) taken.add(`${col},${Math.round(z / LOT)}`);
+    // The launch's car turns into the row from the main street before its first building.
+    for (let z = Math.round(run.zs[0] / LOT) + 1; z <= 0; z++) taken.add(`${col},${z}`);
     // The tower stands alone against the sky, and the tower shots look at it
     // from across the main street: keep its surroundings and that view clear.
     const tz = Math.round(run.zs[run.zs.length - 1] / LOT);
@@ -159,6 +161,7 @@ export interface RigExtras {
   mascot?: [number, number];
   monument?: MonumentTown | null;
   riseFrom?: number;
+  ramHit?: number;
 }
 
 /** What a cut can read about each town: its side, the logins by height, the giant mascot. */

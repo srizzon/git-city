@@ -25,7 +25,7 @@ const MODE = process.argv[3] ?? "full";
 const CUTS = { soon: { freeze: 16, card: 18 }, demo: { freeze: 12, card: 14 } };
 const TEASER = CUTS[MODE];
 // The launch cut, in beats: the freeze, the payoff after the silence, and the cut to black.
-const LAUNCH = MODE === "launch" ? { freeze: 66, resume: 68, card: 76 } : null;
+const LAUNCH = MODE === "launch" ? { freeze: 56, resume: 56, card: 64 } : null;
 const GATE = TEASER ?? (LAUNCH && { freeze: LAUNCH.freeze, card: LAUNCH.resume });
 const BARS = LAUNCH ? Math.ceil((LAUNCH.card + 12) / 4) : TEASER ? Math.ceil((TEASER.card + 10) / 4) : 16;
 const LEN = Math.ceil((BARS * BAR + 2.5) * SR);
@@ -375,36 +375,35 @@ if (LAUNCH) {
   for (let q = 15; q < 20; q++) kick(B(q), 0.7 + 0.05 * (q - 15));
   tone(B(15), 5 * BEAT, 28, { wave: "saw", gain: 0.12, cutoff: 300, env: [0.05, 0.2, 0.8, 0.1], sc: false });
   riser(B(16), B(20), 0.22);
-  // Pick a side, and the week (20-48): the drop, the groove, the lead over
-  // Wednesday, the drop again on Thursday.
+  // Pick a side, the week and Thursday (20-40): the drop, the groove, the
+  // lead over the week, the drop again on Thursday's drift.
   impact(B(20), 1.1);
-  for (let bar = 5; bar < 12; bar++) groove(bar, { drop: bar === 5 || bar === 10 });
+  for (let bar = 5; bar < 10; bar++) groove(bar, { drop: bar === 5 || bar === 9 });
   const MEL = [
     [71, 71, 76, 74, 71, 69, 67, 69],
     [67, 67, 72, 71, 67, 64, 67, 69],
   ];
-  MEL.forEach((m, i) => m.forEach((n, e) => n && lead(at(8 + i, e / 2), (BEAT / 2) * 0.9, n)));
-  // Friday (48-52): lighter, the bass and hats.
-  groove(12, { arp: false, bassBusy: false });
-  // Sunday (52-66): a snare roll that doubles, the bass on quarters, a riser to midnight.
-  for (let bar = 13; bar < 17; bar++) {
+  MEL.forEach((m, i) => m.forEach((n, e) => n && lead(at(7 + i, e / 2), (BEAT / 2) * 0.9, n)));
+  // Friday (39-44): lighter, the bass and hats.
+  groove(10, { arp: false, bassBusy: false });
+  // Sunday (44-56): a snare roll that doubles, the bass on quarters, a riser to midnight.
+  for (let bar = 11; bar < 14; bar++) {
     const c = CHORDS[bar % 4];
     for (let q = 0; q < 4; q++) {
-      if (bar * 4 + q >= LAUNCH.freeze) break;
       kick(at(bar, q), 0.9);
-      tone(at(bar, q), BEAT * 0.9, c.root + 12, { wave: "saw", gain: 0.18, cutoff: 700 + (bar - 13) * 500 + q * 150, env: [0.003, 0.1, 0.6, 0.05], detune: 8 });
+      tone(at(bar, q), BEAT * 0.9, c.root + 12, { wave: "saw", gain: 0.18, cutoff: 700 + (bar - 11) * 600 + q * 150, env: [0.003, 0.1, 0.6, 0.05], detune: 8 });
     }
-    const div = bar < 15 ? 4 : 8;
+    const div = bar < 13 ? 4 : 8;
     for (let k = 0; k < div * 4; k++) {
       const beat = bar * 4 + k / div;
-      if (beat < LAUNCH.freeze) snare(at(0, beat), 0.3 + (0.5 * (beat - 52)) / 14);
+      snare(at(0, beat), 0.3 + (0.5 * (beat - 44)) / 12);
     }
   }
-  riser(B(60), B(LAUNCH.freeze), 0.3);
-  // The payoff (68-76): the crown's hit, the groove once more, a last crash.
-  impact(B(LAUNCH.resume), 1.2);
-  groove(17, { drop: true });
-  groove(18, { drop: true });
+  riser(B(50), B(LAUNCH.freeze), 0.3);
+  // Midnight (56): the crown lands half a beat later on the hit, the groove twice, to the card.
+  impact(B(LAUNCH.resume + 0.5), 1.3);
+  groove(14, { drop: true });
+  groove(15, { drop: true });
   cardHits(LAUNCH.card);
 } else if (TEASER) {
   for (let b = 1; b * 4 < TEASER.freeze; b++) groove(b, { drop: b === 1 });

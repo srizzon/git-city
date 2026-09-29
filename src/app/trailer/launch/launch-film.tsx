@@ -16,8 +16,6 @@ const LAUNCH: TownsCut = {
   shotFor,
   blasts: BLASTS,
   endCard: (clock) => <LaunchEndCard clock={clock} />,
-  // Low neighbours, so the tower the car brings down stands alone.
-  runHeights: [54, 60, 50, 58, 190],
   rig: (stage, town) => ({
     hero: town.tallest[0],
     mascot: town.mascot,

@@ -129,6 +129,7 @@ export default function TownsRig({
   mascot,
   monument = null,
   riseFrom = 0,
+  ramHit = 5,
 }: {
   stage: Stage;
   clock: FilmClock;
@@ -157,6 +158,8 @@ export default function TownsRig({
   monument?: MonumentTown | null;
   /** Rise: the share of its floors every building starts from. */
   riseFrom?: number;
+  /** Ram: the car reaches the tower this many beats into the take. */
+  ramHit?: number;
 }) {
   const camera = useThree((s) => s.camera);
   const home = useRef<THREE.Group>(null);
@@ -798,24 +801,24 @@ export default function TownsRig({
       _pos.set(mx + 25, 10, mz + 160 - 20 * push);
       _look.set(mx, 70, mz);
       lens = 62;
-    } else if (shot.kind === "regrow" && run && tower !== undefined) {
-      // They code too: the fallen tower lies in its rubble under the flag for
-      // a beat, then comes back a band a beat, lit.
-      wholeTown(tower);
-      const target = store.targets[tower];
+    } else if (shot.kind === "regrow" && run) {
+      // They code too: the building the visitor drifted through on Thursday
+      // stands broken for a beat, then its floors come back a band a beat, lit.
+      const i = store.index.get(run.buildings[2].loginLower);
+      if (i === undefined) return;
+      wholeTown(i);
+      const target = store.targets[i];
       const n = Math.floor(t / BEAT);
       const pop = Math.min(1, (t - n * BEAT) / 0.08);
-      const frac = n < 1 ? 0 : Math.min(0.75, 0.25 * (n - 1 + pop));
+      const frac = n < 1 ? 0.35 : 0.35 + 0.65 * Math.min(1, (n - 1 + pop) / 3);
       const rows = Math.round(target.floors * frac);
-      store.setRows(tower, store.rowsOf(tower).map(() => rows), Date.now(), undefined, false);
-      if (rows === 0) store.setBy(tower, attacker);
-      if (fx && pop < 1 && rows > 0)
+      store.setRows(i, store.rowsOf(i).map(() => rows), Date.now(), undefined, false);
+      if (fx && pop < 1 && n >= 1)
         fx.burst(target.x, rows * target.floorH, target.z, { count: 4, speed: 12, colors: ["#8fa3c7", "#ffffff"], size: 1.4, life: 0.5 });
-      const tz = run.zs[run.zs.length - 1];
-      _pos.set(run.x + side * 110, 5, tz + 16);
-      _look.set(run.x, 55, tz);
-      lens = 55;
-      leaveRight(0.35);
+      const bz = run.zs[2];
+      _pos.set(run.x + side * 110, 5, bz + 16);
+      _look.set(run.x, 35, bz);
+      lens = 50;
     } else if (shot.kind === "monument" && mascot && monumentRef.current) {
       // The week's monument goes up in the square in front of the mascot, in
       // two steps on the beat, seen from low in front.
@@ -833,6 +836,109 @@ export default function TownsRig({
       _pos.set(mx, 50, mz + MONUMENT_AHEAD + 240 - 30 * push);
       _look.set(mx, 50, mz + MONUMENT_AHEAD);
       lens = 50;
+    } else if (shot.kind === "week") {
+      // The week from above: on every beat a share of the town's buildings
+      // gain a band of floors (people committing), each building three times
+      // over the take, so the whole town grows toward whole by its end.
+      const beats = shot.end - shot.start + shot.trim;
+      const n = Math.floor(t / BEAT);
+      const pop = Math.min(1, (t - n * BEAT) / 0.1);
+      const now = Date.now();
+      const pops = (i: number, k: number) => (i * 7 + k * 3) % 4 === 0;
+      store.targets.forEach((target, i) => {
+        let total = 0;
+        let done = 0;
+        for (let k = 0; k < beats; k++) {
+          if (!pops(i, k)) continue;
+          total++;
+          if (k < n) done++;
+          else if (k === n) done += pop;
+        }
+        const frac = total ? 0.55 + (0.45 * done) / total : 1;
+        const rows = Math.round(target.floors * frac);
+        store.setRows(i, store.rowsOf(i).map(() => rows), now, undefined, false);
+        if (fx && pops(i, n) && pop < 1 && i % 3 === 0)
+          fx.burst(target.x, rows * target.floorH, target.z, { count: 2, speed: 10, colors: ["#c8e64a", "#ffe9a8"], size: 1.6, life: 0.4 });
+      });
+      // Above the entrance, turned a little toward the split's middle, easing in.
+      const push = smooth(Math.min(1, t / (beats * BEAT)));
+      const a = stage === "claude" ? -0.45 : 0.45;
+      const r = width * (0.42 - 0.06 * push);
+      _look.set(0, 20, cityZ * 0.8);
+      _pos.set(Math.sin(a) * r, r * 0.42, cityZ * 0.8 + Math.cos(a) * r);
+      lens = 50;
+    } else if (shot.kind === "ram" && run && tower !== undefined) {
+      // One shot behind the visitor's car: in through the town's arch, up the
+      // avenue on the tower's side, a turn into its base on the hit, and the
+      // tower sinking in front of the stopped camera, down to its rubble and
+      // the visitor's flag.
+      const target = store.targets[tower];
+      const hitT = ramHit * BEAT;
+      const zf = target.z + target.d / 2;
+      const z0 = gateZ + 40;
+      const v = (z0 - zf) / hitT;
+      const xl = Math.sign(run.x) * LANE;
+      // Up the avenue, then into the tower's own row before its first
+      // building, and straight on through the low ones to the tower.
+      const turnZ = run.zs[0] + 60;
+      const at = (tt: number) => {
+        const z = tt < hitT ? z0 - v * tt : zf - 14 * (1 - Math.exp(-(tt - hitT) * 5));
+        const u = Math.max(0, Math.min(1, (turnZ - z) / 45));
+        return { x: xl + (target.x - xl) * smooth(u), z };
+      };
+      const p = at(t);
+      const q = at(t + 0.02);
+      const yaw = t < hitT ? Math.atan2(q.x - p.x, q.z - p.z) : Math.PI;
+      pose(rival.current, rivalWheels.current, p.x, p.z, t < hitT ? v : 0, dt, t < hitT ? v : 0, 0, 0, yaw);
+      // Through the low buildings of the row on the way: each goes down in a
+      // tenth of a second as the car reaches it, in a burst of its floors.
+      run.buildings.slice(0, -1).forEach((rb) => {
+        const i = store.index.get(rb.loginLower);
+        if (i === undefined) return;
+        const b = store.targets[i];
+        const reach = (z0 - (b.z + b.d / 2)) / v;
+        const k = Math.max(0, Math.min(1, (t - reach + 0.04) / 0.08));
+        store.setRows(i, store.rowsOf(i).map(() => Math.round(b.floors * (1 - k))), Date.now(), undefined, false);
+        if (crossed(shot.start - shot.trim + reach / BEAT)) {
+          fx?.burst(b.x, b.floorH * b.floors * 0.4, b.z + b.d / 2, { count: 40, speed: 36, colors: DEBRIS, size: 2.2, life: 1 });
+          st.current.shake = Math.max(st.current.shake, 0.7);
+        }
+      });
+      const hitBeat = shot.start - shot.trim + ramHit;
+      const row = new Set(run.buildings.map((rb) => store.index.get(rb.loginLower)));
+      store.targets.forEach((tg, i) => {
+        if (!row.has(i)) store.setRows(i, store.rowsOf(i).map(() => tg.floors), Date.now(), undefined, false);
+      });
+      if (beat < hitBeat) store.setRows(tower, store.rowsOf(tower).map(() => target.floors), Date.now(), undefined, false);
+      if (crossed(hitBeat)) {
+        st.current.shake = 1.4;
+        fx?.burst(target.x, 8, zf, { count: 90, speed: 55, colors: FIRE, size: 3, life: 1.2 });
+      }
+      if (beat >= hitBeat) {
+        const due = Math.floor(((beat - hitBeat) * BEAT) / FLOOR_EVERY);
+        const left = Math.max(0, target.floors - due);
+        const was = store.standing(tower);
+        store.setRows(tower, store.rowsOf(tower).map(() => left), Date.now(), undefined, false);
+        if (left === 0) store.setBy(tower, attacker);
+        if (fx && store.standing(tower) < was)
+          fx.burst(target.x, 2, target.z, { count: 16, speed: 30, colors: DEBRIS, size: 2.4, life: 1.2 });
+        if (left > 0) st.current.shake = Math.max(st.current.shake, 0.4);
+      }
+      // The chase camera, low behind the car; from the hit on it stops where
+      // it was and looks up at the tower coming down.
+      const c = at(Math.min(t, hitT - 0.25));
+      const d = at(Math.min(t, hitT - 0.25) + 0.05);
+      const len = Math.hypot(d.x - c.x, d.z - c.z) || 1;
+      const fxz = (d.x - c.x) / len;
+      const fzz = (d.z - c.z) / len;
+      // Low behind the car, the tower ahead; after the hit it cranes up and
+      // back, looking at the tower coming down.
+      const after = smooth(Math.max(0, Math.min(1, (t - hitT + 0.25) / 0.8)));
+      _pos.set(c.x - fxz * (28 + 40 * after), 10 + 30 * after, c.z - fzz * (28 + 40 * after));
+      if (t < hitT - 0.25) _look.set(c.x + fxz * 80, 22, c.z + fzz * 80);
+      else _look.set(c.x + (target.x - c.x) * after + fxz * 80 * (1 - after), 22 + 18 * after, c.z + fzz * 80 + (target.z - c.z - fzz * 80) * after);
+      lens = 58;
+      st.current.amp = 0.5;
     } else if (shot.kind === "rise") {
       // Commits building the town: every building starts as rubble inside
       // its ghost outline and gains a band of floors on every beat, popping
