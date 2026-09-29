@@ -939,6 +939,31 @@ export default function TownsRig({
       else _look.set(c.x + (target.x - c.x) * after + fxz * 80 * (1 - after), 22 + 18 * after, c.z + fzz * 80 + (target.z - c.z - fzz * 80) * after);
       lens = 58;
       st.current.amp = 0.5;
+    } else if (shot.kind === "celebrate" && heroIndex !== undefined) {
+      // The town lights up: fireworks from the roofs in rings out from the
+      // crowned building, a ring a beat, while the camera pulls up and back
+      // from the crown to the whole town.
+      wholeTown();
+      const b = store.targets[heroIndex];
+      const top = b.floors * b.floorH;
+      const beats = shot.end - shot.start + shot.trim;
+      const ring = 110;
+      if (fx)
+        store.targets.forEach((tg, i) => {
+          if (i % 2 !== 0) return;
+          const k = Math.hypot(tg.x - b.x, tg.z - b.z) / ring;
+          if (k >= beats) return;
+          if (!crossed(shot.start - shot.trim + k)) return;
+          const y = tg.floors * tg.floorH + 4;
+          fx.burst(tg.x, y, tg.z, { count: 10, speed: 26, colors: ["#ffd24a", "#e07a4f", "#ffe9a8", "#c8e64a"], size: 1.4, life: 0.9, gravity: 12 });
+        });
+      if (fx && crossed(shot.start - shot.trim))
+        fx.burst(b.x, top + 20, b.z, { count: 60, speed: 40, colors: ["#ffd24a", "#ffe9a8", "#ffb800"], size: 2, life: 1.2 });
+      const u = smooth(Math.min(1, t / (beats * BEAT)));
+      const r = Math.max(60, b.w * 2.2) * 1.8;
+      _pos.set(b.x + r * 0.75 * (1 + 2.5 * u), top + 25 + 170 * u, b.z + r * (1 + 2.5 * u));
+      _look.set(b.x + (0 - b.x) * u * 0.5, top + 26 - (top - 10) * u, b.z + (cityZ - b.z) * u * 0.5);
+      lens = 46 + 10 * u;
     } else if (shot.kind === "rise") {
       // Commits building the town: every building starts as rubble inside
       // its ghost outline and gains a band of floors on every beat, popping

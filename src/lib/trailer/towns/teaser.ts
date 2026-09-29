@@ -58,7 +58,8 @@ export type ShotKind =
   | "monument"
   | "arrivalout"
   | "week"
-  | "ram";
+  | "ram"
+  | "celebrate";
 
 export type Shot = FilmShot<Stage, ShotKind>;
 

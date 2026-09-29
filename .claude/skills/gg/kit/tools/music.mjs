@@ -24,10 +24,10 @@ const BAR = BEAT * 4;
 const MODE = process.argv[3] ?? "full";
 const CUTS = { soon: { freeze: 16, card: 18 }, demo: { freeze: 12, card: 14 } };
 const TEASER = CUTS[MODE];
-// The launch cut, in beats: the freeze, the payoff after the silence, and the cut to black.
-const LAUNCH = MODE === "launch" ? { freeze: 56, resume: 56, card: 64 } : null;
-const GATE = TEASER ?? (LAUNCH && { freeze: LAUNCH.freeze, card: LAUNCH.resume });
-const BARS = LAUNCH ? Math.ceil((LAUNCH.card + 12) / 4) : TEASER ? Math.ceil((TEASER.card + 10) / 4) : 16;
+// The launch cut, in beats: the drop-outs (hard silence, [from, to]), and the cut to black.
+const LAUNCH = MODE === "launch" ? { gates: [[4, 8], [52, 53], [69, 75]], card: 61, end: 75 } : null;
+const GATES = TEASER ? [[TEASER.freeze, TEASER.card]] : LAUNCH ? LAUNCH.gates : [];
+const BARS = LAUNCH ? Math.ceil(LAUNCH.end / 4) + 1 : TEASER ? Math.ceil((TEASER.card + 10) / 4) : 16;
 const LEN = Math.ceil((BARS * BAR + 2.5) * SR);
 const L = new Float32Array(LEN);
 const R = new Float32Array(LEN);
@@ -259,20 +259,22 @@ const CHORDS = [
   { root: 35, notes: [59, 63, 66] },
 ];
 
-function groove(bar, { hats = true, arp = true, pad = true, bassBusy = true, drop = false } = {}) {
-  const c = CHORDS[bar % 4];
+function groove(bar, { hats = true, arp = true, pad = true, bassBusy = true, drop = false, kicks = true, start, chord } = {}) {
+  // \`start\` (beats) places the bar anywhere on the timeline; \`chord\` overrides the progression.
+  const T = (q = 0) => (start !== undefined ? (start + q) * BEAT : at(bar, q));
+  const c = chord ?? CHORDS[bar % 4];
   for (let q = 0; q < 4; q++) {
-    kick(at(bar, q), 1);
-    if (q === 1 || q === 3) snare(at(bar, q), 0.9);
+    if (kicks) kick(T(q), 1);
+    if (q === 1 || q === 3) snare(T(q), 0.9);
     if (hats) {
-      for (let s = 0; s < 4; s++) hat(at(bar, q + s / 4), s === 2, s === 2 ? 0.8 : 0.55);
+      for (let s = 0; s < 4; s++) hat(T(q + s / 4), s === 2, s === 2 ? 0.8 : 0.55);
     }
   }
   // Bass: offbeat octave pumping eighths.
   for (let e = 0; e < 8; e++) {
     const m = c.root + (e % 2 ? 12 : 0);
     if (!bassBusy && e % 2 === 0) continue;
-    tone(at(bar, e / 2), (BEAT / 2) * 0.9, m, {
+    tone(T(e / 2), (BEAT / 2) * 0.9, m, {
       wave: "saw",
       gain: 0.22,
       cutoff: 900,
@@ -282,7 +284,7 @@ function groove(bar, { hats = true, arp = true, pad = true, bassBusy = true, dro
   }
   if (pad)
     for (const n of c.notes)
-      tone(at(bar), BAR, n - 12, {
+      tone(T(), BAR, n - 12, {
         wave: "saw",
         gain: 0.05,
         cutoff: 1500,
@@ -293,7 +295,7 @@ function groove(bar, { hats = true, arp = true, pad = true, bassBusy = true, dro
   if (arp) {
     const seq = [c.notes[0], c.notes[1], c.notes[2], c.notes[0] + 12];
     for (let s = 0; s < 16; s++)
-      tone(at(bar, s / 4), (BEAT / 4) * 0.8, seq[s % 4], {
+      tone(T(s / 4), (BEAT / 4) * 0.8, seq[s % 4], {
         wave: "pulse",
         gain: 0.06,
         cutoff: 3500,
@@ -301,7 +303,7 @@ function groove(bar, { hats = true, arp = true, pad = true, bassBusy = true, dro
         pan: 0.35,
       });
   }
-  if (drop) crash(at(bar), 0.9);
+  if (drop) crash(T(), 0.9);
 }
 
 // The end card (beats after the cut to black): an echo on the cut, an
@@ -360,51 +362,83 @@ function cardHits(card) {
 }
 
 if (LAUNCH) {
-  // Beats as `at(0, beat)`: the timeline of src/lib/trailer/towns/launch.
-  const B = (beat) => at(0, beat);
-  // The hook (0-20): a low drone under the typing, a hit on each Enter (4, 8,
-  // 15), then the town rising a band a beat with a riser into the drop.
-  tone(B(0), 15 * BEAT, 28, { wave: "saw", gain: 0.08, cutoff: 220, env: [0.3, 0.2, 0.8, 0.2], sc: false });
+  // Built on src/lib/trailer/towns/launch ("Revenge"), in beats. The shape
+  // comes from the study (.claude/skills/game-trailer/references.md): loud
+  // the whole way but for three drop-outs on the story's hinges (the email,
+  // midnight, the button), a build that ends bigger than it starts, and a
+  // real ending on the name.
+  const B = (beat) => beat * BEAT;
+  // Relative major for the win: G, D, Em, C.
+  const WIN = [
+    { root: 43, notes: [67, 71, 74] },
+    { root: 38, notes: [62, 66, 69] },
+    { root: 40, notes: [64, 67, 71] },
+    { root: 36, notes: [60, 64, 67] },
+  ];
+
+  // 0-4, the raid: already mid-song, the corner hit on 2.1, then a hard stop at 4.
+  groove(0, { drop: true });
+  impact(B(2.1), 0.9);
+  // 4-8: silence (the email's ping plays alone).
+
+  // 8-20, suiting up in the dark: a sub drone swelling, a heartbeat that
+  // quickens, a filtered saw opening, a riser into the drop.
+  tone(B(8), 12 * BEAT, 28, { wave: "sine", gain: 0.1, cutoff: 200, env: [3, 0.2, 1, 0.1], sc: false });
+  tone(B(14), 6 * BEAT, 40, { wave: "saw", gain: 0.03, cutoff: 500, env: [2, 0.2, 1, 0.1], detune: 12, sc: false });
+  for (const q of [8, 10, 12, 14, 15, 16, 16.5, 17, 17.5, 18, 18.5, 19, 19.25, 19.5, 19.75]) kick(B(q), 0.12 + (q - 8) * 0.045);
   for (const n of CHORDS[0].notes)
-    tone(B(0), 15 * BEAT, n - 12, { wave: "saw", gain: 0.03, cutoff: 800, env: [0.6, 0.4, 0.7, 0.2], detune: 14, pan: n % 2 ? 0.4 : -0.4 });
-  for (const e of [4, 8]) {
-    kick(B(e), 1);
-    tone(B(e), 0.3, 28, { wave: "sine", gain: 0.35, cutoff: 300, env: [0.002, 0.25, 0.1, 0.2], sc: false, glideFrom: 36 });
-  }
-  impact(B(15), 0.9);
-  for (let q = 15; q < 20; q++) kick(B(q), 0.7 + 0.05 * (q - 15));
-  tone(B(15), 5 * BEAT, 28, { wave: "saw", gain: 0.12, cutoff: 300, env: [0.05, 0.2, 0.8, 0.1], sc: false });
+    tone(B(16), 4 * BEAT, n, { wave: "saw", gain: 0.02, cutoff: 700, env: [1.2, 0.3, 0.9, 0.1], detune: 16, pan: n % 2 ? 0.5 : -0.5, sc: false });
   riser(B(16), B(20), 0.22);
-  // Pick a side, the week and Thursday (20-40): the drop, the groove, the
-  // lead over the week, the drop again on Thursday's drift.
-  impact(B(20), 1.1);
-  for (let bar = 5; bar < 10; bar++) groove(bar, { drop: bar === 5 || bar === 9 });
-  const MEL = [
+
+  // 20-36, "#2" and the week: the drop, then the layers stack a bar at a time.
+  impact(B(20), 1.2);
+  groove(5, { arp: false, pad: false, drop: true });
+  groove(6, { arp: false });
+  groove(7);
+  groove(8);
+  const CLIMB = [
     [71, 71, 76, 74, 71, 69, 67, 69],
     [67, 67, 72, 71, 67, 64, 67, 69],
   ];
-  MEL.forEach((m, i) => m.forEach((n, e) => n && lead(at(7 + i, e / 2), (BEAT / 2) * 0.9, n)));
-  // Friday (39-44): lighter, the bass and hats.
-  groove(10, { arp: false, bassBusy: false });
-  // Sunday (44-56): a snare roll that doubles, the bass on quarters, a riser to midnight.
-  for (let bar = 11; bar < 14; bar++) {
-    const c = CHORDS[bar % 4];
-    for (let q = 0; q < 4; q++) {
-      kick(at(bar, q), 0.9);
-      tone(at(bar, q), BEAT * 0.9, c.root + 12, { wave: "saw", gain: 0.18, cutoff: 700 + (bar - 11) * 600 + q * 150, env: [0.003, 0.1, 0.6, 0.05], detune: 8 });
-    }
-    const div = bar < 13 ? 4 : 8;
-    for (let k = 0; k < div * 4; k++) {
-      const beat = bar * 4 + k / div;
-      snare(at(0, beat), 0.3 + (0.5 * (beat - 44)) / 12);
-    }
+  CLIMB.forEach((m, i) => m.forEach((n, e) => n && lead(at(7 + i, e / 2), (BEAT / 2) * 0.9, n)));
+
+  // 36-40, the revenge: the drop again, the melody an octave up.
+  groove(9, { drop: true });
+  [83, 0, 81, 79, 76, 0, 79, 81].forEach((n, e) => n && lead(at(9, e / 2), (BEAT / 2) * 0.9, n, 0.11));
+
+  // 40-52, Sunday: the kick on every beat, the bass climbing in quarters, a
+  // snare roll that doubles, a riser to midnight.
+  for (let q = 40; q < 52; q++) {
+    kick(B(q), 0.95);
+    const c = CHORDS[Math.floor(q / 4) % 4];
+    tone(B(q), BEAT * 0.9, c.root + 12, { wave: "saw", gain: 0.18, cutoff: 700 + (q - 40) * 120, env: [0.003, 0.1, 0.6, 0.05], detune: 8 });
+    for (let s = 0; s < 4; s++) hat(B(q + s / 4), s === 2, 0.5);
   }
-  riser(B(50), B(LAUNCH.freeze), 0.3);
-  // Midnight (56): the crown lands half a beat later on the hit, the groove twice, to the card.
-  impact(B(LAUNCH.resume + 0.5), 1.3);
-  groove(14, { drop: true });
-  groove(15, { drop: true });
+  for (let k = 0; k < 12 * 4; k++) {
+    const beat = 40 + k / (k < 24 ? 2 : 4);
+    if (beat < 52) snare(B(beat), 0.25 + (0.6 * (beat - 40)) / 12);
+  }
+  riser(B(46), B(52), 0.32);
+  // 52-53: midnight, silence.
+
+  // 53-61, the crown and the lit town: the biggest hit, then the chorus in
+  // the major, the lead on top, a crash on each bar.
+  impact(B(53.5), 1.4);
+  const HOOK = [
+    [74, 74, 79, 78, 74, 71, 74, 76],
+    [78, 78, 81, 79, 78, 74, 78, 79],
+  ];
+  for (let k = 0; k < 2; k++) {
+    groove(0, { start: 53 + 4 * k, chord: WIN[(k * 2) % 4], drop: true });
+    HOOK[k].forEach((n, e) => lead(B(53 + 4 * k + e / 2), (BEAT / 2) * 0.9, n, 0.13));
+  }
+
+  // 61: the cut to black, the name's hits, and the last chord ringing out.
+  for (const n of [55, 59, 62, 67, 71])
+    tone(B(61), 7 * BEAT, n, { wave: "saw", gain: 0.05, cutoff: 1600, env: [0.005, 1.5, 0.35, 2], detune: 14, sc: false, pan: n % 2 ? 0.4 : -0.4 });
+  tone(B(61), 6 * BEAT, 31, { wave: "sine", gain: 0.3, cutoff: 300, env: [0.005, 2, 0.4, 2], sc: false });
   cardHits(LAUNCH.card);
+  // 69-75: silence (the button's ping plays alone).
 } else if (TEASER) {
   for (let b = 1; b * 4 < TEASER.freeze; b++) groove(b, { drop: b === 1 });
   cardHits(TEASER.card);
@@ -472,10 +506,10 @@ for (let i = dly; i < LEN; i++) {
   R[i] += echoR[i - dly] * 0.6;
 }
 
-// The freeze: hard silence from the freeze until the cut to black.
-if (GATE) {
-  const s0 = Math.floor(GATE.freeze * BEAT * SR),
-    s1 = Math.floor(GATE.card * BEAT * SR) - 40;
+// The drop-outs: hard silence (a 5ms fade) from each gate's start to its end.
+for (const [from, to] of GATES) {
+  const s0 = Math.floor(from * BEAT * SR),
+    s1 = Math.floor(to * BEAT * SR) - 40;
   for (let i = s0; i < s1 && i < LEN; i++) {
     const k = i < s0 + 220 ? 1 - (i - s0) / 220 : 0;
     L[i] *= k;

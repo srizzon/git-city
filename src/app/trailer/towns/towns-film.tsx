@@ -41,7 +41,7 @@ export interface TownSide {
   fill?: Record<string, unknown>[];
 }
 
-function useTown(side: TownSide, cityNorms: LayoutNorms, gen: number, runHeights?: number[]) {
+function useTown(side: TownSide, cityNorms: LayoutNorms, gen: number, runHeights?: number[], heroInRun = false) {
   const base = useMemo(() => {
     const members = side.cityDevs as unknown as DeveloperRecord[];
     const fill = (side.fill ?? []) as unknown as DeveloperRecord[];
@@ -67,7 +67,18 @@ function useTown(side: TownSide, cityNorms: LayoutNorms, gen: number, runHeights
         return { ...out, height: TOWN_MAX_HEIGHT, floors: Math.floor(TOWN_MAX_HEIGHT / 6) };
       return out;
     });
-    const buildings = run ? [...real, ...run.buildings] : real;
+    let town = real;
+    if (heroInRun && run && top) {
+      // The hero's building moves onto the lot the corner drift goes through.
+      const login = top.github_login.toLowerCase();
+      const hero = real.find((b) => b.loginLower === login);
+      const slot = run.buildings[2];
+      if (hero) {
+        run.buildings[2] = { ...hero, position: slot.position };
+        town = real.filter((b) => b !== hero);
+      }
+    }
+    const buildings = run ? [...town, ...run.buildings] : town;
     const memberLogins = new Set(members.map((d) => d.github_login.toLowerCase()));
     const portal = side.city.objects.find((o) => o.item_type === "portal");
     const giant = side.city.objects.find(
@@ -83,7 +94,7 @@ function useTown(side: TownSide, cityNorms: LayoutNorms, gen: number, runHeights
       mascot: giant ? [giant.px ?? giant.x * LOT, giant.pz ?? giant.z * LOT] : undefined,
     };
     return { buildings, run, gateZ: portal?.pz ?? 24, revZ: plainStreet(side.city.objects), facts };
-  }, [side, cityNorms, runHeights]);
+  }, [side, cityNorms, runHeights, heroInRun]);
   // A fresh store puts every building back up (a new take, a loop, a seek back).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const store = useMemo(() => smashStoreFor(base.buildings), [base, gen]);
@@ -186,6 +197,8 @@ export interface TownsCut {
   rig?: (stage: Stage, town: TownFacts) => RigExtras;
   /** The heights of the run of extra buildings the car smashes (the teaser's by default), tallest last. */
   runHeights?: number[];
+  /** Put this town's top member's building where the corner drift hits (the run's third lot). */
+  heroInRun?: Stage;
   /** A DOM layer over the pictures (under the titles), on the same clock. */
   overlay?: (clock: Transport, towns: [TownFacts, TownFacts]) => ReactNode;
 }
@@ -210,8 +223,8 @@ export default function TownsFilm({
   // A new take (or a loop, or a seek back) rebuilds the smash stores, so every building is back up.
   const [gen, setGen] = useState(0);
   const reset = useCallback(() => setGen((g) => g + 1), []);
-  const claude = useTown(claudeSide, cityNorms, gen, cut.runHeights);
-  const codex = useTown(codexSide, cityNorms, gen, cut.runHeights);
+  const claude = useTown(claudeSide, cityNorms, gen, cut.runHeights, cut.heroInRun === "claude");
+  const codex = useTown(codexSide, cityNorms, gen, cut.runHeights, cut.heroInRun === "codex");
   const [clock] = useState(() => new Transport(cut.film.beat));
 
   const town = (stage: Stage, frame: Frame<Stage>) => {

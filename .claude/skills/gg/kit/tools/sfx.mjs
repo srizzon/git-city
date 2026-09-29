@@ -133,3 +133,62 @@ function wav(path, data) {
   wav(`${OUT}/horn.wav`, d);
 }
 console.log("ok");
+
+// Ping: a notification landing. Two bright sine notes a fifth apart, a soft
+// bell tail, like a phone's inbox chime.
+{
+  const n = Math.floor(0.9 * SR),
+    d = new Float32Array(n);
+  const notes = [
+    [0, 1318.5],
+    [0.09, 1975.5],
+  ];
+  for (let i = 0; i < n; i++) {
+    const x = i / SR;
+    let v = 0;
+    for (const [at, f] of notes) {
+      const t = x - at;
+      if (t < 0) continue;
+      const e = Math.min(1, t / 0.004) * Math.exp(-t * 5.5);
+      v += (Math.sin(2 * Math.PI * f * t) + 0.3 * Math.sin(2 * Math.PI * f * 2 * t) * Math.exp(-t * 12)) * e * 0.5;
+    }
+    d[i] = v;
+  }
+  wav(`${OUT}/ping.wav`, d);
+}
+
+// Click: a mouse button, a short hard tick with a low body.
+{
+  const n = Math.floor(0.05 * SR),
+    d = new Float32Array(n);
+  let prev = 0;
+  for (let i = 0; i < n; i++) {
+    const x = i / SR;
+    const nz = rnd();
+    const hp = nz - prev;
+    prev = nz;
+    d[i] = hp * Math.exp(-x * 260) + Math.sin(2 * Math.PI * 520 * x) * Math.exp(-x * 120) * 0.6;
+  }
+  wav(`${OUT}/click.wav`, d);
+}
+
+// Crown: the win landing. A deep boom under a bright metallic clang and a
+// shimmering chord that rings out.
+{
+  const n = Math.floor(2.4 * SR),
+    d = new Float32Array(n);
+  let ph = 0;
+  const partials = [523.25, 659.25, 783.99, 1046.5, 1318.5, 2093];
+  for (let i = 0; i < n; i++) {
+    const x = i / SR;
+    ph += (2 * Math.PI * (40 + 70 * Math.exp(-x * 10))) / SR;
+    const boom = Math.sin(ph) * Math.exp(-x * 3) * 1.1;
+    let clang = 0;
+    partials.forEach((f, k) => {
+      clang += Math.sin(2 * Math.PI * f * (1 + 0.003 * k) * x + k) * Math.exp(-x * (1.2 + k * 0.5)) * (k < 3 ? 0.35 : 0.2);
+    });
+    const hit = rnd() * Math.exp(-x * 60) * 0.6;
+    d[i] = Math.tanh((boom + clang * Math.min(1, x / 0.002) + hit) * 1.2);
+  }
+  wav(`${OUT}/crown.wav`, d);
+}
