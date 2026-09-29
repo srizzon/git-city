@@ -65,6 +65,8 @@ ${TITLE_CSS}
 .tk-rates button { color: var(--tk-muted); }
 .tk-rates button:hover { color: var(--tk-text); }
 .tk-rates button.tk-on { color: var(--tk-accent); }
+.tk-vol { display: flex; align-items: center; gap: 6px; color: var(--tk-muted); }
+.tk-vol input { width: 64px; accent-color: var(--tk-accent); }
 .tk-timeline { position: relative; margin: 0 16px; user-select: none; touch-action: none; cursor: ew-resize; }
 .tk-marks { position: relative; height: 16px; font-size: 9px; color: var(--tk-muted); font-variant-numeric: tabular-nums; }
 .tk-marks span { position: absolute; top: 0; transform: translateX(-50%); }
@@ -138,7 +140,7 @@ function Icon({ name }: { name: "play" | "pause" | "prev" | "next" }) {
 }
 
 /** Web Audio for the effects: files decoded once, woken by the first key or click (autoplay rules). */
-function useSoundEffects(sounds: SoundCue[]) {
+function useSoundEffects(sounds: SoundCue[], volume: { current: number }) {
   const play = useRef<((c: SoundCue) => void) | null>(null);
   useEffect(() => {
     let ctx: AudioContext | null = null;
@@ -172,7 +174,7 @@ function useSoundEffects(sounds: SoundCue[]) {
         node.buffer = buf;
         node.playbackRate.value = cue.rate ?? 1;
         const gain = c.createGain();
-        gain.gain.value = cue.gain;
+        gain.gain.value = cue.gain * volume.current;
         node.connect(gain).connect(c.destination);
         node.loop = cue.dur !== undefined && cue.dur > buf.duration;
         node.start();
@@ -187,7 +189,7 @@ function useSoundEffects(sounds: SoundCue[]) {
       window.removeEventListener("keydown", wake);
       void ctx?.close();
     };
-  }, [sounds]);
+  }, [sounds, volume]);
   return play;
 }
 
@@ -231,7 +233,28 @@ export default function Studio<S extends string>({
   const [command, setCommand] = useState<string | null>(null);
   const track = useRef<HTMLDivElement>(null);
   const head = useRef<HTMLDivElement>(null);
-  const sfx = useSoundEffects(film.sounds);
+  // The editor's volume (music and effects), remembered in this browser. Export mixes at full volume.
+  const [volume, setVolume] = useState(1);
+  const vol = useRef(1);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("tk-volume");
+      const v = Number(saved);
+      if (saved !== null && v >= 0 && v <= 1) setVolume(v);
+    } catch {
+      // storage blocked: full volume
+    }
+  }, []);
+  useEffect(() => {
+    vol.current = volume;
+    if (audio.current) audio.current.volume = volume;
+    try {
+      localStorage.setItem("tk-volume", String(volume));
+    } catch {
+      // storage blocked: not remembered
+    }
+  }, [volume]);
+  const sfx = useSoundEffects(film.sounds, vol);
   const reset = useRef(onReset);
   useEffect(() => {
     reset.current = onReset;
@@ -252,7 +275,7 @@ export default function Studio<S extends string>({
       if (!on || clock.rate !== 1 || exporting.current) return a.pause();
       const go = () => {
         a.currentTime = (film.song?.offset ?? 0) + Math.max(0, beatOf(clock)) * BEAT;
-        a.volume = 1;
+        a.volume = vol.current;
         a.play().catch(() => {
           // no song file yet (tools/music.mjs): silent
         });
@@ -546,6 +569,19 @@ export default function Studio<S extends string>({
                 </button>
               </div>
               <div className="tk-rates">
+                <label className="tk-vol">
+                  Vol
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={volume}
+                    onChange={(e) => setVolume(Number(e.target.value))}
+                    onKeyDown={(e) => e.preventDefault()}
+                    aria-label="Volume"
+                  />
+                </label>
                 {RATES.map((r) => (
                   <button
                     key={r}

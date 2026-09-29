@@ -5,13 +5,13 @@ import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import {
   ASK,
   BLUE,
-  CLICK,
   CMD,
   COUNT_FROM,
   FREEZE,
   KEY_EVERY,
   LIME,
   ORANGE,
+  POPUP,
   SUIT,
   UI,
   dayName,
@@ -23,9 +23,8 @@ import type { TownFacts } from "@/app/trailer/towns/towns-film";
 
 // The launch trailer's DOM layer (lib/trailer/towns/launch), on the film's
 // clock: the game's own UI is the only caption. The "knocked your building
-// down" email and its "Hit back" button, the terminal where `claude` starts,
-// Claude Code's rank, each town's number over the week, Sunday's clock,
-// WINNER, and the same email on the other side after the name.
+// down" popup over the wreck and its "Hit back" button, the terminal where
+// `claude` starts, each town's number over the week down to Sunday's clock, WINNER.
 
 const COLOR: Record<Side, string> = { claude: ORANGE, codex: BLUE };
 /** The rival who starts it (a made-up handle, like Clash's BigBuffetBoy85). */
@@ -57,123 +56,53 @@ function midnight(b: number): string {
   return `23:59:${String(s).padStart(2, "0")}`;
 }
 
-/** The email's hero image, drawn on the server (app/town/[slug]/demolished-image). */
-const heroSrc = (town: string, attacker: string, victim: string) =>
-  `/town/${town}/demolished-image?attacker=${encodeURIComponent(attacker)}&victim=${encodeURIComponent(victim)}&v=trailer`;
-
 export default function LaunchOverlay({ clock, towns }: { clock: FilmClock; towns: [TownFacts, TownFacts] }) {
   const b = useBeat(clock);
   const [claude, codex] = towns;
-  const hero = claude.tallest[0] ?? "you";
-  // Both images load with the page (they take a moment to draw), so they're there when their email lands.
-  const preload = (
-    <div className="hidden" aria-hidden>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={heroSrc(claude.side.slug, ATTACKER, hero)} alt="" />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={heroSrc(codex.side.slug, hero, ATTACKER)} alt="" />
-    </div>
-  );
-  return (
-    <>
-      {preload}
-      <Layer b={b} claude={claude} codex={codex} towns={towns} hero={hero} />
-    </>
-  );
-}
-
-function Layer({ b, claude, codex, towns, hero }: { b: number; claude: TownFacts; codex: TownFacts; towns: [TownFacts, TownFacts]; hero: string }) {
-  if (inside(b, UI.email))
-    return (
-      <Email
-        b={b - UI.email.start}
-        attacker={ATTACKER}
-        victim={hero}
-        town={claude.side.slug}
-        rival={codex.side.name}
-        click={CLICK}
-      />
-    );
+  if (inside(b, UI.popup)) return <Popup b={b - POPUP.start} attacker={ATTACKER} rival={codex.side.name} />;
   if (inside(b, UI.suit)) return <SuitUp b={b - UI.suit.start} />;
-  if (inside(b, UI.rank)) return <Rank b={b - UI.rank.start} claude={claude} codex={codex} />;
   if (inside(b, UI.week)) return <WeekBars b={b} towns={towns} />;
-  if (b >= UI.sunday[0] && b < UI.sunday[1]) return <ScoreChip b={b} />;
   if (inside(b, UI.winner)) return <Winner b={b - UI.winner.start} town={claude.side.name} />;
-  if (inside(b, UI.button))
-    return (
-      <Email
-        b={b - UI.button.start}
-        attacker={hero}
-        victim={ATTACKER}
-        town={codex.side.slug}
-        rival={claude.side.name}
-      />
-    );
   return null;
 }
 
-// ─── The email ──────────────────────────────────────────────
+// ─── The popup ──────────────────────────────────────────────
 
 /**
- * The real "knocked your building down" email (lib/notification-senders/
- * town-demolished) as it lands: its hero image, the line, the button. It
- * drops in stepped; with `click`, a cursor comes in and presses the button.
+ * Over the held wreck, like Clash's "Your Defense Lost · Revenge": the
+ * picture dims, a small game panel steps up with who did it and one button,
+ * and a cursor comes in and presses it.
  */
-function Email({
-  b,
-  attacker,
-  victim,
-  town,
-  rival,
-  click,
-}: {
-  b: number;
-  attacker: string;
-  victim: string;
-  town: string;
-  rival: string;
-  click?: number;
-}) {
-  const drop = b < 0.12 ? -3 : 0;
-  const pressed = click !== undefined && b >= click && b < click + 0.3;
-  // The cursor travels in over the beat before the click (stepped, a frame a sixteenth).
-  const k = click === undefined ? 0 : Math.max(0, Math.min(1, Math.floor((b - (click - 1)) * 4) / 4));
-  const src = heroSrc(town, attacker, victim);
+function Popup({ b, attacker, rival }: { b: number; attacker: string; rival: string }) {
+  const click = POPUP.click - POPUP.start;
+  const up = b < 0.12 ? 2 : 0;
+  const pressed = b >= click && b < click + 0.3;
+  // The cursor travels in over the beat before the click, stepped a sixteenth at a time.
+  const k = Math.max(0, Math.min(1, Math.floor((b - (click - 1)) * 4) / 4));
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black font-pixel">
+    <div className="absolute inset-0 flex items-end justify-center font-pixel" style={{ background: "rgba(0,0,0,0.45)", paddingBottom: "9cqw" }}>
       <div
-        className="relative flex flex-col items-center border-2 border-border bg-bg"
-        style={{ width: "50cqw", padding: "2cqw", gap: "1.4cqw", transform: `translateY(${drop}cqw)` }}
+        className="relative flex flex-col items-center border-2 bg-bg"
+        style={{ borderColor: "#ef4444", padding: "1.8cqw 3cqw", gap: "1.2cqw", transform: `translateY(${up}cqw)` }}
       >
-        <div className="flex w-full items-center justify-between text-muted" style={{ fontSize: "1.4cqw" }}>
-          <span>
-            <span className="text-cream">GIT</span> <span className="text-lime">CITY</span>
-          </span>
-          <span>now</span>
-        </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="" className="block w-full" style={{ imageRendering: "pixelated" }} />
-        <div className="w-full text-center text-cream normal-case" style={{ fontSize: "2.6cqw" }}>
-          <span className="text-lime">@{attacker}</span> knocked you down
-        </div>
+        <span style={{ color: "#ef4444", fontSize: "1.5cqw" }}>YOUR BUILDING WAS KNOCKED DOWN</span>
+        <span className="text-cream normal-case" style={{ fontSize: "3cqw" }}>
+          <span className="text-lime">@{attacker}</span>
+        </span>
         <span
-          className="inline-block text-bg"
+          className="text-bg"
           style={{
             background: LIME,
-            fontSize: "2cqw",
-            padding: "1cqw 2.6cqw",
+            fontSize: "2.2cqw",
+            padding: "0.9cqw 3cqw",
             transform: pressed ? "scale(0.94)" : undefined,
             filter: pressed ? "brightness(0.85)" : undefined,
           }}
         >
-          Hit {rival} back
+          HIT {rival.toUpperCase()} BACK
         </span>
-        {click !== undefined && b >= click - 1 && (
-          <svg
-            viewBox="0 0 12 18"
-            className="absolute"
-            style={{ width: "2cqw", left: `${62 - 12 * k}%`, top: `${118 - 26 * k}%` }}
-          >
+        {b >= click - 1 && (
+          <svg viewBox="0 0 12 18" className="absolute" style={{ width: "2cqw", left: `${78 - 20 * k}%`, top: `${130 - 42 * k}%` }}>
             <path d="M0 0 L0 14 L4 10 L7 17 L9 16 L6 9 L11 9 Z" fill="#fff" stroke="#000" strokeWidth="1" />
           </svg>
         )}
@@ -228,49 +157,6 @@ function SuitUp({ b }: { b: number }) {
   );
 }
 
-// ─── Where Claude Code stands ───────────────────────────────
-
-/** On the drop: Claude Code is #2 on Monday, Codex #1 above it. Claude's row lands first, Codex's a beat later. */
-function Rank({ b, claude, codex }: { b: number; claude: TownFacts; codex: TownFacts }) {
-  const pop = b < 0.1 ? 1.25 : 1;
-  const rows: [string, string, string, boolean][] = [
-    ["#1", codex.side.name, BLUE, false],
-    ["#2", claude.side.name, ORANGE, true],
-  ];
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black font-pixel">
-      <div className="flex flex-col" style={{ gap: "1.6cqw", width: "52cqw" }}>
-        <div className="text-muted" style={{ fontSize: "1.6cqw" }}>
-          THIS WEEK · PER DEV
-        </div>
-        {rows.map(([rank, name, color, hero], i) => (
-          <div
-            key={rank}
-            className="flex items-center border-2 bg-bg"
-            style={{
-              gap: "2cqw",
-              padding: hero ? "1.4cqw 2cqw" : "0.9cqw 2cqw",
-              borderColor: hero ? color : "#2a2a33",
-              fontSize: hero ? "4.4cqw" : "2.4cqw",
-              opacity: hero || b >= 1 ? 1 : 0,
-              transform: hero ? `scale(${pop})` : undefined,
-              transformOrigin: "left center",
-            }}
-          >
-            <span className={hero ? "text-cream" : "text-muted"}>{rank}</span>
-            <span style={{ color }}>{name}</span>
-            {i === 0 && (
-              <span className="ml-auto text-lime" style={{ fontSize: "1.8cqw" }}>
-                LEADS
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── The week ───────────────────────────────────────────────
 
 /**
@@ -306,34 +192,13 @@ function WeekBars({ b, towns }: { b: number; towns: [TownFacts, TownFacts] }) {
           </div>
         ))}
       </div>
+      {/* The day, and on Sunday the clock running down to midnight. */}
       <div className="absolute inset-x-0 flex justify-center" style={{ bottom: "6.6cqw" }}>
-        <span className="border-2 border-border bg-bg px-[1.6cqw] py-[0.6cqw] text-cream" style={{ fontSize: "2.2cqw" }}>
-          {dayName(b)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ─── Sunday ─────────────────────────────────────────────────
-
-/** Over Sunday's cuts: the two numbers either side of the clock; on midnight it lights up. */
-function ScoreChip({ b }: { b: number }) {
-  const days = daysAt(b);
-  const late = b >= COUNT_FROM;
-  const done = b >= FREEZE;
-  return (
-    <div className="pointer-events-none absolute inset-x-0 top-[3cqw] flex justify-center font-pixel">
-      <div
-        className="flex items-center gap-[2cqw] border-2 bg-bg px-[2cqw] py-[1cqw]"
-        style={{ fontSize: "2.4cqw", borderColor: done ? LIME : "#2a2a33" }}
-      >
-        <span className="tabular-nums" style={{ color: ORANGE }}>
-          {Math.round(perDev("claude", days))}
-        </span>
-        <span className={`tabular-nums ${late ? "text-lime" : "text-muted"}`}>SUN {midnight(b)}</span>
-        <span className="tabular-nums" style={{ color: BLUE }}>
-          {Math.round(perDev("codex", days))}
+        <span
+          className={`border-2 bg-bg px-[1.6cqw] py-[0.6cqw] tabular-nums ${b >= COUNT_FROM ? "text-lime" : "text-cream"}`}
+          style={{ fontSize: "2.2cqw", borderColor: b >= FREEZE ? LIME : "#2a2a33" }}
+        >
+          {b >= COUNT_FROM ? `SUN ${midnight(b)}` : dayName(b)}
         </span>
       </div>
     </div>

@@ -25,7 +25,7 @@ const MODE = process.argv[3] ?? "full";
 const CUTS = { soon: { freeze: 16, card: 18 }, demo: { freeze: 12, card: 14 } };
 const TEASER = CUTS[MODE];
 // The launch cut, in beats: the drop-outs (hard silence, [from, to]), and the cut to black.
-const LAUNCH = MODE === "launch" ? { gates: [[4, 8], [52, 53], [69, 75]], card: 61, end: 75 } : null;
+const LAUNCH = MODE === "launch" ? { gates: [[3, 6], [34, 35]], card: 43, end: 51 } : null;
 const GATES = TEASER ? [[TEASER.freeze, TEASER.card]] : LAUNCH ? LAUNCH.gates : [];
 const BARS = LAUNCH ? Math.ceil(LAUNCH.end / 4) + 1 : TEASER ? Math.ceil((TEASER.card + 10) / 4) : 16;
 const LEN = Math.ceil((BARS * BAR + 2.5) * SR);
@@ -363,10 +363,9 @@ function cardHits(card) {
 
 if (LAUNCH) {
   // Built on src/lib/trailer/towns/launch ("Revenge"), in beats. The shape
-  // comes from the study (.claude/skills/game-trailer/references.md): loud
-  // the whole way but for three drop-outs on the story's hinges (the email,
-  // midnight, the button), a build that ends bigger than it starts, and a
-  // real ending on the name.
+  // comes from the study (.claude/skills/gg/references.md): loud the whole
+  // way but for two drop-outs on the story's hinges (the popup, midnight), a
+  // build that ends bigger than it starts, and a real ending on the name.
   const B = (beat) => beat * BEAT;
   // Relative major for the win: G, D, Em, C.
   const WIN = [
@@ -376,69 +375,59 @@ if (LAUNCH) {
     { root: 36, notes: [60, 64, 67] },
   ];
 
-  // 0-4, the raid: already mid-song, the corner hit on 2.1, then a hard stop at 4.
+  // 0-3, the raid: already mid-song, the corner hit on 2.1, then a hard
+  // stop when the popup comes up over the held wreck (its ping plays alone).
   groove(0, { drop: true });
   impact(B(2.1), 0.9);
-  // 4-8: silence (the email's ping plays alone).
 
-  // 8-20, suiting up in the dark: a sub drone swelling, a heartbeat that
+  // 6-18, suiting up in the dark: a sub drone swelling, a heartbeat that
   // quickens, a filtered saw opening, a riser into the drop.
-  tone(B(8), 12 * BEAT, 28, { wave: "sine", gain: 0.1, cutoff: 200, env: [3, 0.2, 1, 0.1], sc: false });
-  tone(B(14), 6 * BEAT, 40, { wave: "saw", gain: 0.03, cutoff: 500, env: [2, 0.2, 1, 0.1], detune: 12, sc: false });
-  for (const q of [8, 10, 12, 14, 15, 16, 16.5, 17, 17.5, 18, 18.5, 19, 19.25, 19.5, 19.75]) kick(B(q), 0.12 + (q - 8) * 0.045);
+  tone(B(6), 12 * BEAT, 28, { wave: "sine", gain: 0.1, cutoff: 200, env: [3, 0.2, 1, 0.1], sc: false });
+  tone(B(12), 6 * BEAT, 40, { wave: "saw", gain: 0.03, cutoff: 500, env: [2, 0.2, 1, 0.1], detune: 12, sc: false });
+  for (const q of [6, 8, 10, 12, 13, 14, 14.5, 15, 15.5, 16, 16.5, 17, 17.25, 17.5, 17.75]) kick(B(q), 0.12 + (q - 6) * 0.045);
   for (const n of CHORDS[0].notes)
-    tone(B(16), 4 * BEAT, n, { wave: "saw", gain: 0.02, cutoff: 700, env: [1.2, 0.3, 0.9, 0.1], detune: 16, pan: n % 2 ? 0.5 : -0.5, sc: false });
-  riser(B(16), B(20), 0.22);
+    tone(B(14), 4 * BEAT, n, { wave: "saw", gain: 0.02, cutoff: 700, env: [1.2, 0.3, 0.9, 0.1], detune: 16, pan: n % 2 ? 0.5 : -0.5, sc: false });
+  riser(B(14), B(18), 0.22);
 
-  // 20-36, "#2" and the week: the drop, then the layers stack a bar at a time.
-  impact(B(20), 1.2);
-  groove(5, { arp: false, pad: false, drop: true });
-  groove(6, { arp: false });
-  groove(7);
-  groove(8);
+  // 18-34, the week to Sunday midnight: the drop, the layers stacking a bar
+  // at a time, the melody from Wednesday, and Sunday's last bar a roll and a
+  // riser into the freeze.
+  impact(B(18), 1.2);
+  const W = (k) => 18 + 4 * k;
+  groove(0, { start: W(0), arp: false, pad: false, drop: true });
+  groove(1, { start: W(1), arp: false });
+  groove(2, { start: W(2) });
   const CLIMB = [
     [71, 71, 76, 74, 71, 69, 67, 69],
     [67, 67, 72, 71, 67, 64, 67, 69],
   ];
-  CLIMB.forEach((m, i) => m.forEach((n, e) => n && lead(at(7 + i, e / 2), (BEAT / 2) * 0.9, n)));
-
-  // 36-40, the revenge: the drop again, the melody an octave up.
-  groove(9, { drop: true });
-  [83, 0, 81, 79, 76, 0, 79, 81].forEach((n, e) => n && lead(at(9, e / 2), (BEAT / 2) * 0.9, n, 0.11));
-
-  // 40-52, Sunday: the kick on every beat, the bass climbing in quarters, a
-  // snare roll that doubles, a riser to midnight.
-  for (let q = 40; q < 52; q++) {
-    kick(B(q), 0.95);
-    const c = CHORDS[Math.floor(q / 4) % 4];
-    tone(B(q), BEAT * 0.9, c.root + 12, { wave: "saw", gain: 0.18, cutoff: 700 + (q - 40) * 120, env: [0.003, 0.1, 0.6, 0.05], detune: 8 });
-    for (let s = 0; s < 4; s++) hat(B(q + s / 4), s === 2, 0.5);
+  CLIMB.forEach((m, i) => m.forEach((n, e) => n && lead(B(W(1 + i) + e / 2), (BEAT / 2) * 0.9, n)));
+  // Sunday (30-34): kick on every beat, bass climbing, the roll doubling, the riser.
+  for (let q = 30; q < 34; q++) {
+    kick(B(q), 1);
+    tone(B(q), BEAT * 0.9, CHORDS[3].root + 12, { wave: "saw", gain: 0.2, cutoff: 1200 + (q - 30) * 400, env: [0.003, 0.1, 0.6, 0.05], detune: 8 });
   }
-  for (let k = 0; k < 12 * 4; k++) {
-    const beat = 40 + k / (k < 24 ? 2 : 4);
-    if (beat < 52) snare(B(beat), 0.25 + (0.6 * (beat - 40)) / 12);
-  }
-  riser(B(46), B(52), 0.32);
-  // 52-53: midnight, silence.
+  for (let k = 0; k < 32; k++) snare(B(30 + k / 8), 0.35 + (0.55 * k) / 32);
+  riser(B(28), B(34), 0.32);
+  // 34-35: midnight, silence.
 
-  // 53-61, the crown and the lit town: the biggest hit, then the chorus in
+  // 35-43, the crown and the lit town: the biggest hit, then the chorus in
   // the major, the lead on top, a crash on each bar.
-  impact(B(53.5), 1.4);
+  impact(B(35.5), 1.4);
   const HOOK = [
     [74, 74, 79, 78, 74, 71, 74, 76],
     [78, 78, 81, 79, 78, 74, 78, 79],
   ];
   for (let k = 0; k < 2; k++) {
-    groove(0, { start: 53 + 4 * k, chord: WIN[(k * 2) % 4], drop: true });
-    HOOK[k].forEach((n, e) => lead(B(53 + 4 * k + e / 2), (BEAT / 2) * 0.9, n, 0.13));
+    groove(0, { start: 35 + 4 * k, chord: WIN[(k * 2) % 4], drop: true });
+    HOOK[k].forEach((n, e) => lead(B(35 + 4 * k + e / 2), (BEAT / 2) * 0.9, n, 0.13));
   }
 
-  // 61: the cut to black, the name's hits, and the last chord ringing out.
+  // 43: the cut to black, the name's hits, and the last chord ringing out to the end.
   for (const n of [55, 59, 62, 67, 71])
-    tone(B(61), 7 * BEAT, n, { wave: "saw", gain: 0.05, cutoff: 1600, env: [0.005, 1.5, 0.35, 2], detune: 14, sc: false, pan: n % 2 ? 0.4 : -0.4 });
-  tone(B(61), 6 * BEAT, 31, { wave: "sine", gain: 0.3, cutoff: 300, env: [0.005, 2, 0.4, 2], sc: false });
+    tone(B(43), 7 * BEAT, n, { wave: "saw", gain: 0.05, cutoff: 1600, env: [0.005, 1.5, 0.35, 2], detune: 14, sc: false, pan: n % 2 ? 0.4 : -0.4 });
+  tone(B(43), 6 * BEAT, 31, { wave: "sine", gain: 0.3, cutoff: 300, env: [0.005, 2, 0.4, 2], sc: false });
   cardHits(LAUNCH.card);
-  // 69-75: silence (the button's ping plays alone).
 } else if (TEASER) {
   for (let b = 1; b * 4 < TEASER.freeze; b++) groove(b, { drop: b === 1 });
   cardHits(TEASER.card);

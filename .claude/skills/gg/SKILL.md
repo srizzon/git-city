@@ -28,7 +28,7 @@ Unless the invocation already steers ("a teaser, make it feel like…", `--tone`
 > - **Steer:** you tell me what people should feel at the end, and I pitch 2–3 scripts before building.
 
 - **First cut:** infer everything in steps 2–3, then build straight away. The review happens in the studio (step 5).
-- **Steer:** ask two things: what the viewer should feel at the end ("I want to jump in and play", "pick a side"…), and whether it's a teaser or a launch trailer. Research the craft for this kind of video (Derek Lieu's blog; trailers of games like this one). Then pitch 2–3 scripts as tables (time, picture, title card, sound), recommend one, and say why. Build the one they pick, one take at a time, with them watching. Keep the scripts they don't pick in `plan.md` for the next launch.
+- **Steer:** ask two things: what the viewer should feel at the end ("I want to jump in and play", "pick a side"…), and whether it's a teaser or a launch trailer. Study real trailers first: watch 4–8 famous launch trailers of comparable games frame by frame (`yt-dlp`, then `ffmpeg` frames at 2 per second as labelled contact sheets, their captions, and a loudness curve with `ebur128` to see where the music drops out). Write each down as a timeline with its "wow" beat and its button. Start from `references.md`, which already breaks down Fall Guys, Among Us, Clash of Clans, Brawl Stars and more, and add to it; ask the owner for trailers they love. Build the scripts by recreating a structure that worked: recreating beats inventing (the Towns launch went through five rebuilds from general rules, then landed in one pass from Fall Guys and Clash). Then pitch 2–3 scripts as tables (time, picture, title card, sound), recommend one, and say why. Build the one they pick, one take at a time, with them watching. Keep the scripts they don't pick in `plan.md` for the next launch.
 
 **Why:** a first cut that nobody can steer, built from a guess about the owner's idea, cost a whole round. Having them choose up front keeps the fast path fast and the owner's idea the owner's.
 
@@ -68,6 +68,7 @@ Write `gg-output/plan.md`: the angle, the hook, the takes as a table (beats, pic
 
 Start from a copy of the minimal film, with the game's own scenes as the stages (README, "A film of your own").
 - Write the takes on the beat grid. Shot recipes are pure functions of `t` that drive the game's real objects: its camera, its player, its world.
+- Plan the sound with the takes, not after: it's the most important part of a trailer (`references.md`, "Music and sound"). The music builds, varies and ends on a real final hit; it stays loud but for 1–3 drop-outs, each on a story hinge; the game's own sounds play alone in those drop-outs.
 - Generate the music at the film's BPM (`music.mjs`, with its `CUTS` set to the film's freeze and card beats) and the effects (`sfx.mjs`). Use the game's own sounds wherever it has them.
 - Put every visual hit on a beat, with a sound (`film.sounds`) and, for the big ones, a flash.
 - **Before showing anything, step through every take beat by beat** at 0.25× (Home, then Shift+→). Screenshot each beat, look at every screenshot, and fix what they show.
