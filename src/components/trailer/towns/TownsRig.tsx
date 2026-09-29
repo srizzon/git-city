@@ -782,7 +782,8 @@ export default function TownsRig({
         const u = Math.min(1, t / land);
         const bounce = t > land ? 6 * Math.exp(-(t - land) * 8) * Math.abs(Math.sin((t - land) * 18)) : 0;
         crown.current.visible = true;
-        crown.current.position.set(b.x, 220 * (1 - u) * (1 - u) + bounce, b.z);
+        // It comes into the shot already falling: the last few units of its drop, then the bounce.
+        crown.current.position.set(b.x, 40 * (1 - u) * (1 - u) + bounce, b.z);
         if (crossed(shot.start + crownLand)) {
           st.current.shake = 1;
           fx?.burst(b.x, top + 20, b.z, { count: 40, speed: 30, colors: ["#ffd24a", "#ffe9a8", "#ffb800"], size: 1.6, life: 0.9 });

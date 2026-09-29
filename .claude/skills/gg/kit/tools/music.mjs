@@ -414,9 +414,9 @@ if (LAUNCH) {
   for (let k = 0; k < 32; k++) snare(B(38 + k / 8), 0.35 + (0.55 * k) / 32);
   riser(B(36), B(42), 0.32);
   // 42-50, midnight straight into the crown and the lit town: the biggest
-  // hit as it lands, then the chorus in the major, the lead on top, a crash
-  // on each bar.
-  impact(B(42.25), 1.4);
+  // hit on the cut's downbeat, the crown landing with it, then the chorus in
+  // the major, the lead on top, a crash on each bar.
+  impact(B(42), 1.4);
   const HOOK = [
     [74, 74, 79, 78, 74, 71, 74, 76],
     [78, 78, 81, 79, 78, 74, 78, 79],

@@ -32,8 +32,8 @@ const RAID_TRIM = 0.8;
 const DAY_BEATS = 2;
 const SUNDAY_BEATS = 4;
 const WEEK_BEATS = 6 * DAY_BEATS + SUNDAY_BEATS;
-/** The crown lands this many beats into its take. */
-export const CROWN_LAND = 0.25;
+/** The crown lands this many beats into its take: on the cut's downbeat, with the music's hit (a sixteenth later tripped the beat). */
+export const CROWN_LAND = 0.08;
 /** The crew take: a pop every other beat. */
 const CREW_BEATS = 8;
 
@@ -172,10 +172,10 @@ export const SOUNDS: SoundCue[] = [
     gain: 0.3,
     rate: 1.2 + 0.03 * (i % 4),
   })),
-  // Midnight: the crown drops straight in and lands a quarter beat later.
-  { beat: take("Crown").start, src: WHOOSH, gain: 0.6, rate: 1.6 },
-  { beat: take("Crown").start + CROWN_LAND, src: CROWN, gain: 1 },
-  { beat: take("Crown").start + CROWN_LAND, src: IMPACT, gain: 1, rate: 0.6 },
+  // Midnight: a whoosh leads into the cut, and the crown lands on its downbeat with the music's hit.
+  { beat: take("Crown").start - 0.5, src: WHOOSH, gain: 0.5, rate: 1.4 },
+  { beat: take("Crown").start, src: CROWN, gain: 1 },
+  { beat: take("Crown").start, src: IMPACT, gain: 1, rate: 0.6 },
   // The town lights up in rings from the crown.
   ...Array.from({ length: 4 }, (_, i) => ({ beat: UI.winner.start + i, src: BOOM, gain: 0.35 + 0.1 * i, rate: 1.6 - 0.1 * i })),
 ];
