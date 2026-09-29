@@ -68,7 +68,7 @@ export default function LaunchOverlay({ clock, towns }: { clock: FilmClock; town
   if (inside(b, UI.crew)) return <CrewPanel b={b} town={claude} />;
   if (inside(b, UI.week)) return <WeekBars b={b} towns={towns} />;
   if (inside(b, UI.winner)) return <Winner b={b - UI.winner.start} town={claude.side.name} />;
-  if (inside(b, UI.pick)) return <PickASide b={b - UI.pick.start} />;
+  if (inside(b, UI.pick)) return <PickASide b={b - UI.pick.start} towns={towns} />;
   return null;
 }
 
@@ -304,25 +304,32 @@ function Winner({ b, town }: { b: number; town: string }) {
 // ─── PICK A SIDE ────────────────────────────────────────────
 
 /**
- * The first of the two closing cards: black, split down the middle. Claude
- * Code stamps on the left on the cut, Codex on the right a beat later, and
- * PICK A SIDE lands over the seam on the third. Stepped, no easing.
+ * The first of the two closing cards: black, split down the middle, each
+ * side its town's pixel logo at the same size with its name small under it
+ * (so the two weigh the same, whatever the names' lengths). Claude stamps on
+ * the cut, Codex a beat later, and PICK A SIDE lands over the seam on the
+ * third. Stepped, no easing.
  */
-function PickASide({ b }: { b: number }) {
-  const stamp = (at: number) => ({ opacity: b >= at ? 1 : 0, transform: b >= at && b - at < 0.1 ? "scale(1.3)" : undefined });
+function PickASide({ b, towns }: { b: number; towns: [TownFacts, TownFacts] }) {
+  const stamp = (at: number) => ({ opacity: b >= at ? 1 : 0, transform: b >= at && b - at < 0.1 ? "scale(1.25)" : undefined });
   return (
     <div className="absolute inset-0 flex bg-black font-pixel">
-      {(
-        [
-          ["CLAUDE CODE", ORANGE, 0],
-          ["CODEX", BLUE, 1],
-        ] as const
-      ).map(([name, color, at]) => (
-        <div key={name} className="flex flex-1 items-center justify-center" style={{ borderRight: at === 0 ? `2px solid #2a2a33` : undefined }}>
-          <span style={{ color, fontSize: "5.2cqw", ...stamp(at) }}>{name}</span>
+      {towns.map((town, at) => (
+        <div
+          key={town.side.slug}
+          className="flex flex-1 flex-col items-center justify-center"
+          style={{ gap: "1.6cqw", borderRight: at === 0 ? "2px solid #2a2a33" : undefined, ...stamp(at) }}
+        >
+          {town.side.city.identity.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={town.side.city.identity.logoUrl} alt="" style={{ width: "17cqw", height: "17cqw", imageRendering: "pixelated", objectFit: "contain" }} />
+          ) : (
+            <span style={{ width: "17cqw", height: "17cqw", background: town.side.color }} />
+          )}
+          <span style={{ color: town.side.color, fontSize: "2.2cqw" }}>{at === 0 ? "CLAUDE CODE" : "CODEX"}</span>
         </div>
       ))}
-      <div className="absolute inset-x-0 flex justify-center" style={{ bottom: "12cqw" }}>
+      <div className="absolute inset-x-0 flex justify-center" style={{ bottom: "7cqw" }}>
         <span className="text-bg" style={{ background: LIME, fontSize: "3.4cqw", padding: "0.8cqw 3cqw", ...stamp(2) }}>
           PICK A SIDE
         </span>
