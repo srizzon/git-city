@@ -25,7 +25,7 @@ const MODE = process.argv[3] ?? "full";
 const CUTS = { soon: { freeze: 16, card: 18 }, demo: { freeze: 12, card: 14 } };
 const TEASER = CUTS[MODE];
 // The launch cut, in beats: the drop-outs (hard silence, [from, to]), and the cut to black.
-const LAUNCH = MODE === "launch" ? { gates: [[3, 6], [42, 43]], card: 51, end: 59 } : null;
+const LAUNCH = MODE === "launch" ? { gates: [[3, 6]], card: 50, end: 58 } : null;
 const GATES = TEASER ? [[TEASER.freeze, TEASER.card]] : LAUNCH ? LAUNCH.gates : [];
 const BARS = LAUNCH ? Math.ceil(LAUNCH.end / 4) + 1 : TEASER ? Math.ceil((TEASER.card + 10) / 4) : 16;
 const LEN = Math.ceil((BARS * BAR + 2.5) * SR);
@@ -413,24 +413,23 @@ if (LAUNCH) {
   }
   for (let k = 0; k < 32; k++) snare(B(38 + k / 8), 0.35 + (0.55 * k) / 32);
   riser(B(36), B(42), 0.32);
-  // 42-43: midnight, silence.
-
-  // 43-51, the crown and the lit town: the biggest hit, then the chorus in
-  // the major, the lead on top, a crash on each bar.
-  impact(B(43.5), 1.4);
+  // 42-50, midnight straight into the crown and the lit town: the biggest
+  // hit as it lands, then the chorus in the major, the lead on top, a crash
+  // on each bar.
+  impact(B(42.25), 1.4);
   const HOOK = [
     [74, 74, 79, 78, 74, 71, 74, 76],
     [78, 78, 81, 79, 78, 74, 78, 79],
   ];
   for (let k = 0; k < 2; k++) {
-    groove(0, { start: 43 + 4 * k, chord: WIN[(k * 2) % 4], drop: true });
-    HOOK[k].forEach((n, e) => lead(B(43 + 4 * k + e / 2), (BEAT / 2) * 0.9, n, 0.13));
+    groove(0, { start: 42 + 4 * k, chord: WIN[(k * 2) % 4], drop: true });
+    HOOK[k].forEach((n, e) => lead(B(42 + 4 * k + e / 2), (BEAT / 2) * 0.9, n, 0.13));
   }
 
-  // 51: the cut to black, the name's hits, and the last chord ringing out to the end.
+  // 50: the cut to black, the name's hits, and the last chord ringing out to the end.
   for (const n of [55, 59, 62, 67, 71])
-    tone(B(51), 7 * BEAT, n, { wave: "saw", gain: 0.05, cutoff: 1600, env: [0.005, 1.5, 0.35, 2], detune: 14, sc: false, pan: n % 2 ? 0.4 : -0.4 });
-  tone(B(51), 6 * BEAT, 31, { wave: "sine", gain: 0.3, cutoff: 300, env: [0.005, 2, 0.4, 2], sc: false });
+    tone(B(50), 7 * BEAT, n, { wave: "saw", gain: 0.05, cutoff: 1600, env: [0.005, 1.5, 0.35, 2], detune: 14, sc: false, pan: n % 2 ? 0.4 : -0.4 });
+  tone(B(50), 6 * BEAT, 31, { wave: "sine", gain: 0.3, cutoff: 300, env: [0.005, 2, 0.4, 2], sc: false });
   cardHits(LAUNCH.card);
 } else if (TEASER) {
   for (let b = 1; b * 4 < TEASER.freeze; b++) groove(b, { drop: b === 1 });

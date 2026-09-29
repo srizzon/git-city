@@ -173,6 +173,7 @@ export interface RigExtras {
   monument?: MonumentTown | null;
   riseFrom?: number;
   ramHit?: number;
+  crownLand?: number;
 }
 
 /** What a cut can read about each town: its side, the logins by height, the giant mascot. */

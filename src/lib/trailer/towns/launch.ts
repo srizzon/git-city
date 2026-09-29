@@ -32,6 +32,8 @@ const RAID_TRIM = 0.8;
 const DAY_BEATS = 2;
 const SUNDAY_BEATS = 4;
 const WEEK_BEATS = 6 * DAY_BEATS + SUNDAY_BEATS;
+/** The crown lands this many beats into its take. */
+export const CROWN_LAND = 0.25;
 /** The crew take: a pop every other beat. */
 const CREW_BEATS = 8;
 
@@ -46,9 +48,8 @@ const TAKES: Take<Stage, ShotKind>[] = [
   // beat while the town's crew list beside it climbs him from #4 to #1.
   ["Crew", "claude", "grow", CREW_BEATS, 0],
   // The week from above, both towns, Monday to Sunday midnight: two beats a
-  // day, Sunday's last four on the clock, Claude passing on the last one.
-  // The picture holds a beat on midnight, in silence.
-  ["Week", "both", "week", WEEK_BEATS + 1, 0, WEEK_BEATS],
+  // day, Sunday's last four on the clock. Midnight cuts straight to the crown.
+  ["Week", "both", "week", WEEK_BEATS, 0],
   // The crown on the rebuilt building, then the whole town lit.
   ["Crown", "claude", "crown", 4, 0],
   ["Winner", "claude", "celebrate", 4, 0],
@@ -68,7 +69,7 @@ export const LOGO = END;
 export const CARD_END = LOGO + 8;
 export const LENGTH = CARD_END;
 
-/** Sunday's countdown: its last seconds, one a beat, midnight on the freeze (one beat of silence). */
+/** Sunday's countdown: its last seconds, one a beat, midnight on the cut to the crown. */
 export const FREEZE = take("Week").start + WEEK_BEATS;
 export const COUNT_FROM = FREEZE - SUNDAY_BEATS;
 
@@ -171,10 +172,10 @@ export const SOUNDS: SoundCue[] = [
     gain: 0.3,
     rate: 1.2 + 0.03 * (i % 4),
   })),
-  // Midnight's silence breaks on the crown.
-  { beat: take("Crown").start + 0.25, src: WHOOSH, gain: 0.6, rate: 1.4 },
-  { beat: take("Crown").start + 0.5, src: CROWN, gain: 1 },
-  { beat: take("Crown").start + 0.5, src: IMPACT, gain: 1, rate: 0.6 },
+  // Midnight: the crown drops straight in and lands a quarter beat later.
+  { beat: take("Crown").start, src: WHOOSH, gain: 0.6, rate: 1.6 },
+  { beat: take("Crown").start + CROWN_LAND, src: CROWN, gain: 1 },
+  { beat: take("Crown").start + CROWN_LAND, src: IMPACT, gain: 1, rate: 0.6 },
   // The town lights up in rings from the crown.
   ...Array.from({ length: 4 }, (_, i) => ({ beat: UI.winner.start + i, src: BOOM, gain: 0.35 + 0.1 * i, rate: 1.6 - 0.1 * i })),
 ];
@@ -184,7 +185,7 @@ export const BLUE = "#5b8def";
 export const LIME = "#c8e64a";
 
 /** Beats that flash the screen: the drift's corner hit, and the crown. */
-export const BLASTS: number[] = [momentOf(take("Raid"), CORNER_HIT), take("Crown").start + 0.5];
+export const BLASTS: number[] = [momentOf(take("Raid"), CORNER_HIT), take("Crown").start + CROWN_LAND];
 
 /** No stakes cards: the game's own UI (the popup, the numbers, WINNER) is the caption. */
 const TITLES: TitleCue[] = [];

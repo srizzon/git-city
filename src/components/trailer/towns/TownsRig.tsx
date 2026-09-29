@@ -130,6 +130,7 @@ export default function TownsRig({
   monument = null,
   riseFrom = 0,
   ramHit = 5,
+  crownLand = 0.5,
 }: {
   stage: Stage;
   clock: FilmClock;
@@ -160,6 +161,8 @@ export default function TownsRig({
   riseFrom?: number;
   /** Ram: the car reaches the tower this many beats into the take. */
   ramHit?: number;
+  /** Crown: it lands this many beats into its take. */
+  crownLand?: number;
 }) {
   const camera = useThree((s) => s.camera);
   const home = useRef<THREE.Group>(null);
@@ -775,12 +778,12 @@ export default function TownsRig({
       if (pop < 0.5 && popping) st.current.shake = Math.max(st.current.shake, 0.5);
       if (shot.kind === "crown" && crown.current) {
         // It drops from high above in a quarter beat, bounces once, then floats.
-        const land = 0.5 * BEAT;
+        const land = crownLand * BEAT;
         const u = Math.min(1, t / land);
         const bounce = t > land ? 6 * Math.exp(-(t - land) * 8) * Math.abs(Math.sin((t - land) * 18)) : 0;
         crown.current.visible = true;
         crown.current.position.set(b.x, 220 * (1 - u) * (1 - u) + bounce, b.z);
-        if (crossed(shot.start + 0.5)) {
+        if (crossed(shot.start + crownLand)) {
           st.current.shake = 1;
           fx?.burst(b.x, top + 20, b.z, { count: 40, speed: 30, colors: ["#ffd24a", "#ffe9a8", "#ffb800"], size: 1.6, life: 0.9 });
         }

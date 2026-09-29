@@ -1,7 +1,7 @@
 "use client";
 
 import type { LayoutNorms } from "@/lib/github";
-import { BLASTS, FILM, shotFor } from "@/lib/trailer/towns/launch";
+import { BLASTS, CROWN_LAND, FILM, shotFor } from "@/lib/trailer/towns/launch";
 import LaunchEndCard from "@/components/trailer/towns/LaunchEndCard";
 import LaunchOverlay from "@/components/trailer/towns/LaunchOverlay";
 import TownsFilm, { type TownSide, type TownsCut } from "../towns/towns-film";
@@ -19,6 +19,7 @@ const LAUNCH: TownsCut = {
   rig: (_stage, town) => ({
     hero: town.tallest[0],
     mascot: town.mascot,
+    crownLand: CROWN_LAND,
   }),
   overlay: (clock, towns) => <LaunchOverlay clock={clock} towns={towns} />,
 };
