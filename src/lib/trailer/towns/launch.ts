@@ -69,9 +69,9 @@ export const LOGO = END;
 export const CARD_END = LOGO + 8;
 export const LENGTH = CARD_END;
 
-/** Sunday's countdown: its last seconds, one a beat, midnight on the cut to the crown. */
-export const FREEZE = take("Week").start + WEEK_BEATS;
-export const COUNT_FROM = FREEZE - SUNDAY_BEATS;
+/** Sunday's countdown: its last seconds, one a beat, midnight on the week's last beat (Claude passes on it), then the crown. */
+export const FREEZE = take("Week").start + WEEK_BEATS - 1;
+export const COUNT_FROM = FREEZE - (SUNDAY_BEATS - 1);
 
 /** This stage's shot at `beat`, and seconds into its action. */
 export function shotFor(stage: Stage, beat: number) {
@@ -114,8 +114,8 @@ export function daysAt(beat: number): number {
   if (beat >= FREEZE) return 7;
   if (beat < UI.week.start) return 0;
   if (b <= 6 * DAY_BEATS) return b / DAY_BEATS;
-  // Sunday's beats count 6, 6¼, 6½, 6¾: the last quarter comes in on midnight.
-  return 6 + (b - 6 * DAY_BEATS - 1) / SUNDAY_BEATS;
+  // Sunday's beats count 6, 6⅓, 6⅔, and midnight (the last beat) brings it whole.
+  return 6 + (b - 6 * DAY_BEATS - 1) / (SUNDAY_BEATS - 1);
 }
 
 /** The day's name at a beat, while the week counts. */
