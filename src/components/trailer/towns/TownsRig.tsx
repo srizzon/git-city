@@ -758,13 +758,18 @@ export default function TownsRig({
           store.setRows(i, store.rowsOf(i).map(() => rows), now, undefined, false);
         });
       } else if (shot.kind === "grow") {
-        // Two pops, on the take's second and third beats.
-        frac = n < 1 ? 0.7 : n < 2 ? 0.7 + 0.15 * pop : n < 3 ? 0.85 + 0.15 * pop : 1;
+        // A band of floors pops on every other beat (the take's 2nd, 4th, …),
+        // from under half up to whole on the last.
+        const beats = shot.end - shot.start + shot.trim;
+        const total = Math.max(1, Math.floor(beats / 2));
+        const done = Math.min(total, Math.floor((n - 1) / 2) + 1);
+        const current = n >= 1 && (n - 1) % 2 === 0 && done <= total ? pop : 1;
+        frac = 0.4 + (0.6 * Math.max(0, done - 1 + current)) / total;
       }
       const rows = Math.max(1, Math.round(b.floors * frac));
       store.setRows(heroIndex, store.rowsOf(heroIndex).map(() => rows), now, undefined, false);
       const top = rows * b.floorH;
-      const popping = shot.kind === "floor" || (shot.kind === "grow" && n >= 1 && n < 3);
+      const popping = shot.kind === "floor" || (shot.kind === "grow" && n >= 1 && (n - 1) % 2 === 0);
       if (fx && pop < 1 && popping)
         fx.burst(b.x, top, b.z, { count: 3, speed: 14, colors: DEBRIS, size: 1.4, life: 0.5 });
       if (pop < 0.5 && popping) st.current.shake = Math.max(st.current.shake, 0.5);
@@ -784,9 +789,12 @@ export default function TownsRig({
       // take cranes up with it.
       const crowned = shot.kind === "crown";
       const crane = crowned ? smooth(Math.min(1, t / (4 * BEAT))) : 0;
-      const r = Math.max(60, b.w * 2.2) * (crowned ? 1.8 : 1);
-      _pos.set(b.x + r * 0.75, top + (crowned ? 5 : 10) + 20 * crane, b.z + r);
-      _look.set(b.x, top + (crowned ? 26 : -8) + 6 * crane, b.z);
+      const r = Math.max(60, b.w * 2.2) * (crowned ? 1.8 : shot.kind === "grow" ? 1.6 : 1);
+      // A growing building is watched from above its full height, looking down at its roof coming up.
+      const full = b.floors * b.floorH;
+      const eye = shot.kind === "grow" ? full + 25 : top + (crowned ? 5 : 10) + 20 * crane;
+      _pos.set(b.x + r * 0.75, eye, b.z + r);
+      _look.set(b.x, top + (crowned ? 26 : shot.kind === "grow" ? -20 : -8) + 6 * crane, b.z);
       lens = shot.kind === "crown" ? 46 : 42;
       st.current.amp = 0.4;
       // A day's take shares the frame with the board on the right: the building keeps to the left.

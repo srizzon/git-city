@@ -32,6 +32,8 @@ const RAID_TRIM = 0.8;
 const DAY_BEATS = 2;
 const SUNDAY_BEATS = 4;
 const WEEK_BEATS = 6 * DAY_BEATS + SUNDAY_BEATS;
+/** The crew take: a pop every other beat. */
+const CREW_BEATS = 8;
 
 /** The takes: [name, stage, kind, beats long, trim, freeze] (see @trailer-kit/film). "ui" takes are the DOM layer on black. */
 const TAKES: Take<Stage, ShotKind>[] = [
@@ -40,6 +42,9 @@ const TAKES: Take<Stage, ShotKind>[] = [
   ["Raid", "claude", "cornersmash", 6, RAID_TRIM, RAID_TRIM + 2.4],
   // Suiting up, in the dark: `claude`, its welcome, "win the week".
   ["Suit up", "claude", "ui", 12, 0],
+  // Inside Claude Town: @srizzon's building grows back a band every other
+  // beat while the town's crew list beside it climbs him from #4 to #1.
+  ["Crew", "claude", "grow", CREW_BEATS, 0],
   // The week from above, both towns, Monday to Sunday midnight: two beats a
   // day, Sunday's last four on the clock, Claude passing on the last one.
   // The picture holds a beat on midnight, in silence.
@@ -97,6 +102,7 @@ export const POPUP = { start: 3, click: 5 };
 export const UI = {
   popup: { start: POPUP.start, end: take("Raid").end },
   suit: take("Suit up"),
+  crew: take("Crew"),
   week: take("Week"),
   winner: take("Winner"),
 };
@@ -156,6 +162,8 @@ export const SOUNDS: SoundCue[] = [
   { beat: UI.suit.start + SUIT.enter, src: KEY, gain: 1, rate: 0.6 },
   ...keys(UI.suit.start + SUIT.ask, ASK),
   { beat: UI.suit.start + SUIT.send, src: KEY, gain: 1, rate: 0.6 },
+  // The crew: the building pops every other beat, the row climbing with it.
+  ...Array.from({ length: CREW_BEATS / 2 }, (_, i) => ({ beat: UI.crew.start + 1 + 2 * i, src: IMPACT, gain: 0.7, rate: 1 + 0.08 * i })),
   // The week: a soft thud on every beat as buildings gain floors.
   ...Array.from({ length: FREEZE - UI.week.start }, (_, i) => ({
     beat: UI.week.start + i,
@@ -184,7 +192,8 @@ const TITLES: TitleCue[] = [];
 /** The acts, for the studio's scene list. */
 const SCENES = [
   { name: "Raid", start: 0, end: UI.suit.start },
-  { name: "Suit up", start: UI.suit.start, end: UI.week.start },
+  { name: "Suit up", start: UI.suit.start, end: UI.crew.start },
+  { name: "Crew", start: UI.crew.start, end: UI.week.start },
   { name: "Week", start: UI.week.start, end: take("Crown").start },
   { name: "Crown", start: take("Crown").start, end: END },
   { name: "End card", start: LOGO, end: LENGTH },
@@ -209,3 +218,20 @@ export const FILM: Film<Stage> = {
   song: { src: "/trailer/towns-launch.wav", offset: 0 },
   frameAt,
 };
+
+// ─── The crew ───────────────────────────────────────────────
+// Inside Claude Town, the week's totals: the hero climbs from #4 to #1, a
+// jump every other beat (with each pop of his building); the others creep.
+
+/** Pops passed at a beat of the crew take (0 to 4), a pop on beats 1, 3, 5, 7. */
+export function crewPops(beat: number): number {
+  const b = beat - UI.crew.start;
+  return Math.max(0, Math.min(CREW_BEATS / 2, Math.floor((b - 1) / 2) + 1));
+}
+
+/** The hero's total, and the three members ahead of him, at a beat. */
+export function crewTotals(beat: number): { hero: number; others: number[] } {
+  const k = crewPops(beat);
+  const u = Math.max(0, Math.min(1, (beat - UI.crew.start) / CREW_BEATS));
+  return { hero: 58 + 30 * k, others: [150 + 12 * u, 131 + 10 * u, 112 + 8 * u] };
+}

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Crown } from "lucide-react";
+import { DAY_COLORS, dayLevel } from "@/lib/towns/race-view";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import {
   ASK,
@@ -14,6 +16,8 @@ import {
   POPUP,
   SUIT,
   UI,
+  crewPops,
+  crewTotals,
   dayName,
   daysAt,
   perDev,
@@ -61,6 +65,7 @@ export default function LaunchOverlay({ clock, towns }: { clock: FilmClock; town
   const [claude, codex] = towns;
   if (inside(b, UI.popup)) return <Popup b={b - POPUP.start} attacker={ATTACKER} rival={codex.side.name} />;
   if (inside(b, UI.suit)) return <SuitUp b={b - UI.suit.start} />;
+  if (inside(b, UI.crew)) return <CrewPanel b={b} town={claude} />;
   if (inside(b, UI.week)) return <WeekBars b={b} towns={towns} />;
   if (inside(b, UI.winner)) return <Winner b={b - UI.winner.start} town={claude.side.name} />;
   return null;
@@ -153,6 +158,77 @@ function SuitUp({ b }: { b: number }) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// ─── The crew ───────────────────────────────────────────────
+
+/**
+ * Beside the hero's building, the town's crew list as the game shows it
+ * (components/league/hud/race, CrewRow): rank, avatar, @login, the week's
+ * day squares, the total, the crown on #1. The hero's row climbs a place
+ * with every pop of his building, from #4 to #1.
+ */
+function CrewPanel({ b, town }: { b: number; town: TownFacts }) {
+  const [hero, ...rest] = town.tallest;
+  const face = (login: string) => town.faces.find((f) => f.login.toLowerCase() === login)?.avatar_url ?? null;
+  const { hero: mine, others } = crewTotals(b);
+  const rows = [
+    { login: hero, total: mine, me: true },
+    ...rest.slice(0, 3).map((login, i) => ({ login, total: others[i], me: false })),
+  ].sort((x, y) => y.total - x.total);
+  const k = crewPops(b);
+  const jump = (b - UI.crew.start - 1) % 2 < 0.25 && b - UI.crew.start >= 1;
+  return (
+    <div
+      className="absolute inset-y-0 right-0 flex flex-col justify-center border-l-2 border-border bg-bg font-pixel"
+      style={{ width: "40cqw", padding: "0 2.4cqw", gap: "1.6cqw" }}
+    >
+      <div className="flex items-center justify-between" style={{ fontSize: "1.5cqw" }}>
+        <span style={{ color: ORANGE }}>{town.side.name}</span>
+        <span className="text-muted">THIS WEEK</span>
+      </div>
+      <ol className="flex flex-col" style={{ gap: "0.8cqw" }}>
+        {rows.map((r, i) => (
+          <li
+            key={r.login}
+            className="flex items-center border-2"
+            style={{
+              gap: "1cqw",
+              padding: "0.7cqw 0.9cqw",
+              borderColor: r.me ? LIME : "transparent",
+              background: r.me ? "rgba(200,230,74,0.06)" : undefined,
+              transform: r.me && jump ? "translateX(-0.6cqw)" : undefined,
+            }}
+          >
+            <span className={`text-right tabular-nums ${i === 0 ? "text-lime" : "text-muted"}`} style={{ width: "1.6cqw", fontSize: "1.5cqw" }}>
+              {i + 1}
+            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={face(r.login) ?? ""} alt="" className="shrink-0 border-2 border-border" style={{ width: "2.6cqw", height: "2.6cqw" }} />
+            <span className="flex min-w-0 flex-1 items-center gap-[0.5cqw] truncate text-cream normal-case" style={{ fontSize: "1.5cqw" }}>
+              @{r.login}
+              {i === 0 && <Crown size={14} strokeWidth={2.5} className="shrink-0 text-lime" />}
+            </span>
+            <span className="flex" style={{ gap: "0.25cqw" }}>
+              {Array.from({ length: 7 }, (_, d) => {
+                const on = r.me ? d < Math.min(7, 1 + k) : d < 4;
+                return (
+                  <span
+                    key={d}
+                    className="block"
+                    style={{ width: "1.1cqw", height: "1.1cqw", background: on ? DAY_COLORS[dayLevel(r.me ? 40 : 20)] : DAY_COLORS[0] }}
+                  />
+                );
+              })}
+            </span>
+            <span className="text-right tabular-nums text-cream" style={{ width: "4cqw", fontSize: "1.6cqw" }}>
+              {Math.round(r.total)}
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
