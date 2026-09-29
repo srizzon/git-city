@@ -63,9 +63,10 @@ function take(name: string): Shot {
   return s;
 }
 
-/** The pictures end here; the end card runs eight beats from the cut to black. */
+/** The pictures end here. Then two cards on black: PICK A SIDE (four beats), and the name (eight). */
 export const END = SHOTS[SHOTS.length - 1].end;
-export const LOGO = END;
+export const PICK = { start: END, end: END + 4 };
+export const LOGO = PICK.end;
 export const CARD_END = LOGO + 8;
 export const LENGTH = CARD_END;
 
@@ -106,6 +107,7 @@ export const UI = {
   crew: take("Crew"),
   week: take("Week"),
   winner: take("Winner"),
+  pick: PICK,
 };
 
 /** How many days are in at a beat (0 to 7): half a day a beat to Saturday, then Sunday a quarter a beat, whole at midnight. */
@@ -176,6 +178,11 @@ export const SOUNDS: SoundCue[] = [
   { beat: take("Crown").start - 0.5, src: WHOOSH, gain: 0.5, rate: 1.4 },
   { beat: take("Crown").start, src: CROWN, gain: 1 },
   { beat: take("Crown").start, src: IMPACT, gain: 1, rate: 0.6 },
+  // PICK A SIDE: each side stamps on its beat, then the words over the split.
+  { beat: PICK.start, src: IMPACT, gain: 0.9, rate: 0.9 },
+  { beat: PICK.start + 1, src: IMPACT, gain: 0.9, rate: 0.8 },
+  { beat: PICK.start + 2, src: IMPACT, gain: 1, rate: 0.6 },
+  { beat: PICK.start + 2, src: BOOM, gain: 0.5, rate: 1.3 },
   // The town lights up in rings from the crown.
   ...Array.from({ length: 4 }, (_, i) => ({ beat: UI.winner.start + i, src: BOOM, gain: 0.35 + 0.1 * i, rate: 1.6 - 0.1 * i })),
 ];
@@ -197,6 +204,7 @@ const SCENES = [
   { name: "Crew", start: UI.crew.start, end: UI.week.start },
   { name: "Week", start: UI.week.start, end: take("Crown").start },
   { name: "Crown", start: take("Crown").start, end: END },
+  { name: "Pick a side", start: PICK.start, end: PICK.end },
   { name: "End card", start: LOGO, end: LENGTH },
 ];
 

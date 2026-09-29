@@ -68,6 +68,7 @@ export default function LaunchOverlay({ clock, towns }: { clock: FilmClock; town
   if (inside(b, UI.crew)) return <CrewPanel b={b} town={claude} />;
   if (inside(b, UI.week)) return <WeekBars b={b} towns={towns} />;
   if (inside(b, UI.winner)) return <Winner b={b - UI.winner.start} town={claude.side.name} />;
+  if (inside(b, UI.pick)) return <PickASide b={b - UI.pick.start} />;
   return null;
 }
 
@@ -296,6 +297,36 @@ function Winner({ b, town }: { b: number; town: string }) {
           {town}
         </span>
       )}
+    </div>
+  );
+}
+
+// ─── PICK A SIDE ────────────────────────────────────────────
+
+/**
+ * The first of the two closing cards: black, split down the middle. Claude
+ * Code stamps on the left on the cut, Codex on the right a beat later, and
+ * PICK A SIDE lands over the seam on the third. Stepped, no easing.
+ */
+function PickASide({ b }: { b: number }) {
+  const stamp = (at: number) => ({ opacity: b >= at ? 1 : 0, transform: b >= at && b - at < 0.1 ? "scale(1.3)" : undefined });
+  return (
+    <div className="absolute inset-0 flex bg-black font-pixel">
+      {(
+        [
+          ["CLAUDE CODE", ORANGE, 0],
+          ["CODEX", BLUE, 1],
+        ] as const
+      ).map(([name, color, at]) => (
+        <div key={name} className="flex flex-1 items-center justify-center" style={{ borderRight: at === 0 ? `2px solid #2a2a33` : undefined }}>
+          <span style={{ color, fontSize: "5.2cqw", ...stamp(at) }}>{name}</span>
+        </div>
+      ))}
+      <div className="absolute inset-x-0 flex justify-center" style={{ bottom: "12cqw" }}>
+        <span className="text-bg" style={{ background: LIME, fontSize: "3.4cqw", padding: "0.8cqw 3cqw", ...stamp(2) }}>
+          PICK A SIDE
+        </span>
+      </div>
     </div>
   );
 }

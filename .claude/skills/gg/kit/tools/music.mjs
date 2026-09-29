@@ -25,7 +25,7 @@ const MODE = process.argv[3] ?? "full";
 const CUTS = { soon: { freeze: 16, card: 18 }, demo: { freeze: 12, card: 14 } };
 const TEASER = CUTS[MODE];
 // The launch cut, in beats: the drop-outs (hard silence, [from, to]), and the cut to black.
-const LAUNCH = MODE === "launch" ? { gates: [[3, 6]], card: 50, end: 58 } : null;
+const LAUNCH = MODE === "launch" ? { gates: [[3, 6], [53.5, 54]], card: 54, end: 62 } : null;
 const GATES = TEASER ? [[TEASER.freeze, TEASER.card]] : LAUNCH ? LAUNCH.gates : [];
 const BARS = LAUNCH ? Math.ceil(LAUNCH.end / 4) + 1 : TEASER ? Math.ceil((TEASER.card + 10) / 4) : 16;
 const LEN = Math.ceil((BARS * BAR + 2.5) * SR);
@@ -426,10 +426,23 @@ if (LAUNCH) {
     HOOK[k].forEach((n, e) => lead(B(42 + 4 * k + e / 2), (BEAT / 2) * 0.9, n, 0.13));
   }
 
-  // 50: the cut to black, the name's hits, and the last chord ringing out to the end.
+  // 50-54, PICK A SIDE: a stab on each stamp (Claude, Codex, the words),
+  // the last one the biggest, a held chord under it, then half a beat of
+  // silence before the name.
+  for (const [q, g] of [[50, 0.9], [51, 0.9], [52, 1.2]]) {
+    kick(B(q), g);
+    snare(B(q), 0.5 * g);
+    for (const n of [67, 71, 74, 79])
+      tone(B(q), 0.25, n, { wave: "saw", gain: 0.06 * g, cutoff: 2600, env: [0.002, 0.15, 0.3, 0.12], detune: 12, sc: false });
+  }
+  crash(B(52), 0.8);
+  for (const n of [55, 62, 67, 71])
+    tone(B(52), 1.5 * BEAT, n, { wave: "saw", gain: 0.05, cutoff: 1400, env: [0.005, 0.6, 0.5, 0.2], detune: 14, sc: false });
+
+  // 54: the name's hits, and the last chord ringing out to the end.
   for (const n of [55, 59, 62, 67, 71])
-    tone(B(50), 7 * BEAT, n, { wave: "saw", gain: 0.05, cutoff: 1600, env: [0.005, 1.5, 0.35, 2], detune: 14, sc: false, pan: n % 2 ? 0.4 : -0.4 });
-  tone(B(50), 6 * BEAT, 31, { wave: "sine", gain: 0.3, cutoff: 300, env: [0.005, 2, 0.4, 2], sc: false });
+    tone(B(54), 7 * BEAT, n, { wave: "saw", gain: 0.05, cutoff: 1600, env: [0.005, 1.5, 0.35, 2], detune: 14, sc: false, pan: n % 2 ? 0.4 : -0.4 });
+  tone(B(54), 6 * BEAT, 31, { wave: "sine", gain: 0.3, cutoff: 300, env: [0.005, 2, 0.4, 2], sc: false });
   cardHits(LAUNCH.card);
 } else if (TEASER) {
   for (let b = 1; b * 4 < TEASER.freeze; b++) groove(b, { drop: b === 1 });
