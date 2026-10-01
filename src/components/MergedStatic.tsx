@@ -59,12 +59,13 @@ export default function MergedStatic({ children }: { children: ReactNode }) {
       mesh.raycast = () => {}; // clicks still hit the hidden originals
       root.add(mesh);
       merged.push(mesh);
-      for (const m of meshes) { m.visible = false; hidden.push(m); }
+      // Tagged so scene readers (the fruit flies) can still find the real shapes.
+      for (const m of meshes) { m.visible = false; m.userData.mergedAway = true; hidden.push(m); }
     }
 
     return () => {
       for (const m of merged) { root.remove(m); m.geometry.dispose(); }
-      for (const m of hidden) m.visible = true;
+      for (const m of hidden) { m.visible = true; delete m.userData.mergedAway; }
     };
   }, []);
 
