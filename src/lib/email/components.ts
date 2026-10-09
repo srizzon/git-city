@@ -149,6 +149,43 @@ export function button(text: string, url: string): string {
 </table>`;
 }
 
+/** The same call to action, full width with the label centered: for a letter's closing pair. */
+export function buttonWide(text: string, url: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:12px 0 0;">
+  <tr><td align="center" bgcolor="${COLORS.lime}" style="background-color:${COLORS.lime}; border-bottom:4px solid ${COLORS.limeDark};">
+    <a href="${escapeHtml(url)}" style="display:block; padding:16px 24px; font-family:${FONT}; font-size:17px; font-weight:700; color:${COLORS.bg}; text-decoration:none;">${escapeHtml(text)}</a>
+  </td></tr>
+</table>`;
+}
+
+/** The second choice under buttonWide: same size, a bordered dark block. */
+export function buttonSecondary(text: string, url: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0 0;">
+  <tr><td align="center" bgcolor="${COLORS.raised}" style="background-color:${COLORS.raised}; background-image:linear-gradient(${COLORS.raised},${COLORS.raised}); border:2px solid ${COLORS.border};">
+    ${gmailSafe(`<a href="${escapeHtml(url)}" style="display:block; padding:14px 24px; font-family:${FONT}; font-size:16px; font-weight:700; color:${COLORS.cream}; text-decoration:none;">${escapeHtml(text)}</a>`)}
+  </td></tr>
+</table>`;
+}
+
+/** A paragraph with a few words lifted: `{ b }` in bold cream, `{ hl }` in bold lime. */
+export function richParagraph(parts: (string | { b: string } | { hl: string })[]): string {
+  const inner = parts
+    .map((p) =>
+      typeof p === "string"
+        ? escapeHtml(p)
+        : "b" in p
+          ? `<strong style="color:${COLORS.cream};">${escapeHtml(p.b)}</strong>`
+          : `<strong style="color:${COLORS.lime};">${escapeHtml(p.hl)}</strong>`,
+    )
+    .join("");
+  return gmailSafe(`<p style="margin:0 0 20px; font-family:${FONT}; font-size:16px; line-height:1.6; color:${COLORS.warm};">${inner}</p>`);
+}
+
+/** Plain text of a richParagraph, for the text part of an email. */
+export function richText(parts: (string | { b: string } | { hl: string })[]): string {
+  return parts.map((p) => (typeof p === "string" ? p : "b" in p ? p.b : p.hl)).join("");
+}
+
 /** A quiet text link under the button, e.g. "How scoring and checks work". */
 export function textLink(text: string, url: string): string {
   return gmailSafe(`<p style="margin:20px 0 0; font-family:${FONT}; font-size:14px; line-height:1.6; color:${COLORS.muted};"><a href="${escapeHtml(url)}" style="color:${COLORS.lime}; text-decoration:underline;">${escapeHtml(text)}</a></p>`);
