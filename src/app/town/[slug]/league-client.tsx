@@ -26,6 +26,7 @@ import StandingsPanel from "@/components/league/hud/StandingsPanel";
 import InvitePanel from "@/components/league/hud/InvitePanel";
 import JoinPanel, { signInToJoin } from "@/components/league/hud/JoinPanel";
 import BuildingCard from "@/components/league/hud/BuildingCard";
+import FindPanel from "@/components/league/hud/FindPanel";
 import EditorTopBar from "@/components/league/hud/editor/EditorTopBar";
 import Hotbar, { CameraHints, toolForSlot } from "@/components/league/hud/editor/Hotbar";
 import EditorToasts from "@/components/league/hud/editor/EditorToasts";
@@ -124,7 +125,7 @@ function TownRadar({ buildings, camera }: { buildings: CityBuilding[]; camera: M
 /** While driving, check for city changes (an admin's Done) this often. */
 const DRIVE_POLL_MS = 5000;
 
-type PanelId = "hall" | "standings" | "invite" | "join" | "report" | null;
+type PanelId = "hall" | "standings" | "invite" | "join" | "report" | "find" | null;
 
 export default function LeagueClient({
   data,
@@ -904,6 +905,23 @@ export default function LeagueClient({
   const verifyHref =
     !isMember && !showJoinCta && viewer && league.kind === "company" ? `/towns/new?kind=company&org=${encodeURIComponent(league.github_org ?? "")}` : null;
   const close = () => setPanel(null);
+  // Find a building by username: the search button, or / anywhere in the city.
+  const openFind = useCallback(() => {
+    setFocused(null);
+    setPanel("find");
+  }, []);
+  useEffect(() => {
+    if (mode !== "view" || intro || panel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, [contenteditable]")) return;
+      e.preventDefault();
+      openFind();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, intro, panel, openFind]);
   const questStep = (step: QuestStep) => {
     if (step === "drive") enterDrive();
     else if (step === "invite") {
@@ -1177,6 +1195,7 @@ export default function LeagueClient({
                 }
                 requests={pendingRequests}
                 onDrive={() => enterDrive()}
+                onFind={openFind}
                 onReplay={playIntro}
               />
             </div>
@@ -1193,6 +1212,7 @@ export default function LeagueClient({
                 onEdit={isAdmin ? enterEdit : undefined}
                 onCover={isAdmin ? () => sendCover(false, true) : undefined}
                 onDrive={() => enterDrive()}
+                onFind={openFind}
                 onRace={goRace}
                 raceRecord={raceRecord ? `Record @${raceRecord.login} ${formatLap(raceRecord.best_ms)}` : null}
                 drivingNow={watch.drivers.length}
@@ -1259,6 +1279,16 @@ export default function LeagueClient({
           }}
           onPlaced={onInviteePlaced}
           onShared={() => markQuest("invite")}
+          onClose={close}
+        />
+      )}
+      {panel === "find" && (
+        <FindPanel
+          buildings={buildings}
+          onPick={(b) => {
+            setPanel(null);
+            setFocused(b);
+          }}
           onClose={close}
         />
       )}
