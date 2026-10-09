@@ -27,6 +27,7 @@ import DriveCamera from "./DriveCamera";
 import Battle from "./Battle";
 import CrownMode, { type CrownApi, type CrownView } from "./CrownMode";
 import HonkFlash from "./HonkFlash";
+import RouteArrow from "./RouteArrow";
 import Lights from "./Lights";
 import { BoostTrail, EngineSmoke, Smoke } from "./Particles";
 import SkidMarks from "./SkidMarks";
@@ -497,6 +498,14 @@ export default function DriveWorld({
           <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} volume={volume} />
           <EmoteBubbles carRef={car} remotes={remotes} send={send} apiRef={emoteApi ?? ownEmoteApi} sinkRef={emoteSink} name={name} onLog={onEmoteLog} />
           <RadarFeed car={car} cars={cars} telemetryRef={telemetryRef} />
+          <RouteArrow
+            car={car}
+            telemetryRef={telemetryRef}
+            onArrive={(login) => {
+              const b = buildings.find((x) => x.loginLower === login);
+              if (b) setFlash({ b, at: performance.now() });
+            }}
+          />
           {!cinematic && <DriveCamera mode={camera} car={car} impact={impact} seamless={seamless} />}
           <CameraKey input={input} onToggle={onCameraToggle} />
           <Ready onReady={onReady} />

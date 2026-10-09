@@ -26,6 +26,17 @@ export interface DriveTelemetry {
   floorsMaxedAt: number;
   /** The minimap's feed (city units), written every frame by the drive world. */
   radar: RadarFeed;
+  /** Drive here (the building card): the building the arrow over the car points at, null once you get there. */
+  route: DriveRoute | null;
+}
+
+export interface DriveRoute {
+  login: string;
+  /** The building's center, city units. */
+  x: number;
+  z: number;
+  /** Close enough to count as there, city units from the center. */
+  reach: number;
 }
 
 export interface RadarCar {
@@ -45,8 +56,8 @@ export interface RadarFeed {
   crown: { x: number; z: number } | null;
 }
 
-export function createTelemetry(): DriveTelemetry {
-  return { speed: 0, boosting: false, drifting: false, near: null, held: null, gotAt: 0, sideHintAt: 0, shieldHintAt: 0, shieldHours: 0, rebuildFloors: 0, rebuildOf: 0, floorsToday: null, floorsMaxedAt: 0, radar: { x: 0, z: 0, heading: 0, cars: [], crown: null } };
+export function createTelemetry(route: DriveRoute | null = null): DriveTelemetry {
+  return { speed: 0, boosting: false, drifting: false, near: null, held: null, gotAt: 0, sideHintAt: 0, shieldHintAt: 0, shieldHours: 0, rebuildFloors: 0, rebuildOf: 0, floorsToday: null, floorsMaxedAt: 0, radar: { x: 0, z: 0, heading: 0, cars: [], crown: null }, route };
 }
 
 export type DriveCameraMode = "chase" | "top";

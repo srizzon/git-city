@@ -26,6 +26,7 @@ import StandingsPanel from "@/components/league/hud/StandingsPanel";
 import InvitePanel from "@/components/league/hud/InvitePanel";
 import JoinPanel, { signInToJoin } from "@/components/league/hud/JoinPanel";
 import BuildingCard from "@/components/league/hud/BuildingCard";
+import FindPanel from "@/components/league/hud/FindPanel";
 import EditorTopBar from "@/components/league/hud/editor/EditorTopBar";
 import Hotbar, { CameraHints, toolForSlot } from "@/components/league/hud/editor/Hotbar";
 import EditorToasts from "@/components/league/hud/editor/EditorToasts";
@@ -36,7 +37,7 @@ import { useEditorController } from "@/components/league/editor/useEditorControl
 import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { CoverApi, SceneMode } from "@/components/league/LeagueScene";
 import { createTouch, type TouchDrive } from "@/lib/league-city/drive/touch";
-import { createTelemetry, type DriveCameraMode, type DriveTelemetry } from "@/lib/league-city/drive/telemetry";
+import { createTelemetry, type DriveCameraMode, type DriveRoute, type DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import type { DriverInfo } from "@/lib/league-city/drive/net";
 import type { CrownApi, CrownView } from "@/components/league/drive/CrownMode";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
@@ -96,6 +97,8 @@ const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
 const DriveHud = dynamic(() => import("@/components/league/hud/drive/DriveHud"), { ssr: false });
 
 const MUTE_KEY = "gc:drive-muted";
+/** Drive here: this close to the building's center (city units, a lot and a bit) and you're there. */
+const ROUTE_REACH = 56;
 const LIME = "#c8e64a";
 /** The minimap, compass and zoom buttons: ready, off until towns grow past one screen. */
 const SHOW_MAP_NAV = false;
@@ -122,7 +125,7 @@ function TownRadar({ buildings, camera }: { buildings: CityBuilding[]; camera: M
 /** While driving, check for city changes (an admin's Done) this often. */
 const DRIVE_POLL_MS = 5000;
 
-type PanelId = "hall" | "standings" | "invite" | "join" | "report" | null;
+type PanelId = "hall" | "standings" | "invite" | "join" | "report" | "find" | null;
 
 export default function LeagueClient({
   data,
@@ -452,13 +455,13 @@ export default function LeagueClient({
   // Phone controls (lib drive/touch): on screen on touch devices, read by the car.
   const touchRef = useRef<TouchDrive>(createTouch());
   const touchUi = useTouch();
-  const enterDrive = useCallback(() => {
+  const enterDrive = useCallback((route: DriveRoute | null = null) => {
     setFocused(null);
     setPanel(null);
     setFirstDrive(false);
     setArriving(false);
     setDriveReady(false);
-    setTelemetry(createTelemetry());
+    setTelemetry(createTelemetry(route));
     setPaused(false);
     setGate(null);
     try {
@@ -475,8 +478,14 @@ export default function LeagueClient({
     autoDrove.current = true;
     window.history.replaceState(null, "", `/town/${league.slug}`);
     // After the first paint, from a callback: the scene mounts in view mode first.
-    window.setTimeout(enterDrive, 0);
+    window.setTimeout(() => enterDrive(), 0);
   }, [startDriving, league.slug, enterDrive]);
+  // Drive here (the building card): the car starts as usual, an arrow over it
+  // points at the building, and it's marked on the minimap until you get there.
+  const driveTo = useCallback(
+    (b: CityBuilding) => enterDrive({ login: b.loginLower, x: b.position[0], z: b.position[2], reach: ROUTE_REACH }),
+    [enterDrive],
+  );
   const exitDrive = useCallback(() => {
     setMode((m) => (m === "drive" ? "view" : m));
     setFirstDrive(false);
@@ -896,6 +905,23 @@ export default function LeagueClient({
   const verifyHref =
     !isMember && !showJoinCta && viewer && league.kind === "company" ? `/towns/new?kind=company&org=${encodeURIComponent(league.github_org ?? "")}` : null;
   const close = () => setPanel(null);
+  // Find a building by username: the search button, or / anywhere in the city.
+  const openFind = useCallback(() => {
+    setFocused(null);
+    setPanel("find");
+  }, []);
+  useEffect(() => {
+    if (mode !== "view" || intro || panel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, [contenteditable]")) return;
+      e.preventDefault();
+      openFind();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, intro, panel, openFind]);
   const questStep = (step: QuestStep) => {
     if (step === "drive") enterDrive();
     else if (step === "invite") {
@@ -1169,6 +1195,7 @@ export default function LeagueClient({
                 }
                 requests={pendingRequests}
                 onDrive={() => enterDrive()}
+                onFind={openFind}
                 onReplay={playIntro}
               />
             </div>
@@ -1185,6 +1212,7 @@ export default function LeagueClient({
                 onEdit={isAdmin ? enterEdit : undefined}
                 onCover={isAdmin ? () => sendCover(false, true) : undefined}
                 onDrive={() => enterDrive()}
+                onFind={openFind}
                 onRace={goRace}
                 raceRecord={raceRecord ? `Record @${raceRecord.login} ${formatLap(raceRecord.best_ms)}` : null}
                 drivingNow={watch.drivers.length}
@@ -1254,11 +1282,22 @@ export default function LeagueClient({
           onClose={close}
         />
       )}
+      {panel === "find" && (
+        <FindPanel
+          buildings={buildings}
+          onPick={(b) => {
+            setPanel(null);
+            setFocused(b);
+          }}
+          onClose={close}
+        />
+      )}
       {focused && (
         <BuildingCard
           key={focused.loginLower}
           building={focused}
           data={data}
+          onDriveTo={mode === "view" && focused.loginLower !== viewerLogin ? () => driveTo(focused) : undefined}
           onClose={() => setFocused(null)}
         />
       )}

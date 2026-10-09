@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Camera, Car, Check, Clock, Flag, LogIn, LogOut, Pencil, Play, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { Camera, Car, Check, Clock, Flag, LogIn, LogOut, Pencil, Play, Search, Settings, Share2, ShieldCheck, UserPlus } from "lucide-react";
 import { Pending } from "@/components/leagues/PixelSpinner";
 import { HUD_BOX } from "./shared";
 
@@ -27,6 +27,7 @@ export default function ActionBar({
   onEdit,
   onCover,
   onDrive,
+  onFind,
   onRace,
   raceRecord = null,
   onLeave,
@@ -44,6 +45,8 @@ export default function ActionBar({
   /** Admin: this view on screen becomes the town's Discover cover. Resolves to whether it saved. */
   onCover?: () => Promise<boolean>;
   onDrive?: () => void;
+  /** Find a building by username. */
+  onFind?: () => void;
   /** The town's race track (with a screen over the load). */
   onRace?: () => void;
   /** "Record @x 0:22.912", for the tooltip. */
@@ -155,6 +158,11 @@ export default function ActionBar({
               {drivingNow} on the road
             </span>
           )}
+        </button>
+      )}
+      {onFind && (
+        <button type="button" onClick={onFind} aria-label="Find a building" title="Find a building (/)" className={`${ICON_BTN} text-cream hover:text-lime`}>
+          <Search {...ICON} aria-hidden />
         </button>
       )}
       {SHOW_RACE && onDrive && desktop && (

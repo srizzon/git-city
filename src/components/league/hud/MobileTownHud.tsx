@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Car, Check, ChevronLeft, Clock, LogIn, LogOut, MoreHorizontal, Play, Settings, Share2, ShieldCheck, Trophy, UserPlus } from "lucide-react";
+import { Car, Check, ChevronLeft, Clock, LogIn, LogOut, MoreHorizontal, Play, Search, Settings, Share2, ShieldCheck, Trophy, UserPlus } from "lucide-react";
 import { Pending } from "@/components/leagues/PixelSpinner";
 import type { LeaguePageData } from "@/lib/leagues/queries";
 import type { TownBadges } from "@/lib/towns/milestones";
@@ -92,6 +92,7 @@ export function MobileActionBar({
   requests = 0,
   onInvite,
   onDrive,
+  onFind,
   onReplay,
   onLeave,
 }: {
@@ -105,6 +106,8 @@ export function MobileActionBar({
   onInvite: () => void;
   /** Into the car (touch controls). */
   onDrive?: () => void;
+  /** Find a building by username. */
+  onFind?: () => void;
   onReplay?: () => void;
   onLeave?: () => Promise<string | null>;
 }) {
@@ -226,6 +229,11 @@ export function MobileActionBar({
           <button type="button" onClick={onDrive} className="flex h-11 shrink-0 items-center gap-2 px-3 text-[11px] text-lime transition-colors active:bg-white/10">
             <Car {...ICON} aria-hidden />
             Drive
+          </button>
+        )}
+        {onFind && (
+          <button type="button" onClick={onFind} aria-label="Find a building" className={`${SQUARE} text-cream`}>
+            <Search {...ICON} aria-hidden />
           </button>
         )}
         {onReplay && (
