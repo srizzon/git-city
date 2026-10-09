@@ -12,27 +12,29 @@ const ctx: CampaignRenderContext = {
 const VARIANTS = ["announce", "repermission"] as const;
 
 describe("towns launch copy", () => {
-  it("asks one question and has one button in the announce email", () => {
+  it("is a letter from Samuel with one button", () => {
     const e = TOWNS_LAUNCH.render("announce", ctx);
-    expect(e.subject).toBe("Claude or Codex?");
-    expect(e.text).toContain("The side with the most points per player wins the week.");
-    expect(e.text).toContain("You can only pick one, and it's yours for the week.");
-    expect(e.text).toContain("Pick my side:");
+    expect(e.subject).toBe("I turned Git City into a war");
+    expect(e.text).toContain("Hey @octocat,");
+    expect(e.text).toContain("Today 87,600 developers have a building in it, you included.");
+    expect(e.text).toContain("Samuel");
     expect(e.html.match(/Pick my side/g)).toHaveLength(1);
   });
 
-  it("names the weekly Firecrawl prize and the smaller-side bonus", () => {
+  it("covers how it works, smash, the prize and the live count", () => {
     const e = TOWNS_LAUNCH.render("announce", ctx);
-    expect(e.preheader).toBe("Pick a side. The top 5 players each week win Firecrawl credits.");
-    expect(e.text).toContain("The top 5 players each week win 2,500 Firecrawl credits. The smaller side gets bonus prize points.");
+    for (const s of ["How it works", "Smash", "The prize", "Right now"]) expect(e.html).toContain(s);
+    expect(e.text).toContain("Firecrawl gives 2,500 credits to each of the top 5 players every week.");
+    expect(e.html).toContain("/towns/opengraph-image");
+    expect(e.html).toContain("/demolished-image");
   });
 
   it("dates the war as a start before Oct 12 and as a fact after", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-09T12:00:00Z"));
-    expect(TOWNS_LAUNCH.render("announce", ctx).text).toContain("Starts Mon, Oct 12.");
+    expect(TOWNS_LAUNCH.render("announce", ctx).text).toContain("From Mon, Oct 12, Git City is a weekly war");
     vi.setSystemTime(new Date("2026-10-16T12:00:00Z"));
-    expect(TOWNS_LAUNCH.render("announce", ctx).text).toContain("Started Oct 12.");
+    expect(TOWNS_LAUNCH.render("announce", ctx).text).toContain("Since Oct 12, Git City is a weekly war");
     vi.useRealTimers();
   });
 

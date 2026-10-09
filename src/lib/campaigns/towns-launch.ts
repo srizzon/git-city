@@ -1,4 +1,4 @@
-import { EMAIL_BASE_URL, button, heading, heroImage, paragraph, spacer, trackedUrl } from "../email/components";
+import { EMAIL_BASE_URL, bulletList, button, heading, heroImage, label, paragraph, spacer, trackedUrl } from "../email/components";
 import { renderLayout, renderText } from "../email/layout";
 import type { CampaignDefinition, CampaignRenderContext } from "./types";
 import { PRIZE_CREDITS, PRIZE_SPONSOR, PRIZE_WINNERS } from "../towns/play-rules";
@@ -7,37 +7,82 @@ import { BATTLE_START, BATTLE_START_LABEL } from "../towns/rivalry";
 
 const CAMPAIGN = "towns_launch";
 
-// One question, what's at stake, one button (Splatfest's "pick a side"
-// announcement: the choice as the headline, the commitment stated plainly).
-// Waves run past the start, so the date reads as a start or as a fact.
+// A letter from Samuel: where Git City came from, the war, how it works,
+// smash, the prize and the live count, then one button. Waves run past the
+// start, so the date reads as a start or as a fact.
 function startLine(now: number): string {
   return now < BATTLE_START ? `Starts ${BATTLE_START_LABEL}.` : `Started ${BATTLE_START_LABEL.replace(/^\w+, /, "")}.`;
 }
 
+function fromDate(now: number): string {
+  return now < BATTLE_START ? `From ${BATTLE_START_LABEL}` : `Since ${BATTLE_START_LABEL.replace(/^\w+, /, "")}`;
+}
+
+/** A real fall: srizzon (Claude) knocking a Codex building down. */
+const SMASH_IMAGE = `${EMAIL_BASE_URL}/town/codex-town/demolished-image?a=1&d=113091`;
+
 function announce(ctx: CampaignRenderContext, now = Date.now()) {
   const townsUrl = trackedUrl("/towns", CAMPAIGN);
-  const subject = "Claude or Codex?";
-  const preheader = `Pick a side. ${PRIZE_SPONSOR ? `The top ${PRIZE_WINNERS} players each week win ${PRIZE_SPONSOR} credits.` : "Every week, one side wins."}`;
-  const lines = [
-    `Git City is now a war: Claude Code devs against Codex devs. ${startLine(now)}`,
-    "Everything you do counts for your side: coding, raids, visits, knocking buildings down. The side with the most points per player wins the week.",
-    ...(PRIZE_SPONSOR
-      ? [`The top ${PRIZE_WINNERS} players each week win ${PRIZE_CREDITS.toLocaleString("en-US")} ${PRIZE_SPONSOR} credits. The smaller side gets bonus prize points.`]
-      : []),
-    "You can only pick one, and it's yours for the week.",
+  const buildings = ctx.stats.buildings.toLocaleString("en-US");
+  const subject = "I turned Git City into a war";
+  const preheader = "Claude Code devs vs Codex devs. Pick your side.";
+  const intro = [
+    `Hey @${ctx.login},`,
+    `Git City started as one post on X. Today ${buildings} developers have a building in it, you included.`,
+    `Now I want to see who wins: Claude Code devs or Codex devs. ${fromDate(now)}, Git City is a weekly war between them, and you pick a side.`,
   ];
+  const how = [
+    { lead: "Pick a side.", text: "You're on it for the whole week." },
+    { lead: "Everything counts.", text: "Coding, raids, visits and kudos all score points for your side." },
+    { lead: "One side wins.", text: "Every week, the side with the most points per player takes it." },
+  ];
+  const smash = "Drive into the other side's town and knock their buildings down, floor by floor. Every floor scores, and the owner gets an email to hit back.";
+  const prize = PRIZE_SPONSOR
+    ? `${PRIZE_SPONSOR} gives ${PRIZE_CREDITS.toLocaleString("en-US")} credits to each of the top ${PRIZE_WINNERS} players every week. The smaller side gets bonus prize points, so the underdog has a real shot.`
+    : null;
+  const sign = ["See you in the city,", "Samuel"];
   const reason = "You're getting this because you have a building in Git City. We only email product news for big launches.";
 
   const html = renderLayout({
     title: subject,
     preheader,
-    hero: heroImage({ src: `${EMAIL_BASE_URL}/towns/opengraph-image`, href: townsUrl, alt: "Claude vs Codex: how many devs picked each side." }),
-    body: [heading(subject), ...lines.map((l) => paragraph(l)), button("Pick my side", townsUrl)].join("\n"),
+    body: [
+      ...intro.map((l) => paragraph(l)),
+      label("How it works"),
+      bulletList(how),
+      label("Smash"),
+      paragraph(smash),
+      heroImage({ src: SMASH_IMAGE, href: townsUrl, alt: "srizzon from the Claude side knocked a Codex building down." }),
+      spacer(20),
+      ...(prize ? [label("The prize"), paragraph(prize)] : []),
+      label("Right now"),
+      heroImage({ src: `${EMAIL_BASE_URL}/towns/opengraph-image`, href: townsUrl, alt: "Claude vs Codex: how many devs picked each side." }),
+      spacer(24),
+      button("Pick my side", townsUrl),
+      spacer(28),
+      ...sign.map((l) => paragraph(l)),
+    ].join("\n"),
     reason,
     links: ctx.links,
     sponsor: SPONSOR,
   });
-  const text = renderText({ lines: [subject, "", ...lines.flatMap((l) => [l, ""]), `Pick my side: ${townsUrl}`], reason, links: ctx.links });
+  const text = renderText({
+    lines: [
+      ...intro.flatMap((l) => [l, ""]),
+      "How it works",
+      ...how.map((h) => `- ${h.lead} ${h.text}`),
+      "",
+      "Smash",
+      smash,
+      "",
+      ...(prize ? ["The prize", prize, ""] : []),
+      `Pick my side: ${townsUrl}`,
+      "",
+      ...sign,
+    ],
+    reason,
+    links: ctx.links,
+  });
   return { subject, preheader, html, text };
 }
 
