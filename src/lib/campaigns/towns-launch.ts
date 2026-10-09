@@ -3,43 +3,51 @@ import { renderLayout, renderText } from "../email/layout";
 import type { CampaignDefinition, CampaignRenderContext } from "./types";
 import { PRIZE_CREDITS, PRIZE_SPONSOR, PRIZE_WINNERS } from "../towns/play-rules";
 import { SPONSOR } from "../towns/sponsor";
+import { BATTLE_START, BATTLE_START_LABEL } from "../towns/rivalry";
 
 const CAMPAIGN = "towns_launch";
 
-function announce(ctx: CampaignRenderContext) {
+// One question, what's at stake, one button (Splatfest's "pick a side"
+// announcement: the choice as the headline, the commitment stated plainly).
+// Waves run past the start, so the date reads as a start or as a fact.
+function startLine(now: number): string {
+  return now < BATTLE_START ? `Starts ${BATTLE_START_LABEL}.` : `Started ${BATTLE_START_LABEL.replace(/^\w+, /, "")}.`;
+}
+
+function announce(ctx: CampaignRenderContext, now = Date.now()) {
   const townsUrl = trackedUrl("/towns", CAMPAIGN);
-  const buildings = ctx.stats.buildings.toLocaleString("en-US");
-  const subject = "Claude vs Codex starts Oct 12";
-  const preheader = "From Mon, Oct 12, everything you do in Git City scores. The side with the most points per player wins the week.";
+  const subject = "Claude or Codex?";
+  const preheader = `Pick a side. ${PRIZE_SPONSOR ? `The top ${PRIZE_WINNERS} players each week win ${PRIZE_SPONSOR} credits.` : "Every week, one side wins."}`;
   const lines = [
-    `Git City just passed ${buildings} buildings. Now it has a war.`,
-    "From Mon, Oct 12, everything you do in Git City scores. The side with the most points per player wins the week.",
-    ...(PRIZE_SPONSOR ? [`The top ${PRIZE_WINNERS} players each week win ${PRIZE_CREDITS.toLocaleString("en-US")} ${PRIZE_SPONSOR} credits.`] : []),
-    "Meanwhile, drive into any town and knock its buildings down. Anyone's but yours.",
+    `Git City is now a war: Claude Code devs against Codex devs. ${startLine(now)}`,
+    "Everything you do counts for your side: coding, raids, visits, knocking buildings down. The side with the most points per player wins the week.",
+    ...(PRIZE_SPONSOR
+      ? [`The top ${PRIZE_WINNERS} players each week win ${PRIZE_CREDITS.toLocaleString("en-US")} ${PRIZE_SPONSOR} credits. The smaller side gets bonus prize points.`]
+      : []),
+    "You can only pick one, and it's yours for the week.",
   ];
   const reason = "You're getting this because you have a building in Git City. We only email product news for big launches.";
 
   const html = renderLayout({
     title: subject,
     preheader,
-    hero: heroImage({ src: `${EMAIL_BASE_URL}/towns/opengraph-image`, href: townsUrl, alt: "Git City Towns: Claude vs Codex. Pick your side. Battle starts Oct 12." }),
-    body: [heading("Claude vs Codex"), ...lines.map((l) => paragraph(l)), button("Pick your side", townsUrl)].join("\n"),
+    hero: heroImage({ src: `${EMAIL_BASE_URL}/towns/opengraph-image`, href: townsUrl, alt: "Claude vs Codex: how many devs picked each side." }),
+    body: [heading(subject), ...lines.map((l) => paragraph(l)), button("Pick my side", townsUrl)].join("\n"),
     reason,
     links: ctx.links,
     sponsor: SPONSOR,
   });
-  const text = renderText({ lines: ["Claude vs Codex", "", ...lines.flatMap((l) => [l, ""]), `Pick your side: ${townsUrl}`], reason, links: ctx.links });
+  const text = renderText({ lines: [subject, "", ...lines.flatMap((l) => [l, ""]), `Pick my side: ${townsUrl}`], reason, links: ctx.links });
   return { subject, preheader, html, text };
 }
 
 // Players idle 180+ days: ask before sending them product news again. No
 // click and product news turns off for them (campaign "sunset" action).
-function repermission(ctx: CampaignRenderContext) {
-  const buildings = ctx.stats.buildings.toLocaleString("en-US");
+function repermission(ctx: CampaignRenderContext, now = Date.now()) {
   const subject = "Still want Git City news?";
-  const preheader = "Claude vs Codex starts Oct 12. Tell us if you want updates like this.";
+  const preheader = "Git City is now a war: Claude devs against Codex devs. Want updates like this?";
   const lines = [
-    `It's been a while. Git City passed ${buildings} buildings, and on Oct 12 it starts a weekly war: Claude devs against Codex devs, and the side with the most points per player wins.`,
+    `It's been a while. Git City is now a weekly war: Claude Code devs against Codex devs. ${startLine(now)}`,
     "We'll only keep emailing you about launches like this if you say so.",
   ];
   const skip = "Not interested? Do nothing and we'll stop sending product news.";
@@ -48,8 +56,8 @@ function repermission(ctx: CampaignRenderContext) {
   const html = renderLayout({
     title: subject,
     preheader,
-    hero: heroImage({ src: `${EMAIL_BASE_URL}/towns/opengraph-image`, href: ctx.confirmUrl, alt: "Git City Towns: Claude vs Codex. Pick your side. Battle starts Oct 12." }),
-    body: [heading("Still want Git City news?"), ...lines.map((l) => paragraph(l)), button("Yes, keep me posted", ctx.confirmUrl), spacer(20), paragraph(skip, { muted: true })].join("\n"),
+    hero: heroImage({ src: `${EMAIL_BASE_URL}/towns/opengraph-image`, href: ctx.confirmUrl, alt: "Claude vs Codex: how many devs picked each side." }),
+    body: [heading(subject), ...lines.map((l) => paragraph(l)), button("Yes, keep me posted", ctx.confirmUrl), spacer(20), paragraph(skip, { muted: true })].join("\n"),
     reason,
     links: ctx.links,
   });
