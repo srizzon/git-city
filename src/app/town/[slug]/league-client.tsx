@@ -36,7 +36,7 @@ import { useEditorController } from "@/components/league/editor/useEditorControl
 import { useCityAutosave } from "@/components/league/editor/useCityAutosave";
 import type { CoverApi, SceneMode } from "@/components/league/LeagueScene";
 import { createTouch, type TouchDrive } from "@/lib/league-city/drive/touch";
-import { createTelemetry, type DriveCameraMode, type DriveTelemetry } from "@/lib/league-city/drive/telemetry";
+import { createTelemetry, type DriveCameraMode, type DriveRoute, type DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import type { DriverInfo } from "@/lib/league-city/drive/net";
 import type { CrownApi, CrownView } from "@/components/league/drive/CrownMode";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
@@ -96,6 +96,8 @@ const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), {
 const DriveHud = dynamic(() => import("@/components/league/hud/drive/DriveHud"), { ssr: false });
 
 const MUTE_KEY = "gc:drive-muted";
+/** Drive here: this close to the building's center (city units, a lot and a bit) and you're there. */
+const ROUTE_REACH = 56;
 const LIME = "#c8e64a";
 /** The minimap, compass and zoom buttons: ready, off until towns grow past one screen. */
 const SHOW_MAP_NAV = false;
@@ -452,13 +454,13 @@ export default function LeagueClient({
   // Phone controls (lib drive/touch): on screen on touch devices, read by the car.
   const touchRef = useRef<TouchDrive>(createTouch());
   const touchUi = useTouch();
-  const enterDrive = useCallback(() => {
+  const enterDrive = useCallback((route: DriveRoute | null = null) => {
     setFocused(null);
     setPanel(null);
     setFirstDrive(false);
     setArriving(false);
     setDriveReady(false);
-    setTelemetry(createTelemetry());
+    setTelemetry(createTelemetry(route));
     setPaused(false);
     setGate(null);
     try {
@@ -475,8 +477,14 @@ export default function LeagueClient({
     autoDrove.current = true;
     window.history.replaceState(null, "", `/town/${league.slug}`);
     // After the first paint, from a callback: the scene mounts in view mode first.
-    window.setTimeout(enterDrive, 0);
+    window.setTimeout(() => enterDrive(), 0);
   }, [startDriving, league.slug, enterDrive]);
+  // Drive here (the building card): the car starts as usual, an arrow over it
+  // points at the building, and it's marked on the minimap until you get there.
+  const driveTo = useCallback(
+    (b: CityBuilding) => enterDrive({ login: b.loginLower, x: b.position[0], z: b.position[2], reach: ROUTE_REACH }),
+    [enterDrive],
+  );
   const exitDrive = useCallback(() => {
     setMode((m) => (m === "drive" ? "view" : m));
     setFirstDrive(false);
@@ -1259,6 +1267,7 @@ export default function LeagueClient({
           key={focused.loginLower}
           building={focused}
           data={data}
+          onDriveTo={mode === "view" && focused.loginLower !== viewerLogin ? () => driveTo(focused) : undefined}
           onClose={() => setFocused(null)}
         />
       )}

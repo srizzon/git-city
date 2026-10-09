@@ -14,10 +14,13 @@ import { useSheet } from "./useSheet";
 export default function BuildingCard({
   building: b,
   data,
+  onDriveTo,
   onClose,
 }: {
   building: CityBuilding;
   data: LeaguePageData;
+  /** Get in the car with an arrow pointing here (left out while driving and on your own building). */
+  onDriveTo?: () => void;
   onClose: () => void;
 }) {
   const [kudos, setKudos] = useState<{ state: "idle" | "sending" | "sent" | "error"; message?: string }>({ state: "idle" });
@@ -190,6 +193,18 @@ export default function BuildingCard({
                 {kudos.state === "sending" ? "Sending…" : kudos.state === "sent" ? `Kudos sent to @${b.login}` : `Give @${b.login} kudos`}
               </button>
               {kudos.state === "error" && <p className="mt-1.5 text-[9px] text-red-400 normal-case">{kudos.message}</p>}
+            </div>
+          )}
+
+          {onDriveTo && (
+            <div className="mx-4 mb-3">
+              <button
+                type="button"
+                onClick={onDriveTo}
+                className="btn-press w-full border-2 border-lime/60 py-2 text-[10px] text-cream transition-colors hover:border-lime hover:text-lime"
+              >
+                Drive here
+              </button>
             </div>
           )}
 
