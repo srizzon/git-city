@@ -9,9 +9,9 @@ import { LOT } from "@/lib/league-city/grid";
 // Drive mode's minimap: a small round radar that turns with the car (heading
 // up, like GTA or Mario Kart), so left on the map is left on the road. The
 // town's roads and buildings, your building in lime, everyone driving in
-// their car color, bots dimmer, and the crown during Crown Rush. The crown
-// and other drivers past the edge stick to the rim, so you always know which
-// way to go. Drawn on a canvas from the telemetry feed, never re-renders.
+// their car color, bots dimmer, the crown during Crown Rush, and the building
+// you're driving to (Drive here). The crown, the route and other drivers past
+// the edge stick to the rim, so you always know which way to go. Drawn on a canvas from the telemetry feed, never re-renders.
 
 /** City units from the center to the rim. */
 const RANGE = 200;
@@ -145,6 +145,28 @@ export default function Minimap({
         ctx.fillRect(R + x - s / 2 - 1, R + y - s / 2 - 1, s + 2, s + 2);
         ctx.fillStyle = c.color;
         ctx.fillRect(R + x - s / 2, R + y - s / 2, s, s);
+      }
+      const route = telemetry.route;
+      if (route) {
+        const [x, y, far] = pin(toMap(route.x, route.z), 7);
+        const pulse = 0.5 + 0.5 * Math.sin(now / 180);
+        ctx.fillStyle = `rgba(200, 230, 74, ${0.18 + pulse * 0.22})`;
+        ctx.beginPath();
+        ctx.arc(R + x, R + y, far ? 7 : 10, 0, Math.PI * 2);
+        ctx.fill();
+        // A diamond, so it doesn't read as your building's lime block.
+        const d = far ? 4 : 5;
+        ctx.fillStyle = HOME;
+        ctx.strokeStyle = BG;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(R + x, R + y - d);
+        ctx.lineTo(R + x + d, R + y);
+        ctx.lineTo(R + x, R + y + d);
+        ctx.lineTo(R + x - d, R + y);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
       }
       if (r.crown) {
         const [x, y, far] = pin(toMap(r.crown.x, r.crown.z), 8);
