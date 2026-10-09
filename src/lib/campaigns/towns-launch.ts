@@ -19,8 +19,8 @@ function fromDate(now: number): string {
   return now < BATTLE_START ? `From ${BATTLE_START_LABEL}` : `Since ${BATTLE_START_LABEL.replace(/^\w+, /, "")}`;
 }
 
-/** A real fall: srizzon (Claude) knocking a Codex building down. */
-const SMASH_IMAGE = `${EMAIL_BASE_URL}/town/codex-town/demolished-image?a=1&d=113091`;
+/** A real fall: srizzon (Claude, id 1) knocking gxdevs' Codex building down (id 105). The card only renders a logged fall. */
+const SMASH_IMAGE = `${EMAIL_BASE_URL}/town/codex-town/demolished-image?a=1&d=105`;
 
 function announce(ctx: CampaignRenderContext, now = Date.now()) {
   const townsUrl = trackedUrl("/towns", CAMPAIGN);
@@ -74,7 +74,7 @@ function announce(ctx: CampaignRenderContext, now = Date.now()) {
       label("The first battle"),
       richParagraph([...war]),
       richParagraph([...smash]),
-      heroImage({ src: SMASH_IMAGE, href: townsUrl, alt: "srizzon from the Claude side knocked a Codex building down." }),
+      heroImage({ src: SMASH_IMAGE, href: townsUrl, alt: "srizzon from the Claude side knocked gxdevs' Codex building down." }),
       spacer(20),
       ...(prize ? [label("The prize"), richParagraph([...prize])] : []),
       label("Right now"),
