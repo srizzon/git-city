@@ -25,6 +25,7 @@ import { SF_PLAZA_SCALE, plazaCenterWorld } from "@/lib/sponsors/sfPlaza";
 import { IntroColdOpen, HOME_CAM, coldOpen } from "./IntroColdOpen";
 import { sunPosition, samplePalette, skyState } from "@/lib/sky";
 import WhiteRabbit from "./WhiteRabbit";
+import FruitFlySwarm from "./FruitFlySwarm";
 import CelebrationEffect from "./CelebrationEffect";
 import ComparePath from "./ComparePath";
 import CompareCinematic from "./CompareCinematic";
@@ -2197,6 +2198,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
   // *reports* sustained frame drops so the HUD can suggest switching to low;
   // the user makes the call via the perf toggle.
   const lowPerf = perfMode === "low";
+  // The fruit flies measure the plaza monument so they fly over it, not through it.
+  const plazaRef = useRef<THREE.Group>(null);
   // Graphics A/B flags for measuring phones (?logdepth=0|1, ?dpr=1, ?bloom=0, ?smaa=0).
   // Log depth writes depth per pixel, which turns off the hidden-surface
   // removal of phone GPUs: off by default on touch devices (2x fps on an
@@ -2380,9 +2383,9 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       {(() => {
         // The civic plaza holds one thing: the Town of the week monument.
         // Built-in layout: the origin. SF map: downtown, at plaza scale.
-        if (!sfMap) return <group position={[0, 0, 0]}>{plazaCenter}</group>;
+        if (!sfMap) return <group ref={plazaRef} position={[0, 0, 0]}>{plazaCenter}</group>;
         return (
-          <group position={[sfMap.downtown[0], 0, sfMap.downtown[1]]} scale={SF_PLAZA_SCALE}>
+          <group ref={plazaRef} position={[sfMap.downtown[0], 0, sfMap.downtown[1]]} scale={SF_PLAZA_SCALE}>
             {plazaCenter}
           </group>
         );
@@ -2415,6 +2418,10 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       )}
 
       {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={skyRadius} />}
+
+      {!wallpaperMode && !introMode && !rabbitCinematic && !lowPerf && (!raidPhase || raidPhase === "idle" || raidPhase === "preview") && (
+        <FruitFlySwarm buildings={buildings} landmarks={plazaRef} />
+      )}
 
       {!wallpaperMode && rabbitSighting && rabbitSighting >= 1 && rabbitSighting <= 5 && (() => {
         const plazaIdx = RABBIT_PLAZA_INDICES[rabbitSighting - 1];
