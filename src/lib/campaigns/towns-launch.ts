@@ -1,4 +1,4 @@
-import { EMAIL_BASE_URL, bulletList, button, heading, heroImage, label, paragraph, spacer, textLink, trackedUrl } from "../email/components";
+import { EMAIL_BASE_URL, bulletList, button, buttonSecondary, buttonWide, heading, heroImage, label, paragraph, richParagraph, richText, spacer, trackedUrl } from "../email/components";
 import { renderLayout, renderText } from "../email/layout";
 import type { CampaignDefinition, CampaignRenderContext } from "./types";
 import { PRIZE_CREDITS, PRIZE_SPONSOR, PRIZE_WINNERS } from "../towns/play-rules";
@@ -31,18 +31,34 @@ function announce(ctx: CampaignRenderContext, now = Date.now()) {
   const intro = [
     `Hey @${ctx.login},`,
     `Git City started as one post on X. Today ${buildings} developers have a building in it, you included.`,
-    "Now I'm launching Git City Towns: a city of its own for every community, group of friends and company.",
   ];
+  const launch = ["Now I'm launching ", { hl: "Git City Towns" }, ": a city of its own for every community, group of friends and company."] as const;
   const what = [
     { lead: "Everyone becomes a building.", text: "Join a town with GitHub and your building moves in." },
     { lead: "Build it together.", text: "Streets, plazas, ramps and your logo on every corner, in the editor." },
     { lead: "Drive it.", text: "Every town is a map you can drive through, alone or with your crew." },
     { lead: "Towns compete.", text: "Every week, the town that codes the most takes the monument in the center of Git City." },
   ];
-  const war = `We open with a war: Claude Code devs against Codex devs. ${fromDate(now)}, everything you do in Git City scores for your side, and the side with the most points per player wins the week.`;
-  const smash = "Drive into the other side's town and knock their buildings down, floor by floor. Every floor scores, and the owner gets an email to hit back.";
+  const war = [
+    "We open with a war: ",
+    { b: "Claude Code devs against Codex devs" },
+    `. ${fromDate(now)}, everything you do in Git City scores for your side, and `,
+    { b: "the side with the most points per player wins the week" },
+    ".",
+  ] as const;
+  const smash = [
+    "Drive into the other side's town and ",
+    { b: "knock their buildings down" },
+    ", floor by floor. Every floor scores, and the owner gets an email to hit back.",
+  ] as const;
   const prize = PRIZE_SPONSOR
-    ? `${PRIZE_SPONSOR} gives ${PRIZE_CREDITS.toLocaleString("en-US")} credits to each of the top ${PRIZE_WINNERS} players every week. The smaller side gets bonus prize points, so the underdog has a real shot.`
+    ? ([
+        `${PRIZE_SPONSOR} gives `,
+        { hl: `${PRIZE_CREDITS.toLocaleString("en-US")} credits` },
+        ` to each of the `,
+        { b: `top ${PRIZE_WINNERS} players every week` },
+        ". The smaller side gets bonus prize points, so the underdog has a real shot.",
+      ] as const)
     : null;
   const sign = ["See you in the city,", "Samuel"];
   const reason = "You're getting this because you have a building in Git City. We only email product news for big launches.";
@@ -52,19 +68,20 @@ function announce(ctx: CampaignRenderContext, now = Date.now()) {
     preheader,
     body: [
       ...intro.map((l) => paragraph(l)),
+      richParagraph([...launch]),
       label("What's a town"),
       bulletList(what),
       label("The first battle"),
-      paragraph(war),
-      paragraph(smash),
+      richParagraph([...war]),
+      richParagraph([...smash]),
       heroImage({ src: SMASH_IMAGE, href: townsUrl, alt: "srizzon from the Claude side knocked a Codex building down." }),
       spacer(20),
-      ...(prize ? [label("The prize"), paragraph(prize)] : []),
+      ...(prize ? [label("The prize"), richParagraph([...prize])] : []),
       label("Right now"),
       heroImage({ src: `${EMAIL_BASE_URL}/towns/opengraph-image`, href: townsUrl, alt: "Claude vs Codex: how many devs picked each side." }),
       spacer(24),
-      button("Pick my side", townsUrl),
-      textLink("Or create a town for your crew", newTownUrl),
+      buttonWide("Pick my side", townsUrl),
+      buttonSecondary("Create a town for your crew", newTownUrl),
       spacer(28),
       ...sign.map((l) => paragraph(l)),
     ].join("\n"),
@@ -75,17 +92,19 @@ function announce(ctx: CampaignRenderContext, now = Date.now()) {
   const text = renderText({
     lines: [
       ...intro.flatMap((l) => [l, ""]),
+      richText([...launch]),
+      "",
       "What's a town",
       ...what.map((h) => `- ${h.lead} ${h.text}`),
       "",
       "The first battle",
-      war,
+      richText([...war]),
       "",
-      smash,
+      richText([...smash]),
       "",
-      ...(prize ? ["The prize", prize, ""] : []),
+      ...(prize ? ["The prize", richText([...prize]), ""] : []),
       `Pick my side: ${townsUrl}`,
-      `Or create a town for your crew: ${newTownUrl}`,
+      `Create a town for your crew: ${newTownUrl}`,
       "",
       ...sign,
     ],

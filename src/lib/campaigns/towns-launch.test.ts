@@ -17,7 +17,7 @@ describe("towns launch copy", () => {
     expect(e.subject).toBe("Git City Towns is live");
     expect(e.text).toContain("Now I'm launching Git City Towns");
     expect(e.text).toContain("What's a town");
-    expect(e.text).toContain("Or create a town for your crew:");
+    expect(e.text).toContain("Create a town for your crew:");
     expect(e.text).toContain("Hey @octocat,");
     expect(e.text).toContain("Today 87,600 developers have a building in it, you included.");
     expect(e.text).toContain("Samuel");
