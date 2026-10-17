@@ -94,6 +94,8 @@ interface CitySceneProps {
   onBuildingClick?: (building: CityBuilding) => void;
   onFocusInfo?: (info: FocusInfo) => void;
   introMode?: boolean;
+  /** A film's camera (the trailer studio): like the intro, but every building keeps its items. */
+  filmMode?: boolean;
   flyMode?: boolean;
   ghostPreviewLogin?: string | null;
   holdRise?: boolean;
@@ -128,6 +130,7 @@ export default function CityScene({
   onBuildingClick,
   onFocusInfo,
   introMode,
+  filmMode,
   flyMode,
   ghostPreviewLogin,
   holdRise,
@@ -247,7 +250,7 @@ export default function CityScene({
         focusedBuilding={focusedBuilding}
         focusedBuildingB={focusedBuildingB}
         hideEffectsFor={hideEffectsFor}
-        introMode={introMode}
+        introMode={introMode && !filmMode}
         flyMode={flyMode}
         ghostPreviewLogin={ghostPreviewLogin}
         lowPerf={lowPerf}

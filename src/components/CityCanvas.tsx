@@ -2461,6 +2461,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           onBuildingClick={blockCityClicks ? undefined : onBuildingClick}
           onFocusInfo={onFocusInfo}
           introMode={introMode || !!rig}
+          filmMode={!!rig}
           flyMode={flyMode}
           ghostPreviewLogin={ghostPreviewLogin}
           holdRise={holdRise}
