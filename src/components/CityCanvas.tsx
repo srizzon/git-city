@@ -724,6 +724,7 @@ function VehicleFlight({ onExit, onHud, onPause, pauseSignal = 0, hasOverlay = f
     const FLIGHT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight"]);
 
     const down = (e: KeyboardEvent) => {
+      if (e.repeat) return;
       keys.current[e.code] = true;
       // Alt lowers the throttle; on Windows its default would focus the browser menu.
       if (e.code === "AltLeft" || e.code === "AltRight") e.preventDefault();
