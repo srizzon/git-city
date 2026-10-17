@@ -106,6 +106,8 @@ interface CitySceneProps {
   /** Drive-through destruction (rival towns, see lib/league-city/smash). */
   smash?: SmashStore;
   ghostColor?: string;
+  /** A building going up (a film's): nothing is drawn above this world height. */
+  buildTo?: { current: number };
 }
 
 // Tells the loading screen the city is on screen: two rendered frames after
@@ -140,6 +142,7 @@ export default function CityScene({
   lowPerf,
   smash,
   ghostColor,
+  buildTo,
 }: CitySceneProps) {
   // Single atlas texture for all building windows (created once per theme)
   const atlasTexture = useMemo(() => createWindowAtlas(colors), [colors]);
@@ -225,6 +228,7 @@ export default function CityScene({
         dimAll={dimAll}
         smash={smash}
         ghostColor={ghostColor}
+        buildTo={buildTo}
       />
 
       {/* Live presence dots above active buildings */}
