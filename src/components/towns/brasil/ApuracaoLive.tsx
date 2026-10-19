@@ -133,10 +133,20 @@ export default function ApuracaoLive({ slug, initial }: { slug: string; initial:
                   <span className="text-2xl tabular-nums text-cream">{pctText(lead.votes, c.total)}</span>
                   <span className="text-[10px] tabular-nums text-muted">{fmt(lead.votes)} votes</span>
                 </p>
+                {c.mode === "live" && (
+                  <Link href={`/town/${slug}?vote=${lead.number}`} className="btn-press self-start bg-lime px-3 py-1.5 text-[10px] text-bg sm:hidden">
+                    Vote {lead.number}
+                  </Link>
+                )}
               </div>
               <div className="shrink-0 text-right max-sm:hidden">
                 <p className="text-3xl tabular-nums text-cream sm:text-5xl">{pctText(lead.votes, c.total)}</p>
                 <p className="mt-1 text-[10px] tabular-nums text-muted">{fmt(lead.votes)} votes</p>
+                {c.mode === "live" && (
+                  <Link href={`/town/${slug}?vote=${lead.number}`} className="btn-press mt-3 inline-block bg-lime px-3 py-2 text-[10px] text-bg">
+                    Vote {lead.number}
+                  </Link>
+                )}
               </div>
             </section>
 
@@ -160,6 +170,11 @@ export default function ApuracaoLive({ slug, initial }: { slug: string; initial:
                     <span className="block text-sm tabular-nums text-cream">{pctText(r.votes, c.total)}</span>
                     <span className="block text-[9px] tabular-nums text-dim">{fmt(r.votes)}</span>
                   </span>
+                  {c.mode === "live" && (
+                    <Link href={`/town/${slug}?vote=${r.number}`} className="btn-press shrink-0 border-2 border-lime px-2.5 py-1.5 text-[9px] text-lime hover:bg-lime hover:text-bg">
+                      Vote {r.number}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ol>
@@ -167,8 +182,8 @@ export default function ApuracaoLive({ slug, initial }: { slug: string; initial:
         )}
 
         {c.mode !== "final" && (
-          <Link href={`/town/${slug}`} className="btn-press self-center border-2 border-lime bg-lime px-6 py-2.5 text-[11px] text-bg">
-            {c.mode === "live" ? "Vote on the map" : "Run for president on the map"}
+          <Link href={`/town/${slug}?vote=open`} className="btn-press self-center border-2 border-lime bg-lime px-6 py-2.5 text-[11px] text-bg">
+            {c.mode === "live" ? "Open the voting machine" : "Run for president"}
           </Link>
         )}
       </div>

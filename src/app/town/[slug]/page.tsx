@@ -109,7 +109,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
         home={home ? (home.dev.uf ?? "island") : null}
         startAt={atLogin ? { login: atLogin } : uf ? { uf } : null}
         startPick={query.pick === "1"}
-        startVote={PRESIDENCY_ON ? [query.run, query.vote].map((v) => (typeof v === "string" && /^\d{2}$/.test(v) ? Number(v) : null)).find((v) => v !== null) ?? null : null}
+        startVote={!PRESIDENCY_ON ? null : ([query.run, query.vote].map((v) => (typeof v === "string" && /^\d{2}$/.test(v) ? Number(v) : null)).find((v) => v !== null) ?? (query.vote === "open" ? "open" : null))}
         week={week}
         election={election}
         count={count}

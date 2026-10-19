@@ -9,9 +9,10 @@ import type { Count, CountRow } from "@/lib/towns/brasil-election-server";
 // The presidential count on the map, always in view while the presidency is
 // on: on a wide screen a card in the top-left corner (who leads, the top
 // three) that opens down into everyone, Vote and the full page; on a phone a
-// pill under the search that opens the sheet. Read again every 15 seconds
-// while the vote is open. Before the vote it says when it opens; after, who
-// was elected.
+// pill under the search that opens the sheet. Vote is always one tap away,
+// and tapping a candidate opens the voting machine with their number typed.
+// Read again every 15 seconds while the vote is open. Before the vote it says
+// when it opens; after, who was elected.
 
 const POLL_MS = 15_000;
 
@@ -41,9 +42,10 @@ function Face({ src, size }: { src: string | null; size: number }) {
   return src ? <img src={src} alt="" width={size} height={size} className="shrink-0 object-cover" style={{ width: size, height: size }} /> : <span className="shrink-0 bg-bg-raised" style={{ width: size, height: size }} />;
 }
 
-function Row({ r, total, place }: { r: CountRow; total: number; place: number }) {
+function Row({ r, total, place, onPick }: { r: CountRow; total: number; place: number; onPick: (n: number) => void }) {
   return (
-    <li className="flex items-center gap-2 py-1">
+    <li>
+      <button type="button" onClick={() => onPick(r.number)} aria-label={`Vote ${r.number}, @${r.login}`} className="flex w-full items-center gap-2 py-1 text-left hover:text-lime">
       <span className="w-4 text-[9px] tabular-nums text-muted">{place}</span>
       <Num n={r.number} />
       <Face src={r.avatar_url} size={20} />
@@ -54,11 +56,12 @@ function Row({ r, total, place }: { r: CountRow; total: number; place: number })
         </span>
       </span>
       <span className="w-11 text-right text-[10px] tabular-nums text-cream">{pctText(r.votes, total)}</span>
+      </button>
     </li>
   );
 }
 
-export default function ApuracaoWidget({ slug, initial, onVote }: { slug: string; initial: Count; onVote: () => void }) {
+export default function ApuracaoWidget({ slug, initial, onVote }: { slug: string; initial: Count; onVote: (number?: number) => void }) {
   const wide = useWide();
   const [c, setC] = useState(initial);
   const [open, setOpen] = useState(false);
@@ -90,14 +93,14 @@ export default function ApuracaoWidget({ slug, initial, onVote }: { slug: string
     <div className="flex flex-col gap-2">
       <ol className="flex flex-col">
         {c.rows.map((r, i) => (
-          <Row key={r.login} r={r} total={c.total} place={i + 1} />
+          <Row key={r.login} r={r} total={c.total} place={i + 1} onPick={onVote} />
         ))}
         {c.rows.length === 0 && <li className="py-2 text-[9px] normal-case text-muted">Nobody is running yet.</li>}
       </ol>
       <p className="text-[9px] tabular-nums text-muted">{fmt(c.total)} votes</p>
       <div className="grid grid-cols-2 gap-1.5">
-        <button type="button" onClick={onVote} className="btn-press min-h-9 bg-lime text-[10px] text-bg">
-          {c.mode === "live" ? "Vote" : c.mode === "final" ? "See the race" : "Run"}
+        <button type="button" onClick={() => onVote()} className="btn-press min-h-9 bg-lime text-[10px] text-bg">
+          {c.mode === "live" ? "Vote" : c.mode === "final" ? "See the race" : "Run for president"}
         </button>
         <a href={`/town/${slug}/apuracao`} className="btn-press flex min-h-9 items-center justify-center gap-1.5 border-2 border-border text-[10px] text-cream hover:border-lime/60">
           <Maximize2 size={12} aria-hidden /> Full count
@@ -152,11 +155,16 @@ export default function ApuracaoWidget({ slug, initial, onVote }: { slug: string
         ) : lead ? (
           <ol className="flex flex-col">
             {c.rows.slice(0, 3).map((r, i) => (
-              <Row key={r.login} r={r} total={c.total} place={i + 1} />
+              <Row key={r.login} r={r} total={c.total} place={i + 1} onPick={onVote} />
             ))}
           </ol>
         ) : (
           <p className="py-1 text-[9px] normal-case text-muted">Nobody is running yet.</p>
+        )}
+        {!open && (
+          <button type="button" onClick={() => onVote()} className="btn-press mt-2 min-h-9 w-full bg-lime text-[10px] text-bg">
+            {c.mode === "live" ? "Vote" : c.mode === "final" ? "See the race" : "Run for president"}
+          </button>
         )}
       </div>
     </section>

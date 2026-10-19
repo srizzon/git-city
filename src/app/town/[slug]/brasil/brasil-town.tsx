@@ -76,8 +76,8 @@ export interface BrasilTownProps {
   election: ElectionView | null;
   /** The presidential count for the corner widget (null while the presidency is off). */
   count?: Count | null;
-  /** ?vote=34, from a shared vote: the voting machine opens with that number typed. */
-  startVote?: number | null;
+  /** ?vote=34 / ?run=34 (a shared vote or candidacy, the count, a sign-in coming back): the voting machine opens with that number typed; "open": just opens it. */
+  startVote?: number | "open" | null;
 }
 
 type PanelId = "states" | "election" | null;
@@ -107,6 +107,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** Dark between the town's car and the drift run, both ways, while the next world loads. */
   const [curtain, setCurtain] = useState<"drift" | "city" | null>(null);
   const [panel, setPanel] = useState<PanelId>(startVote && election ? "election" : null);
+  /** The number the voting machine opens with, and a key to open it fresh with another. */
+  const [vote, setVote] = useState<{ number: number | null; key: number }>({ number: typeof startVote === "number" ? startVote : null, key: 0 });
+  /** Sent to put a building on the map from the voting machine: come back to it (with this number) once it's there. */
+  const backToVote = useRef<{ number: number | null } | null>(null);
   const [state, setState] = useState<StateStats | null>(null);
   const [focused, setFocused] = useState<CityBuilding | null>(null);
   /** The state card a building was opened from: closing the building brings it back. */
@@ -133,6 +137,11 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const [driveDev, setDriveDev] = useState<number | null>(null);
   const [launching, setLaunching] = useState(false);
   /** A panel takes the right side: any card closes. */
+  /** The voting machine, with a number typed or empty. */
+  const openVote = (number: number | null = null) => {
+    setVote((v) => ({ number, key: v.key + 1 }));
+    openPanel("election");
+  };
   const openPanel = (p: PanelId) => {
     setState(null);
     setFocused(null);
@@ -639,14 +648,28 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       setArriving(null);
       setPicker(null);
       setJoining({ pending: null, error: null });
-      setArrived({ login, uf: arriving.uf });
       setPulse({ x: b.position[0], z: b.position[2], key: Date.now() });
+      // Came from the voting machine: back to it, the number still typed, now able to vote.
+      if (backToVote.current) {
+        const n = backToVote.current.number;
+        backToVote.current = null;
+        setVote((v) => ({ number: n, key: v.key + 1 }));
+        setPanel("election");
+        return;
+      }
+      setArrived({ login, uf: arriving.uf });
       openBuilding(b);
     }, 0);
     return () => clearTimeout(t);
   }, [arriving, viewerLogin, world, openBuilding]);
   const tasteSignIn = () => {
     const next = `/town/${league.slug}?at=${encodeURIComponent(taste ?? "")}&pick=1`;
+    void signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`);
+  };
+  /** Sign in from the voting machine, and come back to it with the number typed. */
+  const signInToVote = (n: number | null) => {
+    posthog.capture("brasil_signin_clicked", { from: "vote" });
+    const next = `/town/${league.slug}?vote=${n ?? "open"}`;
     void signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`);
   };
   const signIn = () => {
@@ -779,7 +802,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               error={joining.error}
               onPick={pickState}
               onSignIn={signIn}
-              onClose={() => setPicker(null)}
+              onClose={() => {
+                backToVote.current = null;
+                setPicker(null);
+              }}
             />
           )}
         </div>
@@ -857,8 +883,12 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             Brazil
           </button>
           {election && (
-            <button type="button" onClick={() => openPanel("election")} className={bar}>
-              <Landmark size={16} className="sm:hidden" aria-hidden />
+            // While the vote is open it's the loudest thing on the bar after your building: lime, with a live dot.
+            <button type="button" onClick={() => openVote()} className={election.phase === "voting" ? bar.replace("bg-[#141417] py-2 text-[9px] text-cream hover:text-lime", "bg-[#141417] py-2 text-[9px] text-lime ring-2 ring-inset ring-lime") : bar}>
+              <span className="flex items-center gap-1.5">
+                {election.phase === "voting" && <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden />}
+                <Landmark size={16} className="sm:hidden" aria-hidden />
+              </span>
               Vote
             </button>
           )}
@@ -933,21 +963,21 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         />
       )}
 
-      {count && !inCar && !state && !focused && !panel && !picker && <ApuracaoWidget slug={league.slug} initial={count} onVote={() => openPanel("election")} />}
+      {count && !inCar && !state && !focused && !panel && !picker && <ApuracaoWidget slug={league.slug} initial={count} onVote={(n) => openVote(n)} />}
 
       {panel === "election" && election && (
         <ElectionPanel
+          key={vote.key}
           slug={league.slug}
           initial={election}
-          startNumber={startVote}
+          startNumber={vote.number}
           signedIn={!!viewerLogin}
           ufOf={(login) => world.ufOf.get(login.toLowerCase())?.uf ?? null}
-          onSignIn={signIn}
-          onPickDev={(login) => {
-            const b = world.placed.get(login.toLowerCase());
-            if (b) openBuilding(b);
+          onSignIn={signInToVote}
+          onPutOnMap={(n) => {
+            backToVote.current = { number: n };
+            openPicker(null);
           }}
-          onPutOnMap={() => openPicker(null)}
           onClose={() => setPanel(null)}
         />
       )}
