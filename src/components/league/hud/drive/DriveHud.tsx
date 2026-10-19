@@ -147,6 +147,25 @@ export default function DriveHud({
   }, [telemetry]);
 
   const touch = !!touchRef;
+  // A phone in the car: a held thumb must never start selecting text (iOS
+  // picks words off hidden page text and the callout covers the controls).
+  // Off for the whole page while you drive, and any selection that slips
+  // through is dropped at once.
+  useEffect(() => {
+    if (!touch) return;
+    const el = document.documentElement;
+    const keep = ["user-select", "-webkit-user-select", "-webkit-touch-callout"].map((k) => [k, el.style.getPropertyValue(k)] as const);
+    for (const [k] of keep) el.style.setProperty(k, "none");
+    const drop = () => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) sel.removeAllRanges();
+    };
+    document.addEventListener("selectionchange", drop);
+    return () => {
+      document.removeEventListener("selectionchange", drop);
+      for (const [k, v] of keep) el.style.setProperty(k, v);
+    };
+  }, [touch]);
   const silent = muted || volume === 0;
   // The prompt on screen: on a phone its button pulses (and the camera's gets a callout).
   const [lesson, setLesson] = useState<Lesson | null>(null);
