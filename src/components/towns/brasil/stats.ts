@@ -1,7 +1,7 @@
 // What the Brasil town's panels show about a state, from the layout and the
-// residents' buildings: every dev who said that state (its capital, its
-// second city, its overflow on the island), its founder, its place, its
-// contributions and who came this week.
+// residents' buildings: every dev who lives in it (all its cities), its
+// cities biggest first, its capital's founder, its place, its contributions
+// and who came this week.
 
 import type { CityBuilding } from "@/lib/github";
 import { BRASIL_LAUNCH } from "@/lib/towns/brasil-day";
@@ -13,7 +13,8 @@ export interface StateStats {
   uf: UF;
   name: string;
   capital: CityLayout;
-  second: CityLayout | null;
+  /** Its cities on the map, most devs first (the capital among them, lived in or not). */
+  cities: CityLayout[];
   devs: number;
   founder: string | null;
   contributions: number;
@@ -28,13 +29,14 @@ export function stateStats(layout: BrasilLayout, byLogin: ReadonlyMap<string, Ci
   const all = [...layout.cities, layout.island];
   const rows = STATES.map((s) => {
     const devs = all.flatMap((c) => c.devs.filter((d) => d.dev.uf === s.uf));
-    const capital = layout.cities.find((c) => c.uf === s.uf && !c.second) as CityLayout;
+    const capital = layout.cities.find((c) => c.uf === s.uf && c.capital) as CityLayout;
+    const cities = layout.cities.filter((c) => c.uf === s.uf).sort((a, b) => b.devs.length - a.devs.length || Number(b.capital) - Number(a.capital) || a.name.localeCompare(b.name));
     const contrib = (login: string) => byLogin.get(login.toLowerCase())?.contributions ?? 0;
     return {
       uf: s.uf,
       name: stateOf(s.uf).name,
       capital,
-      second: layout.cities.find((c) => c.uf === s.uf && c.second) ?? null,
+      cities,
       devs: devs.length,
       founder: capital.devs.find((d) => d.founder)?.dev.login ?? null,
       contributions: devs.reduce((n, d) => n + contrib(d.dev.login), 0),

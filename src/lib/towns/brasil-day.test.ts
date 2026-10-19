@@ -3,7 +3,8 @@ import { brasilDay, brasiliaToday, dayLine } from "./brasil-day";
 import type { Resident } from "./brasil-map";
 
 const at = (iso: string) => Date.parse(iso);
-const r = (login: string, uf: Resident["dev"]["uf"], when: string): Resident => ({ dev: { id: login.length, login, uf }, x: 0, z: 0, hub: 0, at: at(when) });
+const CAPITAL: Record<string, number> = { SP: 3550308, BA: 2927408 };
+const r = (login: string, uf: Resident["dev"]["uf"], when: string): Resident => ({ dev: { id: login.length, login, uf }, city: uf ? CAPITAL[uf] : null, lx: 0, lz: 0, at: at(when) });
 
 const residents = [
   r("ana", "SP", "2026-10-19T13:00:00Z"),
@@ -19,16 +20,16 @@ describe("brasilDay", () => {
     expect(d.day).toBe(1);
     expect(d.devs).toBe(3);
     expect(d.arrived.map((a) => a.login)).toEqual(["ana", "bia", "caio"]);
-    expect(d.newFounders).toEqual([{ login: "ana", uf: "SP" }]);
+    expect(d.newFounders).toEqual([{ login: "ana", uf: "SP", city: "São Paulo" }]);
   });
   it("adds up to the day and names that day's founders", () => {
     const d = brasilDay(residents, "2026-10-20", "2026-10-19");
     expect(d.day).toBe(2);
     expect(d.devs).toBe(5);
     expect(d.founded).toBe(2);
-    expect(d.newFounders).toEqual([{ login: "duda", uf: "BA" }]);
+    expect(d.newFounders).toEqual([{ login: "duda", uf: "BA", city: "Salvador" }]);
     expect(d.states[0]).toEqual({ uf: "SP", devs: 3, today: 1 });
-    expect(dayLine(d)).toBe("Day 2 · 5 devs · 2/27 states founded · +2 today. New founders: @duda (BA).");
+    expect(dayLine(d)).toBe("Day 2 · 5 devs · 2 cities · +2 today. New cities: Salvador (BA) by @duda.");
   });
   it("knows today's date in Brasília", () => {
     expect(brasiliaToday(at("2026-10-20T02:00:00Z"))).toBe("2026-10-19");

@@ -14,7 +14,7 @@ export async function GET() {
   const cities = layout ? [...layout.cities, layout.island] : [];
   return new ImageResponse(
     <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: OG.bg }}>
-      <BrasilPixels width={COVER_W} height={COVER_H - 40} cities={cities} />
+      <BrasilPixels width={COVER_W} height={COVER_H - 40} scale={layout?.scale ?? 1} cities={cities} />
     </div>,
     { width: COVER_W, height: COVER_H, headers: { "Cache-Control": "public, max-age=600, s-maxage=600" } },
   );

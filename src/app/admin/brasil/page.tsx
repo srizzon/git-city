@@ -50,7 +50,7 @@ interface Day {
   devs: number;
   founded: number;
   arrived: { login: string; uf: string | null }[];
-  newFounders: { login: string; uf: string }[];
+  newFounders: { login: string; uf: string; city: string }[];
   states: { uf: string; devs: number; today: number }[];
   line: string;
 }
@@ -280,7 +280,7 @@ export default function BrasilAdminPage() {
                 {[
                   ["Day", day.day > 0 ? String(day.day) : "–"],
                   ["Devs", day.devs.toLocaleString("en-US")],
-                  ["Founded", `${day.founded}/27`],
+                  ["Cities", `${day.founded}`],
                   ["Today", `+${day.arrived.length}`],
                 ].map(([k, v]) => (
                   <div key={k} className="bg-bg-raised py-2">
@@ -291,7 +291,7 @@ export default function BrasilAdminPage() {
               </div>
               {day.newFounders.length > 0 && (
                 <p className="text-[11px] text-cream">
-                  New founders: <span className="normal-case">{day.newFounders.map((f) => `@${f.login} (${f.uf})`).join(", ")}</span>
+                  New cities: <span className="normal-case">{day.newFounders.map((f) => `${f.city} (${f.uf}) by @${f.login}`).join(", ")}</span>
                 </p>
               )}
               <p className="text-[11px] text-muted">

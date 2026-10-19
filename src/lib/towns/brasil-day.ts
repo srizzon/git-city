@@ -1,12 +1,13 @@
 // ─── Brasil town: a day's numbers ───────────────────────────
 // What an episode says about a day, from the stored residents alone (each has
 // the moment it took its lot): day N of the series, devs on the map and
-// states with a founder at the end of that day, who arrived that day and
-// which states got their founder. Days run on Brasília time (UTC-3, no
-// daylight saving since 2019). A move takes a new lot, so it counts as
-// arriving in the new state. Pure.
+// cities founded by the end of that day, who arrived that day and which
+// cities were founded that day (a city's founder is its first resident).
+// Days run on Brasília time (UTC-3, no daylight saving since 2019). A move
+// takes a new lot, so it counts as arriving in the new city. Pure.
 
-import { STATES, type Resident, type UF } from "./brasil-map";
+import { STATES, cityKeyOf, type Resident, type UF } from "./brasil-map";
+import { cityOf } from "./br-cities";
 
 /** Day 1 of the series. */
 export const BRASIL_LAUNCH = "2026-10-18";
@@ -18,9 +19,11 @@ export interface BrasilDay {
   day: number;
   date: string;
   devs: number;
+  /** Cities with anyone in them (the island not counted). */
   founded: number;
   arrived: { login: string; uf: UF | null }[];
-  newFounders: { login: string; uf: UF }[];
+  /** Cities founded that day, by whom. */
+  newFounders: { login: string; uf: UF; city: string }[];
   /** Every state with devs at the end of the day, most first, with that day's arrivals. */
   states: { uf: UF; devs: number; today: number }[];
 }
@@ -35,8 +38,11 @@ export function brasilDay(residents: Resident[], date: string, launch = BRASIL_L
   const from = startOf(date);
   const to = from + DAY_MS;
   const upTo = residents.filter((r) => r.at < to).sort((a, b) => a.at - b.at);
-  const firstOf = new Map<UF, Resident>();
-  for (const r of upTo) if (r.dev.uf && !firstOf.has(r.dev.uf)) firstOf.set(r.dev.uf, r);
+  const firstOf = new Map<string, Resident>();
+  for (const r of upTo) {
+    const k = cityKeyOf(r.city);
+    if (k !== "island" && !firstOf.has(k)) firstOf.set(k, r);
+  }
   const today = upTo.filter((r) => r.at >= from);
   const count = new Map<UF, { devs: number; today: number }>();
   for (const r of upTo) {
@@ -52,7 +58,7 @@ export function brasilDay(residents: Resident[], date: string, launch = BRASIL_L
     devs: upTo.length,
     founded: firstOf.size,
     arrived: today.map((r) => ({ login: r.dev.login, uf: r.dev.uf })),
-    newFounders: [...firstOf.values()].filter((r) => r.at >= from).map((r) => ({ login: r.dev.login, uf: r.dev.uf! })),
+    newFounders: [...firstOf.values()].filter((r) => r.at >= from).map((r) => ({ login: r.dev.login, uf: cityOf(r.city!)!.uf, city: cityOf(r.city!)!.name })),
     states: STATES.map((s) => ({ uf: s.uf, ...(count.get(s.uf) ?? { devs: 0, today: 0 }) }))
       .filter((s) => s.devs > 0)
       .sort((a, b) => b.devs - a.devs || b.today - a.today),
@@ -61,6 +67,6 @@ export function brasilDay(residents: Resident[], date: string, launch = BRASIL_L
 
 /** The day in one line, for the episode script. */
 export function dayLine(d: BrasilDay): string {
-  const founders = d.newFounders.length ? ` New founders: ${d.newFounders.map((f) => `@${f.login} (${f.uf})`).join(", ")}.` : "";
-  return `${d.day > 0 ? `Day ${d.day}` : "Before launch"} · ${d.devs} devs · ${d.founded}/27 states founded · +${d.arrived.length} today.${founders}`;
+  const founders = d.newFounders.length ? ` New cities: ${d.newFounders.map((f) => `${f.city} (${f.uf}) by @${f.login}`).join(", ")}.` : "";
+  return `${d.day > 0 ? `Day ${d.day}` : "Before launch"} · ${d.devs} devs · ${d.founded} cities · +${d.arrived.length} today.${founders}`;
 }

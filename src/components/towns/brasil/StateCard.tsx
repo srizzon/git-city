@@ -6,13 +6,14 @@ import type { CityBuilding } from "@/lib/github";
 import { Avatar, fmt } from "@/components/league/hud/shared";
 import { useSheet } from "@/components/league/hud/useSheet";
 import TrophyIcon from "@/components/towns/TrophyIcon";
-import { stateOf } from "@/lib/towns/brasil-map";
+import { stateOf, type CityLayout } from "@/lib/towns/brasil-map";
 import { type StateStats, type WeekStanding } from "./stats";
 
 // A state's card, opened from its tag or a search: its place in the week's
-// points race, its points, devs and newcomers, who runs it (founder forever,
-// the week's governor, senator and mayor with their points), its biggest
-// buildings, and the two ways to grow it: drive there, or invite someone.
+// points race, its points, devs and newcomers, who runs it (its capital's
+// founder, the week's governor, senator and its cities' mayors with their
+// points), its cities biggest first, its biggest buildings, and the two ways
+// to grow it: drive there, or invite someone.
 // Number first, every number labeled in plain words.
 
 export default function StateCard({
@@ -20,6 +21,7 @@ export default function StateCard({
   byLogin,
   townPath,
   onPickDev,
+  onPickCity,
   onDriveHere,
   onClose,
   week,
@@ -31,12 +33,14 @@ export default function StateCard({
   /** The town's path, for the invite link. */
   townPath: string;
   onPickDev: (login: string) => void;
+  /** Fly to one of its cities. */
+  onPickCity: (c: CityLayout) => void;
   onDriveHere?: () => void;
   onClose: () => void;
   /** Last full week's crown and this week's leader, when either is this state. */
   week?: { crown: WeekStanding | null; leading: WeekStanding | null };
-  /** The state's offices this week (brasil-roles): governor, senators, its second city's mayor. */
-  cabinet?: { provisional: boolean; governor: string | null; senators: string[]; mayor: { city: string; login: string } | null; totals: Record<string, number> };
+  /** The state's offices this week (brasil-roles): governor, senators, the mayors of its biggest cities. */
+  cabinet?: { provisional: boolean; governor: string | null; senators: string[]; mayors: { city: string; login: string }[]; totals: Record<string, number> };
   /** Its place and points in this week's race (the States table's order). */
   race?: { place: number; points: number };
 }) {
@@ -78,8 +82,7 @@ export default function StateCard({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm text-cream">{s.name}</p>
             <p className="truncate text-[9px] normal-case text-muted">
-              {s.uf} · {s.capital.name}
-              {s.second ? ` · ${s.second.name}` : ""}
+              {s.uf} · {fmt(s.cities.filter((c) => c.devs.length > 0).length)} {s.cities.filter((c) => c.devs.length > 0).length === 1 ? "city" : "cities"} on the map
             </p>
           </div>
           {race && s.devs > 0 && (
@@ -122,11 +125,12 @@ export default function StateCard({
         <Section title={`Who runs ${s.uf}`} note={cabinet ? "changes Sunday 21h" : undefined}>
           <Row
             role="Founder"
+            sub={s.capital.name}
             hot
             login={s.founder}
             avatar={founder?.avatar_url ?? null}
             value={s.founder ? "forever" : undefined}
-            empty={`Nobody yet. The first dev founds ${s.name}.`}
+            empty={`Nobody yet. The first dev founds ${s.capital.name}.`}
             onPick={onPickDev}
           />
           {cabinet && (
@@ -135,12 +139,32 @@ export default function StateCard({
               {cabinet.senators.map((l) => (
                 <Row key={l} role="Senator" login={l} avatar={byLogin.get(l)?.avatar_url ?? null} value={`${fmt(cabinet.totals[l] ?? 0)} pts`} onPick={onPickDev} />
               ))}
-              {cabinet.mayor && (
-                <Row role={`Mayor`} sub={cabinet.mayor.city} login={cabinet.mayor.login} avatar={byLogin.get(cabinet.mayor.login)?.avatar_url ?? null} value={`${fmt(cabinet.totals[cabinet.mayor.login] ?? 0)} pts`} onPick={onPickDev} />
-              )}
+              {cabinet.mayors.map((m) => (
+                <Row key={m.city} role="Mayor" sub={m.city} login={m.login} avatar={byLogin.get(m.login)?.avatar_url ?? null} value={`${fmt(cabinet.totals[m.login] ?? 0)} pts`} onPick={onPickDev} />
+              ))}
             </>
           )}
         </Section>
+
+        {s.cities.some((c) => c.devs.length > 0) && (
+          <Section title="Cities" note="devs">
+            {s.cities
+              .filter((c) => c.devs.length > 0)
+              .slice(0, 6)
+              .map((c) => {
+                const f = c.devs.find((d) => d.founder)?.dev.login;
+                return (
+                  <li key={c.key}>
+                    <button type="button" onClick={() => onPickCity(c)} className="flex w-full items-center gap-2.5 py-1 text-left hover:text-lime">
+                      <span className="min-w-0 flex-1 truncate text-[10px] normal-case text-cream">{c.name}</span>
+                      {f && <span className="min-w-0 max-w-[45%] truncate text-[8px] normal-case text-dim">founded by @{f}</span>}
+                      <span className="w-8 shrink-0 text-right text-[9px] tabular-nums text-muted">{fmt(c.devs.length)}</span>
+                    </button>
+                  </li>
+                );
+              })}
+          </Section>
+        )}
 
         {s.top.length > 0 && (
           <Section title="Biggest buildings" note="commits, all time">
@@ -154,7 +178,7 @@ export default function StateCard({
         <div className="mx-4 mb-4 flex flex-col gap-1.5">
           {onDriveHere && (
             <button type="button" onClick={onDriveHere} className="btn-press w-full border-2 border-lime bg-lime py-2 text-[10px] text-bg">
-              Drive to {s.capital.name}
+              Drive to {(s.cities.find((c) => c.devs.length > 0) ?? s.capital).name}
             </button>
           )}
           <button type="button" onClick={invite} className="btn-press w-full border-2 border-border py-2 text-[10px] text-cream hover:border-lime hover:text-lime">

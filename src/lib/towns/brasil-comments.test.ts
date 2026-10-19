@@ -3,32 +3,36 @@ import { parseComment, replyFor } from "./brasil-comments";
 
 describe("parseComment", () => {
   it.each([
-    ["@srizzon SP", { login: "srizzon", uf: "SP" }],
-    ["srizzon sp", { login: "srizzon", uf: "SP" }],
-    ["SP @srizzon", { login: "srizzon", uf: "SP" }],
-    ["github.com/srizzon - São Paulo", { login: "srizzon", uf: "SP" }],
-    ["https://github.com/torvalds RJ", { login: "torvalds", uf: "RJ" }],
-    ["sou de Recife PE @maria-dev", { login: "maria-dev", uf: "PE" }],
-    ["@joao rio grande do sul", { login: "joao", uf: "RS" }],
-    ["coloca eu aqui @ana-b, Minas Gerais", { login: "ana-b", uf: "MG" }],
-    ["@pedro", { login: "pedro", uf: null }],
-    ["Bahia!", { login: null, uf: "BA" }],
-    ["top demais kkkk", { login: null, uf: null }],
-    ["Slickinh0", { login: "slickinh0", uf: null }],
-    ["Codyte ", { login: "codyte", uf: null }],
-    ["top", { login: null, uf: null }],
-    ["Incrível", { login: null, uf: null }],
-    ["Brabo!!", { login: null, uf: null }],
-    ["kkkkkk", { login: null, uf: null }],
-    ["srizzon São Paulo", { login: "srizzon", uf: "SP" }],
-    ["Codyte demais", { login: null, uf: null }],
+    ["@srizzon SP", { login: "srizzon", uf: "SP", place: null }],
+    ["srizzon sp", { login: "srizzon", uf: "SP", place: null }],
+    ["SP @srizzon", { login: "srizzon", uf: "SP", place: null }],
+    ["github.com/srizzon - São Paulo", { login: "srizzon", uf: "SP", place: null }],
+    ["https://github.com/torvalds RJ", { login: "torvalds", uf: "RJ", place: null }],
+    ["sou de Recife PE @maria-dev", { login: "maria-dev", uf: "PE", place: "sou de recife" }],
+    ["@joao rio grande do sul", { login: "joao", uf: "RS", place: null }],
+    ["coloca eu aqui @ana-b, Minas Gerais", { login: "ana-b", uf: "MG", place: null }],
+    ["@pedro", { login: "pedro", uf: null, place: null }],
+    ["Bahia!", { login: null, uf: "BA", place: null }],
+    ["top demais kkkk", { login: null, uf: null, place: null }],
+    ["Slickinh0", { login: "slickinh0", uf: null, place: null }],
+    ["Codyte ", { login: "codyte", uf: null, place: null }],
+    ["top", { login: null, uf: null, place: null }],
+    ["Incrível", { login: null, uf: null, place: null }],
+    ["Brabo!!", { login: null, uf: null, place: null }],
+    ["kkkkkk", { login: null, uf: null, place: null }],
+    ["srizzon São Paulo", { login: "srizzon", uf: "SP", place: null }],
+    ["Codyte demais", { login: null, uf: null, place: null }],
+    ["srizzon campinas", { login: "srizzon", uf: null, place: "campinas" }],
+    ["@ana-b São José dos Campos", { login: "ana-b", uf: null, place: "sao jose dos campos" }],
+    ["joao floripa", { login: "joao", uf: null, place: "floripa" }],
+    ["maria santa rita PB", { login: "maria", uf: "PB", place: "santa rita" }],
   ])("%s", (text, want) => {
     expect(parseComment(text)).toEqual(want);
   });
 
   it("never takes a state's sigla for a username", () => {
-    expect(parseComment("SP")).toEqual({ login: null, uf: "SP" });
-    expect(parseComment("df @dev")).toEqual({ login: "dev", uf: "DF" });
+    expect(parseComment("SP")).toEqual({ login: null, uf: "SP", place: null });
+    expect(parseComment("df @dev")).toEqual({ login: "dev", uf: "DF", place: null });
   });
 
   it("refuses what can't be a GitHub login", () => {
@@ -79,5 +83,18 @@ describe("ptState", () => {
     expect(ptState("SP", "in")).toBe("em São Paulo");
     expect(ptState("RJ", "of")).toBe("do Rio de Janeiro");
     expect(replyFor("added", "srizzon", "AC")).toContain("no Acre");
+  });
+});
+
+describe("replyFor with cities", () => {
+  it("names the city, and the founder", () => {
+    expect(replyFor("added", "srizzon", "SP", "brasil", null, { city: "Campinas", founded: false })).toContain("em Campinas");
+    expect(replyFor("added", "srizzon", "SP", "brasil", null, { city: "Campinas", founded: true })).toContain("Campinas");
+    expect(replyFor("added", "srizzon", "SP", "brasil", null, { city: "Campinas", founded: true })).toMatch(/fund/);
+  });
+  it("asks which city when the name is in several states, in words answeredCity reads back", () => {
+    const r = replyFor("which_city", "joao", null, "brasil", null, { city: "Santa Rita", founded: false, options: ["MA", "PB"] })!;
+    expect(r).toBe("joao, qual Santa Rita? Tem em MA e PB. Responde com o estado que eu coloco 😉");
+    expect(r).not.toContain("@");
   });
 });
