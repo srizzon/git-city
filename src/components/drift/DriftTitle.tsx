@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { medalScores, type LiveSpot } from "@/lib/drift/spots/types";
 import { DRIFT_CONTROLS, MEDAL_COLORS, fmt } from "./DriftHud";
-import { Backdrop, Band, Chip } from "./ui";
+import { Backdrop, Band, Chip } from "@/components/games/ui";
 
 // Before the run, over the camera's wide shot, blurred and darkened so the
 // bands carry the contrast: the spot's name on the lime band (like the start
