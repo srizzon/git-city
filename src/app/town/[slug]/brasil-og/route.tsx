@@ -5,6 +5,7 @@ import { OG } from "@/lib/og/devHero";
 import { BrasilPixels } from "@/lib/og/brasilPixels";
 import { getLeagueBySlug } from "@/lib/leagues/service";
 import { STATES, parseUF } from "@/lib/towns/brasil-map";
+import { cityBySlug } from "@/lib/towns/br-cities";
 import { BRASIL_SLUG, getBrasilLayout } from "@/lib/towns/brasil-server";
 import { weekCrown } from "@/components/towns/brasil/stats";
 import { candidateByNumber } from "@/lib/towns/brasil-election-server";
@@ -13,7 +14,9 @@ import { PRESIDENCY_ON } from "@/lib/towns/brasil-election";
 // The Brasil map's share card: two short lines on the left, the map of Brazil
 // in pixels on the right with the real cities. Each link shares a moment:
 //   ?at=login  someone on the map: their state lit, their city glowing
-//              ("@login / tá no mapa.", "fundou SP." for a founder, "tá na ilha.")
+//              ("@login / tá em Campinas.", "fundou Campinas." for a founder, "tá na ilha.")
+//   ?cidade=campinas-sp  a city: its state lit, the city glowing ("fundada por @x.",
+//              or "ninguém ainda." before anyone lives there)
 //   ?uf=SP     a state: lit, with its place ("#4 do Brasil.", "levou a coroa.", "tá vazio.")
 //   ?vote=34   a vote ("seu voto para"), ?run=34 a candidacy ("vote 34"): the
 //              voting machine's screen with the number, the candidate's face
@@ -59,16 +62,34 @@ export async function GET(req: Request) {
   const league = await getLeagueBySlug(BRASIL_SLUG);
   const { layout, residents } = league ? await getBrasilLayout(league.id) : { layout: null, residents: [] };
   const cities = layout ? [...layout.cities, layout.island] : [];
+  const scale = layout?.scale ?? 1;
   const devs = residents.length;
+  /** A resident's lot on the map and their city. */
+  const lotOf = (login: string) => {
+    for (const c of cities) {
+      const d = c.devs.find((x) => x.dev.login.toLowerCase() === login);
+      if (d) return { city: c, d };
+    }
+    return null;
+  };
 
   let card: Card = { top: `${fmt(devs)} devs`, bottom: "e você?" };
   const at = q.get("at")?.toLowerCase();
   const uf = parseUF(q.get("uf") ?? "");
+  const cidade = q.get("cidade");
   if (at && LOGIN_RE.test(at)) {
-    const me = residents.find((r) => r.dev.login.toLowerCase() === at);
-    const city = me && cities.find((c) => c.devs.some((d) => d.dev.login.toLowerCase() === at));
-    const founder = !!city?.devs.find((d) => d.dev.login.toLowerCase() === at)?.founder;
-    if (me) card = { top: `@${at}`, bottom: !me.dev.uf ? "tá na ilha." : founder ? `fundou ${me.dev.uf}.` : "tá no mapa.", lit: me.dev.uf, hot: [me.x, me.z], litIsland: !me.dev.uf };
+    const me = lotOf(at);
+    if (me) {
+      const island = me.city.ibge === null;
+      card = { top: `@${at}`, bottom: island ? "tá na ilha." : me.d.founder ? `fundou ${me.city.name}.` : `tá em ${me.city.name}.`, lit: me.city.uf, hot: [me.d.x, me.d.z], litIsland: island };
+    }
+  } else if (cidade) {
+    // A city's card: who founded it, or the invitation to.
+    const here = cities.find((c) => c.slug === cidade);
+    const info = cityBySlug(cidade);
+    const founder = here?.devs.find((d) => d.founder)?.dev.login;
+    if (here && founder) card = { top: here.name, bottom: `fundada por @${founder}.`, lit: here.uf, hot: here.center };
+    else if (info) card = { top: info.name, bottom: "ninguém ainda.", lit: info.uf };
   } else if (uf && layout) {
     const counts = STATES.map((s) => ({ uf: s.uf, n: residents.filter((r) => r.dev.uf === s.uf).length })).sort((a, b) => b.n - a.n);
     const n = counts.find((c) => c.uf === uf)!.n;
@@ -84,7 +105,7 @@ export async function GET(req: Request) {
   const num = Number(run ?? q.get("vote"));
   const cand = PRESIDENCY_ON && Number.isInteger(num) && num >= 10 && num <= 99 ? await candidateByNumber(num) : null;
   if (cand) {
-    const me = residents.find((r) => r.dev.login.toLowerCase() === cand.login.toLowerCase());
+    const me = lotOf(cand.login.toLowerCase());
     const name = `@${cand.login}`;
     const ink = "#1b1d22";
     const photo = cand.avatar_url ? `${cand.avatar_url}${cand.avatar_url.includes("?") ? "&" : "?"}s=320` : null;
@@ -106,7 +127,7 @@ export async function GET(req: Request) {
                     ))}
                 </div>
                 <span style={{ fontSize: Math.max(18, Math.min(30, Math.floor(300 / (name.length * 1.05)))), marginTop: 22 }}>{name}</span>
-                <span style={{ fontSize: 22, marginTop: 4 }}>{me?.dev.uf ?? "Ilha"}</span>
+                <span style={{ fontSize: 22, marginTop: 4 }}>{me?.city.uf ?? "Ilha"}</span>
               </div>
               <div style={{ width: 170, height: 214, display: "flex", border: "5px solid #9a9a94", backgroundColor: "#ffffff", overflow: "hidden" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- an OG image (satori) takes plain img */}
@@ -116,7 +137,7 @@ export async function GET(req: Request) {
           </div>
         </div>
         <div style={{ display: "flex", width: 540, height: 590 }}>
-          <BrasilPixels width={540} height={590} cities={cities} lit={me?.dev.uf ?? null} hot={me ? [me.x, me.z] : null} litIsland={!!me && !me.dev.uf} />
+          <BrasilPixels width={540} height={590} scale={scale} cities={cities} lit={me?.city.uf ?? null} hot={me ? [me.d.x, me.d.z] : null} litIsland={!!me && me.city.ibge === null} />
         </div>
       </div>,
       { ...size, fonts: [{ name: "Silkscreen", data: font, style: "normal" }], headers: { "Cache-Control": "public, max-age=600, s-maxage=600" } },
@@ -133,7 +154,7 @@ export async function GET(req: Request) {
         <span style={{ fontSize: fontFor(card.bottom), lineHeight: 1.1, color: OG.accent, textTransform: "uppercase", marginTop: 12 }}>{card.bottom}</span>
       </div>
       <div style={{ display: "flex", width: 600, height: 590 }}>
-        <BrasilPixels width={600} height={590} cities={cities} lit={card.lit ?? null} hot={card.hot ?? null} litIsland={card.litIsland} />
+        <BrasilPixels width={600} height={590} scale={scale} cities={cities} lit={card.lit ?? null} hot={card.hot ?? null} litIsland={card.litIsland} />
       </div>
     </div>,
     { ...size, fonts: [{ name: "Silkscreen", data: font, style: "normal" }], headers: { "Cache-Control": "public, max-age=600, s-maxage=600" } },

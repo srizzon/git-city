@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { STATES } from "@/lib/towns/brasil-map";
+import { cityBySlug, citySlug } from "@/lib/towns/br-cities";
 import { notFound, permanentRedirect } from "next/navigation";
 import { headers } from "next/headers";
 import {
@@ -18,6 +19,7 @@ import { getLapBoard } from "@/lib/league-city/race/board";
 import { TRACK_ID } from "@/lib/league-city/race/track";
 import { getCityDevsByIds, getCityNorms, getLeagueCityDevs, getLeaguePageData, getTownRanking, townPlace } from "@/lib/leagues/queries";
 import { getBrasilLayout, getBrasilWeek } from "@/lib/towns/brasil-server";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import { getElection } from "@/lib/towns/brasil-election-server";
 import { PRESIDENCY_ON } from "@/lib/towns/brasil-election";
 import BrasilTownLoader from "./brasil/loader";
@@ -34,23 +36,24 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string; at?: string; join?: string; new?: string; uf?: string; pick?: string; vote?: string; run?: string }>;
+  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string; at?: string; join?: string; new?: string; uf?: string; cidade?: string; pick?: string; vote?: string; run?: string }>;
 };
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
   const league = await getLeagueBySlug(slug);
   if (!league) return { title: "Town not found - Git City" };
-  // The Brasil map: its own card, naming the dev (?at=) or the state (?uf=) the link points at.
+  // The Brasil map: its own card, naming the dev (?at=), the city (?cidade=) or the state (?uf=) the link points at.
   if (league.map === "brasil") {
-    const { at, uf, vote, run } = await searchParams;
+    const { at, uf, cidade, vote, run } = await searchParams;
+    const city = typeof cidade === "string" ? cityBySlug(cidade) : undefined;
     const voted = PRESIDENCY_ON && typeof vote === "string" && /^\d{2}$/.test(vote) ? vote : null;
     const running = PRESIDENCY_ON && typeof run === "string" && /^\d{2}$/.test(run) ? run : null;
-    const q = running ? `?run=${running}` : voted ? `?vote=${voted}` : at ? `?at=${encodeURIComponent(at)}` : uf ? `?uf=${encodeURIComponent(uf)}` : "";
+    const q = running ? `?run=${running}` : voted ? `?vote=${voted}` : at ? `?at=${encodeURIComponent(at)}` : city ? `?cidade=${citySlug(city)}` : uf ? `?uf=${encodeURIComponent(uf)}` : "";
     // Portuguese: the link travels between Brazilians (WhatsApp, stories), and the preview speaks to them.
     const st = uf ? STATES.find((s) => s.uf === uf.toUpperCase()) : undefined;
-    const title = running ? `Vote ${running} pra presidente do Brasil dos devs · Git City` : voted ? `Votei ${voted} pra presidente do Brasil dos devs · Git City` : at ? `@${at} tá no mapa dos devs · Git City` : st ? `${st.name} no mapa dos devs · Git City` : "Mapa dos devs do Brasil · Git City";
-    const description = voted || running ? "Digita o número na urna do mapa e vota também." : "Cada dev vira um prédio na cidade do seu estado. Onde você tá?";
+    const title = running ? `Vote ${running} pra presidente do Brasil dos devs · Git City` : voted ? `Votei ${voted} pra presidente do Brasil dos devs · Git City` : at ? `@${at} tá no mapa dos devs · Git City` : city ? `${city.name} no mapa dos devs · Git City` : st ? `${st.name} no mapa dos devs · Git City` : "Mapa dos devs do Brasil · Git City";
+    const description = voted || running ? "Digita o número na urna do mapa e vota também." : "Cada dev vira um prédio na sua cidade. Onde você tá?";
     const image = { url: `/town/${league.slug}/brasil-og${q}`, width: 1200, height: 630, alt: "The Brasil map in Git City" };
     return { title, description, openGraph: { title, description, images: [image] }, twitter: { card: "summary_large_image", title, description, images: [image] } };
   }
@@ -96,7 +99,12 @@ export default async function LeaguePage({ params, searchParams }: Props) {
       PRESIDENCY_ON ? getElection(league.id, viewer) : Promise.resolve(null),
     ]);
     const home = viewer ? residents.find((r) => r.dev.id === viewer.id) : undefined;
+    // Whether they named their city or only a state (then the map asks them once).
+    const picked = home
+      ? ((await getSupabaseAdmin().from("brasil_residents").select("city_picked").eq("league_id", league.id).eq("developer_id", home.dev.id).maybeSingle<{ city_picked: boolean }>()).data?.city_picked ?? false)
+      : false;
     const uf = typeof query.uf === "string" && /^[A-Za-z]{2}$/.test(query.uf) ? query.uf.toUpperCase() : null;
+    const cidade = typeof query.cidade === "string" && /^[a-z0-9-]{3,80}$/.test(query.cidade) ? query.cidade : null;
     const atLogin = typeof at === "string" && LOGIN_RE.test(at.toLowerCase()) ? at.toLowerCase() : null;
     return (
       <BrasilTownLoader
@@ -105,8 +113,8 @@ export default async function LeaguePage({ params, searchParams }: Props) {
         cityDevs={cityDevs}
         cityNorms={cityNorms}
         viewerLogin={viewer?.github_login ?? null}
-        home={home ? (home.dev.uf ?? "island") : null}
-        startAt={atLogin ? { login: atLogin } : uf ? { uf } : null}
+        home={home ? { city: home.city, picked } : null}
+        startAt={atLogin ? { login: atLogin } : cidade ? { city: cidade } : uf ? { uf } : null}
         startPick={query.pick === "1"}
         startVote={PRESIDENCY_ON ? [query.run, query.vote].map((v) => (typeof v === "string" && /^\d{2}$/.test(v) ? Number(v) : null)).find((v) => v !== null) ?? null : null}
         week={week}
