@@ -289,8 +289,8 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
       const H = Math.max(MIN_H, target.height);
       const until = typeof cut.params.to === "number" ? cut.params.to : cut.from + (cut.to - cut.from) * 0.6;
       const k = Math.min(1, Math.max(0, (t - cut.from) / Math.max(1e-6, until - cut.from)));
-      // Level with the roof of a tower taller than its neighbours: the roof against the sky, then out.
-      const keys: Orbit[] = [[0, 30, 0.85, 1.05, 1.0], [1, 50, 0.85, 1.05, 1.0]];
+      // Above the tower, looking down on its roof with the city around it (never the sky), then out.
+      const keys: Orbit[] = [[0, 30, 1.1, 2.4, 0.9], [1, 50, 1.0, 2.2, 0.9]];
       const close = orbitPose(target, keys, k, H, turnFor(cut, target, keys, H, world));
       // The tower's roof in the middle of the frame, under the counter.
       aimAt(close, target, target.height + balloonClear(target), 0.42);
