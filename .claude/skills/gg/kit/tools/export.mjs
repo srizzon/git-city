@@ -220,6 +220,11 @@ const posterAt = Math.min(
 );
 console.log(`${seconds.toFixed(2)}s, ${total} frames at ${FPS} fps, ${W}×${H}`);
 
+// The stage goes full frame first, while time still runs for real: canvases
+// resize (on a ResizeObserver and a debounce) and draw at their new size, or
+// frame 0 comes out cropped.
+await page.evaluate(() => window.__gg.prepare?.());
+await page.waitForTimeout(800);
 await page.evaluate(() => {
   window.__ggTime.freeze();
   window.__gg.start();
