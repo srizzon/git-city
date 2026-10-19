@@ -1068,12 +1068,12 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       )}
       {!inCar && <BrasilMinimap scale={layout.scale} cities={layout.cities} island={layout.island} camera={cameraStore} cars={carSpots} track={DRIFT_TAG} paint={paintScene} />}
       {!inCar && (
-        <span className="pointer-events-none fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 max-sm:bottom-[66px] max-sm:text-[8px]">
+        <span className="pointer-events-none fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 max-sm:bottom-[calc(66px+env(safe-area-inset-bottom))] max-sm:max-w-[130px] max-sm:text-[8px] max-sm:leading-tight">
           Map data: IBGE · Natural Earth
         </span>
       )}
 
-      {!inCar && !state && !focused && !panel && !picker && !askCity && (world.arrivals.length > 0 || (grewAt !== null && now - grewAt < 86_400_000)) && (
+      {!inCar && !state && !focused && !panel && !picker && !askCity && !liveRace && (world.arrivals.length > 0 || (grewAt !== null && now - grewAt < 86_400_000)) && (
         <Arrivals
           arrivals={world.arrivals}
           grew={grewAt !== null && now - grewAt < 86_400_000 ? { scale: layout.scale, at: grewAt } : null}
@@ -1483,7 +1483,7 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
         key="grew"
         type="button"
         onClick={onBrazil}
-        className="pointer-events-auto absolute z-20 flex animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream max-sm:left-3 max-sm:top-[142px] max-sm:max-w-[calc(100vw-24px)] sm:bottom-[72px] sm:left-1/2 sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2"
+        className="pointer-events-auto absolute bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream sm:bottom-[72px]"
       >
         <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
         <span className="shrink-0 text-cream">Brazil grew</span>
@@ -1497,7 +1497,7 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
       key={a.login}
       type="button"
       onClick={() => onPick(a.login)}
-      className="pointer-events-auto absolute z-20 flex animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream max-sm:left-3 max-sm:top-[142px] max-sm:max-w-[calc(100vw-24px)] sm:bottom-[72px] sm:left-1/2 sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2"
+      className="pointer-events-auto absolute bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream sm:bottom-[72px]"
     >
       <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
       <span className="truncate normal-case text-cream">@{a.login}</span>
