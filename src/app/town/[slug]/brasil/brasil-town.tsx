@@ -1133,9 +1133,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               posthog.capture("brasil_drive_button_clicked");
               startDrive();
             }}
-            className="-mt-5 flex min-h-[80px] flex-col items-center justify-center gap-1.5 bg-lime text-[10px] text-bg shadow-[0_-6px_0_rgba(0,0,0,0.25)] transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40 sm:-mt-0 sm:h-14 sm:min-h-0 sm:flex-row sm:gap-2.5 sm:px-7 sm:text-sm sm:shadow-none"
+            className="-mt-5 flex min-h-[80px] flex-col items-center justify-center gap-1.5 bg-lime text-[10px] text-bg shadow-[0_-6px_0_rgba(0,0,0,0.25)] transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40 sm:mt-0 sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-6 sm:text-[11px] sm:shadow-none"
           >
-            <Car size={24} className="sm:size-5" aria-hidden />
+            <Car size={24} className="sm:size-4" aria-hidden />
             Drive
           </button>
           {election && (
