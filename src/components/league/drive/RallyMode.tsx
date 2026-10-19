@@ -37,8 +37,8 @@ import type { BattleEvent } from "./useDrivePresence";
 // of the record, down behind), a sting into the last stretch, the fanfare.
 
 export interface RallyApi {
-  /** Start a race on this route (the room invites everyone else). */
-  start: (route: RallyRoute) => void;
+  /** Start a race on this route (the room invites everyone else; `solo`: no invite, a run against the ghost). */
+  start: (route: RallyRoute, solo?: boolean) => void;
   /** Accept the open invite. */
   join: () => void;
 }
@@ -346,7 +346,7 @@ export default function RallyMode({
       }
     };
     apiRef.current = {
-      start: (route) => send({ t: "rally_start", route }),
+      start: (route, solo) => send(solo ? { t: "rally_start", route, solo: true } : { t: "rally_start", route }),
       join: () => send({ t: "rally_join" }),
     };
     return () => {
