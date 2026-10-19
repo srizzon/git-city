@@ -748,7 +748,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
                 <>
                   <span className="h-2 w-2 shrink-0 border border-border-light" style={{ background: place.uf ? swatchOf(place.uf) : LIME }} aria-hidden />
                   <span className="truncate text-cream">{place.ibge !== null ? place.name : "Island"}</span>
-                  <span className={`shrink-0 ${HUD_SOFT}`}>· {fmt(place.devs.length)} devs</span>
+                  <span className={`shrink-0 ${HUD_SOFT}`}>· {fmt(place.devs.length)} {place.devs.length === 1 ? "dev" : "devs"}</span>
                 </>
               ) : (
                 <>
@@ -818,6 +818,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               pending={joining.pending}
               error={joining.error}
               initialQuery={picker.query}
+              firstPick={!!home && !home.picked}
               onPick={(c) => {
                 posthog.capture("brasil_city_picked", { city: c.ibge, founding: c.ibge !== null && !layout.cities.some((x) => x.ibge === c.ibge && x.devs.length > 0) });
                 setAskCity(false);
@@ -863,7 +864,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       )}
       {!inCar && askCity && !picker && !state && !focused && !panel && (
         <div className="pointer-events-auto absolute bottom-[110px] left-1/2 z-20 flex w-[min(420px,calc(100vw-24px))] -translate-x-1/2 items-center gap-3 border-[3px] border-lime bg-bg/95 px-3 py-2 sm:bottom-[76px]">
-          <p className="min-w-0 flex-1 text-[10px] normal-case text-cream">Which city are you from? Your building moves there, and nobody from it yet means you found it.</p>
+          <p className="min-w-0 flex-1 text-[11px] text-cream">Which city are you from?</p>
           <button type="button" onClick={() => openPicker(null)} className="btn-press shrink-0 bg-lime px-2.5 py-1.5 text-[10px] text-bg">
             Pick my city
           </button>

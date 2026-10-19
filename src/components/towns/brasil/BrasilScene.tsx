@@ -425,8 +425,10 @@ export interface CameraApi {
 /** A city's key, the same everywhere: its IBGE code, or "island". */
 export const cityKey = (c: CityLayout) => c.key;
 
-/** Most tags up at once: each is a DOM node over the canvas. */
-const TAG_MAX = 40;
+/** Most tags up at once closer in (from far, the 27 capitals and the island): each is a DOM node over the canvas, and more reads as noise. */
+const TAG_MAX = 24;
+/** Room kept clear round a tag (px). */
+const TAG_PAD = 10;
 /** Farther than this share of the whole-country view, only the capitals (and the island) are tagged. */
 const TAG_FAR = 0.55;
 
@@ -444,7 +446,12 @@ function Tags({ cities, near, crowned, onTag, overview }: { cities: CityLayout[]
   const ranked = useMemo(
     () =>
       cities
-        .map((c) => ({ c, at: lotToWorld(...c.center), w: (c.ibge === null ? c.name.length : Math.max(c.name.length, 2)) * 8 + 44, rank: (crowned && c.capital && c.uf === crowned ? 2e9 : 0) + (c.capital || c.ibge === null ? 1e9 : 0) + c.devs.length }))
+        .map((c) => {
+          const founder = c.devs.find((d) => d.founder)?.dev.login ?? "";
+          // Silkscreen runs ~10px a letter at the tag's size, plus the swatch and the count; from far a capital shows its state's sigla; up close the founder pill under it may be wider.
+          const label = (far: boolean) => (c.ibge === null ? 6 : far && c.capital ? 2 : c.name.length) * 10 + 30 + String(c.devs.length).length * 10;
+          return { c, at: lotToWorld(...c.center), w: (far: boolean, near: boolean) => Math.max(label(far), near ? founder.length * 7 + 80 : 0), rank: (crowned && c.capital && c.uf === crowned ? 2e9 : 0) + (c.capital || c.ibge === null ? 1e9 : 0) + c.devs.length };
+        })
         .sort((a, b) => b.rank - a.rank || (a.c.key < b.c.key ? -1 : 1)),
     [cities, crowned],
   );
@@ -456,13 +463,16 @@ function Tags({ cities, near, crowned, onTag, overview }: { cities: CityLayout[]
     const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
     const list: CityLayout[] = [];
     for (const r of ranked) {
-      if (list.length >= TAG_MAX) break;
+      if (!far && list.length >= TAG_MAX) break;
       if (far && !r.c.capital && r.c.ibge !== null) continue;
       _v.set(r.at[0], 60, r.at[1]).project(camera);
       if (_v.z > 1 || Math.abs(_v.x) > 1.05 || Math.abs(_v.y) > 1.05) continue;
       const x = ((_v.x + 1) / 2) * size.width;
       const y = ((1 - _v.y) / 2) * size.height;
-      const box = { x0: x - r.w / 2, x1: x + r.w / 2, y0: y - 12, y1: y + (near ? 26 : 12) };
+      const w = r.w(far, near);
+      // From far only the 27 capitals: they sit close, and each must show.
+      const pad = far ? 0 : TAG_PAD;
+      const box = { x0: x - w / 2 - pad, x1: x + w / 2 + pad, y0: y - 12 - pad, y1: y + (near ? 34 : 12) + pad };
       if (placed.some((p) => box.x0 < p.x1 && p.x0 < box.x1 && box.y0 < p.y1 && p.y0 < box.y1)) continue;
       placed.push(box);
       list.push(r.c);

@@ -382,6 +382,7 @@ export function BrasilPicker({
   pending,
   error,
   initialQuery = "",
+  firstPick = false,
   onPick,
   onSignIn,
   onClose,
@@ -399,6 +400,8 @@ export function BrasilPicker({
   error: string | null;
   /** Opened from the search for a city nobody lives in yet: its name. */
   initialQuery?: string;
+  /** On the map with only a state: this pick is their city, free (not a move). */
+  firstPick?: boolean;
   onPick: (city: { ibge: number | null; name: string }) => void;
   onSignIn: () => void;
   onClose: () => void;
@@ -457,7 +460,7 @@ export function BrasilPicker({
     <div className="pointer-events-auto mt-1 w-full border-[3px] sm:w-[min(420px,calc(100vw-32px))] border-border bg-bg/95 p-3 font-pixel uppercase text-cream shadow-[0_6px_0_rgba(0,0,0,0.35)] backdrop-blur-sm">
       <div className="mb-2.5 flex items-baseline justify-between gap-3">
         <p className="min-w-0 truncate text-[11px]">
-          {current && !someoneElse ? "Move to another city" : who ? <>Put <span className="normal-case text-lime">@{who}</span> on the map</> : "Put your building on the map"}
+          {current && !someoneElse ? (firstPick ? "Pick your city" : "Move to another city") : who ? <>Put <span className="normal-case text-lime">@{who}</span> on the map</> : "Put your building on the map"}
         </p>
         <button type="button" disabled={busy} onClick={onClose} className="shrink-0 text-[10px] text-muted hover:text-cream disabled:opacity-40">
           ESC
@@ -478,7 +481,7 @@ export function BrasilPicker({
       ) : (
         <div className="flex flex-col gap-2">
           <p className="text-[10px] normal-case text-muted">
-            {current ? "Your building moves to a new lot there. You can move once a week." : "Your building goes up in your city. Nobody from there yet? You found it."}
+            {current && !firstPick ? "Your building moves to a new lot there. You can move once a week." : "Your building goes up in your city. Nobody from there yet? You found it."}
           </p>
           <div className="flex items-stretch">
             <input
