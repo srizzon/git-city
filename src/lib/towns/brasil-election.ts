@@ -81,6 +81,9 @@ export function winner(votes: readonly { candidate: number; at: number }[], stan
 const PARTY_NUMBERS = new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 27, 28, 29, 30, 33, 35, 36, 40, 43, 44, 45, 50, 51, 55, 65, 70, 77, 80, 90]);
 export const BALLOT_NUMBERS: number[] = Array.from({ length: 69 }, (_, i) => i + 31).filter((n) => !PARTY_NUMBERS.has(n));
 
+/** A ballot number as the machine shows it: always two digits ("01"). */
+export const ballot = (n: number) => String(n).padStart(2, "0");
+
 /** The lowest number nobody holds this term, or null when they're all taken. */
 export function nextNumber(taken: Iterable<number>): number | null {
   const used = new Set(taken);
