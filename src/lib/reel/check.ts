@@ -154,6 +154,8 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
     if (!ctx.verifiedHandles.includes(h.slice(1).toLowerCase())) fail("caption", `${h} in the caption isn't a verified handle.`);
   }
 
+  if (spec.kind === "main" && !spec.post.cover) warn("cover", "The main reel has no cover prompt yet (post.cover): it's made after the final, from the prompt approved with the script.");
+
   if (spec.kind === "trial") {
     const main = ctx.main ? filled(ctx.main) : null;
     if (!main) warn("trial", "No main reel for this day to compare with.");
@@ -161,7 +163,7 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
       if (hookOf(main) === hookOf(spec)) fail("trial", "Same hook as the main reel.");
       if (JSON.stringify([main.scenes[0].scene, main.scenes[1]?.scene]) === JSON.stringify([spec.scenes[0].scene, spec.scenes[1]?.scene]))
         fail("trial", "Opens on the same scenes as the main reel.");
-      if (main.bed === spec.bed) fail("trial", "Same music bed as the main reel (Instagram fingerprints the sound too).");
+      if (main.bed && main.bed === spec.bed) out.push({ level: "warn", rule: "trial", message: "Same music bed as the main reel: fine now and then, but Instagram fingerprints the sound too." });
     }
   }
   return out;

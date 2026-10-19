@@ -20,7 +20,7 @@ export const STATE_LABEL: Record<ReelState, string> = {
 
 export function StateTag({ status }: { status: ReelStatus }) {
   const tone = status.error ? "text-red-400" : status.queued ? "text-cream" : status.state === "posted" ? "text-muted" : "text-lime";
-  const doing = { draft: "Rendering the draft", final: "Rendering the final", schedule: "Uploading to the agenda" } as Record<string, string>;
+  const doing = { draft: "Rendering the draft", final: "Rendering the final and the cover" } as Record<string, string>;
   const label = status.error ? `${status.error.job} failed` : status.queued ? `${doing[status.queued] ?? status.queued}…` : STATE_LABEL[status.state];
   return <span className={`text-[10px] uppercase tracking-wider ${tone}`}>{label}</span>;
 }

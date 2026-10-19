@@ -169,7 +169,8 @@ export const ReelSpec = z.object({
   voiceAt: z.number().nonnegative().default(0.4),
   /** Seconds after the last word. */
   tail: z.number().nonnegative().default(1.4),
-  bed: z.string().default("lofi-up-1.mp3"),
+  /** The music bed; left out, the config's rotation picks one. */
+  bed: z.string().optional(),
   bedVolume: z.number().positive().max(1).default(0.26),
   /** The rule up top that turns into the call to action; a reel without one (a story told on its own) leaves it out. */
   header: z

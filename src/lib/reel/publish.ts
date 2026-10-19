@@ -6,7 +6,7 @@
 // post's numbers (hourly for 48h, then daily for a week). Server only.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { containerStatus, createReelContainer, publishContainer, reelInsights } from "@/lib/instagram";
+import { containerStatus, createReelContainer, publishContainer, reelInsights, sharedToFeed } from "@/lib/instagram";
 import { sendEmail } from "@/lib/resend";
 import { FROM_NOTIFY } from "@/lib/email/senders";
 
@@ -137,18 +137,23 @@ interface PostRow {
   media_id: string;
   permalink: string | null;
   posted_at: string;
+  kind: "main" | "trial";
+  graduated: boolean;
 }
 
 /** Snapshots each post's numbers: hourly for its first 48 hours, then daily until it's a week old. */
 export async function measurePosts(sb: SupabaseClient, now = Date.now()): Promise<number> {
   const week = new Date(now - 7 * 86_400_000).toISOString();
-  const { data: posts } = await sb.from("reel_posts").select("media_id, permalink, posted_at").gte("posted_at", week).returns<PostRow[]>();
+  const { data: posts } = await sb.from("reel_posts").select("media_id, permalink, posted_at, kind, graduated").gte("posted_at", week).returns<PostRow[]>();
   let taken = 0;
   for (const p of posts ?? []) {
     const { data: last } = await sb.from("reel_stats").select("taken_at").eq("media_id", p.media_id).order("taken_at", { ascending: false }).limit(1).maybeSingle<{ taken_at: string }>();
     const age = now - Date.parse(p.posted_at);
     const every = age < 48 * 3_600_000 ? 55 * 60_000 : 23 * 3_600_000;
     if (last && now - Date.parse(last.taken_at) < every) continue;
+    // A trial that Instagram graduated now goes to the followers' feed too (is_shared_to_feed turns true;
+    // to confirm on the first real trial).
+    if (p.kind === "trial" && !p.graduated && (await sharedToFeed(p.media_id))) await sb.from("reel_posts").update({ graduated: true }).eq("media_id", p.media_id);
     const m = await reelInsights(p.media_id).catch(() => null);
     if (!m) continue;
     const { count } = p.permalink

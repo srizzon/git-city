@@ -46,9 +46,12 @@ describe("checkText", () => {
     expect(rules).toEqual(expect.arrayContaining(["hook", "scenes"]));
   });
 
-  it("fails a trial that copies the main's hook, opening or bed", () => {
-    const trial = { ...base, id: "2026-10-19-t1", kind: "trial" as const };
-    expect(fails(checkText(trial, { ...ctx, main: base }))).toEqual(["trial", "trial", "trial"]);
+  it("fails a trial that copies the main's hook or opening, and only warns on its bed", () => {
+    const main = { ...base, bed: "lofi-up-1.mp3" };
+    const trial = { ...main, id: "2026-10-19-t1", kind: "trial" as const };
+    const issues = checkText(trial, { ...ctx, main });
+    expect(fails(issues)).toEqual(["trial", "trial"]);
+    expect(issues.filter((i) => i.level === "warn").map((i) => i.rule)).toContain("trial");
   });
 
   it("fails an unverified @ in the caption and a watched reel without the parseable CTA", () => {

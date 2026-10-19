@@ -184,3 +184,15 @@ export async function reelInsights(mediaId: string): Promise<Partial<Record<(typ
   }
   return out;
 }
+
+/** When the account's followers are online, hour by hour (Instagram's online_followers insight; empty without enough data). */
+export async function onlineFollowers(): Promise<{ values?: { value?: Record<string, number> }[] } | null> {
+  const j = await graph<{ data: { values?: { value?: Record<string, number> }[] }[] }>("/me/insights", { metric: "online_followers", period: "lifetime" }).catch(() => null);
+  return j?.data?.[0] ?? null;
+}
+
+/** Whether a post goes to the account's followers and grid: a trial reel turns true once it graduates. */
+export async function sharedToFeed(mediaId: string): Promise<boolean | null> {
+  const j = await graph<{ is_shared_to_feed?: boolean }>(`/${mediaId}`, { fields: "is_shared_to_feed" }).catch(() => null);
+  return typeof j?.is_shared_to_feed === "boolean" ? j.is_shared_to_feed : null;
+}

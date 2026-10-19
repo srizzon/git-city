@@ -22,11 +22,16 @@ export const ReelsConfig = z.object({
   studioUrl: z.string().default("http://localhost:3002"),
   /** Music beds, relative to REELS_HOME. */
   beds: z.string().default("_assets"),
+  /**
+   * The beds reels take turns on when a spec doesn't name one (Sam, 2026-10-19: three bases,
+   * rotated): day by day, and the day's trials each one on from its main.
+   */
+  bedRotation: z.array(z.string()).default([]),
   verifiedHandles: z.array(z.string()).default([]),
   slots: z
     .object({
-      /** Brasília time, "HH:MM". */
-      main: z.string().regex(/^\d{2}:\d{2}$/).default("12:00"),
+      /** Brasília time, "HH:MM", or "auto": the hour the followers are most online (12:00 until Instagram has the data). */
+      main: z.string().regex(/^(\d{2}:\d{2}|auto)$/).default("auto"),
       trialGapHours: z.number().positive().default(2),
     })
     .default({ main: "12:00", trialGapHours: 2 }),

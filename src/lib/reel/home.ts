@@ -21,7 +21,7 @@ export function inHome(rel: string): string | null {
   const home = reelsHome();
   if (!home) return null;
   const full = path.resolve(home, rel);
-  return full === home || full.startsWith(home + path.sep) ? full : null;
+  return full === path.resolve(home) || full.startsWith(path.resolve(home) + path.sep) ? full : null;
 }
 
 export interface ReelFiles {

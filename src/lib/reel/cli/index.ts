@@ -7,6 +7,7 @@
 //   final <id>          1080x1920 30 fps export → sheet → caption.txt → archive folder → log.md row
 //   cover <id>          the main reel's grid cover (Codex image, ~1.5 min of quota) → cover.png
 //   schedule <id> [at]  uploads the final and puts it on the agenda (at: "2026-10-20T12:00", Brasília)
+//   report [from]       the week's report (reports/<from>.md) and the log.md rows filled in
 //   batch <date>        every reel of the day whose state asks for a job, one at a time
 //   worker              runs what the studio queues, one job at a time, until stopped
 //   status [date]       each reel of the day and where it is
@@ -32,7 +33,10 @@ import { computeFacts, loadFactsInput } from "../facts";
 import { reelOf } from "../film";
 import { filled, ReelSpec, specDir } from "../spec";
 import { isAtLeast, readStatus, setError, setState, writeStatus } from "../status";
-import { BUCKET } from "../publish";
+import { busiestHour, scheduleReel } from "../schedule";
+import { bedOf } from "../beds";
+import { fillLog, weeklyReport, type PostRow, type StatRow } from "../report";
+import { onlineFollowers } from "@/lib/instagram";
 import { mix, narrate } from "../voice";
 import { anchorAt } from "@trailer-kit/narration";
 
@@ -166,7 +170,7 @@ async function voice(id: string, config: ReelsConfig) {
   const w = await narrate(lines, spec.voiceAt, config.voice, path.join(home(), ".cache", "tts"), path.join(dir, "vo.mp3"));
   writeFileSync(path.join(dir, "voice.json"), JSON.stringify(w));
   const reel = reelOf(spec, w, null);
-  const bed = path.join(home(), config.beds, spec.bed);
+  const bed = path.join(home(), config.beds, bedOf(spec, config, home()));
   if (!existsSync(bed)) throw new Error(`No bed ${bed}.`);
   mix(path.join(dir, "vo.mp3"), bed, reel.length, path.join(dir, "mix.wav"), spec.bedVolume);
   console.log(`  voice ${reel.length.toFixed(1)}s, ${w.length} words → vo.mp3, mix.wav`);
@@ -228,8 +232,10 @@ async function final(id: string) {
     for (const [from, to] of [["final.mp4", "reel.mp4"], ["final.jpg", "poster.jpg"], ["caption.txt", "caption.txt"], ["vo.mp3", "vo.mp3"], ["voice.json", "vo-words.json"], ["spec.json", "spec.json"]])
       if (existsSync(path.join(dir, from))) copyFileSync(path.join(dir, from), path.join(out, to));
     const hook = spec.lines[0].show.replace(/\*/g, "");
-    appendFileSync(path.join(home(), "log.md"), `| ${folder.slice(0, 2)} | ${specDir(id).date} | ${spec.preset ?? "?"} (${spec.kind}); hook "${hook}" | ${folder} | not yet | | ${reel.length.toFixed(1)}s, bed ${spec.bed} |\n`);
+    appendFileSync(path.join(home(), "log.md"), `| ${folder.slice(0, 2)} | ${specDir(id).date} | ${spec.preset ?? "?"} (${spec.kind}); hook "${hook}" | ${folder} | not yet | | ${reel.length.toFixed(1)}s, bed ${bedOf(spec, config, home())} |\n`);
     setState(dir, "final");
+    // The main reel's grid cover, from the prompt approved with the script (trials have none).
+    if (spec.kind === "main" && spec.post.cover && !existsSync(path.join(dir, "cover.png"))) await cover(id);
     console.log(`→ ${path.join(out, "reel.mp4")}\n  ${path.join(dir, "sheet-final.jpg")}`);
   } catch (e) {
     setError(dir, "final", (e as Error).message);
@@ -237,77 +243,10 @@ async function final(id: string) {
   }
 }
 
-const BRT = "-03:00";
-
-/** Where a reel goes on the agenda: the main at its slot, each trial its gap after; never in the past, never within the hour of another. */
-async function slotFor(spec: ReelSpec, config: ReelsConfig, taken: number[], at?: string): Promise<Date> {
-  if (at) return new Date(`${at}${BRT}`);
-  const { date, slot } = specDir(spec.id);
-  const trials = allIds().filter((id) => id.startsWith(date)).map(loadSpec).filter((s) => s.kind === "trial").map((s) => specDir(s.id).slot).sort();
-  const base = new Date(`${date}T${config.slots.main}:00${BRT}`).getTime();
-  const step = config.slots.trialGapHours * 3_600_000;
-  let t = spec.kind === "main" ? base : base + (trials.indexOf(slot) + 1) * step;
-  const soonest = Date.now() + 10 * 60_000;
-  while (t < soonest || taken.some((x) => Math.abs(x - t) < 3_600_000)) t += t < soonest ? Math.ceil((soonest - t) / 1_800_000) * 1_800_000 : 1_800_000;
-  return new Date(t);
-}
-
 async function schedule(id: string, at?: string) {
-  const config = readConfig(home());
-  const dir = dirOf(id);
-  const spec = filled(loadSpec(id));
-  try {
-    if (readStatus(dir).state !== "final") throw new Error(`${id} isn't a finished reel (state ${readStatus(dir).state}).`);
-    if (!existsSync(path.join(dir, "final.mp4"))) throw new Error("No final.mp4.");
-    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-    const { data: rows } = await sb.from("reel_schedule").select("spec_id, scheduled_at").in("status", ["scheduled", "publishing"]);
-    const when = await slotFor(spec, config, (rows ?? []).filter((r) => r.spec_id !== id).map((r) => Date.parse(r.scheduled_at)), at);
-    const key = `${id}/${crypto.randomUUID()}`;
-    const upload = async (file: string, type: string) => {
-      const p = `${key}-${file}`;
-      const { error } = await sb.storage.from(BUCKET).upload(p, readFileSync(path.join(dir, file)), { contentType: type, upsert: true });
-      if (error) throw new Error(`upload ${file}: ${error.message}`);
-      return p;
-    };
-    const video = await upload("final.mp4", "video/mp4");
-    const cover = spec.kind === "main" && existsSync(path.join(dir, "cover.png")) ? await upload("cover.png", "image/png") : null;
-    const w = words(id)!;
-    const reel = reelOf(spec, w, null);
-    const thumb = spec.post.thumbAt !== undefined ? anchorAt(w, spec.post.thumbAt) : reel.length - 1;
-    const { error } = await sb.from("reel_schedule").upsert(
-      {
-        spec_id: id,
-        kind: spec.kind,
-        caption: spec.post.caption,
-        video_path: video,
-        cover_path: cover,
-        thumb_offset_ms: Math.round(thumb * 1000),
-        scheduled_at: when.toISOString(),
-        status: "scheduled",
-        attempts: 0,
-        error: null,
-        container_id: null,
-        meta: {
-          preset: spec.preset,
-          hook: spec.lines[0].show.replace(/\*/g, ""),
-          opening_scene: spec.scenes[0].scene,
-          length_s: Math.round(reel.length * 100) / 100,
-          bed: spec.bed,
-          cta: (spec.header?.cta ?? []).map((l) => l.text.replace(/\*/g, "")).join(" "),
-          watch: spec.post.watch,
-        },
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "spec_id" },
-    );
-    if (error) throw new Error(`agenda: ${error.message}`);
-    if (spec.kind === "main" && !cover) console.log("  ! no cover.png: the main reel goes out with its frame as the cover (npm run reel -- cover <id> first)");
-    setState(dir, "scheduled");
-    console.log(`  scheduled for ${when.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} (Brasília)`);
-  } catch (e) {
-    setError(dir, "schedule", (e as Error).message);
-    throw e;
-  }
+  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+  const when = await scheduleReel({ home: home(), id, sb, config: readConfig(home()), busiest: busiestHour(await onlineFollowers()), at });
+  console.log(`  scheduled for ${when.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} (Brasília)`);
 }
 
 const VIDEO_EDITOR = path.join(process.env.HOME ?? "", "orca/projects/video-editor");
@@ -326,6 +265,22 @@ async function cover(id: string) {
   await run("uv", ["run", "--python", "3.13", "--with", "pillow", "--directory", VIDEO_EDITOR, "scripts/igcover.py", "samuelrizzondev", id]);
   copyFileSync(path.join(VIDEO_EDITOR, `channels/samuelrizzondev/brand/instagram/out/cover-${id}.png`), path.join(dirOf(id), "cover.png"));
   console.log(`→ ${path.join(dirOf(id), "cover.png")}`);
+}
+
+async function weekReport(from?: string) {
+  const start = from ?? new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+  const { data: posts, error } = await sb.from("reel_posts").select("*").gte("posted_at", `${start}T00:00:00Z`).returns<PostRow[]>();
+  if (error) throw new Error(`reel_posts: ${error.message}`);
+  const ids = (posts ?? []).map((p) => p.media_id);
+  const { data: stats } = ids.length ? await sb.from("reel_stats").select("*").in("media_id", ids).returns<StatRow[]>() : { data: [] as StatRow[] };
+  const md = weeklyReport(start, posts ?? [], stats ?? []);
+  mkdirSync(path.join(home(), "reports"), { recursive: true });
+  writeFileSync(path.join(home(), "reports", `${start}.md`), md + "\n");
+  const log = path.join(home(), "log.md");
+  if (existsSync(log)) writeFileSync(log, fillLog(readFileSync(log, "utf8"), posts ?? [], stats ?? []));
+  console.log(md);
+  console.log(`\n→ ${path.join(home(), "reports", `${start}.md`)}`);
 }
 
 /** The job a reel's state asks for (the studio's buttons set the states and queue). */
@@ -378,12 +333,13 @@ const commands: Record<string, () => Promise<unknown> | unknown> = {
   final: () => final(arg),
   cover: () => cover(arg),
   schedule: () => schedule(arg, process.argv[4]),
+  report: () => weekReport(arg),
   batch: () => batch(arg ?? brt()),
   worker: () => worker(),
   status: () => status(arg),
 };
 if (!cmd || !commands[cmd]) {
-  console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 13).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+  console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 14).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
   process.exit(cmd ? 1 : 0);
 }
 Promise.resolve(commands[cmd]()).catch((e) => {
