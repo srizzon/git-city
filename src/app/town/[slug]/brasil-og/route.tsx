@@ -9,7 +9,7 @@ import { cityBySlug } from "@/lib/towns/br-cities";
 import { BRASIL_SLUG, getBrasilLayout } from "@/lib/towns/brasil-server";
 import { weekCrown } from "@/components/towns/brasil/stats";
 import { candidateByNumber } from "@/lib/towns/brasil-election-server";
-import { PRESIDENCY_ON } from "@/lib/towns/brasil-election";
+import { PRESIDENCY_ON, ballot } from "@/lib/towns/brasil-election";
 
 // The Brasil map's share card: two short lines on the left, the map of Brazil
 // in pixels on the right with the real cities. Each link shares a moment:
@@ -103,7 +103,7 @@ export async function GET(req: Request) {
   // A vote (?vote=34, "seu voto para") or a candidacy (?run=34, "vote 34"): the voting machine's screen with the number, the candidate's face and @.
   const run = q.get("run");
   const num = Number(run ?? q.get("vote"));
-  const cand = PRESIDENCY_ON && Number.isInteger(num) && num >= 10 && num <= 99 ? await candidateByNumber(num) : null;
+  const cand = PRESIDENCY_ON && Number.isInteger(num) && num >= 1 && num <= 99 ? await candidateByNumber(num) : null;
   if (cand) {
     const me = lotOf(cand.login.toLowerCase());
     const name = `@${cand.login}`;
@@ -118,7 +118,7 @@ export async function GET(req: Request) {
                 <span style={{ fontSize: 20, textTransform: "uppercase" }}>{run ? "Para presidente," : "Seu voto para"}</span>
                 <span style={{ fontSize: 38, textTransform: "uppercase", marginTop: 6 }}>{run ? "Vote" : "Presidente"}</span>
                 <div style={{ display: "flex", marginTop: 20, gap: 12 }}>
-                  {String(num)
+                  {ballot(num)
                     .split("")
                     .map((d, i) => (
                       <span key={i} style={{ width: 100, height: 128, display: "flex", alignItems: "center", justifyContent: "center", border: `5px solid ${ink}`, backgroundColor: "rgba(255,255,255,0.6)", fontSize: 100 }}>

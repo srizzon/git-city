@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BALLOT_NUMBERS, FIRST_TERM, FIRST_VOTE, cantVote, electionClock, nextNumber, term, winner } from "./brasil-election";
+import { BALLOT_NUMBERS, ballot, FIRST_TERM, FIRST_VOTE, cantVote, electionClock, nextNumber, term, winner } from "./brasil-election";
 
 const at = (iso: string) => Date.parse(iso);
 
@@ -53,6 +53,10 @@ describe("ballot numbers", () => {
     expect(BALLOT_NUMBERS.every((n) => n >= 31 && n <= 99)).toBe(true);
     for (const party of [33, 35, 40, 45, 50, 55, 65]) expect(BALLOT_NUMBERS).not.toContain(party);
     expect(BALLOT_NUMBERS.length).toBeGreaterThan(40);
+  });
+  it("always two digits", () => {
+    expect(ballot(1)).toBe("01");
+    expect(ballot(31)).toBe("31");
   });
   it("the lowest free one", () => {
     expect(nextNumber([])).toBe(31);

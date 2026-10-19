@@ -8,6 +8,7 @@ import { Avatar, fmt } from "@/components/league/hud/shared";
 import type { ElectionView } from "@/lib/towns/brasil-election-server";
 import type { UF } from "@/lib/towns/brasil-map";
 import { Board } from "./BrasilPanels";
+import { ballot } from "@/lib/towns/brasil-election";
 
 // The presidential race as Brazil's voting machine: every candidate has a
 // two-digit number, you type it on the keypad (or the keyboard, or tap the
@@ -87,7 +88,7 @@ export default function ElectionPanel({
 }) {
   const wide = useWide();
   const [e, setE] = useState(initial);
-  const [typed, setTyped] = useState(startNumber ? String(startNumber) : "");
+  const [typed, setTyped] = useState(startNumber ? ballot(startNumber) : "");
   const [fim, setFim] = useState(false);
   const [copied, setCopied] = useState<"vote" | "run" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -195,8 +196,8 @@ export default function ElectionPanel({
   const share = async (kind: "vote" | "run") => {
     const n = kind === "vote" ? me?.votedFor?.number : me?.running;
     if (!n) return;
-    const url = `${location.origin}/town/${slug}?${kind}=${n}`;
-    const text = kind === "vote" ? `Votei ${n} pra presidente do Brasil dos devs 🗳️` : `Sou candidato a presidente do Brasil dos devs. Vote ${n} 🗳️`;
+    const url = `${location.origin}/town/${slug}?${kind}=${ballot(n)}`;
+    const text = kind === "vote" ? `Votei ${ballot(n)} pra presidente do Brasil dos devs 🗳️` : `Sou candidato a presidente do Brasil dos devs. Vote ${ballot(n)} 🗳️`;
     posthog.capture(kind === "vote" ? "brasil_vote_shared" : "brasil_candidacy_shared", { number: n });
     if ((await shareOrCopy(text, url)) === "copied") {
       setCopied(kind);
@@ -210,7 +211,7 @@ export default function ElectionPanel({
   // ── The machine's screen ──
   const footer = fim ? null : typed.length < 2 ? (
     <>
-      {me?.votedFor && typed.length === 0 ? `Seu voto: ${me.votedFor.number} · @${me.votedFor.login}. Digite outro número para trocar.` : typed.length === 1 ? "Mais um dígito." : "Digite o número do seu candidato."}
+      {me?.votedFor && typed.length === 0 ? `Seu voto: ${ballot(me.votedFor.number)} · @${me.votedFor.login}. Digite outro número para trocar.` : typed.length === 1 ? "Mais um dígito." : "Digite o número do seu candidato."}
       {why && <span className="mt-1 block text-[#c4561c]">{why.text}</span>}
     </>
   ) : !picked ? (
@@ -246,7 +247,7 @@ export default function ElectionPanel({
       ) : fim ? (
         <div className="m-auto flex flex-col items-center gap-3 text-center">
           <span className="text-5xl leading-none tracking-widest">FIM</span>
-          <span className="text-[9px] normal-case">{me?.votedFor ? `Your vote: ${me.votedFor.number} · @${me.votedFor.login}` : "Voto em branco · no vote"}</span>
+          <span className="text-[9px] normal-case">{me?.votedFor ? `Your vote: ${ballot(me.votedFor.number)} · @${me.votedFor.login}` : "Voto em branco · no vote"}</span>
           {me?.votedFor && (
             <button type="button" onClick={() => share("vote")} className="btn-press bg-[#1b1d22] px-4 py-2 text-[10px] uppercase text-lime">
               {copied === "vote" ? "Link copied" : "Share my vote"}
@@ -357,12 +358,12 @@ export default function ElectionPanel({
               <li key={c.number}>
                 <button
                   type="button"
-                  onClick={() => type(String(c.number))}
-                  aria-label={`Type ${c.number}, @${c.login}`}
+                  onClick={() => type(ballot(c.number))}
+                  aria-label={`Type ${ballot(c.number)}, @${c.login}`}
                   className={`flex w-full items-center gap-2.5 border-2 px-2 py-1.5 text-left ${onScreen ? "border-cream" : mine ? "border-lime" : "border-border hover:border-lime/50"}`}
                 >
                   <span className="flex h-8 w-9 shrink-0 items-center justify-center bg-[#eef0ea] text-sm tabular-nums" style={{ color: ink }}>
-                    {c.number}
+                    {ballot(c.number)}
                   </span>
                   <Avatar src={c.avatar_url} size={28} />
                   <span className="min-w-0 flex-1">
@@ -390,14 +391,14 @@ export default function ElectionPanel({
         <div className="flex flex-col gap-1.5 border-2 border-lime p-2.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[9px] text-cream">
-              You&apos;re running · <span className="text-lime">#{me.running}</span>
+              You&apos;re running · <span className="text-lime">#{ballot(me.running)}</span>
             </span>
             <button type="button" disabled={busy} onClick={() => act({ action: "withdraw" })} className="text-[9px] text-muted underline hover:text-cream disabled:opacity-40">
               Stop running
             </button>
           </div>
           <button type="button" onClick={() => share("run")} className="btn-press bg-lime py-2 text-[10px] text-bg">
-            {copied === "run" ? "Link copied" : `Share "vote ${me.running}"`}
+            {copied === "run" ? "Link copied" : `Share "vote ${ballot(me.running)}"`}
           </button>
         </div>
       ) : (

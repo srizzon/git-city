@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, Clock } from "lucide-react";
 import { fmt } from "@/components/league/hud/shared";
 import type { Count } from "@/lib/towns/brasil-election-server";
+import { ballot } from "@/lib/towns/brasil-election";
 
 // The presidential vote's live count, like election night on TV: the leader
 // big (face, ballot number, %, votes), everyone else ranked with a bar, the
@@ -31,7 +32,7 @@ const pctText = (v: number, total: number) => `${pct(v, total).toFixed(1)}%`;
 
 function Number2({ n, big = false }: { n: number; big?: boolean }) {
   return (
-    <span className={`flex shrink-0 items-center justify-center border-2 border-[#9a9a94] bg-[#eef0ea] tabular-nums text-[#1b1d22] ${big ? "h-14 w-16 text-3xl" : "h-8 w-10 text-sm"}`}>{n}</span>
+    <span className={`flex shrink-0 items-center justify-center border-2 border-[#9a9a94] bg-[#eef0ea] tabular-nums text-[#1b1d22] ${big ? "h-14 w-16 text-3xl" : "h-8 w-10 text-sm"}`}>{ballot(n)}</span>
   );
 }
 
@@ -134,8 +135,8 @@ export default function ApuracaoLive({ slug, initial }: { slug: string; initial:
                   <span className="text-[10px] tabular-nums text-muted">{fmt(lead.votes)} votes</span>
                 </p>
                 {c.mode === "live" && (
-                  <Link href={`/town/${slug}?vote=${lead.number}`} className="btn-press self-start bg-lime px-3 py-1.5 text-[10px] text-bg sm:hidden">
-                    Vote {lead.number}
+                  <Link href={`/town/${slug}?vote=${ballot(lead.number)}`} className="btn-press self-start bg-lime px-3 py-1.5 text-[10px] text-bg sm:hidden">
+                    Vote {ballot(lead.number)}
                   </Link>
                 )}
               </div>
@@ -143,8 +144,8 @@ export default function ApuracaoLive({ slug, initial }: { slug: string; initial:
                 <p className="text-3xl tabular-nums text-cream sm:text-5xl">{pctText(lead.votes, c.total)}</p>
                 <p className="mt-1 text-[10px] tabular-nums text-muted">{fmt(lead.votes)} votes</p>
                 {c.mode === "live" && (
-                  <Link href={`/town/${slug}?vote=${lead.number}`} className="btn-press mt-3 inline-block bg-lime px-3 py-2 text-[10px] text-bg">
-                    Vote {lead.number}
+                  <Link href={`/town/${slug}?vote=${ballot(lead.number)}`} className="btn-press mt-3 inline-block bg-lime px-3 py-2 text-[10px] text-bg">
+                    Vote {ballot(lead.number)}
                   </Link>
                 )}
               </div>
@@ -171,8 +172,8 @@ export default function ApuracaoLive({ slug, initial }: { slug: string; initial:
                     <span className="block text-[9px] tabular-nums text-dim">{fmt(r.votes)}</span>
                   </span>
                   {c.mode === "live" && (
-                    <Link href={`/town/${slug}?vote=${r.number}`} className="btn-press shrink-0 border-2 border-lime px-2.5 py-1.5 text-[9px] text-lime hover:bg-lime hover:text-bg">
-                      Vote {r.number}
+                    <Link href={`/town/${slug}?vote=${ballot(r.number)}`} className="btn-press shrink-0 border-2 border-lime px-2.5 py-1.5 text-[9px] text-lime hover:bg-lime hover:text-bg">
+                      Vote {ballot(r.number)}
                     </Link>
                   )}
                 </li>

@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Maximize2 } from "lucide-react";
 import Panel from "@/components/league/hud/Panel";
 import { fmt } from "@/components/league/hud/shared";
 import type { Count, CountRow } from "@/lib/towns/brasil-election-server";
+import { ballot } from "@/lib/towns/brasil-election";
 
 // The presidential count on the map, always in view while the presidency is
 // on: on a wide screen a card in the top-left corner (who leads, the top
@@ -34,7 +35,7 @@ function useWide(): boolean {
 }
 
 function Num({ n }: { n: number }) {
-  return <span className="flex h-6 w-7 shrink-0 items-center justify-center border border-[#9a9a94] bg-[#eef0ea] text-[10px] tabular-nums text-[#1b1d22]">{n}</span>;
+  return <span className="flex h-6 w-7 shrink-0 items-center justify-center border border-[#9a9a94] bg-[#eef0ea] text-[10px] tabular-nums text-[#1b1d22]">{ballot(n)}</span>;
 }
 
 function Face({ src, size }: { src: string | null; size: number }) {
@@ -45,7 +46,7 @@ function Face({ src, size }: { src: string | null; size: number }) {
 function Row({ r, total, place, onPick }: { r: CountRow; total: number; place: number; onPick: (n: number) => void }) {
   return (
     <li>
-      <button type="button" onClick={() => onPick(r.number)} aria-label={`Vote ${r.number}, @${r.login}`} className="flex w-full items-center gap-2 py-1 text-left hover:text-lime">
+      <button type="button" onClick={() => onPick(r.number)} aria-label={`Vote ${ballot(r.number)}, @${r.login}`} className="flex w-full items-center gap-2 py-1 text-left hover:text-lime">
       <span className="w-4 text-[9px] tabular-nums text-muted">{place}</span>
       <Num n={r.number} />
       <Face src={r.avatar_url} size={20} />
