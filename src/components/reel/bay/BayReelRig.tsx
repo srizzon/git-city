@@ -10,6 +10,8 @@ import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import { cutAt, type Reel, type ReelCut } from "@/lib/reel/film";
 import { placeBalloon } from "@/components/reel/ReelOverlay";
 import { BAY_WIDE, bayPose, FOV, type BayWorld } from "./scenes";
+import BayTakes, { isTake } from "./BayTakes";
+import type { SmashStore } from "@/lib/league-city/smash";
 
 // A reel's camera in the home city (./scenes), mounted in CityCanvas in place
 // of its controls; the lot's building (left out of the city) rising on its
@@ -30,9 +32,12 @@ export interface BayReelRigProps {
   lot: CityBuilding | null;
   colors: BuildingColors;
   balloon: RefObject<HTMLDivElement | null>;
+  /** The buildings the takes knock down (left out of the city), and their smash store. */
+  store: SmashStore | null;
+  targets: CityBuilding[];
 }
 
-export default function BayReelRig({ clock, reel, buildings, lot, colors, balloon }: BayReelRigProps) {
+export default function BayReelRig({ clock, reel, buildings, lot, colors, balloon, store, targets }: BayReelRigProps) {
   const riser = useRef<THREE.Group>(null);
   const lone = useMemo(() => (lot ? [lot] : []), [lot]);
   const byLogin = useMemo(() => new Map(buildings.map((b) => [b.loginLower, b])), [buildings]);
@@ -55,6 +60,8 @@ export default function BayReelRig({ clock, reel, buildings, lot, colors, balloo
     const camera = cam as THREE.PerspectiveCamera;
     const t = Math.max(0, beatOf(clock));
     const { cut, u } = cutAt(reel, t);
+    // A gameplay take places its own camera (BayTakes).
+    if (isTake(cut.kind)) return placeBalloon(balloon.current, -1, null);
     const rise = riseOf(t, riseFrom);
     const pose = bayPose(cut, u, world, cut.kind === "lot" && lot ? lot.height * rise + 6 : undefined);
 
@@ -97,10 +104,14 @@ export default function BayReelRig({ clock, reel, buildings, lot, colors, balloo
     });
   });
 
-  // The lot's building on its own, so only it grows.
+  // The lot's building on its own, so only it grows; the gameplay takes' actors.
   return (
-    <group ref={riser} visible={false}>
-      <CityScene buildings={lone} colors={colors} introMode filmMode />
-    </group>
+    <>
+      <group ref={riser} visible={false}>
+        <CityScene buildings={lone} colors={colors} introMode filmMode />
+      </group>
+      {store && targets.length > 0 && <CityScene buildings={targets} colors={colors} introMode filmMode smash={store} />}
+      {reel.cuts.some((c) => isTake(c.kind)) && <BayTakes clock={clock} reel={reel} store={store} />}
+    </>
   );
 }

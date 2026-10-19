@@ -7,14 +7,19 @@ import { leagueBuildings, scaleTownHeights } from "@/lib/league-city/buildings";
 import { lotToWorld } from "@/lib/league-city/grid";
 import { fetchHomeSnapshot, loadSFMap } from "@/lib/city-snapshot-client";
 import { sfRenderMap } from "@/lib/city-sf-layout";
+import { waitForCityFrame } from "@/lib/city-first-frame";
 import { beatOf, Transport, type FilmClock } from "@trailer-kit/clock";
 import type { Word } from "@trailer-kit/narration";
 import Studio from "@trailer-kit/Studio";
 import BrasilScene from "@/components/towns/brasil/BrasilScene";
 import BrasilReelRig from "@/components/reel/brasil/BrasilReelRig";
 import BayReelRig from "@/components/reel/bay/BayReelRig";
+import { smashLogins } from "@/components/reel/bay/BayTakes";
+import { smashStoreFor } from "@/lib/league-city/smash";
 import ReelOverlay, { overlayBoxes } from "@/components/reel/ReelOverlay";
 import { THEMES } from "@/components/city/theme";
+import TownReelRig from "@/components/reel/towns/TownReelRig";
+import type { LeagueCity } from "@/lib/league-city/service";
 import { brasilWorld, plainBuilding } from "@/lib/towns/brasil-world";
 import { BrasilPlacer, layoutFromResidents, type Resident, type UF } from "@/lib/towns/brasil-map";
 import { reelOf, type Reel } from "@/lib/reel/film";
@@ -27,6 +32,7 @@ import type { ReelSpec } from "@/lib/reel/spec";
 // - bay: the home city from the snapshot the home page loads, the spec's lot
 //   dev left out so their lot stands empty until it rises.
 
+const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), { ssr: false, loading: () => null });
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), { ssr: false, loading: () => null });
 
 export interface BrasilData {
@@ -36,12 +42,19 @@ export interface BrasilData {
   norms: LayoutNorms;
 }
 
+export interface TownsData {
+  towns: { stage: string; name: string; city: LeagueCity; cityDevs: Record<string, unknown>[] }[];
+  norms: LayoutNorms;
+}
+
 export interface ReelStudioProps {
   spec: ReelSpec;
   words: Word[];
   song: string | null;
   /** The Brasil map's data (null for the home city, which loads in the browser). */
   brasil: BrasilData | null;
+  /** A towns reel's towns. */
+  towns: TownsData | null;
 }
 
 const REEL = `
@@ -55,6 +68,8 @@ interface StageProps {
   reel: Reel;
   clock: FilmClock;
   balloon: RefObject<HTMLDivElement | null>;
+  /** Bumped when the studio resets (a loop, a seek back, an export): broken buildings stand again. */
+  gen: number;
 }
 
 /** The example building: its own look (items and all), on the lot its state's next dev would get. */
@@ -112,7 +127,7 @@ interface Bay {
   sfMap: SFRenderMap;
 }
 
-function BayStage({ spec, reel, clock, balloon, children }: StageProps & { children: (photoOf: (login: string) => string | null) => ReactNode }) {
+function BayStage({ spec, reel, clock, balloon, gen, children }: StageProps & { children: (photoOf: (login: string) => string | null) => ReactNode }) {
   const [city, setCity] = useState<Bay | null | undefined>(undefined);
   const lotLogin = spec.world.type === "bay" ? (spec.world.lot?.toLowerCase() ?? null) : null;
   useEffect(() => {
@@ -127,7 +142,27 @@ function BayStage({ spec, reel, clock, balloon, children }: StageProps & { child
     );
   }, [lotLogin]);
   const byLogin = useMemo(() => new Map((city?.buildings ?? []).map((b) => [b.loginLower, b])), [city]);
+  // The buildings a take knocks down leave the city and are drawn by the take with their own
+  // smash store (the whole city's would reserve debris for 88k buildings); a reset puts them back up.
+  const targets = useMemo(() => smashLogins(reel.cuts).map((l) => byLogin.get(l)).filter((b): b is CityBuilding => !!b), [reel, byLogin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const store = useMemo(() => (targets.length ? smashStoreFor(targets) : null), [targets, gen]);
+  const standing = useMemo(() => (targets.length ? (city?.buildings ?? []).filter((b) => !targets.includes(b)) : (city?.buildings ?? [])), [city, targets]);
   const photoOf = useCallback((login: string) => (byLogin.has(login.toLowerCase()) ? `https://avatars.githubusercontent.com/${login}?s=160` : null), [byLogin]);
+  // The export waits until the canvas has drawn the city once (tools/export.mjs reads window.__ggReady):
+  // the data lands first, the 88k buildings' first frame seconds later.
+  useEffect(() => {
+    const w = window as Window & { __ggReady?: boolean };
+    w.__ggReady = city === null;
+    if (!city) return;
+    let live = true;
+    void waitForCityFrame(60_000).then(() => {
+      if (live) w.__ggReady = true;
+    });
+    return () => {
+      live = false;
+    };
+  }, [city]);
   if (city === undefined) return <p className="absolute inset-0 flex items-center justify-center font-pixel text-xs text-muted">Loading the city…</p>;
   if (city === null) return <p className="absolute inset-0 flex items-center justify-center font-pixel text-xs text-muted">No city snapshot here.</p>;
   return (
@@ -135,7 +170,7 @@ function BayStage({ spec, reel, clock, balloon, children }: StageProps & { child
       <div className="absolute inset-0">
         <CityCanvas
           embedded
-          buildings={city.buildings}
+          buildings={standing}
           plazas={city.plazas}
           decorations={city.decorations}
           sfMap={city.sfMap}
@@ -143,7 +178,7 @@ function BayStage({ spec, reel, clock, balloon, children }: StageProps & { child
           onExitFly={() => {}}
           themeIndex={0}
           skyHour={() => 20.5}
-          rig={<BayReelRig clock={clock} reel={reel} buildings={city.buildings} lot={city.lot} colors={THEMES[0].building} balloon={balloon} />}
+          rig={<BayReelRig clock={clock} reel={reel} buildings={city.buildings} lot={city.lot} colors={THEMES[0].building} balloon={balloon} store={store} targets={targets} />}
         />
       </div>
       {children(photoOf)}
@@ -151,10 +186,48 @@ function BayStage({ spec, reel, clock, balloon, children }: StageProps & { child
   );
 }
 
-export default function ReelStudio({ spec, words, song, brasil }: ReelStudioProps) {
+/** One town on its own canvas (never remounted: a cut only changes which shows), its buildings breakable. */
+function TownStage({ town, norms, reel, clock, balloon, gen, show }: { town: TownsData["towns"][number]; norms: LayoutNorms; show: boolean } & Omit<StageProps, "spec">) {
+  const buildings = useMemo(() => {
+    const devs = town.cityDevs as unknown as DeveloperRecord[];
+    const byLogin = new Map(generateCityLayout(devs, undefined, norms).buildings.map((b) => [b.loginLower, b]));
+    const byDevId = new Map<number, CityBuilding>();
+    for (const d of devs) {
+      const b = byLogin.get(d.github_login.toLowerCase());
+      if (b) byDevId.set(d.id, b);
+    }
+    return leagueBuildings(town.city.objects, scaleTownHeights(byDevId));
+  }, [town, norms]);
+  // A fresh store puts every building back up (a reset: a loop, a seek back, an export).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const store = useMemo(() => smashStoreFor(buildings), [buildings, gen]);
+  return (
+    <div className="absolute inset-0" style={{ visibility: show ? "visible" : "hidden" }}>
+      <LeagueScene
+        embedded
+        cinematic
+        dpr={2}
+        framing={{ zoom: 1, shiftPx: 0 }}
+        h={town.city.h}
+        identity={town.city.identity}
+        name={town.name}
+        objects={town.city.objects}
+        buildings={buildings}
+        mode="view"
+        smash={{ store, color: "#e07a4f" }}
+      >
+        <TownReelRig stage={town.stage} clock={clock} reel={reel} objects={town.city.objects} store={store} balloon={balloon} />
+      </LeagueScene>
+    </div>
+  );
+}
+
+export default function ReelStudio({ spec, words, song, brasil, towns }: ReelStudioProps) {
   const reel = useMemo(() => reelOf(spec, words, song), [spec, words, song]);
   const [clock] = useState(() => new Transport(reel.film.beat));
   const balloon = useRef<HTMLDivElement>(null);
+  const [gen, setGen] = useState(0);
+  const reset = useCallback(() => setGen((g) => g + 1), []);
 
   // The export's --report reads this every frame (the safe-zone check).
   useEffect(() => {
@@ -169,14 +242,28 @@ export default function ReelStudio({ spec, words, song, brasil }: ReelStudioProp
   }, [clock]);
 
   const overlay = (photoOf: (login: string) => string | null) => <ReelOverlay clock={clock} reel={reel} header={spec.header} balloon={balloon} photoOf={photoOf} />;
-  const stage = { spec, reel, clock, balloon };
+  const stage = { spec, reel, clock, balloon, gen };
 
   return (
     <>
       <style>{REEL}</style>
-      {/* Nothing in these worlds breaks, so there is nothing to put back on a reset. */}
-      <Studio film={reel.film} clock={clock} onReset={() => {}} title={spec.id} className="reel-916">
-        {() => (spec.world.type === "bay" ? <BayStage {...stage}>{overlay}</BayStage> : brasil ? <BrasilStage {...stage} data={brasil}>{overlay}</BrasilStage> : null)}
+      <Studio film={reel.film} clock={clock} onReset={reset} title={spec.id} className="reel-916">
+        {(frame) =>
+          spec.world.type === "bay" ? (
+            <BayStage {...stage}>{overlay}</BayStage>
+          ) : towns ? (
+            <>
+              {towns.towns.map((t) => (
+                <TownStage key={t.stage} town={t} norms={towns.norms} reel={reel} clock={clock} balloon={balloon} gen={gen} show={frame.kind === "full" && frame.stage === t.stage} />
+              ))}
+              {overlay(() => null)}
+            </>
+          ) : brasil ? (
+            <BrasilStage {...stage} data={brasil}>
+              {overlay}
+            </BrasilStage>
+          ) : null
+        }
       </Studio>
     </>
   );

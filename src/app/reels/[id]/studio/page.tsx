@@ -6,6 +6,9 @@ import { getLeagueBySlug } from "@/lib/leagues/service";
 import { BRASIL_SLUG, getBrasilResidents } from "@/lib/towns/brasil-server";
 import { readReel } from "@/lib/reel/home";
 import { filled } from "@/lib/reel/spec";
+import { getLeagueCityDevs, getLeagueMembers } from "@/lib/leagues/queries";
+import { getCachedCity } from "@/lib/league-city/service";
+import { townDisplayName } from "@/lib/towns/names";
 import ReelStudioLoader from "./loader";
 
 // A reel from REELS_HOME played live in its world, in the trailer kit's
@@ -28,7 +31,19 @@ export default async function ReelStudioPage({ params }: { params: Promise<{ id:
 
   const world = spec.world;
   // The home city loads its snapshot in the browser, as the home page does.
-  if (world.type === "bay") return <ReelStudioLoader spec={spec} words={files.words} song={files.song} brasil={null} />;
+  if (world.type === "bay") return <ReelStudioLoader spec={spec} words={files.words} song={files.song} brasil={null} towns={null} />;
+  if (world.type === "towns") {
+    const loaded = await Promise.all(
+      Object.entries(world.towns).map(async ([stage, slug]) => {
+        const league = await getLeagueBySlug(slug);
+        if (!league) return null;
+        const [members, city] = await Promise.all([getLeagueMembers(league.id), getCachedCity(league.id)]);
+        return { stage, name: townDisplayName(league.name), city, cityDevs: await getLeagueCityDevs(members) };
+      }),
+    );
+    if (loaded.some((t) => !t)) return <main className="p-6 font-pixel text-xs text-muted">A town in the spec doesn&apos;t exist.</main>;
+    return <ReelStudioLoader spec={spec} words={files.words} song={files.song} brasil={null} towns={{ towns: loaded.filter((t) => !!t), norms: await getCityNorms() }} />;
+  }
   const league = await getLeagueBySlug(BRASIL_SLUG);
   if (!league) notFound();
   // Without an asOf, the map as it is now.
@@ -50,6 +65,7 @@ export default async function ReelStudioPage({ params }: { params: Promise<{ id:
       words={files.words}
       song={files.song}
       brasil={{ residents, cityDevs, example: exampleDevs[0] ?? null, norms }}
+      towns={null}
     />
   );
 }
