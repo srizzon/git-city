@@ -26,6 +26,11 @@ export interface ReelBalloon {
   badges: { kind: string; at: number; sub: string }[];
 }
 
+/** A panel between the header and the captions: a ranking as bars, or a list of people a page at a time. */
+export type ReelPanel =
+  | { kind: "bars"; from: number; to: number; title: string | null; rows: { label: string; value: number | string; lit: boolean }[] }
+  | { kind: "roster"; from: number; to: number; title: string | null; rows: { tag: string; login: string; lit: boolean }[]; perPage: number };
+
 export interface Reel {
   film: Film<Stage>;
   shots: Shot<Stage, string>[];
@@ -34,6 +39,7 @@ export interface Reel {
   lines: CaptionLine[];
   ctaAt: number;
   balloons: ReelBalloon[];
+  panels: ReelPanel[];
 }
 
 /** The film of a filled spec (./spec `filled`), its words on the film's clock, and its mixed sound's URL. */
@@ -67,7 +73,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
   const paused = spec.lines.some((l) => l.at !== undefined);
   const lines = captionLines(spec.lines, words, length, paused ? 0.7 : undefined);
   const balloons: ReelBalloon[] = spec.overlays
-    .filter((o) => o.type === "balloon")
+    .flatMap((o) => (o.type === "balloon" ? [o] : []))
     .map((o) => {
       const from = anchorAt(words, o.from);
       return {
@@ -78,6 +84,13 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
         badges: o.badges.map((b) => ({ kind: b.kind, at: anchorAt(words, b.at, from), sub: b.sub })),
       };
     });
+  const panels: ReelPanel[] = spec.overlays.flatMap((o): ReelPanel[] => {
+    if (o.type === "balloon") return [];
+    const from = anchorAt(words, o.from);
+    const to = o.to === undefined ? length : anchorAt(words, o.to, from);
+    if (o.type === "bars") return [{ kind: "bars", from, to, title: o.title ?? null, rows: o.rows.map((r) => ({ ...r, lit: !!r.lit })) }];
+    return [{ kind: "roster", from, to, title: o.title ?? null, rows: o.rows.map((r) => ({ ...r, lit: !!r.lit })), perPage: o.perPage }];
+  });
   const film: Film<Stage> = {
     beat: 1,
     length,
@@ -89,7 +102,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
     ...(song ? { song: { src: song, offset: 0 } } : {}),
     frameAt: (beat) => frameOf(shots, beat),
   };
-  return { film, shots, length, cuts, lines, ctaAt: anchorAt(words, spec.header.ctaAt), balloons };
+  return { film, shots, length, cuts, lines, ctaAt: anchorAt(words, spec.header.ctaAt), balloons, panels };
 }
 
 /** The cut under way at `t` seconds, and how far into it (0–1). */

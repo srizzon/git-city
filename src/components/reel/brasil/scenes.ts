@@ -11,6 +11,7 @@
 //   dive       from the last pose down to the target's capital (log-space zoom)
 //   lot-rise   round the target while it goes up floor by floor
 //   orbit      round the target, closing in on its roof
+//   wide       the whole country turning slowly, behind a panel (the race, a list)
 //   pullback   from the last pose back out to the whole country
 
 import * as THREE from "three";
@@ -211,6 +212,12 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
       else aimAt(p, target, target.height + balloonClear(target), 0.36);
       return p;
     }
+    case "wide": {
+      // The whole country turning slowly behind a panel (the race, a list), reached from wherever the last take left off.
+      const turn = top.pos.clone().sub(top.look).applyAxisAngle(THREE.Object3D.DEFAULT_UP, THREE.MathUtils.degToRad(-12 + 24 * u));
+      const slow = { pos: turn.multiplyScalar(1.05).add(top.look), look: top.look.clone() };
+      return i > 0 && cuts[i - 1].kind !== "overview" && cuts[i - 1].kind !== "wide" ? zoom(before(), slow, ease(Math.min(1, u * 2.5))) : slow;
+    }
     case "pullback":
       // Back out to the whole country fast, then hold under the call to action.
       return zoom(before(), top, ease(Math.min(1, u * 1.7)));
@@ -220,6 +227,6 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
 }
 
 /** The scenes this world plays (the validator checks specs against it). */
-export const BRASIL_SCENES = ["overview", "dive", "lot-rise", "orbit", "pullback"] as const;
+export const BRASIL_SCENES = ["overview", "dive", "lot-rise", "orbit", "wide", "pullback"] as const;
 /** Scenes that frame the whole country: no balloon over a roof. */
-export const WIDE_SCENES = new Set(["overview", "dive"]);
+export const WIDE_SCENES = new Set(["overview", "dive", "wide"]);

@@ -37,7 +37,30 @@ const Balloon = z.object({
   badges: z.array(Badge).default([]),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon]);
+/** A ranking as bars between the header and the captions (the state race). */
+const Bars = z.object({
+  type: z.literal("bars"),
+  from: Anchor,
+  to: Anchor.optional(),
+  title: z.string().optional(),
+  rows: z
+    .array(z.object({ label: z.string(), value: z.union([z.number(), z.string()]), lit: z.boolean().optional() }))
+    .min(2)
+    .max(8),
+});
+
+/** A list of people (photo, login, a tag such as the state) between the header and the captions, a page at a time. */
+const Roster = z.object({
+  type: z.literal("roster"),
+  from: Anchor,
+  to: Anchor.optional(),
+  title: z.string().optional(),
+  rows: z.array(z.object({ tag: z.string(), login: z.string(), lit: z.boolean().optional() })).min(1),
+  /** Seven rows fit between the header and the captions. */
+  perPage: z.number().int().min(3).max(7).default(7),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({

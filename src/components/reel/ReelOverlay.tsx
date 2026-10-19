@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
-import type { Reel } from "@/lib/reel/film";
+import type { Reel, ReelPanel } from "@/lib/reel/film";
 import type { ReelSpec } from "@/lib/reel/spec";
 
 // A reel's words over its world: the rule fixed up top that turns into the
@@ -132,6 +132,103 @@ function HeaderLines({ lines }: { lines: ReelSpec["header"]["rule"] }) {
   );
 }
 
+const ease = (u: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
+
+/**
+ * Animates the panels each frame: a panel fades in from its moment and out
+ * 0.3s after its end; bars grow to their value one after another; a roster
+ * shows its rows a page at a time, each row sliding in after the one above.
+ */
+function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) {
+  panels.forEach((p, i) => {
+    const el = root.querySelector<HTMLElement>(`[data-panel="${i}"]`);
+    if (!el) return;
+    const on = t >= p.from && t < p.to + 0.3;
+    el.style.opacity = on ? String(Math.min(1, (t - p.from) / FADE, (p.to + 0.3 - t) / 0.3)) : "0";
+    if (!on) return;
+    const local = t - p.from;
+    if (p.kind === "bars") {
+      el.querySelectorAll<HTMLElement>("[data-bar]").forEach((bar, k) => {
+        bar.style.transform = `scaleX(${ease((local - k * 0.08) / 0.5)})`;
+      });
+      return;
+    }
+    const pages = Math.ceil(p.rows.length / p.perPage);
+    const page = Math.min(pages - 1, Math.floor((local / Math.max(0.001, p.to - p.from)) * pages));
+    const since = local - (page * (p.to - p.from)) / pages;
+    el.querySelectorAll<HTMLElement>("[data-row]").forEach((row) => {
+      const n = Number(row.dataset.row);
+      const k = n - page * p.perPage;
+      const shown = k >= 0 && k < p.perPage;
+      row.style.display = shown ? "" : "none";
+      if (!shown) return;
+      const e = ease((since - k * 0.07) / 0.3);
+      row.style.opacity = String(e);
+      row.style.transform = `translateY(${(1 - e) * 1.5}cqw)`;
+    });
+  });
+}
+
+/** The panels' markup: white outlined type and solid bars, no box (dark bands were rejected). */
+function Panel({ panel, index, photoOf }: { panel: ReelPanel; index: number; photoOf: (login: string) => string | null }) {
+  const type = "font-pixel uppercase text-white whitespace-nowrap";
+  const max = panel.kind === "bars" ? Math.max(...panel.rows.map((r) => (typeof r.value === "number" ? r.value : Number(String(r.value).replace(/\D/g, "")) || 0)), 1) : 1;
+  return (
+    <div
+      data-panel={index}
+      data-reel-box={panel.kind}
+      className="absolute flex flex-col"
+      style={{ left: "50%", transform: "translateX(-50%)", top: "26%", width: "72%", gap: "1.2cqw", opacity: 0, ...outline(1.2) }}
+    >
+      {panel.title && (
+        <p className={`${type} text-center`} style={{ fontSize: "4.2cqw", lineHeight: 1, marginBottom: "0.8cqw" }}>
+          <Lit text={panel.title} />
+        </p>
+      )}
+      {panel.kind === "bars"
+        ? panel.rows.map((r, k) => {
+            const v = typeof r.value === "number" ? r.value : Number(String(r.value).replace(/\D/g, "")) || 0;
+            return (
+              <div key={k} className="flex items-center" style={{ gap: "2cqw", height: "5.6cqw" }}>
+                <span className={type} style={{ fontSize: "4.4cqw", width: "10cqw", color: r.lit ? "var(--color-lime)" : undefined }}>
+                  {r.label}
+                </span>
+                <div className="relative h-full flex-1">
+                  <div
+                    data-bar
+                    className="absolute inset-y-0 left-0"
+                    style={{ width: `${(v / max) * 100}%`, background: r.lit ? "var(--color-lime)" : "var(--color-cream)", transformOrigin: "0 50%", transform: "scaleX(0)", boxShadow: "0 0 0 0.5cqw #000" }}
+                  />
+                </div>
+                <span className={type} style={{ fontSize: "4.4cqw", width: "12cqw", textAlign: "right", color: r.lit ? "var(--color-lime)" : undefined }}>
+                  {typeof r.value === "number" ? r.value.toLocaleString("pt-BR") : r.value}
+                </span>
+              </div>
+            );
+          })
+        : panel.rows.map((r, n) => {
+            const photo = photoOf(r.login);
+            return (
+              <div key={n} data-row={n} className="flex items-center" style={{ gap: "2.4cqw", height: "4.6cqw", display: "none" }}>
+                <span className={type} style={{ fontSize: "4.4cqw", width: "9cqw", color: r.lit ? "var(--color-lime)" : undefined }}>
+                  {r.tag}
+                </span>
+                {photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photo} alt="" style={{ width: "4.6cqw", height: "4.6cqw", border: "0.5cqw solid #000", flexShrink: 0 }} />
+                ) : (
+                  <span style={{ width: "4.6cqw", height: "4.6cqw", flexShrink: 0 }} />
+                )}
+                <span className={`${type} min-w-0 truncate`} style={{ fontSize: "4.4cqw", textTransform: "none", color: r.lit ? "var(--color-lime)" : undefined }}>
+                  {r.login}
+                </span>
+              </div>
+            );
+          })}
+    </div>
+  );
+}
+
 export default function ReelOverlay({
   clock,
   reel,
@@ -149,6 +246,7 @@ export default function ReelOverlay({
   const line = useRef<HTMLParagraphElement>(null);
   const rule = useRef<HTMLDivElement>(null);
   const cta = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   // The film's balloons share one element: its badges are the first balloon's that has any.
   const first = reel.balloons[0] ?? null;
 
@@ -183,6 +281,7 @@ export default function ReelOverlay({
       const c = Math.min(1, Math.max(0, (t - reel.ctaAt) / FADE));
       if (rule.current) rule.current.style.opacity = String(1 - c);
       if (cta.current) cta.current.style.opacity = String(c);
+      if (root.current) drawPanels(root.current, reel.panels, t);
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
@@ -194,7 +293,10 @@ export default function ReelOverlay({
   const photo = first && first.target !== "example" && !first.plate ? photoOf(first.target.login) : null;
 
   return (
-    <div className="pointer-events-none absolute inset-0">
+    <div ref={root} className="pointer-events-none absolute inset-0">
+      {reel.panels.map((p, i) => (
+        <Panel key={i} panel={p} index={i} photoOf={photoOf} />
+      ))}
       <div className={type} style={{ ...safe, top: "15%", ...outline(1.4) }}>
         <div ref={rule} data-reel-box="header">
           <HeaderLines lines={header.rule} />
@@ -273,7 +375,7 @@ export default function ReelOverlay({
         ref={line}
         data-reel-box="captions"
         className={`${type} flex flex-wrap justify-center`}
-        style={{ ...safe, top: "55%", width: "76%", whiteSpace: "normal", gap: "0 3cqw", fontSize: "7cqw", lineHeight: 1.3, opacity: 0, ...outline(1.8) }}
+        style={{ ...safe, top: "55%", width: "72%", whiteSpace: "normal", gap: "0 3cqw", fontSize: "7cqw", lineHeight: 1.3, opacity: 0, ...outline(1.8) }}
       />
     </div>
   );
