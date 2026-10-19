@@ -4,7 +4,8 @@
 // layout alone, so the page that starts a race and the API that saves its
 // times build the same one: the cheapest path over the lot grid (a road lot
 // costs 1, open land ROUTE.grass, the sea, buildings, lawns and squares
-// can't be crossed), gates at its turns and along its straights, the
+// can't be crossed), gates on its straights (just past every turn, like a
+// racing game's checkpoints, each facing its own stretch of road), the
 // finish on the destination's hub, and the grid behind the start line.
 // Pure.
 
@@ -19,6 +20,8 @@ export const ROUTE = {
   grass: 4,
   /** A gate on every turn and at least every this many lots on a straight. */
   gateEvery: 8,
+  /** A turn's gate stands this many lots past it, on the new straight. */
+  afterTurn: 2,
   /** No two gates closer than this (lots). */
   gateMin: 3,
   /** The start line sits this far along the route (m): the grid fits behind it. */
@@ -53,8 +56,8 @@ export interface RaceRoute {
   /** `from-to:hash`: the route's board. A rerouted highway makes a new hash, and a fresh board. */
   key: string;
   hash: string;
-  /** The gates in order (m); the last one is the finish. */
-  gates: [number, number][];
+  /** The gates in order: x, z (m) and the way through (deg clockwise from north); the last one is the finish. */
+  gates: [number, number, number][];
   /** The whole path, lot centers (m), for the minimap's line. */
   line: [number, number][];
   /** From the start line to the finish (m). */
@@ -305,23 +308,36 @@ export function raceRoute(layout: BrasilLayout, fromKey: string, toKey: string):
   // Too short to race (two cities side by side): no route.
   if (total < ROUTE.startAt + ROUTE.gateEvery * LOT_M) return null;
 
-  // Gates: every turn and every gateEvery lots on a straight, past the start line, none too close together.
-  const gates: [number, number][] = [];
+  // Gates stand on straights, facing along them: a few lots past every turn
+  // (you see the next one once you're round the corner, square to your road),
+  // and every gateEvery lots on a long straight; none too close together.
+  const heading = (i: number) => (Math.atan2(lots[i][0] - lots[i - 1][0], -(lots[i][1] - lots[i - 1][1])) * 180) / Math.PI;
+  const gates: [number, number, number][] = [];
   let lastS: number = ROUTE.startAt;
   let lastI = -Infinity;
+  let lastTurn = -Infinity;
+  let pending = false;
   for (let i = 1; i < lots.length - 1; i++) {
-    if (at[i] <= ROUTE.startAt + ROUTE.gateMin * LOT_M) continue;
     const [px, pz] = lots[i - 1];
     const [x, z] = lots[i];
     const [nx, nz] = lots[i + 1];
     const turn = x - px !== nx - x || z - pz !== nz - z;
+    if (turn) {
+      lastTurn = i;
+      if (at[i] > ROUTE.startAt) pending = true;
+      continue;
+    }
+    if (at[i] <= ROUTE.startAt + ROUTE.gateMin * LOT_M) continue;
+    const afterTurn = pending && i - lastTurn >= ROUTE.afterTurn;
     const due = i - lastI >= ROUTE.gateEvery && at[i] - lastS >= ROUTE.gateEvery * LOT_M;
-    if (!(turn || due) || at[i] - lastS < ROUTE.gateMin * LOT_M || at[lots.length - 1] - at[i] < ROUTE.gateMin * LOT_M) continue;
-    gates.push(line[i]);
+    if (!(afterTurn || due) || at[i] - lastS < ROUTE.gateMin * LOT_M || at[lots.length - 1] - at[i] < ROUTE.gateMin * LOT_M) continue;
+    gates.push([line[i][0], line[i][1], Math.round(heading(i))]);
     lastS = at[i];
     lastI = i;
+    pending = false;
   }
-  gates.push(line[line.length - 1]);
+  const fin = line.length - 1;
+  gates.push([line[fin][0], line[fin][1], Math.round(heading(fin))]);
 
   const grid: GridSlot[] = [];
   for (let row = 0; row < 15; row++) {
@@ -379,13 +395,13 @@ export function cleanRaceGhost(input: unknown, ms: number): { ms: number; splits
 }
 
 /** A route as the drive room takes it (rally_start): gates and grid rounded to 10 cm. */
-export function toRallyRoute(r: RaceRoute): { from: string; to: string; key: string; gates: [number, number][]; grid: [number, number, number][]; length: number } {
+export function toRallyRoute(r: RaceRoute): { from: string; to: string; key: string; gates: [number, number, number][]; grid: [number, number, number][]; length: number } {
   const d = (v: number) => Math.round(v * 10) / 10;
   return {
     from: r.from,
     to: r.to,
     key: r.key,
-    gates: r.gates.map(([x, z]) => [d(x), d(z)]),
+    gates: r.gates.map(([x, z, rot]) => [d(x), d(z), rot]),
     grid: r.grid.map((g) => [d(g.x), d(g.z), Math.round(g.rot)]),
     length: Math.round(r.length),
   };
