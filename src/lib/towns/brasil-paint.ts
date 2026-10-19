@@ -382,7 +382,8 @@ export function enclosed(g: PaintGrid, s: number, trail: readonly number[]): num
   const bw = maxI - minI + 1;
   const bd = maxJ - minJ + 1;
   const mine = new Set(trail);
-  const wall = (c: number) => mine.has(c) || g.owner[c] === s || g.home[c] === s;
+  // Home closes a trail (atHome), so home walls a loop in: the state's land and the cells beside its buildings.
+  const wall = (c: number) => mine.has(c) || atHome(g, s, c);
   const seen = new Uint8Array(bw * bd);
   const stack: number[] = [];
   const visit = (i: number, j: number) => {

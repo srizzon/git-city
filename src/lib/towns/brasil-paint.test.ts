@@ -115,6 +115,20 @@ describe("a loop", () => {
     expect(run.cells).toEqual([]);
   });
 
+  it("a U back beside the state's buildings closes in what lies between", () => {
+    const g = board();
+    // A row of SP buildings: lots 0…4 on lot row 1 (cells z 4…7).
+    g.setHomes([0, 1, 2, 3, 4].map((x) => ({ x, z: 1, uf: "SP" as const })));
+    const run = newRun(SP);
+    // Down from beside the row (z 8), across and back up beside it.
+    const ev = drive(g, run, [[3, 8], [3, 9], [3, 10], [3, 11], [4, 11], [5, 11], [6, 11], [7, 11], [7, 10], [7, 9], [7, 8]]);
+    const close = ev.find((e) => e.k === "close");
+    const got = capture(g, SP, enclosed(g, SP, close!.k === "close" ? close!.trail : []));
+    // The U (9 cells: (3,9)…(7,9) less the ends beside home) and the 3×2 inside.
+    expect(g.owner[g.index(5, 9)]).toBe(SP);
+    expect(got.taken).toBe(close!.k === "close" ? close!.trail.length + 6 : -1);
+  });
+
   it("a U from the state's land closes in what lies between", () => {
     const g = board();
     g.setHomes([{ x: 10, z: 10, uf: "SP" }]);
