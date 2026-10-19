@@ -16,7 +16,11 @@ import type { CrownApi, CrownView } from "@/components/league/drive/CrownMode";
 import type { RallyApi, RallyView } from "@/components/league/drive/RallyMode";
 import RacePanel, { RacePicker, raceActive } from "@/components/towns/brasil/RacePanel";
 import { GameMenu, type GameMode } from "@/components/games/kit";
-import { Crown as CrownIcon, Flag as FlagIcon, Map as DriftIcon } from "lucide-react";
+import { Crown as CrownIcon, Flag as FlagIcon, Map as DriftIcon, PaintRoller } from "lucide-react";
+import PaintMission, { paintMissionDone } from "@/components/towns/brasil/PaintMission";
+import type { RallyState } from "@/lib/league-city/drive/rally";
+import { Band } from "@/components/games/ui";
+import { T } from "@/components/games/kit";
 import { cityByKey, parseRouteKey, raceRoute, startLine } from "@/lib/towns/brasil-race";
 import type { RouteRecord } from "@/lib/towns/brasil-race-server";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
@@ -334,7 +338,31 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   }, [driving, paused, exitDrive, taste, games, driveReady, racing]);
   // The State War: the room's paint, through the watch socket on the map and the drive's in the car.
   const paint = usePaint();
-  const watch = useDriveWatch(league.slug, !inCar, (msg) => (msg.t.startsWith("paint_") ? paint.onMessage(msg) : applyRoomDamage(smash, msg, Date.now())));
+  // From the map (not driving): the room's races too, for the "Live" card.
+  const [watchRace, setWatchRace] = useState<{ rally: RallyState; offset: number } | null>(null);
+  const watch = useDriveWatch(league.slug, !inCar, (msg) => {
+    if (msg.t === "rally") return setWatchRace({ rally: msg.rally as RallyState, offset: Number(msg.now) - Date.now() });
+    if (msg.t.startsWith("paint_")) return paint.onMessage(msg);
+    applyRoomDamage(smash, msg, Date.now());
+  });
+  /** "Drive and join" from the map: the race to join once the car is in the room. */
+  const [joinRace, setJoinRace] = useState<string | null>(null);
+  /** The race on the map's Live card: one still taking racers. */
+  const liveRace = watchRace && watchRace.rally.phase === "invite" && watchRace.rally.route && Date.now() + watchRace.offset < watchRace.rally.inviteEnds ? watchRace.rally : null;
+  // In the car for a race from the Live card: join it as soon as the room shows it, or let it go.
+  useEffect(() => {
+    if (!joinRace) return;
+    const r = rallyView?.rally;
+    if (r?.id === joinRace) {
+      if (r.phase === "invite" && rallyApi.current?.join()) setJoinRace(null);
+      else if (r.phase !== "invite") setJoinRace(null);
+    }
+    const t = setTimeout(() => setJoinRace(null), 20_000);
+    return () => clearTimeout(t);
+  }, [joinRace, rallyView]);
+  /** The first goal in the car (the paint mission) until your first paint. */
+  const [missionDone, setMissionDone] = useState(paintMissionDone);
+  const finishMission = useCallback(() => setMissionDone(true), []);
   // Where each driver is now (units), from the room's latest state of their car.
   const driverAt = useCallback(
     (id: string) => {
@@ -793,9 +821,11 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   // The Games menu's modes: a city race, Crown Rush (with someone else here), the drift track (the arrow takes you).
   const raceBusy = !!rallyView && (rallyView.rally.phase === "invite" || rallyView.rally.phase === "countdown" || rallyView.rally.phase === "live");
   const crownBusy = !!crownView && (crownView.crown.phase === "countdown" || crownView.crown.phase === "live");
+  const showMission = driving && driveReady && !missionDone && !!paint.me?.uf && !racing && !crownBusy && !games;
   const gameModes: GameMode[] = [
     { id: "race", icon: FlagIcon, name: "Race", line: "To another city. Everyone starts together.", need: "1+", blocked: raceBusy ? "A race is on. Join the next one." : crownBusy ? "Crown rush is on." : null },
     { id: "crown", icon: CrownIcon, name: "Crown rush", line: "Hold the crown 30 s. Bump to steal it.", need: "2+", blocked: drivers.length === 0 ? "Needs someone else driving here." : raceBusy ? "A race is on." : crownBusy ? "One is on now." : null },
+    { id: "paint", icon: PaintRoller, name: "State war", line: "Drive a circle: what's inside turns your state's.", need: "1+", blocked: paint.me?.uf ? null : viewerLogin ? "Put your building in a state first." : "Sign in to paint for your state." },
     { id: "drift", icon: DriftIcon, name: "Drift track", line: "Off the coast between SP and RJ. The map shows the way.", need: "1" },
   ];
   /** Sends the race to the room; false (and the menu stays) when the room can't be reached. */
@@ -809,6 +839,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     if (id === "race") setGames({ step: "race", initial: null });
     else if (id === "crown") {
       crownApi.current?.start();
+      setGames(null);
+    } else if (id === "paint") {
+      // Always on while you drive: the menu only brings the mission back to say how.
+      setMissionDone(false);
       setGames(null);
     } else if (id === "drift") {
       // The drift track's start: on the minimap, the way there.
@@ -1052,8 +1086,40 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       )}
 
       {/* The bar: a row of words on a desktop, a tab bar of icons on a phone. */}
+      {/* Over the bar: a race anyone can still join, else the one big thing to do here, Drive. */}
+      {!inCar && !state && !focused && !panel && !picker && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[112px]">
+          {liveRace ? (
+            <LiveRace
+              race={liveRace}
+              offset={watchRace?.offset ?? 0}
+              name={(k) => cityByKey(layout, k)?.name ?? "?"}
+              onJoin={() => {
+                const from = cityByKey(layout, liveRace.route?.from ?? "");
+                posthog.capture("brasil_live_race_clicked", { racers: Object.keys(liveRace.racers).length });
+                setJoinRace(liveRace.id);
+                startDrive(from ? { x: from.hub[0] * LOT, z: from.hub[1] * LOT } : undefined);
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              disabled={launching || world.devs === 0}
+              onClick={() => {
+                posthog.capture("brasil_drive_button_clicked");
+                startDrive();
+              }}
+              className="pointer-events-auto flex min-h-14 items-center gap-3 bg-lime px-8 text-bg shadow-[0_8px_0_rgba(0,0,0,0.35)] transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40"
+              style={{ fontSize: T.big }}
+            >
+              <Car size={22} aria-hidden /> Drive
+            </button>
+          )}
+        </div>
+      )}
+
       {!inCar && (
-        <nav className={`pointer-events-auto absolute inset-x-0 bottom-0 grid ${election ? "grid-cols-5" : "grid-cols-4"} gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
+        <nav className={`pointer-events-auto absolute inset-x-0 bottom-0 grid ${election ? "grid-cols-4" : "grid-cols-3"} gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
           <button type="button" onClick={() => openPanel("states")} className={bar}>
             <Trophy size={16} className="sm:hidden" aria-hidden />
             States
@@ -1082,10 +1148,6 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               Vote
             </button>
           )}
-          <button type="button" disabled={launching || world.devs === 0} onClick={() => startDrive()} className={`${bar} disabled:opacity-40`}>
-            <Car size={16} className="sm:hidden" aria-hidden />
-            Drive
-          </button>
           <button
             type="button"
             onClick={() => {
@@ -1112,7 +1174,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       {drift.overlay}
       <div aria-hidden className={`pointer-events-none fixed inset-0 z-[60] bg-bg transition-opacity duration-300 ${curtain ? "opacity-100" : "opacity-0"}`} />
       {driving && driveReady && <AreaTitle telemetry={telemetry} cities={world.allCities} />}
-      {driving && driveReady && crownView?.crown.phase !== "countdown" && crownView?.crown.phase !== "live" && <PaintHud board={paint.board} me={paint.me} news={paint.news} self={paint.self} signedIn={!!viewerLogin} touch={touchUi} />}
+      {driving && driveReady && !showMission && !racing && !crownBusy && <PaintHud board={paint.board} me={paint.me} news={paint.news} self={paint.self} signedIn={!!viewerLogin} touch={touchUi} />}
       {driving && taste && <GuestGate reason="taste" town="Brasil" login={taste} onSignIn={tasteSignIn} onContinue={() => setTaste(null)} />}
       {driving && (
         <DriveHud
@@ -1135,6 +1197,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onEmote={(e) => emoteApi.current?.send(e)}
           onStartCrown={() => crownApi.current?.start()}
           gameOn={racing || !!games}
+          phoneLow={showMission}
           onGames={racing ? undefined : () => setGames({ step: "modes" })}
           onResume={() => setPaused(false)}
           onCamera={toggleCamera}
@@ -1156,6 +1219,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               ) : undefined}
             </GameMenu>
           )}
+          {showMission && paint.me?.uf && <PaintMission uf={paint.me.uf} news={paint.news} onDone={finishMission} />}
           {/* After the menu, so an invite that comes in while it's open shows over it. */}
           <RacePanel layout={layout} view={rallyView} yourUf={yours} onJoin={() => rallyApi.current?.join()} onRematch={(route) => startRace(route, "rematch")} onAlone={(route) => startRace(route, "alone", true)} onResults={setRaceResults} />
         </DriveHud>
@@ -1506,6 +1570,44 @@ function PlaceRow({ login, city, offices, foundedState = null, onCity, onState, 
           {!founder && !island && at >= 0 && <span className="border border-border px-1.5 py-0.5 text-[8px] text-muted">Dev #{fmt(at + 1)}</span>}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The map's Live card (picked in the phone prototype): a race still taking
+ * racers, its route and who started it, and one lime button that starts
+ * your car and joins it. Its clock runs out with the invite.
+ */
+function LiveRace({ race, offset, name, onJoin }: { race: RallyState; offset: number; name: (key: string) => string; onJoin: () => void }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
+  const left = Math.max(0, Math.ceil((race.inviteEnds - now - offset) / 1000));
+  if (!race.route || left <= 0) return null;
+  const by = race.by ? race.racers[race.by]?.name : null;
+  const n = Object.keys(race.racers).length;
+  return (
+    <div className="pointer-events-auto flex w-[min(380px,100%)] flex-col gap-1">
+      <Band className="flex-col items-start gap-1 px-4 py-3" style={{ fontSize: T.small }}>
+        <span className="flex items-center gap-2 text-lime">
+          <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden /> Live · race
+        </span>
+        <span className="normal-case text-cream" style={{ fontSize: T.body }}>
+          {name(race.route.from)} → {name(race.route.to)}
+        </span>
+        <span className="normal-case text-muted">
+          {by && !by.startsWith("guest-") ? `@${by}` : "Someone"} · {n} in · starts in {left}s
+        </span>
+      </Band>
+      <button type="button" onClick={onJoin} className="flex min-h-11 items-center justify-between bg-lime px-4 text-bg shadow-[0_6px_0_rgba(0,0,0,0.35)] transition-[filter] hover:brightness-110 active:translate-y-px" style={{ fontSize: T.body }}>
+        <span className="flex items-center gap-2">
+          <Car size={16} aria-hidden /> Drive and join
+        </span>
+        <span className="tabular-nums">{left}s</span>
+      </button>
     </div>
   );
 }
