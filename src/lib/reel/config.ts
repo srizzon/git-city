@@ -41,5 +41,7 @@ export type ReelsConfig = z.infer<typeof ReelsConfig>;
 export function readConfig(home: string): ReelsConfig {
   const file = path.join(home, "reels.config.json");
   if (!existsSync(file)) throw new Error(`No ${file}: copy the voice and settings there first.`);
-  return ReelsConfig.parse(JSON.parse(readFileSync(file, "utf8")));
+  const config = ReelsConfig.parse(JSON.parse(readFileSync(file, "utf8")));
+  // A second worktree runs its own studio: REELS_STUDIO_URL points the exports at it.
+  return process.env.REELS_STUDIO_URL ? { ...config, studioUrl: process.env.REELS_STUDIO_URL } : config;
 }
