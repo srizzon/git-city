@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { RALLY, idleRally, joinRally, leaveRally, rallyStandings, startRally, stepRally, tickRally, validRoute, type RallyRoute, type RallyTrack } from "./rally";
+import { RALLY, RALLY_BOXES, idleRally, rallyBoxSpots, rallyItem, takeRallyBox, joinRally, leaveRally, rallyStandings, startRally, stepRally, tickRally, validRoute, type RallyRoute, type RallyTrack } from "./rally";
 
 const route: RallyRoute = {
   from: "3550308",
   to: "3304557",
   key: "3550308-3304557:0a1b2c3d",
   gates: [
-    [0, 200],
-    [0, 400],
-    [0, 600],
+    [0, 200, 180],
+    [0, 400, 180],
+    [0, 600, 180],
   ],
   grid: [
     [-3, -10, 180],
@@ -122,8 +122,37 @@ describe("rally", () => {
   it("refuses a route that isn't one", () => {
     expect(validRoute(route, 50_000)).toEqual(route);
     expect(validRoute({ ...route, gates: [] }, 50_000)).toBeNull();
-    expect(validRoute({ ...route, gates: [[0, 1e9]] }, 50_000)).toBeNull();
+    expect(validRoute({ ...route, gates: [[0, 1e9, 0]] }, 50_000)).toBeNull();
+    expect(validRoute({ ...route, gates: [[0, 10]] }, 50_000)).toBeNull();
     expect(validRoute({ ...route, from: route.to }, 50_000)).toBeNull();
     expect(validRoute({ ...route, key: "<script>" }, 50_000)).toBeNull();
+  });
+
+  it("puts rows of boxes across the road between gates, never on the way to the finish", () => {
+    const long = { gates: Array.from({ length: 10 }, (_, i) => [0, -i * 100, 0] as [number, number, number]) };
+    const spots = rallyBoxSpots(long);
+    expect(spots.length % RALLY_BOXES.lanes.length).toBe(0);
+    // First row just before gate 1 (heading north, -z), across x.
+    expect(spots.slice(0, 4).map(([, z]) => Math.round(z))).toEqual([-75, -75, -75, -75]);
+    expect(new Set(spots.slice(0, 4).map(([x]) => x)).size).toBe(4);
+    for (const [, z] of spots) expect(z).toBeGreaterThan(-800);
+  });
+
+  it("takes a box once a generation, only while racing", () => {
+    const st = live();
+    expect(st.boxGen.length).toBe(rallyBoxSpots(route).length);
+    if (!st.boxGen.length) return;
+    expect(takeRallyBox(st, "a", 0, 0, st.startsAt + 10)).toBe(true);
+    expect(takeRallyBox(st, "b", 0, 0, st.startsAt + 20)).toBe(false);
+    expect(takeRallyBox(st, "b", 0, 1, st.startsAt + 30)).toBe(false);
+    expect(takeRallyBox(st, "b", 0, 1, st.startsAt + 10 + RALLY_BOXES.respawn)).toBe(true);
+    expect(takeRallyBox(st, "zz", 0, 2, st.startsAt + 99_999)).toBe(false);
+  });
+
+  it("gives the back of the field the missiles", () => {
+    let s = 1;
+    const rand = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const count = (place: number) => Array.from({ length: 2000 }, () => rallyItem(place, 6, rand)).filter((x) => x === "missile").length;
+    expect(count(6)).toBeGreaterThan(count(1) * 3);
   });
 });

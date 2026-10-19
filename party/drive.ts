@@ -21,6 +21,7 @@ import {
   BOX_RESPAWN_MS,
   TAKE_MIN_MS,
   USE_MIN_MS,
+  BOX_REACH,
   isItem,
   randomItem,
   validUse,
@@ -44,8 +45,12 @@ import {
   idleRally,
   joinRally,
   leaveRally,
+  rallyBoxSpots,
   rallyBusy,
+  rallyItem,
+  rallyStandings,
   startRally,
+  takeRallyBox,
   stepRally,
   tickRally,
   validRoute,
@@ -362,6 +367,24 @@ export class DriveServer extends PartyRoom {
     }
 
     // City races: start one with a route, or accept the open invite.
+    // A race's item box: near it by your last state, holding nothing, then an item by your place.
+    if (t === "rally_take") {
+      const d = this.drivers.get(sender.id);
+      const st = this.rally;
+      const now = Date.now();
+      const at = this.where(sender.id);
+      if (!d || !st.route || d.held || !at || now - d.lastTake < TAKE_MIN_MS || typeof box !== "number" || typeof gen !== "number") return;
+      const spot = rallyBoxSpots(st.route)[box];
+      if (!spot || Math.hypot(spot[0] - at[0], spot[1] - at[1]) > BOX_REACH * 4) return;
+      if (!takeRallyBox(st, sender.id, box, gen, now)) return;
+      d.lastTake = now;
+      const racing = rallyStandings(st).filter((id) => st.racers[id].ms === null && !st.racers[id].gone);
+      d.held = rallyItem(Math.max(1, racing.indexOf(sender.id) + 1), Math.max(1, racing.length));
+      sender.send(JSON.stringify({ t: "got", item: d.held } satisfies ServerMsg));
+      this.sendRally();
+      return;
+    }
+
     if (t === "rally_start" || t === "rally_join") {
       const d = this.drivers.get(sender.id);
       if (!d) return;
