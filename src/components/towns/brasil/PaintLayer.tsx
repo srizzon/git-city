@@ -14,8 +14,8 @@ import type { UF } from "@/lib/towns/brasil-map";
 // on the map and one rival red while you drive. Only the cells that changed
 // are redrawn, and the texture goes up to the GPU a few times a second at most.
 
-/** Just over the paving, under everything that stands. */
-const Y = 0.3;
+/** Over the asphalt (0.3, LeagueRoads), under its markings (0.45) and everything that stands; pulled forward in depth too, so it never flickers against the road from far. */
+const Y = 0.38;
 const HELD = 110;
 const TRAIL = 235;
 /** Shortest time between two texture uploads (ms). */
@@ -106,7 +106,7 @@ export default function PaintLayer({ board, mine, driving }: { board: PaintBoard
   return (
     <mesh ref={mesh} visible={false} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1} frustumCulled={false}>
       <planeGeometry args={[1, 1]} />
-      <meshBasicMaterial ref={material} transparent depthWrite={false} toneMapped={false} />
+      <meshBasicMaterial ref={material} transparent depthWrite={false} toneMapped={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
     </mesh>
   );
 }
