@@ -130,6 +130,14 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** The Games menu (G): closed, its list of modes, or the race's step (with a route from a link). */
   const [games, setGames] = useState<null | { step: "modes" } | { step: "race"; initial: string | null }>(null);
   const closeGames = useCallback(() => setGames(null), []);
+  /** On the grid or between the gates: the Games menu waits. */
+  const racing = raceActive(rallyView);
+  // Joined a race from inside the menu (its invite shows over it): the menu closes for the grid.
+  const [wasRacing, setWasRacing] = useState(racing);
+  if (wasRacing !== racing) {
+    setWasRacing(racing);
+    if (racing && games) setGames(null);
+  }
   // Every route's record, for the state cards: fetched the first time one opens.
   const [raceRecords, setRaceRecords] = useState<RouteRecord[] | null>(null);
   const recordsAsked = useRef(false);
@@ -307,7 +315,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     if (!driving) return;
     const onKey = (e: KeyboardEvent) => {
       // G opens the Games menu (it answers its own keys, Esc included, while it's open).
-      if (e.code === "KeyG" && !e.repeat && !paused && !taste && driveReady && !games && !(e.target instanceof HTMLInputElement)) {
+      if (e.code === "KeyG" && !e.repeat && !paused && !taste && driveReady && !games && !racing && !(e.target instanceof HTMLInputElement)) {
         e.preventDefault();
         setGames({ step: "modes" });
         return;
@@ -319,7 +327,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [driving, paused, exitDrive, taste, games, driveReady]);
+  }, [driving, paused, exitDrive, taste, games, driveReady, racing]);
   // The State War: the room's paint, through the watch socket on the map and the drive's in the car.
   const paint = usePaint();
   const watch = useDriveWatch(league.slug, !inCar, (msg) => (msg.t.startsWith("paint_") ? paint.onMessage(msg) : applyRoomDamage(smash, msg, Date.now())));
@@ -1119,14 +1127,13 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onVolume={changeVolume}
           onEmote={(e) => emoteApi.current?.send(e)}
           onStartCrown={() => crownApi.current?.start()}
-          gameOn={raceActive(rallyView) || !!games}
-          onGames={() => setGames({ step: "modes" })}
+          gameOn={racing || !!games}
+          onGames={racing ? undefined : () => setGames({ step: "modes" })}
           onResume={() => setPaused(false)}
           onCamera={toggleCamera}
           onMute={toggleMute}
           onExit={exitDrive}
         >
-          {!games && <RacePanel layout={layout} view={rallyView} yourUf={yours} onJoin={() => rallyApi.current?.join()} onRematch={(route) => startRace(route, "rematch")} />}
           {games && (
             <GameMenu title={`Games · ${drivers.length + 1} driving here`} modes={gameModes} onPick={pickGame} onClose={closeGames}>
               {games.step === "race" ? (
@@ -1142,6 +1149,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               ) : undefined}
             </GameMenu>
           )}
+          {/* After the menu, so an invite that comes in while it's open shows over it. */}
+          <RacePanel layout={layout} view={rallyView} yourUf={yours} onJoin={() => rallyApi.current?.join()} onRematch={(route) => startRace(route, "rematch")} />
         </DriveHud>
       )}
 

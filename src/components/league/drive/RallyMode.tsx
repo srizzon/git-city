@@ -359,7 +359,8 @@ export default function RallyMode({
 
     // The arrow, the minimap's line, R.
     if (!racing || !route || !mine) {
-      if (tele.route?.login === "") tele.route = null;
+      // Only the race's own pointer (the drift track's, from the Games menu, stays).
+      if (tele.route?.arrow === false) tele.route = null;
       tele.radar.raceLine = null;
       respawnAt.current = null;
       return;

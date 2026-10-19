@@ -272,8 +272,11 @@ export default function RacePanel({
     if (saved?.state === "saved" && saved.newRecord) news.push(["New route record", pts > 0 ? `+${pts} pts${uf}` : ""]);
     else if (pts > 0) news.push(["Points for your state", `+${pts}${uf}`]);
     const live = r.phase === "live";
+    const guest = mine.name.startsWith("guest-");
     const status =
-      saved?.state === "saving"
+      guest && mine.ms !== null && mine.ms > 0
+        ? "Sign in to save your time and score points."
+        : saved?.state === "saving"
         ? "Saving your time…"
         : saved?.state === "guest"
           ? "Sign in to save your time and score points."
@@ -310,7 +313,7 @@ export default function RacePanel({
     return (
       <GameResults
         title={routeName(route)}
-        place={myPlace > 0 ? `${place(myPlace)} of ${order.length}` : mine.ms === -1 ? "Finished, untimed" : "Didn't finish"}
+        place={myPlace > 0 ? (order.length === 1 ? "Your time" : `${place(myPlace)} of ${order.length}`) : mine.ms === -1 ? "Finished, untimed" : "Didn't finish"}
         time={mine.ms !== null && mine.ms > 0 ? formatLap(mine.ms) : null}
         news={news}
         status={status}
@@ -362,8 +365,9 @@ export default function RacePanel({
     );
   }
 
-  // ── The grid and the race ──────────────────────────────────
+  // ── The grid and the race (past the line with the results closed: back to driving, nothing on screen) ─
   if (rally.phase !== "countdown" && rally.phase !== "live") return null;
+  if (mine.ms !== null) return null;
   const order = rallyStandings(rally);
   const gates = route.gates.length;
   const grid = rally.phase === "countdown";
@@ -401,9 +405,10 @@ function finishedRace(view: RallyView | null): RallyState | null {
   return r && mine && (r.phase === "over" || (r.phase === "live" && mine.ms !== null)) ? r : null;
 }
 
-/** Whether the race has the screen (the drive HUD's own top pieces step aside). */
+/** Whether you're racing right now, on the grid or between the gates (the drive HUD's own pieces and the Games menu step aside). */
 export function raceActive(view: RallyView | null): boolean {
   const r = view?.rally;
-  if (!r || !view?.you || !r.racers[view.you]) return false;
+  const mine = r && view?.you ? r.racers[view.you] : undefined;
+  if (!r || !mine || mine.gone || mine.ms !== null) return false;
   return r.phase === "countdown" || r.phase === "live";
 }
