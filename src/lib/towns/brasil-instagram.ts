@@ -25,11 +25,11 @@ import { getSupabaseAdmin } from "../supabase";
 import { instagramComments, instagramMe, instagramThread, instagramUsernameOf, replyToComment } from "../instagram";
 import { getLeagueBySlug } from "../leagues/service";
 import { BRASIL_SLUG, importBrasilComment, type ReelKind } from "./brasil-server";
-import { parseComment, replyFor } from "./brasil-comments";
+import { parseComment, pickReading, replyFor } from "./brasil-comments";
 import type { UF } from "./brasil-map";
 import { answeredCity, confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
 import { captureServer } from "../posthog-server";
-import { creditComment, creditStory } from "./brasil-points-server";
+import { creditComment, creditStory, residentOfInstagram } from "./brasil-points-server";
 
 export const LIMITS = { perUserHour: 5, repliesPerUserHour: 3, modelPerDay: 2_000 } as const;
 
@@ -96,7 +96,9 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
         }
       }
 
-      const { reader, ...parsed } = await read(c, own);
+      // Someone already on the map who comments a lone @ is tagging a friend; someone new may be giving their own.
+      const onMap = c.igUser ? !!(await residentOfInstagram(league.id, c.igUser)) : false;
+      const { reader, ...parsed } = await read(c, own, !onMap);
       const r = await importBrasilComment(league, { id, reel: w.reel, kind: w.kind, igUser: c.igUser, text: c.text, parsed, claimed: true });
       if (!r.fresh) continue;
       await credit();
@@ -141,8 +143,8 @@ export async function handleStoryMentions(stories: { sender: string; mid: string
 }
 
 /** What a comment says: a yes to our suggestion, the rules for a plain one-word comment, else the model (the rules if it can't). */
-async function read(c: IncomingComment, own: string): Promise<{ login: string | null; uf: UF | null; place: string | null; reader: "rules" | "model" | "confirm" }> {
-  const rules = { ...parseComment(c.text, { ignore: [own], reply: !!c.parentId }), reader: "rules" as const };
+async function read(c: IncomingComment, own: string, loneHandle: boolean): Promise<{ login: string | null; uf: UF | null; place: string | null; reader: "rules" | "model" | "confirm" }> {
+  const rules = { ...parseComment(c.text, { ignore: [own], reply: !!c.parentId, loneHandle }), reader: "rules" as const };
   const plain = c.text.trim().split(/\s+/).length === 1 && !c.text.includes("@");
   if (!c.parentId && plain) return rules;
 
@@ -167,7 +169,10 @@ async function read(c: IncomingComment, own: string): Promise<{ login: string | 
   const reading = await readComment({ text: c.text, commenter: c.igUser, own, thread });
   // The bot's health: how often the model fails and the rules take over.
   if (!reading) await captureServer("brasil-comment-bot", "brasil_comment_model_failed", { reply: !!c.parentId });
-  return reading ? { login: reading.login, uf: reading.uf, place: reading.place, reader: "model" } : rules;
+  if (!reading) return rules;
+  // The model's login is checked against the rules (friends' tags, Instagram handles): see pickReading.
+  const picked = pickReading(c.text, { login: reading.login, uf: reading.uf, place: reading.place }, rules);
+  return picked === rules ? rules : { login: picked.login, uf: picked.uf, place: picked.place, reader: "model" };
 }
 
 /** Which of these comment ids brasil_comments already holds. */

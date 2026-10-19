@@ -38,7 +38,28 @@ const LAUGH = /^(k{2,}|(ha){2,}h?|(rs){2,}|(he){2,})$/;
 
 const STATE_NAMES: [string, UF][] = STATES.map((s) => [fold(s.name), s.uf] as [string, UF]).sort((a, b) => b[0].length - a[0].length);
 
-export function parseComment(text: string, opts: { ignore?: string[]; reply?: boolean } = {}): ParsedComment {
+/**
+ * The model's reading of a comment, checked against the rules': a login it took from a friend's tag
+ * (an @handle with nothing else, or the start of an Instagram handle like "@guilherme.ia") gives way to
+ * the rules, and when it finds no login but the rules find one next to a place, the rules win.
+ */
+export function pickReading<T extends ParsedComment>(text: string, model: T | null, rules: ParsedComment): T | ParsedComment {
+  if (!model) return rules;
+  if (model.login) {
+    const handles = [...text.toLowerCase().matchAll(/@([a-z0-9._]+)/g)].map((m) => m[1]);
+    const insideIgHandle = handles.some((h) => h !== model.login && h.startsWith(model.login!) && /[._]/.test(h));
+    const tagOnly = handles.length > 0 && !model.uf && !model.place && !rules.login;
+    if (insideIgHandle || tagOnly) return rules;
+  }
+  if (!model.login && rules.login && (rules.uf || rules.place)) return rules;
+  return model;
+}
+
+/**
+ * `loneHandle`: a comment that is one @handle and nothing else is the commenter's own username (someone
+ * not on the map yet answering the reel); otherwise it tags a friend.
+ */
+export function parseComment(text: string, opts: { ignore?: string[]; reply?: boolean; loneHandle?: boolean } = {}): ParsedComment {
   let raw = text.trim();
   // The account's own @ is never the username, nor the @ Instagram puts at the start of a reply.
   for (const handle of opts.ignore ?? []) raw = raw.replace(new RegExp(`@${handle.replace(/[.]/g, "\\.")}\\b`, "gi"), " ").trim();
@@ -61,7 +82,17 @@ export function parseComment(text: string, opts: { ignore?: string[]; reply?: bo
   let login: string | null = null;
   const link = /github\.com\/([a-z0-9-]+)/i.exec(rest);
   if (link && GITHUB_LOGIN.test(link[1].toLowerCase())) login = link[1].toLowerCase();
-  const words = rest.replace(/github\.com\/[a-z0-9-]+/gi, " ").split(/[\s,;:|/()!?.]+/).filter(Boolean);
+  // Instagram handles come out whole first ("@vitor.mb_" is one handle, never "@vitor"): one with a dot or an
+  // underscore can't be a GitHub login, so it's only ever a friend being tagged.
+  let igOnly = false;
+  const noLink = rest.replace(/github\.com\/[a-z0-9-]+/gi, " ").replace(/@([a-z0-9._-]+)/g, (_, h: string) => {
+    const handle = h.replace(/[._]+$/, "");
+    if (GITHUB_LOGIN.test(handle) && handle === h) return ` @${handle} `;
+    igOnly = true;
+    return " ";
+  });
+  // "ralfferreira- João Pessoa", "viniciusssjbk -SP": a hyphen at a word's edge is punctuation.
+  const words = noLink.replace(/(^|\s)-+|-+(?=\s|$)/g, " ").split(/[\s,;:|/()!?.]+/).filter(Boolean);
   if (!uf) {
     for (const w of words) {
       const code = parseUF(w.replace(/^@/, ""));
@@ -72,7 +103,7 @@ export function parseComment(text: string, opts: { ignore?: string[]; reply?: bo
     }
   }
   // @handles are friends being tagged when a bare word next to the place is the username.
-  const tagged = words.some((w) => w.startsWith("@"));
+  const tagged = igOnly || words.some((w) => w.startsWith("@"));
   const bare = words.filter((w) => !w.startsWith("@"));
   // A bare word counts when it's the whole comment ("srizzon": how most people answer), or next
   // to a state with nothing else it could be ("srizzon sp"), so a comment like "top demais" never
@@ -85,19 +116,39 @@ export function parseComment(text: string, opts: { ignore?: string[]; reply?: bo
     const rest = words.filter((w) => w !== out && !w.startsWith("@") && !(w.length === 2 && parseUF(w))).join(" ");
     return rest && resolveCity(rest, uf).kind !== "none" ? rest : null;
   };
+  // A place named exactly, in the state written (or a short nickname: "bh", "poa").
+  const exactPlace = (text: string) => {
+    const r = resolveCity(text, uf);
+    return r.kind === "city" && (fold(r.city.name) === text || text.length <= 4) && (!uf || r.city.uf === uf);
+  };
   // With a friend tagged, only "user UF @friend": nothing but the word and the state besides the @s.
   const besideState = bare.filter((w) => !(w.length === 2 && parseUF(w)));
-  if (!login && uf && plain.length === 1 && (!tagged || besideState.length === 1)) login = plain[0];
-  // "srizzon campinas" (and "srizzon campinas @maria"): the one word whose removal leaves a city is the username.
-  if (!login && bare.length > 1) {
-    const fits = plain.filter((w) => placeWithout(w));
-    if (fits.length === 1) login = fits[0];
+  // "@rinaldovilela Recife Pernambuco", "@ana Belo Horizonte MG": every bare word is the place, so the @ is the user.
+  const allPlace = besideState.length > 0 && exactPlace(besideState.join(" "));
+  if (!login && !allPlace && uf && plain.length === 1 && (!tagged || besideState.length === 1)) login = plain[0];
+  // "MuriloDev07 Paraíba, não sei se já adicionou": next to a state, the one word written like a login
+  // (a digit, a hyphen, a capital inside it) among Portuguese ones.
+  if (!login && !allPlace && uf && plain.length > 1) {
+    const loginish = new Set(raw.split(/[\s,;:|/()!?.]+/).filter((w) => /\d|-|[a-z][A-Z]/.test(w)).map((w) => w.toLowerCase()));
+    const like = plain.filter((w) => loginish.has(w));
+    if (like.length === 1) login = like[0];
   }
-  if (!login) {
-    const handle = words.find((w) => w.startsWith("@") && GITHUB_LOGIN.test(w.slice(1)));
+  // "srizzon campinas" (and "srizzon campinas @maria"): the one word whose removal leaves a city is the username.
+  if (!login && !allPlace && bare.length > 1) {
+    const fits = plain.filter((w) => placeWithout(w));
+    // A typo-close city ("agustin" → Adustina, BA) loses to the one named exactly, in the state written.
+    const exact = fits.filter((w) => exactPlace(placeWithout(w)!));
+    if (fits.length === 1) login = fits[0];
+    else if (exact.length === 1) login = exact[0];
+  }
+  // An @handle is the username only next to a place ("@joao SP", "@ana campinas"): on its own it tags a friend.
+  if (!login && (uf || bare.some((w) => !(w.length === 2 && parseUF(w))))) {
+    const handle = words.find((w) => w.startsWith("@") && GITHUB_LOGIN.test(w.slice(1)) && (uf || placeWithout(w.slice(1))));
     if (handle) login = handle.slice(1);
   }
-  if (!login && words.length === 1 && plain.length === 1) login = plain[0];
+  if (!login && opts.loneHandle && words.length === 1 && words[0].startsWith("@") && !igOnly && GITHUB_LOGIN.test(words[0].slice(1))) login = words[0].slice(1);
+  // A bare word that is the whole comment, never next to a friend's tag ("voto @gemison.x07", "@p.ferraz3 up").
+  if (!login && !tagged && words.length === 1 && plain.length === 1) login = plain[0];
   const place = login ? placeWithout(login) : null;
   return { login, uf, place };
 }
