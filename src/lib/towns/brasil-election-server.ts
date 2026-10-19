@@ -97,6 +97,64 @@ export async function candidateByNumber(number: number, now = Date.now()): Promi
   return null;
 }
 
+export interface CountRow {
+  number: number;
+  login: string;
+  avatar_url: string | null;
+  uf: string | null;
+  votes: number;
+}
+
+export interface Count {
+  /** live: the vote is open; final: the last vote's result; soon: no vote has happened yet. */
+  mode: "live" | "final" | "soon";
+  term: number;
+  opens: number;
+  closes: number;
+  /** Most votes first (a tie: whoever got there first). */
+  rows: CountRow[];
+  total: number;
+  /** The winner, once the vote closed. */
+  elected: string | null;
+}
+
+/**
+ * The count for the live-count page: the open vote as it stands, else the
+ * last closed vote's result, else the race before its first vote opens.
+ */
+export async function getCount(leagueId: string, now = Date.now()): Promise<Count> {
+  const clock = electionClock(now);
+  const showing = clock.phase === "voting" || !clock.current ? clock.next : clock.current;
+  const mode: Count["mode"] = clock.phase === "voting" ? "live" : clock.current ? "final" : "soon";
+  const [cands, votes] = await Promise.all([standing(showing.n), votesOf(showing.n)]);
+  const ids = cands.map((c) => c.developer_id);
+  const { data: homes } = ids.length
+    ? await getSupabaseAdmin().from("brasil_residents").select("developer_id, uf").eq("league_id", leagueId).in("developer_id", ids)
+    : { data: [] };
+  const ufOf = new Map((homes ?? []).map((h: { developer_id: number; uf: string | null }) => [h.developer_id, h.uf]));
+  const tally = new Map<number, { n: number; last: number }>();
+  for (const v of votes) {
+    const t = tally.get(v.candidate) ?? { n: 0, last: 0 };
+    t.n++;
+    t.last = Math.max(t.last, v.at);
+    tally.set(v.candidate, t);
+  }
+  const rows = cands
+    .map((c) => ({ id: c.developer_id, number: c.number, login: c.developers!.github_login, avatar_url: c.developers!.avatar_url, uf: ufOf.get(c.developer_id) ?? null, votes: tally.get(c.developer_id)?.n ?? 0, last: tally.get(c.developer_id)?.last ?? Infinity }))
+    .sort((a, b) => b.votes - a.votes || a.last - b.last || a.number - b.number);
+  const total = rows.reduce((s, r) => s + r.votes, 0);
+  const winnerId = mode === "final" ? winner(votes, new Set(ids)) : null;
+  return {
+    mode,
+    term: showing.n,
+    opens: showing.opens,
+    closes: showing.closes,
+    rows: rows.map(({ number, login, avatar_url, uf, votes }) => ({ number, login, avatar_url, uf, votes })),
+    total,
+    elected: rows.find((r) => r.id === winnerId)?.login ?? null,
+  };
+}
+
 /** The president in office now (null before the first vote closes, or when nobody got a vote). */
 export async function currentPresident(now = Date.now()): Promise<string | null> {
   const clock = electionClock(now);

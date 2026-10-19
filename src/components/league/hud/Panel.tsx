@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { HUD_BOX } from "./shared";
 import { useSheet } from "./useSheet";
@@ -9,7 +10,7 @@ import { useSheet } from "./useSheet";
  * Sheet over the city: a right-hand column on desktop, a bottom sheet on
  * phones. Slides in, slides out; Esc and the close button dismiss it.
  */
-export default function Panel({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export default function Panel({ title, onClose, children, above = false }: { title: string; onClose: () => void; children: ReactNode; /** Over the site's own notices (the email card), for a sheet you act in: the vote. */ above?: boolean }) {
   const sheet = useSheet(onClose);
   const { close } = sheet;
 
@@ -21,8 +22,8 @@ export default function Panel({ title, onClose, children }: { title: string; onC
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
-  return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex max-h-[78vh] sm:inset-y-4 sm:right-4 sm:left-auto sm:max-h-none sm:w-[400px]">
+  const sheetEl = (
+    <div className={`pointer-events-none fixed inset-x-0 bottom-0 ${above ? "z-[60]" : "z-40"} flex max-h-[78vh] sm:inset-y-4 sm:right-4 sm:left-auto sm:max-h-none sm:w-[400px]`}>
       <section
         role="dialog"
         aria-label={title}
@@ -43,4 +44,6 @@ export default function Panel({ title, onClose, children }: { title: string; onC
       </section>
     </div>
   );
+  // Above: on <body>, so it rises over notices even inside a fixed page (a fixed parent traps z-index).
+  return above ? createPortal(sheetEl, document.body) : sheetEl;
 }

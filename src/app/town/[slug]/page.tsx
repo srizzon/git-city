@@ -20,7 +20,7 @@ import { TRACK_ID } from "@/lib/league-city/race/track";
 import { getCityDevsByIds, getCityNorms, getLeagueCityDevs, getLeaguePageData, getTownRanking, townPlace } from "@/lib/leagues/queries";
 import { getBrasilLayout, getBrasilWeek } from "@/lib/towns/brasil-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getElection } from "@/lib/towns/brasil-election-server";
+import { getCount, getElection } from "@/lib/towns/brasil-election-server";
 import { PRESIDENCY_ON } from "@/lib/towns/brasil-election";
 import BrasilTownLoader from "./brasil/loader";
 import { getCachedCity } from "@/lib/league-city/service";
@@ -92,11 +92,12 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   // The Brasil town is drawn as the map of Brazil: its own page.
   if (league.map === "brasil") {
     const { layout, residents, grewAt } = await getBrasilLayout(league.id);
-    const [cityDevs, cityNorms, week, election] = await Promise.all([
+    const [cityDevs, cityNorms, week, election, count] = await Promise.all([
       getCityDevsByIds(residents.map((r) => r.dev.id)),
       getCityNorms(),
       getBrasilWeek(league.id),
       PRESIDENCY_ON ? getElection(league.id, viewer) : Promise.resolve(null),
+      PRESIDENCY_ON ? getCount(league.id) : Promise.resolve(null),
     ]);
     const home = viewer ? residents.find((r) => r.dev.id === viewer.id) : undefined;
     // Whether they named their city or only a state (then the map asks them once).
@@ -117,9 +118,10 @@ export default async function LeaguePage({ params, searchParams }: Props) {
         startAt={atLogin ? { login: atLogin } : cidade ? { city: cidade } : uf ? { uf } : null}
         startPick={query.pick === "1"}
         grewAt={grewAt}
-        startVote={PRESIDENCY_ON ? [query.run, query.vote].map((v) => (typeof v === "string" && /^\d{2}$/.test(v) ? Number(v) : null)).find((v) => v !== null) ?? null : null}
+        startVote={!PRESIDENCY_ON ? null : ([query.run, query.vote].map((v) => (typeof v === "string" && /^\d{2}$/.test(v) ? Number(v) : null)).find((v) => v !== null) ?? (query.vote === "open" ? "open" : null))}
         week={week}
         election={election}
+        count={count}
       />
     );
   }
