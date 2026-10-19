@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Car, ChevronLeft, Code2, Instagram, Landmark, Map as MapIcon, MessageCircle, Trophy, UserPlus, Vote as VoteIcon, type LucideIcon } from "lucide-react";
+import { Building2, Car, ChevronLeft, Landmark, Map as MapIcon, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import posthog from "posthog-js";
@@ -48,7 +48,6 @@ import { brasilWorld, plainBuilding } from "@/lib/towns/brasil-world";
 import { brasilOffices, officeLabel, type Office } from "@/lib/towns/brasil-roles";
 import type { BrasilWeek } from "@/lib/towns/brasil-server";
 import type { Count, ElectionView } from "@/lib/towns/brasil-election-server";
-import { POINTS, totalOf, type PointsBreakdown } from "@/lib/towns/brasil-points";
 
 // The Brasil town's page: the map of Brazil with the town's residents, each
 // in their city, their buildings sized like everywhere in Git City. Over it:
@@ -127,8 +126,6 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   });
   /** Just placed: in which city (null: the island), until the refreshed map has the building (then the camera goes there). */
   const [arriving, setArriving] = useState<{ city: number | null } | null>(null);
-  /** The arrival the open card celebrates, and the ring under the new lot. */
-  const [arrived, setArrived] = useState<{ login: string } | null>(null);
   const [pulse, setPulse] = useState<{ x: number; z: number; key: number } | null>(null);
   const [now] = useState(() => Date.now());
   /** Up close, the city the camera looks at (its cityKey). */
@@ -444,7 +441,6 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** ‹: one step up. A building goes back to its state's card (or just closes), a city to the whole country, the country to the towns. */
   const closeBuilding = () => {
     setFocused(null);
-    setArrived(null);
     // Opened from a state's card: back to it, and back over its city.
     if (backTo) {
       setState(backTo);
@@ -675,7 +671,6 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         setPanel("election");
         return;
       }
-      setArrived({ login });
       openBuilding(b);
     }, 0);
     return () => clearTimeout(t);
@@ -1090,26 +1085,26 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           key={focused.loginLower}
           building={focused}
           viewerLogin={viewerLogin}
+          lean
           section={
-            <>
-              {arrived?.login === focused.loginLower && (
-                <Arrival login={arrived.login} city={world.cityOfLogin.get(focused.loginLower) ?? null} states={world.states} founder={!!world.ufOf.get(focused.loginLower)?.founder} townPath={`/town/${league.slug}`} />
-              )}
-              <ResidentRow
-                offices={world.offices.byLogin.get(focused.loginLower) ?? []}
-                weekly={officeWeek.totals[focused.loginLower] ?? 0}
-                provisional={officeWeek.provisional}
-                live={officeWeek.live.breakdown[focused.loginLower] ?? null}
-                login={focused.loginLower}
-                ufOf={world.ufOf}
-                city={world.cityOfLogin.get(focused.loginLower) ?? null}
-                states={world.states}
-                onState={openState}
-                onCity={openCity}
-                onMove={viewerLogin?.toLowerCase() === focused.loginLower ? () => openPicker(null) : undefined}
-              />
-            </>
+            <PlaceRow
+              login={focused.loginLower}
+              city={world.cityOfLogin.get(focused.loginLower) ?? null}
+              offices={world.offices.byLogin.get(focused.loginLower) ?? []}
+              onCity={openCity}
+              onState={openState}
+              onMove={viewerLogin?.toLowerCase() === focused.loginLower ? () => openPicker(null) : undefined}
+            />
           }
+          stats={[
+            { label: "Pts this week", value: fmt(officeWeek.live.totals[focused.loginLower] ?? 0) },
+            { label: "Rank", value: `#${fmt(focused.rank ?? 0)}` },
+            { label: "Contribs", value: fmt(focused.contributions ?? 0) },
+            { label: "Stars", value: fmt(focused.total_stars ?? 0) },
+            { label: "+1s", value: fmt(focused.kudos_count ?? 0) },
+            { label: "Visits", value: fmt(focused.visit_count ?? 0) },
+          ]}
+          primary={<InviteButton login={focused.loginLower} city={world.cityOfLogin.get(focused.loginLower) ?? null} founder={!!world.ufOf.get(focused.loginLower)?.founder} townPath={`/town/${league.slug}`} onPickCity={() => openPicker(null)} />}
           onDriveTo={() => startDrive()}
           onClose={closeBuilding}
         />
@@ -1274,144 +1269,73 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
   );
 }
 
-/** Your card right after you're placed: where you landed, what you are there, and the invite. */
-function Arrival({ login, city, states, founder, townPath }: { login: string; city: CityLayout | null; states: StateStats[]; founder: boolean; townPath: string }) {
+/** The one filled button on your own building: invite people to your city (or pick one, on the island). */
+function InviteButton({ login, city, founder, townPath, onPickCity }: { login: string; city: CityLayout | null; founder: boolean; townPath: string; onPickCity: () => void }) {
   const [copied, setCopied] = useState(false);
-  const island = !city || city.ibge === null;
-  const s = !island && city.uf ? states.find((x) => x.uf === city.uf) : null;
+  if (!city || city.ibge === null)
+    return (
+      <button type="button" onClick={onPickCity} className="btn-press w-full bg-lime py-2 text-[10px] text-bg">
+        Pick your city
+      </button>
+    );
   const invite = () => {
     // A founder shares their city (its card names them); anyone else, their own building.
-    const url = founder && city?.slug ? `${window.location.origin}${townPath}?cidade=${city.slug}` : `${window.location.origin}${townPath}?at=${login}`;
+    const url = founder && city.slug ? `${window.location.origin}${townPath}?cidade=${city.slug}` : `${window.location.origin}${townPath}?at=${login}`;
     // Shared on WhatsApp and stories, by and to Brazilians: Portuguese, one line, the link does the rest.
-    const text = founder && !island ? `Fundei ${city!.name} no mapa dos devs 🇧🇷 Bora morar aqui: ${url}` : `Tô no mapa dos devs do Brasil 🇧🇷 ${url}`;
-    posthog.capture("brasil_invite_copied", { uf: city?.uf ?? null, city: city?.ibge ?? null, from: "arrival" });
+    const text = founder ? `Fundei ${city.name} no mapa dos devs 🇧🇷 Bora morar aqui: ${url}` : `Tô em ${city.name} no mapa dos devs 🇧🇷 ${url}`;
+    posthog.capture("brasil_invite_copied", { uf: city.uf, city: city.ibge, from: "building" });
     navigator.clipboard?.writeText(text).then(
       () => setCopied(true),
       () => setCopied(false),
     );
   };
   return (
-    <div className="mx-4 mb-3 border-2 border-lime px-3 py-2.5">
-      <p className="text-[8px] text-lime">You&apos;re on the map</p>
-      <p className="mt-1 text-sm text-cream">{island ? "You're on the island" : founder ? `Founder of ${city!.name}` : `You're in ${city!.name}`}</p>
-      <p className="mt-0.5 text-[9px] normal-case text-muted">
-        {island
-          ? "No city yet. Pick one anytime with Move."
-          : founder
-            ? `The first dev in ${city!.name}. Everyone from there lives in your city now.`
-            : `Dev #${fmt(city!.devs.length)} in ${city!.name}${s ? ` · ${s.uf} is #${s.place} of 27` : ""}`}
-      </p>
-      <button type="button" onClick={invite} className="btn-press mt-2 w-full border-2 border-lime bg-lime py-1.5 text-[10px] text-bg">
-        {copied ? "Invite copied" : island ? "Invite a friend" : `Invite to ${city!.name}`}
-      </button>
-    </div>
+    <button type="button" onClick={invite} className="btn-press w-full bg-lime py-2 text-[10px] text-bg">
+      {copied ? "Invite copied" : `Invite to ${city.name}`}
+    </button>
   );
 }
 
-/** A resident's state on their building card: the state (a click opens it), founder, place there. */
-function ResidentRow({
-  login,
-  ufOf,
-  city,
-  states,
-  onState,
-  onCity,
-  onMove,
-  offices,
-  weekly,
-  provisional,
-  live,
-}: {
-  /** What they hold this week, and the points that elected them. */
-  offices: Office[];
-  weekly: number;
-  provisional: boolean;
-  /** Their points this week so far, by where they came from. */
-  live: PointsBreakdown | null;
-  login: string;
-  ufOf: ReadonlyMap<string, { uf: UF | null; founder: boolean }>;
-  /** Their city on the map. */
-  city: CityLayout | null;
-  states: StateStats[];
-  onState: (uf: UF) => void;
-  onCity: (c: CityLayout) => void;
-  /** Your own building: change state. */
-  onMove?: () => void;
-}) {
-  const r = ufOf.get(login);
-  const s = r?.uf ? states.find((x) => x.uf === r.uf) : null;
-  const inState = s ? s.top.findIndex((l) => l.toLowerCase() === login) : -1;
+/** Where a resident lives, said once: their city (a click flies there), its state, Move on yours, and what they are there as seals. */
+function PlaceRow({ login, city, offices, onCity, onState, onMove }: { login: string; city: CityLayout | null; offices: Office[]; onCity: (c: CityLayout) => void; onState: (uf: UF) => void; onMove?: () => void }) {
+  const island = !city || city.ibge === null;
+  const at = city ? city.devs.findIndex((d) => d.dev.login.toLowerCase() === login) : -1;
+  const founder = !island && at >= 0 && city!.devs[at].founder;
+  // The city is on the line above: a mayor's seal needs no name.
+  const seals = [...(founder ? ["Founder"] : []), ...offices.map((o) => (o.kind === "mayor" ? "Mayor" : officeLabel(o)))];
   return (
-    <>
-      {offices.length > 0 && (
-        <div className="mx-4 mb-2 flex flex-col gap-1 border-2 border-lime px-3 py-2">
-          <div className="flex flex-wrap gap-1">
-            {offices.map((o) => (
-              <span key={officeLabel(o)} className="bg-lime px-1.5 py-0.5 text-[9px] text-bg">
-                {officeLabel(o)}
-              </span>
-            ))}
-          </div>
-          <p className="text-[9px] normal-case text-muted">
-            {offices.some((o) => o.kind === "president")
-              ? "Voted in by Brazil's devs."
-              : provisional
-                ? `Leading this week with ${fmt(weekly)} points. Offices change Sunday 21h.`
-                : `Elected by ${fmt(weekly)} points last week. Holds it until Sunday 21h.`}
-          </p>
-        </div>
-      )}
-      {live && totalOf(live) > 0 && <PointsLine b={live} />}
-      <div className="mx-4 mb-3 flex items-center justify-between gap-2 border-2 border-border px-3 py-2">
-        {s && city && city.ibge !== null ? (
-          <span className="flex min-w-0 items-center gap-2 text-[9px]">
-            <span className="h-2.5 w-2.5 shrink-0" style={{ background: swatchOf(s.uf) }} aria-hidden />
-            <button type="button" onClick={() => onCity(city)} className="min-w-0 truncate normal-case text-cream hover:text-lime">
-              {city.name}
-            </button>
-            <button type="button" onClick={() => onState(s.uf)} className="shrink-0 text-muted hover:text-lime">
-              {s.uf}
-            </button>
-          </span>
+    <div className="mx-4 mb-3 border-2 border-border px-3 py-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        {island ? (
+          <span className="text-[11px] text-cream">The island</span>
         ) : (
-          <span className="text-[9px] text-muted">The island · no city</span>
+          <button type="button" onClick={() => onCity(city!)} className="min-w-0 truncate text-left text-[11px] normal-case text-cream hover:text-lime">
+            {city!.name}
+          </button>
         )}
-        <span className="flex items-center gap-2 text-[9px] text-muted">
-          {r?.founder && city?.ibge !== null ? <span className="text-lime">Founder</span> : inState >= 0 ? `Top ${inState + 1} in ${s?.uf}` : ""}
+        <span className="flex shrink-0 items-baseline gap-2 text-[9px] text-muted">
+          {!island && city!.uf && (
+            <button type="button" onClick={() => onState(city!.uf!)} className="hover:text-lime">
+              {city!.uf}
+            </button>
+          )}
           {onMove && (
-            <button type="button" onClick={onMove} className="text-cream underline hover:text-lime">
-              Move
+            <button type="button" onClick={onMove} className="text-cream underline decoration-dotted underline-offset-2 hover:text-lime">
+              {island ? "Pick a city" : "Move"}
             </button>
           )}
         </span>
       </div>
-    </>
-  );
-}
-
-/** A resident's points this week and where they came from, on their building card: the total, then an icon and a count per source. */
-function PointsLine({ b }: { b: PointsBreakdown }) {
-  const n = (k: "invite" | "story" | "comment" | "coded") => b[k] / POINTS[k];
-  const parts: { icon: LucideIcon; count: number; label: string }[] = [
-    { icon: UserPlus, count: n("invite"), label: "friends who joined" },
-    { icon: Instagram, count: n("story"), label: "stories" },
-    { icon: MessageCircle, count: n("comment"), label: "comments" },
-    { icon: Code2, count: n("coded"), label: "days coding" },
-    { icon: VoteIcon, count: b.vote ? 1 : 0, label: "voted" },
-  ].filter((p) => p.count > 0);
-  return (
-    <div className="mx-4 mb-2 flex items-center justify-between gap-3 border-2 border-border px-3 py-2">
-      <span className="text-[9px] text-cream">
-        <span className="text-sm text-lime">{fmt(totalOf(b))}</span> pts this week
-      </span>
-      <span className="flex items-center gap-2.5">
-        {parts.map((p) => (
-          <span key={p.label} title={`${p.count} ${p.label}`} aria-label={`${p.count} ${p.label}`} className="flex items-center gap-1 text-[9px] tabular-nums text-muted">
-            <p.icon size={12} aria-hidden />
-            {p.count}
-          </span>
-        ))}
-      </span>
+      {(seals.length > 0 || (!island && at >= 0)) && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {seals.map((t) => (
+            <span key={t} className="bg-lime px-1.5 py-0.5 text-[8px] text-bg">
+              {t}
+            </span>
+          ))}
+          {!founder && !island && at >= 0 && <span className="border border-border px-1.5 py-0.5 text-[8px] text-muted">Dev #{fmt(at + 1)}</span>}
+        </div>
+      )}
     </div>
   );
 }

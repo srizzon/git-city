@@ -6,18 +6,27 @@ import type { CityBuilding } from "@/lib/github";
 import type { LeaguePageData } from "@/lib/leagues/queries";
 import { levelProgress, rankFromLevel, tierFromLevel, xpForLevel } from "@/lib/xp";
 import { Avatar, fmt } from "./shared";
+import { SocialLinkChip } from "@/components/SocialIcons";
+import { SOCIAL_PLATFORMS, type SocialLinks } from "@/lib/social-links";
 import { useSheet } from "./useSheet";
 
 // Same card as the home city's building profile (header, level, stats,
 // actions), plus the dev's place in this league and a kudos button. A town
 // drawn another way (the Brasil map) passes its own `section` instead of the
-// league's, and the viewer's login instead of the league's page data.
+// league's, and the viewer's login instead of the league's page data, and may
+// ask for the lean actions: its own numbers, one filled button (`primary`, or
+// kudos on someone else's), Drive and Profile side by side, and the dev's
+// links (GitHub, then what they put on their profile) as pixel icons under
+// their name.
 
 export default function BuildingCard({
   building: b,
   data,
   viewerLogin,
   section,
+  stats,
+  primary,
+  lean = false,
   onDriveTo,
   onClose,
 }: {
@@ -27,6 +36,12 @@ export default function BuildingCard({
   viewerLogin?: string | null;
   /** Without league data: what goes where the league's "Joined / this week" row is. */
   section?: ReactNode;
+  /** The six numbers, when the town has its own. */
+  stats?: { label: string; value: string }[];
+  /** On your own building (lean): the one filled button. */
+  primary?: ReactNode;
+  /** One filled button, Drive and Profile side by side, the links as icons under the name. */
+  lean?: boolean;
   /** Get in the car with an arrow pointing here (left out while driving and on your own building). */
   onDriveTo?: () => void;
   onClose: () => void;
@@ -58,6 +73,17 @@ export default function BuildingCard({
       setKudos({ state: "error", message: "Couldn't send kudos" });
     }
   };
+  // Lean: the links they put on their profile, fetched when the card opens.
+  const [links, setLinks] = useState<SocialLinks>({});
+  useEffect(() => {
+    if (!lean) return;
+    const controller = new AbortController();
+    fetch(`/api/social-links?login=${encodeURIComponent(b.login)}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d: { links?: SocialLinks } | null) => setLinks(d?.links ?? {}))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [lean, b.login]);
   const sheet = useSheet(onClose);
   const { close } = sheet;
 
@@ -127,6 +153,12 @@ export default function BuildingCard({
                   )}
                 </div>
                 <p className="truncate text-[10px] text-muted normal-case">@{b.login}</p>
+                {lean && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    <SocialLinkChip name="github" href={`https://github.com/${b.login}`} size={22} />
+                    {SOCIAL_PLATFORMS.map((p) => (links[p] ? <SocialLinkChip key={p} name={p} href={links[p]!} size={22} /> : null))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -175,14 +207,14 @@ export default function BuildingCard({
 
           {/* Stats */}
           <div className="mx-4 mb-3 grid grid-cols-3 gap-px border border-border/50 bg-border/30">
-            {[
+            {(stats ?? [
               { label: "Rank", value: `#${b.rank}` },
               { label: "Contribs", value: fmt(b.contributions) },
               { label: "Repos", value: fmt(b.public_repos) },
               { label: "Stars", value: fmt(b.total_stars) },
               { label: "+1s", value: fmt(b.kudos_count ?? 0) },
               { label: "Visits", value: fmt(b.visit_count ?? 0) },
-            ].map((s) => (
+            ]).map((s) => (
               <div key={s.label} className="bg-bg-card p-2 text-center">
                 <div className="text-xs text-lime">{s.value}</div>
                 <div className="mt-0.5 text-[8px] text-muted">{s.label}</div>
@@ -190,6 +222,36 @@ export default function BuildingCard({
             ))}
           </div>
 
+          {lean ? (
+            <div className="mx-4 mb-4 flex flex-col gap-2">
+              {isSelf ? (
+                primary
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={giveKudos}
+                    disabled={kudos.state === "sending" || kudos.state === "sent"}
+                    className={`btn-press w-full py-2 text-[10px] ${kudos.state === "sent" ? "border-2 border-lime text-lime" : "bg-lime text-bg"} disabled:cursor-default`}
+                  >
+                    {kudos.state === "sending" ? "Sending…" : kudos.state === "sent" ? "Kudos sent" : "Give kudos"}
+                  </button>
+                  {kudos.state === "error" && <p className="text-[9px] text-red-400 normal-case">{kudos.message}</p>}
+                </>
+              )}
+              <div className="flex gap-2">
+                {onDriveTo && (
+                  <button type="button" onClick={onDriveTo} className="btn-press flex-1 border-2 border-border py-2 text-[10px] text-cream transition-colors hover:border-lime/60">
+                    Drive here
+                  </button>
+                )}
+                <Link href={`/dev/${b.login}`} className="btn-press flex-1 border-2 border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-lime/60">
+                  Profile
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <>
           {/* Kudos */}
           {!isSelf && (
             <div className="mx-4 mb-3">
@@ -237,6 +299,8 @@ export default function BuildingCard({
               GitHub
             </a>
           </div>
+            </>
+          )}
         </div>
       </div>
     </>
