@@ -116,8 +116,8 @@ const racer = (name: string, slot: number): RallyRacer => ({ name, slot, next: 0
 
 /** Someone starts a race. `alone`: nobody else in the room, so no invite. */
 export function startRally(st: RallyState, id: string, by: string, name: string, route: RallyRoute, now: number, alone: boolean): boolean {
+  // A new race clears the last one's results (a rematch starts right from them).
   if (rallyBusy(st)) return false;
-  if (st.phase === "over" && now < st.endsAt + RALLY.over) return false;
   Object.assign(st, idleRally());
   st.id = id;
   st.by = by;
