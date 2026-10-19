@@ -185,6 +185,20 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
     if (!ctx.verifiedHandles.includes(h.slice(1).toLowerCase())) fail("caption", `${h} in the caption isn't a verified handle.`);
   }
 
+  // Words on screen add to the voice, never repeat it (Sam, 2026-10-19: "nunca ter o mesmo texto falado escrito na tela"):
+  // a title, card, plate or label that the narration says word for word fails. Captions are the voice by design.
+  const norm = (x: string) => ` ${x.toLowerCase().replace(/\*/g, "").replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim()} `;
+  const spoken = norm(spec.lines.map((l) => l.say ?? l.show).join(" "));
+  const titles = [
+    ...(spec.header ? [...spec.header.rule, ...spec.header.cta].map((l) => l.text) : []),
+    ...(spec.headline ?? []).flatMap((h) => h.lines.map((l) => l.text)),
+    ...spec.overlays.flatMap((o) => (o.type === "card" ? [o.lines.map((l) => l.text).join(" ")] : o.type === "santinhos" || o.type === "urna" || o.type === "pointer" ? [o.label ?? ""] : [])),
+  ];
+  for (const title of titles) {
+    const t = norm(title);
+    if (words(t).length >= 3 && spoken.includes(t)) fail("echo", `"${title.replace(/\*/g, "")}" on screen is what the voice says: show something it doesn't.`);
+  }
+
   if (spec.kind === "main" && !spec.post.cover) warn("cover", "The main reel has no cover prompt yet (post.cover): it's made after the final, from the prompt approved with the script.");
 
   if (spec.kind === "trial") {

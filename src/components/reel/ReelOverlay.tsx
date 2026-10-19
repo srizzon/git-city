@@ -231,6 +231,25 @@ const COUNT_STEPS = 14;
 const NUMBER = /\d[\d.,]*/;
 const numberOf = (s: string) => Number((NUMBER.exec(s)?.[0] ?? "0").replace(/\./g, "").replace(",", "."));
 
+/** Types PlateLines `local` seconds in: hard steps, a plate showing when its line starts, the cursor solid while it types and blinking after. */
+function typePlates(b: HTMLElement, local: number) {
+  const n = Math.floor(local * HEAD_CPS);
+  const total = b.querySelectorAll("[data-ch]").length;
+  const blink = n < total || Math.floor((local - total / HEAD_CPS) * 2.5) % 2 === 0;
+  const rows = [...b.querySelectorAll<HTMLElement>("p")];
+  rows.forEach((pl, q) => {
+    const chars = [...pl.querySelectorAll<HTMLElement>("[data-ch]")];
+    const first = Number(chars[0]?.dataset.ch ?? 0);
+    const last = first + chars.length;
+    pl.style.visibility = q === 0 || n > first ? "" : "hidden";
+    chars.forEach((ch) => (ch.style.display = Number(ch.dataset.ch) < n ? "" : "none"));
+    // The cursor sits on the line being typed, and stays on the last one once done.
+    const here = (n >= first && n < last) || (q === rows.length - 1 && n >= last);
+    const cursor = pl.querySelector<HTMLElement>("[data-cursor]");
+    if (cursor) cursor.style.visibility = here && blink ? "" : "hidden";
+  });
+}
+
 /**
  * A full-frame card on the dotted background. Every line types in (a block arrives whole when its
  * turn comes), a block's number counts up from 0 in hard steps over the card, and the map's dots
@@ -357,20 +376,9 @@ function SantinhosPanel({ index, panel }: { index: number; panel: Extract<ReelPa
           </div>
         </div>
       ) : (
-        // No hero: the label itself is what lands, big, on its plate.
-        <div className="absolute inset-x-0 flex justify-center" style={{ top: "34%" }}>
-          <div data-hero data-reel-box="santinhos" className="font-pixel uppercase" style={{ ...PLATE, maxWidth: "72%", fontSize: "8.4cqw", lineHeight: 1.3, textAlign: "center", padding: "3cqw 4cqw", visibility: "hidden" }}>
-            <span style={{ color: BRAND.green, marginRight: "0.5em" }}>&gt;</span>
-            {(panel.label ?? "").split(/(\*[^*]+\*)/).map((part, i) =>
-              part.startsWith("*") ? (
-                <span key={i} style={{ color: BRAND.green }}>
-                  {part.slice(1, -1)}
-                </span>
-              ) : (
-                part
-              ),
-            )}
-          </div>
+        // No hero: the label is what comes in, as the terminal's lines (" / " breaks them), typed on their plates.
+        <div data-hero data-reel-box="santinhos" className="absolute inset-x-0 flex flex-col items-center font-pixel uppercase" style={{ top: "30%", visibility: "hidden" }}>
+          <PlateLines lines={(panel.label ?? "").split(" / ").map((text) => ({ text, size: "big" as const }))} />
         </div>
       )}
     </div>
@@ -395,8 +403,9 @@ function drawSantinhos(el: HTMLElement, p: Extract<ReelPanel, { kind: "santinhos
   const k = clamp((t - p.slamAt) / 0.18);
   if (hero) {
     hero.style.visibility = t >= p.slamAt ? "" : "hidden";
-    // From big and tilted down to its size, a little turned: it lands.
-    hero.style.transform = `scale(${1 + 1.6 * (1 - ease(k))}) rotate(${(p.hero ? -4 : -2) - 10 * (1 - k)}deg)`;
+    // A candidate's flyer lands from big and tilted; the label types in on its plates, like the headline.
+    if (p.hero) hero.style.transform = `scale(${1 + 1.6 * (1 - ease(k))}) rotate(${-4 - 10 * (1 - k)}deg)`;
+    else typePlates(hero, t - p.slamAt);
   }
   if (label) label.style.visibility = t >= p.slamAt + 0.15 ? "" : "hidden";
 }
@@ -1676,22 +1685,7 @@ export default function ReelOverlay({
             b.style.transform = `translateX(-50%) scale(${1 + 0.06 * (1 - ease((t - h.from) / 0.18))})`;
             return;
           }
-          // Typed in hard steps, the cursor solid while it types and blinking after.
-          const n = Math.floor((t - h.from) * HEAD_CPS);
-          const total = b.querySelectorAll("[data-ch]").length;
-          const blink = n < total || Math.floor((t - h.from - total / HEAD_CPS) * 2.5) % 2 === 0;
-          const rows = [...b.querySelectorAll<HTMLElement>("p")];
-          rows.forEach((pl, q) => {
-            const chars = [...pl.querySelectorAll<HTMLElement>("[data-ch]")];
-            const first = Number(chars[0]?.dataset.ch ?? 0);
-            const last = first + chars.length;
-            pl.style.visibility = q === 0 || n > first ? "" : "hidden";
-            chars.forEach((ch) => (ch.style.display = Number(ch.dataset.ch) < n ? "" : "none"));
-            // The cursor sits on the line being typed, and stays on the last one once done.
-            const here = (n >= first && n < last) || (q === rows.length - 1 && n >= last);
-            const cursor = pl.querySelector<HTMLElement>("[data-cursor]");
-            if (cursor) cursor.style.visibility = here && blink ? "" : "hidden";
-          });
+          typePlates(b, t - h.from);
         });
       }
       raf = requestAnimationFrame(draw);
