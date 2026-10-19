@@ -118,6 +118,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const [rallyView, setRallyView] = useState<RallyView | null>(null);
   const raceRecordRef = useRef<number | null>(null);
   /** A race's start line, from the map's own route between its cities. */
+  const raceLine = useCallback((r: { from: string; to: string }) => raceRoute(layout, r.from, r.to)?.line ?? null, [layout]);
   const raceStartLine = useCallback(
     (r: { from: string; to: string }) => {
       const built = raceRoute(layout, r.from, r.to);
@@ -576,9 +577,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       onCrown: setCrownView,
       onTaste: viewerLogin ? undefined : onTaste,
       onRoom: paint.onMessage,
-      rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef, startLine: raceStartLine },
+      rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef, startLine: raceStartLine, routeLine: raceLine },
     }),
-    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, paint.onMessage, games, raceStartLine, raceResults],
+    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, paint.onMessage, games, raceStartLine, raceResults, raceLine],
   );
   /** Your state, from your city. */
   const homeCity = viewerLogin ? world.cityOfLogin.get(viewerLogin.toLowerCase()) : undefined;

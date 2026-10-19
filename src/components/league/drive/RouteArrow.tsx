@@ -92,8 +92,7 @@ export default function RouteArrow({
   useFrame(({ camera }, dt) => {
     const g = ref.current;
     const c = car.current;
-    const live = telemetryRef.current.route;
-    const route = live?.arrow === false ? null : live;
+    const route = telemetryRef.current.route;
     if (!g) return;
     g.visible = !!route && !!c;
     if (!route || !c) {

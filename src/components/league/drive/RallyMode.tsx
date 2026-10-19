@@ -8,6 +8,8 @@ import { rallyBoxSpots, type RallyRoute, type RallyState } from "@/lib/league-ci
 import { BOX_REACH } from "@/lib/league-city/drive/battle";
 import { chime } from "@/lib/sfx/chime";
 import { Bursts, Crate, type VoxelBursts } from "./Voxels";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { sfx } from "@/lib/league-city/race/sfx";
 import type { ClientMsg } from "@/lib/league-city/drive/net";
 import { M_TO_UNIT } from "@/lib/league-city/drive/tuning";
 import { carHeading, headingFromRot, placeCar } from "@/lib/league-city/drive/vehicle";
@@ -26,10 +28,13 @@ import type { BattleEvent } from "./useDrivePresence";
 // checkered line), sends R back to the last gate, times you through each gate
 // against the record's splits, records your drive for the route's ghost,
 // races the record's ghost when you're alone, and carries the room's receipt
-// for your finish to the site. The arrow over the car stays off: the banners
-// and the minimap's line show the way. Item boxes sit in rows across the
-// road (rally.ts): drive through one with empty hands and the room gives you
-// an attack, which Battle fires on F like any other.
+// for your finish to the site. The way is always readable: lime chevrons on
+// the road along the whole route (Forza's driving line), the arrow over the
+// car at the next gate, the line on the minimap. Item boxes sit in rows
+// across the road (rally.ts): drive through one with empty hands and the
+// room gives you an attack, which Battle fires on F like any other. It
+// sounds like the race track: a beep a light, GO, a chime a gate (up ahead
+// of the record, down behind), a sting into the last stretch, the fanfare.
 
 export interface RallyApi {
   /** Start a race on this route (the room invites everyone else). */
@@ -192,6 +197,7 @@ export default function RallyMode({
   respawnAt,
   recordMs,
   startLine,
+  routeLine,
   muted = false,
 }: {
   slug: string;
@@ -208,8 +214,18 @@ export default function RallyMode({
   recordMs?: React.MutableRefObject<number | null>;
   /** Where the route's start line is (m), from the map. */
   startLine?: (route: RallyRoute) => { x: number; z: number; rot: number } | null;
+  /** The route's path on the road (m), from the map: the chevrons follow it. */
+  routeLine?: (route: RallyRoute) => [number, number][] | null;
   muted?: boolean;
 }) {
+  const mutedRef = useRef(muted);
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
+  const say = (f: () => void) => {
+    if (!mutedRef.current) f();
+  };
+  const cue = useRef({ lit: 0, go: false, last: false });
   const boxSpots = useRef<[number, number][]>([]);
   const asked = useRef(new Set<string>());
   const [takenBoxes, setTakenBoxes] = useState<Set<string>>(() => new Set());
@@ -252,6 +268,7 @@ export default function RallyMode({
           if (raceId.current !== e.race) return;
           saved.current = res;
           publish();
+          if (res.state === "saved" && res.newRecord) say(sfx.record);
           // The rest of the race's points land as the others save theirs.
           if (res.state === "saved" && s.route) {
             const key = s.route.key;
@@ -296,6 +313,14 @@ export default function RallyMode({
           gateTimes.current[k] = Math.max(0, at - e.rally.startsAt);
           recorder.current.checkpoint(k, at);
         }
+        const gates = e.rally.route?.gates.length ?? 0;
+        const theirs = recordSplits.current?.[after - 1];
+        const mineAt = gateTimes.current[after - 1];
+        if (after >= gates) say(sfx.finish);
+        else if (after === gates - 1 && !cue.current.last) {
+          cue.current.last = true;
+          say(sfx.finalLap);
+        } else say(() => sfx.chime(theirs === undefined || mineAt === undefined || mineAt <= theirs));
       }
       state.current = e.rally;
       setRally(e.rally);
@@ -380,14 +405,14 @@ export default function RallyMode({
     // The arrow, the minimap's line, R.
     if (!racing || !route || !mine) {
       // Only the race's own pointer (the drift track's, from the Games menu, stays).
-      if (tele.route?.arrow === false) tele.route = null;
+      if (tele.route?.race) tele.route = null;
       tele.radar.raceLine = null;
       respawnAt.current = null;
       return;
     }
     const next = Math.min(mine.next, route.gates.length - 1);
     const [gx, gz] = route.gates[next];
-    tele.route = { login: "", x: gx * M_TO_UNIT, z: gz * M_TO_UNIT, reach: 0, arrow: false };
+    tele.route = { login: "", x: gx * M_TO_UNIT, z: gz * M_TO_UNIT, reach: 0, race: true };
     if (!tele.radar.raceLine) tele.radar.raceLine = route.gates.map(([x, z]) => [x * M_TO_UNIT, z * M_TO_UNIT] as [number, number]);
     if (mine.next > 0) {
       const g = gatePose(route, mine.next - 1);
@@ -399,7 +424,19 @@ export default function RallyMode({
 
     if (!c) return;
     const serverNow = Date.now() + offset.current;
-    if (s.phase === "countdown") return;
+    // The lights: a beep as each comes on, GO as they go out.
+    if (s.phase === "countdown") {
+      const lit = Math.max(0, Math.min(5, Math.floor((serverNow - s.lightsAt) / 1000) + 1));
+      if (serverNow >= s.lightsAt && lit > cue.current.lit) say(sfx.beep);
+      cue.current.lit = serverNow >= s.lightsAt ? lit : 0;
+      cue.current.go = false;
+      cue.current.last = false;
+      return;
+    }
+    if (!cue.current.go && serverNow >= s.startsAt) {
+      cue.current.go = true;
+      say(sfx.go);
+    }
     // Live: record your drive for the ghost, from lights out.
     if (!recorder.current.running && serverNow >= s.startsAt) recorder.current.begin(s.startsAt);
     const p = c.body.translation();
@@ -437,8 +474,9 @@ export default function RallyMode({
   return (
     <>
       <Bursts ref={bursts} />
+      {racing && route && <Chevrons line={routeLine?.(route) ?? null} />}
       {crates.map((b) => (
-        <Crate key={b.key} x={b.x * M_TO_UNIT} z={b.z * M_TO_UNIT} faded={!!telemetryRef.current.held} />
+        <Crate key={b.key} x={b.x * M_TO_UNIT} z={b.z * M_TO_UNIT} size={6} />
       ))}
       {racing && route && start && rally?.phase === "countdown" && (
         <group position={[start.x, 0, start.z]} rotation={[0, start.face, 0]}>
@@ -476,6 +514,66 @@ export default function RallyMode({
         />
       )}
     </>
+  );
+}
+
+/** One chevron on the road, its point toward -z (city units): two flat bars in a V. */
+function chevronGeometry(): THREE.BufferGeometry {
+  const arm = 9;
+  const bar = 2.2;
+  const parts = [-1, 1].map((s) => {
+    const g = new THREE.BoxGeometry(bar, 0.2, arm);
+    g.rotateY(s * 0.75);
+    g.translate(s * arm * 0.33, 0, -arm * 0.18);
+    return g;
+  });
+  const merged = mergeGeometries(parts);
+  for (const g of parts) g.dispose();
+  return merged;
+}
+
+const CHEVRON_EVERY = 10;
+
+/** The route painted on the road, a lime chevron every CHEVRON_EVERY m from start to finish, all in one draw. */
+function Chevrons({ line }: { line: [number, number][] | null }) {
+  const geometry = useMemo(() => chevronGeometry(), []);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  const spots = useMemo(() => {
+    const out: { x: number; z: number; yaw: number }[] = [];
+    if (!line || line.length < 2) return out;
+    let carry = 0;
+    for (let i = 1; i < line.length; i++) {
+      const [ax, az] = line[i - 1];
+      const [bx, bz] = line[i];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len === 0) continue;
+      const yaw = Math.atan2(bx - ax, bz - az);
+      for (let d = carry; d < len; d += CHEVRON_EVERY) out.push({ x: (ax + ((bx - ax) * d) / len) * M_TO_UNIT, z: (az + ((bz - az) * d) / len) * M_TO_UNIT, yaw });
+      carry = (carry - len) % CHEVRON_EVERY;
+      if (carry < 0) carry += CHEVRON_EVERY;
+    }
+    return out;
+  }, [line]);
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  useEffect(() => {
+    const m = mesh.current;
+    if (!m) return;
+    const o = new THREE.Object3D();
+    spots.forEach((p, i) => {
+      o.position.set(p.x, 0.18, p.z);
+      // The V's point is at -z in its geometry: turn it to point along the road.
+      o.rotation.set(0, p.yaw + Math.PI, 0);
+      o.updateMatrix();
+      m.setMatrixAt(i, o.matrix);
+    });
+    m.count = spots.length;
+    m.instanceMatrix.needsUpdate = true;
+  }, [spots]);
+  if (!spots.length) return null;
+  return (
+    <instancedMesh key={spots.length} ref={mesh} args={[geometry, undefined, spots.length]} frustumCulled={false}>
+      <meshBasicMaterial color={LIME} transparent opacity={0.55} depthWrite={false} toneMapped={false} />
+    </instancedMesh>
   );
 }
 

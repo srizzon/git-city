@@ -43,7 +43,7 @@ export const RALLY = {
 export const RALLY_BOXES = {
   /** A row between gates k-1 and k for k = first, first + every, … (never on the way to the finish). */
   first: 1,
-  every: 3,
+  every: 2,
   maxRows: 12,
   /** Across the road, from its middle (m). */
   lanes: [-5.4, -1.8, 1.8, 5.4],
