@@ -24,6 +24,8 @@ import type { Word } from "@trailer-kit/narration";
 import { BRASIL_SCENES } from "@/components/reel/brasil/scenes";
 import { BAY_SCENES } from "@/components/reel/bay/scenes";
 import { BAY_TAKES } from "@/components/reel/bay/BayTakes";
+import { BRASIL_TAKES } from "@/components/reel/brasil/BrasilTakes";
+import { TOWN_SCENES } from "@/components/reel/towns/TownReelRig";
 import { checkPicture, checkText, checkTimed, type FrameReport, type Issue } from "../check";
 import { readConfig, type ReelsConfig } from "../config";
 import { computeFacts, loadFactsInput } from "../facts";
@@ -36,7 +38,7 @@ import { anchorAt } from "@trailer-kit/narration";
 
 const ROOT = process.cwd();
 const EXPORT = path.join(ROOT, ".claude/skills/gg/kit/tools/export.mjs");
-const SCENES: Record<string, readonly string[]> = { brasil: BRASIL_SCENES, bay: [...BAY_SCENES, ...BAY_TAKES] };
+const SCENES: Record<string, readonly string[]> = { brasil: [...BRASIL_SCENES, ...BRASIL_TAKES], bay: [...BAY_SCENES, ...BAY_TAKES], towns: TOWN_SCENES };
 
 function home(): string {
   const h = process.env.REELS_HOME;

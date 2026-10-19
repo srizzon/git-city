@@ -10,6 +10,7 @@ import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import { cutAt, type Reel, type ReelCut } from "@/lib/reel/film";
 import { placeBalloon } from "@/components/reel/ReelOverlay";
 import { ease, FOV, ITEMS_H, poseAt, WIDE_SCENES, type SceneWorld, type Target } from "./scenes";
+import BrasilTakes, { isBrasilTake } from "./BrasilTakes";
 
 // A reel's camera on the Brasil map (./scenes), in place of the map's
 // controls, plus the example building rising on its lot when the reel has
@@ -83,6 +84,8 @@ export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf
     const camera = cam as THREE.PerspectiveCamera;
     const t = Math.max(0, beatOf(clock));
     const { cut, index, u } = cutAt(reel, t);
+    // A drift take places its own camera (BrasilTakes).
+    if (isBrasilTake(cut.kind)) return placeBalloon(balloon.current, -1, null);
     const pose = poseAt(reel.cuts, index, u, world);
 
     camera.fov = FOV;
@@ -138,9 +141,11 @@ export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf
     });
   });
 
-  if (!example) return null;
+  const takes = reel.cuts.some((c) => isBrasilTake(c.kind)) ? <BrasilTakes clock={clock} reel={reel} /> : null;
+  if (!example) return takes;
   return (
     <group>
+      {takes}
       <CityScene buildings={lone} colors={NIGHT.building} introMode filmMode={finished} buildTo={buildTo} />
       <mesh ref={slab} position={[example.position[0], 0, example.position[2]]} visible={false}>
         <boxGeometry args={[example.width + 1, 1.2, example.depth + 1]} />
