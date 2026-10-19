@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, Clock, Code2, Instagram, MapPin, MessageCircle, Plus, Search, Trophy, UserPlus, Vote as VoteIcon, X, type LucideIcon } from "lucide-react";
 import type { CityBuilding } from "@/lib/github";
 import Panel from "@/components/league/hud/Panel";
@@ -253,7 +254,9 @@ function useWide(): boolean {
 /**
  * A board over the dimmed map, in the middle of a wide screen: for things
  * read side by side (the table and how to score). Esc, the close button and
- * the dimmed map close it.
+ * the dimmed map close it. It sits over the site's own notices (the email
+ * card), which wait behind the dim until it closes: it renders on <body>,
+ * since the map's page is a fixed layer whose children can't rise above them.
  */
 export function Board({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const boxRef = useRef<HTMLElement>(null);
@@ -264,8 +267,8 @@ export function Board({ title, onClose, children }: { title: string; onClose: ()
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  return (
-    <div className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center p-6">
+  return createPortal(
+    <div className="pointer-events-auto fixed inset-0 z-[60] flex items-center justify-center p-6 font-pixel uppercase text-cream">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
       <section ref={boxRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className={`${HUD_BOX} sheet-in relative outline-none flex max-h-[86vh] w-[min(820px,100%)] flex-col bg-bg/95 font-pixel uppercase text-warm`}>
         <header className="flex items-center justify-between border-b-2 border-border px-5 py-3">
@@ -276,7 +279,8 @@ export function Board({ title, onClose, children }: { title: string; onClose: ()
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
