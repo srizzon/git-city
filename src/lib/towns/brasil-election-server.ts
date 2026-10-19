@@ -102,6 +102,9 @@ export interface CountRow {
   login: string;
   avatar_url: string | null;
   uf: string | null;
+  /** Lives on the map (no state and on the map: the island). */
+  onMap: boolean;
+  nominated: boolean;
   votes: number;
 }
 
@@ -140,7 +143,7 @@ export async function getCount(leagueId: string, now = Date.now()): Promise<Coun
     tally.set(v.candidate, t);
   }
   const rows = cands
-    .map((c) => ({ id: c.developer_id, number: c.number, login: c.developers!.github_login, avatar_url: c.developers!.avatar_url, uf: ufOf.get(c.developer_id) ?? null, votes: tally.get(c.developer_id)?.n ?? 0, last: tally.get(c.developer_id)?.last ?? Infinity }))
+    .map((c) => ({ id: c.developer_id, number: c.number, login: c.developers!.github_login, avatar_url: c.developers!.avatar_url, uf: ufOf.get(c.developer_id) ?? null, onMap: ufOf.has(c.developer_id), nominated: c.added_by === "admin", votes: tally.get(c.developer_id)?.n ?? 0, last: tally.get(c.developer_id)?.last ?? Infinity }))
     .sort((a, b) => b.votes - a.votes || a.last - b.last || a.number - b.number);
   const total = rows.reduce((s, r) => s + r.votes, 0);
   const winnerId = mode === "final" ? winner(votes, new Set(ids)) : null;
@@ -149,7 +152,7 @@ export async function getCount(leagueId: string, now = Date.now()): Promise<Coun
     term: showing.n,
     opens: showing.opens,
     closes: showing.closes,
-    rows: rows.map(({ number, login, avatar_url, uf, votes }) => ({ number, login, avatar_url, uf, votes })),
+    rows: rows.map(({ number, login, avatar_url, uf, onMap, nominated, votes }) => ({ number, login, avatar_url, uf, onMap, nominated, votes })),
     total,
     elected: rows.find((r) => r.id === winnerId)?.login ?? null,
   };
@@ -212,7 +215,8 @@ export async function setRunning(leagueId: string, dev: { id: number; github_log
     await sb.from("brasil_candidates").update({ withdrawn_at: new Date().toISOString() }).eq("term", n).eq("developer_id", dev.id);
     return null;
   }
-  if (!(await isResident(leagueId, dev.id))) return "Put your building on the map to run.";
+  // Someone nominated by the admin runs without a building on the map (their state isn't ours to guess).
+  if (addedBy === "self" && !(await isResident(leagueId, dev.id))) return "Put your building on the map to run.";
   const { data: had } = await sb.from("brasil_candidates").select("number").eq("term", n).eq("developer_id", dev.id).maybeSingle<{ number: number }>();
   if (had) {
     const { error } = await sb.from("brasil_candidates").update({ withdrawn_at: null }).eq("term", n).eq("developer_id", dev.id);
@@ -256,7 +260,7 @@ export async function castVote(leagueId: string, voter: { id: number; github_log
   return null;
 }
 
-/** Admin: put someone in the race, on the map first (in `uf`, or the island) when they aren't there. */
+/** Admin: put someone in the race (a famous dev, nominated). With a state, they go on the map there first; without, they run off the map. */
 export async function adminAddCandidate(league: { id: string }, login: string, uf: UF | null): Promise<string | null> {
   const sb = getSupabaseAdmin();
   let { data: dev } = await sb.from("developers").select("id, github_login").eq("github_login", login).maybeSingle<{ id: number; github_login: string }>();
@@ -268,7 +272,7 @@ export async function adminAddCandidate(league: { id: string }, login: string, u
       throw err;
     }
   }
-  if (!(await isResident(league.id, dev.id))) {
+  if (uf && !(await isResident(league.id, dev.id))) {
     await placeBrasilResident(league, { id: dev.id, login: dev.github_login }, uf, "admin");
     invalidateLeague(league.id);
   }

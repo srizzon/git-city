@@ -3,23 +3,23 @@
 // run (an admin can add someone too); everyone on the map votes once a term,
 // on the site, and can change their vote until it closes. Each term's vote is
 // the last week before it starts, all of it on Brasília time (Sunday 21h is
-// Monday 00:00 UTC). The first one is short: it opens Friday Oct 23 21h and
-// closes on Sunday Oct 25 21h, the day of Brazil's real runoff. Pure.
+// Monday 00:00 UTC). The first one opened on Monday Oct 19 (Sam: let the
+// curious start voting) and closes on Sunday Oct 25 21h, the day of Brazil's
+// real runoff. Pure.
 
 const DAY = 86_400_000;
 
 /**
- * The presidency is built but off (Sam, 2026-10-19: not launching it yet).
- * Off: no Vote button or panel, no president, the election API and the vote
- * card answer nothing, and voting isn't on the points table. The admin can
- * still line up candidates.
+ * The presidency's switch. Off: no Vote button or panel, no president, the
+ * election API and the vote card answer nothing, and voting isn't on the
+ * points table. On since 2026-10-19 (Sam: let the curious start voting).
  */
-export const PRESIDENCY_ON = false;
+export const PRESIDENCY_ON = true;
 
 /** The first term starts (and its vote closes): Sunday Oct 25 2026, 21h Brasília. */
 export const FIRST_TERM = Date.parse("2026-10-26T00:00:00Z");
-/** The first vote opens: Friday Oct 23 2026, 21h Brasília. */
-export const FIRST_VOTE = Date.parse("2026-10-24T00:00:00Z");
+/** The first vote opened: Monday Oct 19 2026, noon in Brasília. */
+export const FIRST_VOTE = Date.parse("2026-10-19T15:00:00Z");
 export const TERM_DAYS = 28;
 /** Every vote after the first lasts a week. */
 export const VOTE_DAYS = 7;

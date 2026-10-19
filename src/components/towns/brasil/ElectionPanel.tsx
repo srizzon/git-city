@@ -77,8 +77,8 @@ export default function ElectionPanel({
   /** Opened on a candidate (a shared link, the count, the widget): that number already typed. */
   startNumber?: number | null;
   signedIn: boolean;
-  /** A resident's state, for the screen and the candidates. */
-  ufOf: (login: string) => UF | null;
+  /** A resident's state (null: the island; undefined: not on the map, like a nominated famous dev). */
+  ufOf: (login: string) => UF | null | undefined;
   /** Sign in and come back to this machine with this number typed (null: just open it). */
   onSignIn: (number: number | null) => void;
   /** Put your building on the map, then come back here with this number typed. */
@@ -271,7 +271,7 @@ export default function ElectionPanel({
                 <span className="text-[9px]">
                   Nome: <span className="text-[10px]">@{picked.login}</span>
                   <br />
-                  Estado: {ufOf(picked.login) ?? "Ilha"}
+                  {ufOf(picked.login) !== undefined && <>Estado: {ufOf(picked.login) ?? "Ilha"}</>}
                 </span>
               )}
               {typed.length === 2 && !picked && <span className="text-[11px] uppercase">Número errado</span>}
@@ -368,7 +368,7 @@ export default function ElectionPanel({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[10px] normal-case text-cream">@{c.login}</span>
                     <span className="block text-[8px] text-muted">
-                      {ufOf(c.login) ?? "Island"}
+                      {[ufOf(c.login) === undefined ? null : (ufOf(c.login) ?? "Island"), c.addedBy === "admin" ? "Nominated" : null].filter(Boolean).join(" · ")}
                       {mine && <span className="text-lime"> · your vote</span>}
                     </span>
                   </span>
