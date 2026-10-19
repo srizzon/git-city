@@ -155,7 +155,9 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
 
   const first = spec.lines[0].show.replace(/\*/g, "");
   if (words(first).length > 3 && !/^\d/.test(first)) warn("hook", `The first line is ${words(first).length} words: open on a number alone or a provocation.`);
-  if (ctx.priorHooks.map(bare).includes(hookOf(spec))) fail("hook", `The hook "${first}" was used before.`);
+  // A variation that keeps the main's spoken hook shares it on purpose.
+  const ownHook = !spec.variation || spec.variation.test === "voice";
+  if (ownHook && ctx.priorHooks.map(bare).includes(hookOf(spec))) fail("hook", `The hook "${first}" was used before.`);
 
   spec.scenes.forEach((s, i) => {
     if (!ctx.scenes.includes(s.scene)) fail("scenes", `"${s.scene}" isn't a scene of the ${spec.world.type} world (${ctx.scenes.join(", ")}).`);
@@ -180,7 +182,15 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   if (spec.kind === "trial") {
     const main = ctx.main ? filled(ctx.main) : null;
     if (!main) warn("trial", "No main reel for this day to compare with.");
-    else {
+    else if (spec.variation) {
+      // A variation is the main with one change: the change must show.
+      const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+      const t = spec.variation.test;
+      if (t === "voice" && hookOf(main) === hookOf(spec)) fail("trial", "A voice variation with the main's spoken hook.");
+      if (t === "text" && same([main.header?.rule, main.headline?.[0]], [spec.header?.rule, spec.headline?.[0]])) fail("trial", "A text variation with the main's text up top.");
+      if (t === "shot" && same(main.scenes[0], spec.scenes[0])) fail("trial", "A shot variation that opens on the main's shot.");
+      if (t === "layout" && same([main.header, main.headline], [spec.header, spec.headline])) fail("trial", "A layout variation with the main's layout.");
+    } else {
       if (hookOf(main) === hookOf(spec)) fail("trial", "Same hook as the main reel.");
       if (JSON.stringify([main.scenes[0].scene, main.scenes[1]?.scene]) === JSON.stringify([spec.scenes[0].scene, spec.scenes[1]?.scene]))
         fail("trial", "Opens on the same scenes as the main reel.");
@@ -199,7 +209,7 @@ export function checkTimed(raw: ReelSpec, voice: readonly Word[], mainLength?: n
     const talk = voice[voice.length - 1][2] - voice[0][1];
     if (talk < 15 || talk > 22) out.push({ level: "fail", rule: "length", message: `${talk.toFixed(1)}s of narration (15–22s).` });
     if (voice[0][1] > 2) out.push({ level: "fail", rule: "hook", message: `The first word comes at ${voice[0][1].toFixed(1)}s: the hook must land in the first 2s.` });
-    if (spec.kind === "trial" && mainLength !== undefined && Math.abs(reel.length - mainLength) < 3)
+    if (spec.kind === "trial" && !spec.variation && mainLength !== undefined && Math.abs(reel.length - mainLength) < 3)
       out.push({ level: "fail", rule: "trial", message: `${reel.length.toFixed(1)}s vs the main's ${mainLength.toFixed(1)}s: a trial differs by 3s or more.` });
   } catch (e) {
     out.push({ level: "fail", rule: "anchors", message: (e as Error).message });

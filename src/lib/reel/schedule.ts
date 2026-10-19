@@ -13,7 +13,8 @@ import type { ReelsConfig } from "./config";
 import { reelOf } from "./film";
 import { BUCKET } from "./publish";
 import { bedOf } from "./beds";
-import { filled, ReelSpec, specDir } from "./spec";
+import { filled, type ReelSpec, specDir } from "./spec";
+import { readSpecAt } from "./home";
 import { readStatus, setError, setState } from "./status";
 
 const BRT = "-03:00";
@@ -49,6 +50,16 @@ export function slotFor(o: { spec: ReelSpec; trials: string[]; config: ReelsConf
   return new Date(t);
 }
 
+/** What the report calls a reel's hook: its first line, or for a variation, the one thing it changed. */
+function hookOf(spec: ReelSpec): string {
+  const v = spec.variation;
+  const plain = (s: string) => s.replace(/\*/g, "");
+  if (!v || v.test === "voice") return plain(spec.lines[0].show);
+  if (v.test === "text") return plain(v.lines.map((l) => l.text).join(" "));
+  if (v.test === "shot") return v.scene.name ?? v.scene.scene;
+  return v.headline ? "headline" : "header";
+}
+
 /** Uploads a finished reel and puts it on the agenda; returns when it will post. */
 export async function scheduleReel(o: {
   home: string;
@@ -63,7 +74,7 @@ export async function scheduleReel(o: {
   try {
     if (readStatus(dir).state !== "final") throw new Error(`${o.id} isn't a finished reel (state ${readStatus(dir).state}).`);
     if (!existsSync(path.join(dir, "final.mp4"))) throw new Error("No final.mp4.");
-    const spec = filled(ReelSpec.parse(JSON.parse(readFileSync(path.join(dir, "spec.json"), "utf8"))));
+    const spec = filled(readSpecAt(dir));
     const day = path.join(o.home, "days", date);
     const trials = readdirSync(day)
       .filter((s) => existsSync(path.join(day, s, "spec.json")))
@@ -101,8 +112,8 @@ export async function scheduleReel(o: {
         error: null,
         container_id: null,
         meta: {
-          preset: spec.preset,
-          hook: spec.lines[0].show.replace(/\*/g, ""),
+          preset: spec.variation ? `trial:${spec.variation.test}` : spec.preset,
+          hook: hookOf(spec),
           opening_scene: spec.scenes[0].scene,
           length_s: Math.round(reel.length * 100) / 100,
           bed: bedOf(spec, o.config, o.home),

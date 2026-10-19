@@ -2,7 +2,8 @@
 // A spec can name its bed; otherwise reels take turns on the config's three
 // bases (Sam, 2026-10-19): the day's main on one, its trials each on the next,
 // and the next day starting one further on. Instagram fingerprints the sound
-// too, so the same bed every day would read as the same video.
+// too, so the same bed every day would read as the same video. Trials written as
+// variations of the main all take the next one: what they test is the one change.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -22,6 +23,6 @@ export function bedOf(spec: ReelSpec, config: ReelsConfig, home: string): string
         .filter((s) => (JSON.parse(readFileSync(path.join(dir, s, "spec.json"), "utf8")) as { kind?: string }).kind === "trial")
         .sort()
     : [];
-  const rank = spec.kind === "main" ? 0 : trials.indexOf(slot) + 1;
+  const rank = spec.kind === "main" ? 0 : spec.variation ? 1 : trials.indexOf(slot) + 1;
   return beds[(day + rank) % beds.length];
 }

@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { Word } from "@trailer-kit/narration";
-import { ReelSpec, specDir } from "./spec";
+import { parseSpec, type ReelSpec, specDir } from "./spec";
 
 /** The folder, when the reels tools are on (dev, with REELS_HOME set). */
 export function reelsHome(): string | null {
@@ -32,11 +32,17 @@ export interface ReelFiles {
   song: string | null;
 }
 
+/** A reel folder's spec: its spec.json, or, for a trial written as a variation, the reel it varies with the change applied. */
+export function readSpecAt(dir: string): ReelSpec {
+  const json = (d: string) => JSON.parse(readFileSync(path.join(d, "spec.json"), "utf8")) as unknown;
+  return parseSpec(json(dir), (slot) => json(path.join(dir, "..", slot)));
+}
+
 /** A reel's spec, voice and mix from its folder (days/<date>/<slot>/). */
 export function readReel(id: string): ReelFiles | null {
   const dir = inHome(specDir(id).rel);
   if (!dir || !existsSync(path.join(dir, "spec.json"))) return null;
-  const spec = ReelSpec.parse(JSON.parse(readFileSync(path.join(dir, "spec.json"), "utf8")));
+  const spec = readSpecAt(dir);
   const voice = path.join(dir, "voice.json");
   const words = existsSync(voice) ? (JSON.parse(readFileSync(voice, "utf8")) as Word[]) : null;
   const rel = specDir(id).rel;

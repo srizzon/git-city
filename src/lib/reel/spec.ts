@@ -242,6 +242,13 @@ export const Scene = z.object({
 });
 export type Scene = z.infer<typeof Scene>;
 
+const Header = z.object({
+  rule: z.array(HeaderLine).min(1),
+  cta: z.array(HeaderLine).min(1),
+  ctaAt: Anchor,
+});
+const Headline = z.array(z.object({ at: Anchor, lines: z.array(HeaderLine) })).min(1);
+
 export const Line = z.object({
   show: z.string().min(1),
   say: z.string().min(1).optional(),
@@ -251,10 +258,29 @@ export const Line = z.object({
   hidden: z.boolean().optional(),
 });
 
+/**
+ * A trial that is the day's main with one thing changed, so the trials of a day differ only in what's
+ * being tested: the spoken hook (its first lines), the hook's text up top, the opening shot, or the
+ * layout (fixed header vs headline beats).
+ */
+export const Variation = z.discriminatedUnion("test", [
+  /** Replaces the main's first lines (as many as given). */
+  z.object({ test: z.literal("voice"), lines: z.array(Line).min(1) }),
+  /** Replaces the first headline beat's lines, or the header's rule. */
+  z.object({ test: z.literal("text"), lines: z.array(HeaderLine).min(1) }),
+  /** Replaces the opening scene (it still starts when the main's does). */
+  z.object({ test: z.literal("shot"), scene: z.object({ scene: z.string().min(1), name: z.string().optional(), params: z.record(z.string(), z.unknown()).default({}) }) }),
+  /** Swaps the main's header and headline for these (one of them, or both). */
+  z.object({ test: z.literal("layout"), header: Header.optional(), headline: Headline.optional() }),
+]);
+export type Variation = z.infer<typeof Variation>;
+
 export const ReelSpec = z.object({
   id: z.string().regex(/^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/),
   kind: z.enum(["main", "trial"]),
   preset: z.string().optional(),
+  /** A trial written as a variation of another reel of the day: what it changes (set when the spec is read). */
+  variation: Variation.optional(),
   world: World,
   /** Seconds of picture before the narrator's first word (single-take voice). */
   voiceAt: z.number().nonnegative().default(0.4),
@@ -264,19 +290,13 @@ export const ReelSpec = z.object({
   bed: z.string().optional(),
   bedVolume: z.number().positive().max(1).default(0.26),
   /** The rule up top that turns into the call to action; a reel without one (a story told on its own) leaves it out. */
-  header: z
-    .object({
-      rule: z.array(HeaderLine).min(1),
-      cta: z.array(HeaderLine).min(1),
-      ctaAt: Anchor,
-    })
-    .optional(),
+  header: Header.optional(),
   /**
    * A big headline up top that carries the story instead of the fixed header: each beat shows from
    * its moment until the next one's, and the captions go small under it; a beat with no lines clears it
    * (a card carries that beat). Anchors are looked for in order.
    */
-  headline: z.array(z.object({ at: Anchor, lines: z.array(HeaderLine) })).min(1).optional(),
+  headline: Headline.optional(),
   /** Extra sound effects (a scene's own, like a fall's thud, come with it). */
   sounds: z.array(z.object({ at: Anchor, src: z.string(), gain: z.number().default(1), rate: z.number().optional() })).default([]),
   lines: z.array(Line).min(1),
@@ -333,4 +353,73 @@ export function specDir(id: string): { date: string; slot: string; rel: string }
   const date = id.slice(0, 10);
   const slot = id.slice(11);
   return { date, slot, rel: `days/${date}/${slot}` };
+}
+
+/** A trial's spec.json written as a variation: the reel it varies (a slot of the same day), and the one change. */
+export const TrialFile = z.object({
+  id: z.string().regex(/^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/),
+  kind: z.literal("trial"),
+  from: z.string().default("main"),
+  variation: Variation,
+  /** The rotation's bed unless named (a day's varied trials share one, apart from the main's). */
+  bed: z.string().optional(),
+  post: z.object({ caption: z.string().optional(), thumbAt: Anchor.optional() }).default({}),
+});
+export type TrialFile = z.infer<typeof TrialFile>;
+
+const wordsIn = (l: z.infer<typeof Line>) => (l.say ?? l.show.replace(/\*/g, "")).trim().split(/\s+/).filter(Boolean).length;
+
+/** Shifts "#n" anchors at or past word `from` by `by` words, anywhere in a value. */
+function shiftWords<T>(v: T, from: number, by: number): T {
+  if (!by) return v;
+  const walk = (x: unknown): unknown => {
+    if (typeof x === "string") {
+      const m = /^#(\d+)((?:[+-]\d+(?:\.\d+)?)?)$/.exec(x.trim());
+      return m && Number(m[1]) >= from ? `#${Number(m[1]) + by}${m[2]}` : x;
+    }
+    if (Array.isArray(x)) return x.map(walk);
+    if (x && typeof x === "object") return Object.fromEntries(Object.entries(x).map(([k, y]) => [k, walk(y)]));
+    return x;
+  };
+  return walk(v) as T;
+}
+
+/** The trial a variation file makes of its base reel (a full spec, parsed). */
+export function applyVariation(base: ReelSpec, trial: TrialFile): ReelSpec {
+  if (base.variation) throw new Error(`${trial.id} varies ${base.id}, which is itself a variation.`);
+  const v = trial.variation;
+  let spec: ReelSpec = { ...base };
+  if (v.test === "voice") {
+    if (v.lines.length > base.lines.length) throw new Error(`The voice variation replaces ${v.lines.length} lines; ${base.id} has ${base.lines.length}.`);
+    const old = base.lines.slice(0, v.lines.length).reduce((t, l) => t + wordsIn(l), 0);
+    const now = v.lines.reduce((t, l) => t + wordsIn(l), 0);
+    spec = { ...shiftWords({ ...base, lines: [] }, old, now - old), lines: [...v.lines, ...base.lines.slice(v.lines.length)] };
+  } else if (v.test === "text") {
+    if (base.headline) spec.headline = [{ ...base.headline[0], lines: v.lines }, ...base.headline.slice(1)];
+    else if (base.header) spec.header = { ...base.header, rule: v.lines };
+    else throw new Error(`${base.id} has no header or headline for a text variation to change.`);
+  } else if (v.test === "shot") {
+    spec.scenes = [{ ...v.scene, at: base.scenes[0].at }, ...base.scenes.slice(1)];
+  } else {
+    if (!v.header && !v.headline) throw new Error("A layout variation gives a header, a headline or both.");
+    spec.header = v.header;
+    spec.headline = v.headline;
+  }
+  return ReelSpec.parse({
+    ...spec,
+    id: trial.id,
+    kind: "trial",
+    variation: v,
+    bed: trial.bed,
+    post: { ...base.post, caption: trial.post.caption ?? base.post.caption, thumbAt: trial.post.thumbAt ?? base.post.thumbAt, cover: undefined },
+  });
+}
+
+/** A spec.json's reel: a full spec, or a variation applied to the reel it names (read by `loadBase`, a slot of the same day). */
+export function parseSpec(json: unknown, loadBase: (slot: string) => unknown): ReelSpec {
+  if (json && typeof json === "object" && "variation" in json && !("lines" in json)) {
+    const trial = TrialFile.parse(json);
+    return applyVariation(ReelSpec.parse(loadBase(trial.from)), trial);
+  }
+  return ReelSpec.parse(json);
 }

@@ -8,7 +8,7 @@ import path from "node:path";
 import type { Word } from "@trailer-kit/narration";
 import type { Issue } from "./check";
 import { reelOf } from "./film";
-import { inHome } from "./home";
+import { inHome, readSpecAt } from "./home";
 import { filled, isReelDay, ReelSpec, specDir } from "./spec";
 import { readStatus, type ReelStatus } from "./status";
 
@@ -82,7 +82,7 @@ export function boardReel(id: string): BoardReel | null {
   const files = { draft: url(rel, "draft.mp4", dir), sheet: url(rel, "sheet.jpg", dir), final: url(rel, "final.mp4", dir), finalSheet: url(rel, "sheet-final.jpg", dir) };
   let spec: ReelSpec;
   try {
-    spec = ReelSpec.parse(JSON.parse(read("spec.json")!));
+    spec = readSpecAt(dir);
   } catch (e) {
     return { id, slot, spec: null as unknown as ReelSpec, status, length: null, rows: [], checks, files, notes, error: (e as Error).message };
   }
