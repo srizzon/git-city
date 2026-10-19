@@ -6,6 +6,8 @@ import { DRIFT } from "@/lib/league-city/drive/tuning";
 import { ITEM_NAMES, isItem } from "@/lib/league-city/drive/battle";
 import type { DriveCameraMode } from "@/lib/league-city/drive/telemetry";
 import type { TouchDrive } from "@/lib/league-city/drive/touch";
+import { Band } from "@/components/games/ui";
+import { T } from "@/components/games/kit";
 
 // Teaches the car one move at a time, at the moment it's useful, the way
 // racers do it (Forza's "hold to accelerate", Crash Team Racing's power slide
@@ -86,11 +88,17 @@ const HOLD = "text-[10px] tracking-[0.2em] text-cream/70 [text-shadow:2px_2px_0_
 const TOUCH_TURN = 0.5;
 
 function TouchPrompt({ lesson, item }: { lesson: Lesson; item: string | null }) {
+  // The car games' bands (components/games): the move on one, how under it.
   const line = (lead: React.ReactNode, sub?: string) => (
-    // A backdrop: over lit windows bare text doesn't read.
-    <span className="flex flex-col items-center gap-2 bg-bg/60 px-4 py-3 text-center backdrop-blur-sm">
-      <span className={`${TEXT} text-cream`}>{lead}</span>
-      {sub && <span className={`${HOLD} normal-case tracking-[0.1em]`}>{sub}</span>}
+    <span className="flex flex-col items-center gap-1 text-center">
+      <Band animate={false} className="px-5 py-2.5 tracking-[0.12em] text-cream" style={{ fontSize: T.big }}>
+        {lead}
+      </Band>
+      {sub && (
+        <Band animate={false} className="px-4 py-2 normal-case text-muted" style={{ fontSize: T.small }}>
+          {sub}
+        </Band>
+      )}
     </span>
   );
   switch (lesson) {
@@ -335,7 +343,7 @@ export default function DrivePrompt({
 
   if (!lesson || (touch && lesson === "camera")) return null;
   return (
-    <div className={`pointer-events-none absolute inset-x-0 flex justify-center px-4 ${touch ? "top-[24%]" : "bottom-[22%]"}`}>
+    <div className={`pointer-events-none absolute inset-x-0 flex justify-center px-4 ${touch ? "bottom-[calc(max(1rem,env(safe-area-inset-bottom))+232px)]" : "bottom-[22%]"}`}>
       <div
         key={lesson}
         role="status"
@@ -344,7 +352,13 @@ export default function DrivePrompt({
         className={`flex items-center gap-3 ${lesson === "drive" ? "animate-[fade-in_0.4s_ease-out_0.5s_both]" : "animate-[fade-in_0.3s_ease-out_both]"}`}
       >
         <div className={`flex items-center gap-3 transition-transform duration-300 ${idle && lesson === "drive" ? "scale-125 animate-pulse" : ""}`}>
-          {touch ? <TouchPrompt lesson={lesson} item={item} /> : <Prompt lesson={lesson} item={item} />}
+          {touch ? (
+            <TouchPrompt lesson={lesson} item={item} />
+          ) : (
+            <Band animate={false} className="gap-3 px-4 py-2.5">
+              <Prompt lesson={lesson} item={item} />
+            </Band>
+          )}
         </div>
       </div>
     </div>

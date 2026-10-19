@@ -35,6 +35,7 @@ export default function CrownPanel({
   you,
   drivers,
   touch = false,
+  idle = true,
   onStart,
 }: {
   crown: CrownState | null;
@@ -42,6 +43,8 @@ export default function CrownPanel({
   you: string | null;
   drivers: DriverInfo[];
   touch?: boolean;
+  /** false: no Start button while nothing runs (a Games menu starts it). */
+  idle?: boolean;
   onStart: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
@@ -84,7 +87,7 @@ export default function CrownPanel({
     const mine = crown.holder === you;
     return (
       <>
-        <div className={`${HUD_BOX} absolute left-1/2 top-4 max-sm:top-[4.25rem] flex -translate-x-1/2 flex-col gap-1.5 px-3 py-2 text-[9px]`}>
+        <div className={`${HUD_BOX} absolute left-1/2 top-4 max-sm:left-auto max-sm:right-4 max-sm:top-[4.25rem] max-sm:translate-x-0 flex -translate-x-1/2 flex-col gap-1.5 px-3 py-2 text-[9px]`}>
           <p className="flex items-center justify-between gap-4 text-cream">
             <span className="flex items-center gap-1.5">
               <Crown className="h-2.5 w-[22px]" /> Crown rush
@@ -143,7 +146,7 @@ export default function CrownPanel({
     );
   }
 
-  if (touch) return null;
+  if (touch || !idle) return null;
   return (
     <div className="pointer-events-auto absolute left-1/2 top-4 -translate-x-1/2">
       {canStart ? (
