@@ -1031,7 +1031,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           initial={election}
           startNumber={vote.number}
           signedIn={!!viewerLogin}
-          ufOf={(login) => world.ufOf.get(login.toLowerCase())?.uf ?? null}
+          ufOf={(login) => {
+            const r = world.ufOf.get(login.toLowerCase());
+            return r ? r.uf : undefined;
+          }}
           onSignIn={signInToVote}
           onPutOnMap={(n) => {
             backToVote.current = { number: n };

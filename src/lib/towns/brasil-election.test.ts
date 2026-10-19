@@ -6,11 +6,12 @@ const at = (iso: string) => Date.parse(iso);
 describe("electionClock", () => {
   it("before the first vote: running for term 1, nobody in office", () => {
     const c = electionClock(at("2026-10-19T12:00:00Z"));
+    // Before the first vote opened that Monday.
     expect(c.current).toBeNull();
     expect(c.next.n).toBe(1);
     expect(c.phase).toBe("candidacy");
   });
-  it("the first vote: Friday 21h to Sunday 21h in Brasília", () => {
+  it("the first vote: from its opening to Sunday 21h in Brasília", () => {
     expect(electionClock(FIRST_VOTE - 1).phase).toBe("candidacy");
     expect(electionClock(FIRST_VOTE).phase).toBe("voting");
     expect(electionClock(FIRST_TERM - 1).phase).toBe("voting");

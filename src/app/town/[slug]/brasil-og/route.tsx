@@ -127,7 +127,7 @@ export async function GET(req: Request) {
                     ))}
                 </div>
                 <span style={{ fontSize: Math.max(18, Math.min(30, Math.floor(300 / (name.length * 1.05)))), marginTop: 22 }}>{name}</span>
-                <span style={{ fontSize: 22, marginTop: 4 }}>{me?.city.uf ?? "Ilha"}</span>
+                {me && <span style={{ fontSize: 22, marginTop: 4 }}>{me.city.uf ?? "Ilha"}</span>}
               </div>
               <div style={{ width: 170, height: 214, display: "flex", border: "5px solid #9a9a94", backgroundColor: "#ffffff", overflow: "hidden" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- an OG image (satori) takes plain img */}

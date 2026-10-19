@@ -125,7 +125,7 @@ export default function ApuracaoLive({ slug, initial }: { slug: string; initial:
                   <Number2 n={lead.number} big />
                   <span className="min-w-0">
                     <span className="block truncate text-sm normal-case text-cream sm:text-lg">@{lead.login}</span>
-                    <span className="block text-[10px] text-muted">{lead.uf ?? "Island"}</span>
+                    <span className="block text-[10px] text-muted">{[lead.onMap ? (lead.uf ?? "Island") : null, lead.nominated ? "Nominated" : null].filter(Boolean).join(" · ")}</span>
                   </span>
                 </div>
                 {/* On a phone the % sits under the name, so the name keeps its room. */}
@@ -160,7 +160,7 @@ export default function ApuracaoLive({ slug, initial }: { slug: string; initial:
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline gap-2">
                       <span className="truncate text-[11px] normal-case text-cream">@{r.login}</span>
-                      <span className="shrink-0 text-[9px] text-muted">{r.uf ?? "Island"}</span>
+                      <span className="shrink-0 text-[9px] text-muted">{[r.onMap ? (r.uf ?? "Island") : null, r.nominated ? "Nominated" : null].filter(Boolean).join(" · ")}</span>
                     </span>
                     <span className="mt-1.5 block h-2 bg-border">
                       <span className="block h-2 bg-cream/70 transition-[width] duration-700" style={{ width: `${pct(r.votes, c.total)}%` }} />
