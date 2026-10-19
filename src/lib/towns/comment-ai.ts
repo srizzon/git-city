@@ -71,6 +71,7 @@ Return:
 Rules:
 - Instagram puts "@<account>" at the start of a reply. An @ of the reel's account is never the username.
 - An @handle that tags someone else on Instagram (a friend) is not a GitHub username unless the comment says it is.
+- The reels ask for the username WITHOUT an @, then the city or state, then an @ to tag a friend: in "joao campinas @maria" the username is joao and @maria is a friend. When a comment has a bare word next to the place and @handles, the bare word is the username. An @handle is the username only when nothing else could be ("@joao SP", "@joao").
 - Portuguese words are not usernames ("acho", "foi", "valeu", "top", "brabo", "manda", "eu"). A username is one token: letters, digits, hyphens.
 - If unsure, answer "other" with login null: a wrong username puts a stranger on the map.`;
 

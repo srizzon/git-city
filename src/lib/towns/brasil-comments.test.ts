@@ -26,6 +26,14 @@ describe("parseComment", () => {
     ["@ana-b São José dos Campos", { login: "ana-b", uf: null, place: "sao jose dos campos" }],
     ["joao floripa", { login: "joao", uf: null, place: "floripa" }],
     ["maria santa rita PB", { login: "maria", uf: "PB", place: "santa rita" }],
+    // The reels' ask: the user without an @, the city or state, and a friend tagged with one.
+    ["seuuser Campinas @amigo", { login: "seuuser", uf: null, place: "campinas" }],
+    ["seuuser SP @amigo", { login: "seuuser", uf: "SP", place: null }],
+    ["joao floripa @maria @pedro", { login: "joao", uf: null, place: "floripa" }],
+    ["srizzon São Paulo @maria", { login: "srizzon", uf: "SP", place: null }],
+    ["@amigo seuuser campinas", { login: "seuuser", uf: null, place: "campinas" }],
+    ["@srizzon SP @maria", { login: "srizzon", uf: "SP", place: null }],
+    ["@srizzon campinas @maria", { login: "srizzon", uf: null, place: "campinas" }],
   ])("%s", (text, want) => {
     expect(parseComment(text)).toEqual(want);
   });

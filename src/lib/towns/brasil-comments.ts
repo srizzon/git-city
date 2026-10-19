@@ -2,9 +2,10 @@
 // What someone wrote under a reel, as the GitHub username and the city (or
 // just the state) to put on the map. People write it every way: "@login SP", "login sp",
 // "github.com/login - São Paulo", "SP: login", "sou de Recife PE @login".
-// The username: a github.com/ link first, else the first @handle, else a
-// bare word, when it's the whole comment, or when the comment also names a
-// state or a city and that word is the only thing it could be. The state: a
+// The username: a github.com/ link first, else a bare word next to a state
+// or a city when it's the only thing it could be (the reels ask for the user
+// without an @, and an @ beside it is a friend being tagged: "joao campinas
+// @maria"), else the first @handle, else a bare word that is the whole comment. The state: a
 // UF on its own, or a state's name. The place: what's left once the username
 // and the filler are gone, when it reads as a city (br-cities). An
 // @handle may be an Instagram handle rather than a GitHub one; the importer
@@ -70,10 +71,9 @@ export function parseComment(text: string, opts: { ignore?: string[]; reply?: bo
       }
     }
   }
-  if (!login) {
-    const handle = words.find((w) => w.startsWith("@") && GITHUB_LOGIN.test(w.slice(1)));
-    if (handle) login = handle.slice(1);
-  }
+  // @handles are friends being tagged when a bare word next to the place is the username.
+  const tagged = words.some((w) => w.startsWith("@"));
+  const bare = words.filter((w) => !w.startsWith("@"));
   // A bare word counts when it's the whole comment ("srizzon": how most people answer), or next
   // to a state with nothing else it could be ("srizzon sp"), so a comment like "top demais" never
   // puts a stranger called "demais" on the map.
@@ -82,17 +82,22 @@ export function parseComment(text: string, opts: { ignore?: string[]; reply?: bo
   const plain = words.filter((w) => typed.has(w) && GITHUB_LOGIN.test(w) && !NOT_LOGINS.has(w) && !LAUGH.test(w) && !(w.length === 2 && parseUF(w)) && !/^\d+$/.test(w));
   // What's left naming a city, once the username (and any state's sigla) is out.
   const placeWithout = (out: string | null) => {
-    const rest = words.filter((w) => w !== out && w.replace(/^@/, "") !== out && !(w.length === 2 && parseUF(w))).join(" ");
+    const rest = words.filter((w) => w !== out && !w.startsWith("@") && !(w.length === 2 && parseUF(w))).join(" ");
     return rest && resolveCity(rest, uf).kind !== "none" ? rest : null;
   };
-  if (!login && (uf || words.length === 1)) {
-    if (plain.length === 1) login = plain[0];
-  }
-  // "srizzon campinas": the one word whose removal leaves a city is the username.
-  if (!login && words.length > 1) {
+  // With a friend tagged, only "user UF @friend": nothing but the word and the state besides the @s.
+  const besideState = bare.filter((w) => !(w.length === 2 && parseUF(w)));
+  if (!login && uf && plain.length === 1 && (!tagged || besideState.length === 1)) login = plain[0];
+  // "srizzon campinas" (and "srizzon campinas @maria"): the one word whose removal leaves a city is the username.
+  if (!login && bare.length > 1) {
     const fits = plain.filter((w) => placeWithout(w));
     if (fits.length === 1) login = fits[0];
   }
+  if (!login) {
+    const handle = words.find((w) => w.startsWith("@") && GITHUB_LOGIN.test(w.slice(1)));
+    if (handle) login = handle.slice(1);
+  }
+  if (!login && words.length === 1 && plain.length === 1) login = plain[0];
   const place = login ? placeWithout(login) : null;
   return { login, uf, place };
 }
