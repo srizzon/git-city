@@ -10,10 +10,16 @@
 // chromium) and ffmpeg on PATH (or the ffmpeg-static package, or FFMPEG=path).
 //
 // Usage: node export.mjs <studio url> [--out gg-output/trailer.mp4] [--fps 30]
-//          [--size 1920x1080] [--poster <seconds>]
+//          [--size 1920x1080] [--poster <seconds>] [--no-poster-frame]
+//          [--report <file.json>]
 //   --poster  the settled frame to use as the thumbnail: written next to the
 //             video as .jpg and baked in as frame 0, the frame every
 //             platform's thumbnail grabber uses. Default: 1s before the end.
+//   --no-poster-frame  keep frame 0 as filmed (a reel's first frame is its
+//             hook; its cover is uploaded on its own). The .jpg is still written.
+//   --report  every frame, call the page's window.__ggReport() (if it has
+//             one) and write what it returns, one entry per frame, as JSON:
+//             a page can report where its overlays are, for checks.
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -25,7 +31,8 @@ const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : fallback;
 };
-const url = args.find((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"));
+const BARE = new Set(["--no-poster-frame"]);
+const url = args.find((a, i) => !a.startsWith("--") && !(args[i - 1]?.startsWith("--") && !BARE.has(args[i - 1])));
 if (!url) {
   console.error(
     "Usage: node export.mjs <studio url> [--out gg-output/trailer.mp4] [--fps 30] [--size 1920x1080] [--poster <s>]",
@@ -36,6 +43,9 @@ const OUT = path.resolve(flag("out", "gg-output/trailer.mp4"));
 mkdirSync(path.dirname(OUT), { recursive: true });
 const POSTER = OUT.replace(/\.mp4$/i, "") + ".jpg";
 const FPS = Number(flag("fps", 30));
+const POSTER_FRAME = !args.includes("--no-poster-frame");
+const REPORT = flag("report", null);
+const report = [];
 const [W, H] = flag("size", "1920x1080").split("x").map(Number);
 
 const need = (name, hint) => {
@@ -239,6 +249,7 @@ await ffmpeg(
     for (let i = 0; i < total; i++) {
       await page.evaluate((ms) => window.__ggTime.advance(ms), i === 0 ? 0 : 1000 / FPS);
       const png = await page.screenshot({ type: "png" });
+      if (REPORT) report.push(await page.evaluate(() => window.__ggReport?.() ?? null));
       if (i === posterAt) poster = png;
       if (!stdin.write(png)) await new Promise((ok) => stdin.once("drain", ok));
       if (i % FPS === 0) process.stdout.write(`\r  frame ${i + 1}/${total}`);
@@ -302,7 +313,7 @@ for (const cue of film.sounds) {
 const still = path.join(work, "poster.png");
 writeFileSync(still, poster);
 const argv = ["-i", silent, "-i", still, ...inputs.flatMap((f) => ["-i", f])];
-const graph = ["[0:v][1:v]overlay=0:0:enable='eq(n,0)'[v]"];
+const graph = [POSTER_FRAME ? "[0:v][1:v]overlay=0:0:enable='eq(n,0)'[v]" : "[0:v]null[v]"];
 if (inputs.length) {
   chains.forEach((c, i) => graph.push(`[${i + 2}:a]${c}[s${i}]`));
   graph.push(
@@ -334,4 +345,5 @@ await ffmpeg([
 // The poster as a small jpg, for uploads and <video poster>.
 await ffmpeg(["-i", still, "-q:v", "2", POSTER]);
 rmSync(work, { recursive: true, force: true });
-console.log(`Wrote ${OUT}\n      ${POSTER} (frame ${posterAt}, also frame 0)`);
+if (REPORT) writeFileSync(path.resolve(REPORT), JSON.stringify(report));
+console.log(`Wrote ${OUT}\n      ${POSTER} (frame ${posterAt}${POSTER_FRAME ? ", also frame 0" : ""})`);
