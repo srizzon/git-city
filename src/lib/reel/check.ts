@@ -58,6 +58,10 @@ function onScreen(spec: ReelSpec): string[] {
                   ? [o.value]
                 : o.type === "score"
                   ? [o.value]
+                : o.type === "pointer"
+                  ? [o.label]
+                : o.type === "card"
+                  ? [...o.lines.map((l) => l.text), ...(o.draw?.kind === "comment" ? [o.draw.text] : []), ...(o.points ? [o.points.value] : [])]
                 : o.type === "phone"
                   ? o.screens.flatMap((x) => [...x.posted, ...x.parts.map((y) => y.text), x.points?.value ?? ""])
                 : o.type === "points"

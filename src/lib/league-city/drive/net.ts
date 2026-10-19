@@ -125,8 +125,8 @@ export type ServerMsg =
   | { t: "damage"; b: string; r: number[]; by?: string | null; s?: number }
   /** Smash: every damaged building [login, rows, by, shield end], when the room loads or you arrive. */
   | { t: "damage_all"; list: [string, number[], string | null, number][] }
-  /** State War (Brasil): the board as runs of state numbers (buildings' lots left out), the land that paints, the week, and every live trail [id, state, cells]. */
-  | { t: "paint_all"; g: PaintGeom | null; r: number[]; land: number; wk: string; tr: [string, number, number[]][] }
+  /** State War (Brasil): the board as runs of state numbers (buildings' lots left out, `hm` those apart), the land that paints, the week, and every live trail [id, state, cells]. */
+  | { t: "paint_all"; g: PaintGeom | null; r: number[]; hm?: number[]; land: number; wk: string; tr: [string, number, number[]][] }
   /** State War: cells `a` added to `id`'s trail (state `s`). */
   | { t: "paint_trail"; id: string; s: number; a: number[] }
   /** State War: `id`'s trail is gone, nothing painted. */

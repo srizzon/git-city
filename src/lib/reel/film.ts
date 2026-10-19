@@ -25,6 +25,7 @@ export interface ReelBalloon {
   from: number;
   to: number;
   plate: string | null;
+  drop: boolean;
   badges: { kind: string; at: number; sub: string }[];
 }
 
@@ -45,6 +46,16 @@ export type ReelPanel =
       screens: { at: number; until: number; kind: string; parts: { at: number; text: string }[]; send: number | null; points: { at: number; value: string } | null; image: string | null; posted: string[] }[];
     }
   | { kind: "score"; from: number; to: number; icon: string; value: string }
+  | { kind: "pointer"; from: number; to: number; label: string }
+  | {
+      kind: "card";
+      from: number;
+      to: number;
+      lines: NonNullable<ReelSpec["header"]>["rule"];
+      draw: { kind: "map" } | { kind: "comment"; text: string; at: number } | { kind: "graph"; at: number } | null;
+      points: { at: number; value: string } | null;
+      image: string | null;
+    }
   | { kind: "points"; from: number; to: number; rows: { at: number; icon: string; value: string; label: string }[] }
   | {
       kind: "follow";
@@ -88,6 +99,7 @@ export interface Reel {
   balloons: ReelBalloon[];
   panels: ReelPanel[];
   pins: ReelPins[];
+  look: ReelSpec["look"];
 }
 
 /** The film of a filled spec (./spec `filled`), its words on the film's clock, and its mixed sound's URL. */
@@ -131,6 +143,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
         from,
         to: o.to === undefined ? length : anchorAt(words, o.to, from),
         plate: o.plate ?? null,
+        drop: o.drop,
         badges: o.badges.map((b) => ({ kind: b.kind, at: anchorAt(words, b.at, from), sub: b.sub })),
       };
     });
@@ -188,7 +201,13 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
       });
       return [{ kind: "phone", from, to, screens }];
     }
+    if (o.type === "pointer") return [{ kind: "pointer", from, to, label: o.label }];
     if (o.type === "score") return [{ kind: "score", from, to, icon: o.icon, value: o.value }];
+    if (o.type === "card") {
+      const d = o.draw;
+      const draw = !d ? null : d.kind === "map" ? d : { ...d, at: anchorAt(words, d.at, from) };
+      return [{ kind: "card", from, to, lines: o.lines, draw, points: o.points ? { at: anchorAt(words, o.points.at, from), value: o.points.value } : null, image: o.image ?? null }];
+    }
     if (o.type === "points") {
       const ats: number[] = [];
       o.rows.forEach((r, i) => ats.push(anchorAt(words, r.at, i ? ats[i - 1] : from)));
@@ -222,7 +241,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
     ...(song ? { song: { src: song, offset: 0 } } : {}),
     frameAt: (beat) => frameOf(shots, beat),
   };
-  return { film, shots, length, cuts, lines, ctaAt: spec.header ? anchorAt(words, spec.header.ctaAt) : Infinity, headline, balloons, panels, pins };
+  return { film, shots, length, cuts, lines, ctaAt: spec.header ? anchorAt(words, spec.header.ctaAt) : Infinity, headline, balloons, panels, pins, look: spec.look };
 }
 
 /** The cut under way at `t` seconds, and how far into it (0–1). */

@@ -489,6 +489,8 @@ export function stateColor(uf: UF): string {
 export class PaintBoard {
   geom: PaintGeom | null = null;
   owner: Uint8Array = new Uint8Array(0);
+  /** The buildings' lots: their state's for good (drawn, never counted). */
+  home: Uint8Array = new Uint8Array(0);
   week = "";
   /** Land that paints, for the percentages. */
   land = 0;
@@ -500,10 +502,11 @@ export class PaintBoard {
   private dirty: Set<number> | null = null;
   private ranked: { v: number; list: { uf: UF; cells: number }[] } = { v: -1, list: [] };
 
-  all(geom: PaintGeom, runs: readonly number[], land: number, week: string, trails: readonly [string, number, number[]][]) {
+  all(geom: PaintGeom, runs: readonly number[], land: number, week: string, trails: readonly [string, number, number[]][], home: readonly number[] = []) {
     this.geom = geom;
     this.land = land;
     this.owner = decodeRuns(runs, new Uint8Array(geom.w * geom.d));
+    this.home = decodeRuns(home, new Uint8Array(geom.w * geom.d));
     this.week = week;
     this.trails.clear();
     for (const [id, s, cells] of trails) this.trails.set(id, { s, cells: [...cells], set: new Set(cells) });
@@ -537,6 +540,11 @@ export class PaintBoard {
     if (!t) return;
     this.trails.delete(id);
     this.touch(t.cells);
+  }
+
+  /** Who a cell shows as held: its painter, else its building's state, else 0. */
+  heldAt(c: number): number {
+    return this.owner[c] || this.home[c] || 0;
   }
 
   /** The state whose live trail covers a cell, else 0. */

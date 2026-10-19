@@ -16,7 +16,7 @@ import type { UF } from "@/lib/towns/brasil-map";
 
 /** Over the asphalt (0.3, LeagueRoads), under its markings (0.45) and everything that stands; pulled forward in depth too, so it never flickers against the road from far. */
 const Y = 0.38;
-const HELD = 110;
+const HELD = 170;
 const TRAIL = 235;
 /** Shortest time between two texture uploads (ms). */
 const UPLOAD_MS = 150;
@@ -76,7 +76,7 @@ export default function PaintLayer({ board, mine, driving }: { board: PaintBoard
     const put = (c: number) => {
       const k = ((d - 1 - Math.floor(c / w)) * w + (c % w)) * 4;
       const t = board.trailAt(c);
-      const s = t || board.owner[c];
+      const s = t || board.heldAt(c);
       const [r, gg, b] = s ? (t ? palette.trail[s] : palette.held[s]) : palette.held[0];
       data[k] = r;
       data[k + 1] = gg;
@@ -90,7 +90,7 @@ export default function PaintLayer({ board, mine, driving }: { board: PaintBoard
         full.current = false;
         data.fill(0);
         const owner = board.owner;
-        for (let c = 0; c < owner.length; c++) if (owner[c]) put(c);
+        for (let c = 0; c < owner.length; c++) if (owner[c] || board.home[c]) put(c);
         for (const t of board.trails.values()) for (const c of t.cells) put(c);
       } else for (const c of dirty) if (c >= 0 && c < board.owner.length) put(c);
       pending.current = true;

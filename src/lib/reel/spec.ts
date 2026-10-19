@@ -34,6 +34,8 @@ const Balloon = z.object({
   to: Anchor.optional(),
   /** A plate with this text (no @: on Instagram an @ tags whoever owns it); else the GitHub photo. */
   plate: z.string().optional(),
+  /** The plate as a comment (the ink speech bubble) that drops onto its building's lot from above, in hard steps. */
+  drop: z.boolean().default(false),
   badges: z.array(Badge).default([]),
 });
 
@@ -197,7 +199,45 @@ const Pins = z.object({
   stagger: z.number().nonnegative().default(0.04),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone]);
+/**
+ * A full-frame card on the channel's dotted dark background that draws what the voice is saying
+ * (how to score, a rule): its lines type in, a number in a `*block*` counts up from 0 over the
+ * card, and under them one drawing in the channel's style:
+ * - map: Brazil in dots, lighting up with the count;
+ * - comment: the ink speech bubble, `text` typed into it from `at`;
+ * - graph: a GitHub contribution graph, today's square lighting at `at`.
+ * What happens on Instagram (following, a reel playing) stays in Instagram's own UI (the phone, the follow card).
+ * `points` pops a green block (`+5`) at its moment. An optional image goes under the lines (under
+ * REELS_HOME). It cuts in and out; the captions and the headline step aside while it's up.
+ */
+const Card = z.object({
+  type: z.literal("card"),
+  from: Anchor,
+  to: Anchor.optional(),
+  lines: z.array(HeaderLine).min(1),
+  draw: z
+    .discriminatedUnion("kind", [
+      z.object({ kind: z.literal("map") }),
+      z.object({ kind: z.literal("comment"), text: z.string().min(1), at: Anchor }),
+      z.object({ kind: z.literal("graph"), at: Anchor }),
+    ])
+    .optional(),
+  points: z.object({ at: Anchor, value: z.string().min(1) }).optional(),
+  image: z.string().optional(),
+});
+
+/**
+ * A green pixel arrow pointing at the viewer's own comment button (bottom right of Instagram's
+ * Reels screen), the scene dimmed, `label` in the green block: "comment here" made literal.
+ */
+const Pointer = z.object({
+  type: z.literal("pointer"),
+  from: Anchor,
+  to: Anchor.optional(),
+  label: z.string().min(1),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({
@@ -279,6 +319,12 @@ export const ReelSpec = z.object({
   id: z.string().regex(/^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/),
   kind: z.enum(["main", "trial"]),
   preset: z.string().optional(),
+  /**
+   * How the words sit on the picture: "outline", white pixel type with a black outline over the scene;
+   * "plates", the channel's own look (samuelrizzondev's kit), each line on a dark plate with a hard
+   * shadow, the headline typed behind a green `>` like its Terminal piece.
+   */
+  look: z.enum(["outline", "plates"]).default("outline"),
   /** A trial written as a variation of another reel of the day: what it changes (set when the spec is read). */
   variation: Variation.optional(),
   world: World,

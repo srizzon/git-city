@@ -21,11 +21,11 @@ export function radarLayer(board: PaintBoard, mine: UF | null) {
     const j0 = Math.max(0, Math.floor((z - reach + LOT / 2) / CELL) - g.z0);
     const j1 = Math.min(g.d - 1, Math.floor((z + reach + LOT / 2) / CELL) - g.z0);
     const at = (c: number) => [(g.x0 + (c % g.w)) * CELL - LOT / 2, (g.z0 + Math.floor(c / g.w)) * CELL - LOT / 2] as const;
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = 0.7;
     for (let j = j0; j <= j1; j++) {
       for (let i = i0; i <= i1; i++) {
         const c = j * g.w + i;
-        const s = board.owner[c];
+        const s = board.heldAt(c);
         if (!s) continue;
         ctx.fillStyle = paintColor(s, mine, true);
         const [wx, wz] = at(c);
@@ -61,7 +61,7 @@ export function boardPicture(board: PaintBoard, mine: UF | null, px: number): { 
   if (!ctx) return null;
   const pick = new Uint8Array(W * D);
   for (let c = 0; c < board.owner.length; c++) {
-    const s = board.owner[c];
+    const s = board.heldAt(c);
     if (s) pick[Math.floor(Math.floor(c / g.w) / px) * W + Math.floor((c % g.w) / px)] = s;
   }
   for (let k = 0; k < pick.length; k++) {
