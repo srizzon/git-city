@@ -6,6 +6,7 @@ import { createJiti } from "jiti";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const jiti = createJiti(import.meta.url, {
+  jsx: true,
   alias: {
     "@/": `${root}/src/`,
     "@trailer-kit/": `${root}/.claude/skills/gg/kit/src/`,

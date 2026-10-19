@@ -16,14 +16,14 @@ interface Props {
 // loadout. Sits higher than crown-zone items so both can show at once.
 
 // Crown voxels on a 5-wide grid: [x, y] cells (y up). Band + three points.
-const CELLS: [number, number][] = [
+export const CELLS: [number, number][] = [
   [0, 0], [1, 0], [2, 0], [3, 0], [4, 0],
   [0, 1], [1, 1], [2, 1], [3, 1], [4, 1],
   [0, 2], [2, 2], [4, 2],
   [0, 3], [2, 3], [4, 3],
   [2, 4],
 ];
-const GEMS: [number, number][] = [[1, 1], [3, 1]];
+export const GEMS: [number, number][] = [[1, 1], [3, 1]];
 
 export default function LeagueCrown3D({ width, height, depth }: Props) {
   const groupRef = useRef<THREE.Group>(null);

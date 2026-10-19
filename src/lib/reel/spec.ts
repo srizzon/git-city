@@ -13,7 +13,7 @@ export type Anchor = z.infer<typeof Anchor>;
 
 const HeaderLine = z.object({
   text: z.string().min(1),
-  size: z.enum(["big", "small"]),
+  size: z.enum(["huge", "big", "small"]),
   /** Kept as typed (a login, "seuuser SP"), not in caps. */
   plain: z.boolean().optional(),
 });
@@ -89,7 +89,7 @@ const Follow = z.object({
   done: Anchor,
   handle: z.string(),
   name: z.string(),
-  /** The GitHub login whose photo is the profile picture. */
+  /** The profile picture: a GitHub login, or an image under REELS_HOME (a path with a "/", e.g. the account's own Instagram photo). */
   avatar: z.string(),
   bio: z.array(z.string()).max(4),
   link: z.string(),
@@ -106,7 +106,98 @@ const Profile = z.object({
   to: Anchor.optional(),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile]);
+/** An Instagram comment as the app draws it in dark mode, typed a part at a time (each @ lit), the scene dimmed behind it. */
+const Comment = z.object({
+  type: z.literal("comment"),
+  from: Anchor,
+  to: Anchor.optional(),
+  /** The commenter as Instagram shows them. */
+  handle: z.string(),
+  /** What gets typed: each part starts typing at its moment, after the ones before. */
+  parts: z.array(z.object({ at: Anchor, text: z.string().min(1) })).min(1),
+});
+
+/** A GitHub contribution graph (an illustration, no numbers), today's square lighting up at `at`; the scene dimmed behind it. */
+const Contrib = z.object({
+  type: z.literal("contrib"),
+  from: Anchor,
+  to: Anchor.optional(),
+  at: Anchor,
+});
+
+/** A place card (the reference's): a dev's photo and login, their office, their number big, and a line on the race; the scene dimmed behind it. */
+const Place = z.object({
+  type: z.literal("place"),
+  from: Anchor,
+  to: Anchor.optional(),
+  login: z.string(),
+  /** Their office as a crown over the photo. */
+  crown: z.boolean().default(false),
+  /** The big number, e.g. "45 pontos". */
+  value: z.string(),
+
+});
+
+/** A points table, a row at a time as each is said: the real thing (an Instagram comment, a GitHub row, an @mention) and its points big. `label` is for the studio, not shown. The scene dimmed behind it. */
+const Points = z.object({
+  type: z.literal("points"),
+  from: Anchor,
+  to: Anchor.optional(),
+  rows: z
+    .array(z.object({ at: Anchor, icon: z.enum(["comment", "code", "friend"]), value: z.string(), label: z.string() }))
+    .min(1)
+    .max(4),
+});
+
+/**
+ * A phone in the middle of the frame, the scene dimmed behind it, its screen
+ * changing at each screen's moment: Instagram's comments with the keyboard up
+ * (typing `parts`, sent at `send`), a GitHub contribution graph (today's
+ * square lighting at `send`), or this reel playing on Instagram (`image` as
+ * its video, the comment button tapped at `send`); `points` pop beside it. The way to show an
+ * action that happens off the map.
+ */
+const Phone = z.object({
+  type: z.literal("phone"),
+  from: Anchor,
+  to: Anchor.optional(),
+  screens: z
+    .array(
+      z.object({
+        at: Anchor,
+        kind: z.enum(["comment", "graph", "reel"]),
+        parts: z.array(z.object({ at: Anchor, text: z.string().min(1) })).default([]),
+        send: Anchor.optional(),
+        points: z.object({ at: Anchor, value: z.string() }).optional(),
+        /** A comments screen's comments already there (sent before), over the one being typed. */
+        posted: z.array(z.string()).default([]),
+        /** A reel screen's video: an image under REELS_HOME (a frame of this reel, so it reads as this one). */
+        image: z.string().optional(),
+      }),
+    )
+    .min(1),
+});
+
+/** One way to score, alone and big: the app's own icon for it (the "How to score" panel's) on its tile, the points under it. */
+const Score = z.object({
+  type: z.literal("score"),
+  from: Anchor,
+  to: Anchor.optional(),
+  icon: z.enum(["comment", "code", "friend", "story", "join"]),
+  value: z.string(),
+});
+
+/** GitHub photos pinned on the map over each state's capital (a world with a map), popping in one after another from the north. */
+const Pins = z.object({
+  type: z.literal("pins"),
+  from: Anchor,
+  to: Anchor.optional(),
+  rows: z.array(z.object({ uf: z.string().length(2), login: z.string() })).min(1),
+  /** Seconds between one pin and the next. */
+  stagger: z.number().nonnegative().default(0.04),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({
@@ -180,6 +271,12 @@ export const ReelSpec = z.object({
       ctaAt: Anchor,
     })
     .optional(),
+  /**
+   * A big headline up top that carries the story instead of the fixed header: each beat shows from
+   * its moment until the next one's, and the captions go small under it; a beat with no lines clears it
+   * (a card carries that beat). Anchors are looked for in order.
+   */
+  headline: z.array(z.object({ at: Anchor, lines: z.array(HeaderLine) })).min(1).optional(),
   /** Extra sound effects (a scene's own, like a fall's thud, come with it). */
   sounds: z.array(z.object({ at: Anchor, src: z.string(), gain: z.number().default(1), rate: z.number().optional() })).default([]),
   lines: z.array(Line).min(1),

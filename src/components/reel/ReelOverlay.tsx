@@ -6,6 +6,7 @@ import type { Reel, ReelBalloon, ReelPanel } from "@/lib/reel/film";
 import type { ReelSpec } from "@/lib/reel/spec";
 import type { CityBuilding } from "@/lib/github";
 import { levelProgress, rankFromLevel, tierFromLevel, xpForLevel } from "@/lib/xp";
+import { CircleUser, Clapperboard, Code2, Heart, House, Instagram, MapPin, MessageCircle, Search, Send, SquarePlus, UserPlus, type LucideIcon } from "lucide-react";
 
 // A reel's words over its world: the rule fixed up top that turns into the
 // call to action, each caption line a word at a time as it is spoken
@@ -19,6 +20,8 @@ import { levelProgress, rankFromLevel, tierFromLevel, xpForLevel } from "@/lib/x
 // most 72% wide.
 
 const FADE = 0.15; // s
+/** How dark the scene goes behind a card. */
+const DIM = 0.55;
 
 type BadgeKind = "governor" | "senator" | "mayor" | "president" | "founder";
 
@@ -88,10 +91,13 @@ export function overlayBoxes(stage: HTMLElement): { name: string; x: number; y: 
   const s = stage.getBoundingClientRect();
   return [...stage.querySelectorAll<HTMLElement>("[data-reel-box]")].flatMap((el) => {
     if (Number(el.style.opacity || 1) < 0.5) return [];
+    // A box inside a panel (the phone's screen) shows only while its panel does.
+    const panel = el.closest<HTMLElement>("[data-panel]");
+    if (panel && Number(panel.style.opacity || 1) < 0.5) return [];
     let r: DOMRect;
-    if (el.dataset.reelBox === "balloon") r = el.getBoundingClientRect();
+    // A balloon or a card is its box; a line of type is its words (a caption line's box is wider than its words).
+    if (["balloon", "points", "comment", "contrib", "place", "phone"].includes(el.dataset.reelBox!)) r = el.getBoundingClientRect();
     else {
-      // The text itself, not its box: a caption line's box is wider than its words.
       const range = document.createRange();
       range.selectNodeContents(el);
       r = range.getBoundingClientRect();
@@ -121,18 +127,20 @@ function Lit({ text }: { text: string }) {
   );
 }
 
-const SIZE = { big: "7.4cqw", small: "4.6cqw" } as const;
+const SIZE = { huge: "11cqw", big: "7.4cqw", small: "4.6cqw" } as const;
+/** The headline carries the story, so it reads bigger than the fixed header. */
+const HEADLINE_SIZE = { huge: "15cqw", big: "11cqw", small: "5.6cqw" } as const;
 const outline = (w: number) => ({
   WebkitTextStroke: `${w}cqw #000`,
   paintOrder: "stroke fill" as const,
   textShadow: `0 ${w / 2}cqw 0 #000`,
 });
 
-function HeaderLines({ lines }: { lines: NonNullable<ReelSpec["header"]>["rule"] }) {
+function HeaderLines({ lines, sizes = SIZE }: { lines: NonNullable<ReelSpec["header"]>["rule"]; sizes?: Record<keyof typeof SIZE, string> }) {
   return (
     <>
       {lines.map((l, i) => (
-        <p key={i} style={{ fontSize: SIZE[l.size], lineHeight: 1, marginTop: i ? "1.8cqw" : 0, textTransform: l.plain ? "none" : undefined }}>
+        <p key={i} data-size={l.size} style={{ fontSize: sizes[l.size], lineHeight: 1, marginTop: i ? (sizes === SIZE ? "1.8cqw" : "1cqw") : 0, textTransform: l.plain ? "none" : undefined }}>
           <Lit text={l.text} />
         </p>
       ))}
@@ -156,10 +164,97 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
     el.style.opacity = on ? String(Math.min(1, (t - p.from) / FADE, (p.to + 0.3 - t) / 0.3)) : "0";
     if (!on) return;
     const local = t - p.from;
+    if (p.kind === "comment") {
+      // Slides up into place, then types each part at its moment, a caret blinking while it types.
+      const k = ease(local / 0.25);
+      el.style.transform = `translate(-50%, ${(1 - k) * 6}cqw)`;
+      const typed = p.parts.map((x) => x.text.slice(0, Math.max(0, Math.floor((t - x.at) * TYPE_CPS)))).join("");
+      const text = el.querySelector<HTMLElement>("[data-typed]");
+      if (text && text.dataset.typed !== typed) {
+        text.dataset.typed = typed;
+        text.replaceChildren(
+          ...typed.split(/(@[\w.]+)/).map((part) => {
+            const span = document.createElement("span");
+            span.textContent = part;
+            if (part.startsWith("@")) span.style.color = "var(--color-lime)";
+            return span;
+          }),
+        );
+      }
+      const typing = p.parts.some((x) => t >= x.at && (t - x.at) * TYPE_CPS < x.text.length);
+      const caret = el.querySelector<HTMLElement>("[data-caret]");
+      if (caret) caret.style.opacity = typing || Math.floor(t * 2.5) % 2 === 0 ? "1" : "0";
+      return;
+    }
+    if (p.kind === "phone") {
+      drawPhone(el, p, t, local);
+      return;
+    }
+    if (p.kind === "score") {
+      // The tile pops in, then its points pop under the icon.
+      const tile = el.querySelector<HTMLElement>("[data-tile]");
+      const n = el.querySelector<HTMLElement>("[data-n]");
+      const k = back(clamp(local / 0.3));
+      if (tile) tile.style.transform = `scale(${Math.max(0.001, k)})`;
+      if (n) {
+        const pop = back(clamp((local - 0.2) / 0.3));
+        n.style.opacity = String(clamp(pop * 2));
+        n.style.transform = `scale(${Math.max(0.001, pop)})`;
+      }
+      return;
+    }
+    if (p.kind === "points") {
+      // Each row as it's said: the thing rises in, then its points pop beside it (a GitHub row's today square lights first).
+      p.rows.forEach((r, k) => {
+        const since = t - r.at;
+        const thing = el.querySelector<HTMLElement>(`[data-thing="${k}"]`);
+        const n = el.querySelector<HTMLElement>(`[data-n="${k}"]`);
+        if (thing) {
+          thing.style.opacity = String(clamp(since / 0.12));
+          thing.style.transform = `translateY(${(1 - ease(since / 0.25)) * 3}cqw)`;
+          const today = thing.querySelector<HTMLElement>("[data-today]");
+          if (today) {
+            const on = since >= 0.2;
+            today.style.background = on ? CONTRIB[4] : CONTRIB[0];
+            today.style.boxShadow = on ? `0 0 ${2.6 * Math.max(0.3, 1 - (since - 0.2) / 0.8)}cqw ${CONTRIB[4]}` : "none";
+          }
+        }
+        if (n) {
+          const pop = back(clamp((since - 0.25) / 0.3));
+          n.style.opacity = String(clamp(pop * 2));
+          n.style.transform = `scale(${Math.max(0.001, pop)})`;
+        }
+      });
+      return;
+    }
+    if (p.kind === "place") {
+      // The photo pops, then the lines come in under it one after another.
+      el.querySelectorAll<HTMLElement>("[data-step]").forEach((x) => {
+        const k = back(clamp((local - Number(x.dataset.step) * 0.12) / 0.3));
+        x.style.opacity = String(clamp(k * 2));
+        x.style.transform = `scale(${Math.max(0.001, k)})`;
+      });
+      return;
+    }
+    if (p.kind === "contrib") {
+      const k = ease(local / 0.25);
+      el.style.transform = `translate(-50%, ${(1 - k) * 6}cqw)`;
+      // Today's square: empty, then lit with a pop and a glow.
+      const today = el.querySelector<HTMLElement>("[data-today]");
+      if (today) {
+        const on = t >= p.at;
+        const pop = back(clamp((t - p.at) / 0.35));
+        today.style.background = on ? CONTRIB[4] : CONTRIB[0];
+        today.style.transform = `scale(${on ? 0.6 + 0.4 * pop + 0.25 * Math.max(0, 1 - (t - p.at) / 0.5) : 1})`;
+        today.style.boxShadow = on ? `0 0 ${3 * Math.max(0.3, 1 - (t - p.at) / 0.8)}cqw ${CONTRIB[4]}` : "none";
+      }
+      return;
+    }
     if (p.kind === "counter") {
       const n = Math.max(1, Math.min(p.value, Math.round(1 + ((t - p.from) / Math.max(0.001, p.reach - p.from)) * (p.value - 1))));
       const num = el.querySelector<HTMLElement>("[data-n]");
-      if (num && num.textContent !== String(n)) num.textContent = String(n);
+      const text = n.toLocaleString("pt-BR");
+      if (num && num.textContent !== text) num.textContent = text;
       return;
     }
     if (p.kind === "profile") {
@@ -209,6 +304,423 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
       row.style.transform = `translateY(${(1 - e) * 1.5}cqw)`;
     });
   });
+}
+
+/** Characters typed a second in a comment card. */
+const TYPE_CPS = 14;
+/** GitHub's dark contribution greens, none to most. */
+const CONTRIB = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
+const CONTRIB_WEEKS = 14;
+/** Today's weekday row in the last week (the rows after it aren't drawn yet). */
+const CONTRIB_TODAY = 4;
+const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
+/** A steady made-up graph (the same every render): mostly coded days, a few gaps. */
+function contribLevel(week: number, day: number) {
+  const h = Math.sin(week * 12.9898 + day * 78.233) * 43758.5453;
+  const r = h - Math.floor(h);
+  return r < 0.18 ? 0 : r < 0.42 ? 1 : r < 0.68 ? 2 : r < 0.88 ? 3 : 4;
+}
+
+function CommentPanel({ index, handle }: { index: number; handle: string }) {
+  return (
+    <div
+      data-panel={index}
+      data-reel-box="comment"
+      style={{ position: "absolute", left: "50%", top: "31%", width: "72cqw", opacity: 0, background: "#000", color: "#f5f5f5", border: "0.3cqw solid #262626", borderRadius: "3cqw", padding: "4.4cqw 4.4cqw", fontFamily: SANS, boxShadow: "0 2cqw 6cqw rgba(0,0,0,0.6)" }}
+    >
+      <div style={{ display: "flex", gap: "3cqw", alignItems: "flex-start" }}>
+        <div style={{ width: "11cqw", height: "11cqw", borderRadius: "50%", background: "#363636", flexShrink: 0, overflow: "hidden", position: "relative" }}>
+          <div style={{ position: "absolute", left: "50%", top: "22%", width: "4.4cqw", height: "4.4cqw", borderRadius: "50%", background: "#8e8e8e", transform: "translateX(-50%)" }} />
+          <div style={{ position: "absolute", left: "50%", top: "62%", width: "8cqw", height: "7.4cqw", borderRadius: "50%", background: "#8e8e8e", transform: "translateX(-50%)" }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: "4cqw", lineHeight: 1.2 }}>
+            <span style={{ fontWeight: 700 }}>{handle}</span> <span style={{ color: "#a8a8a8" }}>agora</span>
+          </p>
+          <p style={{ fontSize: "6.4cqw", lineHeight: 1.25, marginTop: "1cqw", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            <span data-typed="" />
+            <span data-caret style={{ display: "inline-block", width: "0.6cqw", height: "6.6cqw", marginLeft: "0.3cqw", verticalAlign: "-1cqw", background: "#f5f5f5" }} />
+          </p>
+          <p style={{ fontSize: "3.6cqw", color: "#a8a8a8", fontWeight: 600, marginTop: "1.6cqw" }}>Responder</p>
+        </div>
+        {/* The like heart, outlined, as Instagram draws it. */}
+        <svg viewBox="0 0 24 24" style={{ width: "5.4cqw", height: "5.4cqw", flexShrink: 0, marginTop: "5cqw" }} fill="none" stroke="#a8a8a8" strokeWidth="2">
+          <path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3.2 5 6.6 5c2.1 0 3.5 1.2 4.4 2.6h2c.9-1.4 2.3-2.6 4.4-2.6 3.4 0 5.4 3.6 4.1 6.8C19.5 16.4 12 21 12 21z" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+const IG_BLUE = "#0095f6";
+
+type PhoneScreen = Extract<ReelPanel, { kind: "phone" }>["screens"][number];
+/** Each typed character's moment, in order across a screen's parts. */
+const typedAt = (x: PhoneScreen) => x.parts.flatMap((y) => [...y.text].map((c, i) => ({ c, at: y.at + i / TYPE_CPS })));
+
+/** The phone each frame: which screen shows, what's typed, the key pressed, the send, today's square, the points. */
+function drawPhone(el: HTMLElement, p: Extract<ReelPanel, { kind: "phone" }>, t: number, local: number) {
+  el.style.transform = `translate(-50%, ${(1 - ease(local / 0.3)) * 10}cqw)`;
+  p.screens.forEach((x, k) => {
+    const sc = el.querySelector<HTMLElement>(`[data-screen="${k}"]`);
+    if (!sc) return;
+    // The last screen stays up while the phone fades out.
+    const on = t >= x.at && (t < x.until || k === p.screens.length - 1);
+    sc.style.opacity = on ? "1" : "0";
+    const pts = el.querySelector<HTMLElement>(`[data-points="${k}"]`);
+    if (pts) {
+      const pop = on && x.points ? back(clamp((t - x.points.at) / 0.3)) : 0;
+      pts.style.opacity = String(clamp(pop * 2));
+      pts.style.transform = `scale(${Math.max(0.001, pop)})`;
+    }
+    if (!on) return;
+    const sent = x.send !== null && t >= x.send;
+    if (x.kind === "reel") {
+      // The comment button tapped: it dips, a touch ripple spreads from it.
+      const since = x.send === null ? -1 : t - x.send;
+      const btn = sc.querySelector<HTMLElement>("[data-tap]");
+      if (btn) btn.style.transform = `scale(${since >= 0 && since < 0.18 ? 0.8 : 1})`;
+      const ripple = sc.querySelector<HTMLElement>("[data-ripple]");
+      if (ripple) {
+        const k = since >= 0 ? clamp(since / 0.45) : 0;
+        ripple.style.opacity = since >= 0 ? String(0.7 * (1 - k)) : "0";
+        ripple.style.transform = `translate(-50%, -50%) scale(${0.5 + 0.8 * k})`;
+      }
+      return;
+    }
+    if (x.kind === "graph") {
+      const today = sc.querySelector<HTMLElement>("[data-today]");
+      if (today) {
+        today.style.background = sent ? CONTRIB[4] : CONTRIB[0];
+        today.style.transform = `scale(${sent ? 1 + 0.4 * Math.max(0, 1 - (t - x.send!) / 0.35) : 1})`;
+        today.style.boxShadow = sent ? `0 0 ${3 * Math.max(0.3, 1 - (t - x.send!) / 0.8)}cqw ${CONTRIB[4]}` : "none";
+      }
+      return;
+    }
+    const chars = typedAt(x);
+    const typed = chars.filter((c) => c.at <= t).map((c) => c.c).join("");
+    const lit = (text: string) =>
+      text.split(/(@[\w.]+)/).map((part) => {
+        const span = document.createElement("span");
+        span.textContent = part;
+        if (part.startsWith("@")) span.style.color = "#e0f1ff";
+        return span;
+      });
+    const input = sc.querySelector<HTMLElement>("[data-input]");
+    if (input && input.dataset.v !== (sent ? "" : typed)) {
+      input.dataset.v = sent ? "" : typed;
+      input.replaceChildren(...(sent || !typed ? [] : lit(typed)));
+    }
+    const scroll = sc.querySelector<HTMLElement>("[data-scroll]");
+    const field = scroll?.parentElement;
+    if (scroll && field) {
+      const room = field.clientWidth - parseFloat(getComputedStyle(field).paddingLeft) - parseFloat(getComputedStyle(field).paddingRight);
+      scroll.style.transform = `translateX(${-Math.max(0, scroll.scrollWidth - room)}px)`;
+    }
+    const ph = sc.querySelector<HTMLElement>("[data-placeholder]");
+    if (ph) ph.style.display = sent || !typed ? "" : "none";
+    const caret = sc.querySelector<HTMLElement>("[data-caret]");
+    if (caret) caret.style.opacity = !sent && Math.floor(t * 2.5) % 2 === 0 ? "1" : "0";
+    const send = sc.querySelector<HTMLElement>("[data-send]");
+    if (send) {
+      send.style.color = typed && !sent ? IG_BLUE : "#3b3b3b";
+      send.style.transform = `scale(${x.send !== null && t >= x.send && t < x.send + 0.15 ? 0.82 : 1})`;
+    }
+    // The key of the last character typed, pressed for a moment.
+    const last = [...chars].reverse().find((c) => c.at <= t);
+    sc.querySelectorAll<HTMLElement>("[data-key]").forEach((key) => {
+      const down = !sent && !!last && t - last.at < 0.09 && key.dataset.key === last.c.toLowerCase();
+      key.style.background = down ? "#6b6b6b" : "#3a3a3c";
+    });
+    const suggest = sc.querySelector<HTMLElement>("[data-suggest]");
+    if (suggest) suggest.style.opacity = !sent && typed.includes("@") ? "1" : "0";
+    const posted = sc.querySelector<HTMLElement>("[data-posted]");
+    if (posted) {
+      const k2 = sent ? ease((t - x.send!) / 0.25) : 0;
+      posted.style.opacity = String(k2);
+      posted.style.transform = `translateY(${(1 - k2) * 4}cqw)`;
+      const text = posted.querySelector<HTMLElement>("[data-posted-text]");
+      const full = chars.map((c) => c.c).join("");
+      if (text && text.dataset.v !== full) {
+        text.dataset.v = full;
+        text.replaceChildren(...lit(full));
+      }
+    }
+  });
+}
+
+/** A phone in dark mode, its screens stacked (one shows at a time), the points popping over its top right. */
+function PhonePanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "phone" }> }) {
+  const gray = "#a8a8a8";
+  const avatar = (w: string) => <span style={{ width: w, height: w, borderRadius: "50%", background: "#363636", flexShrink: 0, display: "inline-block" }} />;
+  // iOS proportions: the sheet's header, the list taking what's left, the input on one line docked over a full-width keyboard.
+  const key = (c: string, flex = 1) => (
+    <span key={c} data-key={c} style={{ flex, height: "8.4cqw", borderRadius: "1.2cqw", background: "#3a3a3c", fontSize: "3.6cqw", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0.3cqw 0 #111" }}>
+      {c === " " ? "" : c}
+    </span>
+  );
+  const comments = (earlier: string[]) => (
+    <>
+      <div style={{ display: "flex", justifyContent: "center", paddingTop: "1.6cqw" }}>
+        <span style={{ width: "8cqw", height: "0.9cqw", borderRadius: "1cqw", background: "#555" }} />
+      </div>
+      <p style={{ textAlign: "center", fontSize: "3.6cqw", fontWeight: 700, padding: "2.4cqw 0", borderBottom: "0.25cqw solid #262626" }}>Comentários</p>
+      <div style={{ flex: 1, padding: "3.6cqw 4cqw", position: "relative", display: "flex", flexDirection: "column", gap: "3.4cqw" }}>
+        {earlier.map((text, i) => (
+          <div key={i} style={{ display: "flex", gap: "2.6cqw" }}>
+            {avatar("7.4cqw")}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: "2.9cqw", lineHeight: 1.3 }}>
+                <span style={{ fontWeight: 700 }}>voce</span> <span style={{ color: gray }}>agora</span>
+              </p>
+              <p style={{ fontSize: "4.2cqw", lineHeight: 1.3 }}>{text}</p>
+            </div>
+          </div>
+        ))}
+        <div data-posted style={{ display: "flex", gap: "2.6cqw", opacity: 0 }}>
+          {avatar("7.4cqw")}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: "2.9cqw", lineHeight: 1.3 }}>
+              <span style={{ fontWeight: 700 }}>voce</span> <span style={{ color: gray }}>agora</span>
+            </p>
+            <p data-posted-text style={{ fontSize: "4.2cqw", lineHeight: 1.3 }} />
+            <p style={{ fontSize: "2.7cqw", color: gray, fontWeight: 600, marginTop: "0.8cqw" }}>Responder</p>
+          </div>
+        </div>
+        <div data-suggest style={{ position: "absolute", left: "4cqw", right: "4cqw", bottom: "2cqw", display: "flex", alignItems: "center", gap: "2.6cqw", background: "#262626", borderRadius: "2.6cqw", padding: "2.2cqw 3cqw", opacity: 0 }}>
+          {avatar("6.6cqw")}
+          <span style={{ fontSize: "3.8cqw", fontWeight: 700 }}>amigo</span>
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "2.4cqw", padding: "2.4cqw 3.4cqw", borderTop: "0.25cqw solid #262626" }}>
+        {avatar("7.4cqw")}
+        <div style={{ flex: 1, minWidth: 0, height: "9.6cqw", display: "flex", alignItems: "center", border: "0.3cqw solid #363636", borderRadius: "5cqw", padding: "0 3.2cqw", fontSize: "3.9cqw", whiteSpace: "nowrap", overflow: "hidden" }}>
+          {/* The typed text and caret slide left once they run past the field, as iOS scrolls a long line. */}
+          <span data-scroll style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
+            <span data-input />
+            <span data-caret style={{ display: "inline-block", width: "0.45cqw", height: "4.6cqw", margin: "0 0.4cqw", background: IG_BLUE, flexShrink: 0 }} />
+          </span>
+          <span data-placeholder style={{ color: "#737373", fontSize: "3.6cqw", overflow: "hidden", textOverflow: "ellipsis" }}>Adicione um comentário…</span>
+        </div>
+        <svg data-send viewBox="0 0 24 24" style={{ width: "8cqw", height: "8cqw", color: "#3b3b3b", flexShrink: 0 }} aria-hidden>
+          <circle cx="12" cy="12" r="12" fill="currentColor" />
+          <path d="M12 17V7M7.5 11.5 12 7l4.5 4.5" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <div style={{ background: "#1c1c1e", padding: "2.6cqw 1.2cqw 1.6cqw", display: "flex", flexDirection: "column", gap: "2.4cqw" }}>
+        <div style={{ display: "flex", gap: "1.2cqw" }}>{[..."qwertyuiop"].map((c) => key(c))}</div>
+        <div style={{ display: "flex", gap: "1.2cqw", padding: "0 2.6cqw" }}>{[..."asdfghjkl"].map((c) => key(c))}</div>
+        <div style={{ display: "flex", gap: "1.2cqw" }}>
+          {key("⇧", 1.5)}
+          <span style={{ width: "1.4cqw" }} />
+          {[..."zxcvbnm"].map((c) => key(c))}
+          <span style={{ width: "1.4cqw" }} />
+          {key("⌫", 1.5)}
+        </div>
+        <div style={{ display: "flex", gap: "1.2cqw" }}>
+          {key("123", 2.4)}
+          {key(" ", 6)}
+          {key("@", 1.2)}
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: "1.6cqw" }}>
+          <span style={{ width: "22cqw", height: "1cqw", borderRadius: "1cqw", background: "#f5f5f5" }} />
+        </div>
+      </div>
+    </>
+  );
+  // This reel on Instagram as the app lays it out: its video (a frame of it), the right rail, the account and caption, the tab bar.
+  const nav = "#f5f5f5";
+  const reelScreen = (image: string | null) => (
+    <div style={{ position: "relative", height: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ position: "relative", flex: 1, overflow: "hidden", background: "#000" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a frame of this reel, from REELS_HOME */}
+        {image && <img alt="" src={`/api/reels/file/${image}`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0) 18%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.7))" }} />
+        <p style={{ position: "absolute", left: 0, right: 0, top: "3cqw", textAlign: "center", fontSize: "4cqw", fontWeight: 700 }}>Reels</p>
+        <div style={{ position: "absolute", right: "3.6cqw", bottom: "6cqw", display: "flex", flexDirection: "column", alignItems: "center", gap: "5.4cqw" }}>
+          <Heart style={{ width: "7cqw", height: "7cqw" }} strokeWidth={2} aria-hidden />
+          <div data-tap style={{ position: "relative", display: "flex" }}>
+            <MessageCircle style={{ width: "7cqw", height: "7cqw" }} strokeWidth={2} aria-hidden />
+            <span data-ripple style={{ position: "absolute", left: "50%", top: "50%", width: "11cqw", height: "11cqw", borderRadius: "50%", background: "#fff", opacity: 0 }} />
+          </div>
+          <Send style={{ width: "7cqw", height: "7cqw" }} strokeWidth={2} aria-hidden />
+        </div>
+        <div style={{ position: "absolute", left: "4cqw", right: "15cqw", bottom: "3.4cqw" }}>
+          <p style={{ display: "flex", alignItems: "center", gap: "2cqw", fontSize: "3.4cqw", fontWeight: 700, whiteSpace: "nowrap" }}>
+            {avatar("6.4cqw")}
+            samuelrizzondev
+          </p>
+          <p style={{ fontSize: "3.2cqw", marginTop: "1.6cqw" }}>Brasil, Dia 2</p>
+          <p style={{ fontSize: "2.8cqw", marginTop: "1.2cqw", color: "#d6d6d6" }}>♫ Áudio original</p>
+        </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", height: "11cqw", background: "#000", borderTop: "0.25cqw solid #262626" }}>
+        {[House, Search, SquarePlus, Clapperboard, CircleUser].map((I, i) => (
+          <I key={i} style={{ width: "5.6cqw", height: "5.6cqw", color: nav }} strokeWidth={i === 3 ? 2.6 : 2} aria-hidden />
+        ))}
+      </div>
+    </div>
+  );
+  const graph = (
+    <div style={{ background: "#0d1117", height: "100%", padding: "6cqw 4cqw" }}>
+      <p style={{ fontSize: "4cqw", fontWeight: 700 }}>Contribuições</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 4.4cqw)", gridTemplateRows: "repeat(7, 4.4cqw)", gridAutoFlow: "column", gap: "1cqw", marginTop: "4cqw", padding: "3cqw", border: "0.3cqw solid #30363d", borderRadius: "2cqw", justifyContent: "center" }}>
+        {Array.from({ length: 9 * 7 }, (_, i) => {
+          const week = Math.floor(i / 7);
+          const day = i % 7;
+          const last = week === 8;
+          if (last && day > CONTRIB_TODAY) return <span key={i} />;
+          const today = last && day === CONTRIB_TODAY;
+          return <span key={i} data-today={today || undefined} style={{ borderRadius: "0.8cqw", background: today ? CONTRIB[0] : CONTRIB[contribLevel(week, day)], outline: today ? "0.3cqw solid #8b949e" : undefined }} />;
+        })}
+      </div>
+    </div>
+  );
+  return (
+    <div data-panel={index} className="absolute" style={{ left: "50%", top: "17%", width: "60cqw", opacity: 0 }}>
+      <div data-body style={{ position: "relative", height: "118cqw", borderRadius: "8cqw", background: "#000", border: "1.4cqw solid #2a2a2c", boxShadow: "0 3cqw 10cqw rgba(0,0,0,0.7)", overflow: "hidden", color: "#f5f5f5", fontFamily: SANS }}>
+        {/* What the safe-zone check measures: the screen down to the keyboard (the keyboard may run under Instagram's bar). */}
+        <div data-reel-box="phone" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "80cqw" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2.4cqw 6cqw 0", fontSize: "3cqw", fontWeight: 600, height: "7cqw" }}>
+          <span>9:41</span>
+          <span style={{ width: "16cqw", height: "4.4cqw", borderRadius: "3cqw", background: "#111" }} />
+          {/* The right corner stays free for the points badge. */}
+          <span style={{ width: "8cqw" }} />
+        </div>
+        {panel.screens.map((x, k) => (
+          <div key={k} data-screen={k} style={{ position: "absolute", left: 0, right: 0, top: "7cqw", bottom: 0, display: "flex", flexDirection: "column", opacity: 0 }}>
+            {x.kind === "graph" ? graph : x.kind === "reel" ? reelScreen(x.image) : comments(x.posted)}
+          </div>
+        ))}
+      </div>
+      {panel.screens.map((x, k) => (
+        // A badge on the phone's top right corner, poking out of its edge like a notification: over nothing on the screen.
+        <p key={k} data-points={k} className="font-pixel" style={{ position: "absolute", right: "-5cqw", top: "-3.4cqw", fontSize: "7.6cqw", lineHeight: 1, padding: "1.6cqw 2.8cqw", background: "var(--color-lime)", color: "#0b0f0a", border: "0.8cqw solid #000", boxShadow: "0 1.2cqw 0 #000", opacity: 0, transformOrigin: "70% 30%" }}>
+          {x.points?.value}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** The app's icons for the ways to score (BrasilPanels' "How to score"). */
+const SCORE_ICONS: Record<string, LucideIcon> = { comment: MessageCircle, code: Code2, friend: UserPlus, story: Instagram, join: MapPin };
+
+/** One way to score, big: the app's icon on its tile (the panel's border and dark glass), the points under it in lime. */
+function ScorePanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "score" }> }) {
+  const Icon = SCORE_ICONS[panel.icon] ?? MessageCircle;
+  return (
+    <div data-panel={index} data-reel-box="place" className="absolute flex flex-col items-center font-pixel uppercase" style={{ left: "50%", top: "17%", transform: "translateX(-50%)", opacity: 0 }}>
+      <div data-tile className="flex items-center justify-center border-border bg-bg/85" style={{ width: "24cqw", height: "24cqw", borderWidth: "0.8cqw", borderStyle: "solid" }}>
+        <Icon className="text-cream" style={{ width: "13cqw", height: "13cqw" }} strokeWidth={1.6} aria-hidden />
+      </div>
+      <p data-n className="text-lime" style={{ fontSize: "13cqw", lineHeight: 1, marginTop: "2.6cqw", opacity: 0, ...outline(1.6) }}>
+        {panel.value}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The points table: a row per way to score, each in as it's said. A row is
+ * the real thing the viewer already knows, cut out of its app (an Instagram
+ * comment, a GitHub contribution row, an Instagram @mention), with the
+ * points big beside it: no icon to decode, no word to read.
+ */
+function PointsPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "points" }> }) {
+  const sans = { fontFamily: SANS, textTransform: "none" as const, WebkitTextStroke: 0, textShadow: "none" };
+  const thing = (icon: string) => {
+    if (icon === "comment")
+      return (
+        <div className="flex items-center" style={{ ...sans, gap: "1.8cqw", background: "#000", border: "0.3cqw solid #363636", borderRadius: "3cqw", padding: "1.8cqw 2.6cqw" }}>
+          <span style={{ width: "5.6cqw", height: "5.6cqw", borderRadius: "50%", background: "#363636", flexShrink: 0 }} />
+          <span style={{ fontSize: "4.4cqw", color: "#f5f5f5", whiteSpace: "nowrap" }}>seuuser SP</span>
+          <svg viewBox="0 0 24 24" style={{ width: "3.8cqw", height: "3.8cqw", marginLeft: "1cqw" }} fill="none" stroke="#a8a8a8" strokeWidth="2">
+            <path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3.2 5 6.6 5c2.1 0 3.5 1.2 4.4 2.6h2c.9-1.4 2.3-2.6 4.4-2.6 3.4 0 5.4 3.6 4.1 6.8C19.5 16.4 12 21 12 21z" />
+          </svg>
+        </div>
+      );
+    if (icon === "code")
+      return (
+        <div className="flex" style={{ gap: "1.1cqw", background: "#0d1117", border: "0.3cqw solid #30363d", borderRadius: "2cqw", padding: "2.4cqw" }}>
+          {[2, 3, 1, 4, 2, 3].map((l, i) => (
+            <span key={i} style={{ width: "4.2cqw", height: "4.2cqw", borderRadius: "0.8cqw", background: CONTRIB[l] }} />
+          ))}
+          <span data-today style={{ width: "4.2cqw", height: "4.2cqw", borderRadius: "0.8cqw", background: CONTRIB[0], outline: "0.3cqw solid #8b949e" }} />
+        </div>
+      );
+    return (
+      <span style={{ ...sans, fontSize: "6.4cqw", fontWeight: 700, color: "#4cb5f9", background: "#000", border: "0.3cqw solid #363636", borderRadius: "3cqw", padding: "1.6cqw 3.4cqw", whiteSpace: "nowrap" }}>@amigo</span>
+    );
+  };
+  return (
+    <div data-panel={index} data-reel-box="points" className="absolute font-pixel uppercase text-white" style={{ left: "50%", top: "25%", transform: "translateX(-50%)", display: "grid", gridTemplateColumns: "auto auto", alignItems: "center", columnGap: "4cqw", rowGap: "4.6cqw", opacity: 0, ...outline(1.4) }}>
+      {panel.rows.map((r, k) => (
+        <div key={k} data-row={k} style={{ display: "contents" }}>
+          <div data-thing={k} style={{ justifySelf: "end", opacity: 0 }}>
+            {thing(r.icon)}
+          </div>
+          <span data-n={k} className="text-lime" style={{ fontSize: "9cqw", lineHeight: 1, opacity: 0, transformOrigin: "0 50%" }}>
+            {r.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The place card: a photo (the crown over it for an office), the @login, the number big. Outlined pixel type, no box. */
+function PlacePanel({ index, panel, photo }: { index: number; panel: Extract<ReelPanel, { kind: "place" }>; photo: string | null }) {
+  const crown = BADGES.governor;
+  return (
+    <div data-panel={index} data-reel-box="place" className="absolute flex flex-col items-center text-center font-pixel uppercase text-white" style={{ left: "50%", top: "24%", width: "72%", transform: "translateX(-50%)", opacity: 0, ...outline(1.4) }}>
+      {panel.crown && (
+        <svg data-step="1" viewBox="0 0 8 8" style={{ width: "11cqw", height: "11cqw", color: crown.color, marginBottom: "-1.6cqw", position: "relative", zIndex: 1 }} aria-hidden>
+          {crown.pixels.map(([x, y, w, h], i) => (
+            <rect key={i} x={x} y={y} width={w} height={h} fill="currentColor" stroke="#000" strokeWidth={0.3} paintOrder="stroke" />
+          ))}
+        </svg>
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar, drawn as it is */}
+      <img data-step="0" alt="" src={photo ?? `https://avatars.githubusercontent.com/${panel.login}?s=240`} style={{ width: "20cqw", height: "20cqw", border: "1cqw solid #000", outline: "0.7cqw solid var(--color-lime)" }} />
+      <p data-step="2" style={{ fontSize: "6.6cqw", lineHeight: 1, marginTop: "3.4cqw", textTransform: "none" }}>
+        @{panel.login}
+      </p>
+      <p data-step="3" className="text-lime" style={{ fontSize: "11cqw", lineHeight: 1, marginTop: "2.6cqw" }}>
+        <Lit text={panel.value} />
+      </p>
+    </div>
+  );
+}
+
+function ContribPanel({ index }: { index: number }) {
+  const cell = "3.6cqw";
+  return (
+    <div
+      data-panel={index}
+      data-reel-box="contrib"
+      style={{ position: "absolute", left: "50%", top: "31%", width: "72cqw", opacity: 0, background: "#0d1117", border: "0.3cqw solid #30363d", borderRadius: "2.4cqw", padding: "3.6cqw", fontFamily: SANS, boxShadow: "0 2cqw 6cqw rgba(0,0,0,0.6)" }}
+    >
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${CONTRIB_WEEKS}, ${cell})`, gridTemplateRows: `repeat(7, ${cell})`, gridAutoFlow: "column", gap: "0.9cqw", justifyContent: "center" }}>
+        {Array.from({ length: CONTRIB_WEEKS * 7 }, (_, i) => {
+          const week = Math.floor(i / 7);
+          const day = i % 7;
+          const last = week === CONTRIB_WEEKS - 1;
+          if (last && day > CONTRIB_TODAY) return <span key={i} />;
+          const today = last && day === CONTRIB_TODAY;
+          return <span key={i} data-today={today || undefined} style={{ borderRadius: "0.6cqw", background: today ? CONTRIB[0] : CONTRIB[contribLevel(week, day)], outline: today ? "0.3cqw solid #8b949e" : undefined }} />;
+        })}
+      </div>
+      <p style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "0.9cqw", marginTop: "2.4cqw", fontSize: "2.6cqw", color: "#8b949e" }}>
+        Less
+        {CONTRIB.map((c) => (
+          <span key={c} style={{ width: "2.6cqw", height: "2.6cqw", borderRadius: "0.5cqw", background: c }} />
+        ))}
+        More
+      </p>
+    </div>
+  );
 }
 
 /** A building's card, laid out as the app's (home-client's building card), in container units. */
@@ -297,13 +809,22 @@ function Panel({
   index,
   photoOf,
   buildingOf,
+  big,
 }: {
   panel: ReelPanel;
   index: number;
+  /** Under a headline: lists read bigger. */
+  big: boolean;
   photoOf: (login: string) => string | null;
   buildingOf: (login: string) => CityBuilding | null;
 }) {
-  if (panel.kind === "bars" || panel.kind === "roster") return <ListPanel panel={panel} index={index} photoOf={photoOf} />;
+  if (panel.kind === "bars" || panel.kind === "roster") return <ListPanel panel={panel} index={index} photoOf={photoOf} big={big} />;
+  if (panel.kind === "comment") return <CommentPanel index={index} handle={panel.handle} />;
+  if (panel.kind === "contrib") return <ContribPanel index={index} />;
+  if (panel.kind === "points") return <PointsPanel index={index} panel={panel} />;
+  if (panel.kind === "score") return <ScorePanel index={index} panel={panel} />;
+  if (panel.kind === "phone") return <PhonePanel index={index} panel={panel} />;
+  if (panel.kind === "place") return <PlacePanel index={index} panel={panel} photo={photoOf(panel.login)} />;
   if (panel.kind === "profile") {
     const b = buildingOf(panel.login);
     return b ? <ProfilePanel index={index} b={b} /> : null;
@@ -344,13 +865,14 @@ function Panel({
     <div
       data-panel={index}
       data-reel-box="follow"
-      style={{ position: "absolute", left: "50%", top: "15%", width: "72cqw", transformOrigin: "50% 0", opacity: 0, background: "#000", color: "#f5f5f5", border: "0.3cqw solid #262626", borderRadius: "3cqw", padding: "4cqw", fontFamily: sans, boxShadow: "0 2cqw 6cqw rgba(0,0,0,0.6)" }}
+      // Under a headline (it asks for the follow), the card sits lower.
+      style={{ position: "absolute", left: "50%", top: big ? "27%" : "15%", width: "72cqw", transformOrigin: "50% 0", opacity: 0, background: "#000", color: "#f5f5f5", border: "0.3cqw solid #262626", borderRadius: "3cqw", padding: "4cqw", fontFamily: sans, boxShadow: "0 2cqw 6cqw rgba(0,0,0,0.6)" }}
     >
       <p style={{ fontSize: "4.6cqw", fontWeight: 700, lineHeight: 1 }}>{panel.handle}</p>
       <div style={{ display: "flex", alignItems: "center", gap: "4cqw", marginTop: "3.4cqw" }}>
         <div style={{ width: "19cqw", height: "19cqw", borderRadius: "50%", background: "#5dd67a", overflow: "hidden", flexShrink: 0 }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- the account's GitHub photo */}
-          <img alt="" src={avatar(panel.avatar, 300)} style={{ display: "block", width: "100%", height: "100%" }} />
+          <img alt="" src={panel.avatar.includes("/") ? `/api/reels/file/${panel.avatar}` : avatar(panel.avatar, 300)} style={{ display: "block", width: "100%", height: "100%" }} />
         </div>
         <div style={{ display: "flex", flex: 1, justifyContent: "space-between", textAlign: "center" }}>
           {(
@@ -389,18 +911,21 @@ function Panel({
 }
 
 /** The list panels' markup: white outlined type and solid bars, no box (dark bands were rejected). */
-function ListPanel({ panel, index, photoOf }: { panel: Extract<ReelPanel, { kind: "bars" | "roster" }>; index: number; photoOf: (login: string) => string | null }) {
+function ListPanel({ panel, index, photoOf, big = false }: { panel: Extract<ReelPanel, { kind: "bars" | "roster" }>; index: number; photoOf: (login: string) => string | null; big?: boolean }) {
   const type = "font-pixel uppercase text-white whitespace-nowrap";
+  // Under a headline a short list is the beat's subject: it reads bigger, lower, on the dimmed scene.
+  const k = big ? 1.45 : 1;
+  const u = (n: number) => `${n * k}cqw`;
   const max = panel.kind === "bars" ? Math.max(...panel.rows.map((r) => (typeof r.value === "number" ? r.value : Number(String(r.value).replace(/\D/g, "")) || 0)), 1) : 1;
   return (
     <div
       data-panel={index}
       data-reel-box={panel.kind}
       className="absolute flex flex-col"
-      style={{ left: "50%", transform: "translateX(-50%)", top: "26%", width: "72%", gap: "1.2cqw", opacity: 0, ...outline(1.2) }}
+      style={{ left: "50%", transform: "translateX(-50%)", top: big ? "29%" : "26%", width: "72%", gap: u(1.2), opacity: 0, ...outline(1.2 * k) }}
     >
       {panel.title && (
-        <p className={`${type} text-center`} style={{ fontSize: "4.2cqw", lineHeight: 1, marginBottom: "0.8cqw" }}>
+        <p className={`${type} text-center`} style={{ fontSize: u(4.2), lineHeight: 1, marginBottom: u(0.8) }}>
           <Lit text={panel.title} />
         </p>
       )}
@@ -408,18 +933,18 @@ function ListPanel({ panel, index, photoOf }: { panel: Extract<ReelPanel, { kind
         ? panel.rows.map((r, k) => {
             const v = typeof r.value === "number" ? r.value : Number(String(r.value).replace(/\D/g, "")) || 0;
             return (
-              <div key={k} className="flex items-center" style={{ gap: "2cqw", height: "5.6cqw" }}>
-                <span className={type} style={{ fontSize: "4.4cqw", width: "10cqw", color: r.lit ? "var(--color-lime)" : undefined }}>
+              <div key={k} className="flex items-center" style={{ gap: u(2), height: u(5.6) }}>
+                <span className={type} style={{ fontSize: u(4.4), width: u(10), color: r.lit ? "var(--color-lime)" : undefined }}>
                   {r.label}
                 </span>
                 <div className="relative h-full flex-1">
                   <div
                     data-bar
                     className="absolute inset-y-0 left-0"
-                    style={{ width: `${(v / max) * 100}%`, background: r.lit ? "var(--color-lime)" : "var(--color-cream)", transformOrigin: "0 50%", transform: "scaleX(0)", boxShadow: "0 0 0 0.5cqw #000" }}
+                    style={{ width: `${(v / max) * 100}%`, background: r.lit ? "var(--color-lime)" : "var(--color-cream)", transformOrigin: "0 50%", transform: "scaleX(0)", boxShadow: `0 0 0 ${u(0.5)} #000` }}
                   />
                 </div>
-                <span className={type} style={{ fontSize: "4.4cqw", width: "12cqw", textAlign: "right", color: r.lit ? "var(--color-lime)" : undefined }}>
+                <span className={type} style={{ fontSize: u(4.4), width: u(12), textAlign: "right", color: r.lit ? "var(--color-lime)" : undefined }}>
                   {typeof r.value === "number" ? r.value.toLocaleString("pt-BR") : r.value}
                 </span>
               </div>
@@ -428,17 +953,17 @@ function ListPanel({ panel, index, photoOf }: { panel: Extract<ReelPanel, { kind
         : panel.rows.map((r, n) => {
             const photo = photoOf(r.login);
             return (
-              <div key={n} data-row={n} className="flex items-center" style={{ gap: "2.4cqw", height: "4.6cqw", display: "none" }}>
-                <span className={type} style={{ fontSize: "4.4cqw", width: "9cqw", color: r.lit ? "var(--color-lime)" : undefined }}>
+              <div key={n} data-row={n} className="flex items-center" style={{ gap: u(2.4), height: u(4.6), display: "none" }}>
+                <span className={type} style={{ fontSize: u(4.4), width: u(9), color: r.lit ? "var(--color-lime)" : undefined }}>
                   {r.tag}
                 </span>
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photo} alt="" style={{ width: "4.6cqw", height: "4.6cqw", border: "0.5cqw solid #000", flexShrink: 0 }} />
+                  <img src={photo} alt="" style={{ width: u(4.6), height: u(4.6), border: "0.5cqw solid #000", flexShrink: 0 }} />
                 ) : (
-                  <span style={{ width: "4.6cqw", height: "4.6cqw", flexShrink: 0 }} />
+                  <span style={{ width: u(4.6), height: u(4.6), flexShrink: 0 }} />
                 )}
-                <span className={`${type} min-w-0 truncate`} style={{ fontSize: "4.4cqw", textTransform: "none", color: r.lit ? "var(--color-lime)" : undefined }}>
+                <span className={`${type} min-w-0 truncate`} style={{ fontSize: u(4.4), textTransform: "none", color: r.lit ? "var(--color-lime)" : undefined }}>
                   {r.login}
                 </span>
               </div>
@@ -562,6 +1087,26 @@ export default function ReelOverlay({
   const cta = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
 
+  // A headline line wider than the safe zone shrinks to fit it (66%, so its pop-in stays inside 72%): a long word never runs into the rail.
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const fit = () => {
+      const max = el.clientWidth * 0.66;
+      el.querySelectorAll<HTMLElement>("[data-headline] p").forEach((p) => {
+        const size = HEADLINE_SIZE[p.dataset.size as keyof typeof HEADLINE_SIZE];
+        p.style.fontSize = size;
+        const w = p.scrollWidth;
+        if (w > max) p.style.fontSize = `${(parseFloat(size) * max) / w}cqw`;
+      });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    void document.fonts?.ready.then(fit);
+    return () => ro.disconnect();
+  }, [reel]);
+
   useEffect(() => {
     let raf = 0;
     let shown = -1;
@@ -593,7 +1138,23 @@ export default function ReelOverlay({
       const c = Math.min(1, Math.max(0, (t - reel.ctaAt) / FADE));
       if (rule.current) rule.current.style.opacity = String(1 - c);
       if (cta.current) cta.current.style.opacity = String(c);
-      if (root.current) drawPanels(root.current, reel.panels, t);
+      if (root.current) {
+        drawPanels(root.current, reel.panels, t);
+        // Behind a card or a list, the scene dims so it and the words over it read.
+        const dim = root.current.querySelector<HTMLElement>("[data-dim]");
+        if (dim) {
+          const k = Math.max(0, ...reel.panels.map((p) => (p.kind === "comment" || p.kind === "contrib" || p.kind === "roster" || p.kind === "bars" || p.kind === "place" || p.kind === "points" || p.kind === "phone" ? clamp(Math.min((t - p.from) / 0.25, (p.to + 0.3 - t) / 0.3)) : 0)));
+          dim.style.opacity = String(k * DIM);
+        }
+        // Each beat pops in at its moment (a little big, then settles) and gives way to the next.
+        reel.headline.forEach((h, k) => {
+          const b = root.current!.querySelector<HTMLElement>(`[data-headline="${k}"]`);
+          if (!b) return;
+          const on = t >= h.from && t < h.to;
+          b.style.opacity = on ? "1" : "0";
+          if (on) b.style.transform = `translateX(-50%) scale(${1 + 0.06 * (1 - ease((t - h.from) / 0.18))})`;
+        });
+      }
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
@@ -605,8 +1166,14 @@ export default function ReelOverlay({
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0">
+      <div data-dim className="absolute inset-0" style={{ background: "#000", opacity: 0 }} />
       {reel.panels.map((p, i) => (
-        <Panel key={i} panel={p} index={i} photoOf={photoOf} buildingOf={buildingOf} />
+        <Panel key={i} panel={p} index={i} photoOf={photoOf} buildingOf={buildingOf} big={reel.headline.length > 0} />
+      ))}
+      {reel.headline.map((h, k) => (
+        <div key={k} data-headline={k} data-reel-box="header" className={type} style={{ ...safe, top: "16%", opacity: 0, transformOrigin: "50% 0", ...outline(1.4) }}>
+          <HeaderLines lines={h.lines} sizes={HEADLINE_SIZE} />
+        </div>
       ))}
       {header && (
         <div className={type} style={{ ...safe, top: "15%", ...outline(1.4) }}>
@@ -623,13 +1190,28 @@ export default function ReelOverlay({
         {reel.balloons.map((b, i) => (
           <Balloon key={i} b={b} index={i} photoOf={photoOf} />
         ))}
+        {/* Photos the rig pins over capitals on the map (it moves and pops them each frame). */}
+        {reel.pins.flatMap((g, i) =>
+          g.rows.map((r, k) => (
+            // eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar, drawn as it is
+            <img
+              key={`${i}-${k}`}
+              data-pin={`${i}-${k}`}
+              alt=""
+              src={photoOf(r.login) ?? `https://avatars.githubusercontent.com/${r.login}?s=96`}
+              className="absolute"
+              style={{ width: "5.6cqw", height: "5.6cqw", border: "0.5cqw solid #000", outline: "0.35cqw solid var(--color-lime)", opacity: 0, transform: "translate(-50%, -100%)" }}
+            />
+          )),
+        )}
       </div>
 
       <p
         ref={line}
         data-reel-box="captions"
         className={`${type} flex flex-wrap justify-center`}
-        style={{ ...safe, top: "55%", width: "72%", whiteSpace: "normal", gap: "0 3cqw", fontSize: "7cqw", lineHeight: 1.3, opacity: 0, ...outline(1.8) }}
+        // Under a headline the captions are the small spoken line; alone they carry the reel.
+        style={{ ...safe, top: "55%", width: "72%", whiteSpace: "normal", gap: reel.headline.length ? "0 2cqw" : "0 3cqw", fontSize: reel.headline.length ? "6cqw" : "7cqw", lineHeight: 1.3, opacity: 0, ...outline(1.8) }}
       />
     </div>
   );

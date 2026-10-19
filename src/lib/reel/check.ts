@@ -35,6 +35,7 @@ function factValues(facts: unknown, out = new Set<string>()): Set<string> {
 function onScreen(spec: ReelSpec): string[] {
   return [
     ...(spec.header ? [...spec.header.rule, ...spec.header.cta].map((l) => l.text) : []),
+    ...(spec.headline ?? []).flatMap((h) => h.lines.map((l) => l.text)),
     ...spec.lines.map((l) => l.show),
     ...spec.overlays.flatMap((o) =>
       o.type === "balloon"
@@ -47,8 +48,20 @@ function onScreen(spec: ReelSpec): string[] {
               ? [String(o.value), o.label]
               : o.type === "poster"
                 ? [o.title, o.when, o.where]
-                : o.type === "profile"
+                : o.type === "profile" || o.type === "contrib"
                   ? []
+                : o.type === "comment"
+                  ? [o.handle, ...o.parts.map((x) => x.text)]
+                : o.type === "pins"
+                  ? []
+                : o.type === "place"
+                  ? [o.value]
+                : o.type === "score"
+                  ? [o.value]
+                : o.type === "phone"
+                  ? o.screens.flatMap((x) => [...x.posted, ...x.parts.map((y) => y.text), x.points?.value ?? ""])
+                : o.type === "points"
+                  ? o.rows.flatMap((r) => [r.value, r.label])
                 : // The account's own profile card: its bio is the owner's, not the day's data.
                   [],
     ),
@@ -129,11 +142,14 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   });
 
   const known = factValues(spec.facts);
+  // A login's digits ("erickj3") aren't a number on screen: the facts' words come out before the numbers are read.
+  const factWords = [...known].filter((v) => /[a-z]/.test(v) && /\d/.test(v)).sort((x, y) => y.length - x.length);
   for (const text of onScreen(spec)) {
-    for (const n of numbersIn(text)) if (!known.has(n)) fail("real data", `"${n}" on screen isn't a fact: "${text}"`);
+    const plain = factWords.reduce((t, w) => t.split(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi")).join(" "), text);
+    for (const n of numbersIn(plain)) if (!known.has(n)) fail("real data", `"${n}" on screen isn't a fact: "${text}"`);
   }
   const logins = spec.overlays.flatMap((o) =>
-    o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" ? o.rows.map((r) => r.login) : o.type === "poster" || o.type === "profile" ? [o.login] : [],
+    o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" || o.type === "pins" ? o.rows.map((r) => r.login) : o.type === "poster" || o.type === "profile" || o.type === "place" ? [o.login] : [],
   );
   for (const login of logins) if (!known.has(login.toLowerCase())) fail("real data", `${login} on screen isn't in the facts.`);
 
@@ -148,8 +164,13 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
     if (prev && prev.scene === s.scene && !s.scene.startsWith("montage")) fail("scenes", `"${s.scene}" twice in a row (scenes ${i} and ${i + 1}).`);
   });
 
-  if (spec.post.watch && !(spec.header?.cta ?? []).some((l) => /\bseuuser [A-Z]{2}\b/i.test(l.text.replace(/\*/g, ""))))
-    fail("cta", "A watched reel's call to action must show the parseable `seuuser UF`.");
+  // The call to action: the header's, else the last headline beat and the last comment card (typed out in full).
+  // The call to action: the header's, else the last headline beat and the last comment typed (a card or the phone).
+  const last = [...spec.overlays].reverse().find((o) => o.type === "comment" || o.type === "phone");
+  const typed = !last ? [] : last.type === "comment" ? [last.parts.map((x) => x.text).join("")] : last.screens.flatMap((x) => [...x.posted, x.parts.map((y) => y.text).join("")]);
+  const cta = [...(spec.header?.cta ?? spec.headline?.[spec.headline.length - 1].lines ?? []).map((l) => l.text), ...typed];
+  if (spec.post.watch && !cta.some((t) => /\bseuuser (?:[A-Z]{2}\b|[A-ZÀ-Ú][a-zà-ú])/.test(t.replace(/\*/g, ""))))
+    fail("cta", "A watched reel's call to action must show the parseable `seuuser UF` or `seuuser Cidade`.");
   for (const h of spec.post.caption.match(/@[\w.]+/g) ?? []) {
     if (!ctx.verifiedHandles.includes(h.slice(1).toLowerCase())) fail("caption", `${h} in the caption isn't a verified handle.`);
   }

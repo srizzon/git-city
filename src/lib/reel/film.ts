@@ -35,6 +35,17 @@ export type ReelPanel =
   | { kind: "counter"; from: number; reach: number; to: number; value: number; label: string }
   | { kind: "poster"; from: number; to: number; title: string; login: string; when: string; where: string }
   | { kind: "profile"; from: number; to: number; login: string }
+  | { kind: "comment"; from: number; to: number; handle: string; parts: { at: number; text: string }[] }
+  | { kind: "contrib"; from: number; to: number; at: number }
+  | { kind: "place"; from: number; to: number; login: string; crown: boolean; value: string }
+  | {
+      kind: "phone";
+      from: number;
+      to: number;
+      screens: { at: number; until: number; kind: string; parts: { at: number; text: string }[]; send: number | null; points: { at: number; value: string } | null; image: string | null; posted: string[] }[];
+    }
+  | { kind: "score"; from: number; to: number; icon: string; value: string }
+  | { kind: "points"; from: number; to: number; rows: { at: number; icon: string; value: string; label: string }[] }
   | {
       kind: "follow";
       from: number;
@@ -57,6 +68,14 @@ const SCENE_SOUNDS: Record<string, { at: number; gain: number; rate?: number }> 
 };
 const THUD = "/sounds/drive/impact.ogg";
 
+/** Photos pinned on the map over capitals (the rig places them each frame). */
+export interface ReelPins {
+  from: number;
+  to: number;
+  stagger: number;
+  rows: { uf: string; login: string }[];
+}
+
 export interface Reel {
   film: Film<Stage>;
   shots: Shot<Stage, string>[];
@@ -64,8 +83,11 @@ export interface Reel {
   cuts: ReelCut[];
   lines: CaptionLine[];
   ctaAt: number;
+  /** The headline's beats on the film's clock (the spec's `headline`, in order); empty with the fixed header. */
+  headline: { from: number; to: number; lines: NonNullable<ReelSpec["headline"]>[number]["lines"] }[];
   balloons: ReelBalloon[];
   panels: ReelPanel[];
+  pins: ReelPins[];
 }
 
 /** The film of a filled spec (./spec `filled`), its words on the film's clock, and its mixed sound's URL. */
@@ -113,7 +135,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
       };
     });
   const panels: ReelPanel[] = spec.overlays.flatMap((o): ReelPanel[] => {
-    if (o.type === "balloon") return [];
+    if (o.type === "balloon" || o.type === "pins") return [];
     const from = anchorAt(words, o.from);
     if (o.type === "counter") {
       const value = typeof o.value === "number" ? o.value : Number(String(o.value).replace(/\D/g, ""));
@@ -141,8 +163,49 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
     const to = o.to === undefined ? length : anchorAt(words, o.to, from);
     if (o.type === "poster") return [{ kind: "poster", from, to, title: o.title, login: o.login, when: o.when, where: o.where }];
     if (o.type === "profile") return [{ kind: "profile", from, to, login: o.login }];
+    if (o.type === "comment") {
+      const ats: number[] = [];
+      o.parts.forEach((x, i) => ats.push(anchorAt(words, x.at, i ? ats[i - 1] : from)));
+      return [{ kind: "comment", from, to, handle: o.handle, parts: o.parts.map((x, i) => ({ at: ats[i], text: x.text })) }];
+    }
+    if (o.type === "phone") {
+      const to = o.to === undefined ? length : anchorAt(words, o.to, from);
+      const starts: number[] = [];
+      o.screens.forEach((x, i) => starts.push(anchorAt(words, x.at, i ? starts[i - 1] : from)));
+      const screens = o.screens.map((x, i) => {
+        const ats: number[] = [];
+        x.parts.forEach((y, k) => ats.push(anchorAt(words, y.at, k ? ats[k - 1] : starts[i])));
+        return {
+          at: starts[i],
+          until: starts[i + 1] ?? to,
+          kind: x.kind,
+          parts: x.parts.map((y, k) => ({ at: ats[k], text: y.text })),
+          send: x.send === undefined ? null : anchorAt(words, x.send, starts[i]),
+          points: x.points ? { at: anchorAt(words, x.points.at, starts[i]), value: x.points.value } : null,
+          image: x.image ?? null,
+          posted: x.posted,
+        };
+      });
+      return [{ kind: "phone", from, to, screens }];
+    }
+    if (o.type === "score") return [{ kind: "score", from, to, icon: o.icon, value: o.value }];
+    if (o.type === "points") {
+      const ats: number[] = [];
+      o.rows.forEach((r, i) => ats.push(anchorAt(words, r.at, i ? ats[i - 1] : from)));
+      return [{ kind: "points", from, to, rows: o.rows.map((r, i) => ({ at: ats[i], icon: r.icon, value: r.value, label: r.label })) }];
+    }
+    if (o.type === "place") return [{ kind: "place", from, to, login: o.login, crown: o.crown, value: o.value }];
+    if (o.type === "contrib") return [{ kind: "contrib", from, to, at: anchorAt(words, o.at, from) }];
     if (o.type === "bars") return [{ kind: "bars", from, to, title: o.title ?? null, rows: o.rows.map((r) => ({ ...r, lit: !!r.lit })) }];
     return [{ kind: "roster", from, to, title: o.title ?? null, rows: o.rows.map((r) => ({ ...r, lit: !!r.lit })), perPage: o.perPage }];
+  });
+  const beats: number[] = [];
+  (spec.headline ?? []).forEach((h, i) => beats.push(anchorAt(words, h.at, i ? beats[i - 1] : 0)));
+  const headline = (spec.headline ?? []).map((h, i) => ({ from: beats[i], to: beats[i + 1] ?? length, lines: h.lines }));
+  const pins: ReelPins[] = spec.overlays.flatMap((o) => {
+    if (o.type !== "pins") return [];
+    const from = anchorAt(words, o.from);
+    return [{ from, to: o.to === undefined ? length : anchorAt(words, o.to, from), stagger: o.stagger, rows: o.rows }];
   });
   const sounds: SoundCue[] = [
     ...cuts.flatMap((c) => (SCENE_SOUNDS[c.kind] ? [{ beat: c.from + SCENE_SOUNDS[c.kind].at, src: THUD, gain: SCENE_SOUNDS[c.kind].gain, rate: SCENE_SOUNDS[c.kind].rate }] : [])),
@@ -159,7 +222,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
     ...(song ? { song: { src: song, offset: 0 } } : {}),
     frameAt: (beat) => frameOf(shots, beat),
   };
-  return { film, shots, length, cuts, lines, ctaAt: spec.header ? anchorAt(words, spec.header.ctaAt) : Infinity, balloons, panels };
+  return { film, shots, length, cuts, lines, ctaAt: spec.header ? anchorAt(words, spec.header.ctaAt) : Infinity, headline, balloons, panels, pins };
 }
 
 /** The cut under way at `t` seconds, and how far into it (0–1). */
