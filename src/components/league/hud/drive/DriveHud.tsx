@@ -59,6 +59,7 @@ export default function DriveHud({
   gameOn = false,
   onGames,
   phoneLow = false,
+  startNote = null,
   children,
   onVolume,
   onEmote,
@@ -99,6 +100,8 @@ export default function DriveHud({
   onGames?: () => void;
   /** A phone: something sits under the top bar (a mission), so the minimap starts lower. */
   phoneLow?: boolean;
+  /** What's going on here, on the loading band ("4 driving · a race to Campinas is open"). */
+  startNote?: string | null;
   /** A town's own HUD pieces (the Brasil map's races), over the rest. */
   children?: React.ReactNode;
   onVolume: (v: number) => void;
@@ -324,7 +327,7 @@ export default function DriveHud({
       {ready && entered && children}
 
       {/* Last, so they blur and cover the rest of the HUD. */}
-      {!firstRun && <StartScreen ready={ready} touch={touch} />}
+      {!firstRun && <StartScreen ready={ready} touch={touch} note={startNote} />}
       {paused && ready && (
         <PauseMenu camera={camera} muted={muted} onResume={onResume} onCamera={onCamera} onMute={onMute} onExit={onExit} />
       )}
