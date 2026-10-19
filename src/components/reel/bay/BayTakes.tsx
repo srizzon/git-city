@@ -39,6 +39,9 @@ import { cutAt, type Reel, type ReelCut } from "@/lib/reel/film";
 //   tower-fall  a tower (params.login) coming down, from low and wide
 //   fly-canyon  the fly-mode vehicle down the avenue between the towers, then up
 //   boss        the boss over the skyline, from the street looking up
+//
+// The car and fly takes take params.cam, the angle on the subject: chase, side, front, wheel
+// (low by the rear wheel), top, drone (high behind), pass (fixed, it goes by), orbit, below.
 //   league-crown round a tower (params.login) wearing the week's town crown on its roof
 
 export const BAY_TAKES = ["car-cruise", "car-drift", "car-boost", "car-missile", "car-ramp", "crown-grab", "car-ram", "tower-fall", "fly-canyon", "boss", "league-crown"] as const;
@@ -162,6 +165,51 @@ export default function BayTakes({ clock, reel, store, byLogin }: BayTakesProps)
       _look.set(lx, lh, lz);
       camera.fov = fov;
     };
+    const mode = typeof p.cam === "string" ? p.cam : null;
+    const span = cut.to - cut.from;
+    /**
+     * The angle the spec picked (params.cam) on a subject at road (s, l, height y); false when
+     * none was picked, and the take keeps its own camera. `sMid`: where the subject is mid-take,
+     * for the fixed "pass" camera it goes by.
+     */
+    const angle = (s: number, l: number, y: number, sMid: number): boolean => {
+      const away = l >= 0 ? -6 : 6;
+      switch (mode) {
+        case "chase":
+          cam(s - 16, l * 0.5, y + 4.5, s + 30, l, y + 4, 52);
+          return true;
+        case "side":
+          // Three-quarters from the road's edge, a little behind: the avenue is too narrow to stand off square.
+          cam(s - 8, away, y + 3.2, s + 3, l, y + 1.2, 60);
+          return true;
+        case "front":
+          cam(s + 18, l * 0.5, y + 3, s, l, y + 1.5, 48);
+          return true;
+        case "wheel":
+          cam(s - 2.5, l + (away > 0 ? 3.4 : -3.4), y + 0.6, s + 25, l, y + 1.2, 62);
+          return true;
+        case "top":
+          cam(s - 4, l, y + 55, s + 4, l, y, 45);
+          return true;
+        case "drone":
+          cam(s - 42, l * 0.5, y + 34, s + 14, l, y, 50);
+          return true;
+        case "pass":
+          // Fixed on the road's edge mid-way: the subject comes at the lens, goes by, and away.
+          cam(sMid, away, y > 5 ? y - 6 : 1.8, s, l, y + 1.2, 56);
+          return true;
+        case "orbit": {
+          const a = -1.2 + (2.4 * t) / Math.max(0.5, span);
+          cam(s + 11 * Math.cos(a), Math.max(-6, Math.min(6, l + 11 * Math.sin(a))), y + 3, s, l, y + 1.2, 50);
+          return true;
+        }
+        case "below":
+          cam(s + 14, l, Math.max(1.5, y - 30), s, l, y, 62);
+          return true;
+        default:
+          return false;
+      }
+    };
     const rearSmoke = (s: number, l: number, turn: number, colors: string[] | null) => {
       if (!fx) return;
       for (const w of [WHEELS[2], WHEELS[3]]) {
@@ -200,7 +248,7 @@ export default function BayTakes({ clock, reel, store, byLogin }: BayTakesProps)
       case "car-cruise": {
         const s = 20 + 45 * t;
         car(0, s, 0, 45);
-        cam(s - 16, 4, 4.5, s + 30, 0, 6, 52);
+        if (!angle(s, 0, 0, 20 + 45 * span * 0.5)) cam(s - 16, 4, 4.5, s + 30, 0, 6, 52);
         break;
       }
       case "car-drift": {
@@ -212,7 +260,7 @@ export default function BayTakes({ clock, reel, store, byLogin }: BayTakesProps)
         car(0, s, l, 55, { turn: -slip, roll: 0.05 * slip });
         if (slip > 0.15) rearSmoke(s, l, -slip, [TURBO.colors[v < 0.35 ? 1 : v < 0.7 ? 2 : 3]]);
         // Low ahead of the car on the road's edge, looking back: it slides toward the lens showing its flank.
-        cam(s + 17, -5, 2, s, l, 1.6, 48);
+        if (!angle(s, l, 0, 40 + 55 * span * 0.5)) cam(s + 17, -5, 2, s, l, 1.6, 48);
         break;
       }
       case "car-boost": {
@@ -223,7 +271,8 @@ export default function BayTakes({ clock, reel, store, byLogin }: BayTakesProps)
         if (t >= hit) flame(s, 0, 0);
         if (crossed(hit)) st.current.shake = 0.7;
         const lag = t < hit ? 0 : 18 * (1 - Math.exp(-u * 5)) * Math.exp(-u * 1.2);
-        cam(s - 17 - lag, 3, 4.5, s + 30, 0, 3.5, 50 + 26 * (t < hit ? 0 : Math.exp(-u * 1.5) * (1 - Math.exp(-u * 12))));
+        if (!angle(s, 0, 0, 30 + 45 * span * 0.5))
+          cam(s - 17 - lag, 3, 4.5, s + 30, 0, 3.5, 50 + 26 * (t < hit ? 0 : Math.exp(-u * 1.5) * (1 - Math.exp(-u * 12))));
         break;
       }
       case "car-missile": {
@@ -257,7 +306,7 @@ export default function BayTakes({ clock, reel, store, byLogin }: BayTakesProps)
           }
         }
         // High behind the shooter: it sits low in the frame, the street and the target ahead of it.
-        cam(sb - 20, 3, 10, so + 14, -2, 1.5, 46);
+        if (!angle((sb + so) / 2, 0, 0, 30 + 48 * 1.8 + 12)) cam(sb - 20, 3, 10, so + 14, -2, 1.5, 46);
         break;
       }
       case "car-ramp": {
@@ -288,7 +337,7 @@ export default function BayTakes({ clock, reel, store, byLogin }: BayTakesProps)
         flame(s, 0, y);
         // Behind the car, low, falling back a little as it leaves the ramp: the ramp, the lift-off, the arc.
         const back = 16 + 10 * smooth(clamp01((s - lip) / 60));
-        cam(s - back, 2, 3 + y * 0.6, s + 30, 0, 3 + y * 0.9, 56);
+        if (!angle(s, 0, y, lip)) cam(s - back, 2, 3 + y * 0.6, s + 30, 0, 3 + y * 0.9, 56);
         break;
       }
       case "crown-grab": {
@@ -314,7 +363,7 @@ export default function BayTakes({ clock, reel, store, byLogin }: BayTakesProps)
           fx?.burst(cx, 5, cz, { count: 40, speed: 20, colors: [GOLD, "#fff2b0", "#ff4f7a"], size: 0.8, life: 0.8 });
           st.current.shake = 0.4;
         }
-        cam(Math.min(s, cs) - 22 + 8 * smooth(clamp01(t - 1.4)), 10, 7, Math.max(s, cs - 10) + 6, 0, 5, 48);
+        if (!angle(s, 0, 0, cs)) cam(Math.min(s, cs) - 22 + 8 * smooth(clamp01(t - 1.4)), 10, 7, Math.max(s, cs - 10) + 6, 0, 5, 48);
         break;
       }
       case "car-ram": {
@@ -370,7 +419,7 @@ export default function BayTakes({ clock, reel, store, byLogin }: BayTakesProps)
           plane.current.position.set(x, y, z);
           plane.current.rotation.set(-0.5 * climb, road.yaw + Math.PI, 0.35 * Math.sin(t * 1.3), "YXZ");
         }
-        cam(s - 26, 0, y + 8 - 20 * climb, s + 30, 0, y + 30 * climb, 55);
+        if (!angle(s, 0, y, 10 + 85 * span * 0.5)) cam(s - 26, 0, y + 8 - 20 * climb, s + 30, 0, y + 30 * climb, 55);
         break;
       }
       case "league-crown": {
