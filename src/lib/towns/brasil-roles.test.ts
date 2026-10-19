@@ -3,10 +3,10 @@ import { brasilOffices, officeLabel } from "./brasil-roles";
 import type { BrasilLayout, CityLayout } from "./brasil-map";
 
 const dev = (login: string, uf: CityLayout["uf"]) => ({ dev: { id: login.length, login, uf }, x: 0, z: 0, founder: false, at: 0 });
-const city = (name: string, uf: CityLayout["uf"], logins: string[], second = false) => ({ name, uf, second, devs: logins.map((l) => dev(l, uf)) }) as unknown as CityLayout;
+const city = (name: string, uf: CityLayout["uf"], logins: string[], key: string) => ({ name, uf, key, capital: false, devs: logins.map((l) => dev(l, uf)) }) as unknown as CityLayout;
 
 const layout = {
-  cities: [city("São Paulo", "SP", ["ana", "bia", "caio", "duda"]), city("Campinas", "SP", ["enzo"], true), city("Salvador", "BA", ["fabi"])],
+  cities: [city("São Paulo", "SP", ["ana", "bia", "caio", "duda"], "3550308"), city("Campinas", "SP", ["enzo"], "3509502"), city("Salvador", "BA", ["fabi"], "2927408")],
   island: { devs: [dev("gus", null)] } as unknown as CityLayout,
   highways: [],
 } as unknown as BrasilLayout;
@@ -26,7 +26,7 @@ describe("brasilOffices", () => {
     expect(o.senators.has("BA")).toBe(false);
   });
   it("a mayor is whoever is left; nobody who didn't code holds anything", () => {
-    expect(o.mayors.get("São Paulo")?.login).toBe("ana");
+    expect(o.mayors.get("3550308")?.login).toBe("ana");
     expect(o.byLogin.has("duda")).toBe(false);
     expect(o.byLogin.get("bia")?.map(officeLabel)).toEqual(["Governor of SP"]);
     expect([...o.byLogin.values()].every((os) => os.length === 1)).toBe(true);
