@@ -307,7 +307,7 @@ export function raceRoute(layout: BrasilLayout, fromKey: string, toKey: string):
 
   // Gates: every turn and every gateEvery lots on a straight, past the start line, none too close together.
   const gates: [number, number][] = [];
-  let lastS = ROUTE.startAt;
+  let lastS: number = ROUTE.startAt;
   let lastI = -Infinity;
   for (let i = 1; i < lots.length - 1; i++) {
     if (at[i] <= ROUTE.startAt + ROUTE.gateMin * LOT_M) continue;
@@ -376,4 +376,17 @@ export function cleanRaceGhost(input: unknown, ms: number): { ms: number; splits
   }
   if (last < ms - 1500 || last > ms + 1500) return null;
   return { ms, splits: splits as number[], frames: frames as number[] };
+}
+
+/** A route as the drive room takes it (rally_start): gates and grid rounded to 10 cm. */
+export function toRallyRoute(r: RaceRoute): { from: string; to: string; key: string; gates: [number, number][]; grid: [number, number, number][]; length: number } {
+  const d = (v: number) => Math.round(v * 10) / 10;
+  return {
+    from: r.from,
+    to: r.to,
+    key: r.key,
+    gates: r.gates.map(([x, z]) => [d(x), d(z)]),
+    grid: r.grid.map((g) => [d(g.x), d(g.z), Math.round(g.rot)]),
+    length: Math.round(r.length),
+  };
 }
