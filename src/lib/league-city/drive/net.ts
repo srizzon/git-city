@@ -16,6 +16,8 @@ export const MAX_DRIVERS = 30;
 export const MAX_MESSAGE_BYTES = 512;
 /** The one bigger message: `auth`, which carries a Supabase access token. */
 export const MAX_AUTH_BYTES = 4096;
+/** A race's route (`rally_start`): its gates and grid. */
+export const MAX_ROUTE_BYTES = 12_000;
 /**
  * Farthest a car can be from the town's middle (m); anything past this is
  * junk. Physics works in meters; a 40-lot city spans ±400 m. The Brasil map
@@ -59,6 +61,7 @@ export interface DriverInfo {
 
 /** A box slot's generation and how long until it's back (ms, 0 = there now). */
 import type { CrownState } from "./crown";
+import type { RallyRoute, RallyState } from "./rally";
 
 export interface BoxState {
   gen: number;
@@ -76,6 +79,9 @@ export type ClientMsg =
   | { t: "crown_grab" }
   | { t: "crown_hit"; victim: string; steal: boolean }
   | { t: "crown_drop" }
+  /** A city race (rally.ts): start one on this route, or accept the open invite. */
+  | { t: "rally_start"; route: RallyRoute }
+  | { t: "rally_join" }
   /** A quick reaction over your car (lib drive/emotes: the slot). */
   | { t: "emote"; e: number }
   /** Rivalry smash (lib/league-city/smash-net): who you are, for the room to ask the site. */
@@ -90,7 +96,10 @@ export type ClientMsg =
   | ["s", ...number[]];
 // Server → client
 export type ServerMsg =
-  | { t: "welcome"; you: string; drivers: (DriverInfo & { s: number[] | null })[]; boxes: BoxState[]; crown: CrownState; now: number }
+  | { t: "welcome"; you: string; drivers: (DriverInfo & { s: number[] | null })[]; boxes: BoxState[]; crown: CrownState; rally?: RallyState; now: number }
+  | { t: "rally"; rally: RallyState; now: number }
+  /** Your timed finish, signed, for the site to save (yours only). */
+  | { t: "rally_receipt"; token: string; race: string }
   | { t: "crown"; crown: CrownState; now: number }
   | { t: "box"; box: number; gen: number; wait: number }
   | { t: "got"; item: string }

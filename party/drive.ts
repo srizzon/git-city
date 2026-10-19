@@ -3,6 +3,7 @@ import { PartyRoom, type Connection, type ConnectionContext, type Env } from "./
 import {
   MAX_AUTH_BYTES,
   MAX_DRIVERS,
+  MAX_ROUTE_BYTES,
   MAX_MESSAGE_BYTES,
   SEND_MS,
   WATCH_MS,
@@ -38,6 +39,19 @@ import {
   tickCrown,
 } from "../src/lib/league-city/drive/crown";
 import { EMOTE_MIN_MS, validEmote } from "../src/lib/league-city/drive/emotes";
+import {
+  RALLY_RECEIPT_TTL_MS,
+  idleRally,
+  joinRally,
+  leaveRally,
+  rallyBusy,
+  startRally,
+  stepRally,
+  tickRally,
+  validRoute,
+  type RallyTrack,
+} from "../src/lib/league-city/drive/rally";
+import { raceId, signRallyReceipt } from "./rallyToken";
 import { parseSmash } from "../src/lib/league-city/smash-net";
 import { JumpWatch, seenHash } from "../src/lib/league-city/smash-floors";
 import { SmashRoom } from "./smash";
@@ -55,6 +69,11 @@ import { LIVE_SECRET_HEADER, createReporter, type TownLive } from "../src/lib/to
 //
 // Crown Rush: the server runs the match (see crown.ts) and broadcasts its
 // state on every change and once a second while it's live.
+//
+// City races (see rally.ts): someone sends a route, the room invites
+// everyone, times each racer on its own clock from their states, and signs
+// a receipt for each timed finish by a GitHub login (the site saves it only
+// for the signed-in viewer). Never at the same time as a Crown Rush.
 //
 // Smash (party/smash.ts): in every town the room is also the authority on the
 // buildings' floors; spectators get those changes too.
@@ -95,6 +114,11 @@ export class DriveServer extends PartyRoom {
   private crown = idleCrown();
   private crownTimer: ReturnType<typeof setInterval> | null = null;
   private lastCrownSync = 0;
+  private rally = idleRally();
+  private rallyTimer: ReturnType<typeof setInterval> | null = null;
+  private lastRallySync = 0;
+  /** Each racer's last state (m, server ms), for the race's speed check. */
+  private rallyTracks = new Map<string, RallyTrack>();
   private watchers = new Set<string>();
   private watchTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -133,6 +157,57 @@ export class DriveServer extends PartyRoom {
         this.crownTimer = null;
       }
     }, 200);
+  }
+
+  private sendRally() {
+    const now = Date.now();
+    this.lastRallySync = now;
+    this.room.broadcast(JSON.stringify({ t: "rally", rally: this.rally, now } satisfies ServerMsg));
+  }
+
+  /** Tick while a race is on; stop once it's back to idle. */
+  private runRallyClock() {
+    if (this.rallyTimer) return;
+    this.rallyTimer = setInterval(() => {
+      const now = Date.now();
+      const was = this.rally.phase;
+      const changed = tickRally(this.rally, now);
+      if (was !== "live" && this.rally.phase === "live") this.rallyTracks.clear();
+      if (changed || (this.rally.phase !== "idle" && now - this.lastRallySync >= 1000)) this.sendRally();
+      if (this.rally.phase === "idle") {
+        if (this.rallyTimer) clearInterval(this.rallyTimer);
+        this.rallyTimer = null;
+      }
+    }, 200);
+  }
+
+  /** A racer's car state during the race: gates, the finish, and a receipt for a timed one. */
+  private rallyState(id: string, x: number, z: number, now: number) {
+    const st = this.rally;
+    if (st.phase !== "live" || !st.racers[id]) return;
+    const events = stepRally(st, id, x, z, now, this.rallyTracks.get(id));
+    this.rallyTracks.set(id, { x, z, at: now });
+    if (!events.length) return;
+    this.sendRally();
+    const fin = events.find((e) => e.t === "finish");
+    const d = this.drivers.get(id);
+    const secret = this.room.env.FORCE_PUSH_HMAC_SECRET as string | undefined;
+    if (!fin || fin.t !== "finish" || !d || !st.route || !secret || d.name.startsWith("guest-")) return;
+    const receipt = {
+      room: this.room.id.toLowerCase(),
+      race: st.id,
+      key: st.route.key,
+      from: st.route.from,
+      to: st.route.to,
+      dln: d.name.toLowerCase(),
+      ms: fin.ms,
+      place: fin.place,
+      n: Object.keys(st.racers).length,
+      exp: now + RALLY_RECEIPT_TTL_MS,
+    };
+    void signRallyReceipt(receipt, secret)
+      .then((token) => this.room.getConnection(id)?.send(JSON.stringify({ t: "rally_receipt", token, race: st.id } satisfies ServerMsg)))
+      .catch((err) => console.error("[rally] receipt", err));
   }
 
   /** Last known position (m) of a driver's car. */
@@ -205,6 +280,7 @@ export class DriveServer extends PartyRoom {
       drivers: [...this.drivers.entries()].map(([id, d]) => ({ id, name: d.name, s: d.state })),
       boxes: this.boxStates(Date.now()),
       crown: this.crown,
+      rally: this.rally,
       now: Date.now(),
     };
     conn.send(JSON.stringify(msg));
@@ -219,8 +295,13 @@ export class DriveServer extends PartyRoom {
   onMessage(sender: Connection, message: string | ArrayBuffer | ArrayBufferView) {
     if (this.watchers.has(sender.id)) return;
     if (typeof message !== "string") return;
-    // Only `auth` (an access token) may be longer than a normal message.
-    if (message.length > MAX_MESSAGE_BYTES && !(message.length <= MAX_AUTH_BYTES && message.startsWith('{"t":"auth"'))) return;
+    // Only `auth` (an access token) and a race's route may be longer than a normal message.
+    if (
+      message.length > MAX_MESSAGE_BYTES &&
+      !(message.length <= MAX_AUTH_BYTES && message.startsWith('{"t":"auth"')) &&
+      !(message.length <= MAX_ROUTE_BYTES && message.startsWith('{"t":"rally_start"'))
+    )
+      return;
     let msg: unknown;
     try {
       msg = JSON.parse(message);
@@ -239,12 +320,13 @@ export class DriveServer extends PartyRoom {
       d.lastState = now;
       d.state = encodeState(s);
       if (d.jumps.see({ x: s.x, z: s.z, at: now })) this.smash.jumped(sender.id, now);
+      this.rallyState(sender.id, s.x, s.z, now);
       this.room.broadcast(JSON.stringify(["s", sender.id, ...d.state]), [sender.id, ...this.watchers]);
       return;
     }
 
     if (!msg || typeof msg !== "object") return;
-    const { t, name, to, x, z, box, gen, item, dx, dz, id, target, victim, steal, token, e } = msg as Record<string, unknown>;
+    const { t, name, to, x, z, box, gen, item, dx, dz, id, target, victim, steal, token, e, route } = msg as Record<string, unknown>;
 
     // A quick reaction: to everyone else driving (spectators don't draw cars' bubbles).
     if (t === "emote") {
@@ -267,6 +349,25 @@ export class DriveServer extends PartyRoom {
       return;
     }
 
+    // City races: start one with a route, or accept the open invite.
+    if (t === "rally_start" || t === "rally_join") {
+      const d = this.drivers.get(sender.id);
+      if (!d) return;
+      const now = Date.now();
+      let changed = false;
+      if (t === "rally_start") {
+        const r = validRoute(route, COORD_MAX);
+        if (!r || this.crown.phase === "live" || this.crown.phase === "countdown") return;
+        changed = startRally(this.rally, raceId(), sender.id, d.name, r, now, this.drivers.size === 1);
+        if (changed) {
+          this.rallyTracks.clear();
+          this.runRallyClock();
+        }
+      } else changed = joinRally(this.rally, sender.id, d.name, now);
+      if (changed) this.sendRally();
+      return;
+    }
+
     // Crown Rush.
     if (t === "crown_start" || t === "crown_grab" || t === "crown_hit" || t === "crown_drop") {
       const d = this.drivers.get(sender.id);
@@ -274,6 +375,7 @@ export class DriveServer extends PartyRoom {
       const now = Date.now();
       let changed = false;
       if (t === "crown_start") {
+        if (rallyBusy(this.rally)) return;
         if (typeof x !== "number" || typeof z !== "number" || !Number.isFinite(x) || !Number.isFinite(z)) return;
         if (Math.abs(x) > COORD_MAX || Math.abs(z) > COORD_MAX) return;
         changed = startCrown(this.crown, [...this.drivers.keys()], now, x, z);
@@ -369,6 +471,8 @@ export class DriveServer extends PartyRoom {
     }
     this.countChanged();
     if (leaveCrown(this.crown, conn.id, Date.now(), at[0], at[1])) this.sendCrown();
+    this.rallyTracks.delete(conn.id);
+    if (leaveRally(this.rally, conn.id)) this.sendRally();
     this.room.broadcast(JSON.stringify({ t: "leave", id: conn.id } satisfies ServerMsg));
   }
 }
