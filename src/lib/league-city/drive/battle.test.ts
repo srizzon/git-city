@@ -36,7 +36,7 @@ describe("attacks", () => {
   it("validates a use: point in bounds, direction normalized", () => {
     expect(validUse(1, 2, 3, 4)).toEqual({ x: 1, z: 2, dx: 0.6, dz: 0.8 });
     expect(validUse(1, 2, 0, 0)).toBeNull();
-    expect(validUse(9000, 0, 1, 0)).toBeNull();
+    expect(validUse(60_000, 0, 1, 0)).toBeNull();
   });
 
   it("blasts cars away and up, harder up close, not past the radius", () => {
