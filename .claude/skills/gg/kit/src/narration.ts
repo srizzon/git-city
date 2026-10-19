@@ -45,6 +45,8 @@ export interface NarrationLine {
   show: string;
   /** The spoken words behind this line; defaults to `show` without the stars. */
   say?: string;
+  /** Said but not captioned: the line takes its words and shows none of them. */
+  hidden?: boolean;
 }
 
 export interface CaptionLine {
@@ -83,7 +85,7 @@ export function captionLines(lines: readonly NarrationLine[], words: readonly Wo
   return lines.map((l, k) => {
     const span = spans[k];
     let lit = false;
-    const shown = l.show.split(/\s+/).filter(Boolean);
+    const shown = l.hidden ? [] : l.show.split(/\s+/).filter(Boolean);
     const out = shown.map((w, j) => {
       if (w.startsWith("*")) lit = true;
       const on = lit;

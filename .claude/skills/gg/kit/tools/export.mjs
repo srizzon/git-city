@@ -17,6 +17,8 @@
 //             platform's thumbnail grabber uses. Default: 1s before the end.
 //   --no-poster-frame  keep frame 0 as filmed (a reel's first frame is its
 //             hook; its cover is uploaded on its own). The .jpg is still written.
+//   A page whose world loads after the studio mounts sets window.__ggReady =
+//             false, then true once it's drawn: the export waits for it.
 //   --report  every frame, call the page's window.__ggReport() (if it has
 //             one) and write what it returns, one entry per frame, as JSON:
 //             a page can report where its overlays are, for checks.
@@ -202,6 +204,8 @@ target.searchParams.set("export", "1");
 console.log(`Opening ${target.href}`);
 await page.goto(target.href, { waitUntil: "load", timeout: 180_000 });
 await page.waitForFunction(() => window.__gg, null, { timeout: 180_000 });
+// A page that loads its world after the studio mounts says when it's ready (window.__ggReady = false, then true).
+await page.waitForFunction(() => window.__ggReady !== false, null, { timeout: 300_000 });
 await page.waitForLoadState("networkidle").catch(() => {});
 await page.evaluate(() => document.fonts.ready);
 // Dev servers draw their own badges over the page (Next.js, Vite): not in the film.
