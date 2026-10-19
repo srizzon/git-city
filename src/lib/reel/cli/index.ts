@@ -11,6 +11,7 @@
 //   batch <date>        every reel of the day whose state asks for a job, one at a time
 //   worker              runs what the studio queues, one job at a time, until stopped
 //   status [date]       each reel of the day and where it is
+//   vary <id> <test>    a trial of that reel changing one thing (voice, text, shot, layout) → the next t<n>/spec.json
 //
 // A reel is days/<date>/<slot>/spec.json under REELS_HOME (an id is
 // <date>-<slot>). One export at a time: a lock file holds the one headless
@@ -26,7 +27,8 @@ import { checkPicture, checkText, checkTimed, type FrameReport, type Issue } fro
 import { readConfig, type ReelsConfig } from "../config";
 import { computeFacts, loadFactsInput } from "../facts";
 import { reelOf } from "../film";
-import { filled, isReelDay, ReelSpec, specDir } from "../spec";
+import { filled, isReelDay, type ReelSpec, specDir } from "../spec";
+import { readSpecAt } from "../home";
 import { isAtLeast, readStatus, setError, setState, writeStatus } from "../status";
 import { busiestHour, scheduleReel } from "../schedule";
 import { bedOf } from "../beds";
@@ -52,7 +54,7 @@ const brt = (d = new Date()) => new Date(d.getTime() - 3 * 3600_000).toISOString
 function loadSpec(id: string): ReelSpec {
   const file = path.join(dirOf(id), "spec.json");
   if (!existsSync(file)) throw new Error(`No reel ${id} (${file}).`);
-  return ReelSpec.parse(JSON.parse(readFileSync(file, "utf8")));
+  return readSpecAt(dirOf(id));
 }
 
 /** Every reel id under days/, oldest first. */
@@ -333,6 +335,30 @@ function status(date?: string) {
   }
 }
 
+/** Starts a trial that varies one thing of a reel, filled with the reel's current value for it, to edit. */
+function vary(id: string, test: string) {
+  const base = loadSpec(id);
+  if (base.variation) throw new Error(`${id} is itself a variation: vary the reel it comes from.`);
+  const { date, slot } = specDir(id);
+  const variation =
+    test === "voice"
+      ? { test, lines: base.lines.slice(0, 2) }
+      : test === "text"
+        ? { test, lines: base.headline?.[0].lines ?? base.header?.rule ?? [] }
+        : test === "shot"
+          ? { test, scene: { scene: base.scenes[0].scene, params: base.scenes[0].params } }
+          : test === "layout"
+            ? { test, header: base.header, headline: base.headline }
+            : null;
+  if (!variation) throw new Error(`Test "${test}": one of voice, text, shot, layout.`);
+  let n = 1;
+  while (existsSync(path.join(home(), "days", date, `t${n}`))) n++;
+  const trial = `${date}-t${n}`;
+  mkdirSync(dirOf(trial), { recursive: true });
+  writeFileSync(path.join(dirOf(trial), "spec.json"), JSON.stringify({ id: trial, kind: "trial", from: slot, variation, post: { caption: base.post.caption } }, null, 2));
+  console.log(`${trial}: a ${test} variation of ${id}, filled with ${id}'s own ${test}. Change it in ${path.join(dirOf(trial), "spec.json")}, then check ${trial}.`);
+}
+
 const [cmd, arg] = process.argv.slice(2);
 const commands: Record<string, () => Promise<unknown> | unknown> = {
   facts: () => facts(arg),
@@ -345,9 +371,10 @@ const commands: Record<string, () => Promise<unknown> | unknown> = {
   batch: () => batch(arg ?? brt()),
   worker: () => worker(),
   status: () => status(arg),
+  vary: () => vary(arg, process.argv[4]),
 };
 if (!cmd || !commands[cmd]) {
-  console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 14).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+  console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 15).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
   process.exit(cmd ? 1 : 0);
 }
 Promise.resolve(commands[cmd]()).catch((e) => {
