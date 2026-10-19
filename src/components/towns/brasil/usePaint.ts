@@ -36,7 +36,7 @@ export function usePaint() {
           if (typeof msg.you === "string") self.current = msg.you;
           break;
         case "paint_all":
-          if (msg.g && isNums(msg.r) && Array.isArray(msg.tr)) board.all(msg.g as PaintGeom, msg.r, Number(msg.land) || 0, String(msg.wk), msg.tr as [string, number, number[]][]);
+          if (msg.g && isNums(msg.r) && Array.isArray(msg.tr)) board.all(msg.g as PaintGeom, msg.r, Number(msg.land) || 0, String(msg.wk), msg.tr as [string, number, number[]][], isNums(msg.hm) ? msg.hm : []);
           break;
         case "paint_trail":
           if (typeof msg.id === "string" && isNums(msg.a)) board.trail(msg.id, Number(msg.s), msg.a);

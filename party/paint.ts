@@ -165,16 +165,16 @@ export class PaintRoom {
     }
   }
 
-  /** The board without the buildings' lots (they're under the buildings), and every live trail. */
+  /** The board without the buildings' lots, those apart (they never change hands), and every live trail. */
   all(): ServerMsg {
     const g = this.grid;
-    if (!g) return { t: "paint_all", g: null, r: [], land: 0, wk: this.week, tr: [] };
+    if (!g) return { t: "paint_all", g: null, r: [], hm: [], land: 0, wk: this.week, tr: [] };
     const shown = g.owner.slice();
     for (let c = 0; c < shown.length; c++) if (g.home[c]) shown[c] = 0;
     const tr: [string, number, number[]][] = [];
     for (const [id, p] of this.painters) if (p.run?.cells.length) tr.push([id, p.run.s, p.run.cells]);
     this.land ||= g.landCount();
-    return { t: "paint_all", g: g.geom, r: encodeRuns(shown), land: this.land, wk: this.week, tr };
+    return { t: "paint_all", g: g.geom, r: encodeRuns(shown), hm: encodeRuns(g.home), land: this.land, wk: this.week, tr };
   }
 
   async greet(conn: Connection) {
