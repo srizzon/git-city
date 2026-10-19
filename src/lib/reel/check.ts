@@ -37,9 +37,40 @@ function onScreen(spec: ReelSpec): string[] {
     ...spec.header.rule.map((l) => l.text),
     ...spec.header.cta.map((l) => l.text),
     ...spec.lines.map((l) => l.show),
-    ...spec.overlays.flatMap((o) => [o.plate ?? "", ...o.badges.map((b) => b.sub)]),
+    ...spec.overlays.flatMap((o) =>
+      o.type === "balloon"
+        ? [o.plate ?? "", ...o.badges.map((b) => b.sub)]
+        : o.type === "bars"
+          ? [o.title ?? "", ...o.rows.flatMap((r) => [r.label, String(r.value)])]
+          : [o.title ?? "", ...o.rows.map((r) => r.tag)],
+    ),
   ].map((t) => t.replace(/\*/g, ""));
 }
+
+const UNITS = ["zero", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez", "onze", "doze", "treze", "catorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+const TENS = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+const HUNDREDS = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+
+/** A whole number in Portuguese words, as the narrator says it ("mil seiscentos e sessenta e cinco"). */
+export function extenso(n: number): string {
+  if (n < 20) return UNITS[n];
+  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? ` e ${UNITS[n % 10]}` : "");
+  if (n === 100) return "cem";
+  if (n < 1000) return HUNDREDS[Math.floor(n / 100)] + (n % 100 ? ` e ${extenso(n % 100)}` : "");
+  if (n < 1_000_000) {
+    const k = Math.floor(n / 1000);
+    const r = n % 1000;
+    const head = k === 1 ? "mil" : `${extenso(k)} mil`;
+    return r === 0 ? head : `${head}${r < 100 || r % 100 === 0 ? " e " : " "}${extenso(r)}`;
+  }
+  return String(n);
+}
+
+/** A shown number ("1.665", "64") said the way the voice says it, or null when it isn't a plain count. */
+const spokenNumber = (shown: string): string | null => {
+  const n = Number(shown.replace(/\./g, ""));
+  return /^\d{1,3}(\.\d{3})*$|^\d+$/.test(shown) && Number.isFinite(n) ? extenso(n) : null;
+};
 
 const hookOf = (spec: ReelSpec) => bare(spec.lines[0].show.replace(/\*/g, ""));
 
@@ -79,13 +110,22 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
     if (!l.say && /\d/.test(l.show)) fail("voice", `Line ${i + 1} shows digits and has no "say": the voice would read them as digits.`);
   });
 
+  // A number on a caption line is said as that number (a script that shows 25 and says "vinte e sete" is wrong).
+  spec.lines.forEach((l, i) => {
+    if (!l.say) return;
+    const said = ` ${bare(l.say.replace(/[-–]/g, " ")).length ? l.say.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim() : ""} `;
+    for (const n of numbersIn(l.show.replace(/\*/g, ""))) {
+      const words = spokenNumber(n);
+      if (words && !said.includes(` ${words} `)) fail("real data", `Line ${i + 1} shows ${n} but says "${l.say}" (${n} is "${words}").`);
+    }
+  });
+
   const known = factValues(spec.facts);
   for (const text of onScreen(spec)) {
     for (const n of numbersIn(text)) if (!known.has(n)) fail("real data", `"${n}" on screen isn't a fact: "${text}"`);
   }
-  for (const o of spec.overlays) {
-    if (o.target !== "example" && !known.has(o.target.login.toLowerCase())) fail("real data", `@${o.target.login} on screen isn't in the facts.`);
-  }
+  const logins = spec.overlays.flatMap((o) => (o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" ? o.rows.map((r) => r.login) : []));
+  for (const login of logins) if (!known.has(login.toLowerCase())) fail("real data", `${login} on screen isn't in the facts.`);
 
   const first = spec.lines[0].show.replace(/\*/g, "");
   if (words(first).length > 3 && !/^\d/.test(first)) warn("hook", `The first line is ${words(first).length} words: open on a number alone or a provocation.`);
@@ -163,6 +203,11 @@ export function checkPicture(frames: readonly FrameReport[]): Issue[] {
     if (roof && captions && roof.y > captions.y - 0.01 && roof.y < captions.y + captions.h + 0.01 && roof.x > captions.x && roof.x < captions.x + captions.w)
       subject("roof", `The captions cover the building's roof at ${f.t.toFixed(1)}s.`);
     if (roof && (roof.y < 0.05 || roof.y > 0.95)) subject("roof-off", `The building's roof is off screen at ${f.t.toFixed(1)}s.`);
+    // Nothing over the captions: the header, a balloon or a panel running into them.
+    if (captions)
+      for (const b of f.boxes)
+        if (b.name !== "captions" && b.name !== "roof" && b.w > 0 && b.y < captions.y + captions.h && b.y + b.h > captions.y && b.x < captions.x + captions.w && b.x + b.w > captions.x)
+          fail(`${b.name}-captions`, `The ${b.name} runs into the captions at ${f.t.toFixed(1)}s.`);
     const balloon = f.boxes.find((b) => b.name === "balloon");
     const header = f.boxes.find((b) => b.name === "header");
     if (balloon && header && balloon.w > 0 && balloon.y < header.y + header.h) fail("balloon-header", `The balloon runs under the header at ${f.t.toFixed(1)}s.`);

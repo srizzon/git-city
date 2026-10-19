@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkPicture, checkText, checkTimed } from "./check";
+import { checkPicture, checkText, checkTimed, extenso } from "./check";
 import { ReelSpec } from "./spec";
 
 const base = ReelSpec.parse({
@@ -77,5 +77,23 @@ describe("checkPicture", () => {
       },
     ]);
     expect(issues.map((i) => i.rule)).toEqual(["safe zone", "subject"]);
+  });
+});
+
+describe("extenso", () => {
+  it("says numbers the way the narrator does", () => {
+    expect(extenso(11)).toBe("onze");
+    expect(extenso(64)).toBe("sessenta e quatro");
+    expect(extenso(100)).toBe("cem");
+    expect(extenso(277)).toBe("duzentos e setenta e sete");
+    expect(extenso(1000)).toBe("mil");
+    expect(extenso(1665)).toBe("mil seiscentos e sessenta e cinco");
+    expect(extenso(2005)).toBe("dois mil e cinco");
+    expect(extenso(88202)).toBe("oitenta e oito mil duzentos e dois");
+  });
+
+  it("fails a line that shows one number and says another", () => {
+    const spec = { ...base, lines: [{ show: "*{facts.gap}* devs", say: "Doze devs." }, ...base.lines.slice(1)] };
+    expect(fails(checkText(spec, ctx))).toContain("real data");
   });
 });
