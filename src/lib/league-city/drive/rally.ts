@@ -5,7 +5,9 @@
 //
 // - Anyone driving starts one with a route (gates and a grid, worked out on
 //   their screen from the map: lib/towns/brasil-race). Everyone else in the
-//   room has RALLY.invite ms to accept; alone in the room it starts at once.
+//   room has RALLY.invite ms to accept. Nobody accepts: no race ("cancel",
+//   the starter can race alone from there). Alone in the room, or asking
+//   for it, it's a solo run against the record's ghost and starts at once.
 // - Everyone in is put on a grid slot behind the start line and held there;
 //   five lights, one a second, out after a short random wait.
 // - The room times each car on its own clock: a gate counts when a car's
@@ -92,7 +94,7 @@ export function rallyItem(place: number, n: number, rand: () => number = Math.ra
   return "missile";
 }
 
-export type RallyPhase = "idle" | "invite" | "countdown" | "live" | "over";
+export type RallyPhase = "idle" | "invite" | "cancel" | "countdown" | "live" | "over";
 
 export interface RallyRacer {
   name: string;
@@ -135,13 +137,15 @@ export interface RallyState {
   racers: Record<string, RallyRacer>;
   /** Finishers in order (ids). */
   order: string[];
+  /** A solo run (no invite, nobody else needed). */
+  solo: boolean;
   /** Each item box's generation, and until when it's gone (server ms, 0 = there). */
   boxGen: number[];
   boxUntil: number[];
 }
 
 export function idleRally(): RallyState {
-  return { phase: "idle", id: "", by: null, route: null, inviteEnds: 0, lightsAt: 0, startsAt: 0, endsAt: 0, racers: {}, order: [], boxGen: [], boxUntil: [] };
+  return { phase: "idle", id: "", by: null, route: null, inviteEnds: 0, lightsAt: 0, startsAt: 0, endsAt: 0, racers: {}, order: [], solo: false, boxGen: [], boxUntil: [] };
 }
 
 /** A race is on or about to be (the room's other games wait). */
@@ -174,7 +178,7 @@ export function validRoute(r: unknown, coordMax: number): RallyRoute | null {
 
 const racer = (name: string, slot: number): RallyRacer => ({ name, slot, next: 0, ms: null, void: false, gone: false });
 
-/** Someone starts a race. `alone`: nobody else in the room, so no invite. */
+/** Someone starts a race. `alone`: a solo run (nobody else in the room, or asked for), so no invite. */
 export function startRally(st: RallyState, id: string, by: string, name: string, route: RallyRoute, now: number, alone: boolean): boolean {
   // A new race clears the last one's results (a rematch starts right from them).
   if (rallyBusy(st)) return false;
@@ -188,6 +192,7 @@ export function startRally(st: RallyState, id: string, by: string, name: string,
   st.boxUntil = Array.from({ length: boxes }, () => 0);
   st.phase = "invite";
   st.inviteEnds = now + (alone ? 0 : RALLY.invite);
+  st.solo = alone;
   return true;
 }
 
@@ -204,6 +209,12 @@ export function joinRally(st: RallyState, id: string, name: string, now: number)
 /** The clock: invite → countdown → live → over. True when anything changed. */
 export function tickRally(st: RallyState, now: number, rand: () => number = Math.random): boolean {
   if (st.phase === "invite" && now >= st.inviteEnds) {
+    // Nobody took the challenge: no race. The starter can run it alone from the card.
+    if (!st.solo && Object.keys(st.racers).length < 2) {
+      st.phase = "cancel";
+      st.endsAt = now;
+      return true;
+    }
     st.phase = "countdown";
     st.lightsAt = now + RALLY.settle;
     const hold = RALLY.holdMin + rand() * (RALLY.holdMax - RALLY.holdMin);
@@ -223,7 +234,7 @@ export function tickRally(st: RallyState, now: number, rand: () => number = Math
       return true;
     }
   }
-  if (st.phase === "over" && now >= st.endsAt + RALLY.over) {
+  if ((st.phase === "over" || st.phase === "cancel") && now >= st.endsAt + RALLY.over) {
     Object.assign(st, idleRally());
     return true;
   }
