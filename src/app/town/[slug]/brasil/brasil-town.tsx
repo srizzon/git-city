@@ -130,6 +130,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** The Games menu (G): closed, its list of modes, or the race's step (with a route from a link). */
   const [games, setGames] = useState<null | { step: "modes" } | { step: "race"; initial: string | null }>(null);
   const closeGames = useCallback(() => setGames(null), []);
+  /** A race's results are on screen: the car stands still under them. */
+  const [raceResults, setRaceResults] = useState(false);
   /** On the grid or between the gates: the Games menu waits. */
   const racing = raceActive(rallyView);
   // Joined a race from inside the menu (its invite shows over it): the menu closes for the grid.
@@ -307,6 +309,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setDrivers([]);
     setCrownView(null);
     setRallyView(null);
+    setRaceResults(false);
     setGames(null);
     emoteLog.clear();
   }, [emoteLog, telemetry]);
@@ -557,7 +560,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       volume,
       emoteApi,
       onEmoteLog: emoteLog.push,
-      paused: paused || !!taste || !!games,
+      paused: paused || !!taste || !!games || raceResults,
       stallAt: null,
       onReady: () => {
         setDriveReady(true);
@@ -575,7 +578,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       onRoom: paint.onMessage,
       rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef, startLine: raceStartLine },
     }),
-    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, paint.onMessage, games, raceStartLine],
+    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, paint.onMessage, games, raceStartLine, raceResults],
   );
   /** Your state, from your city. */
   const homeCity = viewerLogin ? world.cityOfLogin.get(viewerLogin.toLowerCase()) : undefined;
@@ -676,6 +679,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setDrivers([]);
     setCrownView(null);
     setRallyView(null);
+    setRaceResults(false);
     emoteLog.clear();
     startDrift();
     setDrifting(true);
@@ -1150,7 +1154,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             </GameMenu>
           )}
           {/* After the menu, so an invite that comes in while it's open shows over it. */}
-          <RacePanel layout={layout} view={rallyView} yourUf={yours} onJoin={() => rallyApi.current?.join()} onRematch={(route) => startRace(route, "rematch")} />
+          <RacePanel layout={layout} view={rallyView} yourUf={yours} onJoin={() => rallyApi.current?.join()} onRematch={(route) => startRace(route, "rematch")} onResults={setRaceResults} />
         </DriveHud>
       )}
 
