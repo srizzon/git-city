@@ -579,7 +579,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       onRoom: paint.onMessage,
       rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef, startLine: raceStartLine, routeLine: raceLine },
     }),
-    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, games, raceStartLine, raceLine, raceResults, paint.onMessage],
+    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, paint.onMessage, games, raceStartLine, raceResults, raceLine],
   );
   /** Your state, from your city. */
   const homeCity = viewerLogin ? world.cityOfLogin.get(viewerLogin.toLowerCase()) : undefined;
@@ -798,10 +798,12 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     { id: "crown", icon: CrownIcon, name: "Crown rush", line: "Hold the crown 30 s. Bump to steal it.", need: "2+", blocked: drivers.length === 0 ? "Needs someone else driving here." : raceBusy ? "A race is on." : crownBusy ? "One is on now." : null },
     { id: "drift", icon: DriftIcon, name: "Drift track", line: "Off the coast between SP and RJ. The map shows the way.", need: "1" },
   ];
-  const startRace = (route: Parameters<NonNullable<typeof rallyApi.current>["start"]>[0], how: string, solo = false) => {
-    rallyApi.current?.start(route, solo);
+  /** Sends the race to the room; false (and the menu stays) when the room can't be reached. */
+  const startRace = (route: Parameters<NonNullable<typeof rallyApi.current>["start"]>[0], how: string, solo = false): boolean => {
+    if (!rallyApi.current?.start(route, solo)) return false;
     posthog.capture("brasil_race_started", { km: Math.round(route.length / 100) / 10, gates: route.gates.length, how, solo, others: drivers.length });
     setGames(null);
+    return true;
   };
   const pickGame = (id: string) => {
     if (id === "race") setGames({ step: "race", initial: null });
