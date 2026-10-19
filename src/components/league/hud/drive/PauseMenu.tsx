@@ -27,7 +27,7 @@ export const TOUCH_CONTROLS: [string, string][] = [
   ["Hold Brake", "brake, then reverse"],
   ["Hold Boost", "boost"],
   ["Tap the item", "attack (from ? boxes)"],
-  ["Tap the smile", "react"],
+  ["Tap a face", "react (the row over the buttons)"],
 ];
 
 type Item = { id: "resume" | "camera" | "sound" | "menu" | "exit"; label: string };
