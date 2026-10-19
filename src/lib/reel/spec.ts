@@ -13,7 +13,8 @@ export type Anchor = z.infer<typeof Anchor>;
 
 const HeaderLine = z.object({
   text: z.string().min(1),
-  size: z.enum(["huge", "big", "small"]),
+  /** giant: one number or word that fills the frame (a card's candidate number). */
+  size: z.enum(["giant", "huge", "big", "small"]),
   /** Kept as typed (a login, "seuuser SP"), not in caps. */
   plain: z.boolean().optional(),
 });
@@ -223,6 +224,10 @@ const Card = z.object({
     ])
     .optional(),
   points: z.object({ at: Anchor, value: z.string().min(1) }).optional(),
+  /** What a number in a block does: counts up over the card, blinks in hard steps (a candidate's number), or holds still. */
+  numbers: z.enum(["count", "blink", "still"]).default("count"),
+  /** Its words type in; off, they're all there from the first frame (a hook that has to read at once). */
+  typed: z.boolean().default(true),
   image: z.string().optional(),
 });
 

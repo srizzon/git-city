@@ -54,6 +54,8 @@ export type ReelPanel =
       lines: NonNullable<ReelSpec["header"]>["rule"];
       draw: { kind: "map" } | { kind: "comment"; text: string; at: number } | { kind: "graph"; at: number } | null;
       points: { at: number; value: string } | null;
+      numbers: "count" | "blink" | "still";
+      typed: boolean;
       image: string | null;
     }
   | { kind: "points"; from: number; to: number; rows: { at: number; icon: string; value: string; label: string }[] }
@@ -206,7 +208,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
     if (o.type === "card") {
       const d = o.draw;
       const draw = !d ? null : d.kind === "map" ? d : { ...d, at: anchorAt(words, d.at, from) };
-      return [{ kind: "card", from, to, lines: o.lines, draw, points: o.points ? { at: anchorAt(words, o.points.at, from), value: o.points.value } : null, image: o.image ?? null }];
+      return [{ kind: "card", from, to, lines: o.lines, draw, points: o.points ? { at: anchorAt(words, o.points.at, from), value: o.points.value } : null, numbers: o.numbers, typed: o.typed, image: o.image ?? null }];
     }
     if (o.type === "points") {
       const ats: number[] = [];

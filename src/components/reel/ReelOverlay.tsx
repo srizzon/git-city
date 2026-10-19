@@ -134,9 +134,9 @@ function Lit({ text }: { text: string }) {
   );
 }
 
-const SIZE = { huge: "11cqw", big: "7.4cqw", small: "4.6cqw" } as const;
+const SIZE = { giant: "14cqw", huge: "11cqw", big: "7.4cqw", small: "4.6cqw" } as const;
 /** The headline carries the story, so it reads bigger than the fixed header. */
-const HEADLINE_SIZE = { huge: "15cqw", big: "11cqw", small: "5.6cqw" } as const;
+const HEADLINE_SIZE = { giant: "18cqw", huge: "15cqw", big: "11cqw", small: "5.6cqw" } as const;
 const outline = (w: number) => ({
   WebkitTextStroke: `${w}cqw #000`,
   paintOrder: "stroke fill" as const,
@@ -169,7 +169,7 @@ function HeaderLines({ lines, sizes = SIZE, plates = false }: { lines: NonNullab
 const BRAND = { bg: "#0c0d0b", ink: "#eceee6", muted: "#8d9288", green: "#5ce483", onGreen: "#0b1f12", dot: "#22241e" };
 const HARD = "1.1cqw 1.1cqw 0 rgba(0,0,0,.85)";
 const PLATE: CSSProperties = { display: "table", margin: "0 auto", background: BRAND.bg, color: BRAND.ink, boxShadow: HARD, padding: "1.4cqw 2.8cqw 1.8cqw", lineHeight: 1.1 };
-const PLATE_SIZE = { huge: "10cqw", big: "7.4cqw", small: "4.2cqw" } as const;
+const PLATE_SIZE = { giant: "14cqw", huge: "10cqw", big: "7.4cqw", small: "4.2cqw" } as const;
 const CAPTION_YELLOW = "#ffd84a";
 const CAPTION_SHADOW = [[-0.4, 0], [0.4, 0], [0, -0.4], [0, 0.4], [-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]].map(([x, y]) => `${x}cqw ${y}cqw 0 ${BRAND.bg}`).join(", ") + `, 0.8cqw 0.8cqw 0 ${BRAND.bg}`;
 /** Characters a second the headline types (his Terminal piece: two frames a character at 30 fps). */
@@ -237,7 +237,7 @@ const numberOf = (s: string) => Number((NUMBER.exec(s)?.[0] ?? "0").replace(/\./
  * light with the count: the hook moves from its first frame.
  */
 function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "card" }> }) {
-  const size = { huge: "10cqw", big: "8.6cqw", small: "4.6cqw" } as const;
+  const size = { giant: "26cqw", huge: "10cqw", big: "8.6cqw", small: "4.6cqw" } as const;
   let k = 0;
   return (
     <div
@@ -250,10 +250,10 @@ function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
         <div data-reel-box="card" className="flex flex-col items-center text-center" style={{ gap: CARD_GAP.line, maxWidth: "72%" }}>
           {panel.lines.map((l, i) => (
             // Every character keeps its place while it types in, so the centred line never shifts.
-            <p key={i} style={{ fontSize: size[l.size], lineHeight: 1.5, color: l.size === "small" ? BRAND.muted : BRAND.ink, textTransform: l.plain ? "none" : undefined }}>
+            <p key={i} style={{ fontSize: size[l.size], lineHeight: 1.35, color: l.size === "small" ? BRAND.muted : BRAND.ink, textTransform: l.plain ? "none" : undefined }}>
               {segments(l.text).map((s, j) =>
                 s.lit ? (
-                  <span key={j} data-ch={k++} data-count={NUMBER.test(s.text) ? s.text : undefined} style={{ visibility: "hidden", background: BRAND.green, color: BRAND.onGreen, padding: "0.1em 0.3em", boxShadow: HARD }}>
+                  <span key={j} data-ch={k++} data-count={NUMBER.test(s.text) ? s.text : undefined} style={{ display: "inline-block", lineHeight: 1.1, visibility: "hidden", background: BRAND.green, color: BRAND.onGreen, padding: "0.08em 0.3em", boxShadow: HARD }}>
                     {s.text}
                   </span>
                 ) : (
@@ -341,12 +341,17 @@ function PointerPanel({ index, label }: { index: number; label: string }) {
 /** Each frame of a card: the typing, the count and the lit dots. */
 function drawCard(el: HTMLElement, p: Extract<ReelPanel, { kind: "card" }>, t: number) {
   const local = t - p.from;
-  const n = Math.floor(local * CARD_CPS);
+  const n = p.typed ? Math.floor(local * CARD_CPS) : Infinity;
   el.querySelectorAll<HTMLElement>("[data-ch]").forEach((c) => (c.style.visibility = Number(c.dataset.ch) < n ? "" : "hidden"));
   // The count runs over the card, ending a beat before it cuts away.
   const span = Math.max(0.3, p.to - p.from - 0.3);
   const u = Math.floor(clamp(local / span) * COUNT_STEPS) / COUNT_STEPS;
   el.querySelectorAll<HTMLElement>("[data-count]").forEach((c) => {
+    // A blinking number: on and off every 0.3s once it's typed in; a still one stays as written.
+    if (p.numbers !== "count") {
+      if (p.numbers === "blink" && c.style.visibility !== "hidden") c.style.visibility = Math.floor(local / 0.3) % 2 ? "hidden" : "";
+      return;
+    }
     const text = c.dataset.count!;
     const v = Math.round(numberOf(text) * u).toLocaleString("pt-BR");
     const next = text.replace(NUMBER, v);
