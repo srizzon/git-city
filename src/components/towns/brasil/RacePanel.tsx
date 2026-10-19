@@ -11,7 +11,8 @@ import type { BrasilLayout } from "@/lib/towns/brasil-map";
 import { cityByKey, nearestCity, parseRouteKey, pickDestination, raceRoute, toRallyRoute, type RaceLength, type RaceRoute } from "@/lib/towns/brasil-race";
 import type { RallyView } from "@/components/league/drive/RallyMode";
 import { Band } from "@/components/games/ui";
-import { GameClock, GameInvite, GameOnBand, GameResults, GameStandings, Keys, LIGHTS, T, type ResultRow, type StandingRow } from "@/components/games/kit";
+import { GameClock, GameInvite, GameOnBand, GameResults, GameStandings, KEYS_ONLY, Keys, LIGHTS, T, type ResultRow, type StandingRow } from "@/components/games/kit";
+import { Chip } from "@/components/games/ui";
 
 // The Brasil map's city race in the car games' kit (components/games): the
 // race's step in the Games menu (how long, the route it drew, its record and
@@ -86,7 +87,7 @@ export function RacePicker({
   others: number;
   /** A route key from a link. */
   initial: string | null;
-  onStart: (route: RallyRoute, how: string) => void;
+  onStart: (route: RallyRoute, how: string, solo?: boolean) => void;
   onBack: () => void;
 }) {
   const [length, setLength] = useState<RaceLength>("medium");
@@ -128,9 +129,12 @@ export function RacePicker({
 
   return (
     <>
-      <Band className="px-4 py-2 text-lime" style={{ fontSize: T.small }}>
-        Race · from {from}
-      </Band>
+      <button type="button" onClick={onBack} className="text-left outline-none active:translate-y-px">
+        <Band className="w-full justify-between px-4 py-2 text-lime" style={{ fontSize: T.small }}>
+          <span>‹ Race · from {from}</span>
+          <span className="text-muted">Back</span>
+        </Band>
+      </button>
       <div className="grid grid-cols-3 gap-1.5">
         {ORDER.map((l, i) => (
           <button
@@ -188,21 +192,37 @@ export function RacePicker({
         </Band>
       )}
       <Band delay={320} className="px-4 py-2 normal-case text-dim" style={{ fontSize: T.small }}>
-        {others > 0 ? `Everyone driving here gets ${RALLY.invite / 1000} s to join.` : "Nobody else is driving here: you race the record's ghost."}
+        {others > 0 ? `Everyone driving here gets ${RALLY.invite / 1000} s to join. Nobody does: no race.` : "Nobody else is driving here: you race the record's ghost."}
       </Band>
-      {draft.route && (
-        <button type="button" onClick={() => draft.route && onStart(toRallyRoute(draft.route), draft.how)} className="outline-none active:translate-y-px">
-          <Band tone="lime" delay={360} className="min-h-11 w-full justify-center gap-3 px-4 py-2.5" style={{ fontSize: T.body }}>
-            Challenge
+      <div className="grid grid-cols-2 gap-1.5">
+        <button type="button" onClick={() => setDraft(draw(layout, telemetry, length))} className="outline-none active:translate-y-px">
+          <Band delay={340} className="min-h-11 w-full justify-center gap-2 px-3 py-2.5 text-cream" style={{ fontSize: T.small }}>
+            <span className={KEYS_ONLY}>
+              <Chip>R</Chip>
+            </span>{" "}
+            Other city
+          </Band>
+        </button>
+        {draft.route && (
+          <button type="button" onClick={() => draft.route && onStart(toRallyRoute(draft.route), draft.how)} className="outline-none active:translate-y-px">
+            <Band tone="lime" delay={360} className="min-h-11 w-full justify-center gap-3 px-4 py-2.5" style={{ fontSize: T.body }}>
+              {others > 0 ? "Challenge" : "Race"}
+            </Band>
+          </button>
+        )}
+      </div>
+      {draft.route && others > 0 && (
+        <button type="button" onClick={() => draft.route && onStart(toRallyRoute(draft.route), draft.how, true)} className="outline-none active:translate-y-px">
+          <Band delay={380} className="min-h-11 w-full justify-center px-4 py-2 normal-case text-muted" style={{ fontSize: T.small }}>
+            Or race it alone, against the record&apos;s ghost
           </Band>
         </button>
       )}
       <Keys
         delay={400}
         keys={[
-          ["Enter", "challenge"],
+          ["Enter", others > 0 ? "challenge" : "race"],
           ["← →", "length"],
-          ["R", "other city"],
           ["Esc", "back"],
         ]}
       />
@@ -227,8 +247,11 @@ export default function RacePanel({
   yourUf,
   onJoin,
   onRematch,
+  onAlone,
   onResults,
 }: {
+  /** Run this route solo (nobody took the challenge). */
+  onAlone: (route: RallyRoute) => void;
   /** The results are up (true) or gone: the car waits while they are. */
   onResults?: (open: boolean) => void;
   layout: BrasilLayout;
@@ -337,6 +360,24 @@ export default function RacePanel({
   const route = rally.route;
   const mine = you ? rally.racers[you] : undefined;
   const n = Object.keys(rally.racers).length;
+
+  // ── Nobody took it: no race; the one who asked can run it alone ─
+  if (rally.phase === "cancel") {
+    if (!mine || you !== rally.by) return null;
+    return (
+      <GameInvite
+        kind="Race"
+        icon={Flag}
+        title={routeName(route)}
+        lines={["Nobody joined, so no race."]}
+        endsAt={rally.endsAt + RALLY.over}
+        serverNow={serverNow}
+        total={RALLY.over}
+        action="Race it alone"
+        onJoin={() => onAlone(route)}
+      />
+    );
+  }
 
   // ── Invite ─────────────────────────────────────────────────
   if (rally.phase === "invite") {

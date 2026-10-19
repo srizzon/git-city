@@ -343,7 +343,7 @@ export class DriveServer extends PartyRoom {
     }
 
     if (!msg || typeof msg !== "object") return;
-    const { t, name, to, x, z, box, gen, item, dx, dz, id, target, victim, steal, token, e, route } = msg as Record<string, unknown>;
+    const { t, name, to, x, z, box, gen, item, dx, dz, id, target, victim, steal, token, e, route, solo } = msg as Record<string, unknown>;
 
     // A quick reaction: to everyone else driving (spectators don't draw cars' bubbles).
     if (t === "emote") {
@@ -393,7 +393,7 @@ export class DriveServer extends PartyRoom {
       if (t === "rally_start") {
         const r = validRoute(route, COORD_MAX);
         if (!r || this.crown.phase === "live" || this.crown.phase === "countdown") return;
-        changed = startRally(this.rally, raceId(), sender.id, d.name, r, now, this.drivers.size === 1);
+        changed = startRally(this.rally, raceId(), sender.id, d.name, r, now, solo === true || this.drivers.size === 1);
         if (changed) {
           this.rallyTracks.clear();
           this.runRallyClock();

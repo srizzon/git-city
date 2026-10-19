@@ -25,10 +25,13 @@ export const T = {
 
 export const who = (name: string) => (name.startsWith("guest-") ? "guest" : `@${name}`);
 
-/** A row of key hints at the foot of a screen: "Enter pick · Esc back". */
+/** Hidden on a touch screen (no keyboard): key hints and key chips. */
+export const KEYS_ONLY = "[@media(hover:none)]:hidden";
+
+/** A row of key hints at the foot of a screen: "Enter pick · Esc back". Not on a phone. */
 export function Keys({ keys, delay }: { keys: [string, string][]; delay?: number }) {
   return (
-    <Band delay={delay} className="flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-muted" style={{ fontSize: T.small }}>
+    <Band delay={delay} className={`flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-muted ${KEYS_ONLY}`} style={{ fontSize: T.small }}>
       {keys.map(([k, label]) => (
         <span key={k}>
           <Chip>{k}</Chip> {label}
@@ -94,12 +97,15 @@ export function GameMenu({
       <div className="absolute inset-0" onClick={onClose} aria-hidden>
         <Backdrop side="left" />
       </div>
-      <div role="dialog" aria-label={title} className="absolute inset-y-0 left-[6vw] flex w-[min(520px,88vw)] flex-col justify-center gap-1.5">
+      <div role="dialog" aria-label={title} className="absolute inset-y-0 left-[6vw] flex w-[min(520px,88vw)] flex-col justify-center gap-1.5 overflow-y-auto py-4 max-sm:left-4 max-sm:w-[calc(100vw-2rem)]">
         {children ?? (
           <>
-            <Band className="px-4 py-2 text-lime" style={{ fontSize: T.small }}>
-              {title}
-            </Band>
+            <button type="button" onClick={onClose} className="text-left outline-none active:translate-y-px">
+              <Band className="w-full justify-between px-4 py-2 text-lime" style={{ fontSize: T.small }}>
+                <span>{title}</span>
+                <span className="text-muted">Close ✕</span>
+              </Band>
+            </button>
             {modes.map((m, i) => {
               const on = i === sel;
               return (
@@ -208,7 +214,10 @@ export function GameInvite({
           <span className="absolute inset-y-0 left-0 bg-black/15" style={{ width: `${(1 - k) * 100}%` }} aria-hidden />
           <span className="relative flex min-h-11 items-center justify-between gap-3 px-4 py-3">
             <span className="flex items-center gap-3">
-              <Chip tone="dark">J</Chip> {action}
+              <span className={KEYS_ONLY}>
+                <Chip tone="dark">J</Chip>
+              </span>{" "}
+              {action}
             </span>
             <span className="tabular-nums">{left}s</span>
           </span>
@@ -394,14 +403,20 @@ export function GameResults({
           <div className="mt-3 flex justify-center gap-1.5">
             {onAgain && (
               <button type="button" onClick={onAgain} className="active:translate-y-px">
-                <Band tone="lime" delay={180 + rows.length * 50} className="min-h-10 gap-3 px-4 py-2" style={{ fontSize: T.small }}>
-                  <Chip tone="dark">Enter</Chip> {again}
+                <Band tone="lime" delay={180 + rows.length * 50} className="min-h-11 gap-3 px-4 py-2" style={{ fontSize: T.small }}>
+                  <span className={KEYS_ONLY}>
+                    <Chip tone="dark">Enter</Chip>
+                  </span>{" "}
+                  {again}
                 </Band>
               </button>
             )}
             <button type="button" onClick={onClose} className="active:translate-y-px">
-              <Band delay={220 + rows.length * 50} className="min-h-10 gap-3 px-4 py-2 text-cream" style={{ fontSize: T.small }}>
-                <Chip>Esc</Chip> Drive on
+              <Band delay={220 + rows.length * 50} className="min-h-11 gap-3 px-4 py-2 text-cream" style={{ fontSize: T.small }}>
+                <span className={KEYS_ONLY}>
+                  <Chip>Esc</Chip>
+                </span>{" "}
+                Drive on
               </Band>
             </button>
           </div>
@@ -414,10 +429,10 @@ export function GameResults({
 /** A small band top center while others play and you watch: "Race on: A → B · 3 racing". */
 export function GameOnBand({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
   return (
-    <div className="absolute left-1/2 top-16 -translate-x-1/2 max-sm:top-[7.5rem]">
-      <Band className="gap-2 whitespace-nowrap px-4 py-2 normal-case text-muted" style={{ fontSize: T.small }}>
-        <Icon size={12} strokeWidth={2.5} className="text-lime" aria-hidden />
-        {children}
+    <div className="absolute left-1/2 top-16 max-w-[calc(100vw-2rem)] -translate-x-1/2 max-sm:top-[4.5rem]">
+      <Band className="max-w-full gap-2 px-4 py-2 normal-case text-muted" style={{ fontSize: T.small }}>
+        <Icon size={12} strokeWidth={2.5} className="shrink-0 text-lime" aria-hidden />
+        <span className="min-w-0 truncate">{children}</span>
       </Band>
     </div>
   );

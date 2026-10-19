@@ -82,7 +82,7 @@ export type ClientMsg =
   | { t: "crown_hit"; victim: string; steal: boolean }
   | { t: "crown_drop" }
   /** A city race (rally.ts): start one on this route, or accept the open invite. */
-  | { t: "rally_start"; route: RallyRoute }
+  | { t: "rally_start"; route: RallyRoute; solo?: boolean }
   | { t: "rally_join" }
   /** A city race's item box (rally.ts): you drove through it. */
   | { t: "rally_take"; box: number; gen: number }

@@ -155,4 +155,17 @@ describe("rally", () => {
     const count = (place: number) => Array.from({ length: 2000 }, () => rallyItem(place, 6, rand)).filter((x) => x === "missile").length;
     expect(count(6)).toBeGreaterThan(count(1) * 3);
   });
+
+  it("calls off a challenge nobody took, and lets the starter run it alone", () => {
+    const st = idleRally();
+    startRally(st, "r1", "a", "alice", route, 0, false);
+    tickRally(st, RALLY.invite, () => 0);
+    expect(st.phase).toBe("cancel");
+    tickRally(st, RALLY.invite + RALLY.over);
+    expect(st.phase).toBe("idle");
+    const solo = idleRally();
+    startRally(solo, "r2", "a", "alice", route, 0, true);
+    tickRally(solo, 0, () => 0);
+    expect(solo.phase).toBe("countdown");
+  });
 });
