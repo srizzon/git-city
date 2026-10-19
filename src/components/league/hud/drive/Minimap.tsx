@@ -135,6 +135,16 @@ export default function Minimap({
         ctx.fillStyle = b.home ? HOME : BUILDING;
         ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d);
       }
+      // A city race's route: its gates joined up, to the finish.
+      if (r.raceLine?.length) {
+        ctx.strokeStyle = HOME;
+        ctx.lineWidth = 3 / k;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        r.raceLine.forEach(([x, z], i) => (i ? ctx.lineTo(x, z) : ctx.moveTo(x, z)));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
       ctx.restore();
 
       // Bots under people, people pinned to the rim when far.

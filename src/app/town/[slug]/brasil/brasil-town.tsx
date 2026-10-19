@@ -13,6 +13,10 @@ import { createCameraStore, mapNav } from "@/lib/map-nav";
 import { createBrowserSupabase } from "@/lib/supabase";
 import { signInWithGitHub } from "@/lib/sign-in";
 import type { CrownApi, CrownView } from "@/components/league/drive/CrownMode";
+import type { RallyApi, RallyView } from "@/components/league/drive/RallyMode";
+import RacePanel, { raceActive } from "@/components/towns/brasil/RacePanel";
+import { cityByKey, parseRouteKey } from "@/lib/towns/brasil-race";
+import type { RouteRecord } from "@/lib/towns/brasil-race-server";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
 import { useTouch } from "@/components/towns/useDesktop";
 import { createEmoteLog } from "@/lib/league-city/drive/emote-log";
@@ -107,6 +111,27 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const cameraStore = useMemo(() => createCameraStore(), []);
   const [telemetry, setTelemetry] = useState(createTelemetry);
   const crownApi = useRef<CrownApi | null>(null);
+  // City races: the HUD starts and joins them through the drive room; the record decides whether your ghost goes up.
+  const rallyApi = useRef<RallyApi | null>(null);
+  const [rallyView, setRallyView] = useState<RallyView | null>(null);
+  const raceRecordRef = useRef<number | null>(null);
+  const onRaceRecord = useCallback((ms: number | null) => {
+    raceRecordRef.current = ms;
+  }, []);
+  /** ?race=<route>: a beaten record's email opens that route's race. */
+  const [pendingRace, setPendingRace] = useState<string | null>(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("race")));
+  const clearPendingRace = useCallback(() => setPendingRace(null), []);
+  // Every route's record, for the state cards: fetched the first time one opens.
+  const [raceRecords, setRaceRecords] = useState<RouteRecord[] | null>(null);
+  const recordsAsked = useRef(false);
+  const askRecords = useCallback(() => {
+    if (recordsAsked.current) return;
+    recordsAsked.current = true;
+    fetch(`/api/towns/${encodeURIComponent(league.slug)}/brasil/race?view=week`)
+      .then((r) => r.json())
+      .then((b: { records?: RouteRecord[] }) => setRaceRecords(b.records ?? []))
+      .catch(() => {});
+  }, [league.slug]);
   const [driving, setDriving] = useState(false);
   /** On the drift track: the town's car is parked, a drift run is on. */
   const [drifting, setDrifting] = useState(false);
@@ -264,6 +289,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setPaused(false);
     setDrivers([]);
     setCrownView(null);
+    setRallyView(null);
     emoteLog.clear();
   }, [emoteLog, telemetry]);
   // Esc pauses; Esc again on the pause menu leaves the car.
@@ -431,6 +457,24 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     return () => clearTimeout(t);
   }, [startAt, world, openState, openCity, openBuilding, startPick, viewerLogin, home]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (state) askRecords();
+  }, [state, askRecords]);
+
+  // ?race=<route>: straight into the car at the route's start city; the race card opens once it's ready.
+  const raceStarted = useRef(false);
+  useEffect(() => {
+    if (raceStarted.current || !pendingRace) return;
+    const from = cityByKey(layout, parseRouteKey(pendingRace)?.from ?? "");
+    raceStarted.current = true;
+    if (!from) {
+      setPendingRace(null);
+      return;
+    }
+    const t = setTimeout(() => startDrive({ x: from.hub[0] * LOT, z: from.hub[1] * LOT }), 700);
+    return () => clearTimeout(t);
+  }, [pendingRace, layout]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Where you are: the building's city, the open state, or the city the camera is over.
   const place = (focused ? world.cityOfLogin.get(focused.loginLower) : undefined) ?? state?.capital ?? (viewKey ? world.cityByKey.get(viewKey) : undefined) ?? null;
   /** The building the car starts at: the open one, else the city you're over, else yours, else the biggest state's. */
@@ -495,6 +539,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       onCrown: setCrownView,
       onTaste: viewerLogin ? undefined : onTaste,
       onRoom: paint.onMessage,
+      rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef },
     }),
     [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, paint.onMessage],
   );
@@ -596,6 +641,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setPaused(false);
     setDrivers([]);
     setCrownView(null);
+    setRallyView(null);
     emoteLog.clear();
     startDrift();
     setDrifting(true);
@@ -1029,11 +1075,26 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onVolume={changeVolume}
           onEmote={(e) => emoteApi.current?.send(e)}
           onStartCrown={() => crownApi.current?.start()}
+          crownHidden={raceActive(rallyView)}
           onResume={() => setPaused(false)}
           onCamera={toggleCamera}
           onMute={toggleMute}
           onExit={exitDrive}
-        />
+        >
+          <RacePanel
+            slug={league.slug}
+            layout={layout}
+            view={rallyView}
+            telemetry={telemetry}
+            drivers={drivers}
+            touch={touchUi}
+            pending={driveReady ? pendingRace : null}
+            onRecord={onRaceRecord}
+            onStart={(route) => rallyApi.current?.start(route)}
+            onJoin={() => rallyApi.current?.join()}
+            onPendingDone={clearPendingRace}
+          />
+        </DriveHud>
       )}
 
       {panel === "states" && (
@@ -1041,6 +1102,15 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           states={world.states}
           points={world.statePoints}
           yours={yours}
+          races={{
+            slug: league.slug,
+            cityName: (key) => cityByKey(layout, key)?.name ?? "?",
+            you: viewerLogin,
+            onRace: () => {
+              posthog.capture("brasil_race_board_drive");
+              startDrive();
+            },
+          }}
           onPick={(s) => {
             posthog.capture("brasil_state_opened", { uf: s.uf, from: "ranking" });
             openState(s.uf);
@@ -1092,6 +1162,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onDriveHere={state.devs > 0 ? () => startDrive() : undefined}
           week={world.week}
           race={{ place: world.racePlace.get(state.uf) ?? 27, points: world.statePoints[state.uf] ?? 0 }}
+          records={raceRecords
+            ?.filter((r) => cityByKey(layout, r.from)?.uf === state.uf)
+            .sort((a, b) => a.ms - b.ms)
+            .map((r) => ({ route: `${cityByKey(layout, r.from)?.name ?? "?"} → ${cityByKey(layout, r.to)?.name ?? "?"}`, login: r.login, ms: r.ms }))}
           cabinet={{
             provisional: officeWeek.provisional,
             governor: world.offices.governors.get(state.uf) ?? null,

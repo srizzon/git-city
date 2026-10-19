@@ -15,8 +15,24 @@ export const POINTS = {
   story: 20,
   coded: 10,
   vote: 10,
-  /** Per point: the State War pays one for every PAINT.lotsPerPoint lots, PAINT.dayCap a day (lib/towns/brasil-paint). */
+  /** Per point: the State War pays one for every PAINT.cellsPerPoint cells, PAINT.dayCap a day (lib/towns/brasil-paint). */
   paint: 1,
+  /** Finishing a race with another signed-in racer (more for winning and records: RACE_POINTS). */
+  race: 3,
+} as const;
+
+/** Races (lib/towns/brasil-race): what each finish pays, and the day's cap. */
+export const RACE_POINTS = {
+  finish: 3,
+  /** The winner, per other signed-in racer. */
+  beat: 3,
+  maxBeats: 5,
+  /** Paid for the same winner over the same racer this many times a day at most. */
+  samePairPerDay: 3,
+  /** A new route record, once per route a week. */
+  record: 10,
+  /** Race points per dev per (Brasília) day. */
+  dayCap: 30,
 } as const;
 
 export type PointKind = keyof typeof POINTS;
@@ -71,11 +87,12 @@ export interface PointsBreakdown {
   coded: number;
   vote: number;
   paint: number;
+  race: number;
 }
 
-export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0 });
+export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0, race: 0 });
 
-export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote + b.paint;
+export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote + b.paint + b.race;
 
 /**
  * Each dev's week: the ledger's rows plus POINTS.coded for every day they
