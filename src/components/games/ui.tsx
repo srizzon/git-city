@@ -1,9 +1,10 @@
 "use client";
 
-// The drift screens' pieces, after motorsport TV graphics: opaque square
-// bands with no border and a hard edge below, the lime one with dark type
-// like the start gantry's sign. Menus blur and darken the scene behind them
-// so the bands carry the contrast; the driving HUD sits on the scene as is.
+// The car games' pieces (drift, city races, Crown Rush), after motorsport
+// TV graphics: opaque square bands with no border and a hard edge below, the
+// lime one with dark type like the start gantry's sign. Menus blur and
+// darken the scene behind them so the bands carry the contrast; the driving
+// HUD sits on the scene as is.
 
 import type { CSSProperties, ReactNode } from "react";
 

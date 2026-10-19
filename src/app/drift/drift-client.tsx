@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
-import { Backdrop, Band, Chip } from "@/components/drift/ui";
+import { Backdrop, Band, Chip } from "@/components/games/ui";
 import { PixelSelect, type PixelOption } from "@/components/ui/PixelSelect";
 import { MEDAL_COLORS, fmt } from "@/components/drift/DriftHud";
 import type { BoardRowLite } from "@/components/drift/DriftTitle";

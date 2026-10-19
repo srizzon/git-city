@@ -6,7 +6,7 @@ import { SERIES, standings, type Series } from "@/lib/drift/series";
 import { SPOTS } from "@/lib/drift/spots";
 import type { LiveSpot, SpotId } from "@/lib/drift/spots/types";
 import { fmt } from "./DriftHud";
-import { Backdrop, Band, Chip } from "./ui";
+import { Backdrop, Band, Chip } from "@/components/games/ui";
 
 // A room with friends, in the drift screens' bands. The lobby (before each
 // run, and for whoever came in mid-run): the room's code, the spot, who's in
