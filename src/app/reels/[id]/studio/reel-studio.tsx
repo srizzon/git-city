@@ -179,7 +179,8 @@ function BayStage({ spec, reel, clock, balloon, gen, children }: StageProps & { 
           flyMode={false}
           onExitFly={() => {}}
           themeIndex={0}
-          skyHour={() => 20.5}
+          skyHour={() => (spec.world.type === "bay" ? spec.world.skyHour : 20.5)}
+          filmLight={spec.world.type === "bay" ? spec.world.exposure : 1}
           rig={<BayReelRig clock={clock} reel={reel} buildings={city.buildings} lot={city.lot} colors={THEMES[0].building} balloon={balloon} store={store} targets={targets} />}
         />
       </div>

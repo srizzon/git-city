@@ -123,6 +123,10 @@ const BayWorld = z.object({
   type: z.literal("bay"),
   /** A dev left out of the city: their lot stands empty until the "lot" scene raises their building. */
   lot: z.string().optional(),
+  /** The time of day the sky and the light are drawn at (0–24); 20.5 is the city's night. */
+  skyHour: z.number().min(0).max(24).default(20.5),
+  /** How much more light the film lets into the night: the ambient fill times this (1: as the city is; 2, Sam's pick 2026-10-19). */
+  exposure: z.number().positive().max(6).default(2),
 });
 
 /** One or more towns (a canvas each, cut between): stage name → town slug. Scenes say which with params.town. */
