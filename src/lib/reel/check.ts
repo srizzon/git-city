@@ -59,6 +59,8 @@ function onScreen(spec: ReelSpec): string[] {
                   ? [o.value]
                 : o.type === "score"
                   ? [o.value]
+                : o.type === "race"
+                  ? [...o.rows.map((r) => r.number), ...(o.label ? [o.label] : [])]
                 : o.type === "carousel"
                   ? o.cards.map((c) => c.number)
                 : o.type === "santinhos"
@@ -160,7 +162,7 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
     for (const n of numbersIn(plain)) if (!known.has(n)) fail("real data", `"${n}" on screen isn't a fact: "${text}"`);
   }
   const logins = spec.overlays.flatMap((o) =>
-    o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" || o.type === "pins" ? o.rows.map((r) => r.login) : o.type === "poster" || o.type === "profile" || o.type === "place" || o.type === "urna" ? [o.login] : o.type === "santinhos" || o.type === "carousel" ? o.cards.map((c) => c.login) : [],
+    o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" || o.type === "pins" ? o.rows.map((r) => r.login) : o.type === "poster" || o.type === "profile" || o.type === "place" || o.type === "urna" ? [o.login] : o.type === "santinhos" || o.type === "carousel" ? o.cards.map((c) => c.login) : o.type === "race" ? o.rows.map((r) => r.login) : [],
   );
   for (const login of logins) if (!known.has(login.toLowerCase())) fail("real data", `${login} on screen isn't in the facts.`);
 
@@ -195,7 +197,7 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   const titles = [
     ...(spec.header ? [...spec.header.rule, ...spec.header.cta].map((l) => l.text) : []),
     ...(spec.headline ?? []).flatMap((h) => h.lines.map((l) => l.text)),
-    ...spec.overlays.flatMap((o) => (o.type === "card" ? [o.lines.map((l) => l.text).join(" ")] : o.type === "santinhos" || o.type === "urna" || o.type === "pointer" ? [o.label ?? ""] : [])),
+    ...spec.overlays.flatMap((o) => (o.type === "card" ? [o.lines.map((l) => l.text).join(" ")] : o.type === "santinhos" || o.type === "urna" || o.type === "pointer" || o.type === "race" ? [o.label ?? ""] : [])),
   ];
   for (const title of titles) {
     const t = norm(title);

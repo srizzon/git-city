@@ -290,7 +290,21 @@ const Carousel = z.object({
   stops: z.array(z.object({ at: Anchor, number: z.string() })).min(1),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna, Santinhos, Carousel]);
+/**
+ * A vote count raced: each vote in `events` (ballot numbers, in the order they really came in) lands
+ * in turn over the first part of the overlay, the bars growing and the rows swapping places when one
+ * passes another, then the final count holds. `label` goes on a terminal plate over it.
+ */
+const Race = z.object({
+  type: z.literal("race"),
+  from: Anchor,
+  to: Anchor.optional(),
+  rows: z.array(z.object({ number: z.string(), login: z.string(), avatar: z.string() })).min(2).max(5),
+  events: z.array(z.string()).min(1),
+  label: z.string().optional(),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna, Santinhos, Carousel, Race]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({

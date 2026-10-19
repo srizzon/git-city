@@ -384,6 +384,88 @@ function SantinhosPanel({ index, panel }: { index: number; panel: Extract<ReelPa
   );
 }
 
+// ── The vote count, raced ──
+/** Share of the overlay the votes take to land (the rest holds the final count), a row's height (cqw) and a swap's length (s). */
+const RACE_SHARE = 0.65;
+const RACE_ROW = 30;
+const RACE_SWAP = 0.15;
+
+/** Each row's count and place after every vote (step 0: before any). */
+function raceSteps(p: Extract<ReelPanel, { kind: "race" }>) {
+  const count = p.rows.map(() => 0);
+  const order = (c: number[]) => p.rows.map((_, i) => i).sort((a, b) => c[b] - c[a] || a - b);
+  const steps = [{ count: [...count], place: order(count) }];
+  for (const e of p.events) {
+    const i = p.rows.findIndex((r) => r.number === e);
+    if (i >= 0) count[i]++;
+    steps.push({ count: [...count], place: order(count) });
+  }
+  return steps;
+}
+
+function RacePanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "race" }> }) {
+  return (
+    <div data-panel={index} className="absolute inset-0 font-pixel uppercase" style={{ zIndex: 5, opacity: 0, background: "rgba(12,13,11,.62)" }}>
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: "16%", gap: CARD_GAP.group }}>
+        {panel.label && (
+          <p data-reel-box="race" style={{ ...PLATE, fontSize: "5cqw", whiteSpace: "nowrap" }}>
+            <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>
+            {panel.label}
+          </p>
+        )}
+        <div className="relative" style={{ width: "86cqw", height: `${panel.rows.length * RACE_ROW}cqw` }}>
+          {panel.rows.map((r, i) => (
+            <div key={i} data-race={i} className="absolute inset-x-0 flex items-center" style={{ top: 0, height: `${RACE_ROW - 4}cqw`, gap: "3cqw" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- the candidate's GitHub photo */}
+              <img alt="" src={r.avatar} style={{ width: `${RACE_ROW - 4}cqw`, height: `${RACE_ROW - 4}cqw`, objectFit: "cover", border: `0.6cqw solid ${BRAND.ink}`, boxShadow: HARD, flexShrink: 0 }} />
+              <div className="flex min-w-0 flex-1 flex-col" style={{ gap: "1.6cqw" }}>
+                <span style={{ fontSize: "3.3cqw", color: BRAND.ink, textTransform: "none", whiteSpace: "nowrap" }}>
+                  <span style={{ background: BRAND.green, color: BRAND.onGreen, padding: "0 0.3em", marginRight: "0.5em" }}>{r.number}</span>@{r.login}
+                </span>
+                <div className="flex items-center" style={{ gap: "2cqw" }}>
+                  <span data-bar style={{ height: "8cqw", width: 0, background: BRAND.green, boxShadow: HARD }} />
+                  <span data-n style={{ fontSize: "8cqw", color: BRAND.ink }}>0</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function drawRace(el: HTMLElement, p: Extract<ReelPanel, { kind: "race" }>, t: number) {
+  const steps = raceSteps(p);
+  const span = (p.to - p.from) * RACE_SHARE;
+  const every = span / p.events.length;
+  const at = (k: number) => p.from + 0.1 + k * every;
+  const k = Math.max(0, Math.min(p.events.length, Math.floor((t - p.from - 0.1) / every) + 1));
+  const now = steps[k];
+  const max = Math.max(1, ...steps[steps.length - 1].count);
+  el.querySelectorAll<HTMLElement>("[data-race]").forEach((row) => {
+    const i = Number(row.dataset.race);
+    // Its place now, and where it was before the last swap that moved it: it slides between them.
+    let from = now.place.indexOf(i);
+    let since = -Infinity;
+    for (let s = k; s > 0; s--) {
+      const before = steps[s - 1].place.indexOf(i);
+      if (before !== steps[s].place.indexOf(i)) {
+        from = before;
+        since = at(s - 1);
+        break;
+      }
+    }
+    const u = clamp((t - since) / RACE_SWAP);
+    const y = from + (now.place.indexOf(i) - from) * u;
+    row.style.transform = `translateY(${y * RACE_ROW}cqw)`;
+    const bar = row.querySelector<HTMLElement>("[data-bar]");
+    if (bar) bar.style.width = `${(now.count[i] / max) * 40}cqw`;
+    const n = row.querySelector<HTMLElement>("[data-n]");
+    if (n && n.textContent !== String(now.count[i])) n.textContent = String(now.count[i]);
+  });
+}
+
 // ── The conveyor of flyers ──
 /** A flyer's width and the step from one to the next, in cqw. */
 const BELT_CARD = 58;
@@ -666,6 +748,12 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
   panels.forEach((p, i) => {
     const el = root.querySelector<HTMLElement>(`[data-panel="${i}"]`);
     if (!el) return;
+    if (p.kind === "race") {
+      const up = t >= p.from && t < p.to;
+      el.style.opacity = up ? "1" : "0";
+      if (up) drawRace(el, p, t);
+      return;
+    }
     if (p.kind === "carousel") {
       const up = t >= p.from && t < p.to;
       el.style.opacity = up ? "1" : "0";
@@ -1398,6 +1486,7 @@ function Panel({
   if (panel.kind === "urna") return <UrnaPanel index={index} panel={panel} />;
   if (panel.kind === "santinhos") return <SantinhosPanel index={index} panel={panel} />;
   if (panel.kind === "carousel") return <CarouselPanel index={index} panel={panel} />;
+  if (panel.kind === "race") return <RacePanel index={index} panel={panel} />;
   if (panel.kind === "pointer") return <PointerPanel index={index} label={panel.label} />;
   if (panel.kind === "counter" && plates)
     return (
@@ -1714,7 +1803,7 @@ export default function ReelOverlay({
       const t = beatOf(clock);
       const i = reel.lines.findIndex((l) => t >= l.from && t < l.to);
       // While a card is up it is the frame: the captions, the header and the headline step aside.
-      const card = reel.panels.some((p) => (p.kind === "card" || p.kind === "urna" || p.kind === "santinhos" || p.kind === "carousel") && t >= p.from && t < p.to);
+      const card = reel.panels.some((p) => (p.kind === "card" || p.kind === "urna" || p.kind === "santinhos" || p.kind === "carousel" || p.kind === "race") && t >= p.from && t < p.to);
       const el = line.current;
       if (el) {
         if (i !== shown) {
