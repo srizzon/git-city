@@ -558,6 +558,8 @@ export interface LeagueSceneProps {
   coverRef?: React.MutableRefObject<CoverApi | null>;
   /** A child owns the camera (the trailer's shots): no orbit, no spin, no fly-in. */
   cinematic?: boolean;
+  /** A film's extra fill light (ThemeLights' `light`). */
+  filmLight?: number;
   /** Pixel ratio, default [1, 1.5]; the trailer renders at the screen's own. */
   dpr?: number | [number, number];
 }
@@ -590,6 +592,7 @@ export default function LeagueScene({
   smash: smashTown = null,
   navCamera,
   cinematic = false,
+  filmLight = 1,
   dpr = [1, 1.5],
 }: LeagueSceneProps) {
   const editing = mode === "edit";
@@ -653,7 +656,7 @@ export default function LeagueScene({
       }}
     >
       <fog attach="fog" args={[theme.fogColor, theme.fogNear * 2, theme.fogFar * 1.2]} />
-      <ThemeLights theme={theme} themeIndex={themeKey} />
+      <ThemeLights theme={theme} themeIndex={themeKey} light={filmLight} />
       {/* Moon and stars from the main city's matching sky. */}
       <ThemeSkyFX themeIndex={skyFx} theme={theme} lowSky />
       {embedded && <HeroFraming shiftPx={framing?.shiftPx} />}

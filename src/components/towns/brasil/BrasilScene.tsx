@@ -655,6 +655,8 @@ export interface BrasilSceneProps {
    */
   rig?: ReactNode;
   embedded?: boolean;
+  /** A film's extra fill light (ThemeLights' `light`). */
+  filmLight?: number;
   children?: ReactNode;
 }
 
@@ -748,7 +750,7 @@ function Pulse({ x, z }: { x: number; z: number }) {
   );
 }
 
-export default function BrasilScene({ cities, island, objects, buildings, cameraApi, cameraStore, onTag, onBuildingClick, focused = null, drive, smash, pulse = null, watching, onCity, cameraStart = null, stats = false, crowned = null, fresh, offices, drivers, driverAt, drift, driftBoard = NO_BOARD, onDriftTag, rig, embedded, children }: BrasilSceneProps) {
+export default function BrasilScene({ cities, island, objects, buildings, cameraApi, cameraStore, onTag, onBuildingClick, focused = null, drive, smash, pulse = null, watching, onCity, cameraStart = null, stats = false, crowned = null, fresh, offices, drivers, driverAt, drift, driftBoard = NO_BOARD, onDriftTag, rig, embedded, children, filmLight = 1 }: BrasilSceneProps) {
   const allCities = useMemo(() => [...cities, island], [cities, island]);
   // Phones and weak GPUs draw at a lower resolution, as in the main city (?perf=low|high overrides).
   const { mode: perf } = usePerfMode();
@@ -811,7 +813,7 @@ export default function BrasilScene({ cities, island, objects, buildings, camera
       gl={{ antialias: true, logarithmicDepthBuffer: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: EXPOSURE }}
       style={embedded ? { position: "absolute", inset: 0 } : { position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
-      <ThemeLights theme={NIGHT} themeIndex={NIGHT_KEY} />
+      <ThemeLights theme={NIGHT} themeIndex={NIGHT_KEY} light={filmLight} />
       <ThemeSkyFX themeIndex={NIGHT_FX} theme={NIGHT} lowSky />
       {rig ?? (!driving && <MapCamera apiRef={cameraApi} onNear={setNear} store={cameraStore} cities={allCities} onCity={onCity} start={cameraStart} />)}
       {/* The ground is ~200 static meshes (sea, land, borders, rivers and their banks): merged to a handful of draw calls. */}
