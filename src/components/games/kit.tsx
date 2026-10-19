@@ -262,8 +262,8 @@ export function GameClock({
   note?: ReactNode;
 }) {
   return (
-    <div className="absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-1.5 max-sm:top-[4.25rem]">
-      <div className={`${HUD_BOX} flex min-w-[240px] flex-col items-center px-5 py-2`}>
+    <div className="absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-1.5 max-sm:left-auto max-sm:right-4 max-sm:top-[4.25rem] max-sm:translate-x-0 max-sm:items-end">
+      <div className={`${HUD_BOX} flex min-w-[240px] flex-col items-center px-5 py-2 max-sm:min-w-[200px]`}>
         <span className="text-[9px] text-muted">{label}</span>
         {lit !== null ? (
           <span className="flex h-9 items-center gap-1.5" role="img" aria-label={`${lit} of ${LIGHTS} lights on`}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Gamepad2, LogIn, Plus, Volume1, Volume2, VolumeX, X } from "lucide-react";
+import { Camera, Gamepad2, LogIn, Plus, Users, Volume1, Volume2, VolumeX, X } from "lucide-react";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { HUD_BOX } from "../shared";
@@ -58,6 +58,7 @@ export default function DriveHud({
   onStartCrown,
   gameOn = false,
   onGames,
+  phoneLow = false,
   children,
   onVolume,
   onEmote,
@@ -96,6 +97,8 @@ export default function DriveHud({
   gameOn?: boolean;
   /** The Games menu (G): a button leads the top-right toolbar. Without it, Crown Rush keeps its own Start. */
   onGames?: () => void;
+  /** A phone: something sits under the top bar (a mission), so the minimap starts lower. */
+  phoneLow?: boolean;
   /** A town's own HUD pieces (the Brasil map's races), over the rest. */
   children?: React.ReactNode;
   onVolume: (v: number) => void;
@@ -181,6 +184,9 @@ export default function DriveHud({
             <X {...ICON} aria-hidden />
           </button>
           <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border`}>
+            <span className="flex items-center gap-1.5 px-3 py-2.5 text-[10px] text-cream" aria-label={`${drivers.length + 1} driving here`}>
+              <Users {...ICON} aria-hidden /> {drivers.length + 1}
+            </span>
             {onGames && (
               <button type="button" onClick={onGames} aria-label="Games" className={`${ICON_BTN} w-11 py-2.5 text-lime`}>
                 <Gamepad2 {...ICON} aria-hidden />
@@ -281,6 +287,19 @@ export default function DriveHud({
       {ready && entered && <SmashNotice telemetry={telemetry} touch={touch} />}
 
       {ready && entered && !touch && <Dash telemetry={telemetry} style={enter(0.24)} />}
+
+      {/* Phone: the minimap under the top bar with others' reactions under it, and the six reactions over the controls. */}
+      {ready && entered && touch && (
+        <div className={`absolute left-4 flex flex-col items-start gap-2 ${phoneLow ? "top-[calc(max(1rem,env(safe-area-inset-top))+9.5rem)]" : "top-[calc(max(1rem,env(safe-area-inset-top))+7.75rem)]"}`}>
+          <Minimap telemetry={telemetry} buildings={map.buildings} objects={map.objects} home={map.home} size={104} layer={map.layer} />
+          <ReactionLog log={emoteLog} align="start" />
+        </div>
+      )}
+      {ready && entered && touch && (
+        <div className="absolute inset-x-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+162px)] flex justify-center">
+          <ReactionBar on={!paused} onEmote={onEmote} big />
+        </div>
+      )}
 
       {ready && entered && !touch && (
         <div

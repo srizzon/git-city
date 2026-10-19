@@ -51,10 +51,13 @@ export function ReactionBar({
   on,
   onEmote,
   style,
+  big = false,
 }: {
   on: boolean;
   onEmote: (e: number) => void;
   style?: React.CSSProperties;
+  /** A phone: thumb-sized keys, no key numbers. */
+  big?: boolean;
 }) {
   const flash = useEmoteKeys(on, onEmote);
   return (
@@ -73,7 +76,7 @@ export function ReactionBar({
           onClick={() => onEmote(i)}
           aria-label={`React ${emoji} (${i + 1})`}
           title={`React (${i + 1})`}
-          className="relative flex h-9 w-9 items-center justify-center text-[16px] leading-none transition-colors hover:bg-white/5 active:translate-y-px"
+          className={`relative flex items-center justify-center leading-none transition-colors hover:bg-white/5 active:translate-y-px ${big ? "h-11 w-12 text-xl" : "h-9 w-9 text-[16px]"}`}
         >
           <span
             key={flash?.e === i ? flash.at : undefined}
@@ -82,9 +85,11 @@ export function ReactionBar({
           >
             {emoji}
           </span>
-          <span className="absolute bottom-0 right-0.5 text-[7px] text-dim" aria-hidden>
-            {i + 1}
-          </span>
+          {!big && (
+            <span className="absolute bottom-0 right-0.5 text-[7px] text-dim" aria-hidden>
+              {i + 1}
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -138,12 +143,12 @@ export function ReactionButton({
 }
 
 /** Keyboard: the last few reactions in the room, newest at the bottom, older ones fading. */
-export function ReactionLog({ log }: { log: EmoteLog }) {
+export function ReactionLog({ log, align = "end" }: { log: EmoteLog; align?: "start" | "end" }) {
   const entries = useSyncExternalStore(log.subscribe, log.get, log.get);
   if (entries.length === 0) return null;
   return (
     <ol
-      className="flex flex-col items-end gap-0.5 text-[8px] normal-case"
+      className={`flex flex-col gap-0.5 text-[8px] normal-case ${align === "start" ? "items-start" : "items-end"}`}
       aria-label="Recent reactions"
       aria-live="polite"
     >
