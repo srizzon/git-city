@@ -87,7 +87,8 @@ export function RacePicker({
   others: number;
   /** A route key from a link. */
   initial: string | null;
-  onStart: (route: RallyRoute, how: string, solo?: boolean) => void;
+  /** False: the room couldn't be reached (the menu stays, saying so). */
+  onStart: (route: RallyRoute, how: string, solo?: boolean) => boolean;
   onBack: () => void;
 }) {
   const [length, setLength] = useState<RaceLength>("medium");
@@ -98,6 +99,9 @@ export function RacePicker({
     return draw(layout, telemetry, "medium");
   });
   const board = useBoard(slug, draft.route?.key ?? null);
+  const go = (route: RaceRoute, solo = false) => {
+    if (!onStart(toRallyRoute(route), draft.how, solo)) setDraft((d) => ({ ...d, problem: "Can't reach the race room right now. Try again in a moment." }));
+  };
   const record = board?.[0] ?? null;
   const name = (key: string) => cityByKey(layout, key)?.name ?? "?";
   const from = draft.route ? name(draft.route.from) : (nearestCity(layout, telemetry.radar.x * UNIT_TO_M, telemetry.radar.z * UNIT_TO_M)?.name ?? "here");
@@ -116,7 +120,7 @@ export function RacePicker({
         }
       } else if (e.code === "KeyR") setDraft(draw(layout, telemetry, length));
       else if (e.code === "Enter") {
-        if (draft.route) onStart(toRallyRoute(draft.route), draft.how);
+        if (draft.route) go(draft.route);
       } else if (e.code === "Escape" || e.code === "Backspace") onBack();
       else if (e.code === "KeyG") onBack();
       else return;
@@ -125,7 +129,7 @@ export function RacePicker({
     };
     window.addEventListener("keydown", on, true);
     return () => window.removeEventListener("keydown", on, true);
-  }, [layout, telemetry, length, draft, onStart, onBack]);
+  }, [layout, telemetry, length, draft, go, onBack]);
 
   return (
     <>
@@ -204,7 +208,7 @@ export function RacePicker({
           </Band>
         </button>
         {draft.route && (
-          <button type="button" onClick={() => draft.route && onStart(toRallyRoute(draft.route), draft.how)} className="outline-none active:translate-y-px">
+          <button type="button" onClick={() => draft.route && go(draft.route)} className="outline-none active:translate-y-px">
             <Band tone="lime" delay={360} className="min-h-11 w-full justify-center gap-3 px-4 py-2.5" style={{ fontSize: T.body }}>
               {others > 0 ? "Challenge" : "Race"}
             </Band>
@@ -212,7 +216,7 @@ export function RacePicker({
         )}
       </div>
       {draft.route && others > 0 && (
-        <button type="button" onClick={() => draft.route && onStart(toRallyRoute(draft.route), draft.how, true)} className="outline-none active:translate-y-px">
+        <button type="button" onClick={() => draft.route && go(draft.route, true)} className="outline-none active:translate-y-px">
           <Band delay={380} className="min-h-11 w-full justify-center px-4 py-2 normal-case text-muted" style={{ fontSize: T.small }}>
             Or race it alone, against the record&apos;s ghost
           </Band>

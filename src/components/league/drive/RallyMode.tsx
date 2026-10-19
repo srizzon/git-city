@@ -37,10 +37,10 @@ import type { BattleEvent } from "./useDrivePresence";
 // of the record, down behind), a sting into the last stretch, the fanfare.
 
 export interface RallyApi {
-  /** Start a race on this route (the room invites everyone else; `solo`: no invite, a run against the ghost). */
-  start: (route: RallyRoute, solo?: boolean) => void;
+  /** Start a race on this route (the room invites everyone else; `solo`: no invite, a run against the ghost). False: the room isn't reachable. */
+  start: (route: RallyRoute, solo?: boolean) => boolean;
   /** Accept the open invite. */
-  join: () => void;
+  join: () => boolean;
 }
 
 /** What the site said about your finish. */
@@ -202,7 +202,7 @@ export default function RallyMode({
 }: {
   slug: string;
   carRef: React.MutableRefObject<CarApi | null>;
-  send: (msg: ClientMsg) => void;
+  send: (msg: ClientMsg) => boolean;
   selfId: React.MutableRefObject<string | null>;
   sinkRef: React.MutableRefObject<(e: BattleEvent) => void>;
   apiRef: React.MutableRefObject<RallyApi | null>;
