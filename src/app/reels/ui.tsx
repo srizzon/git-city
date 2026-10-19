@@ -20,7 +20,8 @@ export const STATE_LABEL: Record<ReelState, string> = {
 
 export function StateTag({ status }: { status: ReelStatus }) {
   const tone = status.error ? "text-red-400" : status.queued ? "text-cream" : status.state === "posted" ? "text-muted" : "text-lime";
-  const label = status.error ? `${status.error.job} failed` : status.queued ? `${status.queued === "draft" ? "Rendering the draft" : "Rendering the final"}…` : STATE_LABEL[status.state];
+  const doing = { draft: "Rendering the draft", final: "Rendering the final", schedule: "Uploading to the agenda" } as Record<string, string>;
+  const label = status.error ? `${status.error.job} failed` : status.queued ? `${doing[status.queued] ?? status.queued}…` : STATE_LABEL[status.state];
   return <span className={`text-[10px] uppercase tracking-wider ${tone}`}>{label}</span>;
 }
 
@@ -72,7 +73,7 @@ export function ReelButtons({ id, status, hasFailures }: { id: string; status: R
           </button>
         )}
         {s === "final" && (
-          <button type="button" disabled className={primary} title="Scheduling comes with the Instagram agenda">
+          <button type="button" disabled={busy || !!status.queued} onClick={() => post({ action: "schedule" })} className={primary}>
             Schedule
           </button>
         )}
@@ -84,7 +85,8 @@ export function ReelButtons({ id, status, hasFailures }: { id: string; status: R
       </div>
       {hasFailures && s === "draft" && <p className="text-[11px] text-red-400">A check fails: fix the spec and render again before approving.</p>}
       {status.error && <p className="text-[11px] normal-case text-red-400">{status.error.message}</p>}
-      {status.queued && <p className="text-[11px] text-muted">Queued. `npm run reel worker` renders it.</p>}
+      {status.queued && <p className="text-[11px] text-muted">Queued: `npm run reel worker` runs it.</p>}
+      {s === "scheduled" && <p className="text-[11px] text-muted">On the agenda (/admin/reels): it posts at its slot.</p>}
       {error && <p className="text-[11px] text-red-400">{error}</p>}
     </div>
   );

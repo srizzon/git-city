@@ -10,6 +10,7 @@ import { readStatus, setState, writeStatus } from "@/lib/reel/status";
 //
 // POST { action: "approve_script" }       → script_ok, queues the draft
 // POST { action: "approve_draft" }        → draft_ok, queues the final
+// POST { action: "schedule" }             → queues the upload to the agenda (the cron posts it at its slot)
 // POST { action: "note", text }           → appends to notes.md
 // POST { action: "edit", lines }          → new lines; back to script (the voice is stale)
 // POST { action: "cancel" }               → drops a queued job
@@ -28,6 +29,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (status.state !== "draft") return NextResponse.json({ error: "There's no draft to approve." }, { status: 400 });
     setState(dir, "draft_ok");
     writeStatus(dir, { ...readStatus(dir), queued: "final" });
+  } else if (body.action === "schedule") {
+    if (status.state !== "final") return NextResponse.json({ error: "Only a finished reel can be scheduled." }, { status: 400 });
+    writeStatus(dir, { ...status, queued: "schedule" });
   } else if (body.action === "note") {
     const text = body.text?.trim();
     if (!text) return NextResponse.json({ error: "Empty note." }, { status: 400 });

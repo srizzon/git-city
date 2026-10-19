@@ -124,6 +124,8 @@ export const ReelSpec = z.object({
       thumbAt: Anchor.optional(),
       /** Add to /admin/brasil's watched reels: only when the CTA is `user UF`. */
       watch: z.boolean().default(false),
+      /** The main reel's grid cover: the image prompt in the channel's cover style (see covers.json), approved with the script. */
+      cover: z.object({ prompt: z.string().min(1) }).optional(),
     })
     .default({ caption: "", watch: false }),
 });
