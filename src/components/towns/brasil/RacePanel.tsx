@@ -84,7 +84,7 @@ export default function RacePanel({
   const [problem, setProblem] = useState<string | null>(null);
   const [closedRace, setClosedRace] = useState<string | null>(null);
   // The last race's results stay up after the room moves on, until closed or the next race.
-  const [results, setResults] = useState<RallyView["rally"] | null>(null);
+  const [results, setResults] = useState<RallyView["rally"] | null>(() => (view?.rally.phase === "over" && view.you && view.rally.racers[view.you] ? view.rally : null));
   const [seenView, setSeenView] = useState(view);
   if (seenView !== view) {
     setSeenView(view);
@@ -248,7 +248,7 @@ export default function RacePanel({
     const by = rally.by ? rally.racers[rally.by]?.name : null;
     return (
       <div className={`${HUD_BOX} absolute left-1/2 top-16 max-sm:top-[7.5rem] flex -translate-x-1/2 items-center gap-4 px-3 py-2 text-[9px] max-sm:w-[calc(100vw-2rem)]`}>
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 sm:whitespace-nowrap">
           <span className="block text-cream">{by && !by.startsWith("guest-") ? `@${by}` : "Someone"} started a race</span>
           <span className="block normal-case text-muted">
             {routeName(route)} · {km(route.length)}
