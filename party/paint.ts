@@ -119,6 +119,8 @@ export class PaintRoom {
       const old = new PaintGrid(stored.geom);
       decodeRuns(stored.runs, old.owner);
       grid.copyFrom(old);
+      // Boards saved before buildings could be painted over held each building for its own state: that's no paint.
+      for (let c = 0; c < grid.size; c++) if (grid.owner[c] && grid.owner[c] === grid.home[c]) grid.owner[c] = 0;
     }
     this.grid = grid;
     this.land = 0;
@@ -165,16 +167,14 @@ export class PaintRoom {
     }
   }
 
-  /** The board without the buildings' lots, those apart (they never change hands), and every live trail. */
+  /** The board, the buildings' lots apart (what an unpainted lot shows), and every live trail. */
   all(): ServerMsg {
     const g = this.grid;
     if (!g) return { t: "paint_all", g: null, r: [], hm: [], land: 0, wk: this.week, tr: [] };
-    const shown = g.owner.slice();
-    for (let c = 0; c < shown.length; c++) if (g.home[c]) shown[c] = 0;
     const tr: [string, number, number[]][] = [];
     for (const [id, p] of this.painters) if (p.run?.cells.length) tr.push([id, p.run.s, p.run.cells]);
     this.land ||= g.landCount();
-    return { t: "paint_all", g: g.geom, r: encodeRuns(shown), hm: encodeRuns(g.home), land: this.land, wk: this.week, tr };
+    return { t: "paint_all", g: g.geom, r: encodeRuns(g.owner), hm: encodeRuns(g.home), land: this.land, wk: this.week, tr };
   }
 
   async greet(conn: Connection) {

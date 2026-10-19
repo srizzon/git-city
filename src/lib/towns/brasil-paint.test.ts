@@ -4,6 +4,7 @@ import { UNIT_TO_M } from "../league-city/drive/tuning";
 import {
   CELL,
   PAINT,
+  atHome,
   SUB,
   PaintBoard,
   PaintGrid,
@@ -141,18 +142,33 @@ describe("a loop", () => {
     expect(got.taken).toBe(8 + 4);
   });
 
-  it("over another state is an invasion; buildings never change hands", () => {
+  it("over another state is an invasion, its buildings too, and they stay its home", () => {
     const g = board();
     // RJ's building: lot (1, 1), cells 4…7.
     g.setHomes([{ x: 0, z: 0, uf: "SP" }, { x: 1, z: 1, uf: "RJ" }]);
     const cells: number[] = [];
-    for (let x = 3; x < 8; x++) for (let z = 3; z < 8; z++) cells.push(g.index(x, z));
+    for (let x = 4; x < 10; x++) for (let z = 4; z < 10; z++) cells.push(g.index(x, z));
     for (const c of cells) if (!g.home[c]) g.owner[c] = RJ;
+    // 36 cells: 16 of RJ's building, 20 RJ painted.
     const got = capture(g, SP, cells);
-    // 25 cells, less RJ's building (16) and SP's corner (3, 3).
-    expect(got.invaded).toBe(8);
-    expect(got.from.get("RJ")).toBe(8);
-    expect(g.owner[g.index(5, 5)]).toBe(RJ);
+    expect(got.invaded).toBe(36);
+    expect(got.from.get("RJ")).toBe(36);
+    expect(g.heldAt(g.index(5, 5))).toBe(SP);
+    // Beside its building RJ is still home.
+    expect(atHome(g, RJ, g.index(8, 5))).toBe(true);
+    // An unpainted building counts for nobody.
+    expect(g.shares().get("SP")).toBe(36);
+  });
+
+  it("a trail across another state's building walls the loop in", () => {
+    const g = board();
+    g.setHomes([{ x: 0, z: 0, uf: "SP" }, { x: 3, z: 3, uf: "RJ" }]);
+    const run = newRun(SP);
+    // A ring whose east side runs through RJ's building (cells 12…15, 12…15).
+    const ev = drive(g, run, [[4, 1], ...ring(5, 1, 13, 14), [4, 2]]);
+    const close = ev.find((e) => e.k === "close");
+    capture(g, SP, enclosed(g, SP, close!.k === "close" ? close!.trail : []));
+    expect(g.heldAt(g.index(9, 8))).toBe(SP);
   });
 });
 
