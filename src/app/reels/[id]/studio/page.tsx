@@ -27,6 +27,8 @@ export default async function ReelStudioPage({ params }: { params: Promise<{ id:
     return <main className="flex min-h-screen items-center justify-center bg-black font-pixel text-xs text-muted">No voice yet: run `npm run reel draft {id}`.</main>;
 
   const world = spec.world;
+  // The home city loads its snapshot in the browser, as the home page does.
+  if (world.type === "bay") return <ReelStudioLoader spec={spec} words={files.words} song={files.song} brasil={null} />;
   const league = await getLeagueBySlug(BRASIL_SLUG);
   if (!league) notFound();
   // Without an asOf, the map as it is now.
@@ -47,10 +49,7 @@ export default async function ReelStudioPage({ params }: { params: Promise<{ id:
       spec={spec}
       words={files.words}
       song={files.song}
-      residents={residents}
-      cityDevs={cityDevs}
-      example={exampleDevs[0] ?? null}
-      norms={norms}
+      brasil={{ residents, cityDevs, example: exampleDevs[0] ?? null, norms }}
     />
   );
 }

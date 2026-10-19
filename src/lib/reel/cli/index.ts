@@ -22,6 +22,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import type { Word } from "@trailer-kit/narration";
 import { BRASIL_SCENES } from "@/components/reel/brasil/scenes";
+import { BAY_SCENES } from "@/components/reel/bay/scenes";
 import { checkPicture, checkText, checkTimed, type FrameReport, type Issue } from "../check";
 import { readConfig, type ReelsConfig } from "../config";
 import { computeFacts, loadFactsInput } from "../facts";
@@ -34,7 +35,7 @@ import { anchorAt } from "@trailer-kit/narration";
 
 const ROOT = process.cwd();
 const EXPORT = path.join(ROOT, ".claude/skills/gg/kit/tools/export.mjs");
-const SCENES: Record<string, readonly string[]> = { brasil: BRASIL_SCENES };
+const SCENES: Record<string, readonly string[]> = { brasil: BRASIL_SCENES, bay: BAY_SCENES };
 
 function home(): string {
   const h = process.env.REELS_HOME;

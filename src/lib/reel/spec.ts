@@ -73,7 +73,13 @@ const BrasilWorld = z.object({
   example: z.object({ login: z.string(), uf: z.string().length(2) }).optional(),
 });
 
-export const World = z.discriminatedUnion("type", [BrasilWorld]);
+const BayWorld = z.object({
+  type: z.literal("bay"),
+  /** A dev left out of the city: their lot stands empty until the "lot" scene raises their building. */
+  lot: z.string().optional(),
+});
+
+export const World = z.discriminatedUnion("type", [BrasilWorld, BayWorld]);
 export type World = z.infer<typeof World>;
 
 export const Scene = z.object({
