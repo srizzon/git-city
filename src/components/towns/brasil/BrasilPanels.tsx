@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronUp, Clock, Code2, Instagram, MapPin, MessageCircle, Plus, Search, Trophy, UserPlus, Vote as VoteIcon, X, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, Code2, Flag, Instagram, MapPin, MessageCircle, Plus, Search, Trophy, UserPlus, Vote as VoteIcon, X, type LucideIcon } from "lucide-react";
 import type { CityBuilding } from "@/lib/github";
 import Panel from "@/components/league/hud/Panel";
 import { Avatar, HUD_BOX, fmt, useCountdown } from "@/components/league/hud/shared";
@@ -12,6 +12,7 @@ import { STATES, type CityLayout, type UF } from "@/lib/towns/brasil-map";
 import type { BrCity } from "@/lib/towns/br-cities";
 import { swatchOf, type StateStats } from "./stats";
 import { useBrCities } from "./useBrCities";
+import RaceBoard from "./RaceBoard";
 
 // The Brasil town's side panels, in the towns' Panel: search the map (a
 // state, any city in Brazil, a dev), the 27 states ranked by the week's
@@ -172,6 +173,7 @@ const EARN: { icon: LucideIcon; pts: number; word: string; hint: string; cap: st
   { icon: Instagram, pts: 20, word: "Story", hint: "Post a story tagging @samuelrizzondev.", cap: "1/day" },
   { icon: MapPin, pts: 20, word: "Join", hint: "Put your building on the map.", cap: "1×" },
   { icon: Code2, pts: 10, word: "Code", hint: "Commit on GitHub that day.", cap: "1/day" },
+  { icon: Flag, pts: 3, word: "Race", hint: "Finish a race with someone. More to win or set a route record.", cap: "30/day" },
   { icon: VoteIcon, pts: 10, word: "Vote", hint: "Vote for president.", cap: "1×" },
   { icon: MessageCircle, pts: 5, word: "Comment", hint: "Comment on a reel.", cap: "1/day" },
 ];
@@ -318,6 +320,7 @@ export function BrasilRanking({
   states,
   points,
   yours,
+  races,
   onPick,
   onClose,
 }: {
@@ -325,11 +328,14 @@ export function BrasilRanking({
   /** Each state's points this week. */
   points: Partial<Record<UF, number>>;
   yours: UF | null;
+  /** The racers' board: the town, city names for its routes, you, and a way into the car. */
+  races: { slug: string; cityName: (key: string) => string; you: string | null; onRace: () => void };
   onPick: (s: StateStats) => void;
   onClose: () => void;
 }) {
   const wide = useWide();
-  const [tab, setTab] = useState<"table" | "points">("table");
+  const [tab, setTab] = useState<"table" | "races" | "points">("table");
+  const raceBoard = <RaceBoard {...races} />;
   const ranked = useMemo(() => [...states].sort((a, b) => (points[b.uf] ?? 0) - (points[a.uf] ?? 0) || b.devs - a.devs || a.name.localeCompare(b.name)), [states, points]);
   const table = <StatesTable ranked={ranked} points={points} yours={yours} onPick={onPick} />;
 
@@ -338,8 +344,20 @@ export function BrasilRanking({
       <Board title="States" onClose={onClose}>
         <div className="grid grid-cols-[1fr_300px] gap-5">
           <div className="flex min-w-0 flex-col gap-2">
+            <div role="tablist" className="grid grid-cols-2 border-2 border-border">
+              {(
+                [
+                  ["table", Trophy, "States"],
+                  ["races", Flag, "Racers"],
+                ] as const
+              ).map(([id, Icon, label]) => (
+                <button key={id} role="tab" aria-selected={(tab === "races") === (id === "races")} type="button" onClick={() => setTab(id)} className={`flex min-h-9 items-center justify-center gap-2 text-[10px] ${(tab === "races") === (id === "races") ? "bg-lime text-bg" : "text-muted hover:text-cream"}`}>
+                  <Icon size={13} aria-hidden /> {label}
+                </button>
+              ))}
+            </div>
             <WeekEnds />
-            {table}
+            {tab === "races" ? raceBoard : table}
           </div>
           <div className="flex flex-col gap-2">
             <p className="px-1 text-[9px] text-muted">How to score</p>
@@ -352,10 +370,11 @@ export function BrasilRanking({
   return (
     <Panel title="States" onClose={onClose}>
       <div className="flex flex-col gap-2">
-        <div role="tablist" className="grid grid-cols-2 border-2 border-border">
+        <div role="tablist" className="grid grid-cols-3 border-2 border-border">
           {(
             [
               ["table", Trophy, "Ranking"],
+              ["races", Flag, "Racers"],
               ["points", Plus, "Points"],
             ] as const
           ).map(([id, Icon, label]) => (
@@ -365,7 +384,7 @@ export function BrasilRanking({
           ))}
         </div>
         <WeekEnds />
-        {tab === "table" ? table : <PointsRules />}
+        {tab === "table" ? table : tab === "races" ? raceBoard : <PointsRules />}
       </div>
     </Panel>
   );

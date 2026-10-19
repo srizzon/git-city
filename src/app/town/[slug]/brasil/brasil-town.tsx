@@ -16,6 +16,7 @@ import type { CrownApi, CrownView } from "@/components/league/drive/CrownMode";
 import type { RallyApi, RallyView } from "@/components/league/drive/RallyMode";
 import RacePanel, { raceActive } from "@/components/towns/brasil/RacePanel";
 import { cityByKey, parseRouteKey } from "@/lib/towns/brasil-race";
+import type { RouteRecord } from "@/lib/towns/brasil-race-server";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
 import { useTouch } from "@/components/towns/useDesktop";
 import { createEmoteLog } from "@/lib/league-city/drive/emote-log";
@@ -116,6 +117,17 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** ?race=<route>: a beaten record's email opens that route's race. */
   const [pendingRace, setPendingRace] = useState<string | null>(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("race")));
   const clearPendingRace = useCallback(() => setPendingRace(null), []);
+  // Every route's record, for the state cards: fetched the first time one opens.
+  const [raceRecords, setRaceRecords] = useState<RouteRecord[] | null>(null);
+  const recordsAsked = useRef(false);
+  const askRecords = useCallback(() => {
+    if (recordsAsked.current) return;
+    recordsAsked.current = true;
+    fetch(`/api/towns/${encodeURIComponent(league.slug)}/brasil/race?view=week`)
+      .then((r) => r.json())
+      .then((b: { records?: RouteRecord[] }) => setRaceRecords(b.records ?? []))
+      .catch(() => {});
+  }, [league.slug]);
   const [driving, setDriving] = useState(false);
   /** On the drift track: the town's car is parked, a drift run is on. */
   const [drifting, setDrifting] = useState(false);
@@ -438,6 +450,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     }, 600);
     return () => clearTimeout(t);
   }, [startAt, world, openState, openCity, openBuilding, startPick, viewerLogin, home]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (state) askRecords();
+  }, [state, askRecords]);
 
   // ?race=<route>: straight into the car at the route's start city; the race card opens once it's ready.
   const raceStarted = useRef(false);
@@ -1063,6 +1079,15 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           states={world.states}
           points={world.statePoints}
           yours={yours}
+          races={{
+            slug: league.slug,
+            cityName: (key) => cityByKey(layout, key)?.name ?? "?",
+            you: viewerLogin,
+            onRace: () => {
+              posthog.capture("brasil_race_board_drive");
+              startDrive();
+            },
+          }}
           onPick={(s) => {
             posthog.capture("brasil_state_opened", { uf: s.uf, from: "ranking" });
             openState(s.uf);
@@ -1114,6 +1139,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onDriveHere={state.devs > 0 ? () => startDrive() : undefined}
           week={world.week}
           race={{ place: world.racePlace.get(state.uf) ?? 27, points: world.statePoints[state.uf] ?? 0 }}
+          records={raceRecords
+            ?.filter((r) => cityByKey(layout, r.from)?.uf === state.uf)
+            .sort((a, b) => a.ms - b.ms)
+            .map((r) => ({ route: `${cityByKey(layout, r.from)?.name ?? "?"} → ${cityByKey(layout, r.to)?.name ?? "?"}`, login: r.login, ms: r.ms }))}
           cabinet={{
             provisional: officeWeek.provisional,
             governor: world.offices.governors.get(state.uf) ?? null,
