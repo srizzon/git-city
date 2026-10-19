@@ -27,7 +27,7 @@ import { LOT, lotToWorld } from "@/lib/league-city/grid";
 import { TREE_TYPES, type CityObject, type TreeType } from "@/lib/league-city/types";
 import type { SmashStore } from "@/lib/league-city/smash";
 import RubbleFlags from "@/components/league/RubbleFlags";
-import { MAP_BOUNDS, MAP_H, OUTLINE, RIVERS, STATE_RINGS, type Ring } from "@/lib/towns/brasil-geo";
+import { geoAt, type Geo, type Ring } from "@/lib/towns/brasil-geo";
 import { mapNav, type MapCameraStore } from "@/lib/map-nav";
 import { usePerfMode } from "@/lib/perfMode";
 import { stateOf, type CityLayout, type UF } from "@/lib/towns/brasil-map";
@@ -35,11 +35,12 @@ import type { BoardRowLite } from "@/components/drift/DriftTitle";
 import { DriftSite, DriftTag } from "./BrasilDrift";
 
 // The Brasil town: the country on its real outline under the towns' night
-// sky, a pale coast, the states' borders dashed in lime, a city in every
-// state paved like a town, highway streets between neighboring capitals, the
-// island out at sea.
-// Over every city floats its tag (the state, the founder, how many devs);
-// a tag flies the camera to its city. The camera is a map's: drag to pan,
+// sky, a pale coast, the states' borders dashed in lime, every city someone
+// lives in paved like a town, highway streets between them, the island out
+// at sea. Brazil is drawn at the map's scale (geoAt): it grows with the cities.
+// Tags float over the cities like a map's labels: from the whole country the
+// capitals, closer in more cities, up close every one on screen; where two
+// would overlap the one with more devs wins. A tag flies the camera to its city. The camera is a map's: drag to pan,
 // right-drag to turn, scroll to zoom. Drive mode is the towns' (DriveWorld).
 // Between São Paulo and Rio lies the drift track (BrasilDrift): crossing its
 // START line swaps the town's car for a drift run (DriftWorld) right there.
@@ -94,11 +95,11 @@ function ribbon(points: [number, number][], w: number, closed: boolean): THREE.B
   return g;
 }
 
-function Ground({ island }: { island: CityLayout }) {
-  const land = useMemo(() => new THREE.ShapeGeometry(OUTLINE.map(shapeOf)), []);
-  const beach = useMemo(() => OUTLINE.map((r) => ribbon(r, 160, true)), []);
-  const rivers = useMemo(() => RIVERS.map((r) => ribbon(r.points, r.width, false)), []);
-  const banks = useMemo(() => RIVERS.map((r) => ribbon(r.points, r.width + 26, false)), []);
+function Ground({ island, geo }: { island: CityLayout; geo: Geo }) {
+  const land = useMemo(() => new THREE.ShapeGeometry(geo.outline.map(shapeOf)), [geo]);
+  const beach = useMemo(() => geo.outline.map((r) => ribbon(r, 160, true)), [geo]);
+  const rivers = useMemo(() => geo.rivers.map((r) => ribbon(r.points, r.width, false)), [geo]);
+  const banks = useMemo(() => geo.rivers.map((r) => ribbon(r.points, r.width + 26, false)), [geo]);
   // The sea is the main city's bay as it is; the rivers the same water, lighter.
   // Brighter than the bay's: an ocean blue that sets the green country off and keeps the map readable.
   const sea = useMemo(() => {
@@ -123,7 +124,7 @@ function Ground({ island }: { island: CityLayout }) {
   });
   const borders = useMemo(() => {
     const pts: number[] = [];
-    for (const rings of Object.values(STATE_RINGS)) {
+    for (const rings of Object.values(geo.stateRings)) {
       for (const r of rings) {
         for (let i = 0; i < r.length; i++) {
           const [ax, az] = r[i];
@@ -135,7 +136,7 @@ function Ground({ island }: { island: CityLayout }) {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
     return new THREE.LineSegments(g, new THREE.LineDashedMaterial({ color: LIME, dashSize: 100, gapSize: 70, transparent: true, opacity: 0.4 })).computeLineDistances();
-  }, []);
+  }, [geo]);
   useEffect(
     () => () => {
       land.dispose();
@@ -170,9 +171,10 @@ function Ground({ island }: { island: CityLayout }) {
     },
     [isle, sand],
   );
-  const cx = (MAP_BOUNDS.minX + MAP_BOUNDS.maxX) / 2;
-  const cz = (MAP_BOUNDS.minZ + MAP_BOUNDS.maxZ) / 2;
-  const span = Math.max(MAP_BOUNDS.maxX - MAP_BOUNDS.minX, MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ);
+  const { bounds } = geo;
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cz = (bounds.minZ + bounds.maxZ) / 2;
+  const span = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ);
   return (
     <group>
       <mesh position={[cx, -8, cz]} rotation={[-Math.PI / 2, 0, 0]} material={sea}>
@@ -296,20 +298,46 @@ function CitySign({ city }: { city: CityLayout }) {
   }, [city.name, city.uf, fontReady]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => tex.dispose(), [tex]);
   const [x, z] = lotToWorld(...city.center);
-  // Unreadable from high up: drawn only near, so the whole country costs no sign draw calls.
-  const group = useRef<THREE.Group>(null);
-  useFrame(({ camera }) => {
-    const g = group.current;
-    if (g) g.visible = Math.hypot(camera.position.x - x, camera.position.y, camera.position.z - z) < SIGN_VIEW;
-  });
-  return (
-    <group ref={group}>
-      <Billboard position={[x, z - LOT * 0.42]} rot={0} map={tex} />
-    </group>
-  );
+  return <Billboard position={[x, z - LOT * 0.42]} rot={0} map={tex} />;
 }
 /** Closer than this a city's sign is drawn. */
 const SIGN_VIEW = 9000;
+/** Most signs up at once: each is a texture and a draw call. */
+const SIGN_MAX = 16;
+
+/**
+ * The signs of the cities nearest the camera, within SIGN_VIEW (unreadable
+ * from higher): mounted as they come near, so a country of cities never
+ * holds a texture for each.
+ */
+function NearSigns({ cities }: { cities: CityLayout[] }) {
+  const [shown, setShown] = useState<CityLayout[]>([]);
+  const last = useRef(0);
+  const key = useRef("");
+  const spots = useMemo(() => cities.map((c) => ({ c, at: lotToWorld(...c.center) })), [cities]);
+  useFrame(({ camera, clock }) => {
+    if (clock.elapsedTime - last.current < 0.4) return;
+    last.current = clock.elapsedTime;
+    const near = spots
+      .map((s) => ({ c: s.c, d: Math.hypot(camera.position.x - s.at[0], camera.position.y, camera.position.z - s.at[1]) }))
+      .filter((e) => e.d < SIGN_VIEW)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, SIGN_MAX)
+      .map((e) => e.c);
+    const k = near.map((c) => c.key).join();
+    if (k !== key.current) {
+      key.current = k;
+      setShown(near);
+    }
+  });
+  return (
+    <>
+      {shown.map((c) => (
+        <CitySign key={c.key} city={c} />
+      ))}
+    </>
+  );
+}
 
 /** Up close: the @login over the buildings nearest the middle of the view (the towns' name tags). */
 function NearPlates({ buildings, fresh, offices }: { buildings: CityBuilding[]; fresh?: ReadonlySet<string>; offices?: ReadonlyMap<string, string> }) {
@@ -352,7 +380,7 @@ function NearPlates({ buildings, fresh, offices }: { buildings: CityBuilding[]; 
 
 // ─── Tags ────────────────────────────────────────────────────
 
-function Tag({ city, near, crowned, onClick }: { city: CityLayout; near: boolean; crowned: boolean; onClick: () => void }) {
+function Tag({ city, near, far, crowned, onClick }: { city: CityLayout; near: boolean; far: boolean; crowned: boolean; onClick: () => void }) {
   const [x, z] = lotToWorld(...city.center);
   const founder = city.devs.find((d) => d.founder)?.dev.login ?? null;
   const st = city.uf ? stateOf(city.uf) : null;
@@ -362,7 +390,8 @@ function Tag({ city, near, crowned, onClick }: { city: CityLayout; near: boolean
       <button type="button" onClick={onClick} className="flex cursor-pointer flex-col items-center whitespace-nowrap font-pixel uppercase">
         <span className="flex items-center gap-1 border-2 border-border bg-bg/85 px-1 py-px text-[9px] text-cream hover:border-lime sm:gap-1.5 sm:px-1.5 sm:py-0.5 sm:text-[11px]">
           {crowned ? <TrophyIcon size={11} className="text-lime" label="State of the week" /> : <span className="h-1.5 w-1.5 sm:h-2 sm:w-2" style={{ background: swatch }} aria-hidden />}
-          {city.second ? city.name : (city.uf ?? "Island")}
+          {/* From the whole country a capital stands for its state. */}
+          {city.ibge === null ? "Island" : far && city.capital ? city.uf : city.name}
           {city.devs.length > 0 && <span className="text-lime">{city.devs.length}</span>}
         </span>
         {near && (
@@ -372,7 +401,7 @@ function Tag({ city, near, crowned, onClick }: { city: CityLayout; near: boolean
                 <span className="uppercase text-lime">founder</span> @{founder}
               </>
             ) : (
-              <span className="uppercase">{city.uf ? "no founder yet" : "no state"}</span>
+              <span className="uppercase">{city.uf ? "no founder yet" : "no city"}</span>
             )}
           </span>
         )}
@@ -393,8 +422,65 @@ export interface CameraApi {
   flyToPoint: (x: number, z: number, distance: number, done?: () => void) => void;
 }
 
-/** A city's key, the same everywhere: its state (or "island") and which of the state's cities. */
-export const cityKey = (c: CityLayout) => `${c.uf ?? "island"}-${c.second ? 2 : 1}`;
+/** A city's key, the same everywhere: its IBGE code, or "island". */
+export const cityKey = (c: CityLayout) => c.key;
+
+/** Most tags up at once: each is a DOM node over the canvas. */
+const TAG_MAX = 40;
+/** Farther than this share of the whole-country view, only the capitals (and the island) are tagged. */
+const TAG_FAR = 0.55;
+
+const _v = new THREE.Vector3();
+
+/**
+ * Which tags show, like a map's labels: on screen, the ones that matter most
+ * first (a crowned or capital city, then more devs), each kept only if it
+ * doesn't overlap one already placed; from far, only the capitals.
+ */
+function Tags({ cities, near, crowned, onTag, overview }: { cities: CityLayout[]; near: boolean; crowned: UF | null; onTag?: (c: CityLayout) => void; overview: number }) {
+  const [shown, setShown] = useState<{ list: CityLayout[]; far: boolean }>({ list: [], far: true });
+  const last = useRef(0);
+  const key = useRef("");
+  const ranked = useMemo(
+    () =>
+      cities
+        .map((c) => ({ c, at: lotToWorld(...c.center), w: (c.ibge === null ? c.name.length : Math.max(c.name.length, 2)) * 8 + 44, rank: (crowned && c.capital && c.uf === crowned ? 2e9 : 0) + (c.capital || c.ibge === null ? 1e9 : 0) + c.devs.length }))
+        .sort((a, b) => b.rank - a.rank || (a.c.key < b.c.key ? -1 : 1)),
+    [cities, crowned],
+  );
+  useFrame(({ camera, controls, size, clock }) => {
+    if (clock.elapsedTime - last.current < 0.3) return;
+    last.current = clock.elapsedTime;
+    const target = (controls as unknown as { target?: THREE.Vector3 } | null)?.target;
+    const far = !!target && camera.position.distanceTo(target) > overview * TAG_FAR;
+    const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+    const list: CityLayout[] = [];
+    for (const r of ranked) {
+      if (list.length >= TAG_MAX) break;
+      if (far && !r.c.capital && r.c.ibge !== null) continue;
+      _v.set(r.at[0], 60, r.at[1]).project(camera);
+      if (_v.z > 1 || Math.abs(_v.x) > 1.05 || Math.abs(_v.y) > 1.05) continue;
+      const x = ((_v.x + 1) / 2) * size.width;
+      const y = ((1 - _v.y) / 2) * size.height;
+      const box = { x0: x - r.w / 2, x1: x + r.w / 2, y0: y - 12, y1: y + (near ? 26 : 12) };
+      if (placed.some((p) => box.x0 < p.x1 && p.x0 < box.x1 && box.y0 < p.y1 && p.y0 < box.y1)) continue;
+      placed.push(box);
+      list.push(r.c);
+    }
+    const k = `${far}|${list.map((c) => c.key).join()}`;
+    if (k !== key.current) {
+      key.current = k;
+      setShown({ list, far });
+    }
+  });
+  return (
+    <>
+      {shown.list.map((c) => (
+        <Tag key={c.key} city={c} near={near} far={shown.far} crowned={!!crowned && c.uf === crowned && c.capital} onClick={() => onTag?.(c)} />
+      ))}
+    </>
+  );
+}
 
 /** Up close, the city the camera looks at (its center within reach of where the camera points). */
 function cityAt(cities: CityLayout[], x: number, z: number): CityLayout | null {
@@ -433,11 +519,11 @@ function cityNearest(cities: CityLayout[], x: number, z: number): CityLayout | n
 const FOV = 45;
 
 /** The whole country in frame, a little tilted, north up. */
-function overviewPose(aspect: number) {
-  const cx = (MAP_BOUNDS.minX + MAP_BOUNDS.maxX) / 2;
-  const cz = (MAP_BOUNDS.minZ + MAP_BOUNDS.maxZ) / 2;
-  const w = MAP_BOUNDS.maxX - MAP_BOUNDS.minX;
-  const d = MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ;
+function overviewPose(aspect: number, bounds: Geo["bounds"]) {
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cz = (bounds.minZ + bounds.maxZ) / 2;
+  const w = bounds.maxX - bounds.minX;
+  const d = bounds.maxZ - bounds.minZ;
   const half = Math.tan(((FOV / 2) * Math.PI) / 180);
   // A phone held upright: the width decides, with room for the coast and the island past it.
   const dist = (Math.max(w / aspect, d) / (2 * half)) * (aspect < 1 ? 1.05 : 1.08);
@@ -446,8 +532,8 @@ function overviewPose(aspect: number) {
 }
 
 /** How far the overview sits: zooming out stops a little past it, on any screen shape. */
-function overviewDistance(aspect: number) {
-  const p = overviewPose(aspect);
+function overviewDistance(aspect: number, bounds: Geo["bounds"]) {
+  const p = overviewPose(aspect, bounds);
   return p.position.distanceTo(p.target);
 }
 
@@ -458,7 +544,9 @@ function MapCamera({
   cities,
   onCity,
   start,
+  bounds,
 }: {
+  bounds: Geo["bounds"];
   apiRef?: React.MutableRefObject<CameraApi | null>;
   onNear: Near;
   store?: MapCameraStore;
@@ -490,7 +578,7 @@ function MapCamera({
               return [new THREE.Vector3(x, d * 0.75, z + d * 0.7), new THREE.Vector3(x, 0, z)] as [THREE.Vector3, THREE.Vector3];
             })()
           : (() => {
-              const p = overviewPose(size.width / size.height);
+              const p = overviewPose(size.width / size.height, bounds);
               return [p.position, p.target] as [THREE.Vector3, THREE.Vector3];
             })();
         flightDone.current = null;
@@ -506,7 +594,7 @@ function MapCamera({
     return () => {
       apiRef.current = null;
     };
-  }, [apiRef, size]);
+  }, [apiRef, size, bounds]);
 
   // The compass and zoom buttons (MapNavControls), and the minimap's clicks.
   useEffect(
@@ -541,7 +629,7 @@ function MapCamera({
         camera.position.set(start.x, 900, start.z + 1100);
         c.target.set(start.x, 0, start.z);
       } else {
-        const p = overviewPose(size.width / size.height);
+        const p = overviewPose(size.width / size.height, bounds);
         camera.position.copy(p.position);
         c.target.copy(p.target);
       }
@@ -566,7 +654,7 @@ function MapCamera({
       const city = dist < CITY_VIEW ? cityAt(cities, c.target.x, c.target.z) : null;
       const key = city ? cityKey(city) : null;
       // Below the whole-country view, the city you're looking at (for Drive) even before you're over its streets.
-      const looking = dist < overviewDistance(size.width / size.height) * 0.7 ? cityNearest(cities, c.target.x, c.target.z) : null;
+      const looking = dist < overviewDistance(size.width / size.height, bounds) * 0.7 ? cityNearest(cities, c.target.x, c.target.z) : null;
       const both = `${key}|${looking ? cityKey(looking) : ""}`;
       if (both !== lastCity.current) {
         lastCity.current = both;
@@ -599,7 +687,7 @@ function MapCamera({
       dampingFactor={0.12}
       screenSpacePanning={false}
       minDistance={180}
-      maxDistance={Math.max((MAP_BOUNDS.maxX - MAP_BOUNDS.minX) * 1.6, overviewDistance(size.width / size.height) * 1.15)}
+      maxDistance={Math.max((bounds.maxX - bounds.minX) * 1.6, overviewDistance(size.width / size.height, bounds) * 1.15)}
       maxPolarAngle={Math.PI / 2.4}
     />
   );
@@ -608,6 +696,8 @@ function MapCamera({
 // ─── Scene ───────────────────────────────────────────────────
 
 export interface BrasilSceneProps {
+  /** How big Brazil is drawn (the layout's scale). */
+  scale?: number;
   cities: CityLayout[];
   island: CityLayout;
   objects: CityObject[];
@@ -739,7 +829,7 @@ function Pulse({ x, z }: { x: number; z: number }) {
   );
 }
 
-export default function BrasilScene({ cities, island, objects, buildings, cameraApi, cameraStore, onTag, onBuildingClick, focused = null, drive, smash, pulse = null, watching, onCity, cameraStart = null, stats = false, crowned = null, fresh, offices, drivers, driverAt, drift, driftBoard = NO_BOARD, onDriftTag }: BrasilSceneProps) {
+export default function BrasilScene({ scale = 1, cities, island, objects, buildings, cameraApi, cameraStore, onTag, onBuildingClick, focused = null, drive, smash, pulse = null, watching, onCity, cameraStart = null, stats = false, crowned = null, fresh, offices, drivers, driverAt, drift, driftBoard = NO_BOARD, onDriftTag }: BrasilSceneProps) {
   const allCities = useMemo(() => [...cities, island], [cities, island]);
   // Phones and weak GPUs draw at a lower resolution, as in the main city (?perf=low|high overrides).
   const { mode: perf } = usePerfMode();
@@ -791,8 +881,17 @@ export default function BrasilScene({ cities, island, objects, buildings, camera
   const treeCull = useMemo(() => ({ ...TREE_CULL, hidden: hiddenTrees }), [hiddenTrees]);
   const treeBubble = useMemo(() => ({ list: bubbleTrees, onHidden: onHiddenTrees }), [bubbleTrees, onHiddenTrees]);
   const identity = useMemo(() => ({ sky: 0, signSide: null, logoUrl: null, logoRemoved: false, identityVersion: 0 }), []);
-  const cx = (MAP_BOUNDS.minX + MAP_BOUNDS.maxX) / 2;
-  const cz = (MAP_BOUNDS.minZ + MAP_BOUNDS.maxZ) / 2;
+  const geo = geoAt(scale);
+  const { bounds } = geo;
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cz = (bounds.minZ + bounds.maxZ) / 2;
+  const [aspect, setAspect] = useState(() => (typeof window === "undefined" ? 1.6 : window.innerWidth / Math.max(1, window.innerHeight)));
+  useEffect(() => {
+    const on = () => setAspect(window.innerWidth / Math.max(1, window.innerHeight));
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  const overview = overviewDistance(aspect, bounds);
   return (
     <Canvas
       shadows={false}
@@ -803,26 +902,23 @@ export default function BrasilScene({ cities, island, objects, buildings, camera
     >
       <ThemeLights theme={NIGHT} themeIndex={NIGHT_KEY} />
       <ThemeSkyFX themeIndex={NIGHT_FX} theme={NIGHT} lowSky />
-      {!driving && <MapCamera apiRef={cameraApi} onNear={setNear} store={cameraStore} cities={allCities} onCity={onCity} start={cameraStart} />}
+      {!driving && <MapCamera apiRef={cameraApi} onNear={setNear} store={cameraStore} cities={allCities} onCity={onCity} start={cameraStart} bounds={bounds} />}
       {/* The ground is ~200 static meshes (sea, land, borders, rivers and their banks): merged to a handful of draw calls. */}
       {!off("ground") && (
         <MergedStatic byMaterial>
-          <Ground island={island} />
+          <Ground island={island} geo={geo} />
         </MergedStatic>
       )}
       {!off("paving") && <Paving cities={[...cities, island]} />}
       {!off("squares") && <Squares cities={[...cities, island]} />}
-      {!off("signs") &&
-        [...cities, island].map((c) => (
-          <CitySign key={`sign-${c.uf ?? "island"}-${c.second ? 2 : 1}`} city={c} />
-        ))}
+      {!off("signs") && <NearSigns cities={allCities} />}
       {!off("decor") && <InstancedDecorations items={decorations} roadMarkingColor={NIGHT.roadMarkingColor} sidewalkColor={NIGHT.sidewalkColor} />}
       {!off("roads") && <LeagueRoads objects={objects} markingColor={NIGHT.roadMarkingColor} />}
       <LeagueToys objects={objects} driving={driving} />
       <Suspense fallback={null}>
         <LeagueTrees objects={objects} cull={treeCull} />
       </Suspense>
-      {!off("identity") && <IdentityLayer objects={objects} identity={identity} name="Brasil" h={MAP_H} hillColor={LAND} />}
+      {!off("identity") && <IdentityLayer objects={objects} identity={identity} name="Brasil" h={geo.h} hillColor={LAND} />}
       {!off("buildings") && <CityScene
         buildings={buildings}
         colors={NIGHT.building}
@@ -833,11 +929,11 @@ export default function BrasilScene({ cities, island, objects, buildings, camera
       />}
       {smash && !off("buildings") && <RubbleFlags store={smash} />}
       {!driving && <NearPlates buildings={buildings} fresh={fresh} offices={offices} />}
-      {!driving && [...cities, island].map((c) => <Tag key={`${c.uf ?? "island"}-${c.second ? 2 : 1}`} city={c} near={near} crowned={!!crowned && c.uf === crowned && !c.second} onClick={() => onTag?.(c)} />)}
+      {!driving && <Tags cities={allCities} near={near} crowned={crowned} onTag={onTag} overview={overview} />}
       {!drifting && <DriftSite board={driftBoard} />}
       {!driving && onDriftTag && <DriftTag record={driftBoard[0] ?? null} onClick={onDriftTag} />}
       {drift}
-      {drive && !drifting && <DriveWorld objects={driveObjects} buildings={buildings} h={MAP_H} smash={smash} boxSpots={cityStreets} trees={treeBubble} {...drive} />}
+      {drive && !drifting && <DriveWorld objects={driveObjects} buildings={buildings} h={geo.h} smash={smash} boxSpots={cityStreets} trees={treeBubble} {...drive} />}
       {pulse && !driving && <Pulse key={pulse.key} x={pulse.x} z={pulse.z} />}
       {stats && <Stats />}
       {!driving && watching && watching.length > 0 && <WatchedCars cars={watching} />}

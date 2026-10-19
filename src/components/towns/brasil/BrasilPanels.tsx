@@ -8,20 +8,22 @@ import { Avatar, HUD_BOX, fmt, useCountdown } from "@/components/league/hud/shar
 import TrophyIcon from "@/components/towns/TrophyIcon";
 import { PRESIDENCY_ON } from "@/lib/towns/brasil-election";
 import { STATES, type CityLayout, type UF } from "@/lib/towns/brasil-map";
+import type { BrCity } from "@/lib/towns/br-cities";
 import { swatchOf, type StateStats } from "./stats";
+import { useBrCities } from "./useBrCities";
 
 // The Brasil town's side panels, in the towns' Panel: search the map (a
-// state, a city, a dev), the 27 states ranked by the week's points with how
-// points are made, and picking your state.
+// state, any city in Brazil, a dev), the 27 states ranked by the week's
+// points with how points are made, and picking your city.
 
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 const LOGIN = /^[a-z0-9](?:[a-z0-9-]{0,38})$/;
 
 /**
- * The search over the map, always there: a state (name or UF), a city
- * (capital or second city) or a GitHub username. A username that isn't on
- * the map yet gets the way to put it there.
+ * The search over the map, always there: a state (name or UF), a city (on
+ * the map, or any other in Brazil: nobody there yet, found it) or a GitHub
+ * username. A username that isn't on the map yet gets the way to put it there.
  */
 export function BrasilSearchBar({
   cities,
@@ -30,6 +32,7 @@ export function BrasilSearchBar({
   onPickCity,
   onPickBuilding,
   onPutOnMap,
+  onFound,
 }: {
   cities: CityLayout[];
   island: CityLayout;
@@ -38,10 +41,13 @@ export function BrasilSearchBar({
   onPickBuilding: (b: CityBuilding) => void;
   /** Someone typed a username that isn't on the map. */
   onPutOnMap: (login: string) => void;
+  /** A city nobody lives in yet: found it. */
+  onFound: (city: BrCity) => void;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const q = fold(query.trim().replace(/^@/, ""));
+  const br = useBrCities(q.length >= 2);
   const places = useMemo(() => {
     if (!q) return [];
     return [...cities, island]
@@ -49,15 +55,24 @@ export function BrasilSearchBar({
         const st = c.uf ? STATES.find((s) => s.uf === c.uf) : null;
         return fold(c.name).includes(q) || (st && (fold(st.name).includes(q) || st.uf.toLowerCase() === q)) || (!c.uf && "island".startsWith(q));
       })
+      .sort((a, b) => Number(fold(b.name).startsWith(q)) - Number(fold(a.name).startsWith(q)) || b.devs.length - a.devs.length)
       .slice(0, 5);
   }, [cities, island, q]);
+  // Cities nobody lives in yet, by the same words.
+  const unfounded = useMemo(() => {
+    if (!br || q.length < 2) return [];
+    const onMap = new Set(cities.map((c) => c.ibge));
+    return br.searchCities(q, 12).filter((c) => !onMap.has(c.ibge)).slice(0, 3);
+  }, [br, cities, q]);
   const devs = useMemo(() => {
     if (!q) return [];
     const starts = buildings.filter((b) => b.loginLower.startsWith(q));
     const contains = buildings.filter((b) => !b.loginLower.startsWith(q) && b.loginLower.includes(q));
     return [...starts, ...contains].slice(0, 6);
   }, [buildings, q]);
-  const missing = LOGIN.test(q) && !buildings.some((b) => b.loginLower === q) ? q : null;
+  // A word that names a city reads as the city, not as a username.
+  const isCity = places.some((c) => fold(c.name) === q) || unfounded.some((c) => fold(c.name) === q);
+  const missing = LOGIN.test(q) && !isCity && !buildings.some((b) => b.loginLower === q) ? q : null;
   const pick = (f: () => void) => {
     f();
     setOpen(false);
@@ -72,6 +87,7 @@ export function BrasilSearchBar({
           const exact = devs.find((b) => b.loginLower === q);
           if (exact) pick(() => onPickBuilding(exact));
           else if (places[0]) pick(() => onPickCity(places[0]));
+          else if (unfounded[0]) pick(() => onFound(unfounded[0]));
           else if (devs[0]) pick(() => onPickBuilding(devs[0]));
           else if (missing) pick(() => onPutOnMap(missing));
         }}
@@ -110,11 +126,20 @@ export function BrasilSearchBar({
       {open && q && (
         <div className="absolute inset-x-0 top-full z-40 mt-1 flex max-h-[50vh] flex-col overflow-y-auto border-[3px] border-border bg-bg/95 uppercase backdrop-blur-sm">
           {places.map((c) => (
-            <button key={`${c.uf ?? "island"}-${c.second ? 2 : 1}`} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(() => onPickCity(c))} className="flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#141417]">
+            <button key={c.key} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(() => onPickCity(c))} className="flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#141417]">
               <span className="h-2.5 w-2.5 shrink-0" style={{ background: c.uf ? swatchOf(c.uf) : "#c8e64a" }} aria-hidden />
               <span className="min-w-0 flex-1 truncate text-[11px] normal-case text-cream">{c.name}</span>
               <span className="text-[9px] text-muted">
                 {c.uf ?? "Island"} · {fmt(c.devs.length)}
+              </span>
+            </button>
+          ))}
+          {unfounded.map((c) => (
+            <button key={c.ibge} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(() => onFound(c))} className="flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#141417]">
+              <span className="h-2.5 w-2.5 shrink-0 border border-border-light" aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-[11px] normal-case text-cream">{c.name}</span>
+              <span className="text-[9px] text-muted">
+                {c.uf} · <span className="text-lime">Found it</span>
               </span>
             </button>
           ))}
@@ -133,7 +158,7 @@ export function BrasilSearchBar({
               </button>
             </div>
           )}
-          {places.length === 0 && devs.length === 0 && !missing && <p className="px-3 py-2 text-[10px] normal-case text-muted">Nothing on the map called “{query.trim()}”.</p>}
+          {places.length === 0 && unfounded.length === 0 && devs.length === 0 && !missing && <p className="px-3 py-2 text-[10px] normal-case text-muted">Nothing on the map called “{query.trim()}”.</p>}
         </div>
       )}
     </div>
@@ -343,17 +368,20 @@ export function BrasilRanking({
 }
 
 /**
- * Pick your state (or none: the island), right under the search: where you
- * typed your name is where you choose. Moving gives you a new lot in the new
- * state. While your lot is found the picked state says so.
+ * Pick your city (or none: the island), right under the search: where you
+ * typed your name is where you choose. Type it, or tap a state to see its
+ * cities. A city nobody lives in yet is founded by whoever picks it first.
+ * Moving gives you a new lot in the new city.
  */
 export function BrasilPicker({
   signedIn,
   viewerLogin,
   forLogin,
+  cities,
   current,
   pending,
   error,
+  initialQuery = "",
   onPick,
   onSignIn,
   onClose,
@@ -362,12 +390,16 @@ export function BrasilPicker({
   viewerLogin: string | null;
   /** Opened for a username typed in the search (maybe someone else's). */
   forLogin: string | null;
-  /** Where you live now: a state, "island", or null when you're not on the map. */
-  current: UF | "island" | null;
-  /** The state being placed in right now. */
-  pending: UF | "island" | null;
+  /** The cities on the map, for who lives where. */
+  cities: CityLayout[];
+  /** Where you live now: a city's IBGE code, "island", or null when you're not on the map. */
+  current: number | "island" | null;
+  /** The city being placed in right now. */
+  pending: { ibge: number | null; name: string } | null;
   error: string | null;
-  onPick: (uf: UF | null) => void;
+  /** Opened from the search for a city nobody lives in yet: its name. */
+  initialQuery?: string;
+  onPick: (city: { ibge: number | null; name: string }) => void;
   onSignIn: () => void;
   onClose: () => void;
 }) {
@@ -376,16 +408,56 @@ export function BrasilPicker({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, pending]);
+  const [query, setQuery] = useState(initialQuery);
+  const [state, setState] = useState<UF | null>(null);
+  const br = useBrCities(signedIn);
   const someoneElse = !!forLogin && !!viewerLogin && forLogin !== viewerLogin.toLowerCase();
   const who = forLogin ?? viewerLogin?.toLowerCase() ?? null;
   const busy = pending !== null;
-  const pendingName = pending === "island" ? "the island" : pending ? (STATES.find((s) => s.uf === pending)?.name ?? pending) : "";
+  const onMap = useMemo(() => new Map(cities.map((c) => [c.ibge, c])), [cities]);
+  const q = query.trim();
+  const results = useMemo((): { ibge: number; name: string; uf: UF }[] => {
+    if (q.length >= 2 && br) return br.searchCities(q, 20, (ibge) => onMap.get(ibge)?.devs.length ?? 0).filter((c) => !state || c.uf === state).slice(0, 8);
+    if (state) {
+      // A state's cities on the map, biggest first, its capital among them.
+      return cities
+        .filter((c) => c.uf === state && c.ibge !== null)
+        .sort((a, b) => b.devs.length - a.devs.length || Number(b.capital) - Number(a.capital))
+        .slice(0, 8)
+        .map((c) => ({ ibge: c.ibge!, name: c.name, uf: c.uf! }));
+    }
+    return [];
+  }, [q, br, state, cities, onMap]);
+
+  const row = (c: { ibge: number; name: string; uf: UF }) => {
+    const here = onMap.get(c.ibge);
+    const n = here?.devs.length ?? 0;
+    const founder = here?.devs.find((d) => d.founder)?.dev.login;
+    const mine = current === c.ibge;
+    const now = pending?.ibge === c.ibge;
+    return (
+      <li key={c.ibge}>
+        <button
+          type="button"
+          disabled={busy || mine}
+          onClick={() => onPick({ ibge: c.ibge, name: c.name })}
+          className={`flex w-full items-center gap-2.5 border-2 px-2.5 py-2 text-left transition-opacity ${now ? "border-lime bg-lime text-bg" : mine ? "border-lime text-lime" : "border-border text-cream hover:border-lime/60"} ${busy && !now ? "opacity-30" : ""} disabled:cursor-default`}
+        >
+          <span className="h-2 w-2 shrink-0 border border-border-light" style={{ background: swatchOf(c.uf) }} aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-[11px] normal-case">
+            {c.name} <span className={now ? "" : "text-muted"}>{c.uf}</span>
+          </span>
+          <span className={`shrink-0 text-[9px] normal-case ${now ? "" : n ? "text-muted" : "text-lime"}`}>{mine ? "You live here" : n ? `${fmt(n)} dev${n === 1 ? "" : "s"}${founder ? ` · @${founder}` : ""}` : "Nobody yet · found it"}</span>
+        </button>
+      </li>
+    );
+  };
 
   return (
     <div className="pointer-events-auto mt-1 w-full border-[3px] sm:w-[min(420px,calc(100vw-32px))] border-border bg-bg/95 p-3 font-pixel uppercase text-cream shadow-[0_6px_0_rgba(0,0,0,0.35)] backdrop-blur-sm">
       <div className="mb-2.5 flex items-baseline justify-between gap-3">
         <p className="min-w-0 truncate text-[11px]">
-          {current && !someoneElse ? "Move to another state" : who ? <>Put <span className="normal-case text-lime">@{who}</span> on the map</> : "Put your building on the map"}
+          {current && !someoneElse ? "Move to another city" : who ? <>Put <span className="normal-case text-lime">@{who}</span> on the map</> : "Put your building on the map"}
         </p>
         <button type="button" disabled={busy} onClick={onClose} className="shrink-0 text-[10px] text-muted hover:text-cream disabled:opacity-40">
           ESC
@@ -394,11 +466,11 @@ export function BrasilPicker({
 
       {someoneElse ? (
         <p className="text-[10px] normal-case text-muted">
-          Only @{forLogin} can put their building here: they sign in with GitHub on this page, or comment their @ and state on the reel. You&apos;re signed in as @{viewerLogin}.
+          Only @{forLogin} can put their building here: they sign in with GitHub on this page, or comment their @ and city on the reel. You&apos;re signed in as @{viewerLogin}.
         </p>
       ) : !signedIn ? (
         <div className="flex flex-col gap-2.5">
-          <p className="text-[10px] normal-case text-muted">{forLogin ? `Is @${forLogin} you? ` : ""}Sign in with GitHub, pick your state, and your building goes up in its city.</p>
+          <p className="text-[10px] normal-case text-muted">{forLogin ? `Is @${forLogin} you? ` : ""}Sign in with GitHub, pick your city, and your building goes up there.</p>
           <button type="button" onClick={onSignIn} className="btn-press border-2 border-lime bg-lime py-2 text-[11px] text-bg">
             Sign in with GitHub
           </button>
@@ -406,38 +478,67 @@ export function BrasilPicker({
       ) : (
         <div className="flex flex-col gap-2">
           <p className="text-[10px] normal-case text-muted">
-            {current ? "Your building moves to a new lot there. You can move once a week." : "Your building goes up in your state's city. The first dev in a state founds it."}
+            {current ? "Your building moves to a new lot there. You can move once a week." : "Your building goes up in your city. Nobody from there yet? You found it."}
           </p>
-          <div className="grid grid-cols-7 gap-1">
-            {STATES.map((s) => (
-              <button
-                key={s.uf}
-                type="button"
-                title={s.name}
-                disabled={busy || current === s.uf}
-                onClick={() => onPick(s.uf)}
-                className={`flex items-center justify-center gap-1 border-2 py-1.5 text-[10px] transition-opacity ${
-                  pending === s.uf ? "border-lime bg-lime text-bg" : current === s.uf ? "border-lime text-lime" : "border-border text-cream hover:border-lime/60"
-                } ${busy && pending !== s.uf ? "opacity-30" : ""} disabled:cursor-default`}
-              >
-                <span className="h-2 w-2 shrink-0 border border-border-light" style={{ background: swatchOf(s.uf) }} aria-hidden />
-                {s.uf}
+          <div className="flex items-stretch">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={state ? `A city in ${state}` : "Your city"}
+              aria-label="Your city"
+              type="search"
+              name="brasil-city"
+              autoComplete="off"
+              spellCheck={false}
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-form-type="other"
+              className="h-10 min-w-0 flex-1 border-2 border-border bg-bg px-3 text-base normal-case text-cream outline-none placeholder:text-dim focus:border-lime/70 sm:text-[12px] [&::-webkit-search-cancel-button]:hidden"
+            />
+            {state && (
+              <button type="button" onClick={() => setState(null)} className="flex items-center gap-1.5 border-2 border-l-0 border-border px-2 text-[10px] text-cream" aria-label={`Any state (now ${state})`}>
+                {state} <X size={12} aria-hidden />
               </button>
-            ))}
+            )}
           </div>
+          {results.length > 0 ? (
+            <ul className="flex flex-col gap-1">{results.map(row)}</ul>
+          ) : q.length >= 2 ? (
+            <p className="px-1 text-[10px] normal-case text-muted">{br ? `No city called “${q}”.` : "Loading the cities…"}</p>
+          ) : (
+            <>
+              <p className="px-1 text-[9px] text-dim">Or pick your state</p>
+              <div className="grid grid-cols-7 gap-1">
+                {STATES.map((s) => (
+                  <button
+                    key={s.uf}
+                    type="button"
+                    title={s.name}
+                    disabled={busy}
+                    onClick={() => setState(s.uf)}
+                    className={`flex items-center justify-center gap-1 border-2 py-1.5 text-[10px] ${state === s.uf ? "border-lime text-lime" : "border-border text-cream hover:border-lime/60"}`}
+                  >
+                    <span className="h-2 w-2 shrink-0 border border-border-light" style={{ background: swatchOf(s.uf) }} aria-hidden />
+                    {s.uf}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <button
             type="button"
             disabled={busy || current === "island"}
-            onClick={() => onPick(null)}
+            onClick={() => onPick({ ibge: null, name: "the island" })}
             className={`border-2 py-1.5 text-[10px] transition-opacity ${
-              pending === "island" ? "border-lime bg-lime text-bg" : current === "island" ? "border-lime text-lime" : "border-border text-muted hover:text-cream"
-            } ${busy && pending !== "island" ? "opacity-30" : ""}`}
+              pending && pending.ibge === null ? "border-lime bg-lime text-bg" : current === "island" ? "border-lime text-lime" : "border-border text-muted hover:text-cream"
+            } ${busy && pending?.ibge !== null ? "opacity-30" : ""}`}
           >
-            No state · live on the island
+            No city · live on the island
           </button>
           {busy && (
             <div className="flex flex-col gap-1.5 pt-1">
-              <p className="text-[10px] normal-case text-lime">Finding your lot in {pendingName}…</p>
+              <p className="text-[10px] normal-case text-lime">Finding your lot in {pending!.name}…</p>
               <div className="h-1 animate-pulse bg-lime" />
             </div>
           )}
