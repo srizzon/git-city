@@ -14,7 +14,8 @@
 // top-level comment (most of them) goes to the rules; anything else goes to
 // the model with its thread (comment-ai.ts), the rules again if the model
 // fails or the day's budget is spent. A login that isn't on GitHub gets a
-// suggestion ("É o slickinho?") when one is a typo away.
+// suggestion ("É o slickinho?") when one is a typo away; a city name several
+// states share gets "qual Santa Rita?", and the state in the answer places them.
 //
 // Limits: per Instagram account, LIMITS.perUserHour comments read and
 // LIMITS.repliesPerUserHour replies an hour (the rest are logged, unread or
@@ -26,7 +27,7 @@ import { getLeagueBySlug } from "../leagues/service";
 import { BRASIL_SLUG, importBrasilComment, type ReelKind } from "./brasil-server";
 import { parseComment, replyFor } from "./brasil-comments";
 import type { UF } from "./brasil-map";
-import { confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
+import { answeredCity, confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
 import { captureServer } from "../posthog-server";
 import { creditComment, creditStory } from "./brasil-points-server";
 
@@ -103,7 +104,7 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
       await captureServer(c.igUser ? `ig:${c.igUser}` : `ig-comment:${c.id}`, "brasil_comment_imported", { outcome: r.outcome, reader, kind: w.kind, reply: !!c.parentId });
       if (r.outcome === "added" && r.login) await captureServer(r.login, w.kind === "brasil" ? "brasil_resident_added" : "city_building_from_comment", { uf: r.uf, source: "instagram" });
       const suggestion = r.outcome === "unknown_user" && r.login ? await suggestLogin(r.login) : null;
-      const reply = replyFor(r.outcome, r.login, r.uf, w.kind, suggestion);
+      const reply = replyFor(r.outcome, r.login, r.uf, w.kind, suggestion, { city: r.city, founded: r.founded, options: r.options });
       if (!reply) continue;
       if (c.igUser) {
         const { count } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", c.igUser).gte("replied_at", hourAgo());
@@ -140,7 +141,7 @@ export async function handleStoryMentions(stories: { sender: string; mid: string
 }
 
 /** What a comment says: a yes to our suggestion, the rules for a plain one-word comment, else the model (the rules if it can't). */
-async function read(c: IncomingComment, own: string): Promise<{ login: string | null; uf: UF | null; reader: "rules" | "model" | "confirm" }> {
+async function read(c: IncomingComment, own: string): Promise<{ login: string | null; uf: UF | null; place: string | null; reader: "rules" | "model" | "confirm" }> {
   const rules = { ...parseComment(c.text, { ignore: [own], reply: !!c.parentId }), reader: "rules" as const };
   const plain = c.text.trim().split(/\s+/).length === 1 && !c.text.includes("@");
   if (!c.parentId && plain) return rules;
@@ -153,7 +154,9 @@ async function read(c: IncomingComment, own: string): Promise<{ login: string | 
       // no thread: read the comment alone
     }
     const yes = confirmedLogin(c.text, own, thread);
-    if (yes) return { login: yes, uf: null, reader: "confirm" };
+    if (yes) return { login: yes, uf: null, place: null, reader: "confirm" };
+    const which = answeredCity(c.text, own, thread);
+    if (which) return { ...which, reader: "confirm" };
   }
 
   const { count } = await getSupabaseAdmin()
@@ -164,7 +167,7 @@ async function read(c: IncomingComment, own: string): Promise<{ login: string | 
   const reading = await readComment({ text: c.text, commenter: c.igUser, own, thread });
   // The bot's health: how often the model fails and the rules take over.
   if (!reading) await captureServer("brasil-comment-bot", "brasil_comment_model_failed", { reply: !!c.parentId });
-  return reading ? { login: reading.login, uf: reading.uf, reader: "model" } : rules;
+  return reading ? { login: reading.login, uf: reading.uf, place: reading.place, reader: "model" } : rules;
 }
 
 /** Which of these comment ids brasil_comments already holds. */
