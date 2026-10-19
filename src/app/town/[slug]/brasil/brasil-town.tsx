@@ -1155,7 +1155,12 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             }}
             className={bar}
           >
-            {yours ? <span className="h-3.5 w-3.5 border border-bg/40 sm:h-2.5 sm:w-2.5" style={{ background: swatchOf(yours) }} aria-hidden /> : <Building2 size={18} className="sm:hidden" aria-hidden />}
+            {/* The building, like every tab's icon; your state's color as a corner on it. */}
+            <span className="relative sm:hidden" aria-hidden>
+              <Building2 size={18} />
+              {yours && <span className="absolute -bottom-1 -right-1.5 h-2 w-2 border border-bg" style={{ background: swatchOf(yours) }} />}
+            </span>
+            {yours && <span className="h-2.5 w-2.5 border border-border-light max-sm:hidden" style={{ background: swatchOf(yours) }} aria-hidden />}
             {home ? (
               <>
                 <span className="sm:hidden">Mine</span>
