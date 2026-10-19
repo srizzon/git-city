@@ -108,6 +108,7 @@ function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps 
       <div className="absolute inset-0">
         <BrasilScene
           embedded
+          filmLight={spec.world.type === "brasil" ? spec.world.exposure : 1}
           cities={world.layout.cities}
           island={world.layout.island}
           objects={world.objects}
@@ -190,7 +191,7 @@ function BayStage({ spec, reel, clock, balloon, gen, children }: StageProps & { 
 }
 
 /** One town on its own canvas (never remounted: a cut only changes which shows), its buildings breakable. */
-function TownStage({ town, norms, reel, clock, balloon, gen, show }: { town: TownsData["towns"][number]; norms: LayoutNorms; show: boolean } & Omit<StageProps, "spec">) {
+function TownStage({ town, norms, reel, clock, balloon, gen, show, light }: { town: TownsData["towns"][number]; norms: LayoutNorms; show: boolean; light: number } & Omit<StageProps, "spec">) {
   const buildings = useMemo(() => {
     const devs = town.cityDevs as unknown as DeveloperRecord[];
     const byLogin = new Map(generateCityLayout(devs, undefined, norms).buildings.map((b) => [b.loginLower, b]));
@@ -218,6 +219,7 @@ function TownStage({ town, norms, reel, clock, balloon, gen, show }: { town: Tow
         buildings={buildings}
         mode="view"
         smash={{ store, color: "#e07a4f" }}
+        filmLight={light}
       >
         <TownReelRig stage={town.stage} clock={clock} reel={reel} objects={town.city.objects} store={store} balloon={balloon} />
       </LeagueScene>
@@ -259,7 +261,7 @@ export default function ReelStudio({ spec, words, song, brasil, towns }: ReelStu
           ) : towns ? (
             <>
               {towns.towns.map((t) => (
-                <TownStage key={t.stage} town={t} norms={towns.norms} reel={reel} clock={clock} balloon={balloon} gen={gen} show={frame.kind === "full" && frame.stage === t.stage} />
+                <TownStage key={t.stage} light={spec.world.type === "towns" ? spec.world.exposure : 1} town={t} norms={towns.norms} reel={reel} clock={clock} balloon={balloon} gen={gen} show={frame.kind === "full" && frame.stage === t.stage} />
               ))}
               {overlay(() => null)}
             </>

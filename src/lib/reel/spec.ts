@@ -117,6 +117,8 @@ const BrasilWorld = z.object({
   residents: z.enum(["live", "none"]).default("live"),
   /** A building that isn't on the map yet, put on the first lot of its state's capital (lot-rise raises it). */
   example: z.object({ login: z.string(), uf: z.string().length(2) }).optional(),
+  /** A film's extra fill light (2: Sam's pick for the map, 2026-10-19). */
+  exposure: z.number().positive().max(6).default(2),
 });
 
 const BayWorld = z.object({
@@ -133,6 +135,8 @@ const BayWorld = z.object({
 const TownsWorld = z.object({
   type: z.literal("towns"),
   towns: z.record(z.string().regex(/^[a-z]+$/), z.string()),
+  /** A film's extra fill light (the towns read well as they are: 1). */
+  exposure: z.number().positive().max(6).default(1),
 });
 
 export const World = z.discriminatedUnion("type", [BrasilWorld, BayWorld, TownsWorld]);
