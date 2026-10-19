@@ -1,7 +1,8 @@
 // ─── Instagram (API with Instagram Login) ───────────────────
 // The one connected account (@samuelrizzondev): its posts, replying to a
-// comment, subscribing the app to its comment webhooks, and keeping the
-// long-lived token alive. The token lives in instagram_account (migration
+// comment, subscribing the app to its comment and message webhooks (a story
+// that tags the account arrives as a message), who sent a message, and
+// keeping the long-lived token alive. The token lives in instagram_account (migration
 // 170) once the cron has refreshed it, INSTAGRAM_ACCESS_TOKEN before that.
 // Webhook payloads are signed with INSTAGRAM_APP_SECRET. Server only.
 
@@ -51,9 +52,41 @@ export function replyToComment(commentId: string, message: string) {
   return graph<{ id: string }>(`/${commentId}/replies`, { message }, "POST");
 }
 
-/** Turns on the comment webhooks for the account (the dashboard's webhook setup alone doesn't). */
-export function subscribeToComments() {
-  return graph<{ success: boolean }>("/me/subscribed_apps", { subscribed_fields: "comments" }, "POST");
+/**
+ * Turns on the account's webhooks (the dashboard's webhook setup alone
+ * doesn't): comments, and messages when the token has the messaging
+ * permission (stories that tag the account). Without it, comments alone.
+ */
+export async function subscribeToComments(): Promise<{ fields: string }> {
+  try {
+    await graph<{ success: boolean }>("/me/subscribed_apps", { subscribed_fields: "comments,messages" }, "POST");
+    return { fields: "comments,messages" };
+  } catch {
+    await graph<{ success: boolean }>("/me/subscribed_apps", { subscribed_fields: "comments" }, "POST");
+    return { fields: "comments" };
+  }
+}
+
+/** The username behind a message's sender (an Instagram-scoped id). */
+export async function instagramUsernameOf(igsid: string): Promise<string | null> {
+  const u = await graph<{ username?: string }>(`/${igsid}`, { fields: "username" });
+  return u.username?.toLowerCase() ?? null;
+}
+
+/** Stores a token pasted in the admin (one generated with new permissions), then turns the webhooks on with it. */
+export async function connectInstagramToken(token: string): Promise<{ username: string; fields: string }> {
+  // Checked before it replaces the working one.
+  const res = await fetch(`${GRAPH}/me?fields=user_id,username&access_token=${encodeURIComponent(token)}`, { cache: "no-store" });
+  const who = (await res.json().catch(() => ({}))) as { username?: string; error?: { message?: string } };
+  if (!res.ok || !who.username) throw new Error(`That token doesn't work: ${who.error?.message ?? res.status}`);
+  const sb = getSupabaseAdmin();
+  const { data } = await sb.from("instagram_account").select("id").eq("id", 1).maybeSingle();
+  if (data) await sb.from("instagram_account").update({ access_token: token, refreshed_at: new Date().toISOString() }).eq("id", 1);
+  else await sb.from("instagram_account").insert({ id: 1, access_token: token });
+  const me = await instagramMe();
+  await sb.from("instagram_account").update({ ig_user_id: me.user_id, username: me.username }).eq("id", 1);
+  const { fields } = await subscribeToComments();
+  return { username: me.username, fields };
 }
 
 /** Stores the account and the token it was connected with (the env's, generated in Meta's dashboard). */

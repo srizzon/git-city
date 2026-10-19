@@ -15,7 +15,7 @@
 //   pullback   from the last pose back out to the whole country
 
 import * as THREE from "three";
-import { MAP_BOUNDS } from "@/lib/towns/brasil-geo";
+import type { Geo } from "@/lib/towns/brasil-geo";
 import type { ReelCut } from "@/lib/reel/film";
 
 export const FOV = 45;
@@ -66,6 +66,8 @@ export interface Obstacle {
 
 export interface SceneWorld {
   aspect: number;
+  /** The country's extent at the map's scale (Brazil grows with its cities). */
+  bounds: Geo["bounds"];
   /** Buildings near a point (for line of sight), within `r` world units. */
   near: (x: number, z: number, r: number) => Obstacle[];
   /** Where a cut's target stands. */
@@ -79,11 +81,11 @@ export interface SceneWorld {
 export const ease = (u: number) => u * u * (3 - 2 * u);
 
 /** The whole country, filling a phone's width, its middle a touch south so it sits under the header. */
-export function overview(aspect: number): Pose {
-  const cx = (MAP_BOUNDS.minX + MAP_BOUNDS.maxX) / 2;
-  const cz = (MAP_BOUNDS.minZ + MAP_BOUNDS.maxZ) / 2;
-  const w = MAP_BOUNDS.maxX - MAP_BOUNDS.minX;
-  const d = MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ;
+export function overview(aspect: number, bounds: Geo["bounds"]): Pose {
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cz = (bounds.minZ + bounds.maxZ) / 2;
+  const w = bounds.maxX - bounds.minX;
+  const d = bounds.maxZ - bounds.minZ;
   const dist = (Math.max(w / aspect, d) / (2 * Math.tan(((FOV / 2) * Math.PI) / 180))) * 0.9;
   const tilt = (72 * Math.PI) / 180;
   const lift = d * 0.07;
@@ -183,7 +185,7 @@ export function frameHeight(world: SceneWorld, cut: ReelCut, t: number): number 
 export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: SceneWorld): Pose {
   const cut = cuts[i];
   const t = cut.from + u * (cut.to - cut.from);
-  const top = overview(world.aspect);
+  const top = overview(world.aspect, world.bounds);
   const before = () => (i > 0 ? poseAt(cuts, i - 1, 1, world) : top);
   switch (cut.kind) {
     case "overview": {

@@ -1,23 +1,25 @@
 // ─── Brasil town: server side ───────────────────────────────
-// Residents are stored with their lot (brasil_residents, migration 169), so
-// the map is the same for everyone and nobody's building moves. Placing a
-// resident reads everyone already placed, asks the placer (brasil-map.ts)
-// for the next lot of their state's city and stores it; two arrivals at the
-// same instant can't share a lot (the table's unique key), so the loser
-// re-reads and tries again. A resident is also an active member of the
-// town, so every town feature (standings, smash, the drive room) sees them.
-// Server only.
+// The map is stored (migration 175): every resident's city and their lot in
+// it (brasil_residents), where each city stands (brasil_cities), and how big
+// Brazil is (brasil_map, with a version). Reading it never moves anything.
+// Placing a resident reads the map fresh, lets BrasilMap (brasil-map.ts) pick
+// the lot and make room, and writes it all at once (brasil_place), which
+// refuses if someone placed in between: then it reads again and retries. A
+// resident is also an active member of the town, so every town feature
+// (standings, smash, the drive room) sees them. Server only.
 
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "../supabase";
-import { invalidateLeague } from "../leagues/cache";
+import { invalidateLeague, leagueTag } from "../leagues/cache";
 import type { League } from "../leagues/service";
 import { createDeveloperFromGitHub } from "../create-developer";
 import { GitHubFetchError } from "../github-api";
-import { BrasilPlacer, STATES, layoutFromResidents, ptState, type BrasilLayout, type MapDev, type Resident, type UF } from "./brasil-map";
+import { BrasilMap, HUB, STATES, capitalIbge, cityKeyOf, layoutFromState, ptState, type BrasilLayout, type MapState, type Resident, type UF } from "./brasil-map";
+import { cityOf, resolveCity, type BrCity } from "./br-cities";
 import { parseComment } from "./brasil-comments";
-import { weekStart } from "../leagues/scoring";
-import { loadLeagueStandings } from "../leagues/standings";
-import { CAPITALS, ISLAND, SECOND_CITIES } from "./brasil-geo";
+import { awardPoints, creditInvite, getOfficeAndLiveWeeks } from "./brasil-points-server";
+import type { PointsBreakdown } from "./brasil-points";
+import { ISLAND } from "./brasil-geo";
 import { sendBrasilMapNotification } from "../notification-senders/brasil-map";
 
 export const BRASIL_SLUG = "brasil-town";
@@ -27,9 +29,9 @@ export type ResidentSource = "site" | "instagram" | "admin";
 interface ResidentRow {
   developer_id: number;
   uf: string | null;
-  hub: number;
-  x: number;
-  z: number;
+  ibge: number | null;
+  lx: number | null;
+  lz: number | null;
   placed_at: string;
   developers: { github_login: string } | null;
 }
@@ -41,69 +43,126 @@ export async function getBrasilResidents(leagueId: string): Promise<Resident[]> 
   for (let from = 0; ; from += 1000) {
     const { data, error } = await sb
       .from("brasil_residents")
-      .select("developer_id, uf, hub, x, z, placed_at, developers(github_login)")
+      .select("developer_id, uf, ibge, lx, lz, placed_at, developers(github_login)")
       .eq("league_id", leagueId)
       .order("placed_at", { ascending: true })
+      .order("developer_id", { ascending: true })
       .range(from, from + 999)
       .returns<ResidentRow[]>();
     if (error) throw new Error(`brasil residents: ${error.message}`);
     for (const r of data ?? []) {
       const login = r.developers?.github_login;
-      if (!login) continue;
-      out.push({ dev: { id: r.developer_id, login, uf: (r.uf as UF | null) ?? null }, x: r.x, z: r.z, hub: r.hub, at: Date.parse(r.placed_at) });
+      // A row without its lot in a city is from before migration 175 and its backfill: not on the map.
+      if (!login || r.lx === null || r.lz === null) continue;
+      out.push({ dev: { id: r.developer_id, login, uf: (r.uf as UF | null) ?? null }, city: r.ibge, lx: r.lx, lz: r.lz, at: Date.parse(r.placed_at) });
     }
     if (!data || data.length < 1000) break;
   }
   return out;
 }
 
-/** The whole map from what's stored. */
-export async function getBrasilLayout(leagueId: string): Promise<{ layout: BrasilLayout; residents: Resident[] }> {
-  const residents = await getBrasilResidents(leagueId);
-  return { layout: layoutFromResidents(residents), residents };
+/** The whole stored map: the residents, where every city stands, the scale, and its version (uncached: scripts read it outside Next). */
+export async function readMapState(leagueId: string): Promise<MapState & { version: number; grewAt: number | null }> {
+  const sb = getSupabaseAdmin();
+  const [residents, cities, map] = await Promise.all([
+    getBrasilResidents(leagueId),
+    sb.from("brasil_cities").select("ibge, cx, cz").eq("league_id", leagueId).range(0, 9999).returns<{ ibge: number; cx: number; cz: number }[]>(),
+    sb.from("brasil_map").select("scale, version, grew_at").eq("league_id", leagueId).maybeSingle<{ scale: number | string; version: number | string; grew_at: string | null }>(),
+  ]);
+  if (cities.error) throw new Error(`brasil cities: ${cities.error.message}`);
+  if (map.error) throw new Error(`brasil map: ${map.error.message}`);
+  return {
+    residents,
+    cities: cities.data ?? [],
+    scale: Number(map.data?.scale ?? 1),
+    version: Number(map.data?.version ?? 0),
+    grewAt: map.data?.grew_at ? Date.parse(map.data.grew_at) : null,
+  };
 }
 
-export type PlaceOutcome = { status: "added" | "already" | "moved"; x: number; z: number; hub: number };
+/**
+ * The stored map, cached for everyone a little while (every placement
+ * expires it): the page, the share cards and the smash room all read it,
+ * and a busy db mustn't be asked for every resident on every view.
+ */
+export function getBrasilState(leagueId: string): Promise<MapState & { version: number; grewAt: number | null }> {
+  return unstable_cache(() => readMapState(leagueId), ["brasil-map-state", leagueId], { revalidate: 60, tags: [leagueTag(leagueId)] })();
+}
+
+/** The last layout drawn on this server, by map version: drawing thousands of cities isn't free, and most views share a version. */
+let drawn: { key: string; layout: BrasilLayout } | null = null;
+
+/** The whole map from what's stored. */
+export async function getBrasilLayout(leagueId: string): Promise<{ layout: BrasilLayout; residents: Resident[]; grewAt: number | null }> {
+  const state = await getBrasilState(leagueId);
+  const key = `${leagueId}:${state.version}:${state.residents.length}`;
+  if (drawn?.key !== key) drawn = { key, layout: layoutFromState(state) };
+  return { layout: drawn.layout, residents: state.residents, grewAt: state.grewAt };
+}
+
+export type PlaceOutcome = {
+  status: "added" | "already" | "moved";
+  /** The city's IBGE code (null: the island). */
+  city: number | null;
+  /** They're the first to live there: they founded it. */
+  founded: boolean;
+};
+
+/** The city a dev named only by state goes to: its capital. */
+export const cityForState = (uf: UF | null): number | null => (uf ? capitalIbge(uf) : null);
 
 /**
- * Puts a developer on the map in their state (null: the island), as an
- * active member of the town. Already there in the same state: nothing
- * changes. Already there in another state: they move (a new lot, the old one
- * freed), only when `allowMove` (the site's state picker, not a comment).
+ * Puts a developer on the map in a city (its IBGE code; null: the island),
+ * as an active member of the town, founding the city if nobody lives there.
+ * Already there in the same city: nothing changes. Already somewhere else:
+ * they move (a new lot, the old one freed), only when `allowMove` (the
+ * site's picker, not a comment).
  */
 export async function placeBrasilResident(
   league: Pick<League, "id">,
   dev: { id: number; login: string },
-  uf: UF | null,
+  city: number | null,
   source: ResidentSource,
   allowMove = false,
+  /** They named this city themselves (not just a state). */
+  cityPicked = true,
 ): Promise<PlaceOutcome> {
   const sb = getSupabaseAdmin();
+  const info = city === null ? null : cityOf(city);
+  if (city !== null && !info) throw new Error(`brasil: unknown city ${city}`);
   const { data: current } = await sb
     .from("brasil_residents")
-    .select("uf, hub, x, z")
+    .select("ibge, lx")
     .eq("league_id", league.id)
     .eq("developer_id", dev.id)
-    .maybeSingle<{ uf: string | null; hub: number; x: number; z: number }>();
-  if (current && (current.uf === uf || !allowMove)) return { status: "already", x: current.x, z: current.z, hub: current.hub };
+    .maybeSingle<{ ibge: number | null; lx: number | null }>();
+  const there = !!current && current.lx !== null;
+  if (there && (cityKeyOf(current!.ibge) === cityKeyOf(city) || !allowMove)) return { status: "already", city: current!.ibge, founded: false };
 
   await ensureMember(league.id, dev.id, source);
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const others = (await getBrasilResidents(league.id)).filter((r) => r.dev.id !== dev.id);
-    const lot = new BrasilPlacer(others).place({ id: dev.id, login: dev.login, uf } satisfies MapDev);
-    if (!lot) throw new Error("brasil: no lot left anywhere");
-    const row = { league_id: league.id, developer_id: dev.id, uf, hub: lot.hub, x: lot.x, z: lot.z, source, placed_at: new Date().toISOString() };
-    const { error } = current
-      ? await sb.from("brasil_residents").update(row).eq("league_id", league.id).eq("developer_id", dev.id)
-      : await sb.from("brasil_residents").insert(row);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const state = await readMapState(league.id);
+    const map = new BrasilMap(state).ensureCapitals();
+    if (there) map.remove(dev.id);
+    const before = map.population(city);
+    const r = map.place({ id: dev.id, login: dev.login, uf: info?.uf ?? null }, city, Date.now());
+    const { cities, grew } = map.changes();
+    const island = cityKeyOf(city) === "island";
+    const { error } = await sb.rpc("brasil_place", {
+      p_league: league.id,
+      p_version: state.version,
+      p_scale: map.scale,
+      p_cities: cities,
+      p_resident: { developer_id: dev.id, uf: info?.uf ?? null, hub: island ? HUB.island : HUB.city, ibge: city, lx: r.lx, lz: r.lz, city_picked: cityPicked, source },
+    });
     if (!error) {
       invalidateLeague(league.id);
-      return { status: current ? "moved" : "added", x: lot.x, z: lot.z, hub: lot.hub };
+      if (!there) await awardPoints(dev.id, "join", String(dev.id));
+      if (grew) console.info(`[brasil] the map grew to ${map.scale}`);
+      return { status: there ? "moved" : "added", city, founded: !island && before === 0 };
     }
-    // 23505: someone took that lot a moment ago (or this dev arrived twice at once). Read again and retry.
-    if (error.code !== "23505") throw new Error(`brasil place: ${error.message}`);
-    const { data: raced } = await sb.from("brasil_residents").select("uf, hub, x, z").eq("league_id", league.id).eq("developer_id", dev.id).maybeSingle<{ uf: string | null; hub: number; x: number; z: number }>();
-    if (raced && !current) return { status: "already", x: raced.x, z: raced.z, hub: raced.hub };
+    // 40001: someone placed a moment ago (the map changed); 23505: the lot was taken. Read again and retry.
+    if (error.code !== "40001" && error.code !== "23505") throw new Error(`brasil place: ${error.message}`);
   }
   throw new Error("brasil place: too many retries");
 }
@@ -144,19 +203,43 @@ export interface ReelComment {
   /** What the reel is about: the Brasil map (the default), or just a building in the city. */
   kind?: ReelKind;
   /** The comment already read (by the model, or as a "sim" to our suggestion); else the rules read it. */
-  parsed?: { login: string | null; uf: UF | null };
+  parsed?: { login: string | null; uf: UF | null; place?: string | null };
   /** Its log row is already there (the caller claimed it): fill it in instead of adding one. */
   claimed?: boolean;
 }
 
 export type ReelKind = "brasil" | "city";
 
-export type ImportOutcome = "added" | "already" | "unknown_user" | "no_login" | "blocked" | "capped";
+export type ImportOutcome = "added" | "already" | "unknown_user" | "no_login" | "blocked" | "capped" | "which_city";
+
+export interface ImportResult {
+  outcome: ImportOutcome;
+  login: string | null;
+  uf: UF | null;
+  /** The city they're in (or the name asked about, for "which_city"). */
+  city: string | null;
+  /** "which_city": the states that have a city by that name. */
+  options?: UF[];
+  founded: boolean;
+  fresh: boolean;
+}
+
+/** The city a comment names: by its words for a place, else its state's capital, else the island. Ambiguous names come back to ask. */
+export function cityOfComment(place: string | null | undefined, uf: UF | null): { city: BrCity | null } | { ask: BrCity[] } {
+  if (place) {
+    const r = resolveCity(place, uf);
+    if (r.kind === "city") return { city: r.city };
+    if (r.kind === "ambiguous") return { ask: r.options };
+  }
+  const capital = cityForState(uf);
+  return { city: capital === null ? null : (cityOf(capital) ?? null) };
+}
 
 /**
  * One comment: read it, check the username on GitHub (creating the dev if
- * Git City doesn't have them yet), put them on the map in the state they
- * named (none: the island), and log what came of it. A comment seen before
+ * Git City doesn't have them yet), put them on the map in the city they
+ * named (only a state: its capital; nothing: the island), and log what came
+ * of it. A city name several states share comes back as "which_city". A comment seen before
  * returns what it got then, not fresh (so it is never answered twice). One
  * Instagram account puts one GitHub login on the map. A city reel's comment
  * only gives the dev their building in the city: "added" when it's new.
@@ -164,19 +247,25 @@ export type ImportOutcome = "added" | "already" | "unknown_user" | "no_login" | 
 export async function importBrasilComment(
   league: Pick<League, "id">,
   c: ReelComment,
-): Promise<{ outcome: ImportOutcome; login: string | null; uf: UF | null; fresh: boolean }> {
+): Promise<ImportResult> {
   const sb = getSupabaseAdmin();
   const { data: seen } = c.claimed
     ? { data: null }
-    : await sb.from("brasil_comments").select("outcome, github_login, uf").eq("id", c.id).maybeSingle<{ outcome: ImportOutcome; github_login: string | null; uf: UF | null }>();
-  if (seen) return { outcome: seen.outcome, login: seen.github_login, uf: seen.uf, fresh: false };
+    : await sb.from("brasil_comments").select("outcome, github_login, uf, ibge").eq("id", c.id).maybeSingle<{ outcome: ImportOutcome; github_login: string | null; uf: UF | null; ibge: number | null }>();
+  if (seen) return { outcome: seen.outcome, login: seen.github_login, uf: seen.uf, city: seen.ibge ? (cityOf(seen.ibge)?.name ?? null) : null, founded: false, fresh: false };
 
-  const { login, uf } = c.parsed ?? parseComment(c.text);
+  const parsed = c.parsed ?? parseComment(c.text);
+  const { login } = parsed;
+  const where = cityOfComment(parsed.place, parsed.uf);
+  const target = "city" in where ? where.city : null;
+  const uf = target?.uf ?? parsed.uf;
+  let founded = false;
   const log = async (outcome: ImportOutcome, developerId: number | null = null) => {
-    const row = { reel: c.reel, ig_user: c.igUser, github_login: login, uf, developer_id: developerId, outcome };
+    const row = { reel: c.reel, ig_user: c.igUser, github_login: login, uf, ibge: target?.ibge ?? null, developer_id: developerId, outcome };
     if (c.claimed) await sb.from("brasil_comments").update(row).eq("id", c.id);
     else await sb.from("brasil_comments").insert({ id: c.id, ...row });
-    return { outcome, login, uf, fresh: true };
+    const ask = "ask" in where ? where.ask : null;
+    return { outcome, login, uf, city: ask ? ask[0].name : (target?.name ?? null), options: ask?.map((x) => x.uf), founded, fresh: true };
   };
   if (!login) return log("no_login");
 
@@ -202,26 +291,21 @@ export async function importBrasilComment(
     if (c.kind === "city") return log("added", dev.id);
   }
 
-  const placed = await placeBrasilResident(league, { id: dev.id, login: dev.github_login }, uf, "instagram");
-  if (placed.status === "added") await emailOnMap(league, { id: dev.id, login: dev.github_login }, uf, placed.hub);
+  // A city name in several states: ask which before placing anyone.
+  if ("ask" in where) return log("which_city", dev.id);
+  const placed = await placeBrasilResident(league, { id: dev.id, login: dev.github_login }, target?.ibge ?? null, "instagram", false, !!parsed.place && !!target);
+  founded = placed.founded;
+  if (placed.status === "added") {
+    await emailOnMap({ id: dev.id, login: dev.github_login }, target, placed.founded);
+    // Someone tagged them: the friend's points go to whoever tagged them first.
+    if (c.igUser) await creditInvite(c.igUser, dev).catch((err) => console.error("[brasil] invite", err));
+  }
   return log(placed.status === "already" ? "already" : "added", dev.id);
 }
 
 /** "Você tá no mapa": the email to a dev a comment just placed (only those with an account get it). */
-async function emailOnMap(league: Pick<League, "id">, dev: { id: number; login: string }, uf: UF | null, hub: number) {
-  let founder = false;
-  if (uf) {
-    const { data: first } = await getSupabaseAdmin()
-      .from("brasil_residents")
-      .select("developer_id")
-      .eq("league_id", league.id)
-      .eq("uf", uf)
-      .order("placed_at", { ascending: true })
-      .limit(1)
-      .maybeSingle<{ developer_id: number }>();
-    founder = first?.developer_id === dev.id;
-  }
-  const city = !uf || hub === 9 ? ISLAND.name : hub === 1 ? (SECOND_CITIES[uf]?.city ?? CAPITALS[uf].city) : CAPITALS[uf].city;
+async function emailOnMap(dev: { id: number; login: string }, city: BrCity | null, founder: boolean) {
+  const uf = city?.uf ?? null;
   sendBrasilMapNotification({
     developerId: dev.id,
     login: dev.login,
@@ -230,7 +314,7 @@ async function emailOnMap(league: Pick<League, "id">, dev: { id: number; login: 
     stateThe: uf ? ptState(uf, "the") : null,
     stateIn: uf ? ptState(uf, "in") : null,
     stateOf: uf ? ptState(uf, "of") : null,
-    city: uf ? city : null,
+    city: city?.name ?? ISLAND.name,
     founder,
   });
 }
@@ -238,27 +322,19 @@ async function emailOnMap(league: Pick<League, "id">, dev: { id: number; login: 
 // ─── The week the offices come from ─────────────────────────
 
 export interface BrasilWeek {
-  /** The Monday (UTC) of the week the totals are for. */
+  /** The Monday (UTC) of the week that elects the offices. */
   weekStart: string;
-  /** No closed week yet: the totals are this week's so far. */
+  /** No closed points week yet: the offices go by this week so far. */
   provisional: boolean;
-  /** Each resident's contributions that week (login lowercase; each day capped like the towns' race). */
+  /** Each resident's points that week (login lowercase). */
   totals: Record<string, number>;
+  breakdown: Record<string, PointsBreakdown>;
+  /** This week so far (the same as the above while provisional). */
+  live: { weekStart: string; totals: Record<string, number>; breakdown: Record<string, PointsBreakdown> };
 }
 
-/** Last closed week's frozen standings (the offices hold all of this week), else this week so far. */
+/** Last closed week's points (the offices hold all of this week), else this week so far, and this week live. */
 export async function getBrasilWeek(leagueId: string): Promise<BrasilWeek> {
-  const thisWeek = weekStart(new Date());
-  const last = new Date(thisWeek.getTime() - 7 * 86_400_000);
-  const lastIso = last.toISOString().slice(0, 10);
-  const { data } = await getSupabaseAdmin()
-    .from("league_weeks")
-    .select("standings")
-    .eq("league_id", leagueId)
-    .eq("week_start", lastIso)
-    .maybeSingle<{ standings: { standings?: { login: string; total: number }[] } | null }>();
-  const frozen = data?.standings?.standings;
-  if (frozen?.length) return { weekStart: lastIso, provisional: false, totals: Object.fromEntries(frozen.map((s) => [s.login.toLowerCase(), s.total])) };
-  const live = await loadLeagueStandings({ id: leagueId }, thisWeek);
-  return { weekStart: thisWeek.toISOString().slice(0, 10), provisional: true, totals: Object.fromEntries(live.standings.map((s) => [s.login.toLowerCase(), s.total])) };
+  const { office, live, provisional } = await getOfficeAndLiveWeeks(leagueId);
+  return { ...office, provisional, live };
 }

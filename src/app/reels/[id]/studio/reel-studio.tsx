@@ -21,7 +21,9 @@ import { THEMES } from "@/components/city/theme";
 import TownReelRig from "@/components/reel/towns/TownReelRig";
 import type { LeagueCity } from "@/lib/league-city/service";
 import { brasilWorld, plainBuilding } from "@/lib/towns/brasil-world";
-import { BrasilPlacer, layoutFromResidents, type Resident, type UF } from "@/lib/towns/brasil-map";
+import type { BrasilLayout } from "@/lib/towns/brasil-map";
+import { geoAt } from "@/lib/towns/brasil-geo";
+import type { CityObject } from "@/lib/league-city/types";
 import { reelOf, type Reel } from "@/lib/reel/film";
 import type { ReelSpec } from "@/lib/reel/spec";
 
@@ -36,9 +38,11 @@ const LeagueScene = dynamic(() => import("@/components/league/LeagueScene"), { s
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), { ssr: false, loading: () => null });
 
 export interface BrasilData {
-  residents: Resident[];
+  layout: BrasilLayout;
   cityDevs: Record<string, unknown>[];
   example: Record<string, unknown> | null;
+  /** The example's lot (x, z), placed on the map server-side. */
+  exampleLot: [number, number] | null;
   norms: LayoutNorms;
 }
 
@@ -73,30 +77,26 @@ interface StageProps {
 }
 
 /** The example building: its own look (items and all), on the lot its state's next dev would get. */
-function exampleBuilding(spec: ReelSpec, residents: Resident[], record: Record<string, unknown> | null, norms: LayoutNorms): CityBuilding | null {
+function exampleBuilding(spec: ReelSpec, lot: [number, number] | null, record: Record<string, unknown> | null, norms: LayoutNorms): CityBuilding | null {
   const ex = spec.world.type === "brasil" ? spec.world.example : undefined;
-  if (!ex) return null;
-  const dev = { id: -1, login: ex.login, uf: ex.uf.toUpperCase() as UF };
-  const lot = new BrasilPlacer(residents).place(dev);
-  if (!lot) return null;
-  const { objects } = brasilWorld(layoutFromResidents([{ dev, ...lot, at: 0 }]), () => ({}) as CityBuilding, 1);
+  if (!ex || !lot) return null;
+  const objects = [{ id: "example", kind: "building", item_type: null, developer_id: -1, x: lot[0], z: lot[1], px: null, pz: null, rot: 0, is_new: false } as unknown as CityObject];
   const own = record ? generateCityLayout([record as unknown as DeveloperRecord], undefined, norms).buildings[0] : null;
   return leagueBuildings(objects, new Map([[-1, own ?? plainBuilding(ex.login)]]))[0] ?? null;
 }
 
 function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps & { data: BrasilData; children: (photoOf: (login: string) => string | null, buildingOf: (login: string) => CityBuilding | null) => ReactNode }) {
-  const { residents, cityDevs, example, norms } = data;
+  const { layout, cityDevs, example, exampleLot, norms } = data;
   const world = useMemo(() => {
-    const layout = layoutFromResidents(residents);
     const records = generateCityLayout(cityDevs as unknown as DeveloperRecord[], undefined, norms).buildings;
     const byRecord = new Map(records.map((b) => [b.loginLower, b]));
     const { objects, byDevId } = brasilWorld(layout, (dev) => byRecord.get(dev.login.toLowerCase()) ?? plainBuilding(dev.login), 1);
     const buildings = leagueBuildings(objects, scaleTownHeights(byDevId));
-    return { layout, objects, buildings, byLogin: new Map(buildings.map((b) => [b.loginLower, b])), example: exampleBuilding(spec, residents, example, norms) };
-  }, [spec, residents, cityDevs, example, norms]);
+    return { layout, objects, buildings, byLogin: new Map(buildings.map((b) => [b.loginLower, b])), example: exampleBuilding(spec, exampleLot, example, norms) };
+  }, [spec, layout, cityDevs, example, exampleLot, norms]);
   const capitalOf = useCallback(
     (uf: string): [number, number] | null => {
-      const c = world.layout.cities.find((x) => x.uf === uf.toUpperCase() && !x.second);
+      const c = world.layout.cities.find((x) => x.uf === uf.toUpperCase() && x.capital);
       return c ? lotToWorld(c.center[0], c.center[1]) : null;
     },
     [world.layout],
@@ -108,12 +108,13 @@ function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps 
       <div className="absolute inset-0">
         <BrasilScene
           embedded
+          scale={world.layout.scale}
           filmLight={spec.world.type === "brasil" ? spec.world.exposure : 1}
           cities={world.layout.cities}
           island={world.layout.island}
           objects={world.objects}
           buildings={world.buildings}
-          rig={<BrasilReelRig clock={clock} reel={reel} example={world.example} byLogin={world.byLogin} capitalOf={capitalOf} balloon={balloon} />}
+          rig={<BrasilReelRig clock={clock} reel={reel} bounds={geoAt(world.layout.scale).bounds} example={world.example} byLogin={world.byLogin} capitalOf={capitalOf} balloon={balloon} />}
         />
       </div>
       {children(photoOf, buildingOf)}

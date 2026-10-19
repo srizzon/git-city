@@ -26,7 +26,7 @@ import { loadRun, saveRun, type LocalRun } from "@/lib/drift/local";
 import { courseOf, getLiveSpot } from "@/lib/drift/spots";
 import type { LiveSpot } from "@/lib/drift/spots/types";
 import { createDriftTelemetry } from "@/lib/drift/telemetry";
-import { DRIFT_SIGN_LOT } from "@/lib/towns/brasil-drift";
+import { DRIFT_SIGN_LOT, moveOldRun } from "@/lib/towns/brasil-drift";
 
 // The Brasil town's drift track (Brasil Drift), out on the land between São
 // Paulo and Mato Grosso do Sul. From the town it's a circuit painted on the
@@ -138,7 +138,8 @@ export function DriftTag({ record, onClick }: { record: BoardRowLite | null; onC
   );
 }
 
-const toGhost = (frames: Frames, splits: number[]): GhostRun => ({ ms: frames[frames.length - 4] ?? 0, splits, frames });
+// A run driven before the track went out to sea is moved over to it.
+const toGhost = (frames: Frames, splits: number[]): GhostRun => ({ ms: frames[frames.length - 4] ?? 0, splits, frames: moveOldRun(frames) });
 
 /**
  * A drift run on the town's track: the world for the Canvas and the HUD over

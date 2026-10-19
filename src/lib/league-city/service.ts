@@ -96,21 +96,24 @@ interface CityRow {
 
 async function loadCity(leagueId: string): Promise<LeagueCity | null> {
   const sb = getSupabaseAdmin();
-  const { data: city } = await sb
+  // A failed read throws: read as "no objects" it would be cached as an empty city.
+  const { data: city, error: cityErr } = await sb
     .from("league_cities")
     .select("h, version, sky, sign_side, identity_version, logo:league_assets!league_cities_logo_asset_id_fkey(path, status)")
     .eq("league_id", leagueId)
     .maybeSingle<CityRow>();
+  if (cityErr) throw cityErr;
   if (!city) return null;
   const objects: CityObject[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data } = await sb
+    const { data, error } = await sb
       .from("league_objects")
       .select("id, kind, item_type, developer_id, x, z, px, pz, rot, is_new, props, locked")
       .eq("league_id", leagueId)
       .order("id")
       .range(from, from + 999)
       .returns<CityObject[]>();
+    if (error) throw error;
     if (!data || data.length === 0) break;
     objects.push(...data);
     if (data.length < 1000) break;

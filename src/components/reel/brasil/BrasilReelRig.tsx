@@ -6,6 +6,7 @@ import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
 import CityScene from "@/components/CityScene";
 import { townEmerald } from "@/components/league/townTheme";
+import type { Geo } from "@/lib/towns/brasil-geo";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import { cutAt, type Reel, type ReelCut } from "@/lib/reel/film";
 import { placeBalloon } from "@/components/reel/ReelOverlay";
@@ -26,6 +27,8 @@ const smoother = (x: number) => x * x * x * (x * (x * 6 - 15) + 10);
 
 export interface BrasilReelRigProps {
   clock: FilmClock;
+  /** The country's extent at the map's scale. */
+  bounds: Geo["bounds"];
   reel: Reel;
   /** The example building (on its lot), if the world has one. */
   example: CityBuilding | null;
@@ -36,7 +39,7 @@ export interface BrasilReelRigProps {
   balloon: RefObject<HTMLDivElement | null>;
 }
 
-export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf, balloon }: BrasilReelRigProps) {
+export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, capitalOf, balloon }: BrasilReelRigProps) {
   const { size } = useThree();
   const lone = useMemo(() => (example ? [example] : []), [example]);
   const buildTo = useRef(0);
@@ -69,13 +72,14 @@ export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf
     };
     return {
       aspect: size.width / size.height,
+      bounds,
       targetOf,
       riseAt: (t) => (riseCut ? smoother(ramp(t, rise.from, rise.to)) : 1),
       isRise: (cut) => cut === riseCut,
       near: (x, z, r) =>
         nearby.filter((o) => Math.abs(o.x - x) < r && Math.abs(o.z - z) < r),
     };
-  }, [size.width, size.height, example, byLogin, capitalOf, riseCut, rise, nearby]);
+  }, [size.width, size.height, bounds, example, byLogin, capitalOf, riseCut, rise, nearby]);
 
   const floors = example ? Math.max(6, example.floors || Math.round(example.height / 6)) : 1;
   const pin = useMemo(() => new THREE.Vector3(), []);

@@ -6,24 +6,30 @@
 // is imported once and answered once (importBrasilComment's `fresh`). The
 // account's own comments never count.
 //
+// Points (brasil-points-server.ts): a comment from someone on the map scores
+// on any of the account's posts, watched or not, and the friends it tags are
+// remembered for when they join.
+//
 // Reading one: a "sim" to our suggestion needs nothing more; a one-word
 // top-level comment (most of them) goes to the rules; anything else goes to
 // the model with its thread (comment-ai.ts), the rules again if the model
 // fails or the day's budget is spent. A login that isn't on GitHub gets a
-// suggestion ("É o slickinho?") when one is a typo away.
+// suggestion ("É o slickinho?") when one is a typo away; a city name several
+// states share gets "qual Santa Rita?", and the state in the answer places them.
 //
 // Limits: per Instagram account, LIMITS.perUserHour comments read and
 // LIMITS.repliesPerUserHour replies an hour (the rest are logged, unread or
 // unanswered); LIMITS.modelPerDay model reads a day for everyone. Server only.
 
 import { getSupabaseAdmin } from "../supabase";
-import { instagramComments, instagramMe, instagramThread, replyToComment } from "../instagram";
+import { instagramComments, instagramMe, instagramThread, instagramUsernameOf, replyToComment } from "../instagram";
 import { getLeagueBySlug } from "../leagues/service";
 import { BRASIL_SLUG, importBrasilComment, type ReelKind } from "./brasil-server";
 import { parseComment, replyFor } from "./brasil-comments";
 import type { UF } from "./brasil-map";
-import { confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
+import { answeredCity, confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
 import { captureServer } from "../posthog-server";
+import { creditComment, creditStory } from "./brasil-points-server";
 
 export const LIMITS = { perUserHour: 5, repliesPerUserHour: 3, modelPerDay: 2_000 } as const;
 
@@ -62,9 +68,14 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
 
   let fresh = 0;
   for (const c of comments) {
-    const w = watched.get(c.mediaId);
-    if (!w || c.igUser === own) continue;
+    if (c.igUser === own) continue;
     const id = `ig:${c.id}`;
+    const credit = () => creditComment(league.id, { id, igUser: c.igUser, text: c.text }, own).catch((err) => console.error("[brasil] comment points", c.id, err));
+    const w = watched.get(c.mediaId);
+    if (!w) {
+      await credit();
+      continue;
+    }
     try {
       // Claim the comment before reading it: a second delivery of it fails here (the id is the key), and
       // webhooks running at once for one account see each other's claims, so the hourly limit holds.
@@ -80,6 +91,7 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
           .limit(LIMITS.perUserHour);
         if (!(first ?? []).some((r: { id: string }) => r.id === id)) {
           await sb.from("brasil_comments").update({ outcome: "capped" }).eq("id", id);
+          await credit();
           continue;
         }
       }
@@ -87,11 +99,12 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
       const { reader, ...parsed } = await read(c, own);
       const r = await importBrasilComment(league, { id, reel: w.reel, kind: w.kind, igUser: c.igUser, text: c.text, parsed, claimed: true });
       if (!r.fresh) continue;
+      await credit();
       fresh++;
       await captureServer(c.igUser ? `ig:${c.igUser}` : `ig-comment:${c.id}`, "brasil_comment_imported", { outcome: r.outcome, reader, kind: w.kind, reply: !!c.parentId });
       if (r.outcome === "added" && r.login) await captureServer(r.login, w.kind === "brasil" ? "brasil_resident_added" : "city_building_from_comment", { uf: r.uf, source: "instagram" });
       const suggestion = r.outcome === "unknown_user" && r.login ? await suggestLogin(r.login) : null;
-      const reply = replyFor(r.outcome, r.login, r.uf, w.kind, suggestion);
+      const reply = replyFor(r.outcome, r.login, r.uf, w.kind, suggestion, { city: r.city, founded: r.founded, options: r.options });
       if (!reply) continue;
       if (c.igUser) {
         const { count } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", c.igUser).gte("replied_at", hourAgo());
@@ -112,8 +125,23 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
   return fresh;
 }
 
+/** Stories that tag the account (from the message webhook): each scores for whoever posted it, once a day, when they're on the map. */
+export async function handleStoryMentions(stories: { sender: string; mid: string | null }[]): Promise<void> {
+  const league = await getLeagueBySlug(BRASIL_SLUG);
+  if (!league || league.map !== "brasil") return;
+  for (const s of stories) {
+    try {
+      const igUser = await instagramUsernameOf(s.sender);
+      const scored = igUser ? await creditStory(league.id, igUser) : false;
+      await captureServer(igUser ? `ig:${igUser}` : `igsid:${s.sender}`, "brasil_story_mention", { scored, known: !!igUser });
+    } catch (err) {
+      console.error("[brasil] story mention", s.sender, err);
+    }
+  }
+}
+
 /** What a comment says: a yes to our suggestion, the rules for a plain one-word comment, else the model (the rules if it can't). */
-async function read(c: IncomingComment, own: string): Promise<{ login: string | null; uf: UF | null; reader: "rules" | "model" | "confirm" }> {
+async function read(c: IncomingComment, own: string): Promise<{ login: string | null; uf: UF | null; place: string | null; reader: "rules" | "model" | "confirm" }> {
   const rules = { ...parseComment(c.text, { ignore: [own], reply: !!c.parentId }), reader: "rules" as const };
   const plain = c.text.trim().split(/\s+/).length === 1 && !c.text.includes("@");
   if (!c.parentId && plain) return rules;
@@ -126,7 +154,9 @@ async function read(c: IncomingComment, own: string): Promise<{ login: string | 
       // no thread: read the comment alone
     }
     const yes = confirmedLogin(c.text, own, thread);
-    if (yes) return { login: yes, uf: null, reader: "confirm" };
+    if (yes) return { login: yes, uf: null, place: null, reader: "confirm" };
+    const which = answeredCity(c.text, own, thread);
+    if (which) return { ...which, reader: "confirm" };
   }
 
   const { count } = await getSupabaseAdmin()
@@ -137,7 +167,7 @@ async function read(c: IncomingComment, own: string): Promise<{ login: string | 
   const reading = await readComment({ text: c.text, commenter: c.igUser, own, thread });
   // The bot's health: how often the model fails and the rules take over.
   if (!reading) await captureServer("brasil-comment-bot", "brasil_comment_model_failed", { reply: !!c.parentId });
-  return reading ? { login: reading.login, uf: reading.uf, reader: "model" } : rules;
+  return reading ? { login: reading.login, uf: reading.uf, place: reading.place, reader: "model" } : rules;
 }
 
 /** Which of these comment ids brasil_comments already holds. */

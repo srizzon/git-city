@@ -73,6 +73,7 @@ supabase/
 - **Drive sounds** (`public/sounds/drive/*.ogg`): `engine`, `skid` and `impact` from [KenneyNL/Starter-Kit-Racing](https://github.com/KenneyNL/Starter-Kit-Racing) (CC0; the skid sound is by Landeplage, also CC0). The horn is synthesized in code, no file.
 - **San Francisco and Bay Area maps** (`public/maps/sf.json`, `public/maps/bay.json`, `src/lib/maps/bay-lots.json`): baked from [OpenStreetMap](https://www.openstreetmap.org/copyright) data (the Bay from a Geofabrik extract). OSM data is **ODbL** — the "© OpenStreetMap contributors" credit MUST stay visible on the map (rendered in `home-client.tsx`). The committed files are what ship; the bake scripts live under the gitignored `scripts/` folder and are not in the repo.
 
+- **Brazil's cities** (`src/lib/towns/br-cities.json`): the 5,571 municipalities with their IBGE codes and seats, from [kelvins/municipios-brasileiros](https://github.com/kelvins/municipios-brasileiros) (MIT, compiled from IBGE).
 - **Brazil map** (`src/lib/towns/brasil-geo.json`, `src/lib/towns/brasil-rivers.json`): the outline and states simplified from [IBGE](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html) meshes (public data, credit IBGE), the rivers from [Natural Earth](https://www.naturalearthdata.com) (public domain). The "Map data: IBGE · Natural Earth" credit stays on the Brasil map (`brasil-town.tsx`).
 
 ## Key files

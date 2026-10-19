@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getCityDevsByIds, getCityNorms } from "@/lib/leagues/queries";
 import { getLeagueBySlug } from "@/lib/leagues/service";
-import { BRASIL_SLUG, getBrasilResidents } from "@/lib/towns/brasil-server";
+import { BRASIL_SLUG, getBrasilState } from "@/lib/towns/brasil-server";
+import { BrasilMap, capitalIbge, layoutBrasil, layoutFromState, type UF } from "@/lib/towns/brasil-map";
 import { readReel } from "@/lib/reel/home";
 import { filled } from "@/lib/reel/spec";
 import { getLeagueCityDevs, getLeagueMembers } from "@/lib/leagues/queries";
@@ -46,16 +47,31 @@ export default async function ReelStudioPage({ params }: { params: Promise<{ id:
   }
   const league = await getLeagueBySlug(BRASIL_SLUG);
   if (!league) notFound();
-  // Without an asOf, the map as it is now.
-  const asOf = world.asOf ? Date.parse(world.asOf) : Infinity;
-  const residents = world.residents === "none" ? [] : (await getBrasilResidents(league.id)).filter((r) => r.at <= asOf);
+  // The map as it's stored now (asOf no longer applies: the map grows and moves its cities), or empty (Dia 1).
+  const state = world.residents === "none" ? null : await getBrasilState(league.id);
+  const layout = state ? layoutFromState(state) : layoutBrasil([]);
+  // The example building: on the lot its state's next dev would get in the capital (placed on a copy of the map).
+  let exampleLot: [number, number] | null = null;
+  if (world.example) {
+    const dev = { id: -1, login: world.example.login, uf: world.example.uf.toUpperCase() as UF };
+    const withIt = state
+      ? (() => {
+          const map = new BrasilMap(structuredClone({ scale: state.scale, cities: state.cities, residents: state.residents }));
+          // Arriving after everyone already there.
+          map.place(dev, capitalIbge(dev.uf), state.residents.reduce((m, r) => Math.max(m, r.at), 0) + 1);
+          return map.layout();
+        })()
+      : layoutBrasil([dev]);
+    const lot = [...withIt.cities, withIt.island].flatMap((c) => c.devs).find((d) => d.dev.id === -1);
+    exampleLot = lot ? [lot.x, lot.z] : null;
+  }
   const sb = getSupabaseAdmin();
   const { data: ex, error } = world.example
     ? await sb.from("developers").select("id").eq("github_login", world.example.login.toLowerCase()).maybeSingle<{ id: number }>()
     : { data: null, error: null };
   if (error) throw new Error(`The example building (${world.example?.login}): ${error.message}`);
   const [cityDevs, exampleDevs, norms] = await Promise.all([
-    getCityDevsByIds(residents.map((r) => r.dev.id)),
+    getCityDevsByIds((state?.residents ?? []).map((r) => r.dev.id)),
     getCityDevsByIds(ex ? [ex.id] : []),
     getCityNorms(),
   ]);
@@ -64,7 +80,7 @@ export default async function ReelStudioPage({ params }: { params: Promise<{ id:
       spec={spec}
       words={files.words}
       song={files.song}
-      brasil={{ residents, cityDevs, example: exampleDevs[0] ?? null, norms }}
+      brasil={{ layout, cityDevs, example: exampleDevs[0] ?? null, exampleLot, norms }}
       towns={null}
     />
   );
