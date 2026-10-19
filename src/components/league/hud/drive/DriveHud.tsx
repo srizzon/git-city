@@ -56,6 +56,8 @@ export default function DriveHud({
   map,
   emoteLog,
   onStartCrown,
+  crownHidden = false,
+  children,
   onVolume,
   onEmote,
   onResume,
@@ -89,6 +91,10 @@ export default function DriveHud({
   /** The room's last reactions, oldest first. */
   emoteLog: EmoteLog;
   onStartCrown: () => void;
+  /** Another game has the top of the screen (a city race): Crown Rush steps aside. */
+  crownHidden?: boolean;
+  /** A town's own HUD pieces (the Brasil map's races), over the rest. */
+  children?: React.ReactNode;
   onVolume: (v: number) => void;
   /** A quick reaction (lib drive/emotes slot). */
   onEmote: (e: number) => void;
@@ -280,7 +286,8 @@ export default function DriveHud({
         </div>
       )}
 
-      {ready && entered && <CrownPanel crown={crown?.crown ?? null} offset={crown?.offset ?? 0} you={crown?.you ?? null} drivers={drivers} touch={touch} onStart={onStartCrown} />}
+      {ready && entered && !crownHidden && <CrownPanel crown={crown?.crown ?? null} offset={crown?.offset ?? 0} you={crown?.you ?? null} drivers={drivers} touch={touch} onStart={onStartCrown} />}
+      {ready && entered && children}
 
       {/* Last, so they blur and cover the rest of the HUD. */}
       {!firstRun && <StartScreen ready={ready} touch={touch} />}
