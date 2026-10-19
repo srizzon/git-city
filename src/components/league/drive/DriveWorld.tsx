@@ -560,6 +560,7 @@ export default function DriveWorld({
               respawnAt={respawnAt}
               recordMs={rally.recordMs}
               startLine={rally.startLine}
+              muted={muted || paused}
             />
           )}
           {smash && (

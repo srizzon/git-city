@@ -227,7 +227,10 @@ export default function RacePanel({
   yourUf,
   onJoin,
   onRematch,
+  onResults,
 }: {
+  /** The results are up (true) or gone: the car waits while they are. */
+  onResults?: (open: boolean) => void;
   layout: BrasilLayout;
   view: RallyView | null;
   /** Your state (its points go up). */
@@ -253,6 +256,11 @@ export default function RacePanel({
     if (done) setResults(done);
     else if (r && (r.phase === "invite" || r.phase === "countdown") && results) setResults(null);
   }
+
+  const showing = !!(results?.route && you && results.racers[you] && closed !== results.id);
+  useEffect(() => {
+    onResults?.(showing);
+  }, [showing, onResults]);
 
   const cityName = (key: string) => cityByKey(layout, key)?.name ?? "?";
   const routeName = (r: { from: string; to: string }) => `${cityName(r.from)} → ${cityName(r.to)}`;
