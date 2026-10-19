@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useBeforePhysicsStep } from "@react-three/rapier";
 import * as THREE from "three";
-import type { RallyRoute, RallyState } from "@/lib/league-city/drive/rally";
+import { rallyBoxSpots, type RallyRoute, type RallyState } from "@/lib/league-city/drive/rally";
+import { BOX_REACH } from "@/lib/league-city/drive/battle";
+import { chime } from "@/lib/sfx/chime";
+import { Bursts, Crate, type VoxelBursts } from "./Voxels";
 import type { ClientMsg } from "@/lib/league-city/drive/net";
 import { M_TO_UNIT } from "@/lib/league-city/drive/tuning";
 import { carHeading, headingFromRot, placeCar } from "@/lib/league-city/drive/vehicle";
@@ -24,7 +27,9 @@ import type { BattleEvent } from "./useDrivePresence";
 // against the record's splits, records your drive for the route's ghost,
 // races the record's ghost when you're alone, and carries the room's receipt
 // for your finish to the site. The arrow over the car stays off: the banners
-// and the minimap's line show the way.
+// and the minimap's line show the way. Item boxes sit in rows across the
+// road (rally.ts): drive through one with empty hands and the room gives you
+// an attack, which Battle fires on F like any other.
 
 export interface RallyApi {
   /** Start a race on this route (the room invites everyone else). */
@@ -141,11 +146,10 @@ function Checker() {
   );
 }
 
-/** Where a gate stands, which way the cars go through it (radians about y), and the yaw that turns a banner's face to them. */
-function gatePose(route: RallyRoute, k: number): { x: number; z: number; yaw: number; face: number } {
-  const [x, z] = route.gates[k];
-  const [px, pz] = k > 0 ? route.gates[k - 1] : [route.grid[0][0], route.grid[0][1]];
-  return { x: x * M_TO_UNIT, z: z * M_TO_UNIT, yaw: Math.atan2(x - px, z - pz), face: Math.atan2(px - x, pz - z) };
+/** Where a gate stands (units), the way through it (deg clockwise from north, as a spawn), and the yaw that turns a banner's face to the cars coming. */
+function gatePose(route: RallyRoute, k: number): { x: number; z: number; rot: number; face: number } {
+  const [x, z, rot] = route.gates[k];
+  return { x: x * M_TO_UNIT, z: z * M_TO_UNIT, rot, face: (-rot * Math.PI) / 180 };
 }
 
 /** The start line (units, facing the grid): from the map when the page knows it, else just ahead of the front row. */
@@ -188,6 +192,7 @@ export default function RallyMode({
   respawnAt,
   recordMs,
   startLine,
+  muted = false,
 }: {
   slug: string;
   carRef: React.MutableRefObject<CarApi | null>;
@@ -203,7 +208,12 @@ export default function RallyMode({
   recordMs?: React.MutableRefObject<number | null>;
   /** Where the route's start line is (m), from the map. */
   startLine?: (route: RallyRoute) => { x: number; z: number; rot: number } | null;
+  muted?: boolean;
 }) {
+  const boxSpots = useRef<[number, number][]>([]);
+  const asked = useRef(new Set<string>());
+  const [takenBoxes, setTakenBoxes] = useState<Set<string>>(() => new Set());
+  const bursts = useRef<VoxelBursts | null>(null);
   const [rally, setRally] = useState<RallyState | null>(null);
   const state = useRef<RallyState | null>(null);
   const offset = useRef(0);
@@ -278,6 +288,7 @@ export default function RallyMode({
       const meId = selfId.current;
       const before = meId ? (prev?.id === e.rally.id ? prev.racers[meId]?.next : 0) : undefined;
       const after = meId ? e.rally.racers[meId]?.next : undefined;
+      if (meId && prev?.id === e.rally.id && prev.racers[meId]?.ms === null && e.rally.racers[meId]?.ms != null) stopCar.current = true;
       if (before !== undefined && after !== undefined && after > before && e.rally.phase === "live") {
         const at = e.now;
         for (let k = before; k < after; k++) {
@@ -326,7 +337,16 @@ export default function RallyMode({
   // revving on the grid never moves the car (snapping it back after a frame
   // made it hop).
   const placed = useRef<string | null>(null);
+  /** Past the line: the car stops dead (the results are up). */
+  const stopCar = useRef(false);
   useBeforePhysicsStep(() => {
+    const car = carRef.current;
+    if (stopCar.current && car) {
+      stopCar.current = false;
+      const v = car.body.linvel();
+      car.body.setLinvel({ x: 0, y: Math.min(0, v.y), z: 0 }, true);
+      car.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    }
     const s = state.current;
     const c = carRef.current;
     const me = selfId.current;
@@ -371,7 +391,7 @@ export default function RallyMode({
     if (!tele.radar.raceLine) tele.radar.raceLine = route.gates.map(([x, z]) => [x * M_TO_UNIT, z * M_TO_UNIT] as [number, number]);
     if (mine.next > 0) {
       const g = gatePose(route, mine.next - 1);
-      respawnAt.current = { x: g.x, z: g.z, rot: 180 - (g.yaw * 180) / Math.PI };
+      respawnAt.current = { x: g.x, z: g.z, rot: g.rot };
     } else {
       const [x, z, rot] = route.grid[mine.slot] ?? route.grid[0];
       respawnAt.current = { x: x * M_TO_UNIT, z: z * M_TO_UNIT, rot };
@@ -384,6 +404,20 @@ export default function RallyMode({
     if (!recorder.current.running && serverNow >= s.startsAt) recorder.current.begin(s.startsAt);
     const p = c.body.translation();
     recorder.current.push(serverNow, p.x, p.z, carHeading(c.body));
+
+    // Drive through a box with empty hands: ask the room for it (once a generation).
+    if (s.phase !== "live" || tele.held) return;
+    if (boxSpots.current.length !== s.boxGen.length) boxSpots.current = rallyBoxSpots(route);
+    boxSpots.current.forEach(([bx, bz], i) => {
+      if (serverNow < (s.boxUntil[i] ?? 0) || Math.hypot(bx - p.x, bz - p.z) > BOX_REACH) return;
+      const key = `${s.id}:${i}:${s.boxGen[i]}`;
+      if (asked.current.has(key)) return;
+      asked.current.add(key);
+      send({ t: "rally_take", box: i, gen: s.boxGen[i] });
+      setTakenBoxes((t) => new Set(t).add(key));
+      bursts.current?.burst(bx * M_TO_UNIT, 3.6, bz * M_TO_UNIT, { count: 46, speed: 32, colors: ["#ffd23f", "#ff9a3c", "#c8e64a", "#fff2c0"], size: 1.3, life: 0.7 });
+      if (!muted) chime();
+    });
   });
 
   const route = rally?.route ?? null;
@@ -392,8 +426,20 @@ export default function RallyMode({
   const racing = !!(rally && route && me && !me.gone && (rally.phase === "countdown" || (rally.phase === "live" && me.ms === null)));
   const next = me ? Math.min(me.next, (route?.gates.length ?? 1) - 1) : 0;
   const start = useMemo(() => (route ? startPose(route, startLine?.(route) ?? null) : null), [route, startLine]);
+  const serverNowRender = Date.now() + offset.current;
+  const crates =
+    racing && route && rally?.phase === "live"
+      ? rallyBoxSpots(route).flatMap(([x, z], i) => {
+          const key = `${rally.id}:${i}:${rally.boxGen[i]}`;
+          return serverNowRender < (rally.boxUntil[i] ?? 0) || takenBoxes.has(key) ? [] : [{ key, x, z }];
+        })
+      : [];
   return (
     <>
+      <Bursts ref={bursts} />
+      {crates.map((b) => (
+        <Crate key={b.key} x={b.x * M_TO_UNIT} z={b.z * M_TO_UNIT} faded={!!telemetryRef.current.held} />
+      ))}
       {racing && route && start && rally?.phase === "countdown" && (
         <group position={[start.x, 0, start.z]} rotation={[0, start.face, 0]}>
           <Checker />
