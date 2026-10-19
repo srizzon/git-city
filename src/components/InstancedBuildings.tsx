@@ -35,6 +35,7 @@ const vertexShader = /* glsl */ `
   varying vec4 vTint;
   varying float vLive;
   varying float vInvited;
+  varying float vWorldY;
   #include <common>
   #include <logdepthbuf_pars_vertex>
 
@@ -53,6 +54,7 @@ const vertexShader = /* glsl */ `
 
     vec4 mvPos = modelViewMatrix * instanceMatrix * vec4(localPos, 1.0);
     vViewPos = mvPos.xyz;
+    vWorldY = (modelMatrix * instanceMatrix * vec4(localPos, 1.0)).y;
     vInstanceId = aOwner;
 
     gl_Position = projectionMatrix * mvPos;
@@ -73,6 +75,7 @@ const fragmentShader = /* glsl */ `
   uniform float uDimEmissive;
   uniform float uCityEnergy;
   uniform float uInvitedOpacity;
+  uniform float uBuildTo;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -83,9 +86,12 @@ const fragmentShader = /* glsl */ `
   varying vec4 vTint;
   varying float vLive;
   varying float vInvited;
+  varying float vWorldY;
   #include <logdepthbuf_pars_fragment>
 
   void main() {
+    // Under construction: nothing above the floors built so far.
+    if (vWorldY > uBuildTo) discard;
     // Early discard: skip fragments fully inside fog (invisible anyway)
     float fogDepth = length(vViewPos);
     if (fogDepth > uFogFar) discard;
@@ -229,6 +235,8 @@ interface InstancedBuildingsProps {
   smash?: SmashStore;
   /** The ghost's color (the town's side). */
   ghostColor?: string;
+  /** A building going up (a film's): nothing is drawn above this world height, read every frame. */
+  buildTo?: { current: number };
 }
 
 const RISE_DURATION = 0.85; // seconds
@@ -254,6 +262,7 @@ export default memo(function InstancedBuildings({
   dimAll,
   smash,
   ghostColor = "#ffffff",
+  buildTo,
 }: InstancedBuildingsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const ghostRef = useRef<THREE.InstancedMesh>(null);
@@ -291,6 +300,7 @@ export default memo(function InstancedBuildings({
         uDimEmissive: { value: 0.5 },
         uCityEnergy: { value: 1.0 },
         uInvitedOpacity: { value: 0.35 },
+        uBuildTo: { value: 1e9 },
       },
       vertexShader,
       fragmentShader,
@@ -478,6 +488,8 @@ export default memo(function InstancedBuildings({
         lastFogFar.current = fog.far;
       }
     }
+
+    if (buildTo) material.uniforms.uBuildTo.value = buildTo.current;
 
     // Smooth lerp city energy (transition over ~5 seconds)
     const current = material.uniforms.uCityEnergy.value;

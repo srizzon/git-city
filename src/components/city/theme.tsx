@@ -199,13 +199,14 @@ export function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 }
 // ─── Theme Lights ────────────────────────────────────────────
 
-export function ThemeLights({ theme: t, themeIndex }: { theme: CityTheme; themeIndex: number }) {
+/** `light`: a film's extra fill (the ambient and sky light times this; 1 as the theme is). */
+export function ThemeLights({ theme: t, themeIndex, light = 1 }: { theme: CityTheme; themeIndex: number; light?: number }) {
   return (
     <>
-      <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
+      <ambientLight intensity={t.ambientIntensity * 3 * light} color={t.ambientColor} />
       <directionalLight position={t.sunPos} intensity={t.sunIntensity * 3.5} color={t.sunColor} />
       <directionalLight position={t.fillPos} intensity={t.fillIntensity * 3} color={t.fillColor} />
-      <hemisphereLight args={[t.hemiSky, t.hemiGround, t.hemiIntensity * 3.5]} key={`hemi-${themeIndex}`} />
+      <hemisphereLight args={[t.hemiSky, t.hemiGround, t.hemiIntensity * 3.5 * light]} key={`hemi-${themeIndex}-${light}`} />
       <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
     </>
   );

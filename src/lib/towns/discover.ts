@@ -63,15 +63,17 @@ async function loadCovers(ids: string[]): Promise<Map<string, CoverInfo>> {
       .select("league_id, sky, cover_path, logo:league_assets!league_cities_logo_asset_id_fkey(path, status)")
       .in("league_id", ids)
       .returns<{ league_id: string; sky: number; cover_path: string | null; logo: { path: string; status: string } | null }[]>(),
-    sb.from("leagues").select("id, country").in("id", ids),
+    sb.from("leagues").select("id, slug, country, map").in("id", ids),
   ]);
-  const country = new Map((leagues ?? []).map((l) => [l.id as string, (l.country as string | null) ?? null]));
+  const byId = new Map((leagues ?? []).map((l) => [l.id as string, l as { slug: string; country: string | null; map: string | null }]));
   for (const c of data ?? []) {
+    const l = byId.get(c.league_id);
     out.set(c.league_id, {
-      cover: c.cover_path ? leagueAssetUrl(c.cover_path) : null,
+      // The Brasil map has no lot city to photograph: its card draws the live map.
+      cover: l?.map === "brasil" ? `/town/${l.slug}/brasil-cover` : c.cover_path ? leagueAssetUrl(c.cover_path) : null,
       logoUrl: c.logo?.status === "active" ? leagueAssetUrl(c.logo.path) : null,
       sky: c.sky,
-      country: country.get(c.league_id) ?? null,
+      country: l?.country ?? null,
     });
   }
   return out;
@@ -80,12 +82,29 @@ async function loadCovers(ids: string[]): Promise<Map<string, CoverInfo>> {
 async function loadCatalog(): Promise<TownEntry[]> {
   const { data, error } = await getSupabaseAdmin().rpc("town_catalog");
   // PGRST202: a database without migration 141 yet (staging before its push).
-  if (error?.code === "PGRST202") return loadBasicCatalog();
+  if (error?.code === "PGRST202") return withBrasilResidents(await loadBasicCatalog());
   if (error) throw error;
-  return ((data ?? []) as (Omit<TownEntry, "id"> & { league_id: string })[]).map(({ league_id, ...t }) => ({
-    ...t,
-    id: league_id,
-  }));
+  return withBrasilResidents(
+    ((data ?? []) as (Omit<TownEntry, "id"> & { league_id: string })[]).map(({ league_id, ...t }) => ({
+      ...t,
+      id: league_id,
+    })),
+  );
+}
+
+/** A Brasil map town's buildings are its residents, not the lot objects it had before the map. */
+async function withBrasilResidents(towns: TownEntry[]): Promise<TownEntry[]> {
+  const sb = getSupabaseAdmin();
+  const { data: maps } = await sb.from("leagues").select("id").eq("map", "brasil");
+  if (!maps?.length) return towns;
+  const counts = new Map<string, number>();
+  await Promise.all(
+    maps.map(async ({ id }) => {
+      const { count } = await sb.from("brasil_residents").select("developer_id", { count: "exact", head: true }).eq("league_id", id);
+      counts.set(id as string, count ?? 0);
+    }),
+  );
+  return towns.map((t) => (counts.has(t.id) ? { ...t, buildings: counts.get(t.id)! } : t));
 }
 
 /** Towns and building counts only, no visits or edits: before migration 141. */
@@ -109,7 +128,7 @@ async function loadBasicCatalog(): Promise<TownEntry[]> {
   }));
 }
 
-const cachedCatalog = unstable_cache(loadCatalog, ["towns-catalog"], { revalidate: 300 });
+const cachedCatalog = unstable_cache(loadCatalog, ["towns-catalog-v2"], { revalidate: 300 });
 
 /**
  * Every listed town, shared by Discover, search and Surprise me. 5 minutes.
@@ -154,7 +173,7 @@ const getSharedRows = unstable_cache(
       }),
     };
   },
-  ["towns-discover-v7"],
+  ["towns-discover-v8"],
   { revalidate: 300 },
 );
 

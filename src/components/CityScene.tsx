@@ -94,6 +94,8 @@ interface CitySceneProps {
   onBuildingClick?: (building: CityBuilding) => void;
   onFocusInfo?: (info: FocusInfo) => void;
   introMode?: boolean;
+  /** A film's camera (the trailer studio): like the intro, but every building keeps its items. */
+  filmMode?: boolean;
   flyMode?: boolean;
   ghostPreviewLogin?: string | null;
   holdRise?: boolean;
@@ -104,6 +106,8 @@ interface CitySceneProps {
   /** Drive-through destruction (rival towns, see lib/league-city/smash). */
   smash?: SmashStore;
   ghostColor?: string;
+  /** A building going up (a film's): nothing is drawn above this world height. */
+  buildTo?: { current: number };
 }
 
 // Tells the loading screen the city is on screen: two rendered frames after
@@ -128,6 +132,7 @@ export default function CityScene({
   onBuildingClick,
   onFocusInfo,
   introMode,
+  filmMode,
   flyMode,
   ghostPreviewLogin,
   holdRise,
@@ -137,6 +142,7 @@ export default function CityScene({
   lowPerf,
   smash,
   ghostColor,
+  buildTo,
 }: CitySceneProps) {
   // Single atlas texture for all building windows (created once per theme)
   const atlasTexture = useMemo(() => createWindowAtlas(colors), [colors]);
@@ -222,6 +228,7 @@ export default function CityScene({
         dimAll={dimAll}
         smash={smash}
         ghostColor={ghostColor}
+        buildTo={buildTo}
       />
 
       {/* Live presence dots above active buildings */}
@@ -247,7 +254,7 @@ export default function CityScene({
         focusedBuilding={focusedBuilding}
         focusedBuildingB={focusedBuildingB}
         hideEffectsFor={hideEffectsFor}
-        introMode={introMode}
+        introMode={introMode && !filmMode}
         flyMode={flyMode}
         ghostPreviewLogin={ghostPreviewLogin}
         lowPerf={lowPerf}

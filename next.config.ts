@@ -62,7 +62,12 @@ const nextConfig: NextConfig = {
   },
   skipTrailingSlashRedirect: true,
   async redirects() {
-    return [...TOWN_REDIRECTS, ...REMOVED_PAGE_REDIRECTS];
+    return [
+      ...TOWN_REDIRECTS,
+      ...REMOVED_PAGE_REDIRECTS,
+      // Common typo of /partners
+      { source: "/partnes/:path*", destination: "/partners/:path*", permanent: true },
+    ];
   },
   async rewrites() {
     return [

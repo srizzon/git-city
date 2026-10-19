@@ -1979,6 +1979,17 @@ interface Props {
   flyEngageBoss?: (maxHp: number) => void;
   flySendBossHit?: (kind: "boss" | "minion") => void;
   flySendBossSelfHit?: () => void;
+  /**
+   * A camera that isn't the city's: a film's rig (the trailer studio). It
+   * replaces the orbit controls, hides the labels and clicks like the intro,
+   * and `skyHour` drives the time of day from it. `embedded` fills the parent
+   * instead of the viewport.
+   */
+  rig?: ReactNode;
+  skyHour?: () => number;
+  embedded?: boolean;
+  /** A film's extra light at night: the ambient fill times this (1: as the city is). */
+  filmLight?: number;
 }
 
 const _SRGB = THREE.SRGBColorSpace;
@@ -1996,7 +2007,7 @@ const _SRGB = THREE.SRGBColorSpace;
  */
 const SUN_DIST = 4000; // light distance from the scene centre
 
-function SunRig({ forceHour }: { forceHour?: number }) {
+function SunRig({ forceHour, hourAt, light = 1 }: { forceHour?: number; hourAt?: () => number; light?: number }) {
   const { scene, gl, camera } = useThree();
   const dirRef = useRef<THREE.DirectionalLight>(null);
   const ambRef = useRef<THREE.AmbientLight>(null);
@@ -2004,8 +2015,11 @@ function SunRig({ forceHour }: { forceHour?: number }) {
   const targetObj = useMemo(() => new THREE.Object3D(), []);
 
   useFrame(() => {
-    const { dir, altitudeDeg } = sunPosition(new Date(), forceHour);
+    const { dir, altitudeDeg } = sunPosition(new Date(), hourAt ? hourAt() : forceHour);
     const p = samplePalette(altitudeDeg);
+    // A film can let more light into the night (the ambient fill, and the exposure a little).
+    const ambient = p.ambientStrength * light;
+    const hemi = p.hemiStrength * light;
 
     if (dirRef.current) {
       const light = dirRef.current;
@@ -2016,12 +2030,12 @@ function SunRig({ forceHour }: { forceHour?: number }) {
     }
     if (ambRef.current) {
       ambRef.current.color.setRGB(p.ambientColor[0], p.ambientColor[1], p.ambientColor[2], _SRGB);
-      ambRef.current.intensity = p.ambientStrength;
+      ambRef.current.intensity = ambient;
     }
     if (hemiRef.current) {
       hemiRef.current.color.setRGB(p.hemiSky[0], p.hemiSky[1], p.hemiSky[2], _SRGB);
       hemiRef.current.groundColor.setRGB(p.hemiGround[0], p.hemiGround[1], p.hemiGround[2], _SRGB);
-      hemiRef.current.intensity = p.hemiStrength;
+      hemiRef.current.intensity = hemi;
     }
 
     // Fog (created by the <fog> element) — animate color + distance.
@@ -2046,7 +2060,7 @@ function SunRig({ forceHour }: { forceHour?: number }) {
     if (!(scene.background instanceof THREE.Color)) scene.background = new THREE.Color();
     scene.background.setRGB(p.bg[0], p.bg[1], p.bg[2], _SRGB);
 
-    gl.toneMappingExposure = p.exposure;
+    gl.toneMappingExposure = p.exposure * (1 + (light - 1) * 0.4);
 
     // Publish for the building shader + sky dome.
     const s = skyState;
@@ -2054,10 +2068,10 @@ function SunRig({ forceHour }: { forceHour?: number }) {
     s.sunColor = p.sunColor;
     s.sunStrength = p.sunStrength;
     s.ambientColor = p.ambientColor;
-    s.ambientStrength = p.ambientStrength;
+    s.ambientStrength = ambient;
     s.hemiSky = p.hemiSky;
     s.hemiGround = p.hemiGround;
-    s.hemiStrength = p.hemiStrength;
+    s.hemiStrength = hemi;
     s.skyTop = p.skyTop;
     s.skyHorizon = p.skyHorizon;
     s.nightFactor = p.nightFactor;
@@ -2148,7 +2162,7 @@ function NoPointLights() {
   return null;
 }
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, sfMap, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, perfMode = "high", onPerfDecline, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, focusPos, plazaCenter, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove, bossPreview, flyBossStateRef, flyEngageBoss, flySendBossHit, flySendBossSelfHit }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, sfMap, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, perfMode = "high", onPerfDecline, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, focusPos, plazaCenter, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, flyProjectilesRef, flySelfStateRef, flySelfId, flyOnShoot, flyOnReportHit, flyPvpEnabled, flyPendingRespawnRef, onCameraMove, bossPreview, flyBossStateRef, flyEngageBoss, flySendBossHit, flySendBossSelfHit, rig, skyHour, embedded, filmLight }: Props) {
   const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
   const prevComparePairRef = useRef<string>("");
 
@@ -2252,7 +2266,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       camera={{ position: sfHome ? sfHome.camPos : [-400, 450, -600], fov: 55, near: sfHome ? 6 : 0.5, far: sfHome ? 16000 : 15000 }}
       dpr={dpr}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3, logarithmicDepthBuffer: gfx.logDepth }}
-      style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
+      style={embedded ? { position: "absolute", inset: 0 } : { position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
       {showPerf && <Stats />}
       {gfx.noLights && <NoPointLights />}
@@ -2278,7 +2292,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           drives all lighting + fog + exposure; DynamicSky is the gradient sky. */}
       {sfHome && (
         <>
-          <SunRig forceHour={skyForceHour} />
+          <SunRig forceHour={skyForceHour} hourAt={skyHour} light={filmLight} />
           <DynamicSky />
         </>
       )}
@@ -2296,7 +2310,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         />
       )}
 
-      {wallpaperMode ? (
+      {rig ?? (wallpaperMode ? (
         <WallpaperOrbitScene speed={wallpaperSpeed ?? 0.08} />
       ) : (
         <>
@@ -2372,7 +2386,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
             />
           )}
         </>
-      )}
+      ))}
 
       {!sfMap && <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />}
       {sfMap && <SFMapLayers sfMap={sfMap} />}
@@ -2451,7 +2465,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           accentColor={t.building.accent}
           onBuildingClick={blockCityClicks ? undefined : onBuildingClick}
           onFocusInfo={onFocusInfo}
-          introMode={introMode}
+          introMode={introMode || !!rig}
+          filmMode={!!rig}
           flyMode={flyMode}
           ghostPreviewLogin={ghostPreviewLogin}
           holdRise={holdRise}

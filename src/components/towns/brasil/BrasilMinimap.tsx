@@ -3,7 +3,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { LOT } from "@/lib/league-city/grid";
 import { mapNav, type MapCameraStore } from "@/lib/map-nav";
-import { MAP_BOUNDS, OUTLINE } from "@/lib/towns/brasil-geo";
+import { geoAt } from "@/lib/towns/brasil-geo";
 import type { CityLayout } from "@/lib/towns/brasil-map";
 import { swatchOf } from "./stats";
 
@@ -13,12 +13,15 @@ import { swatchOf } from "./stats";
 const W = 150;
 
 export default function BrasilMinimap({
+  scale = 1,
   cities,
   island,
   camera,
   cars = [],
   track,
 }: {
+  /** How big Brazil is drawn (the layout's scale). */
+  scale?: number;
   cities: CityLayout[];
   island: CityLayout;
   camera: MapCameraStore;
@@ -27,15 +30,16 @@ export default function BrasilMinimap({
   track?: { x: number; z: number };
 }) {
   const cam = useSyncExternalStore(camera.subscribe, camera.get, camera.get);
-  const pad = 600;
-  const x0 = MAP_BOUNDS.minX - pad;
-  const z0 = MAP_BOUNDS.minZ - pad;
-  const span = Math.max(MAP_BOUNDS.maxX - MAP_BOUNDS.minX, MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ) + pad * 2;
+  const { bounds, outline } = geoAt(scale);
+  const pad = 600 * scale;
+  const x0 = bounds.minX - pad;
+  const z0 = bounds.minZ - pad;
+  const span = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) + pad * 2;
   const k = W / span;
-  const path = useMemo(() => OUTLINE.map((r) => `M${r.map(([x, z]) => `${((x - x0) * k).toFixed(1)},${((z - z0) * k).toFixed(1)}`).join("L")}Z`).join(""), [x0, z0, k]);
+  const path = useMemo(() => outline.map((r) => `M${r.map(([x, z]) => `${((x - x0) * k).toFixed(1)},${((z - z0) * k).toFixed(1)}`).join("L")}Z`).join(""), [outline, x0, z0, k]);
   const dot = (c: CityLayout) => {
     const [x, z] = c.hub;
-    return { cx: (x * LOT - x0) * k, cy: (z * LOT - z0) * k, r: Math.min(5, 1.2 + Math.sqrt(c.devs.length) * 0.35) };
+    return { cx: (x * LOT - x0) * k, cy: (z * LOT - z0) * k, r: Math.min(5, 0.8 + Math.sqrt(c.devs.length) * 0.35) };
   };
   const click = (e: React.MouseEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -49,7 +53,7 @@ export default function BrasilMinimap({
         <path d={path} fill="#1d2634" stroke="#4b5466" strokeWidth={1} />
         {[...cities, island].map((c) => {
           const d = dot(c);
-          return <circle key={`${c.uf ?? "isl"}-${c.second ? 2 : 1}`} cx={d.cx} cy={d.cy} r={d.r} fill={c.uf ? swatchOf(c.uf) : "#c8e64a"} stroke="#0b0d12" strokeWidth={0.8} opacity={c.devs.length ? 1 : 0.35} />;
+          return <circle key={c.key} cx={d.cx} cy={d.cy} r={d.r} fill={c.uf ? swatchOf(c.uf) : "#c8e64a"} stroke="#0b0d12" strokeWidth={0.8} opacity={c.devs.length ? 1 : 0.35} />;
         })}
         {cars.map((c, i) => (
           <rect key={i} x={(c.x - x0) * k - 2.5} y={(c.z - z0) * k - 2.5} width={5} height={5} fill="#e8dcc8" stroke="#0b0d12" strokeWidth={1} />

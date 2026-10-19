@@ -394,6 +394,11 @@ export default function Studio<S extends string>({
         song: film.song ?? null,
         sounds: film.sounds,
       }),
+      // The stage goes full frame before the clocks stop, so canvases resize on real time.
+      prepare: () => {
+        rec.current = true;
+        setRecording(true);
+      },
       start: () => {
         exporting.current = true;
         rec.current = true;

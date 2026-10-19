@@ -16,9 +16,13 @@ export const MAX_DRIVERS = 30;
 export const MAX_MESSAGE_BYTES = 512;
 /** The one bigger message: `auth`, which carries a Supabase access token. */
 export const MAX_AUTH_BYTES = 4096;
-/** Physics works in meters; a 40-lot city spans ±400 m. Anything past this is junk. */
-/** Farthest a car can be from the city's middle (m): the Brasil map reaches ~6.6 km; anything past this is junk. */
-export const COORD_MAX = 8000;
+/**
+ * Farthest a car can be from the town's middle (m); anything past this is
+ * junk. Physics works in meters; a 40-lot city spans ±400 m. The Brasil map
+ * reaches ~6.6 km and grows with its cities (brasil-geo's scale): room for
+ * Brazil seven times as big.
+ */
+export const COORD_MAX = 50_000;
 
 /** A bump is a velocity change (m/s) for the car that was hit; capped. */
 export const BUMP_MAX = 25;

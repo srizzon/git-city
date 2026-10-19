@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Car, ChevronLeft, Code2, Instagram, Landmark, Map as MapIcon, MessageCircle, Trophy, UserPlus, Vote as VoteIcon, type LucideIcon } from "lucide-react";
+import { Building2, Car, ChevronLeft, Landmark, Map as MapIcon, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import posthog from "posthog-js";
@@ -42,19 +42,20 @@ import ElectionPanel from "@/components/towns/brasil/ElectionPanel";
 import ApuracaoWidget from "@/components/towns/brasil/ApuracaoWidget";
 import StateCard from "@/components/towns/brasil/StateCard";
 import { stateStats, swatchOf, weekCrown, type StateStats } from "@/components/towns/brasil/stats";
-import { ptState, stateOf, type BrasilLayout, type CityLayout, type UF } from "@/lib/towns/brasil-map";
+import { stateOf, type BrasilLayout, type CityLayout, type UF } from "@/lib/towns/brasil-map";
+import type { BrCity } from "@/lib/towns/br-cities";
 import { brasilWorld, plainBuilding } from "@/lib/towns/brasil-world";
 import { brasilOffices, officeLabel, type Office } from "@/lib/towns/brasil-roles";
 import type { BrasilWeek } from "@/lib/towns/brasil-server";
 import type { Count, ElectionView } from "@/lib/towns/brasil-election-server";
-import { POINTS, totalOf, type PointsBreakdown } from "@/lib/towns/brasil-points";
 
 // The Brasil town's page: the map of Brazil with the town's residents, each
-// in their state's city, their buildings sized like everywhere in Git City.
-// Over it: the counter and the top states; a bar to search the map, rank the
-// states and pick your state; a state's card from its tag, a dev's from their
+// in their city, their buildings sized like everywhere in Git City. Over it:
+// the counter and the top states; a bar to search the map, rank the states
+// and pick your city; a state's card from a capital's tag, a dev's from their
 // building; the compass, the zoom and a minimap. ?uf=SP opens a state,
-// ?at=login a building. Driving across the drift track's START line (between
+// ?cidade=campinas-sp a city, ?at=login a building. A resident who only ever
+// named a state is asked once which city they're from. Driving across the drift track's START line (between
 // São Paulo and Rio) turns the drive into a drift run there (BrasilDrift).
 
 export interface BrasilTownProps {
@@ -64,10 +65,12 @@ export interface BrasilTownProps {
   cityDevs: Record<string, unknown>[];
   cityNorms: LayoutNorms;
   viewerLogin: string | null;
-  /** Where the viewer lives on the map, or null when they're not on it. */
-  home: UF | "island" | null;
-  /** Open on a state or a building. */
-  startAt: { uf: string } | { login: string } | null;
+  /** Where the viewer lives on the map (their city's IBGE code; null: the island), and whether they named it; null when they're not on it. */
+  home: { city: number | null; picked: boolean } | null;
+  /** Open on a state, a city (its slug) or a building. */
+  startAt: { uf: string } | { city: string } | { login: string } | null;
+  /** When Brazil last grew to make room for its cities (ms), or null: the ticker says so for a day. */
+  grewAt?: number | null;
   /** ?pick=1, back from signing in after a guest's free building: open the state picker if you're not on the map. */
   startPick?: boolean;
   /** The week's points the offices come from (last closed week, or this week so far before the first one closes), and this week's. */
@@ -92,7 +95,7 @@ const HUD_BG = "bg-bg/90";
 const HUD_EDGE = "border-border";
 const HUD_SOFT = "text-muted";
 
-export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, week: officeWeek, election, count = null, startVote = null }: BrasilTownProps) {
+export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, grewAt = null, week: officeWeek, election, count = null, startVote = null }: BrasilTownProps) {
   const router = useRouter();
   const camera = useRef<CameraApi | null>(null);
   const cameraStore = useMemo(() => createCameraStore(), []);
@@ -115,16 +118,14 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const [focused, setFocused] = useState<CityBuilding | null>(null);
   /** The state card a building was opened from: closing the building brings it back. */
   const [backTo, setBackTo] = useState<StateStats | null>(null);
-  /** The state picker under the search, for a username typed there (null: yours). */
-  const [picker, setPicker] = useState<{ forLogin: string | null } | null>(null);
-  const [joining, setJoining] = useState<{ pending: UF | "island" | null; error: string | null }>({
+  /** The city picker under the search, for a username typed there (null: yours), maybe opened on a city to found. */
+  const [picker, setPicker] = useState<{ forLogin: string | null; query?: string } | null>(null);
+  const [joining, setJoining] = useState<{ pending: { ibge: number | null; name: string } | null; error: string | null }>({
     pending: null,
     error: null,
   });
-  /** Just placed: where, until the refreshed map has the building (then the camera goes there). */
-  const [arriving, setArriving] = useState<{ uf: UF | null } | null>(null);
-  /** The arrival the open card celebrates, and the ring under the new lot. */
-  const [arrived, setArrived] = useState<{ login: string; uf: UF | null } | null>(null);
+  /** Just placed: in which city (null: the island), until the refreshed map has the building (then the camera goes there). */
+  const [arriving, setArriving] = useState<{ city: number | null } | null>(null);
   const [pulse, setPulse] = useState<{ x: number; z: number; key: number } | null>(null);
   const [now] = useState(() => Date.now());
   /** Up close, the city the camera looks at (its cityKey). */
@@ -150,13 +151,13 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setPanel(p);
   };
   /** The picker takes over: cards and panels close. */
-  const openPicker = (forLogin: string | null) => {
+  const openPicker = (forLogin: string | null, query?: string) => {
     setState(null);
     setFocused(null);
     setBackTo(null);
     setPanel(null);
     setJoining({ pending: null, error: null });
-    setPicker({ forLogin });
+    setPicker({ forLogin, query });
     posthog.capture("brasil_picker_opened", { signed_in: !!viewerLogin, on_map: !!home });
   };
 
@@ -168,16 +169,17 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const placed = new Map(buildings.map((b) => [b.loginLower, b]));
     const states = stateStats(layout, placed, now);
     const devs = [...layout.cities, layout.island].reduce((n, c) => n + c.devs.length, 0);
-    const founders = layout.cities.filter((c) => !c.second && c.devs.length > 0).length;
-    // Which state each resident said, for their card.
-    const ufOf = new Map([...layout.cities, layout.island].flatMap((c) => c.devs.map((d) => [d.dev.login.toLowerCase(), { uf: d.dev.uf, founder: d.founder }] as const)));
+    const founded = layout.cities.filter((c) => c.devs.length > 0).length;
+    // Each resident's state and whether they founded their city, for their card.
+    const ufOf = new Map([...layout.cities, layout.island].flatMap((c) => c.devs.map((d) => [d.dev.login.toLowerCase(), { uf: c.uf, founder: d.founder }] as const)));
     const allCities = [...layout.cities, layout.island];
     const cityByKey = new Map(allCities.map((c) => [cityKey(c), c]));
+    const cityBySlug = new Map(allCities.filter((c) => c.slug).map((c) => [c.slug!, c]));
     const cityOfLogin = new Map(allCities.flatMap((c) => c.devs.map((d) => [d.dev.login.toLowerCase(), c] as const)));
     const week = weekCrown(layout, now);
     // Who arrived in the last day, newest first: the ticker over the bar and the "new" name plates.
     const arrivals = allCities
-      .flatMap((c) => c.devs.map((d) => ({ login: d.dev.login, uf: d.dev.uf, at: d.at })))
+      .flatMap((c) => c.devs.map((d) => ({ login: d.dev.login, where: c.ibge === null ? "island" : c.name, at: d.at })))
       .filter((a) => now - a.at < 86_400_000)
       .sort((a, b) => b.at - a.at);
     const fresh = new Set(arrivals.map((a) => a.login.toLowerCase()));
@@ -190,7 +192,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const plateOffice = new Map([...offices.byLogin].map(([l, os]) => [l, SHORT[os[0].kind]]));
     // Each state's place in the week's race: the States table's order.
     const racePlace = new Map([...states].sort((a, b) => (statePoints[b.uf] ?? 0) - (statePoints[a.uf] ?? 0) || b.devs - a.devs || a.name.localeCompare(b.name)).map((st, i) => [st.uf, i + 1]));
-    return { objects, buildings, placed, states, devs, founders, ufOf, allCities, cityByKey, cityOfLogin, week, arrivals, fresh, offices, plateOffice, statePoints, racePlace };
+    return { objects, buildings, placed, states, devs, founded, ufOf, allCities, cityByKey, cityBySlug, cityOfLogin, week, arrivals, fresh, offices, plateOffice, statePoints, racePlace };
   }, [layout, cityDevs, cityNorms, now, officeWeek, election]);
 
   const smash = useMemo(() => smashStoreFor(world.buildings), [world.buildings]);
@@ -353,8 +355,11 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       applying.current = true;
       const at = q.get("at");
       const uf = q.get("uf");
+      const cidade = q.get("cidade");
       const b = at ? world.placed.get(at.toLowerCase()) : undefined;
+      const city = cidade ? world.cityBySlug.get(cidade) : undefined;
       if (b) openBuilding(b);
+      else if (city) openCity(city);
       else if (uf && world.states.some((s) => s.uf === uf)) openState(uf as UF);
       else if (state) toBrazil();
       else {
@@ -366,20 +371,24 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [world, openBuilding, openState, toBrazil, state]);
+  }, [world, openBuilding, openState, toBrazil, state]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** A capital opens its state's card; any other city, the camera over it and its link. */
   const openCity = useCallback(
     (c: CityLayout) => {
-      if (c.uf) return openState(c.uf);
+      if (c.uf && c.capital) return openState(c.uf);
+      if (c.slug) pushUrl(`cidade=${c.slug}`);
       setState(null);
+      setFocused(null);
       setPanel(null);
+      setPicker(null);
       camera.current?.flyTo(c.center, c.radius);
     },
-    [openState],
+    [openState, pushUrl],
   );
 
   // Who comes, and how: the top of the comment → visit → building funnel.
   useEffect(() => {
-    posthog.capture("brasil_map_viewed", { signed_in: !!viewerLogin, on_map: !!home, link: startAt ? ("uf" in startAt ? "state" : "building") : null });
+    posthog.capture("brasil_map_viewed", { signed_in: !!viewerLogin, on_map: !!home, link: startAt ? ("uf" in startAt ? "state" : "city" in startAt ? "city" : "building") : null });
     // Once per page load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -396,15 +405,21 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           openState(uf);
           posthog.capture("brasil_state_opened", { uf, from: "link" });
         }
+      } else if ("city" in startAt) {
+        const c = world.cityBySlug.get(startAt.city);
+        if (c) {
+          openCity(c);
+          posthog.capture("brasil_city_opened", { city: c.ibge, from: "link" });
+        }
       } else {
         const b = world.placed.get(startAt.login);
-        // Back from signing in after the free building: on the map is joining, so pick your state.
+        // Back from signing in after the free building: on the map is joining, so pick your city.
         if (startPick && viewerLogin && !home) openPicker(null);
         else if (b) openBuilding(b);
       }
     }, 600);
     return () => clearTimeout(t);
-  }, [startAt, world, openState, openBuilding, startPick, viewerLogin, home]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [startAt, world, openState, openCity, openBuilding, startPick, viewerLogin, home]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Where you are: the building's city, the open state, or the city the camera is over.
   const place = (focused ? world.cityOfLogin.get(focused.loginLower) : undefined) ?? state?.capital ?? (viewKey ? world.cityByKey.get(viewKey) : undefined) ?? null;
@@ -426,7 +441,6 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** ‹: one step up. A building goes back to its state's card (or just closes), a city to the whole country, the country to the towns. */
   const closeBuilding = () => {
     setFocused(null);
-    setArrived(null);
     // Opened from a state's card: back to it, and back over its city.
     if (backTo) {
       setState(backTo);
@@ -620,18 +634,18 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const t = setTimeout(() => setCurtain(null), 5000);
     return () => clearTimeout(t);
   }, [curtain]);
-  const pickState = async (uf: UF | null) => {
-    setJoining({ pending: uf ?? "island", error: null });
+  const pickCity = async (city: { ibge: number | null; name: string }) => {
+    setJoining({ pending: city, error: null });
     try {
       const res = await fetch(`/api/towns/${league.slug}/brasil/place`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uf }),
+        body: JSON.stringify({ city: city.ibge }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) return setJoining({ pending: null, error: body.error ?? "Couldn't put you on the map." });
       // The picker stays (saying "finding your lot") until the refreshed map has the building.
-      setArriving({ uf });
+      setArriving({ city: city.ibge });
       router.refresh();
     } catch {
       setJoining({ pending: null, error: "Couldn't put you on the map." });
@@ -643,7 +657,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     if (!arriving || !viewerLogin) return;
     const login = viewerLogin.toLowerCase();
     const b = world.placed.get(login);
-    if (!b || (world.ufOf.get(login)?.uf ?? null) !== arriving.uf) return;
+    if (!b || (world.cityOfLogin.get(login)?.ibge ?? null) !== arriving.city) return;
     const t = setTimeout(() => {
       setArriving(null);
       setPicker(null);
@@ -657,7 +671,6 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         setPanel("election");
         return;
       }
-      setArrived({ login, uf: arriving.uf });
       openBuilding(b);
     }, 0);
     return () => clearTimeout(t);
@@ -677,13 +690,33 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     void signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=/town/${league.slug}`);
   };
 
-  const yours = home && home !== "island" ? home : null;
+  /** Your state, from your city. */
+  const homeCity = viewerLogin ? world.cityOfLogin.get(viewerLogin.toLowerCase()) : undefined;
+  const yours = homeCity?.uf ?? null;
+  /** On the map with only a state: asked once which city (until they pick one or wave it off). */
+  const [askCity, setAskCity] = useState(() => {
+    if (!home || home.picked || home.city === null) return false;
+    try {
+      return window.localStorage.getItem("gc:brasil-ask-city") !== "no";
+    } catch {
+      return true;
+    }
+  });
+  const dismissAsk = () => {
+    setAskCity(false);
+    try {
+      window.localStorage.setItem("gc:brasil-ask-city", "no");
+    } catch {
+      // private mode: asked again next time
+    }
+  };
   const top = world.states.filter((s) => s.devs > 0).slice(0, 3);
   const bar = "flex flex-col items-center justify-center gap-1 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
 
   return (
     <main className="fixed inset-0 bg-bg font-pixel uppercase text-cream">
       <BrasilScene
+        scale={layout.scale}
         cities={layout.cities}
         island={layout.island}
         objects={world.objects}
@@ -691,7 +724,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         cameraApi={camera}
         cameraStore={cameraStore}
         onTag={(c) => {
-          if (c.uf) posthog.capture("brasil_state_opened", { uf: c.uf, from: "tag" });
+          if (c.uf && c.capital) posthog.capture("brasil_state_opened", { uf: c.uf, from: "tag" });
+          else posthog.capture("brasil_city_opened", { city: c.ibge, from: "tag" });
           openCity(c);
         }}
         onBuildingClick={(b) => {
@@ -736,14 +770,14 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               {place ? (
                 <>
                   <span className="h-2 w-2 shrink-0 border border-border-light" style={{ background: place.uf ? swatchOf(place.uf) : LIME }} aria-hidden />
-                  <span className="truncate text-cream">{place.uf ? place.name : "Island"}</span>
-                  <span className={`shrink-0 ${HUD_SOFT}`}>· {fmt(place.devs.length)} devs</span>
+                  <span className="truncate text-cream">{place.ibge !== null ? place.name : "Island"}</span>
+                  <span className={`shrink-0 ${HUD_SOFT}`}>· {fmt(place.devs.length)} {place.devs.length === 1 ? "dev" : "devs"}</span>
                 </>
               ) : (
                 <>
                   <span style={{ color: LIME }}>Brasil</span>
                   <span className="text-cream">· {fmt(world.devs)} devs</span>
-                  <span className={`truncate ${HUD_SOFT} max-sm:hidden`}>· {world.founders} of 27 states</span>
+                  <span className={`truncate ${HUD_SOFT} max-sm:hidden`}>· {fmt(world.founded)} cities</span>
                 </>
               )}
             </p>
@@ -782,6 +816,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               setPicker(null);
               openCity(c);
             }}
+            onFound={(c: BrCity) => {
+              posthog.capture("brasil_search", { picked: "unfounded", uf: c.uf });
+              openPicker(null, c.name);
+            }}
             onPickBuilding={(b) => {
               posthog.capture("brasil_search", { picked: "building", self: b.loginLower === viewerLogin?.toLowerCase() });
               setPicker(null);
@@ -794,13 +832,21 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           />
           {picker && (
             <BrasilPicker
+              key={picker.query ?? ""}
               signedIn={!!viewerLogin}
               viewerLogin={viewerLogin}
               forLogin={picker.forLogin}
-              current={home}
+              cities={layout.cities}
+              current={home ? (home.city === null ? "island" : home.city) : null}
               pending={joining.pending}
               error={joining.error}
-              onPick={pickState}
+              initialQuery={picker.query}
+              firstPick={!!home && !home.picked}
+              onPick={(c) => {
+                posthog.capture("brasil_city_picked", { city: c.ibge, founding: c.ibge !== null && !layout.cities.some((x) => x.ibge === c.ibge && x.devs.length > 0) });
+                setAskCity(false);
+                void pickCity(c);
+              }}
               onSignIn={signIn}
               onClose={() => {
                 backToVote.current = null;
@@ -842,16 +888,29 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           <MapNavControls camera={cameraStore} accent={LIME} showPlaces={false} />
         </div>
       )}
-      {!inCar && <BrasilMinimap cities={layout.cities} island={layout.island} camera={cameraStore} cars={carSpots} track={DRIFT_TAG} />}
+      {!inCar && askCity && !picker && !state && !focused && !panel && (
+        <div className="pointer-events-auto absolute bottom-[110px] left-1/2 z-20 flex w-[min(420px,calc(100vw-24px))] -translate-x-1/2 items-center gap-3 border-[3px] border-lime bg-bg/95 px-3 py-2 sm:bottom-[76px]">
+          <p className="min-w-0 flex-1 text-[11px] text-cream">Which city are you from?</p>
+          <button type="button" onClick={() => openPicker(null)} className="btn-press shrink-0 bg-lime px-2.5 py-1.5 text-[10px] text-bg">
+            Pick my city
+          </button>
+          <button type="button" onClick={dismissAsk} aria-label="Not now" className="shrink-0 text-[10px] text-muted hover:text-cream">
+            ✕
+          </button>
+        </div>
+      )}
+      {!inCar && <BrasilMinimap scale={layout.scale} cities={layout.cities} island={layout.island} camera={cameraStore} cars={carSpots} track={DRIFT_TAG} />}
       {!inCar && (
         <span className="pointer-events-none fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 max-sm:bottom-[66px] max-sm:text-[8px]">
           Map data: IBGE · Natural Earth
         </span>
       )}
 
-      {!inCar && !state && !focused && !panel && !picker && world.arrivals.length > 0 && (
+      {!inCar && !state && !focused && !panel && !picker && !askCity && (world.arrivals.length > 0 || (grewAt !== null && now - grewAt < 86_400_000)) && (
         <Arrivals
           arrivals={world.arrivals}
+          grew={grewAt !== null && now - grewAt < 86_400_000 ? { scale: layout.scale, at: grewAt } : null}
+          onBrazil={() => camera.current?.flyTo(null)}
           onPick={(login) => {
             const b = world.placed.get(login.toLowerCase());
             if (!b) return;
@@ -997,6 +1056,12 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             openBuilding(b);
             setBackTo(state);
           }}
+          onPickCity={(c) => {
+            posthog.capture("brasil_city_opened", { city: c.ibge, from: "state_card" });
+            setState(null);
+            camera.current?.flyTo(c.center, c.radius);
+            if (c.slug) pushUrl(`cidade=${c.slug}`);
+          }}
           onDriveHere={state.devs > 0 ? () => startDrive() : undefined}
           week={world.week}
           race={{ place: world.racePlace.get(state.uf) ?? 27, points: world.statePoints[state.uf] ?? 0 }}
@@ -1004,7 +1069,12 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             provisional: officeWeek.provisional,
             governor: world.offices.governors.get(state.uf) ?? null,
             senators: world.offices.senators.get(state.uf) ?? [],
-            mayor: state.second ? (world.offices.mayors.get(state.second.name) ? { city: state.second.name, login: world.offices.mayors.get(state.second.name)!.login } : null) : null,
+            mayors: state.cities
+              .flatMap((c) => {
+                const m = world.offices.mayors.get(c.key);
+                return m ? [{ city: m.city, login: m.login }] : [];
+              })
+              .slice(0, 3),
             totals: officeWeek.totals,
           }}
           onClose={() => {
@@ -1018,24 +1088,26 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           key={focused.loginLower}
           building={focused}
           viewerLogin={viewerLogin}
+          lean
           section={
-            <>
-              {arrived?.login === focused.loginLower && (
-                <Arrival login={arrived.login} uf={arrived.uf} states={world.states} founder={!!world.ufOf.get(focused.loginLower)?.founder} townPath={`/town/${league.slug}`} />
-              )}
-              <ResidentRow
-                offices={world.offices.byLogin.get(focused.loginLower) ?? []}
-                weekly={officeWeek.totals[focused.loginLower] ?? 0}
-                provisional={officeWeek.provisional}
-                live={officeWeek.live.breakdown[focused.loginLower] ?? null}
-                login={focused.loginLower}
-                ufOf={world.ufOf}
-                states={world.states}
-                onState={openState}
-                onMove={viewerLogin?.toLowerCase() === focused.loginLower ? () => openPicker(null) : undefined}
-              />
-            </>
+            <PlaceRow
+              login={focused.loginLower}
+              city={world.cityOfLogin.get(focused.loginLower) ?? null}
+              offices={world.offices.byLogin.get(focused.loginLower) ?? []}
+              onCity={openCity}
+              onState={openState}
+              onMove={viewerLogin?.toLowerCase() === focused.loginLower ? () => openPicker(null) : undefined}
+            />
           }
+          stats={[
+            { label: "Pts this week", value: fmt(officeWeek.live.totals[focused.loginLower] ?? 0) },
+            { label: "Rank", value: `#${fmt(focused.rank ?? 0)}` },
+            { label: "Contribs", value: fmt(focused.contributions ?? 0) },
+            { label: "Stars", value: fmt(focused.total_stars ?? 0) },
+            { label: "+1s", value: fmt(focused.kudos_count ?? 0) },
+            { label: "Visits", value: fmt(focused.visit_count ?? 0) },
+          ]}
+          primary={<InviteButton login={focused.loginLower} city={world.cityOfLogin.get(focused.loginLower) ?? null} founder={!!world.ufOf.get(focused.loginLower)?.founder} townPath={`/town/${league.slug}`} onPickCity={() => openPicker(null)} />}
           onDriveTo={() => startDrive()}
           onClose={closeBuilding}
         />
@@ -1077,7 +1149,7 @@ function AreaTitle({ telemetry, cities }: { telemetry: { radar: { x: number; z: 
   return (
     <div key={shown.at} className="area-title pointer-events-none fixed inset-x-0 top-[22%] z-30 flex flex-col items-center gap-1.5 text-center font-pixel uppercase">
       {c.uf && stateOf(c.uf).name !== c.name && <span className="text-[10px] tracking-[0.3em] text-muted">{stateOf(c.uf).name}</span>}
-      <span className="text-3xl text-cream [text-shadow:0_3px_0_rgba(0,0,0,0.6)] sm:text-5xl">{c.uf ? c.name : "The island"}</span>
+      <span className="text-3xl text-cream [text-shadow:0_3px_0_rgba(0,0,0,0.6)] sm:text-5xl">{c.ibge !== null ? c.name : "The island"}</span>
       <span className="text-[10px] text-lime">{fmt(c.devs.length)} devs live here</span>
     </div>
   );
@@ -1109,7 +1181,7 @@ function DriversList({
       }
     }
     if (!best) return "";
-    const name = best.uf ? best.name : "the island";
+    const name = best.ibge !== null ? best.name : "the island";
     return bestD < (best.radius + 12) * LOT ? name : `near ${name}`;
   };
   return (
@@ -1151,22 +1223,39 @@ function ago(at: number, now: number): string {
 }
 
 /**
- * Who just arrived, one at a time over the bar: "@login just arrived · SP · 3m",
+ * Who just arrived, one at a time over the bar: "@login just arrived · Campinas · 3m",
  * a tap away from their building. Whoever commented on the reel opens the map
- * and sees their name go by.
+ * and sees their name go by. When Brazil grew in the last day to make room
+ * for its cities, that goes by first.
  */
-function Arrivals({ arrivals, onPick }: { arrivals: { login: string; uf: UF | null; at: number }[]; onPick: (login: string) => void }) {
+function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: string; where: string; at: number }[]; grew: { scale: number; at: number } | null; onPick: (login: string) => void; onBrazil: () => void }) {
   const [i, setI] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const n = Math.min(arrivals.length, 12) + (grew ? 1 : 0);
   useEffect(() => {
-    if (arrivals.length < 2) return;
+    if (n < 2) return;
     const t = setInterval(() => {
-      setI((n) => (n + 1) % Math.min(arrivals.length, 12));
+      setI((k) => (k + 1) % n);
       setNow(Date.now());
     }, 4000);
     return () => clearInterval(t);
-  }, [arrivals.length]);
-  const a = arrivals[i % arrivals.length];
+  }, [n]);
+  const k = i % n;
+  if (grew && k === 0)
+    return (
+      <button
+        key="grew"
+        type="button"
+        onClick={onBrazil}
+        className="pointer-events-auto absolute bottom-[70px] left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream sm:bottom-[72px]"
+      >
+        <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
+        <span className="shrink-0 text-cream">Brazil grew</span>
+        <span className="shrink-0 text-lime">{grew.scale}x</span>
+        <span className="shrink-0">{ago(grew.at, now)}</span>
+      </button>
+    );
+  const a = arrivals[(k - (grew ? 1 : 0)) % arrivals.length];
   return (
     <button
       key={a.login}
@@ -1177,135 +1266,79 @@ function Arrivals({ arrivals, onPick }: { arrivals: { login: string; uf: UF | nu
       <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
       <span className="truncate normal-case text-cream">@{a.login}</span>
       <span className="shrink-0">just arrived</span>
-      <span className="shrink-0 text-lime">{a.uf ?? "island"}</span>
+      <span className="min-w-0 truncate text-lime">{a.where}</span>
       <span className="shrink-0">{ago(a.at, now)}</span>
     </button>
   );
 }
 
-/** Your card right after you're placed: where you landed, what you are there, and the invite. */
-function Arrival({ login, uf, states, founder, townPath }: { login: string; uf: UF | null; states: StateStats[]; founder: boolean; townPath: string }) {
+/** The one filled button on your own building: invite people to your city (or pick one, on the island). */
+function InviteButton({ login, city, founder, townPath, onPickCity }: { login: string; city: CityLayout | null; founder: boolean; townPath: string; onPickCity: () => void }) {
   const [copied, setCopied] = useState(false);
-  const s = uf ? states.find((x) => x.uf === uf) : null;
+  if (!city || city.ibge === null)
+    return (
+      <button type="button" onClick={onPickCity} className="btn-press w-full bg-lime py-2 text-[10px] text-bg">
+        Pick your city
+      </button>
+    );
   const invite = () => {
-    // Your link: its share card says where you live.
-    const url = `${window.location.origin}${townPath}?at=${login}`;
+    // A founder shares their city (its card names them); anyone else, their own building.
+    const url = founder && city.slug ? `${window.location.origin}${townPath}?cidade=${city.slug}` : `${window.location.origin}${townPath}?at=${login}`;
     // Shared on WhatsApp and stories, by and to Brazilians: Portuguese, one line, the link does the rest.
-    const text = founder && uf ? `Fundei ${ptState(uf, "the")} no mapa dos devs 🇧🇷 ${url}` : `Tô no mapa dos devs do Brasil 🇧🇷 ${url}`;
-    posthog.capture("brasil_invite_copied", { uf, from: "arrival" });
+    const text = founder ? `Fundei ${city.name} no mapa dos devs 🇧🇷 Bora morar aqui: ${url}` : `Tô em ${city.name} no mapa dos devs 🇧🇷 ${url}`;
+    posthog.capture("brasil_invite_copied", { uf: city.uf, city: city.ibge, from: "building" });
     navigator.clipboard?.writeText(text).then(
       () => setCopied(true),
       () => setCopied(false),
     );
   };
   return (
-    <div className="mx-4 mb-3 border-2 border-lime px-3 py-2.5">
-      <p className="text-[8px] text-lime">You&apos;re on the map</p>
-      <p className="mt-1 text-sm text-cream">{s ? (founder ? `Founder of ${s.name}` : `You're in ${s.name}`) : "You're on the island"}</p>
-      <p className="mt-0.5 text-[9px] normal-case text-muted">
-        {s ? (founder ? `The first dev in ${s.uf}. Everyone after you lives in your city.` : `Dev #${fmt(s.devs)} in ${s.uf} · #${s.place} of 27 states`) : "No state yet. Pick one anytime with Move."}
-      </p>
-      <button type="button" onClick={invite} className="btn-press mt-2 w-full border-2 border-lime bg-lime py-1.5 text-[10px] text-bg">
-        {copied ? "Invite copied" : s ? `Invite to ${s.uf}` : "Invite a friend"}
-      </button>
-    </div>
+    <button type="button" onClick={invite} className="btn-press w-full bg-lime py-2 text-[10px] text-bg">
+      {copied ? "Invite copied" : `Invite to ${city.name}`}
+    </button>
   );
 }
 
-/** A resident's state on their building card: the state (a click opens it), founder, place there. */
-function ResidentRow({
-  login,
-  ufOf,
-  states,
-  onState,
-  onMove,
-  offices,
-  weekly,
-  provisional,
-  live,
-}: {
-  /** What they hold this week, and the points that elected them. */
-  offices: Office[];
-  weekly: number;
-  provisional: boolean;
-  /** Their points this week so far, by where they came from. */
-  live: PointsBreakdown | null;
-  login: string;
-  ufOf: ReadonlyMap<string, { uf: UF | null; founder: boolean }>;
-  states: StateStats[];
-  onState: (uf: UF) => void;
-  /** Your own building: change state. */
-  onMove?: () => void;
-}) {
-  const r = ufOf.get(login);
-  const s = r?.uf ? states.find((x) => x.uf === r.uf) : null;
-  const inState = s ? s.top.findIndex((l) => l.toLowerCase() === login) : -1;
+/** Where a resident lives, said once: their city (a click flies there), its state, Move on yours, and what they are there as seals. */
+function PlaceRow({ login, city, offices, onCity, onState, onMove }: { login: string; city: CityLayout | null; offices: Office[]; onCity: (c: CityLayout) => void; onState: (uf: UF) => void; onMove?: () => void }) {
+  const island = !city || city.ibge === null;
+  const at = city ? city.devs.findIndex((d) => d.dev.login.toLowerCase() === login) : -1;
+  const founder = !island && at >= 0 && city!.devs[at].founder;
+  // The city is on the line above: a mayor's seal needs no name.
+  const seals = [...(founder ? ["Founder"] : []), ...offices.map((o) => (o.kind === "mayor" ? "Mayor" : officeLabel(o)))];
   return (
-    <>
-      {offices.length > 0 && (
-        <div className="mx-4 mb-2 flex flex-col gap-1 border-2 border-lime px-3 py-2">
-          <div className="flex flex-wrap gap-1">
-            {offices.map((o) => (
-              <span key={officeLabel(o)} className="bg-lime px-1.5 py-0.5 text-[9px] text-bg">
-                {officeLabel(o)}
-              </span>
-            ))}
-          </div>
-          <p className="text-[9px] normal-case text-muted">
-            {offices.some((o) => o.kind === "president")
-              ? "Voted in by Brazil's devs."
-              : provisional
-                ? `Leading this week with ${fmt(weekly)} points. Offices change Sunday 21h.`
-                : `Elected by ${fmt(weekly)} points last week. Holds it until Sunday 21h.`}
-          </p>
-        </div>
-      )}
-      {live && totalOf(live) > 0 && <PointsLine b={live} />}
-      <div className="mx-4 mb-3 flex items-center justify-between gap-2 border-2 border-border px-3 py-2">
-        {s ? (
-          <button type="button" onClick={() => onState(s.uf)} className="flex items-center gap-2 text-[9px] text-cream hover:text-lime">
-            <span className="h-2.5 w-2.5" style={{ background: swatchOf(s.uf) }} aria-hidden />
-            {stateOf(s.uf).name}
-          </button>
+    <div className="mx-4 mb-3 border-2 border-border px-3 py-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        {island ? (
+          <span className="text-[11px] text-cream">The island</span>
         ) : (
-          <span className="text-[9px] text-muted">The island · no state</span>
+          <button type="button" onClick={() => onCity(city!)} className="min-w-0 truncate text-left text-[11px] normal-case text-cream hover:text-lime">
+            {city!.name}
+          </button>
         )}
-        <span className="flex items-center gap-2 text-[9px] text-muted">
-          {r?.founder ? <span className="text-lime">Founder</span> : inState >= 0 ? `Top ${inState + 1} in ${s?.uf}` : ""}
+        <span className="flex shrink-0 items-baseline gap-2 text-[9px] text-muted">
+          {!island && city!.uf && (
+            <button type="button" onClick={() => onState(city!.uf!)} className="hover:text-lime">
+              {city!.uf}
+            </button>
+          )}
           {onMove && (
-            <button type="button" onClick={onMove} className="text-cream underline hover:text-lime">
-              Move
+            <button type="button" onClick={onMove} className="text-cream underline decoration-dotted underline-offset-2 hover:text-lime">
+              {island ? "Pick a city" : "Move"}
             </button>
           )}
         </span>
       </div>
-    </>
-  );
-}
-
-/** A resident's points this week and where they came from, on their building card: the total, then an icon and a count per source. */
-function PointsLine({ b }: { b: PointsBreakdown }) {
-  const n = (k: "invite" | "story" | "comment" | "coded") => b[k] / POINTS[k];
-  const parts: { icon: LucideIcon; count: number; label: string }[] = [
-    { icon: UserPlus, count: n("invite"), label: "friends who joined" },
-    { icon: Instagram, count: n("story"), label: "stories" },
-    { icon: MessageCircle, count: n("comment"), label: "comments" },
-    { icon: Code2, count: n("coded"), label: "days coding" },
-    { icon: VoteIcon, count: b.vote ? 1 : 0, label: "voted" },
-  ].filter((p) => p.count > 0);
-  return (
-    <div className="mx-4 mb-2 flex items-center justify-between gap-3 border-2 border-border px-3 py-2">
-      <span className="text-[9px] text-cream">
-        <span className="text-sm text-lime">{fmt(totalOf(b))}</span> pts this week
-      </span>
-      <span className="flex items-center gap-2.5">
-        {parts.map((p) => (
-          <span key={p.label} title={`${p.count} ${p.label}`} aria-label={`${p.count} ${p.label}`} className="flex items-center gap-1 text-[9px] tabular-nums text-muted">
-            <p.icon size={12} aria-hidden />
-            {p.count}
-          </span>
-        ))}
-      </span>
+      {(seals.length > 0 || (!island && at >= 0)) && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {seals.map((t) => (
+            <span key={t} className="bg-lime px-1.5 py-0.5 text-[8px] text-bg">
+              {t}
+            </span>
+          ))}
+          {!founder && !island && at >= 0 && <span className="border border-border px-1.5 py-0.5 text-[8px] text-muted">Dev #{fmt(at + 1)}</span>}
+        </div>
+      )}
     </div>
   );
 }

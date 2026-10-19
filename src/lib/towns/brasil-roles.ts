@@ -2,21 +2,21 @@
 // The president is voted in for a term (brasil-election.ts) and comes in from
 // outside. The rest go every week by points (brasil-points.ts: the week runs
 // Monday 00:00 UTC). One office per person, filled from the top down: each
-// state's governor is its top dev left, its senator the next one; each city's
-// mayor is its top dev left (a state's second city has its own). An office
-// nobody is left for stays empty. Only devs who scored count. The founder (the
-// first to arrive in a state) is not elected and never changes. Pure.
+// state's governor is its top dev left, its senator the next one; every
+// city's mayor is its top dev left, however small the city. An office nobody
+// is left for stays empty. Only devs who scored count. A city's founder (its
+// first resident) is not elected. Pure.
 
 import { STATES, type BrasilLayout, type UF } from "./brasil-map";
 
-export type Office = { kind: "president" } | { kind: "governor"; uf: UF } | { kind: "senator"; uf: UF } | { kind: "mayor"; city: string; uf: UF };
+export type Office = { kind: "president" } | { kind: "governor"; uf: UF } | { kind: "senator"; uf: UF } | { kind: "mayor"; city: string; key: string; uf: UF };
 
 export interface BrasilOffices {
   president: string | null;
   governors: Map<UF, string>;
   senators: Map<UF, string[]>;
-  /** By city name (a state's capital or its second city). */
-  mayors: Map<string, { login: string; uf: UF }>;
+  /** By city key (CityLayout.key: its IBGE code; names repeat across states). */
+  mayors: Map<string, { login: string; uf: UF; city: string }>;
   /** The office each login holds (one each). */
   byLogin: Map<string, Office[]>;
 }
@@ -51,13 +51,13 @@ export function brasilOffices(layout: BrasilLayout, totals: ReadonlyMap<string, 
     if (sen.length) senators.set(s.uf, sen);
     for (const l of sen) give(l, { kind: "senator", uf: s.uf });
   }
-  const mayors = new Map<string, { login: string; uf: UF }>();
+  const mayors = new Map<string, { login: string; uf: UF; city: string }>();
   for (const c of layout.cities) {
     if (!c.uf) continue;
     const mayor = rank(c.devs.filter((d) => d.dev.uf === c.uf).map((d) => d.dev.login))[0];
     if (!mayor) continue;
-    mayors.set(c.name, { login: mayor, uf: c.uf });
-    give(mayor, { kind: "mayor", city: c.name, uf: c.uf });
+    mayors.set(c.key, { login: mayor, uf: c.uf, city: c.name });
+    give(mayor, { kind: "mayor", city: c.name, key: c.key, uf: c.uf });
   }
   return { president: president?.toLowerCase() ?? null, governors, senators, mayors, byLogin };
 }

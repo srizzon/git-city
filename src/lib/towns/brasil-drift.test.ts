@@ -4,50 +4,49 @@ import { M_TO_UNIT } from "../league-city/drive/tuning";
 import { wallOffset } from "../league-city/race/track";
 import { courseOf, getLiveSpot } from "../drift/spots";
 import { sceneryFor } from "../drift/scenery";
-import { BrasilPlacer, STATES, layoutBrasil, type MapDev } from "./brasil-map";
+import { STATES, layoutBrasil, type MapDev } from "./brasil-map";
 import { brasilWorld, plainBuilding } from "./brasil-world";
 import { pointAt } from "../league-city/race/track";
-import { DRIFT_EXIT, DRIFT_SIGN_LOT, DRIFT_SITE, clearOfStart, crossedStart, inDriftSite } from "./brasil-drift";
-import { RIVERS, coastDistance, onLand } from "./brasil-geo";
+import { DRIFT_EXIT, DRIFT_SIGN_LOT, DRIFT_SITE, clearOfStart, crossedStart, inDriftSite, moveOldRun } from "./brasil-drift";
+import { coastDistance, geoAt } from "./brasil-geo";
 
 const spot = getLiveSpot("brasil")!;
 const { track, clips } = courseOf(spot);
+const line0 = pointAt(track, 0);
 /** Meters to the lot under them. */
 const lotOf = (x: number, z: number) => [Math.round((x * M_TO_UNIT) / LOT), Math.round((z * M_TO_UNIT) / LOT)] as const;
 
 describe("the Brasil drift site", () => {
-  it("is open land, clear of the coast and of every river", () => {
-    for (let x = DRIFT_SITE.x0; x <= DRIFT_SITE.x1; x++)
-      for (let z = DRIFT_SITE.z0; z <= DRIFT_SITE.z1; z++) {
-        expect(onLand(x * LOT, z * LOT)).toBe(true);
-        expect(coastDistance(x * LOT, z * LOT)).toBeGreaterThan(LOT);
-      }
-    // No river runs under the site (its water would show through the track).
-    const pad = LOT;
-    for (const r of RIVERS)
-      for (let i = 1; i < r.points.length; i++) {
-        const [a, b] = [r.points[i - 1], r.points[i]];
-        const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 8);
-        for (let k = 0; k <= n; k++) {
-          const x = a[0] + ((b[0] - a[0]) * k) / n;
-          const z = a[1] + ((b[1] - a[1]) * k) / n;
-          const inside = x > (DRIFT_SITE.x0 - 0.5) * LOT - pad && x < (DRIFT_SITE.x1 + 0.5) * LOT + pad && z > (DRIFT_SITE.z0 - 0.5) * LOT - pad && z < (DRIFT_SITE.z1 + 0.5) * LOT + pad;
-          expect(inside, r.name).toBe(false);
+  it("is out at sea off the south-east, and Brazil never grows over it", () => {
+    for (let x = DRIFT_SITE.x0 - 3; x <= DRIFT_SITE.x1 + 3; x++)
+      for (let z = DRIFT_SITE.z0 - 3; z <= DRIFT_SITE.z1 + 3; z++)
+        for (const S of [1, 1.5, 3, 10]) {
+          const geo = geoAt(S);
+          expect(geo.onLand(x * LOT, z * LOT)).toBe(false);
         }
-      }
-    for (const [x, z] of [DRIFT_SIGN_LOT, [DRIFT_EXIT.x, DRIFT_EXIT.z]]) {
-      expect(onLand(x * LOT, z * LOT)).toBe(true);
-      expect(inDriftSite(x, z)).toBe(false);
-    }
+    // Off the coast between São Paulo and Rio.
+    expect(coastDistance(((DRIFT_SITE.x0 + DRIFT_SITE.x1) / 2) * LOT, ((DRIFT_SITE.z0 + DRIFT_SITE.z1) / 2) * LOT)).toBeLessThan(30 * LOT);
   });
 
-  it("puts the sign and the exit by the START gate, the exit on the highway", () => {
-    const layout = layoutBrasil([]);
-    expect(layout.highways.some(([x, z]) => x === DRIFT_EXIT.x && z === DRIFT_EXIT.z)).toBe(true);
+  it("puts the sign and the exit by the START gate, off the track", () => {
     const line = pointAt(track, 0);
     const [lx, lz] = lotOf(line.x, line.z);
     expect(Math.hypot(DRIFT_SIGN_LOT[0] - lx, DRIFT_SIGN_LOT[1] - lz)).toBeLessThan(5);
     expect(Math.hypot(DRIFT_EXIT.x - lx, DRIFT_EXIT.z - lz)).toBeLessThan(7);
+    for (const [x, z] of [DRIFT_SIGN_LOT, [DRIFT_EXIT.x, DRIFT_EXIT.z]]) expect(inDriftSite(x, z)).toBe(false);
+  });
+
+  it("moves a run driven where the track was over to where it is, and leaves a new run alone", () => {
+    const now = [0, line0.x, line0.z, 0, 50, line0.x + 1, line0.z, 0];
+    expect(moveOldRun(now)).toEqual(now);
+    // The old site's middle was 56 lots west and 28 lots north of the new one (in m: lots × LOT ÷ M_TO_UNIT).
+    const dx = (56 * LOT) / M_TO_UNIT;
+    const dz = (28 * LOT) / M_TO_UNIT;
+    const old = [0, line0.x - dx, line0.z - dz, 0.5, 50, line0.x - dx + 1, line0.z - dz, 0.5];
+    const moved = moveOldRun(old);
+    expect(moved[1]).toBeCloseTo(line0.x);
+    expect(moved[2]).toBeCloseTo(line0.z);
+    expect(moved[3]).toBe(0.5);
   });
 
   it("holds the whole track, its walls and its scenery", () => {
@@ -72,8 +71,8 @@ describe("the Brasil drift site", () => {
     for (const [x, z] of layout.highways) expect(inDriftSite(x, z)).toBe(false);
     const { objects } = brasilWorld(layout, (d) => plainBuilding(d.login));
     for (const o of objects) expect(inDriftSite(o.x, o.z)).toBe(false);
-    // A placer started from those residents still never picks a lot there.
-    expect(new BrasilPlacer().place({ id: -1, login: "x", uf: "SP" })).not.toBeNull();
+    // Brazil grown to make room keeps the track clear too.
+    expect(layout.scale).toBeGreaterThanOrEqual(1);
   });
 });
 

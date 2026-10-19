@@ -30,7 +30,7 @@ describe("state encoding", () => {
     expect(decodeState(good.slice(1))).toBeNull();
     expect(decodeState([NaN, ...good.slice(1)])).toBeNull();
     expect(decodeState(["1", ...good.slice(1)])).toBeNull();
-    expect(decodeState([9000, ...good.slice(1)])).toBeNull();
+    expect(decodeState([60_000, ...good.slice(1)])).toBeNull();
     expect(decodeState([...good.slice(0, 10), 99])).toBeNull();
     expect(decodeState([...good.slice(0, 10), 1.5])).toBeNull();
     expect(decodeState([...good.slice(0, 3), 0, 0, 0, 0, ...good.slice(7)])).toBeNull(); // zero quaternion

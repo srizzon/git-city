@@ -138,7 +138,8 @@ export async function getLeagueMembers(leagueId: string): Promise<LeagueMemberRo
     developers: { github_login: string; name: string | null; avatar_url: string | null; contributions: number } | null;
   };
   for (let from = 0; ; from += 1000) {
-    const { data } = await sb
+    // A failed read throws: read as "no members" it would be cached as an empty town.
+    const { data, error } = await sb
       .from("league_members")
       .select(
         "developer_id, status, verification, joined_at, invited_by, developers!league_members_developer_id_fkey(github_login, name, avatar_url, contributions)",
@@ -147,6 +148,7 @@ export async function getLeagueMembers(leagueId: string): Promise<LeagueMemberRo
       .order("developer_id")
       .range(from, from + 999)
       .returns<Row[]>();
+    if (error) throw error;
     if (!data || data.length === 0) break;
     for (const r of data) {
       if (!r.developers) continue;

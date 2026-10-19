@@ -5,6 +5,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
 import type { Frames } from "./frames";
 import type { SpotId } from "./spots/types";
+import { moveOldRun } from "../towns/brasil-drift";
 
 export type Scope = "world" | string;
 
@@ -124,7 +125,9 @@ export async function getGhost(spot: SpotId, login: string): Promise<DriftGhost 
     .maybeSingle();
   if (error || !data) return null;
   const r = data as unknown as { score: number; ghost: { frames: Frames; splits: number[] }; developers: { github_login: string } };
-  return { login: r.developers.github_login, score: r.score, frames: r.ghost.frames, splits: r.ghost.splits };
+  // The Brasil track went out to sea: a run driven where it was is moved over.
+  const frames = spot === "brasil" ? moveOldRun(r.ghost.frames) : r.ghost.frames;
+  return { login: r.developers.github_login, score: r.score, frames, splits: r.ghost.splits };
 }
 
 /** Each spot's record (the top of the world board). */

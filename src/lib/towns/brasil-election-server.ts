@@ -14,7 +14,7 @@ import { GitHubFetchError } from "../github-api";
 import { invalidateLeague } from "../leagues/cache";
 import { cantVote, electionClock, nextNumber, winner, type ElectionClock } from "./brasil-election";
 import { awardPoints } from "./brasil-points-server";
-import { placeBrasilResident } from "./brasil-server";
+import { cityForState, placeBrasilResident } from "./brasil-server";
 import type { UF } from "./brasil-map";
 
 export interface Candidate {
@@ -273,7 +273,7 @@ export async function adminAddCandidate(league: { id: string }, login: string, u
     }
   }
   if (uf && !(await isResident(league.id, dev.id))) {
-    await placeBrasilResident(league, { id: dev.id, login: dev.github_login }, uf, "admin");
+    await placeBrasilResident(league, { id: dev.id, login: dev.github_login }, cityForState(uf), "admin", false, false);
     invalidateLeague(league.id);
   }
   return setRunning(league.id, dev, true, "admin");

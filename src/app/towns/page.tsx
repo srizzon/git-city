@@ -69,21 +69,28 @@ async function loadSide(
   cityNorms: Awaited<ReturnType<typeof getCityNorms>>,
   viewerId: number | null,
 ): Promise<RivalSide & { mine: boolean }> {
-  const league = await getLeagueBySlug(r.slug);
   const card = grid.find((t) => t.slug === r.slug);
   const base = { slug: r.slug, name: r.name, color: r.color, cover: card?.cover ?? null, picked: 0, faces: [], hero: null, mine: false };
-  if (!league) return base;
   try {
+    const league = await getLeagueBySlug(r.slug);
+    if (!league) throw new Error("town not found");
     const [side, mine] = await Promise.all([
       cachedSide(league.id)(),
       viewerId === null ? null : getMembership(league.id, viewerId),
     ]);
+    lastGood.set(r.slug, side);
     return { ...base, ...side, hero: { ...side.hero, cityNorms }, mine: mine?.status === "active" };
   } catch (err) {
     console.error(`[towns] ${r.slug} failed:`, err);
-    return base;
+    // A busy db shows the side as it last was, not "0 picked" and an empty city.
+    const side = lastGood.get(r.slug);
+    return side ? { ...base, ...side, hero: { ...side.hero, cityNorms } } : base;
   }
 }
+
+type Side = Awaited<ReturnType<ReturnType<typeof cachedSide>>>;
+/** Each side's last read that worked, on this server. */
+const lastGood = new Map<string, Side>();
 
 // Everything a visitor sees of a side, shared by every visitor. The league's
 // tag expires it on every pick or leave (invalidateLeague), so the one who
