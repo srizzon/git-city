@@ -156,6 +156,8 @@ export async function measurePosts(sb: SupabaseClient, now = Date.now()): Promis
     if (p.kind === "trial" && !p.graduated && (await sharedToFeed(p.media_id))) await sb.from("reel_posts").update({ graduated: true }).eq("media_id", p.media_id);
     const m = await reelInsights(p.media_id).catch(() => null);
     if (!m) continue;
+    // In a trial's first half hour Instagram has views but reports reach and skip rate as 0: not measured yet.
+    const early = (m.views ?? 0) > 0 && !m.reach;
     const { count } = p.permalink
       ? await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("reel", p.permalink).eq("outcome", "added")
       : { count: null };
@@ -163,14 +165,14 @@ export async function measurePosts(sb: SupabaseClient, now = Date.now()): Promis
       media_id: p.media_id,
       taken_at: new Date(now).toISOString(),
       views: m.views ?? null,
-      reach: m.reach ?? null,
+      reach: early ? null : (m.reach ?? null),
       likes: m.likes ?? null,
       comments: m.comments ?? null,
       shares: m.shares ?? null,
       saved: m.saved ?? null,
       total_interactions: m.total_interactions ?? null,
-      avg_watch_ms: m.ig_reels_avg_watch_time ?? null,
-      skip_rate: m.reels_skip_rate ?? null,
+      avg_watch_ms: early ? null : (m.ig_reels_avg_watch_time ?? null),
+      skip_rate: early ? null : (m.reels_skip_rate ?? null),
       devs_placed: count ?? null,
     });
     taken++;
