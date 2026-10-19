@@ -45,7 +45,7 @@ export type ReelPanel =
       screens: { at: number; until: number; kind: string; parts: { at: number; text: string }[]; send: number | null; points: { at: number; value: string } | null; image: string | null; posted: string[] }[];
     }
   | { kind: "score"; from: number; to: number; icon: string; value: string }
-  | { kind: "card"; from: number; to: number; lines: NonNullable<ReelSpec["header"]>["rule"]; image: string | null }
+  | { kind: "card"; from: number; to: number; lines: NonNullable<ReelSpec["header"]>["rule"]; map: boolean; image: string | null }
   | { kind: "points"; from: number; to: number; rows: { at: number; icon: string; value: string; label: string }[] }
   | {
       kind: "follow";
@@ -191,7 +191,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
       return [{ kind: "phone", from, to, screens }];
     }
     if (o.type === "score") return [{ kind: "score", from, to, icon: o.icon, value: o.value }];
-    if (o.type === "card") return [{ kind: "card", from, to, lines: o.lines, image: o.image ?? null }];
+    if (o.type === "card") return [{ kind: "card", from, to, lines: o.lines, map: o.map, image: o.image ?? null }];
     if (o.type === "points") {
       const ats: number[] = [];
       o.rows.forEach((r, i) => ats.push(anchorAt(words, r.at, i ? ats[i - 1] : from)));

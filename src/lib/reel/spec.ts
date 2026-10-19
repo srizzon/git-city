@@ -199,14 +199,17 @@ const Pins = z.object({
 
 /**
  * A full-frame card on the channel's dotted dark background (the opening hook, the closing call to
- * action): its lines centred, a `*word*` in the green block, an optional image under them (under
- * REELS_HOME). It cuts in and out; the captions and the headline step aside while it's up.
+ * action). It moves from its first frame: its lines type in, a number in a `*block*` counts up
+ * from 0 over the card, and with `map` Brazil is drawn in dots that light up with the count. An
+ * optional image goes under the lines (under REELS_HOME). It cuts in and out; the captions and the
+ * headline step aside while it's up.
  */
 const Card = z.object({
   type: z.literal("card"),
   from: Anchor,
   to: Anchor.optional(),
   lines: z.array(HeaderLine).min(1),
+  map: z.boolean().default(false),
   image: z.string().optional(),
 });
 

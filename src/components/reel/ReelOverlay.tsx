@@ -5,6 +5,7 @@ import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import type { Reel, ReelBalloon, ReelPanel } from "@/lib/reel/film";
 import type { ReelSpec } from "@/lib/reel/spec";
 import type { CityBuilding } from "@/lib/github";
+import { MAP_BOUNDS, onLand } from "@/lib/towns/brasil-geo";
 import { levelProgress, rankFromLevel, tierFromLevel, xpForLevel } from "@/lib/xp";
 import { CircleUser, Clapperboard, Code2, Heart, House, Instagram, MapPin, MessageCircle, Search, Send, SquarePlus, UserPlus, type LucideIcon } from "lucide-react";
 
@@ -201,9 +202,36 @@ function PlateLines({ lines }: { lines: NonNullable<ReelSpec["headline"]>[number
   );
 }
 
-/** A full-frame card on the dotted background: its lines centred, a starred word in the green block, an image under them. */
+/** Brazil as a grid of dots (the channel's dot style), each dot's place in the order it lights. */
+const BRAZIL_DOTS = (() => {
+  const cols = 46;
+  const { minX, maxX, minZ, maxZ } = MAP_BOUNDS;
+  const step = (maxX - minX) / cols;
+  const dots: { x: number; y: number; order: number }[] = [];
+  for (let z = minZ + step / 2; z < maxZ; z += step) for (let x = minX + step / 2; x < maxX; x += step) if (onLand(x, z)) dots.push({ x: (x - minX) / step, y: (z - minZ) / step, order: 0 });
+  // A fixed shuffle, so the country fills everywhere at once, the same way every render.
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  dots.forEach((d) => (d.order = rand()));
+  const rank = [...dots].sort((p, q) => p.order - q.order);
+  rank.forEach((d, i) => (d.order = i / rank.length));
+  return { dots, w: cols, h: Math.ceil((maxZ - minZ) / step) };
+})();
+
+/** The card's typing and counting speed: characters a second, and the number's steps over the card. */
+const CARD_CPS = 20;
+const COUNT_STEPS = 14;
+const NUMBER = /\d[\d.,]*/;
+const numberOf = (s: string) => Number((NUMBER.exec(s)?.[0] ?? "0").replace(/\./g, "").replace(",", "."));
+
+/**
+ * A full-frame card on the dotted background. Every line types in (a block arrives whole when its
+ * turn comes), a block's number counts up from 0 in hard steps over the card, and the map's dots
+ * light with the count: the hook moves from its first frame.
+ */
 function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "card" }> }) {
   const size = { huge: "13cqw", big: "8.5cqw", small: "4.6cqw" } as const;
+  let k = 0;
   return (
     <div
       data-panel={index}
@@ -215,22 +243,50 @@ function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
           <p key={i} style={{ fontSize: size[l.size], lineHeight: 1.1, color: l.size === "small" ? BRAND.muted : BRAND.ink, textTransform: l.plain ? "none" : undefined }}>
             {segments(l.text).map((s, j) =>
               s.lit ? (
-                <span key={j} style={{ background: BRAND.green, color: BRAND.onGreen, padding: "0 0.25em", boxShadow: HARD }}>
+                <span key={j} data-ch={k++} data-count={NUMBER.test(s.text) ? s.text : undefined} style={{ display: "none", background: BRAND.green, color: BRAND.onGreen, padding: "0 0.25em", boxShadow: HARD }}>
                   {s.text}
                 </span>
               ) : (
-                <span key={j}>{s.text}</span>
+                [...s.text].map((c, n) => (
+                  <span key={`${j}-${n}`} data-ch={k++} style={{ display: "none" }}>
+                    {c}
+                  </span>
+                ))
               ),
             )}
           </p>
         ))}
       </div>
+      {panel.map && (
+        <svg viewBox={`-1 -1 ${BRAZIL_DOTS.w + 2} ${BRAZIL_DOTS.h + 2}`} style={{ marginTop: "7cqw", width: "64%" }}>
+          {BRAZIL_DOTS.dots.map((d, i) => (
+            <rect key={i} data-dot={d.order} x={d.x - 0.4} y={d.y - 0.4} width={0.8} height={0.8} fill={BRAND.dot} />
+          ))}
+        </svg>
+      )}
       {panel.image && (
         // eslint-disable-next-line @next/next/no-img-element -- an image from the reels folder, drawn as it is
         <img alt="" src={`/api/reels/file/${panel.image}`} style={{ marginTop: "6cqw", width: "72%", maxHeight: "40%", objectFit: "contain", imageRendering: "pixelated" }} />
       )}
     </div>
   );
+}
+
+/** Each frame of a card: the typing, the count and the lit dots. */
+function drawCard(el: HTMLElement, p: Extract<ReelPanel, { kind: "card" }>, t: number) {
+  const local = t - p.from;
+  const n = Math.floor(local * CARD_CPS);
+  el.querySelectorAll<HTMLElement>("[data-ch]").forEach((c) => (c.style.display = Number(c.dataset.ch) < n ? "" : "none"));
+  // The count runs over the card, ending a beat before it cuts away.
+  const span = Math.max(0.3, p.to - p.from - 0.3);
+  const u = Math.floor(clamp(local / span) * COUNT_STEPS) / COUNT_STEPS;
+  el.querySelectorAll<HTMLElement>("[data-count]").forEach((c) => {
+    const text = c.dataset.count!;
+    const v = Math.round(numberOf(text) * u).toLocaleString("pt-BR");
+    const next = text.replace(NUMBER, v);
+    if (c.textContent !== next) c.textContent = next;
+  });
+  el.querySelectorAll<SVGRectElement>("[data-dot]").forEach((d) => d.setAttribute("fill", Number(d.dataset.dot) < u ? BRAND.green : BRAND.dot));
 }
 
 const clamp = (u: number) => Math.min(1, Math.max(0, u));
@@ -247,7 +303,9 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
     if (!el) return;
     // A card cuts in and out, no fade.
     if (p.kind === "card") {
-      el.style.opacity = t >= p.from && t < p.to ? "1" : "0";
+      const up = t >= p.from && t < p.to;
+      el.style.opacity = up ? "1" : "0";
+      if (up) drawCard(el, p, t);
       return;
     }
     const on = t >= p.from && t < p.to + 0.3;

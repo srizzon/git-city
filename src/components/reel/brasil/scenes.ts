@@ -15,7 +15,7 @@
 //   pullback   from the last pose back out to the whole country
 //   map        the whole country held still and small enough to sit under the header with room
 //              round it, a slow push in (params.y: where its middle sits down the frame, 0–1,
-//              default 0.47; params.size: its width share of the frame, default 0.74). With
+//              default 0.55, so a headline above it has room; params.size: its width share of the frame, default 0.68). With
 //              params.login it opens close on that building and pulls out to the country by params.to;
 //              with params.start "previous" it pulls out from wherever the last take left the camera.
 //   fill       over a capital (params.uf) while the map fills up in the order people arrived
@@ -247,8 +247,8 @@ export function frameHeight(world: SceneWorld, cut: ReelCut, t: number): number 
 
 /** The whole country held still (the map scene): its middle at params.y down the frame, params.size of its width, easing in 4%. */
 function mapPose(cut: ReelCut, u: number, top: Pose): Pose {
-  const y = typeof cut.params.y === "number" ? cut.params.y : 0.47;
-  const size = typeof cut.params.size === "number" ? cut.params.size : 0.74;
+  const y = typeof cut.params.y === "number" ? cut.params.y : 0.55;
+  const size = typeof cut.params.size === "number" ? cut.params.size : 0.68;
   const p = { pos: top.pos.clone(), look: top.look.clone() };
   const dir = p.pos.clone().sub(p.look);
   // overview() fills the width at 0.9 of its fit distance: back off to the asked share, easing in 4%.
