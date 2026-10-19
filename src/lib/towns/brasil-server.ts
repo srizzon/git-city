@@ -62,16 +62,22 @@ export async function getBrasilResidents(leagueId: string): Promise<Resident[]> 
 }
 
 /** The whole stored map: the residents, where every city stands, the scale, and its version. */
-async function readMapState(leagueId: string): Promise<MapState & { version: number }> {
+async function readMapState(leagueId: string): Promise<MapState & { version: number; grewAt: number | null }> {
   const sb = getSupabaseAdmin();
   const [residents, cities, map] = await Promise.all([
     getBrasilResidents(leagueId),
     sb.from("brasil_cities").select("ibge, cx, cz").eq("league_id", leagueId).range(0, 9999).returns<{ ibge: number; cx: number; cz: number }[]>(),
-    sb.from("brasil_map").select("scale, version").eq("league_id", leagueId).maybeSingle<{ scale: number | string; version: number | string }>(),
+    sb.from("brasil_map").select("scale, version, grew_at").eq("league_id", leagueId).maybeSingle<{ scale: number | string; version: number | string; grew_at: string | null }>(),
   ]);
   if (cities.error) throw new Error(`brasil cities: ${cities.error.message}`);
   if (map.error) throw new Error(`brasil map: ${map.error.message}`);
-  return { residents, cities: cities.data ?? [], scale: Number(map.data?.scale ?? 1), version: Number(map.data?.version ?? 0) };
+  return {
+    residents,
+    cities: cities.data ?? [],
+    scale: Number(map.data?.scale ?? 1),
+    version: Number(map.data?.version ?? 0),
+    grewAt: map.data?.grew_at ? Date.parse(map.data.grew_at) : null,
+  };
 }
 
 /**
@@ -79,7 +85,7 @@ async function readMapState(leagueId: string): Promise<MapState & { version: num
  * expires it): the page, the share cards and the smash room all read it,
  * and a busy db mustn't be asked for every resident on every view.
  */
-export function getBrasilState(leagueId: string): Promise<MapState & { version: number }> {
+export function getBrasilState(leagueId: string): Promise<MapState & { version: number; grewAt: number | null }> {
   return unstable_cache(() => readMapState(leagueId), ["brasil-map-state", leagueId], { revalidate: 60, tags: [leagueTag(leagueId)] })();
 }
 
@@ -87,11 +93,11 @@ export function getBrasilState(leagueId: string): Promise<MapState & { version: 
 let drawn: { key: string; layout: BrasilLayout } | null = null;
 
 /** The whole map from what's stored. */
-export async function getBrasilLayout(leagueId: string): Promise<{ layout: BrasilLayout; residents: Resident[] }> {
+export async function getBrasilLayout(leagueId: string): Promise<{ layout: BrasilLayout; residents: Resident[]; grewAt: number | null }> {
   const state = await getBrasilState(leagueId);
   const key = `${leagueId}:${state.version}:${state.residents.length}`;
   if (drawn?.key !== key) drawn = { key, layout: layoutFromState(state) };
-  return { layout: drawn.layout, residents: state.residents };
+  return { layout: drawn.layout, residents: state.residents, grewAt: state.grewAt };
 }
 
 export type PlaceOutcome = {

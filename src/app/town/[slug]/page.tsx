@@ -91,7 +91,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
 
   // The Brasil town is drawn as the map of Brazil: its own page.
   if (league.map === "brasil") {
-    const { layout, residents } = await getBrasilLayout(league.id);
+    const { layout, residents, grewAt } = await getBrasilLayout(league.id);
     const [cityDevs, cityNorms, week, election] = await Promise.all([
       getCityDevsByIds(residents.map((r) => r.dev.id)),
       getCityNorms(),
@@ -116,6 +116,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
         home={home ? { city: home.city, picked } : null}
         startAt={atLogin ? { login: atLogin } : cidade ? { city: cidade } : uf ? { uf } : null}
         startPick={query.pick === "1"}
+        grewAt={grewAt}
         startVote={PRESIDENCY_ON ? [query.run, query.vote].map((v) => (typeof v === "string" && /^\d{2}$/.test(v) ? Number(v) : null)).find((v) => v !== null) ?? null : null}
         week={week}
         election={election}

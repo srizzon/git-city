@@ -69,6 +69,8 @@ export interface BrasilTownProps {
   home: { city: number | null; picked: boolean } | null;
   /** Open on a state, a city (its slug) or a building. */
   startAt: { uf: string } | { city: string } | { login: string } | null;
+  /** When Brazil last grew to make room for its cities (ms), or null: the ticker says so for a day. */
+  grewAt?: number | null;
   /** ?pick=1, back from signing in after a guest's free building: open the state picker if you're not on the map. */
   startPick?: boolean;
   /** The week's points the offices come from (last closed week, or this week so far before the first one closes), and this week's. */
@@ -91,7 +93,7 @@ const HUD_BG = "bg-bg/90";
 const HUD_EDGE = "border-border";
 const HUD_SOFT = "text-muted";
 
-export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, week: officeWeek, election, startVote = null }: BrasilTownProps) {
+export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, grewAt = null, week: officeWeek, election, startVote = null }: BrasilTownProps) {
   const router = useRouter();
   const camera = useRef<CameraApi | null>(null);
   const cameraStore = useMemo(() => createCameraStore(), []);
@@ -880,9 +882,11 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         </span>
       )}
 
-      {!inCar && !state && !focused && !panel && !picker && !askCity && world.arrivals.length > 0 && (
+      {!inCar && !state && !focused && !panel && !picker && !askCity && (world.arrivals.length > 0 || (grewAt !== null && now - grewAt < 86_400_000)) && (
         <Arrivals
           arrivals={world.arrivals}
+          grew={grewAt !== null && now - grewAt < 86_400_000 ? { scale: layout.scale, at: grewAt } : null}
+          onBrazil={() => camera.current?.flyTo(null)}
           onPick={(login) => {
             const b = world.placed.get(login.toLowerCase());
             if (!b) return;
@@ -1188,20 +1192,37 @@ function ago(at: number, now: number): string {
 /**
  * Who just arrived, one at a time over the bar: "@login just arrived · Campinas · 3m",
  * a tap away from their building. Whoever commented on the reel opens the map
- * and sees their name go by.
+ * and sees their name go by. When Brazil grew in the last day to make room
+ * for its cities, that goes by first.
  */
-function Arrivals({ arrivals, onPick }: { arrivals: { login: string; where: string; at: number }[]; onPick: (login: string) => void }) {
+function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: string; where: string; at: number }[]; grew: { scale: number; at: number } | null; onPick: (login: string) => void; onBrazil: () => void }) {
   const [i, setI] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const n = Math.min(arrivals.length, 12) + (grew ? 1 : 0);
   useEffect(() => {
-    if (arrivals.length < 2) return;
+    if (n < 2) return;
     const t = setInterval(() => {
-      setI((n) => (n + 1) % Math.min(arrivals.length, 12));
+      setI((k) => (k + 1) % n);
       setNow(Date.now());
     }, 4000);
     return () => clearInterval(t);
-  }, [arrivals.length]);
-  const a = arrivals[i % arrivals.length];
+  }, [n]);
+  const k = i % n;
+  if (grew && k === 0)
+    return (
+      <button
+        key="grew"
+        type="button"
+        onClick={onBrazil}
+        className="pointer-events-auto absolute bottom-[70px] left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream sm:bottom-[72px]"
+      >
+        <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
+        <span className="shrink-0 text-cream">Brazil grew</span>
+        <span className="shrink-0 text-lime">{grew.scale}x</span>
+        <span className="shrink-0">{ago(grew.at, now)}</span>
+      </button>
+    );
+  const a = arrivals[(k - (grew ? 1 : 0)) % arrivals.length];
   return (
     <button
       key={a.login}
