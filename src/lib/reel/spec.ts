@@ -34,6 +34,8 @@ const Balloon = z.object({
   to: Anchor.optional(),
   /** A plate with this text (no @: on Instagram an @ tags whoever owns it); else the GitHub photo. */
   plate: z.string().optional(),
+  /** The plate as a comment (the ink speech bubble) that drops onto its building's lot from above, in hard steps. */
+  drop: z.boolean().default(false),
   badges: z.array(Badge).default([]),
 });
 
@@ -224,7 +226,18 @@ const Card = z.object({
   image: z.string().optional(),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card]);
+/**
+ * A green pixel arrow pointing at the viewer's own comment button (bottom right of Instagram's
+ * Reels screen), the scene dimmed, `label` in the green block: "comment here" made literal.
+ */
+const Pointer = z.object({
+  type: z.literal("pointer"),
+  from: Anchor,
+  to: Anchor.optional(),
+  label: z.string().min(1),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({

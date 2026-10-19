@@ -25,6 +25,7 @@ export interface ReelBalloon {
   from: number;
   to: number;
   plate: string | null;
+  drop: boolean;
   badges: { kind: string; at: number; sub: string }[];
 }
 
@@ -45,6 +46,7 @@ export type ReelPanel =
       screens: { at: number; until: number; kind: string; parts: { at: number; text: string }[]; send: number | null; points: { at: number; value: string } | null; image: string | null; posted: string[] }[];
     }
   | { kind: "score"; from: number; to: number; icon: string; value: string }
+  | { kind: "pointer"; from: number; to: number; label: string }
   | {
       kind: "card";
       from: number;
@@ -141,6 +143,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
         from,
         to: o.to === undefined ? length : anchorAt(words, o.to, from),
         plate: o.plate ?? null,
+        drop: o.drop,
         badges: o.badges.map((b) => ({ kind: b.kind, at: anchorAt(words, b.at, from), sub: b.sub })),
       };
     });
@@ -198,6 +201,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
       });
       return [{ kind: "phone", from, to, screens }];
     }
+    if (o.type === "pointer") return [{ kind: "pointer", from, to, label: o.label }];
     if (o.type === "score") return [{ kind: "score", from, to, icon: o.icon, value: o.value }];
     if (o.type === "card") {
       const d = o.draw;

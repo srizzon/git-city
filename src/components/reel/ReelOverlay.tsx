@@ -74,7 +74,9 @@ export function placeBalloon(
     el.dataset.roofY = String(at.roof.y);
   }
   el.style.left = `${at.left}%`;
-  el.style.top = `${at.top}%`;
+  // A dropped comment falls onto its lot from above in five hard steps.
+  const drop = el.dataset.drop ? Math.floor(clamp((at.t - Number(el.dataset.drop)) / 0.4) * 5) / 5 : 1;
+  el.style.top = `${at.top - (1 - drop) * 40}%`;
   const ks = at.badges.map((m) => back(Math.min(1, Math.max(0, (at.t - m) / 0.4))));
   const show = (key: string, k: number) => {
     const c = el.querySelector<HTMLElement>(`[data-tag="${key}"]`);
@@ -302,6 +304,40 @@ function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
   );
 }
 
+// A pixel arrow drawn on the diagonal, pointing down and right, its tip at the bottom-right corner (a 12x12 grid; never a rotated one, which breaks the pixels).
+const ARROW = [
+  "###.........",
+  "####........",
+  ".####.......",
+  "..####......",
+  "...####...##",
+  "....####..##",
+  ".....####.##",
+  "......######",
+  ".......#####",
+  "....########",
+  "....########",
+  "............",
+];
+/** Where Instagram's Reels screen puts the comment button (the right rail), as stage fractions. */
+const COMMENT_BUTTON = { x: 0.915, y: 0.745 };
+
+/** The arrow at the viewer's own comment button and its label: the tip on the button, the label up and left of it. */
+function PointerPanel({ index, label }: { index: number; label: string }) {
+  return (
+    <div data-panel={index} className="absolute inset-0 font-pixel uppercase" style={{ opacity: 0 }}>
+      <div data-arrow className="absolute" style={{ left: `${COMMENT_BUTTON.x * 100}%`, top: `${COMMENT_BUTTON.y * 100}%`, width: "30cqw", transform: "translate(-100%, -91%)" }}>
+        <svg viewBox="-0.5 -0.5 13 13" shapeRendering="crispEdges" style={{ display: "block", width: "100%" }} aria-hidden>
+          {ARROW.flatMap((row, y) => [...row].map((c, x) => (c === "#" ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={BRAND.green} stroke={BRAND.bg} strokeWidth={0.25} paintOrder="stroke" /> : null)))}
+        </svg>
+      </div>
+      <p data-reel-box="pointer" className="absolute" style={{ left: "50%", top: "40%", transform: "translateX(-50%)", fontSize: "13cqw", lineHeight: 1, background: BRAND.green, color: BRAND.onGreen, padding: "2cqw 4cqw", boxShadow: HARD }}>
+        {label}
+      </p>
+    </div>
+  );
+}
+
 /** Each frame of a card: the typing, the count and the lit dots. */
 function drawCard(el: HTMLElement, p: Extract<ReelPanel, { kind: "card" }>, t: number) {
   const local = t - p.from;
@@ -350,6 +386,13 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
   panels.forEach((p, i) => {
     const el = root.querySelector<HTMLElement>(`[data-panel="${i}"]`);
     if (!el) return;
+    // The arrow cuts in and taps toward the button in hard steps.
+    if (p.kind === "pointer") {
+      el.style.opacity = t >= p.from && t < p.to ? "1" : "0";
+      const arrow = el.querySelector<HTMLElement>("[data-arrow]");
+      if (arrow) arrow.style.marginLeft = arrow.style.marginTop = Math.floor((t - p.from) / 0.18) % 2 ? "-2.4cqw" : "0";
+      return;
+    }
     // A card cuts in and out, no fade.
     if (p.kind === "card") {
       const up = t >= p.from && t < p.to;
@@ -1053,6 +1096,7 @@ function Panel({
   if (panel.kind === "score") return <ScorePanel index={index} panel={panel} />;
   if (panel.kind === "phone") return <PhonePanel index={index} panel={panel} />;
   if (panel.kind === "card") return <CardPanel index={index} panel={panel} />;
+  if (panel.kind === "pointer") return <PointerPanel index={index} label={panel.label} />;
   if (panel.kind === "counter" && plates)
     return (
       <div data-panel={index} data-reel-box="counter" className="absolute font-pixel uppercase" style={{ left: "50%", transform: "translateX(-50%)", top: "17%", opacity: 0 }}>
@@ -1232,21 +1276,27 @@ function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf
   const photo = b.target !== "example" && !b.plate ? photoOf(b.target.login) : null;
   const ghost = b.target === "example" && !b.plate;
   return (
-      <div data-balloon={index} data-reel-box="balloon" className="absolute font-pixel uppercase" style={{ opacity: 0, transform: "translate(-50%, -100%)", paddingBottom: "2.4cqw" }}>
+      <div data-balloon={index} data-drop={b.drop ? b.from : undefined} data-reel-box="balloon" className="absolute font-pixel uppercase" style={{ opacity: 0, transform: "translate(-50%, -100%)", paddingBottom: "2.4cqw" }}>
         <div style={{ display: "grid", justifyItems: "center", alignItems: "end" }}>
           <div
             data-tag="plate"
-            className="bg-bg text-cream"
-            style={{
-              gridArea: "1 / 1",
-              border: `0.6cqw solid ${ghost ? "var(--color-lime)" : "var(--color-border)"}`,
-              padding: photo ? "0.6cqw" : "1.6cqw 2.6cqw",
-              fontSize: "4.6cqw",
-              lineHeight: 1,
-              textTransform: "none",
-              whiteSpace: "nowrap",
-            }}
+            className={b.drop ? "relative" : "bg-bg text-cream"}
+            style={
+              b.drop
+                ? // A dropped comment: the brand's ink speech bubble, a pixel tail under it.
+                  { gridArea: "1 / 1", background: BRAND.ink, color: BRAND.bg, boxShadow: HARD, padding: "3cqw 4cqw", fontSize: "6cqw", lineHeight: 1, textTransform: "none", whiteSpace: "nowrap" }
+                : {
+                    gridArea: "1 / 1",
+                    border: `0.6cqw solid ${ghost ? "var(--color-lime)" : "var(--color-border)"}`,
+                    padding: photo ? "0.6cqw" : "1.6cqw 2.6cqw",
+                    fontSize: "4.6cqw",
+                    lineHeight: 1,
+                    textTransform: "none",
+                    whiteSpace: "nowrap",
+                  }
+            }
           >
+            {b.drop && <span className="absolute" style={{ left: "12%", top: "100%", width: "4cqw", height: "4cqw", background: BRAND.ink, clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />}
             {photo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={photo} alt="" style={{ width: "13cqw", height: "13cqw", display: "block", imageRendering: "pixelated" }} />
@@ -1395,7 +1445,7 @@ export default function ReelOverlay({
         // Behind a card or a list, the scene dims so it and the words over it read.
         const dim = root.current.querySelector<HTMLElement>("[data-dim]");
         if (dim) {
-          const k = Math.max(0, ...reel.panels.map((p) => (p.kind === "comment" || p.kind === "contrib" || p.kind === "roster" || p.kind === "bars" || p.kind === "place" || p.kind === "points" || p.kind === "phone" ? clamp(Math.min((t - p.from) / 0.25, (p.to + 0.3 - t) / 0.3)) : 0)));
+          const k = Math.max(0, ...reel.panels.map((p) => (p.kind === "comment" || p.kind === "contrib" || p.kind === "roster" || p.kind === "bars" || p.kind === "place" || p.kind === "points" || p.kind === "phone" || p.kind === "pointer" ? clamp(Math.min((t - p.from) / 0.25, (p.to + 0.3 - t) / 0.3)) : 0)));
           dim.style.opacity = String(k * DIM);
         }
         // Each beat pops in at its moment (a little big, then settles) and gives way to the next.
