@@ -12,7 +12,7 @@
 // recalcs): a few reads, the rest computed here.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { STATES, layoutFromState, type BrasilLayout, type Resident, type UF } from "@/lib/towns/brasil-map";
+import { STATES, layoutFromState, type BrasilLayout, type Resident } from "@/lib/towns/brasil-map";
 import { brasilOffices } from "@/lib/towns/brasil-roles";
 import { BRASIL_SLUG, getBrasilWeek, readMapState, type BrasilWeek } from "@/lib/towns/brasil-server";
 import { getCount, type Count } from "@/lib/towns/brasil-election-server";

@@ -26,7 +26,7 @@ import { checkPicture, checkText, checkTimed, type FrameReport, type Issue } fro
 import { readConfig, type ReelsConfig } from "../config";
 import { computeFacts, loadFactsInput } from "../facts";
 import { reelOf } from "../film";
-import { filled, ReelSpec, specDir } from "../spec";
+import { filled, isReelDay, ReelSpec, specDir } from "../spec";
 import { isAtLeast, readStatus, setError, setState, writeStatus } from "../status";
 import { busiestHour, scheduleReel } from "../schedule";
 import { bedOf } from "../beds";
@@ -60,8 +60,9 @@ function allIds(): string[] {
   const days = path.join(home(), "days");
   if (!existsSync(days)) return [];
   return readdirSync(days)
+    .filter(isReelDay)
     .sort()
-    .flatMap((d) => (existsSync(path.join(days, d)) ? readdirSync(path.join(days, d)).filter((s) => existsSync(path.join(days, d, s, "spec.json"))).map((s) => `${d}-${s}`) : []));
+    .flatMap((d) => readdirSync(path.join(days, d)).filter((s) => existsSync(path.join(days, d, s, "spec.json"))).map((s) => `${d}-${s}`));
 }
 
 function mainOf(spec: ReelSpec): ReelSpec | null {

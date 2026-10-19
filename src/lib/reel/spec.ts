@@ -322,6 +322,12 @@ export function filled(spec: ReelSpec): ReelSpec {
   return walk(spec) as ReelSpec;
 }
 
+/** The kit's takes are rendered from specs filed on this day: they're not reels, so the board and the worker skip it. */
+export const KIT_DAY = "2000-01-01";
+
+/** A day folder of reels (not the kit's, not a stray file). */
+export const isReelDay = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d !== KIT_DAY;
+
 /** "2026-10-19-main" → its folder under REELS_HOME. */
 export function specDir(id: string): { date: string; slot: string; rel: string } {
   const date = id.slice(0, 10);

@@ -9,7 +9,7 @@ import type { Word } from "@trailer-kit/narration";
 import type { Issue } from "./check";
 import { reelOf } from "./film";
 import { inHome } from "./home";
-import { filled, ReelSpec, specDir } from "./spec";
+import { filled, isReelDay, ReelSpec, specDir } from "./spec";
 import { readStatus, type ReelStatus } from "./status";
 
 export interface ScriptRow {
@@ -42,7 +42,7 @@ export function reelDays(): string[] {
   const days = inHome("days");
   if (!days || !existsSync(days)) return [];
   return readdirSync(days)
-    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .filter(isReelDay)
     .sort()
     .reverse();
 }
