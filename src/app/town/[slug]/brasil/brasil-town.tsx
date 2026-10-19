@@ -39,13 +39,14 @@ import { LOT, lotToWorld } from "@/lib/league-city/grid";
 import BrasilMinimap from "@/components/towns/brasil/BrasilMinimap";
 import { BrasilPicker, BrasilRanking, BrasilSearchBar } from "@/components/towns/brasil/BrasilPanels";
 import ElectionPanel from "@/components/towns/brasil/ElectionPanel";
+import ApuracaoWidget from "@/components/towns/brasil/ApuracaoWidget";
 import StateCard from "@/components/towns/brasil/StateCard";
 import { stateStats, swatchOf, weekCrown, type StateStats } from "@/components/towns/brasil/stats";
 import { ptState, stateOf, type BrasilLayout, type CityLayout, type UF } from "@/lib/towns/brasil-map";
 import { brasilWorld, plainBuilding } from "@/lib/towns/brasil-world";
 import { brasilOffices, officeLabel, type Office } from "@/lib/towns/brasil-roles";
 import type { BrasilWeek } from "@/lib/towns/brasil-server";
-import type { ElectionView } from "@/lib/towns/brasil-election-server";
+import type { Count, ElectionView } from "@/lib/towns/brasil-election-server";
 import { POINTS, totalOf, type PointsBreakdown } from "@/lib/towns/brasil-points";
 
 // The Brasil town's page: the map of Brazil with the town's residents, each
@@ -73,6 +74,8 @@ export interface BrasilTownProps {
   week: BrasilWeek;
   /** The presidential race and who's in office (null while the presidency is off). */
   election: ElectionView | null;
+  /** The presidential count for the corner widget (null while the presidency is off). */
+  count?: Count | null;
   /** ?vote=34, from a shared vote: the voting machine opens with that number typed. */
   startVote?: number | null;
 }
@@ -89,7 +92,7 @@ const HUD_BG = "bg-bg/90";
 const HUD_EDGE = "border-border";
 const HUD_SOFT = "text-muted";
 
-export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, week: officeWeek, election, startVote = null }: BrasilTownProps) {
+export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, week: officeWeek, election, count = null, startVote = null }: BrasilTownProps) {
   const router = useRouter();
   const camera = useRef<CameraApi | null>(null);
   const cameraStore = useMemo(() => createCameraStore(), []);
@@ -929,6 +932,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onClose={() => setPanel(null)}
         />
       )}
+
+      {count && !inCar && !state && !focused && !panel && !picker && <ApuracaoWidget slug={league.slug} initial={count} onVote={() => openPanel("election")} />}
 
       {panel === "election" && election && (
         <ElectionPanel
