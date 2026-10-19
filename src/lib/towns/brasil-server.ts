@@ -61,8 +61,8 @@ export async function getBrasilResidents(leagueId: string): Promise<Resident[]> 
   return out;
 }
 
-/** The whole stored map: the residents, where every city stands, the scale, and its version. */
-async function readMapState(leagueId: string): Promise<MapState & { version: number; grewAt: number | null }> {
+/** The whole stored map: the residents, where every city stands, the scale, and its version (uncached: scripts read it outside Next). */
+export async function readMapState(leagueId: string): Promise<MapState & { version: number; grewAt: number | null }> {
   const sb = getSupabaseAdmin();
   const [residents, cities, map] = await Promise.all([
     getBrasilResidents(leagueId),

@@ -161,3 +161,71 @@ export async function instagramThread(parentId: string): Promise<{ id: string; t
   );
   return [parent, ...replies.filter((r): r is NonNullable<typeof r> => !!r)].map((c) => ({ id: c.id, text: c.text, username: c.from?.username?.toLowerCase() ?? null, at: c.timestamp }));
 }
+
+// ─── Publishing reels and reading their numbers (the reel factory) ──────────
+
+/** A reel's container: Instagram fetches the video from `videoUrl` and processes it. A trial goes only to non-followers. */
+export async function createReelContainer(o: { videoUrl: string; caption: string; coverUrl?: string | null; thumbOffsetMs?: number | null; trial: boolean }): Promise<string> {
+  const { id } = await graph<{ id: string }>(
+    "/me/media",
+    {
+      media_type: "REELS",
+      video_url: o.videoUrl,
+      caption: o.caption,
+      share_to_feed: "true",
+      ...(o.coverUrl ? { cover_url: o.coverUrl } : {}),
+      ...(o.thumbOffsetMs != null ? { thumb_offset: String(o.thumbOffsetMs) } : {}),
+      // Instagram graduates a trial that does well with non-followers by itself (it then reaches followers and the grid).
+      ...(o.trial ? { trial_params: JSON.stringify({ graduation_strategy: "SS_PERFORMANCE" }) } : {}),
+    },
+    "POST",
+  );
+  return id;
+}
+
+/** A container's processing state: IN_PROGRESS, FINISHED, ERROR, EXPIRED or PUBLISHED. */
+export async function containerStatus(containerId: string): Promise<{ status: string; detail: string | null }> {
+  const j = await graph<{ status_code?: string; status?: string }>(`/${containerId}`, { fields: "status_code,status" });
+  return { status: j.status_code ?? "IN_PROGRESS", detail: j.status ?? null };
+}
+
+/** Publishes a finished container: the reel goes live. Returns its media id and permalink. */
+export async function publishContainer(containerId: string): Promise<{ mediaId: string; permalink: string | null }> {
+  const { id } = await graph<{ id: string }>("/me/media_publish", { creation_id: containerId }, "POST");
+  const media = await graph<{ permalink?: string }>(`/${id}`, { fields: "permalink" }).catch(() => ({ permalink: undefined }));
+  return { mediaId: id, permalink: media.permalink ?? null };
+}
+
+export const REEL_METRICS = ["views", "reach", "likes", "comments", "shares", "saved", "total_interactions", "ig_reels_avg_watch_time", "reels_skip_rate"] as const;
+
+/** A reel's insights, one call per metric so a metric Instagram doesn't return for it leaves just that one out. */
+export async function reelInsights(mediaId: string): Promise<Partial<Record<(typeof REEL_METRICS)[number], number>>> {
+  const out: Partial<Record<(typeof REEL_METRICS)[number], number>> = {};
+  const all = await graph<{ data: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] }>(`/${mediaId}/insights`, {
+    metric: REEL_METRICS.join(","),
+  }).catch(() => null);
+  const rows = all?.data ?? [];
+  if (!all) {
+    for (const m of REEL_METRICS) {
+      const one = await graph<{ data: typeof rows }>(`/${mediaId}/insights`, { metric: m }).catch(() => null);
+      rows.push(...(one?.data ?? []));
+    }
+  }
+  for (const r of rows) {
+    const v = r.values?.[0]?.value ?? r.total_value?.value;
+    if (typeof v === "number") out[r.name as (typeof REEL_METRICS)[number]] = v;
+  }
+  return out;
+}
+
+/** When the account's followers are online, hour by hour (Instagram's online_followers insight; empty without enough data). */
+export async function onlineFollowers(): Promise<{ values?: { value?: Record<string, number> }[] } | null> {
+  const j = await graph<{ data: { values?: { value?: Record<string, number> }[] }[] }>("/me/insights", { metric: "online_followers", period: "lifetime" }).catch(() => null);
+  return j?.data?.[0] ?? null;
+}
+
+/** Whether a post goes to the account's followers and grid: a trial reel turns true once it graduates. */
+export async function sharedToFeed(mediaId: string): Promise<boolean | null> {
+  const j = await graph<{ is_shared_to_feed?: boolean }>(`/${mediaId}`, { fields: "is_shared_to_feed" }).catch(() => null);
+  return typeof j?.is_shared_to_feed === "boolean" ? j.is_shared_to_feed : null;
+}

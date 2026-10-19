@@ -41,7 +41,8 @@ const GOLD_DARK = "#c98f10";
 const GEM = "#ff4f7a";
 
 /** A blocky crown, ~5 units across, sitting on y = 0. */
-function VoxelCrown() {
+/** The crown: a ring of gold blocks with gems on its points. */
+export function VoxelCrown() {
   const blocks = useMemo(() => {
     const out: { p: [number, number, number]; s: number; c: string }[] = [];
     const n = 8;

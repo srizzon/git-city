@@ -772,6 +772,17 @@ export interface BrasilSceneProps {
   driftBoard?: BoardRowLite[];
   /** The track's tag on the map: drive there. */
   onDriftTag?: () => void;
+  /**
+   * A camera that isn't the map's: a film's rig (the trailer studio). It
+   * replaces the map controls and sets the haze itself; the tags, name plates
+   * and cars stay off. `embedded` fills the parent instead of the viewport,
+   * and `children` adds the film's own pieces to the scene.
+   */
+  rig?: ReactNode;
+  embedded?: boolean;
+  /** A film's extra fill light (ThemeLights' `light`). */
+  filmLight?: number;
+  children?: ReactNode;
 }
 
 const WatchedCars = dynamic(() => import("@/components/league/drive/WatchedCars"), { ssr: false, loading: () => null });
@@ -864,7 +875,7 @@ function Pulse({ x, z }: { x: number; z: number }) {
   );
 }
 
-export default function BrasilScene({ scale = 1, cities, island, objects, buildings, cameraApi, cameraStore, onTag, onBuildingClick, focused = null, drive, smash, pulse = null, watching, onCity, cameraStart = null, stats = false, crowned = null, fresh, offices, drivers, driverAt, drift, driftBoard = NO_BOARD, onDriftTag }: BrasilSceneProps) {
+export default function BrasilScene({ scale = 1, cities, island, objects, buildings, cameraApi, cameraStore, onTag, onBuildingClick, focused = null, drive, smash, pulse = null, watching, onCity, cameraStart = null, stats = false, crowned = null, fresh, offices, drivers, driverAt, drift, driftBoard = NO_BOARD, onDriftTag, rig, embedded, children, filmLight = 1 }: BrasilSceneProps) {
   const allCities = useMemo(() => [...cities, island], [cities, island]);
   // Phones and weak GPUs draw at a lower resolution, as in the main city (?perf=low|high overrides).
   const { mode: perf } = usePerfMode();
@@ -873,6 +884,7 @@ export default function BrasilScene({ scale = 1, cities, island, objects, buildi
   const off = (layer: string) => hidden.has(layer);
   const drifting = !!drift;
   const driving = !!drive || drifting;
+  const film = !!rig;
   const [near, setNear] = useState(false);
   // Driving: the trees fall instead of stopping the car (LeagueTrees' knock, so they're out of the colliders),
   // and the lamps and fountains round where the car starts are physics props you can knock over (thousands
@@ -933,11 +945,11 @@ export default function BrasilScene({ scale = 1, cities, island, objects, buildi
       dpr={perf === "low" ? 0.75 : [1, 1.5]}
       camera={{ position: [cx, 40000, cz + 15000], fov: FOV, near: 5, far: 400000 }}
       gl={{ antialias: true, logarithmicDepthBuffer: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: EXPOSURE }}
-      style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
+      style={embedded ? { position: "absolute", inset: 0 } : { position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
-      <ThemeLights theme={NIGHT} themeIndex={NIGHT_KEY} />
+      <ThemeLights theme={NIGHT} themeIndex={NIGHT_KEY} light={filmLight} />
       <ThemeSkyFX themeIndex={NIGHT_FX} theme={NIGHT} lowSky />
-      {!driving && <MapCamera apiRef={cameraApi} onNear={setNear} store={cameraStore} cities={allCities} onCity={onCity} start={cameraStart} bounds={bounds} />}
+      {rig ?? (!driving && <MapCamera apiRef={cameraApi} onNear={setNear} store={cameraStore} cities={allCities} onCity={onCity} start={cameraStart} bounds={bounds} />)}
       {/* The ground is ~200 static meshes (sea, land, borders, rivers and their banks): merged to a handful of draw calls. */}
       {!off("ground") && (
         <MergedStatic byMaterial>
@@ -963,16 +975,17 @@ export default function BrasilScene({ scale = 1, cities, island, objects, buildi
         onBuildingClick={driving ? undefined : onBuildingClick}
       />}
       {smash && !off("buildings") && <RubbleFlags store={smash} />}
-      {!driving && <NearPlates buildings={buildings} fresh={fresh} offices={offices} />}
-      {!driving && <Tags cities={allCities} near={near} crowned={crowned} onTag={onTag} overview={overview} />}
+      {!driving && !film && <NearPlates buildings={buildings} fresh={fresh} offices={offices} />}
+      {!driving && !film && <Tags cities={allCities} near={near} crowned={crowned} onTag={onTag} overview={overview} />}
       {!drifting && <DriftSite board={driftBoard} />}
-      {!driving && onDriftTag && <DriftTag record={driftBoard[0] ?? null} onClick={onDriftTag} />}
+      {!driving && !film && onDriftTag && <DriftTag record={driftBoard[0] ?? null} onClick={onDriftTag} />}
       {drift}
       {drive && !drifting && <DriveWorld objects={driveObjects} buildings={buildings} h={geo.h} smash={smash} boxSpots={cityStreets} trees={treeBubble} {...drive} />}
-      {pulse && !driving && <Pulse key={pulse.key} x={pulse.x} z={pulse.z} />}
+      {pulse && !driving && !film && <Pulse key={pulse.key} x={pulse.x} z={pulse.z} />}
       {stats && <Stats />}
-      {!driving && watching && watching.length > 0 && <WatchedCars cars={watching} />}
-      {!driving && driverAt && drivers?.map((d) => <DriverPin key={d.id} id={d.id} name={d.name} at={driverAt} />)}
+      {!driving && !film && watching && watching.length > 0 && <WatchedCars cars={watching} />}
+      {!driving && !film && driverAt && drivers?.map((d) => <DriverPin key={d.id} id={d.id} name={d.name} at={driverAt} />)}
+      {children}
     </Canvas>
   );
 }
