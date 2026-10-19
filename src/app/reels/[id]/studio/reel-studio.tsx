@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { generateCityLayout, type CityBuilding, type DeveloperRecord, type LayoutNorms } from "@/lib/github";
 import { leagueBuildings, scaleTownHeights } from "@/lib/league-city/buildings";
 import { lotToWorld } from "@/lib/league-city/grid";
-import { Transport } from "@trailer-kit/clock";
+import { beatOf, Transport } from "@trailer-kit/clock";
 import type { Word } from "@trailer-kit/narration";
 import Studio from "@trailer-kit/Studio";
 import BrasilScene from "@/components/towns/brasil/BrasilScene";
 import BrasilReelRig from "@/components/reel/brasil/BrasilReelRig";
-import ReelOverlay from "@/components/reel/ReelOverlay";
+import ReelOverlay, { overlayBoxes } from "@/components/reel/ReelOverlay";
 import { brasilWorld, plainBuilding } from "@/lib/towns/brasil-world";
 import { BrasilPlacer, layoutFromResidents, type Resident, type UF } from "@/lib/towns/brasil-map";
 import { reelOf } from "@/lib/reel/film";
@@ -73,6 +73,17 @@ export default function ReelStudio({ spec, words, song, residents, cityDevs, exa
     },
     [world.layout],
   );
+  // The export's --report reads this every frame (the safe-zone check).
+  useEffect(() => {
+    const w = window as Window & { __ggReport?: () => unknown };
+    w.__ggReport = () => {
+      const stage = document.querySelector<HTMLElement>(".tk-stage");
+      return stage ? { t: beatOf(clock), boxes: overlayBoxes(stage) } : null;
+    };
+    return () => {
+      delete w.__ggReport;
+    };
+  }, [clock]);
   const photoOf = useCallback((login: string) => world.byLogin.get(login.toLowerCase())?.avatar_url ?? null, [world.byLogin]);
 
   return (

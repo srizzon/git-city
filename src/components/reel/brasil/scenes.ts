@@ -33,9 +33,10 @@ const ORBITS: Record<"lot-rise" | "orbit", Orbit[]> = {
     [1, 35, 1.6, 1.25, 1.0],
   ],
   // Closer on the roof (far off, the engine stops drawing a thin tower's roof items), looking a little down.
+  // The look point a little over the roof keeps the balloon clear under the header.
   orbit: [
-    [0, 35, 1.6, 1.25, 1.0],
-    [1, 70, 1.2, 1.3, 1.0],
+    [0, 35, 1.6, 1.25, 1.06],
+    [1, 70, 1.2, 1.3, 1.08],
   ],
 };
 
@@ -49,10 +50,23 @@ export interface Target {
   z: number;
   /** The building's full height (0 for a capital with nothing to rise). */
   height: number;
+  /** Whether items (crown, face, aura) stand on its roof: its balloon sits higher. */
+  items?: boolean;
+}
+
+/** A building that can stand between the camera and a target. */
+export interface Obstacle {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  h: number;
 }
 
 export interface SceneWorld {
   aspect: number;
+  /** Buildings near a point (for line of sight), within `r` world units. */
+  near: (x: number, z: number, r: number) => Obstacle[];
   /** Where a cut's target stands. */
   targetOf: (cut: ReelCut) => Target;
   /** The rising building's height share (0–1) at `t` seconds, 1 when nothing rises. */
@@ -84,9 +98,9 @@ function keyed(keys: Orbit[], u: number) {
   return a.map((v, j) => v + (b[j] - v) * f);
 }
 
-function orbitPose(target: Target, keys: Orbit[], u: number, scale: number): Pose {
+function orbitPose(target: Target, keys: Orbit[], u: number, scale: number, turn = 0): Pose {
   const [, az, d, hh, lh] = keyed(keys, u);
-  const r = THREE.MathUtils.degToRad(az);
+  const r = THREE.MathUtils.degToRad(az + turn);
   return {
     pos: new THREE.Vector3(target.x + d * scale * Math.sin(r), hh * scale, target.z + d * scale * Math.cos(r)),
     look: new THREE.Vector3(target.x, lh * scale, target.z),
@@ -104,6 +118,58 @@ function zoom(a: Pose, b: Pose, e: number): Pose {
   const dist = Math.exp(Math.log(d0.length()) + (Math.log(d1.length()) - Math.log(d0.length())) * e);
   const look = a.look.clone().lerp(b.look, e);
   return { look, pos: d0.normalize().lerp(d1.normalize(), e).normalize().multiplyScalar(dist).add(look) };
+}
+
+/** Whether nothing stands between `cam` and `pt` (sampled along the line, as tools/los.py did). */
+function clear(cam: THREE.Vector3, pt: THREE.Vector3, obs: Obstacle[]): boolean {
+  for (let i = 1; i < 40; i++) {
+    const u = i / 40;
+    const x = cam.x + (pt.x - cam.x) * u;
+    const y = cam.y + (pt.y - cam.y) * u;
+    const z = cam.z + (pt.z - cam.z) * u;
+    for (const o of obs) if (Math.abs(x - o.x) < o.w / 2 + 1 && Math.abs(z - o.z) < o.d / 2 + 1 && y < o.h) return false;
+  }
+  return true;
+}
+
+const turns = new WeakMap<ReelCut, number>();
+/**
+ * How far to turn an orbit (degrees) so the target's roof and its balloon
+ * are in plain sight the whole move: the smallest turn, either way, for which
+ * the camera sees both at the move's start, middle and end. Remembered per cut.
+ */
+function turnFor(cut: ReelCut, target: Target, keys: Orbit[], H: number, world: SceneWorld): number {
+  const known = turns.get(cut);
+  if (known !== undefined) return known;
+  const reach = Math.max(...keys.map((k) => k[2])) * H + 60;
+  const obs = world.near(target.x, target.z, reach).filter((o) => Math.hypot(o.x - target.x, o.z - target.z) > 1);
+  const roof = new THREE.Vector3(target.x, Math.max(target.height, 1) * 0.9, target.z);
+  const tag = new THREE.Vector3(target.x, target.height + 12, target.z);
+  const sees = (turn: number) => [0, 0.5, 1].every((u) => {
+    const p = orbitPose(target, keys, u, H, turn).pos;
+    return clear(p, roof, obs) && clear(p, tag, obs);
+  });
+  let best = 0;
+  for (let k = 0; k <= 18; k++) {
+    const found = [k * 10, -k * 10].find(sees);
+    if (found !== undefined) {
+      best = found;
+      break;
+    }
+  }
+  turns.set(cut, best);
+  return best;
+}
+
+/** How far over a roof its balloon's foot stands: over its items, when it has some. */
+export const balloonClear = (target: Target) => 8 + (target.items ? ITEMS_H : 0);
+
+/** Tilts the camera so the point `height` up the target shows `y` (0 top – 1 bottom) down the frame. */
+function aimAt(p: Pose, target: Target, height: number, y: number) {
+  const flat = Math.hypot(p.look.x - p.pos.x, p.look.z - p.pos.z);
+  const toRoof = Math.atan2(height - p.pos.y, Math.hypot(target.x - p.pos.x, target.z - p.pos.z));
+  const above = Math.atan((1 - 2 * y) * Math.tan(THREE.MathUtils.degToRad(FOV / 2)));
+  p.look.y = p.pos.y + flat * Math.tan(toRoof - above);
 }
 
 /** How tall the framing takes the target to be at `t`: its rise inside the rise cut, never under MIN_H. */
@@ -132,9 +198,17 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
     case "lot-rise":
     case "orbit": {
       const H = frameHeight(world, cut, t);
-      const p = orbitPose(world.targetOf(cut), ORBITS[cut.kind], u, H);
+      const target = world.targetOf(cut);
+      // A rising example stands alone on its lot; a resident's building stands in a city.
+      // Round a finished building the camera stands back a little, so its roof and balloon stay close on screen.
+      const back = world.isRise(cut) ? 1 : 1.4;
+      const turn = world.isRise(cut) ? 0 : turnFor(cut, target, ORBITS[cut.kind], frameHeight(world, cut, cut.to) * back, world);
+      const p = orbitPose(target, ORBITS[cut.kind], u, H * back, turn);
       // While the lot is empty, look down at it, not at a roof that isn't there yet.
       if (world.isRise(cut)) p.look.y = THREE.MathUtils.lerp(0.15 * H, p.look.y, Math.min(1, world.riseAt(t) * 4));
+      // A finished building: its roof held at a set height on screen, under its balloon and the
+      // header, above the captions (higher with roof items, whose balloon stands taller).
+      else aimAt(p, target, target.height + balloonClear(target), 0.36);
       return p;
     }
     case "pullback":

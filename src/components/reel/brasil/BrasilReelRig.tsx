@@ -49,12 +49,17 @@ export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf
     return { from, to };
   }, [riseCut]);
 
+  // Every building as a box, for the orbits' line of sight.
+  const nearby = useMemo(
+    () => [...byLogin.values()].map((b) => ({ x: b.position[0], z: b.position[2], w: b.width, d: b.depth, h: b.height })),
+    [byLogin],
+  );
   const world = useMemo<SceneWorld>(() => {
     const building = (login: string): CityBuilding | null => (example && example.loginLower === login.toLowerCase() ? example : (byLogin.get(login.toLowerCase()) ?? null));
     const targetOf = (cut: ReelCut): Target => {
       const p = cut.params;
       const b = typeof p.login === "string" ? building(p.login) : p.target === "example" || !p.uf ? example : null;
-      if (b) return { x: b.position[0], z: b.position[2], height: b.height };
+      if (b) return { x: b.position[0], z: b.position[2], height: b.height, items: !!b.owned_items?.length };
       if (typeof p.uf === "string") {
         const c = capitalOf(p.uf);
         if (c) return { x: c[0], z: c[1], height: 0 };
@@ -66,8 +71,10 @@ export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf
       targetOf,
       riseAt: (t) => (riseCut ? smoother(ramp(t, rise.from, rise.to)) : 1),
       isRise: (cut) => cut === riseCut,
+      near: (x, z, r) =>
+        nearby.filter((o) => Math.abs(o.x - x) < r && Math.abs(o.z - z) < r),
     };
-  }, [size.width, size.height, example, byLogin, capitalOf, riseCut, rise]);
+  }, [size.width, size.height, example, byLogin, capitalOf, riseCut, rise, nearby]);
 
   const floors = example ? Math.max(6, example.floors || Math.round(example.height / 6)) : 1;
   const pin = useMemo(() => new THREE.Vector3(), []);
@@ -112,8 +119,12 @@ export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf
     if (!target) return placeBalloon(balloon.current, null);
     const isExample = target === example;
     const top = isExample ? buildTo.current : target.height;
-    // Once a rising building is finished its items stand on the roof: the tag rises over them.
-    const clear = 8 + ITEMS_H * (isExample && riseCut ? ease(ramp(t, rise.to, rise.to + 0.35)) : 1);
+    // Its roof items (crown, face, aura) stand on the roof: the tag clears them (once a rising one is finished).
+    const items = target.owned_items?.length ? ITEMS_H : 0;
+    const clear = 8 + items * (isExample && riseCut ? ease(ramp(t, rise.to, rise.to + 0.35)) : 1);
+    // The roof on screen, for the export's check that no caption covers it.
+    pin.set(target.position[0], top, target.position[2]).project(camera);
+    const roof = { x: (pin.x + 1) / 2, y: (1 - pin.y) / 2 };
     pin.set(target.position[0], top + clear, target.position[2]).project(camera);
     placeBalloon(balloon.current, {
       left: ((pin.x + 1) / 2) * 100,
@@ -121,6 +132,7 @@ export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf
       opacity: Math.min(1, (t - b.from) / 0.15) * Math.max(0, Math.min(1, 1 - (t - b.to) / 0.4)),
       badges: b.badges.map((x) => x.at),
       t,
+      roof,
     });
   });
 

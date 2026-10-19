@@ -47,11 +47,16 @@ function back(x: number) {
  */
 export function placeBalloon(
   el: HTMLDivElement | null,
-  at: { left: number; top: number; opacity: number; badges: number[]; t: number } | null,
+  at: { left: number; top: number; opacity: number; badges: number[]; t: number; roof?: { x: number; y: number } } | null,
 ) {
   if (!el) return;
   el.style.opacity = at ? String(at.opacity) : "0";
   if (!at) return;
+  // Where its building's roof is on screen (0–1), for the export's report.
+  if (at.roof) {
+    el.dataset.roofX = String(at.roof.x);
+    el.dataset.roofY = String(at.roof.y);
+  }
   el.style.left = `${at.left}%`;
   el.style.top = `${at.top}%`;
   const ks = at.badges.map((m) => back(Math.min(1, Math.max(0, (at.t - m) / 0.4))));
@@ -63,6 +68,32 @@ export function placeBalloon(
   };
   show("plate", (ks[0] ?? 0) > 0 ? 0 : 1);
   ks.forEach((k, i) => show(String(i), (ks[i + 1] ?? 0) > 0 ? 0 : k));
+}
+
+/**
+ * Where each overlay is on the stage this frame, in fractions (0–1): the
+ * header (rule or call to action, whichever shows), the caption line's
+ * spoken words and the balloon. The export records it per frame for the
+ * safe-zone check (lib/reel/check), so nobody screenshots the 3D city.
+ */
+export function overlayBoxes(stage: HTMLElement): { name: string; x: number; y: number; w: number; h: number }[] {
+  const s = stage.getBoundingClientRect();
+  return [...stage.querySelectorAll<HTMLElement>("[data-reel-box]")].flatMap((el) => {
+    if (Number(el.style.opacity || 1) < 0.5) return [];
+    let r: DOMRect;
+    if (el.dataset.reelBox === "balloon") r = el.getBoundingClientRect();
+    else {
+      // The text itself, not its box: a caption line's box is wider than its words.
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      r = range.getBoundingClientRect();
+    }
+    if (!r.width || !r.height) return [];
+    const box = { name: el.dataset.reelBox!, x: (r.left - s.left) / s.width, y: (r.top - s.top) / s.height, w: r.width / s.width, h: r.height / s.height };
+    // A balloon's building: where its roof is (a point).
+    const roof = el.dataset.roofY ? [{ name: "roof", x: Number(el.dataset.roofX), y: Number(el.dataset.roofY), w: 0, h: 0 }] : [];
+    return [box, ...roof];
+  });
 }
 
 /** "dia 1 · *0 devs*" → spans, the starred words lime. */
@@ -165,16 +196,16 @@ export default function ReelOverlay({
   return (
     <div className="pointer-events-none absolute inset-0">
       <div className={type} style={{ ...safe, top: "15%", ...outline(1.4) }}>
-        <div ref={rule}>
+        <div ref={rule} data-reel-box="header">
           <HeaderLines lines={header.rule} />
         </div>
-        <div ref={cta} className="absolute inset-0 flex flex-col items-center justify-center" style={{ opacity: 0 }}>
+        <div ref={cta} data-reel-box="header" className="absolute inset-0 flex flex-col items-center justify-center" style={{ opacity: 0 }}>
           <HeaderLines lines={header.cta} />
         </div>
       </div>
 
       {first && (
-        <div ref={balloon} className="absolute font-pixel uppercase" style={{ opacity: 0, transform: "translate(-50%, -100%)", paddingBottom: "2.4cqw" }}>
+        <div ref={balloon} data-reel-box="balloon" className="absolute font-pixel uppercase" style={{ opacity: 0, transform: "translate(-50%, -100%)", paddingBottom: "2.4cqw" }}>
           <div style={{ display: "grid", justifyItems: "center", alignItems: "end" }}>
             <div
               data-tag="plate"
@@ -240,6 +271,7 @@ export default function ReelOverlay({
 
       <p
         ref={line}
+        data-reel-box="captions"
         className={`${type} flex flex-wrap justify-center`}
         style={{ ...safe, top: "55%", width: "76%", whiteSpace: "normal", gap: "0 3cqw", fontSize: "7cqw", lineHeight: 1.3, opacity: 0, ...outline(1.8) }}
       />
