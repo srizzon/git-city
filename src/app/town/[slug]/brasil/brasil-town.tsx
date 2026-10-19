@@ -14,8 +14,10 @@ import { createBrowserSupabase } from "@/lib/supabase";
 import { signInWithGitHub } from "@/lib/sign-in";
 import type { CrownApi, CrownView } from "@/components/league/drive/CrownMode";
 import type { RallyApi, RallyView } from "@/components/league/drive/RallyMode";
-import RacePanel, { raceActive } from "@/components/towns/brasil/RacePanel";
-import { cityByKey, parseRouteKey } from "@/lib/towns/brasil-race";
+import RacePanel, { RacePicker, raceActive } from "@/components/towns/brasil/RacePanel";
+import { GameMenu, type GameMode } from "@/components/games/kit";
+import { Crown as CrownIcon, Flag as FlagIcon, Map as DriftIcon } from "lucide-react";
+import { cityByKey, parseRouteKey, raceRoute, startLine } from "@/lib/towns/brasil-race";
 import type { RouteRecord } from "@/lib/towns/brasil-race-server";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
 import { useTouch } from "@/components/towns/useDesktop";
@@ -115,12 +117,30 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const rallyApi = useRef<RallyApi | null>(null);
   const [rallyView, setRallyView] = useState<RallyView | null>(null);
   const raceRecordRef = useRef<number | null>(null);
-  const onRaceRecord = useCallback((ms: number | null) => {
-    raceRecordRef.current = ms;
-  }, []);
+  /** A race's start line, from the map's own route between its cities. */
+  const raceLine = useCallback((r: { from: string; to: string }) => raceRoute(layout, r.from, r.to)?.line ?? null, [layout]);
+  const raceStartLine = useCallback(
+    (r: { from: string; to: string }) => {
+      const built = raceRoute(layout, r.from, r.to);
+      return built ? startLine(built) : null;
+    },
+    [layout],
+  );
   /** ?race=<route>: a beaten record's email opens that route's race. */
   const [pendingRace, setPendingRace] = useState<string | null>(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("race")));
-  const clearPendingRace = useCallback(() => setPendingRace(null), []);
+  /** The Games menu (G): closed, its list of modes, or the race's step (with a route from a link). */
+  const [games, setGames] = useState<null | { step: "modes" } | { step: "race"; initial: string | null }>(null);
+  const closeGames = useCallback(() => setGames(null), []);
+  /** A race's results are on screen: the car stands still under them. */
+  const [raceResults, setRaceResults] = useState(false);
+  /** On the grid or between the gates: the Games menu waits. */
+  const racing = raceActive(rallyView);
+  // Joined a race from inside the menu (its invite shows over it): the menu closes for the grid.
+  const [wasRacing, setWasRacing] = useState(racing);
+  if (wasRacing !== racing) {
+    setWasRacing(racing);
+    if (racing && games) setGames(null);
+  }
   // Every route's record, for the state cards: fetched the first time one opens.
   const [raceRecords, setRaceRecords] = useState<RouteRecord[] | null>(null);
   const recordsAsked = useRef(false);
@@ -290,20 +310,28 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setDrivers([]);
     setCrownView(null);
     setRallyView(null);
+    setRaceResults(false);
+    setGames(null);
     emoteLog.clear();
   }, [emoteLog, telemetry]);
   // Esc pauses; Esc again on the pause menu leaves the car.
   useEffect(() => {
     if (!driving) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.repeat || taste) return; // the free building's choice answers Esc itself
+      // G opens the Games menu (it answers its own keys, Esc included, while it's open).
+      if (e.code === "KeyG" && !e.repeat && !paused && !taste && driveReady && !games && !racing && !(e.target instanceof HTMLInputElement)) {
+        e.preventDefault();
+        setGames({ step: "modes" });
+        return;
+      }
+      if (e.key !== "Escape" || e.repeat || taste || games) return; // the free building's choice answers Esc itself
       e.preventDefault();
       if (paused) exitDrive();
       else setPaused(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [driving, paused, exitDrive, taste]);
+  }, [driving, paused, exitDrive, taste, games, driveReady, racing]);
   // The State War: the room's paint, through the watch socket on the map and the drive's in the car.
   const paint = usePaint();
   const watch = useDriveWatch(league.slug, !inCar, (msg) => (msg.t.startsWith("paint_") ? paint.onMessage(msg) : applyRoomDamage(smash, msg, Date.now())));
@@ -474,6 +502,16 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const t = setTimeout(() => startDrive({ x: from.hub[0] * LOT, z: from.hub[1] * LOT }), 700);
     return () => clearTimeout(t);
   }, [pendingRace, layout]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Once the car is ready, the link's route opens in the Games menu.
+  useEffect(() => {
+    if (!pendingRace || !driving || !driveReady) return;
+    const key = pendingRace;
+    const t = setTimeout(() => {
+      setGames({ step: "race", initial: key });
+      setPendingRace(null);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [pendingRace, driving, driveReady]);
 
   // Where you are: the building's city, the open state, or the city the camera is over.
   const place = (focused ? world.cityOfLogin.get(focused.loginLower) : undefined) ?? state?.capital ?? (viewKey ? world.cityByKey.get(viewKey) : undefined) ?? null;
@@ -523,7 +561,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       volume,
       emoteApi,
       onEmoteLog: emoteLog.push,
-      paused: paused || !!taste,
+      paused: paused || !!taste || !!games || raceResults,
       stallAt: null,
       onReady: () => {
         setDriveReady(true);
@@ -539,9 +577,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       onCrown: setCrownView,
       onTaste: viewerLogin ? undefined : onTaste,
       onRoom: paint.onMessage,
-      rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef },
+      rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef, startLine: raceStartLine, routeLine: raceLine },
     }),
-    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, paint.onMessage],
+    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, games, raceStartLine, raceLine, raceResults, paint.onMessage],
   );
   /** Your state, from your city. */
   const homeCity = viewerLogin ? world.cityOfLogin.get(viewerLogin.toLowerCase()) : undefined;
@@ -642,6 +680,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setDrivers([]);
     setCrownView(null);
     setRallyView(null);
+    setRaceResults(false);
     emoteLog.clear();
     startDrift();
     setDrifting(true);
@@ -751,6 +790,31 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     void signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=/town/${league.slug}`);
   };
 
+  // The Games menu's modes: a city race, Crown Rush (with someone else here), the drift track (the arrow takes you).
+  const raceBusy = !!rallyView && (rallyView.rally.phase === "invite" || rallyView.rally.phase === "countdown" || rallyView.rally.phase === "live");
+  const crownBusy = !!crownView && (crownView.crown.phase === "countdown" || crownView.crown.phase === "live");
+  const gameModes: GameMode[] = [
+    { id: "race", icon: FlagIcon, name: "Race", line: "To another city. Everyone starts together.", need: "1+", blocked: raceBusy ? "A race is on. Join the next one." : crownBusy ? "Crown rush is on." : null },
+    { id: "crown", icon: CrownIcon, name: "Crown rush", line: "Hold the crown 30 s. Bump to steal it.", need: "2+", blocked: drivers.length === 0 ? "Needs someone else driving here." : raceBusy ? "A race is on." : crownBusy ? "One is on now." : null },
+    { id: "drift", icon: DriftIcon, name: "Drift track", line: "Off the coast between SP and RJ. The map shows the way.", need: "1" },
+  ];
+  const startRace = (route: Parameters<NonNullable<typeof rallyApi.current>["start"]>[0], how: string) => {
+    rallyApi.current?.start(route);
+    posthog.capture("brasil_race_started", { km: Math.round(route.length / 100) / 10, gates: route.gates.length, how, others: drivers.length });
+    setGames(null);
+  };
+  const pickGame = (id: string) => {
+    if (id === "race") setGames({ step: "race", initial: null });
+    else if (id === "crown") {
+      crownApi.current?.start();
+      setGames(null);
+    } else if (id === "drift") {
+      // The drift track's start: on the minimap, the way there.
+      const p = pointAt(courseOf(BRASIL_DRIFT).track, -30);
+      telemetry.route = { login: "", x: p.x * M_TO_UNIT, z: p.z * M_TO_UNIT, reach: 30 };
+      setGames(null);
+    }
+  };
   /** On the map with only a state: asked once which city (until they pick one or wave it off). */
   const [askCity, setAskCity] = useState(() => {
     if (!home || home.picked || home.city === null) return false;
@@ -1075,25 +1139,30 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onVolume={changeVolume}
           onEmote={(e) => emoteApi.current?.send(e)}
           onStartCrown={() => crownApi.current?.start()}
-          crownHidden={raceActive(rallyView)}
+          gameOn={racing || !!games}
+          onGames={racing ? undefined : () => setGames({ step: "modes" })}
           onResume={() => setPaused(false)}
           onCamera={toggleCamera}
           onMute={toggleMute}
           onExit={exitDrive}
         >
-          <RacePanel
-            slug={league.slug}
-            layout={layout}
-            view={rallyView}
-            telemetry={telemetry}
-            drivers={drivers}
-            touch={touchUi}
-            pending={driveReady ? pendingRace : null}
-            onRecord={onRaceRecord}
-            onStart={(route) => rallyApi.current?.start(route)}
-            onJoin={() => rallyApi.current?.join()}
-            onPendingDone={clearPendingRace}
-          />
+          {games && (
+            <GameMenu title={`Games · ${drivers.length + 1} driving here`} modes={gameModes} onPick={pickGame} onClose={closeGames}>
+              {games.step === "race" ? (
+                <RacePicker
+                  slug={league.slug}
+                  layout={layout}
+                  telemetry={telemetry}
+                  others={drivers.length}
+                  initial={games.initial}
+                  onStart={(route, how) => startRace(route, how)}
+                  onBack={() => setGames(games.initial ? null : { step: "modes" })}
+                />
+              ) : undefined}
+            </GameMenu>
+          )}
+          {/* After the menu, so an invite that comes in while it's open shows over it. */}
+          <RacePanel layout={layout} view={rallyView} yourUf={yours} onJoin={() => rallyApi.current?.join()} onRematch={(route) => startRace(route, "rematch")} onResults={setRaceResults} />
         </DriveHud>
       )}
 

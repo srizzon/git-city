@@ -27,6 +27,7 @@ import DriveCamera from "./DriveCamera";
 import Battle from "./Battle";
 import CrownMode, { type CrownApi, type CrownView } from "./CrownMode";
 import RallyMode, { type RallyApi, type RallyView } from "./RallyMode";
+import type { RallyRoute } from "@/lib/league-city/drive/rally";
 import HonkFlash from "./HonkFlash";
 import RouteArrow from "./RouteArrow";
 import Lights from "./Lights";
@@ -110,6 +111,10 @@ export interface DriveWorldProps {
     onView: (v: RallyView) => void;
     /** The route's record (ms), when the HUD knows it: a faster finish sends its ghost. */
     recordMs: React.MutableRefObject<number | null>;
+    /** Where a route's start line is (m, heading deg), worked out from the map: the room's route doesn't carry it. */
+    startLine?: (route: RallyRoute) => { x: number; z: number; rot: number } | null;
+    /** The route's path on the road (m), from the map: the chevrons follow it. */
+    routeLine?: (route: RallyRoute) => [number, number][] | null;
   };
   /** The town's floors (lib/league-city/smash). Signed in, every building but yours has no collider: the car drives through and breaks it. */
   smash?: SmashStore;
@@ -556,6 +561,9 @@ export default function DriveWorld({
               telemetryRef={telemetryRef}
               respawnAt={respawnAt}
               recordMs={rally.recordMs}
+              startLine={rally.startLine}
+              routeLine={rally.routeLine}
+              muted={muted || paused}
             />
           )}
           {smash && (

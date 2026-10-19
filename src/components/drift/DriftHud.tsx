@@ -7,7 +7,7 @@ import { DRIFT_SCORE, driftGrade, type SlideHint } from "@/lib/drift/score";
 import { medalScores, type LiveSpot, type Medal } from "@/lib/drift/spots/types";
 import type { DriftTelemetry } from "@/lib/drift/telemetry";
 import { markSeen, seen } from "@/lib/drift/local";
-import { Backdrop, Band, Chip } from "./ui";
+import { Backdrop, Band, Chip } from "@/components/games/ui";
 
 // The driving HUD in broadcast bands, on the scene as is (no blur while you
 // drive). The center is the road: only the countdown, the live combo and a

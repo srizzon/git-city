@@ -30,11 +30,22 @@ describe("raceRoute", () => {
   it("ends on the destination's hub, with gates no closer than the minimum", () => {
     const r = raceRoute(layout, SP, RIO)!;
     const rio = cityByKey(layout, RIO)!;
-    expect(r.gates[r.gates.length - 1]).toEqual([rio.hub[0] * LOT_M, rio.hub[1] * LOT_M]);
+    expect(r.gates[r.gates.length - 1].slice(0, 2)).toEqual([rio.hub[0] * LOT_M, rio.hub[1] * LOT_M]);
     for (let i = 1; i < r.gates.length; i++) {
       const [ax, az] = r.gates[i - 1];
       const [bx, bz] = r.gates[i];
       expect(Math.hypot(bx - ax, bz - az)).toBeGreaterThanOrEqual(ROUTE.gateMin * LOT_M - 0.01);
+    }
+  });
+
+  it("faces every gate along its own road, never on a corner", () => {
+    const r = raceRoute(layout, SP, RIO)!;
+    for (const [x, z, rot] of r.gates.slice(0, -1)) {
+      const f = (rot * Math.PI) / 180;
+      // A lot behind and a lot ahead of the gate, along its heading, are both on the route's line.
+      const on = (px: number, pz: number) => r.line.some(([lx, lz]) => Math.hypot(lx - px, lz - pz) < 1);
+      expect(on(x - Math.sin(f) * LOT_M, z + Math.cos(f) * LOT_M)).toBe(true);
+      expect(on(x + Math.sin(f) * LOT_M, z - Math.cos(f) * LOT_M)).toBe(true);
     }
   });
 

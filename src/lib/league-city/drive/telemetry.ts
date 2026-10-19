@@ -37,6 +37,8 @@ export interface DriveRoute {
   z: number;
   /** Close enough to count as there, city units from the center. */
   reach: number;
+  /** A city race's next gate (cleared when the race is over, unlike Drive here's). */
+  race?: boolean;
 }
 
 export interface RadarCar {
