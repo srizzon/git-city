@@ -113,10 +113,12 @@ export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf
     }
 
     // The balloon over its target's roof (one at a time: the one whose window holds t).
-    const b = reel.balloons.find((x) => t >= x.from && t < x.to + 0.4) ?? null;
-    if (!b || WIDE_SCENES.has(cut.kind)) return placeBalloon(balloon.current, null);
+    // A balloon fades out after its end only while its take goes on: a cut to another building drops it at once.
+    const bi = reel.balloons.findIndex((x) => t >= x.from && (t < x.to || (t < x.to + 0.4 && cut.from < x.to)));
+    const b = reel.balloons[bi];
+    if (!b || WIDE_SCENES.has(cut.kind)) return placeBalloon(balloon.current, -1, null);
     const target = b.target === "example" ? example : byLogin.get(b.target.login.toLowerCase());
-    if (!target) return placeBalloon(balloon.current, null);
+    if (!target) return placeBalloon(balloon.current, -1, null);
     const isExample = target === example;
     const top = isExample ? buildTo.current : target.height;
     // Its roof items (crown, face, aura) stand on the roof: the tag clears them (once a rising one is finished).
@@ -126,7 +128,7 @@ export default function BrasilReelRig({ clock, reel, example, byLogin, capitalOf
     pin.set(target.position[0], top, target.position[2]).project(camera);
     const roof = { x: (pin.x + 1) / 2, y: (1 - pin.y) / 2 };
     pin.set(target.position[0], top + clear, target.position[2]).project(camera);
-    placeBalloon(balloon.current, {
+    placeBalloon(balloon.current, bi, {
       left: ((pin.x + 1) / 2) * 100,
       top: ((1 - pin.y) / 2) * 100,
       opacity: Math.min(1, (t - b.from) / 0.15) * Math.max(0, Math.min(1, 1 - (t - b.to) / 0.4)),

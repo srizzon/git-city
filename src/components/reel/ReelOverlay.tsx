@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
-import type { Reel, ReelPanel } from "@/lib/reel/film";
+import type { Reel, ReelBalloon, ReelPanel } from "@/lib/reel/film";
 import type { ReelSpec } from "@/lib/reel/spec";
 
 // A reel's words over its world: the rule fixed up top that turns into the
@@ -41,17 +41,23 @@ function back(x: number) {
 }
 
 /**
- * Moves the balloon (stage percent) and shows its plate until the first
+ * Moves balloon `index` of the overlay's balloons (stage percent) and shows its plate until the first
  * badge's moment, then each badge as its moment comes (popping in over
  * 0.4s), the next one replacing it. null hides it.
  */
 export function placeBalloon(
-  el: HTMLDivElement | null,
+  container: HTMLDivElement | null,
+  index: number,
   at: { left: number; top: number; opacity: number; badges: number[]; t: number; roof?: { x: number; y: number } } | null,
 ) {
-  if (!el) return;
-  el.style.opacity = at ? String(at.opacity) : "0";
-  if (!at) return;
+  if (!container) return;
+  // One balloon at a time: the others hide.
+  container.querySelectorAll<HTMLElement>("[data-balloon]").forEach((x) => {
+    if (Number(x.dataset.balloon) !== index || !at) x.style.opacity = "0";
+  });
+  const el = container.querySelector<HTMLElement>(`[data-balloon="${index}"]`);
+  if (!el || !at) return;
+  el.style.opacity = String(at.opacity);
   // Where its building's roof is on screen (0–1), for the export's report.
   if (at.roof) {
     el.dataset.roofX = String(at.roof.x);
@@ -229,6 +235,98 @@ function Panel({ panel, index, photoOf }: { panel: ReelPanel; index: number; pho
   );
 }
 
+/** A silhouette with a "?" on its head: the balloon over an empty lot, the viewer's building to be. */
+const GHOST_PIXELS: [number, number, number][] = [
+  [3, 0, 4],
+  [2, 1, 6],
+  [2, 2, 6],
+  [2, 3, 6],
+  [3, 4, 4],
+  [2, 6, 6],
+  [1, 7, 8],
+  [0, 8, 10],
+  [0, 9, 10],
+];
+
+/** One balloon: a GitHub photo, a plate, or (an example with no plate) the "?" silhouette; then its office badges. */
+function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf: (login: string) => string | null }) {
+  const photo = b.target !== "example" && !b.plate ? photoOf(b.target.login) : null;
+  const ghost = b.target === "example" && !b.plate;
+  return (
+      <div data-balloon={index} data-reel-box="balloon" className="absolute font-pixel uppercase" style={{ opacity: 0, transform: "translate(-50%, -100%)", paddingBottom: "2.4cqw" }}>
+        <div style={{ display: "grid", justifyItems: "center", alignItems: "end" }}>
+          <div
+            data-tag="plate"
+            className="bg-bg text-cream"
+            style={{
+              gridArea: "1 / 1",
+              border: `0.6cqw solid ${ghost ? "var(--color-lime)" : "var(--color-border)"}`,
+              padding: photo ? "0.6cqw" : "1.6cqw 2.6cqw",
+              fontSize: "4.6cqw",
+              lineHeight: 1,
+              textTransform: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photo} alt="" style={{ width: "13cqw", height: "13cqw", display: "block", imageRendering: "pixelated" }} />
+            ) : ghost ? (
+              <svg viewBox="0 0 10 10" shapeRendering="crispEdges" style={{ width: "13cqw", height: "13cqw", display: "block" }}>
+                {GHOST_PIXELS.map(([x, y, w]) => (
+                  <rect key={`${x}-${y}`} x={x} y={y} width={w} height={1} fill="var(--color-lime-dark)" />
+                ))}
+                <text x="5" y="4.1" textAnchor="middle" fontFamily="Silkscreen, monospace" fontSize="3.6" fill="var(--color-bg)">
+                  ?
+                </text>
+              </svg>
+            ) : (
+              (b.plate ?? "")
+            )}
+          </div>
+          {b.badges.map((b, i) => {
+            const look = BADGES[b.kind as BadgeKind];
+            return (
+              <div
+                key={i}
+                data-tag={String(i)}
+                className="bg-bg"
+                style={{
+                  gridArea: "1 / 1",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "2.2cqw",
+                  border: `0.7cqw solid ${look.color}`,
+                  padding: "2cqw 2.8cqw 2cqw 2.2cqw",
+                  opacity: 0,
+                  transformOrigin: "50% 100%",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <svg viewBox="0 0 8 8" shapeRendering="crispEdges" style={{ width: "9cqw", height: "9cqw", flexShrink: 0 }}>
+                  {look.pixels.map(([x, y, w, h]) => (
+                    <rect key={`${x}-${y}`} x={x} y={y} width={w} height={h} fill={look.color} />
+                  ))}
+                </svg>
+                <div>
+                  <p style={{ fontSize: "6.4cqw", lineHeight: 1, color: look.color }}>{look.title}</p>
+                  <p className="text-muted" style={{ fontSize: "3cqw", lineHeight: 1, marginTop: "1.6cqw", textTransform: "none" }}>
+                    {b.sub}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* The tail, pointing at the roof. */}
+        <span
+          className="absolute bg-border"
+          style={{ left: "50%", transform: "translateX(-50%)", bottom: "0.4cqw", width: "2.6cqw", height: "2.2cqw", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }}
+        />
+      </div>
+  );
+}
+
 export default function ReelOverlay({
   clock,
   reel,
@@ -247,8 +345,6 @@ export default function ReelOverlay({
   const rule = useRef<HTMLDivElement>(null);
   const cta = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
-  // The film's balloons share one element: its badges are the first balloon's that has any.
-  const first = reel.balloons[0] ?? null;
 
   useEffect(() => {
     let raf = 0;
@@ -290,7 +386,6 @@ export default function ReelOverlay({
 
   const type = "absolute text-center font-pixel uppercase text-white whitespace-nowrap";
   const safe = { left: "50%", transform: "translateX(-50%)" } as const;
-  const photo = first && first.target !== "example" && !first.plate ? photoOf(first.target.login) : null;
 
   return (
     <div ref={root} className="pointer-events-none absolute inset-0">
@@ -306,70 +401,11 @@ export default function ReelOverlay({
         </div>
       </div>
 
-      {first && (
-        <div ref={balloon} data-reel-box="balloon" className="absolute font-pixel uppercase" style={{ opacity: 0, transform: "translate(-50%, -100%)", paddingBottom: "2.4cqw" }}>
-          <div style={{ display: "grid", justifyItems: "center", alignItems: "end" }}>
-            <div
-              data-tag="plate"
-              className="border-border bg-bg text-cream"
-              style={{
-                gridArea: "1 / 1",
-                borderWidth: "0.6cqw",
-                padding: photo ? "0.6cqw" : "1.6cqw 2.6cqw",
-                fontSize: "4.6cqw",
-                lineHeight: 1,
-                textTransform: "none",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {photo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photo} alt="" style={{ width: "13cqw", height: "13cqw", display: "block", imageRendering: "pixelated" }} />
-              ) : (
-                (first.plate ?? "")
-              )}
-            </div>
-            {first.badges.map((b, i) => {
-              const look = BADGES[b.kind as BadgeKind];
-              return (
-                <div
-                  key={i}
-                  data-tag={String(i)}
-                  className="bg-bg"
-                  style={{
-                    gridArea: "1 / 1",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "2.2cqw",
-                    border: `0.7cqw solid ${look.color}`,
-                    padding: "2cqw 2.8cqw 2cqw 2.2cqw",
-                    opacity: 0,
-                    transformOrigin: "50% 100%",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <svg viewBox="0 0 8 8" shapeRendering="crispEdges" style={{ width: "9cqw", height: "9cqw", flexShrink: 0 }}>
-                    {look.pixels.map(([x, y, w, h]) => (
-                      <rect key={`${x}-${y}`} x={x} y={y} width={w} height={h} fill={look.color} />
-                    ))}
-                  </svg>
-                  <div>
-                    <p style={{ fontSize: "6.4cqw", lineHeight: 1, color: look.color }}>{look.title}</p>
-                    <p className="text-muted" style={{ fontSize: "3cqw", lineHeight: 1, marginTop: "1.6cqw", textTransform: "none" }}>
-                      {b.sub}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {/* The tail, pointing at the roof. */}
-          <span
-            className="absolute bg-border"
-            style={{ left: "50%", transform: "translateX(-50%)", bottom: "0.4cqw", width: "2.6cqw", height: "2.2cqw", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }}
-          />
-        </div>
-      )}
+      <div ref={balloon}>
+        {reel.balloons.map((b, i) => (
+          <Balloon key={i} b={b} index={i} photoOf={photoOf} />
+        ))}
+      </div>
 
       <p
         ref={line}
