@@ -3,6 +3,7 @@
 import { useEffect, useRef, type CSSProperties, type RefObject } from "react";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import type { Reel, ReelBalloon, ReelPanel } from "@/lib/reel/film";
+import { TYPE_CPS as LINE_CPS } from "@/lib/reel/timing";
 import type { ReelSpec } from "@/lib/reel/spec";
 import type { CityBuilding } from "@/lib/github";
 import { MAP_BOUNDS, onLand } from "@/lib/towns/brasil-geo";
@@ -172,8 +173,6 @@ const PLATE: CSSProperties = { display: "table", margin: "0 auto", background: B
 const PLATE_SIZE = { giant: "14cqw", huge: "10cqw", big: "7.4cqw", small: "4.2cqw" } as const;
 const CAPTION_YELLOW = "#ffd84a";
 const CAPTION_SHADOW = [[-0.4, 0], [0.4, 0], [0, -0.4], [0, 0.4], [-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]].map(([x, y]) => `${x}cqw ${y}cqw 0 ${BRAND.bg}`).join(", ") + `, 0.8cqw 0.8cqw 0 ${BRAND.bg}`;
-/** Characters a second the headline types (his Terminal piece: two frames a character at 30 fps). */
-const HEAD_CPS = 15;
 
 const segments = (text: string) => text.split(/(\*[^*]+\*)/).filter(Boolean).map((s) => (s.startsWith("*") ? { text: s.slice(1, -1), lit: true } : { text: s, lit: false }));
 
@@ -233,9 +232,9 @@ const numberOf = (s: string) => Number((NUMBER.exec(s)?.[0] ?? "0").replace(/\./
 
 /** Types PlateLines `local` seconds in: hard steps, a plate showing when its line starts, the cursor solid while it types and blinking after. */
 function typePlates(b: HTMLElement, local: number) {
-  const n = Math.floor(local * HEAD_CPS);
+  const n = Math.floor(local * LINE_CPS);
   const total = b.querySelectorAll("[data-ch]").length;
-  const blink = n < total || Math.floor((local - total / HEAD_CPS) * 2.5) % 2 === 0;
+  const blink = n < total || Math.floor((local - total / LINE_CPS) * 2.5) % 2 === 0;
   const rows = [...b.querySelectorAll<HTMLElement>("p")];
   rows.forEach((pl, q) => {
     const chars = [...pl.querySelectorAll<HTMLElement>("[data-ch]")];

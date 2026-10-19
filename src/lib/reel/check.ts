@@ -6,6 +6,7 @@
 
 import { bare, type Word } from "@trailer-kit/narration";
 import { reelOf } from "./film";
+import { READ_HOLD, TYPE_CPS } from "./timing";
 import { filled, type ReelSpec } from "./spec";
 
 export interface Issue {
@@ -228,6 +229,16 @@ export function checkTimed(raw: ReelSpec, voice: readonly Word[], mainLength?: n
   const spec = filled(raw);
   try {
     const reel = reelOf(spec, voice, null);
+    // Typed words finish READ_HOLD before their cut, or nobody reads them (Sam, 2026-10-19).
+    const typed = [
+      ...reel.headline.map((h) => ({ what: h.lines.map((l) => l.text).join(" "), from: h.from, to: h.to })),
+      ...reel.panels.flatMap((p) => (p.kind === "santinhos" && p.label && !p.hero ? [{ what: p.label.replace(/ \/ /g, " "), from: p.slamAt, to: p.to }] : [])),
+    ];
+    for (const x of typed) {
+      const done = x.from + x.what.replace(/\*/g, "").length / TYPE_CPS;
+      if (x.what && done > x.to - READ_HOLD)
+        out.push({ level: "fail", rule: "typing", message: `"${x.what.replace(/\*/g, "")}" finishes typing at ${done.toFixed(1)}s, ${(x.to - done).toFixed(1)}s before its cut (${READ_HOLD}s to read).` });
+    }
     const talk = voice[voice.length - 1][2] - voice[0][1];
     if (talk < 15 || talk > 22) out.push({ level: "fail", rule: "length", message: `${talk.toFixed(1)}s of narration (15–22s).` });
     if (voice[0][1] > 2) out.push({ level: "fail", rule: "hook", message: `The first word comes at ${voice[0][1].toFixed(1)}s: the hook must land in the first 2s.` });
