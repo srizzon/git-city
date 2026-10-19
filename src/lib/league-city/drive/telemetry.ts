@@ -54,6 +54,8 @@ export interface RadarFeed {
   cars: RadarCar[];
   /** Crown Rush: where the crown is while a match runs. */
   crown: { x: number; z: number } | null;
+  /** A city race you're in: its gates in order (city units), drawn as a line. */
+  raceLine?: [number, number][] | null;
 }
 
 export function createTelemetry(route: DriveRoute | null = null): DriveTelemetry {
