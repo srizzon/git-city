@@ -384,6 +384,76 @@ function SantinhosPanel({ index, panel }: { index: number; panel: Extract<ReelPa
   );
 }
 
+// ── The conveyor of flyers ──
+/** A flyer's width and the step from one to the next, in cqw. */
+const BELT_CARD = 58;
+const BELT_STEP = 66;
+/** Flyers the belt runs through before its first stop, and how long it takes to brake onto one. */
+const BELT_RUNUP = 14;
+const BELT_BRAKE = 0.55;
+
+function CarouselPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "carousel" }> }) {
+  // Three copies of the deck, so a whip can run past every flyer and still land on a real one.
+  const deck = [...panel.cards, ...panel.cards, ...panel.cards];
+  return (
+    <div data-panel={index} className="absolute inset-0 overflow-hidden" style={{ zIndex: 5, opacity: 0, background: "rgba(12,13,11,.62)" }}>
+      <div className="absolute" style={{ left: "50%", top: "16%", width: 0, height: 0 }}>
+        {deck.map((c, i) => (
+          <div key={i} data-belt={i} className="absolute" style={{ left: 0, top: 0 }}>
+            <Santinho card={c} size={`${BELT_CARD}cqw`} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Where the belt is at `t`, in flyers (fractional): running in, braking onto each stop, whipping to the next. */
+function beltAt(p: Extract<ReelPanel, { kind: "carousel" }>, t: number): number {
+  const n = p.cards.length;
+  const idx = (num: string) => Math.max(0, p.cards.findIndex((c) => c.number === num));
+  // Each stop's place on the three-copy deck: the first in the middle copy, each next one further on.
+  const marks: number[] = [];
+  p.stops.forEach((s, i) => {
+    let m = n + idx(s.number);
+    if (i) while (m <= marks[i - 1] + 4) m += n;
+    marks.push(m);
+  });
+  const ease = (u: number) => 1 - Math.pow(1 - clamp(u), 3);
+  // Run-up: from far back, fast, braking onto the first stop at its moment.
+  const first = p.stops[0].at;
+  if (t < first) {
+    const u = clamp((t - p.from) / Math.max(0.01, first - p.from));
+    return marks[0] - BELT_RUNUP * (1 - ease(u));
+  }
+  for (let i = 1; i < marks.length; i++) {
+    const at = p.stops[i].at;
+    // Holds on a stop, then whips off BELT_BRAKE * 2 before the next, braking onto it.
+    const go = at - BELT_BRAKE * 1.4;
+    if (t < go) return marks[i - 1];
+    if (t < at) {
+      const u = (t - go) / (at - go);
+      const k = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+      return marks[i - 1] + (marks[i] - marks[i - 1]) * k;
+    }
+  }
+  return marks[marks.length - 1];
+}
+
+function drawCarousel(el: HTMLElement, p: Extract<ReelPanel, { kind: "carousel" }>, t: number) {
+  const at = beltAt(p, t);
+  el.querySelectorAll<HTMLElement>("[data-belt]").forEach((x) => {
+    const d = Number(x.dataset.belt) - at;
+    const on = Math.abs(d) < 2.5;
+    x.style.visibility = on ? "" : "hidden";
+    if (!on) return;
+    // The middle flyer full size and straight; the ones beside it smaller and a little turned.
+    const k = Math.max(0, 1 - Math.abs(d) * 0.28);
+    x.style.transform = `translateX(calc(${d * BELT_STEP}cqw - 50%)) scale(${0.72 + 0.28 * k}) rotate(${d * 4}deg)`;
+    x.style.zIndex = String(10 - Math.round(Math.abs(d) * 2));
+  });
+}
+
 /** Each frame of the rain: every flyer falling and turning from its start; the hero slamming in big at `slamAt`. */
 function drawSantinhos(el: HTMLElement, p: Extract<ReelPanel, { kind: "santinhos" }>, t: number) {
   const local = t - p.from;
@@ -596,6 +666,12 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
   panels.forEach((p, i) => {
     const el = root.querySelector<HTMLElement>(`[data-panel="${i}"]`);
     if (!el) return;
+    if (p.kind === "carousel") {
+      const up = t >= p.from && t < p.to;
+      el.style.opacity = up ? "1" : "0";
+      if (up) drawCarousel(el, p, t);
+      return;
+    }
     if (p.kind === "santinhos") {
       const up = t >= p.from && t < p.to;
       el.style.opacity = up ? "1" : "0";
@@ -1321,6 +1397,7 @@ function Panel({
   if (panel.kind === "card") return <CardPanel index={index} panel={panel} />;
   if (panel.kind === "urna") return <UrnaPanel index={index} panel={panel} />;
   if (panel.kind === "santinhos") return <SantinhosPanel index={index} panel={panel} />;
+  if (panel.kind === "carousel") return <CarouselPanel index={index} panel={panel} />;
   if (panel.kind === "pointer") return <PointerPanel index={index} label={panel.label} />;
   if (panel.kind === "counter" && plates)
     return (
@@ -1637,7 +1714,7 @@ export default function ReelOverlay({
       const t = beatOf(clock);
       const i = reel.lines.findIndex((l) => t >= l.from && t < l.to);
       // While a card is up it is the frame: the captions, the header and the headline step aside.
-      const card = reel.panels.some((p) => (p.kind === "card" || p.kind === "urna" || p.kind === "santinhos") && t >= p.from && t < p.to);
+      const card = reel.panels.some((p) => (p.kind === "card" || p.kind === "urna" || p.kind === "santinhos" || p.kind === "carousel") && t >= p.from && t < p.to);
       const el = line.current;
       if (el) {
         if (i !== shown) {

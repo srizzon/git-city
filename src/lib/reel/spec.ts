@@ -277,7 +277,20 @@ const Santinhos = z.object({
   label: z.string().optional(),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna, Santinhos]);
+/**
+ * The candidates' flyers on a conveyor over the dimmed world: it runs fast from `from`, brakes onto
+ * each stop's flyer (a ballot number) at its moment, and whips past all the others to the next.
+ * The flyer in the middle reads bigger.
+ */
+const Carousel = z.object({
+  type: z.literal("carousel"),
+  from: Anchor,
+  to: Anchor.optional(),
+  cards: z.array(z.object({ number: z.string(), login: z.string(), avatar: z.string() })).min(3),
+  stops: z.array(z.object({ at: Anchor, number: z.string() })).min(1),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna, Santinhos, Carousel]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({
