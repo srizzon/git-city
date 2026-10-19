@@ -352,3 +352,28 @@ export function parseRouteKey(key: string): { from: string; to: string; hash: st
   const m = /^(\d{7})-(\d{7}):([0-9a-f]{8})$/.exec(key);
   return m ? { from: m[1], to: m[2], hash: m[3] } : null;
 }
+
+/** A race's ghost keeps at most this many frames (20 a second: 6 minutes). */
+export const RACE_GHOST_FRAMES = 20 * 60 * 6;
+
+/**
+ * A record's ghost as sent by the client, or null when it isn't one: frames
+ * in time order, on the map, ending near the finish time. Only ever drawn,
+ * never timed, so this keeps out junk, not cheats.
+ */
+export function cleanRaceGhost(input: unknown, ms: number): { ms: number; splits: number[]; frames: number[] } | null {
+  if (!input || typeof input !== "object") return null;
+  const { frames, splits } = input as { frames?: unknown; splits?: unknown };
+  if (!Array.isArray(frames) || !Array.isArray(splits)) return null;
+  if (frames.length < 32 || frames.length % 4 !== 0 || frames.length > RACE_GHOST_FRAMES * 4) return null;
+  if (splits.length > 130 || !splits.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= ms)) return null;
+  let last = -1;
+  for (let i = 0; i < frames.length; i += 4) {
+    const [t, x, z, yaw] = frames.slice(i, i + 4) as unknown[];
+    if (![t, x, z, yaw].every((v) => typeof v === "number" && Number.isFinite(v))) return null;
+    if ((t as number) < last || Math.abs(x as number) > 50_000 || Math.abs(z as number) > 50_000) return null;
+    last = t as number;
+  }
+  if (last < ms - 1500 || last > ms + 1500) return null;
+  return { ms, splits: splits as number[], frames: frames as number[] };
+}

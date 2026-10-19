@@ -18,6 +18,9 @@ export interface GhostRun {
 }
 
 export class GhostRecorder {
+  /** `maxFrames`: the most it keeps (a lap: 3 minutes; a city race runs longer). */
+  constructor(private maxFrames: number = MAX_FRAMES) {}
+
   private frames: number[] = [];
   private splits: number[] = [0];
   private start: number | null = null;
@@ -41,7 +44,7 @@ export class GhostRecorder {
   }
 
   push(now: number, x: number, z: number, yaw: number): void {
-    if (this.start === null || now - this.last < RATE_MS || this.frames.length >= MAX_FRAMES * 4) return;
+    if (this.start === null || now - this.last < RATE_MS || this.frames.length >= this.maxFrames * 4) return;
     this.last = now;
     this.frames.push(Math.round(now - this.start), Math.round(x * 100) / 100, Math.round(z * 100) / 100, Math.round(yaw * 1000) / 1000);
   }
