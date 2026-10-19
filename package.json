@@ -33,6 +33,8 @@
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "reel": "dotenv -e .env.prod -- node src/lib/reel/cli/run.mjs",
+    "reel:studio": "dotenv -e .env.prod -- next dev -p 3002 --webpack",
     "trailer:export": "node .claude/skills/gg/kit/tools/export.mjs",
     "trailer:audio": "node .claude/skills/gg/kit/tools/music.mjs public/trailer/towns-teaser.wav gitcity soon && node .claude/skills/gg/kit/tools/music.mjs public/trailer/demo.wav gitcity demo && node .claude/skills/gg/kit/tools/sfx.mjs public/trailer/sfx"
   },
