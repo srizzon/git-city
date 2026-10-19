@@ -8,7 +8,7 @@ import type { PaintMe, PaintNews } from "./usePaint";
 
 // The State War in the car: your state, your trail against its limit, your
 // points today and where your state stands; a toast when a loop paints or a
-// trail is lost. Top middle, under the Crown rush button; hidden while a
+// trail is lost. Top middle, level with the top corners (a phone: under its top bar); hidden while a
 // Crown rush match runs (its panel takes that spot).
 
 const LOST: Record<LostWhy, string> = {
@@ -37,7 +37,8 @@ export default function PaintHud({ board, me, news, self, signedIn, touch }: { b
   }, [news]);
 
   // Under the Crown rush button (top middle: top-4, a phone's 4.25rem).
-  const top = touch ? "top-[calc(max(1rem,env(safe-area-inset-top))+6.75rem)]" : "top-[4.25rem]";
+  // Level with the top corners on a desktop; right under the top bar on a phone (the minimap starts below it).
+  const top = touch ? "top-[calc(max(1rem,env(safe-area-inset-top))+3.5rem)]" : "top-4";
   if (!me?.uf) {
     return (
       <div className={`pointer-events-none fixed inset-x-0 ${top} z-30 flex justify-center font-pixel uppercase`}>

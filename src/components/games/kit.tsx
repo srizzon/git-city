@@ -429,7 +429,7 @@ export function GameResults({
 /** A small band top center while others play and you watch: "Race on: A → B · 3 racing". */
 export function GameOnBand({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
   return (
-    <div className="absolute left-1/2 top-16 max-w-[calc(100vw-2rem)] -translate-x-1/2 max-sm:top-[4.5rem]">
+    <div className="absolute left-1/2 top-16 max-w-[calc(100vw-2rem)] -translate-x-1/2 max-sm:top-[calc(max(1rem,env(safe-area-inset-top))+5.75rem)]">
       <Band className="max-w-full gap-2 px-4 py-2 normal-case text-muted" style={{ fontSize: T.small }}>
         <Icon size={12} strokeWidth={2.5} className="shrink-0 text-lime" aria-hidden />
         <span className="min-w-0 truncate">{children}</span>

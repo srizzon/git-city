@@ -314,7 +314,7 @@ export default function DriveHud({
 
       {/* Phone: the minimap under the top bar with others' reactions under it, and the six reactions over the controls. */}
       {ready && loaded && entered && touch && (
-        <div className={`absolute left-4 flex flex-col items-start gap-2 ${phoneLow ? "top-[calc(max(1rem,env(safe-area-inset-top))+9.5rem)]" : "top-[calc(max(1rem,env(safe-area-inset-top))+7.75rem)]"}`}>
+        <div className={`absolute left-4 flex flex-col items-start gap-2 ${phoneLow ? "top-[calc(max(1rem,env(safe-area-inset-top))+9.5rem)]" : "top-[calc(max(1rem,env(safe-area-inset-top))+8.75rem)]"}`}>
           <Minimap telemetry={telemetry} buildings={map.buildings} objects={map.objects} home={map.home} size={104} layer={map.layer} />
           <ReactionLog log={emoteLog} align="start" />
         </div>
