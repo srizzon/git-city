@@ -85,7 +85,7 @@ export default function DriveHud({
   /** Crown Rush state from the drive room. */
   crown: { crown: CrownState; offset: number; you: string | null } | null;
   /** What the minimap draws: the town, and your login (lowercase) for your building. */
-  map: { buildings: CityBuilding[]; objects: CityObject[]; home: string | null };
+  map: { buildings: CityBuilding[]; objects: CityObject[]; home: string | null; layer?: (ctx: CanvasRenderingContext2D, x: number, z: number, reach: number) => void };
   /** The room's last reactions, oldest first. */
   emoteLog: EmoteLog;
   onStartCrown: () => void;
@@ -253,7 +253,7 @@ export default function DriveHud({
         <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2" style={enter(0.2)}>
           <ReactionLog log={emoteLog} />
           <ReactionBar on={!paused} onEmote={onEmote} />
-          <Minimap telemetry={telemetry} buildings={map.buildings} objects={map.objects} home={map.home} size={150} />
+          <Minimap telemetry={telemetry} buildings={map.buildings} objects={map.objects} home={map.home} size={150} layer={map.layer} />
         </div>
       )}
 

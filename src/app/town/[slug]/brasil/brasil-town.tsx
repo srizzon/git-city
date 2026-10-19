@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Car, ChevronLeft, Landmark, Map as MapIcon, Trophy } from "lucide-react";
+import { Building2, Car, ChevronLeft, Landmark, Map as MapIcon, PaintRoller, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import posthog from "posthog-js";
@@ -41,6 +41,10 @@ import { BrasilPicker, BrasilRanking, BrasilSearchBar } from "@/components/towns
 import ElectionPanel from "@/components/towns/brasil/ElectionPanel";
 import ApuracaoWidget from "@/components/towns/brasil/ApuracaoWidget";
 import StateCard from "@/components/towns/brasil/StateCard";
+import PaintHud from "@/components/towns/brasil/PaintHud";
+import WarCard from "@/components/towns/brasil/WarCard";
+import { usePaint } from "@/components/towns/brasil/usePaint";
+import { radarLayer } from "@/components/towns/brasil/paintDraw";
 import { stateStats, swatchOf, weekCrown, type StateStats } from "@/components/towns/brasil/stats";
 import { stateOf, type BrasilLayout, type CityLayout, type UF } from "@/lib/towns/brasil-map";
 import type { BrCity } from "@/lib/towns/br-cities";
@@ -51,7 +55,7 @@ import type { Count, ElectionView } from "@/lib/towns/brasil-election-server";
 
 // The Brasil town's page: the map of Brazil with the town's residents, each
 // in their city, their buildings sized like everywhere in Git City. Over it:
-// the counter and the top states; a bar to search the map, rank the states
+// the counter and the State War (WarCard, PaintHud in the car); a bar to search the map, rank the states
 // and pick your city; a state's card from a capital's tag, a dev's from their
 // building; the compass, the zoom and a minimap. ?uf=SP opens a state,
 // ?cidade=campinas-sp a city, ?at=login a building. A resident who only ever
@@ -274,7 +278,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [driving, paused, exitDrive, taste]);
-  const watch = useDriveWatch(league.slug, !inCar, (msg) => applyRoomDamage(smash, msg, Date.now()));
+  // The State War: the room's paint, through the watch socket on the map and the drive's in the car.
+  const paint = usePaint();
+  const watch = useDriveWatch(league.slug, !inCar, (msg) => (msg.t.startsWith("paint_") ? paint.onMessage(msg) : applyRoomDamage(smash, msg, Date.now())));
   // Where each driver is now (units), from the room's latest state of their car.
   const driverAt = useCallback(
     (id: string) => {
@@ -488,17 +494,22 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       crownApi,
       onCrown: setCrownView,
       onTaste: viewerLogin ? undefined : onTaste,
+      onRoom: paint.onMessage,
     }),
-    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste],
+    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, paint.onMessage],
   );
-  // The drive minimap: the map around the car, and your building.
+  /** Your state, from your city. */
+  const homeCity = viewerLogin ? world.cityOfLogin.get(viewerLogin.toLowerCase()) : undefined;
+  const yours = homeCity?.uf ?? null;
+  // The drive minimap: the map around the car, your building and the State War's paint.
   const driveMap = useMemo(
     () => ({
       buildings: world.buildings,
       objects: world.objects,
       home: viewerLogin?.toLowerCase() ?? null,
+      layer: radarLayer(paint.board, yours),
     }),
-    [world, viewerLogin],
+    [world, viewerLogin, paint.board, yours],
   );
   /** `near`: start at the building closest to this point (driving with someone). */
   const startDrive = (near?: { x: number; z: number }) => {
@@ -694,9 +705,6 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     void signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=/town/${league.slug}`);
   };
 
-  /** Your state, from your city. */
-  const homeCity = viewerLogin ? world.cityOfLogin.get(viewerLogin.toLowerCase()) : undefined;
-  const yours = homeCity?.uf ?? null;
   /** On the map with only a state: asked once which city (until they pick one or wave it off). */
   const [askCity, setAskCity] = useState(() => {
     if (!home || home.picked || home.city === null) return false;
@@ -714,7 +722,25 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       // private mode: asked again next time
     }
   };
-  const top = world.states.filter((s) => s.devs > 0).slice(0, 3);
+  const paintScene = useMemo(() => ({ board: paint.board, mine: yours }), [paint.board, yours]);
+  /** Into the car to paint: from your building; not on the map yet, the way in first. */
+  const startPaint = () => {
+    posthog.capture("brasil_paint_clicked", { has_state: !!yours, signed_in: !!viewerLogin });
+    const mine = viewerLogin ? world.placed.get(viewerLogin.toLowerCase()) : undefined;
+    if (mine && yours) return startDrive({ x: mine.position[0], z: mine.position[2] });
+    if (!viewerLogin) return signIn();
+    openPicker(null);
+  };
+  // ?paint=1 (the invasion email's button): straight into the car, once the map is up.
+  const paintLink = useRef(false);
+  useEffect(() => {
+    if (paintLink.current || new URLSearchParams(window.location.search).get("paint") !== "1") return;
+    paintLink.current = true;
+    const t = setTimeout(() => startPaint(), 800);
+    return () => clearTimeout(t);
+    // Once per page load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const bar = "flex flex-col items-center justify-center gap-1 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
 
   return (
@@ -756,6 +782,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           setLookKey(looking);
         }}
         cameraStart={cameraStart}
+        paint={paintScene}
       />
 
       {/* The top, one block as wide as the search: where you are (‹ one step up: a building, its city, the whole country, the towns) and who's online, the search under it. */}
@@ -861,21 +888,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         </div>
       )}
 
-      {top.length > 0 && !inCar && !state && !focused && !panel && (
-        <div className="pointer-events-auto absolute right-4 top-4 flex flex-col gap-1 text-[11px] max-sm:hidden">
-          {top.map((t, i) => (
-            <button
-              key={t.uf}
-              type="button"
-              onClick={() => openState(t.uf)}
-              className={`flex justify-between gap-4 px-3 py-1 text-left ${i === 0 ? "bg-lime text-bg" : "bg-[#141417] text-cream hover:text-lime"}`}
-            >
-              <span>
-                {i + 1}. {t.uf}
-              </span>
-              <span>{fmt(t.devs)}</span>
-            </button>
-          ))}
+      {!inCar && !state && !focused && !panel && (
+        <div className="absolute right-4 top-4 max-sm:hidden">
+          <WarCard board={paint.board} slug={league.slug} yours={yours} onPaint={startPaint} onPick={openState} />
         </div>
       )}
 
@@ -903,7 +918,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           </button>
         </div>
       )}
-      {!inCar && <BrasilMinimap scale={layout.scale} cities={layout.cities} island={layout.island} camera={cameraStore} cars={carSpots} track={DRIFT_TAG} />}
+      {!inCar && <BrasilMinimap scale={layout.scale} cities={layout.cities} island={layout.island} camera={cameraStore} cars={carSpots} track={DRIFT_TAG} paint={paintScene} />}
       {!inCar && (
         <span className="pointer-events-none fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 max-sm:bottom-[66px] max-sm:text-[8px]">
           Map data: IBGE · Natural Earth
@@ -955,10 +970,17 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               Vote
             </button>
           )}
-          <button type="button" disabled={launching || world.devs === 0} onClick={() => startDrive()} className={`${bar} disabled:opacity-40`}>
-            <Car size={16} className="sm:hidden" aria-hidden />
-            Drive
-          </button>
+          {yours ? (
+            <button type="button" disabled={launching} onClick={startPaint} className={`${bar} disabled:opacity-40`}>
+              <PaintRoller size={16} className="sm:hidden" aria-hidden />
+              Paint
+            </button>
+          ) : (
+            <button type="button" disabled={launching || world.devs === 0} onClick={() => startDrive()} className={`${bar} disabled:opacity-40`}>
+              <Car size={16} className="sm:hidden" aria-hidden />
+              Drive
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -985,6 +1007,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       {drift.overlay}
       <div aria-hidden className={`pointer-events-none fixed inset-0 z-[60] bg-bg transition-opacity duration-300 ${curtain ? "opacity-100" : "opacity-0"}`} />
       {driving && driveReady && <AreaTitle telemetry={telemetry} cities={world.allCities} />}
+      {driving && driveReady && <PaintHud board={paint.board} me={paint.me} news={paint.news} self={paint.self} signedIn={!!viewerLogin} touch={touchUi} />}
       {driving && taste && <GuestGate reason="taste" town="Brasil" login={taste} onSignIn={tasteSignIn} onContinue={() => setTaste(null)} />}
       {driving && (
         <DriveHud

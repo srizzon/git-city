@@ -46,6 +46,7 @@ export default function Minimap({
   objects,
   home,
   size,
+  layer,
 }: {
   telemetry: DriveTelemetry;
   buildings: CityBuilding[];
@@ -54,7 +55,13 @@ export default function Minimap({
   home: string | null;
   /** Diameter, CSS px. */
   size: number;
+  /** Drawn under the roads, in city units round (x, z) out to `reach` (the Brasil map's State War paint). */
+  layer?: (ctx: CanvasRenderingContext2D, x: number, z: number, reach: number) => void;
 }) {
+  const layerRef = useRef(layer);
+  useEffect(() => {
+    layerRef.current = layer;
+  }, [layer]);
   const canvas = useRef<HTMLCanvasElement>(null);
   const lots = useMemo(
     () =>
@@ -117,6 +124,7 @@ export default function Minimap({
       ctx.scale(k, k);
       ctx.translate(-r.x, -r.z);
       const reach = RANGE * 1.5;
+      layerRef.current?.(ctx, r.x, r.z, reach);
       for (const l of lots) {
         if (Math.abs(l.x - r.x) > reach || Math.abs(l.z - r.z) > reach) continue;
         ctx.fillStyle = l.plaza ? PLAZA : ROAD;

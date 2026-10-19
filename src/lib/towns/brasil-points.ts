@@ -1,7 +1,7 @@
 // ─── Brasil town: points ────────────────────────────────────
 // Whoever moves their state the most governs it. Points come mostly from
 // Instagram (a comment a day, a tagged friend who joins, a story tagging the
-// account) and a little from coding; the week's points elect the governors,
+// account), a little from coding and from the State War's loops; the week's points elect the governors,
 // senators and mayors (brasil-roles.ts). Weeks run Monday 00:00 UTC, Sunday
 // 21h in Brasília, like the towns' race. Days (one comment, one story a day)
 // run on Brasília time. Pure.
@@ -15,6 +15,8 @@ export const POINTS = {
   story: 20,
   coded: 10,
   vote: 10,
+  /** Per point: the State War pays one for every PAINT.lotsPerPoint lots, PAINT.dayCap a day (lib/towns/brasil-paint). */
+  paint: 1,
 } as const;
 
 export type PointKind = keyof typeof POINTS;
@@ -68,11 +70,12 @@ export interface PointsBreakdown {
   story: number;
   coded: number;
   vote: number;
+  paint: number;
 }
 
-export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0 });
+export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0 });
 
-export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote;
+export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote + b.paint;
 
 /**
  * Each dev's week: the ledger's rows plus POINTS.coded for every day they

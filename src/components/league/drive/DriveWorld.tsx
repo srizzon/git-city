@@ -109,6 +109,8 @@ export interface DriveWorldProps {
   offline?: boolean;
   /** Guests: one free building breaks on this screen only; called with its login once it falls. */
   onTaste?: (login: string) => void;
+  /** Every room message the drive doesn't handle itself, and the welcome (the Brasil map's State War listens here). */
+  onRoom?: (msg: { t: string } & Record<string, unknown>) => void;
 }
 
 /** Your Supabase access token for the drive room (null signed out: you drive, you don't smash). */
@@ -301,7 +303,12 @@ export default function DriveWorld({
   smash,
   offline = false,
   onTaste,
+  onRoom,
 }: DriveWorldProps) {
+  const onRoomRef = useRef(onRoom);
+  useEffect(() => {
+    onRoomRef.current = onRoom;
+  }, [onRoom]);
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     const on = () => setHidden(document.hidden);
@@ -401,6 +408,7 @@ export default function DriveWorld({
     auth: smash ? smashToken : undefined,
     onOther: smash
       ? (msg) => {
+          onRoomRef.current?.(msg);
           if (msg.t === "smash_me") {
             setSide(msg.can === true ? "smash" : "none");
             telemetryRef.current.floorsToday = msg.can === true && msg.home !== true ? Number(msg.floors) || 0 : null;

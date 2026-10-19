@@ -34,6 +34,8 @@ import { stateOf, type CityLayout, type UF } from "@/lib/towns/brasil-map";
 import type { BoardRowLite } from "@/components/drift/DriftTitle";
 import { DriftSite, DriftTag } from "./BrasilDrift";
 import { DRIFT_SITE } from "@/lib/towns/brasil-drift";
+import PaintLayer from "./PaintLayer";
+import type { PaintBoard } from "@/lib/towns/brasil-paint";
 
 // The Brasil town: the country on its real outline under the towns' night
 // sky, a pale coast, the states' borders dashed in lime, every city someone
@@ -758,6 +760,8 @@ export interface BrasilSceneProps {
   /** Who's out driving, and where each one is now (units): a pin over every car, at any height. */
   drivers?: { id: string; name: string }[];
   driverAt?: (id: string) => { x: number; z: number } | null;
+  /** The State War's board (PaintLayer), and the viewer's state (lime). */
+  paint?: { board: PaintBoard; mine: UF | null };
   /** The state of the week: its tag wears the crown. */
   crowned?: UF | null;
   /** Dev only: fps, draw calls and triangles in a corner (the preview's ?stats=1). */
@@ -875,7 +879,7 @@ function Pulse({ x, z }: { x: number; z: number }) {
   );
 }
 
-export default function BrasilScene({ scale = 1, cities, island, objects, buildings, cameraApi, cameraStore, onTag, onBuildingClick, focused = null, drive, smash, pulse = null, watching, onCity, cameraStart = null, stats = false, crowned = null, fresh, offices, drivers, driverAt, drift, driftBoard = NO_BOARD, onDriftTag, rig, embedded, children, filmLight = 1 }: BrasilSceneProps) {
+export default function BrasilScene({ scale = 1, cities, island, objects, buildings, cameraApi, cameraStore, onTag, onBuildingClick, focused = null, drive, smash, pulse = null, watching, onCity, cameraStart = null, stats = false, crowned = null, fresh, offices, drivers, driverAt, paint, drift, driftBoard = NO_BOARD, onDriftTag, rig, embedded, children, filmLight = 1 }: BrasilSceneProps) {
   const allCities = useMemo(() => [...cities, island], [cities, island]);
   // Phones and weak GPUs draw at a lower resolution, as in the main city (?perf=low|high overrides).
   const { mode: perf } = usePerfMode();
@@ -975,6 +979,7 @@ export default function BrasilScene({ scale = 1, cities, island, objects, buildi
         onBuildingClick={driving ? undefined : onBuildingClick}
       />}
       {smash && !off("buildings") && <RubbleFlags store={smash} />}
+      {paint && <PaintLayer board={paint.board} mine={paint.mine} driving={driving} />}
       {!driving && !film && <NearPlates buildings={buildings} fresh={fresh} offices={offices} />}
       {!driving && !film && <Tags cities={allCities} near={near} crowned={crowned} onTag={onTag} overview={overview} />}
       {!drifting && <DriftSite board={driftBoard} />}
