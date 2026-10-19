@@ -30,7 +30,8 @@ import type { ReelSpec } from "@/lib/reel/spec";
 // A reel spec played in its world, in the trailer kit's studio, with the
 // overlay's words over it. 9:16, exported at --size 1080x1920.
 // - brasil: the map as it stood at the spec's asOf (or empty), the example
-//   building on the next free lot of its state's capital.
+//   building on the next free lot of its state's capital. A fill cut builds
+//   the map up in the order people arrived, from none to all.
 // - bay: the home city from the snapshot the home page loads, the spec's lot
 //   dev left out so their lot stands empty until it rises.
 
@@ -101,6 +102,28 @@ function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps 
     },
     [world.layout],
   );
+  // A fill cut: how many buildings stand (in the order people arrived), stepped so the city redraws a few dozen times, not every frame.
+  const fill = reel.cuts.find((c) => c.kind === "fill") ?? null;
+  const arrived = useMemo(() => {
+    const at = new Map([...world.layout.cities, world.layout.island].flatMap((c) => c.devs.map((d) => [d.dev.login.toLowerCase(), d.at] as const)));
+    return [...world.buildings].sort((a, b) => (at.get(a.loginLower) ?? 0) - (at.get(b.loginLower) ?? 0));
+  }, [world.buildings, world.layout]);
+  const [standing, setStanding] = useState(fill ? 0 : arrived.length);
+  useEffect(() => {
+    if (!fill) return;
+    const from = typeof fill.params.from === "number" ? fill.params.from : fill.from;
+    const to = typeof fill.params.to === "number" ? fill.params.to : fill.to;
+    const steps = 40;
+    let raf = 0;
+    const tick = () => {
+      const k = Math.min(1, Math.max(0, (beatOf(clock) - from) / Math.max(1e-6, to - from)));
+      setStanding(Math.round((Math.floor(k * steps) / steps) * arrived.length));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [fill, arrived, clock]);
+  const shown = useMemo(() => (!fill || standing >= arrived.length ? world.buildings : arrived.slice(0, standing)), [fill, standing, arrived, world.buildings]);
   const photoOf = useCallback((login: string) => world.byLogin.get(login.toLowerCase())?.avatar_url ?? null, [world.byLogin]);
   const buildingOf = useCallback((login: string) => world.byLogin.get(login.toLowerCase()) ?? null, [world.byLogin]);
   return (
@@ -113,7 +136,7 @@ function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps 
           cities={world.layout.cities}
           island={world.layout.island}
           objects={world.objects}
-          buildings={world.buildings}
+          buildings={shown}
           rig={<BrasilReelRig clock={clock} reel={reel} bounds={geoAt(world.layout.scale).bounds} example={world.example} byLogin={world.byLogin} capitalOf={capitalOf} balloon={balloon} />}
         />
       </div>

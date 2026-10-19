@@ -13,6 +13,20 @@
 //   orbit      round the target, closing in on its roof
 //   wide       the whole country turning slowly, behind a panel (the race, a list)
 //   pullback   from the last pose back out to the whole country
+//   map        the whole country held still and small enough to sit under the header with room
+//              round it, a slow push in (params.y: where its middle sits down the frame, 0–1,
+//              default 0.47; params.size: its width share of the frame, default 0.74). With
+//              params.login it opens close on that building and pulls out to the country by params.to;
+//              with params.start "previous" it pulls out from wherever the last take left the camera.
+//   fill       over a capital (params.uf) while the map fills up in the order people arrived
+//              (params.from → params.to), the camera easing in and turning
+//   facade-rise from the street, up the target's facade to its roof (a tall tower; a short one is boxed in)
+//   drop       from high over the city, steeply down onto the target's roof (a short building among towers)
+//   push-in    a quick push in on the target's roof, from high and behind
+//   crown      round the target's roof from above, the week's crown coming down onto it
+// Any move round a building takes params.crown: true to show the crown on its roof.
+// push-in, drop and crown take params.y: where the roof sits down the frame.
+// lot-rise takes params.angle "high" in a built-up city: from above, so the towers round the lot don't hide it.
 
 import * as THREE from "three";
 import type { Geo } from "@/lib/towns/brasil-geo";
@@ -23,11 +37,25 @@ export const FOV = 45;
 export const MIN_H = 150;
 /** How far a building's roof items reach above the roof (the tallest crown or face). */
 export const ITEMS_H = 28;
+/** How far the week's crown stands over a roof (14 up, then its five cells). */
+export const CROWN_H = 44;
+/** The reel crown's voxel size: five across (25 units), enough to read on the map's small buildings. */
+export const CROWN_CELL = 5;
 
 export type Orbit = [number, number, number, number, number];
 /** Over a capital, in world units (a lot is 48, an empty capital ~330 across, its trees up to ~60). */
 const ESTABLISH: Orbit = [0, 30, 620, 560, 0];
-const ORBITS: Record<"lot-rise" | "orbit", Orbit[]> = {
+/** Over a capital filling up, in world units: high enough for the whole city, then easing in. */
+const FILL: Orbit[] = [
+  [0, 10, 900, 2300, 0],
+  [1, 35, 800, 1700, 0],
+];
+/** A lot in a built-up city, from above (shares of the framing height). */
+const LOT_HIGH: Orbit[] = [
+  [0, 30, 2.0, 2.8, 0.15],
+  [1, 40, 1.6, 1.8, 1.15],
+];
+const ORBITS: Record<"lot-rise" | "orbit" | "facade-rise" | "push-in" | "crown" | "drop", Orbit[]> = {
   // Level with the roof: the roof mid-frame, its tag between it and the header, the tower under the captions.
   "lot-rise": [
     [0, 30, 2.4, 1.0, 0.98],
@@ -38,6 +66,27 @@ const ORBITS: Record<"lot-rise" | "orbit", Orbit[]> = {
   orbit: [
     [0, 35, 1.6, 1.25, 1.06],
     [1, 70, 1.2, 1.3, 1.08],
+  ],
+  // Low by the door looking up the tower, rising to the roof.
+  "facade-rise": [
+    [0, 200, 0.62, 0.05, 0.6],
+    [1, 215, 0.95, 1.15, 1.02],
+  ],
+  // From high behind, quickly in on the roof.
+  "push-in": [
+    [0, 150, 2.6, 1.8, 1.0],
+    [1, 158, 1.45, 1.3, 1.0],
+  ],
+  // Round the roof from above and the other side, close, the crown landing on it.
+  crown: [
+    [0, 250, 1.9, 2.5, 1.1],
+    [1, 300, 1.55, 2.1, 1.1],
+  ],
+  // From high over the city, steeply down onto the roof, settling.
+  drop: [
+    [0, 140, 3.4, 5.0, 0.5],
+    [0.7, 152, 1.9, 2.6, 1.0],
+    [1, 158, 1.7, 2.3, 1.0],
   ],
 };
 
@@ -53,6 +102,8 @@ export interface Target {
   height: number;
   /** Whether items (crown, face, aura) stand on its roof: its balloon sits higher. */
   items?: boolean;
+  /** Whether the week's crown stands over its roof this cut (LeagueCrown3D, taller than items). */
+  crown?: boolean;
 }
 
 /** A building that can stand between the camera and a target. */
@@ -123,6 +174,19 @@ function zoom(a: Pose, b: Pose, e: number): Pose {
   return { look, pos: d0.normalize().lerp(d1.normalize(), e).normalize().multiplyScalar(dist).add(look) };
 }
 
+/**
+ * zoom() for a pull out from close: the look point slides only as far as the
+ * camera has backed off (in proportion to the distance gained), so the
+ * subject holds the middle of the frame until the scale has grown past it.
+ */
+function zoomOut(a: Pose, b: Pose, e: number): Pose {
+  const d0 = a.pos.clone().sub(a.look);
+  const d1 = b.pos.clone().sub(b.look);
+  const dist = Math.exp(Math.log(d0.length()) + (Math.log(d1.length()) - Math.log(d0.length())) * e);
+  const look = a.look.clone().lerp(b.look, (dist - d0.length()) / Math.max(1e-6, d1.length() - d0.length()));
+  return { look, pos: d0.normalize().lerp(d1.normalize(), e).normalize().multiplyScalar(dist).add(look) };
+}
+
 /** Whether nothing stands between `cam` and `pt` (sampled along the line, as tools/los.py did). */
 function clear(cam: THREE.Vector3, pt: THREE.Vector3, obs: Obstacle[]): boolean {
   for (let i = 1; i < 40; i++) {
@@ -165,7 +229,7 @@ function turnFor(cut: ReelCut, target: Target, keys: Orbit[], H: number, world: 
 }
 
 /** How far over a roof its balloon's foot stands: over its items, when it has some. */
-export const balloonClear = (target: Target) => 8 + (target.items ? ITEMS_H : 0);
+export const balloonClear = (target: Target) => 8 + (target.crown ? CROWN_H : target.items ? ITEMS_H : 0);
 
 /** Tilts the camera so the point `height` up the target shows `y` (0 top – 1 bottom) down the frame. */
 function aimAt(p: Pose, target: Target, height: number, y: number) {
@@ -179,6 +243,20 @@ function aimAt(p: Pose, target: Target, height: number, y: number) {
 export function frameHeight(world: SceneWorld, cut: ReelCut, t: number): number {
   const target = world.targetOf(cut);
   return Math.max(MIN_H, target.height * (world.isRise(cut) ? world.riseAt(t) : 1));
+}
+
+/** The whole country held still (the map scene): its middle at params.y down the frame, params.size of its width, easing in 4%. */
+function mapPose(cut: ReelCut, u: number, top: Pose): Pose {
+  const y = typeof cut.params.y === "number" ? cut.params.y : 0.47;
+  const size = typeof cut.params.size === "number" ? cut.params.size : 0.74;
+  const p = { pos: top.pos.clone(), look: top.look.clone() };
+  const dir = p.pos.clone().sub(p.look);
+  // overview() fills the width at 0.9 of its fit distance: back off to the asked share, easing in 4%.
+  const dist = dir.length() * (1.0 / 0.9 / size) * (1.04 - 0.04 * ease(u));
+  // Moving the look point toward the camera's bottom edge raises the map on screen.
+  const shift = (0.5 - y) * 2 * dist * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+  const look = p.look.clone().add(new THREE.Vector3(0, 0, shift / Math.sin(THREE.MathUtils.degToRad(72))));
+  return { look, pos: dir.normalize().multiplyScalar(dist).add(look) };
 }
 
 /** The camera at `u` (0–1) of cut `i`. */
@@ -198,6 +276,53 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
       const target = world.targetOf(cut);
       return zoom(before(), orbitPose(target, [ESTABLISH, ESTABLISH], 0, 1), ease(Math.min(1, u * 1.3)));
     }
+    case "map": {
+      const held = mapPose(cut, u, top);
+      if (cut.params.start === "previous" && i > 0) {
+        const until = typeof cut.params.to === "number" ? cut.params.to : cut.from + (cut.to - cut.from) * 0.6;
+        const k = Math.min(1, Math.max(0, (t - cut.from) / Math.max(1e-6, until - cut.from)));
+        return zoomOut(before(), held, k * k * (3 - 2 * k));
+      }
+      if (typeof cut.params.login !== "string") return held;
+      // Opening close on a building, turning a little, then out to the held country (log space, so the scale reads evenly).
+      const target = world.targetOf(cut);
+      const H = Math.max(MIN_H, target.height);
+      const until = typeof cut.params.to === "number" ? cut.params.to : cut.from + (cut.to - cut.from) * 0.6;
+      const k = Math.min(1, Math.max(0, (t - cut.from) / Math.max(1e-6, until - cut.from)));
+      // Level with the roof of a tower taller than its neighbours: the roof against the sky, then out.
+      const keys: Orbit[] = [[0, 30, 0.85, 1.05, 1.0], [1, 50, 0.85, 1.05, 1.0]];
+      const close = orbitPose(target, keys, k, H, turnFor(cut, target, keys, H, world));
+      // The tower's roof in the middle of the frame, under the counter.
+      aimAt(close, target, target.height + balloonClear(target), 0.42);
+      return zoomOut(close, mapPose(cut, Math.max(u, 0), top), k * k * (3 - 2 * k));
+    }
+    case "fill": {
+      const target = world.targetOf(cut);
+      return orbitPose(target, FILL, ease(u), 1);
+    }
+    case "facade-rise": {
+      const target = world.targetOf(cut);
+      const H = Math.max(MIN_H, target.height);
+      const turn = turnFor(cut, target, ORBITS[cut.kind], H, world);
+      const p = orbitPose(target, ORBITS[cut.kind], ease(u), H, turn);
+      // Looking up the tower on the way, then the roof settles under the header as it arrives.
+      const up = p.look.y;
+      aimAt(p, target, target.height + balloonClear(target), 0.4);
+      p.look.y = THREE.MathUtils.lerp(up, p.look.y, ease(Math.min(1, Math.max(0, (u - 0.55) / 0.45))));
+      return p;
+    }
+    case "push-in":
+    case "drop":
+    case "crown": {
+      const target = world.targetOf(cut);
+      const H = Math.max(MIN_H, target.height);
+      const turn = turnFor(cut, target, ORBITS[cut.kind], H, world);
+      const p = orbitPose(target, ORBITS[cut.kind], cut.kind === "crown" ? u : 1 - Math.pow(1 - u, 3), H, turn);
+      // With the crown on, the balloon a little higher so the crown under it clears the captions.
+      // params.y: where the roof's balloon point sits down the frame (under a big card, lower).
+      aimAt(p, target, target.height + balloonClear(target), typeof cut.params.y === "number" ? cut.params.y : target.crown ? 0.36 : 0.42);
+      return p;
+    }
     case "lot-rise":
     case "orbit": {
       const H = frameHeight(world, cut, t);
@@ -205,10 +330,15 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
       // A rising example stands alone on its lot; a resident's building stands in a city.
       // Round a finished building the camera stands back a little, so its roof and balloon stay close on screen.
       const back = world.isRise(cut) ? 1 : 1.4;
-      const turn = world.isRise(cut) ? 0 : turnFor(cut, target, ORBITS[cut.kind], frameHeight(world, cut, cut.to) * back, world);
-      const p = orbitPose(target, ORBITS[cut.kind], u, H * back, turn);
+      const keys = cut.kind === "lot-rise" && cut.params.angle === "high" ? LOT_HIGH : ORBITS[cut.kind];
+      const turn = world.isRise(cut) ? 0 : turnFor(cut, target, keys, frameHeight(world, cut, cut.to) * back, world);
+      const p = orbitPose(target, keys, u, H * back, turn);
       // While the lot is empty, look down at it, not at a roof that isn't there yet.
-      if (world.isRise(cut)) p.look.y = THREE.MathUtils.lerp(0.15 * H, p.look.y, Math.min(1, world.riseAt(t) * 4));
+      if (world.isRise(cut)) {
+        p.look.y = THREE.MathUtils.lerp(0.15 * H, p.look.y, Math.min(1, world.riseAt(t) * 4));
+        // From above, the roof as it goes up held over the captions, under the header.
+        if (keys === LOT_HIGH) aimAt(p, target, H + 8, THREE.MathUtils.lerp(0.55, 0.46, world.riseAt(t)));
+      }
       // A finished building: its roof held at a set height on screen, under its balloon and the
       // header, above the captions (higher with roof items, whose balloon stands taller).
       else aimAt(p, target, target.height + balloonClear(target), 0.36);
@@ -230,5 +360,5 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
 
 /** The scenes this world plays (the validator checks specs against it). */
 export { BRASIL_SCENES } from "@/lib/reel/scenes";
-/** Scenes that frame the whole country: no balloon over a roof. */
-export const WIDE_SCENES = new Set(["overview", "dive", "wide"]);
+/** Scenes that frame the whole country or a whole city: no balloon over a roof. */
+export const WIDE_SCENES = new Set(["map", "overview", "dive", "wide", "fill"]);

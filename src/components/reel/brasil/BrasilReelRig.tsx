@@ -5,21 +5,26 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CityBuilding } from "@/lib/github";
 import CityScene from "@/components/CityScene";
+import { CELLS as CROWN_CELLS, GEMS as CROWN_GEMS } from "@/components/LeagueCrown3D";
 import { townEmerald } from "@/components/league/townTheme";
 import type { Geo } from "@/lib/towns/brasil-geo";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import { cutAt, type Reel, type ReelCut } from "@/lib/reel/film";
 import { placeBalloon } from "@/components/reel/ReelOverlay";
-import { ease, FOV, ITEMS_H, poseAt, WIDE_SCENES, type SceneWorld, type Target } from "./scenes";
+import { CROWN_CELL, CROWN_H, ease, FOV, ITEMS_H, poseAt, WIDE_SCENES, type SceneWorld, type Target } from "./scenes";
 import BrasilTakes, { isBrasilTake } from "./BrasilTakes";
 
 // A reel's camera on the Brasil map (./scenes), in place of the map's
 // controls, plus the example building rising on its lot when the reel has
 // one. It reads the film's clock every frame, places the camera, sets the
-// haze, and pins the balloon over its target's roof.
+// haze, and pins the balloon over its target's roof. A crown cut sets the
+// week's crown on its target's roof, coming down onto it as the cut opens.
 
 // The map's own night (BrasilScene): greens, lime windows. The example building wears it too.
 const NIGHT = townEmerald().theme;
+
+/** The crown comes down from this far above its place, over this long. */
+const CROWN_DROP = { h: 160, s: 0.9 };
 
 const ramp = (t: number, from: number, to: number) => Math.min(1, Math.max(0, (t - from) / Math.max(1e-6, to - from)));
 /** Floor by floor, easing in and out (smootherstep), so it reads as a building going up, not a pop. */
@@ -63,7 +68,7 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
     const targetOf = (cut: ReelCut): Target => {
       const p = cut.params;
       const b = typeof p.login === "string" ? building(p.login) : p.target === "example" || !p.uf ? example : null;
-      if (b) return { x: b.position[0], z: b.position[2], height: b.height, items: !!b.owned_items?.length };
+      if (b) return { x: b.position[0], z: b.position[2], height: b.height, items: !!b.owned_items?.length, crown: cut.kind === "crown" || p.crown === true };
       if (typeof p.uf === "string") {
         const c = capitalOf(p.uf);
         if (c) return { x: c[0], z: c[1], height: 0 };
@@ -83,6 +88,31 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
 
   const floors = example ? Math.max(6, example.floors || Math.round(example.height / 6)) : 1;
   const pin = useMemo(() => new THREE.Vector3(), []);
+  // Each crown cut's building (by cut), and the group the crown hangs from.
+  const crowns = useMemo(
+    () =>
+      reel.cuts.flatMap((c) => {
+        if ((c.kind !== "crown" && c.params.crown !== true) || typeof c.params.login !== "string") return [];
+        const b = c.params.login.toLowerCase() === example?.loginLower ? example : byLogin.get(c.params.login.toLowerCase());
+        return b ? [{ cut: c, b }] : [];
+      }),
+    [reel, byLogin, example],
+  );
+  const crownRefs = useRef<(THREE.Group | null)[]>([]);
+  // Each pinned photo's capital, and its place in the north-to-south wave.
+  const pinned = useMemo(
+    () =>
+      reel.pins.map((g) => {
+        const at = g.rows.map((r) => capitalOf(r.uf));
+        const order = g.rows.map((_, k) => k).sort((a, b) => (at[a]?.[1] ?? 0) - (at[b]?.[1] ?? 0));
+        const rank = new Map(order.map((k, n) => [k, n]));
+        return g.rows.map((_, k) => ({ at: at[k], n: rank.get(k) ?? 0 }));
+      }),
+    [reel, capitalOf],
+  );
+  const crownBox = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
+  const crownGold = useMemo(() => new THREE.MeshStandardMaterial({ color: "#ffd24a", emissive: "#ffb800", emissiveIntensity: 1.2, toneMapped: false }), []);
+  const crownGem = useMemo(() => new THREE.MeshStandardMaterial({ color: "#ff3b6b", emissive: "#ff1f55", emissiveIntensity: 1.4, toneMapped: false }), []);
 
   useFrame(({ camera: cam, scene }) => {
     const camera = cam as THREE.PerspectiveCamera;
@@ -91,6 +121,16 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
     // A drift take places its own camera (BrasilTakes).
     if (isBrasilTake(cut.kind)) return placeBalloon(balloon.current, -1, null);
     const pose = poseAt(reel.cuts, index, u, world);
+    // The crown faces the camera (it's a flat voxel crown, an icon), comes down onto the roof, then bobs on the film's clock.
+    crowns.forEach(({ cut: c, b }, k) => {
+      const g = crownRefs.current[k];
+      if (!g) return;
+      g.visible = c === cut;
+      if (c !== cut) return;
+      const drop = (1 - ease(Math.min(1, (t - c.from) / CROWN_DROP.s))) * CROWN_DROP.h;
+      g.position.set(b.position[0], b.height + 14 + CROWN_CELL * 2.5 + drop + Math.sin(t * 2.2) * CROWN_CELL * 0.25, b.position[2]);
+      g.rotation.y = Math.atan2(pose.pos.x - b.position[0], pose.pos.z - b.position[2]) + Math.sin(t * 1.4) * 0.25;
+    });
 
     camera.fov = FOV;
     camera.near = 5;
@@ -119,17 +159,36 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
       if (share >= 1 !== finished) setFinished(share >= 1);
     }
 
+    // Photos pinned over capitals: each pops in on its turn in the wave, standing on its capital.
+    reel.pins.forEach((g, i) => {
+      pinned[i].forEach(({ at, n }, k) => {
+        const el = balloon.current?.querySelector<HTMLElement>(`[data-pin="${i}-${k}"]`);
+        if (!el) return;
+        const start = g.from + n * g.stagger;
+        if (!at || t < start || t > g.to + 0.3) return void (el.style.opacity = "0");
+        pin.set(at[0], 0, at[1]).project(camera);
+        const pop = Math.min(1, (t - start) / 0.3);
+        const s = pop <= 0 ? 0 : 1 + 2.7 * Math.pow(pop - 1, 3) + 1.7 * Math.pow(pop - 1, 2);
+        el.style.left = `${((pin.x + 1) / 2) * 100}%`;
+        el.style.top = `${((1 - pin.y) / 2) * 100}%`;
+        el.style.opacity = String(Math.min(1, pop * 3) * Math.min(1, Math.max(0, (g.to + 0.3 - t) / 0.3)));
+        el.style.transform = `translate(-50%, -100%) scale(${Math.max(0.001, s)})`;
+      });
+    });
+
     // The balloon over its target's roof (one at a time: the one whose window holds t).
     // A balloon fades out after its end only while its take goes on: a cut to another building drops it at once.
     const bi = reel.balloons.findIndex((x) => t >= x.from && (t < x.to || (t < x.to + 0.4 && cut.from < x.to)));
     const b = reel.balloons[bi];
-    if (!b || WIDE_SCENES.has(cut.kind)) return placeBalloon(balloon.current, -1, null);
+    // A wide scene has no balloon, except a map opening close on a building: that building's own.
+    const opener = cut.kind === "map" && typeof cut.params.login === "string" && b?.target !== "example" && b?.target.login.toLowerCase() === cut.params.login.toLowerCase();
+    if (!b || (WIDE_SCENES.has(cut.kind) && !opener)) return placeBalloon(balloon.current, -1, null);
     const target = b.target === "example" ? example : byLogin.get(b.target.login.toLowerCase());
     if (!target) return placeBalloon(balloon.current, -1, null);
     const isExample = target === example;
     const top = isExample ? buildTo.current : target.height;
     // Its roof items (crown, face, aura) stand on the roof: the tag clears them (once a rising one is finished).
-    const items = target.owned_items?.length ? ITEMS_H : 0;
+    const items = Math.max(target.owned_items?.length ? ITEMS_H : 0, crowns.some((c) => c.cut === cut && c.b === target) ? CROWN_H : 0);
     const clear = 8 + items * (isExample && riseCut ? ease(ramp(t, rise.to, rise.to + 0.35)) : 1);
     // The roof on screen, for the export's check that no caption covers it.
     pin.set(target.position[0], top, target.position[2]).project(camera);
@@ -146,10 +205,23 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
   });
 
   const takes = reel.cuts.some((c) => isBrasilTake(c.kind)) ? <BrasilTakes clock={clock} reel={reel} /> : null;
-  if (!example) return takes;
+  const crowned = crowns.map((_, k) => (
+    <group key={k} ref={(g) => void (crownRefs.current[k] = g)} visible={false}>
+      {CROWN_CELLS.map(([x, y]) => (
+        <mesh key={`${x}-${y}`} geometry={crownBox} material={CROWN_GEMS.some(([gx, gy]) => gx === x && gy === y) ? crownGem : crownGold} position={[(x - 2) * CROWN_CELL, (y - 2) * CROWN_CELL, 0]} scale={[CROWN_CELL, CROWN_CELL, CROWN_CELL * 1.4]} />
+      ))}
+    </group>
+  ));
+  if (!example) return (
+    <group>
+      {takes}
+      {crowned}
+    </group>
+  );
   return (
     <group>
       {takes}
+      {crowned}
       <CityScene buildings={lone} colors={NIGHT.building} introMode filmMode={finished} buildTo={buildTo} />
       <mesh ref={slab} position={[example.position[0], 0, example.position[2]]} visible={false}>
         <boxGeometry args={[example.width + 1, 1.2, example.depth + 1]} />
