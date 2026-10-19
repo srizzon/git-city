@@ -1,5 +1,5 @@
 // ─── Brasil town: server side ───────────────────────────────
-// The map is stored (migration 174): every resident's city and their lot in
+// The map is stored (migration 175): every resident's city and their lot in
 // it (brasil_residents), where each city stands (brasil_cities), and how big
 // Brazil is (brasil_map, with a version). Reading it never moves anything.
 // Placing a resident reads the map fresh, lets BrasilMap (brasil-map.ts) pick
@@ -52,7 +52,7 @@ export async function getBrasilResidents(leagueId: string): Promise<Resident[]> 
     if (error) throw new Error(`brasil residents: ${error.message}`);
     for (const r of data ?? []) {
       const login = r.developers?.github_login;
-      // A row without its lot in a city is from before migration 174 and its backfill: not on the map.
+      // A row without its lot in a city is from before migration 175 and its backfill: not on the map.
       if (!login || r.lx === null || r.lz === null) continue;
       out.push({ dev: { id: r.developer_id, login, uf: (r.uf as UF | null) ?? null }, city: r.ibge, lx: r.lx, lz: r.lz, at: Date.parse(r.placed_at) });
     }
