@@ -1483,7 +1483,7 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
         key="grew"
         type="button"
         onClick={onBrazil}
-        className="pointer-events-auto absolute z-20 flex animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream max-sm:right-3 max-sm:top-[104px] max-sm:max-w-[calc(100vw-150px)] sm:bottom-[72px] sm:left-1/2 sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2"
+        className="pointer-events-auto absolute z-20 flex animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream max-sm:left-3 max-sm:top-[142px] max-sm:max-w-[calc(100vw-24px)] sm:bottom-[72px] sm:left-1/2 sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2"
       >
         <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
         <span className="shrink-0 text-cream">Brazil grew</span>
@@ -1497,7 +1497,7 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
       key={a.login}
       type="button"
       onClick={() => onPick(a.login)}
-      className="pointer-events-auto absolute z-20 flex animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream max-sm:right-3 max-sm:top-[104px] max-sm:max-w-[calc(100vw-150px)] sm:bottom-[72px] sm:left-1/2 sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2"
+      className="pointer-events-auto absolute z-20 flex animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream max-sm:left-3 max-sm:top-[142px] max-sm:max-w-[calc(100vw-24px)] sm:bottom-[72px] sm:left-1/2 sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2"
     >
       <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
       <span className="truncate normal-case text-cream">@{a.login}</span>
