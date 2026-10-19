@@ -12,6 +12,10 @@
 //   state passes within RALLY.reach of it, in order; the last gate is the
 //   finish. A car that ever moves faster than a car can goes on, untimed.
 // - When the winner is in, the rest have RALLY.afterWinner; then results.
+// - Item boxes, after Mario Kart: rows across the road between gates (a
+//   straight, since every turn has a gate), back RALLY_BOXES.respawn after
+//   one is taken. The room owns them (who took which, the item); the item
+//   depends on your place: the back of the field gets the missiles.
 
 export const RALLY = {
   invite: 15_000,
@@ -35,6 +39,59 @@ export const RALLY = {
   jitter: 0.3,
 } as const;
 
+/** The race's item boxes: a row across the road every few gates. */
+export const RALLY_BOXES = {
+  /** A row between gates k-1 and k for k = first, first + every, … (never on the way to the finish). */
+  first: 1,
+  every: 3,
+  maxRows: 12,
+  /** Across the road, from its middle (m). */
+  lanes: [-5.4, -1.8, 1.8, 5.4],
+  /** How far before its gate a row sits (m): on the gate's straight. */
+  before: 25,
+  respawn: 2500,
+} as const;
+
+/** Where every box sits (m), row by row, from the route's gates alone: the room and every screen agree. */
+export function rallyBoxSpots(route: Pick<RallyRoute, "gates">): [number, number][] {
+  const out: [number, number][] = [];
+  const last = route.gates.length - 1;
+  let rows = 0;
+  for (let k = RALLY_BOXES.first; k < last && rows < RALLY_BOXES.maxRows; k += RALLY_BOXES.every, rows++) {
+    // A row across the road just before gate k, on its straight.
+    const [gx, gz, rot] = route.gates[k];
+    const r = (rot * Math.PI) / 180;
+    const fx = Math.sin(r);
+    const fz = -Math.cos(r);
+    const cx = gx - fx * RALLY_BOXES.before;
+    const cz = gz - fz * RALLY_BOXES.before;
+    for (const o of RALLY_BOXES.lanes) out.push([cx - fz * o, cz + fx * o]);
+  }
+  return out;
+}
+
+export type RallyItem = "shock" | "bomb" | "missile";
+
+/**
+ * Mario Kart's odds, by place: the leader mostly gets what defends (a bomb
+ * to drop, a shockwave), the back of the field mostly missiles to catch up.
+ * `place` 1-based of `n` racing.
+ */
+export function rallyItem(place: number, n: number, rand: () => number = Math.random): RallyItem {
+  const q = n > 1 ? (place - 1) / (n - 1) : 0.5;
+  const w: [RallyItem, number][] = [
+    ["missile", 0.15 + 0.7 * q],
+    ["bomb", 0.5 - 0.35 * q],
+    ["shock", 0.35 - 0.35 * q + 0.15],
+  ];
+  const total = w.reduce((a, [, x]) => a + x, 0);
+  let r = rand() * total;
+  for (const [item, x] of w) {
+    if ((r -= x) <= 0) return item;
+  }
+  return "missile";
+}
+
 export type RallyPhase = "idle" | "invite" | "countdown" | "live" | "over";
 
 export interface RallyRacer {
@@ -55,8 +112,8 @@ export interface RallyRoute {
   from: string;
   to: string;
   key: string;
-  /** Meters; the last one is the finish. */
-  gates: [number, number][];
+  /** x, z (m) and the way through (deg clockwise from north); the last one is the finish. */
+  gates: [number, number, number][];
   /** x, z (m), rot (deg clockwise from north). */
   grid: [number, number, number][];
   /** Start line to finish (m). */
@@ -78,10 +135,13 @@ export interface RallyState {
   racers: Record<string, RallyRacer>;
   /** Finishers in order (ids). */
   order: string[];
+  /** Each item box's generation, and until when it's gone (server ms, 0 = there). */
+  boxGen: number[];
+  boxUntil: number[];
 }
 
 export function idleRally(): RallyState {
-  return { phase: "idle", id: "", by: null, route: null, inviteEnds: 0, lightsAt: 0, startsAt: 0, endsAt: 0, racers: {}, order: [] };
+  return { phase: "idle", id: "", by: null, route: null, inviteEnds: 0, lightsAt: 0, startsAt: 0, endsAt: 0, racers: {}, order: [], boxGen: [], boxUntil: [] };
 }
 
 /** A race is on or about to be (the room's other games wait). */
@@ -99,14 +159,14 @@ export function validRoute(r: unknown, coordMax: number): RallyRoute | null {
   if (typeof length !== "number" || !Number.isFinite(length) || length < 100 || length > 200_000) return null;
   const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= coordMax;
   if (!Array.isArray(gates) || gates.length < 1 || gates.length > RALLY.maxGates) return null;
-  if (!gates.every((g) => Array.isArray(g) && g.length === 2 && num(g[0]) && num(g[1]))) return null;
+  if (!gates.every((g) => Array.isArray(g) && g.length === 3 && num(g[0]) && num(g[1]) && typeof g[2] === "number" && Number.isFinite(g[2]))) return null;
   if (!Array.isArray(grid) || grid.length < 1 || grid.length > RALLY.maxGrid) return null;
   if (!grid.every((g) => Array.isArray(g) && g.length === 3 && num(g[0]) && num(g[1]) && typeof g[2] === "number" && Number.isFinite(g[2]))) return null;
   return {
     from,
     to,
     key,
-    gates: (gates as number[][]).map(([x, z]) => [x, z]),
+    gates: (gates as number[][]).map(([x, z, rot]) => [x, z, rot]),
     grid: (grid as number[][]).map(([x, z, rot]) => [x, z, rot]),
     length,
   };
@@ -123,6 +183,9 @@ export function startRally(st: RallyState, id: string, by: string, name: string,
   st.by = by;
   st.route = route;
   st.racers = { [by]: racer(name, 0) };
+  const boxes = rallyBoxSpots(route).length;
+  st.boxGen = Array.from({ length: boxes }, () => 0);
+  st.boxUntil = Array.from({ length: boxes }, () => 0);
   st.phase = "invite";
   st.inviteEnds = now + (alone ? 0 : RALLY.invite);
   return true;
@@ -213,6 +276,16 @@ export function stepRally(st: RallyState, id: string, x: number, z: number, now:
     if (st.order.length === 1) st.endsAt = Math.min(st.endsAt, now + RALLY.afterWinner);
   }
   return out;
+}
+
+/** A racer takes box `box` of generation `gen`: true when it was theirs to take (the room then hands them an item). */
+export function takeRallyBox(st: RallyState, id: string, box: number, gen: number, now: number): boolean {
+  const r = st.racers[id];
+  if (st.phase !== "live" || !r || r.ms !== null || r.gone) return false;
+  if (!Number.isInteger(box) || box < 0 || box >= st.boxGen.length || st.boxGen[box] !== gen || now < st.boxUntil[box]) return false;
+  st.boxGen[box] += 1;
+  st.boxUntil[box] = now + RALLY_BOXES.respawn;
+  return true;
 }
 
 /** A racer left: out of the race (their time stands if they finished). */

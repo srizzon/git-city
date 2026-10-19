@@ -82,6 +82,8 @@ export type ClientMsg =
   /** A city race (rally.ts): start one on this route, or accept the open invite. */
   | { t: "rally_start"; route: RallyRoute }
   | { t: "rally_join" }
+  /** A city race's item box (rally.ts): you drove through it. */
+  | { t: "rally_take"; box: number; gen: number }
   /** A quick reaction over your car (lib drive/emotes: the slot). */
   | { t: "emote"; e: number }
   /** Rivalry smash (lib/league-city/smash-net): who you are, for the room to ask the site. */
