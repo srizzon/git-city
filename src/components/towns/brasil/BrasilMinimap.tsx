@@ -1,14 +1,18 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { LOT } from "@/lib/league-city/grid";
 import { mapNav, type MapCameraStore } from "@/lib/map-nav";
 import { geoAt } from "@/lib/towns/brasil-geo";
 import type { CityLayout } from "@/lib/towns/brasil-map";
 import { swatchOf } from "./stats";
+import { boardPicture } from "./paintDraw";
+import type { PaintBoard } from "@/lib/towns/brasil-paint";
+import type { UF } from "@/lib/towns/brasil-map";
 
-// Brazil in a corner: the coast, a dot per city sized by its devs, the drift
-// track's flag, where the camera is looking. A click flies there.
+// Brazil in a corner: the coast, the State War's paint, a dot per city sized
+// by its devs, the drift track's flag, where the camera is looking. A click
+// flies there.
 
 const W = 150;
 
@@ -19,6 +23,7 @@ export default function BrasilMinimap({
   camera,
   cars = [],
   track,
+  paint,
 }: {
   /** How big Brazil is drawn (the layout's scale). */
   scale?: number;
@@ -28,6 +33,8 @@ export default function BrasilMinimap({
   cars?: { x: number; z: number }[];
   /** The drift track's gate (world units): a checkered flag. */
   track?: { x: number; z: number };
+  /** The State War's board, and your state (lime). */
+  paint?: { board: PaintBoard; mine: UF | null };
 }) {
   const cam = useSyncExternalStore(camera.subscribe, camera.get, camera.get);
   const { bounds, outline } = geoAt(scale);
@@ -41,6 +48,22 @@ export default function BrasilMinimap({
     const [x, z] = c.hub;
     return { cx: (x * LOT - x0) * k, cy: (z * LOT - z0) * k, r: Math.min(5, 0.8 + Math.sqrt(c.devs.length) * 0.35) };
   };
+  // The paint as a picture, redrawn every few seconds while the board changes.
+  const [picture, setPicture] = useState<ReturnType<typeof boardPicture>>(null);
+  useEffect(() => {
+    if (!paint) return;
+    let seen = -1;
+    const draw = () => {
+      if (paint.board.version === seen) return;
+      seen = paint.board.version;
+      // About a pixel of the corner map per pixel of the picture.
+      const g = paint.board.geom;
+      if (g) setPicture(boardPicture(paint.board, paint.mine, Math.max(1, Math.round(g.w / W))));
+    };
+    draw();
+    const t = setInterval(draw, 3000);
+    return () => clearInterval(t);
+  }, [paint]);
   const click = (e: React.MouseEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * W;
@@ -51,6 +74,9 @@ export default function BrasilMinimap({
     <div className="pointer-events-auto fixed bottom-4 right-4 z-30 border-[3px] border-border bg-bg/80 p-1 backdrop-blur-sm max-sm:hidden">
       <svg width={W} height={W} viewBox={`0 0 ${W} ${W}`} onClick={click} className="cursor-pointer" role="img" aria-label="Map of Brazil">
         <path d={path} fill="#1d2634" stroke="#4b5466" strokeWidth={1} />
+        {picture && (
+          <image href={picture.url} x={(picture.x - x0) * k} y={(picture.z - z0) * k} width={picture.w * k} height={picture.d * k} preserveAspectRatio="none" opacity={0.85} style={{ imageRendering: "pixelated" }} />
+        )}
         {[...cities, island].map((c) => {
           const d = dot(c);
           return <circle key={c.key} cx={d.cx} cy={d.cy} r={d.r} fill={c.uf ? swatchOf(c.uf) : "#c8e64a"} stroke="#0b0d12" strokeWidth={0.8} opacity={c.devs.length ? 1 : 0.35} />;
