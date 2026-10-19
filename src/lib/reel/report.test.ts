@@ -29,10 +29,16 @@ const stat = (id: string, views: number, reach: number, skip: number, devs: numb
 });
 
 describe("weeklyReport", () => {
-  it("compares each trial with its day's main", () => {
-    const md = weeklyReport("2026-10-20", [post("main", "main", "11 devs"), post("t1", "trial", "Esse cara governa SP")], [stat("main", 1000, 800, 45, 30), stat("t1", 900, 600, 30, 10)]);
-    expect(md).toContain('"Esse cara governa SP" vs the main\'s "11 devs": kept more people past 3s (-15.0 pts skipped)');
-    expect(md).toContain("2 reels, 1,900 views, 40 devs");
+  it("ranks a day's trials by who kept people past 3s, naming what each changed", () => {
+    const md = weeklyReport(
+      "2026-10-20",
+      [post("main", "main", "11 devs"), post("t1", "trial", "orbit", "trial:shot"), post("t2", "trial", "Esse cara governa SP", "trial:voice")],
+      [stat("main", 1000, 800, 45, 30), stat("t1", 900, 600, 50, 10), stat("t2", 900, 600, 30, 10)],
+    );
+    expect(md).toContain('1. voice: "Esse cara governa SP": 30% skipped in 3s');
+    expect(md).toContain('2. shot: "orbit": 50% skipped in 3s');
+    expect(md).toContain("3 reels, 2,800 views, 50 devs");
+    expect(md.slice(md.indexOf("## Formats"))).not.toContain("trial:");
   });
 });
 

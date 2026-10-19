@@ -1,8 +1,8 @@
 // ─── The weekly reels report ────────────────────────────────
 // What each posted reel did (reel_posts + the reel-insights cron's latest
 // reel_stats), and what the trials taught: on each day, every trial against
-// that day's main on the numbers a hook moves (skipped in the first 3s,
-// views per account reached), and the formats ranked by the devs they put on
+// the day's other trials on the numbers a hook moves (skipped in the first
+// 3s, views per account reached), and the formats ranked by the devs they put on
 // the map per 1k views. Pure: the CLI loads the rows and writes the file.
 
 export interface PostRow {
@@ -66,8 +66,9 @@ export function weeklyReport(from: string, posts: readonly PostRow[], stats: rea
     );
   }
 
-  // Each day's trials against its main: what the different hook did.
-  out.push("", "## Trials against their main", "");
+  // Each day's trials against each other: they all go to non-followers, the main mostly to followers,
+  // so the trials compare among themselves; a variation changed one thing (preset "trial:<what>").
+  out.push("", "## Trials", "");
   const byDay = new Map<string, typeof rows>();
   for (const r of rows) {
     const day = r.p.spec_id.slice(0, 10);
@@ -75,25 +76,26 @@ export function weeklyReport(from: string, posts: readonly PostRow[], stats: rea
   }
   let any = false;
   for (const [day, list] of byDay) {
+    const trials = list.filter((r) => r.p.kind === "trial" && r.s?.skip_rate != null).sort((a, b) => a.s!.skip_rate! - b.s!.skip_rate!);
+    if (!trials.length) continue;
+    any = true;
     const main = list.find((r) => r.p.kind === "main");
-    if (!main?.s) continue;
-    for (const t of list.filter((r) => r.p.kind === "trial" && r.s)) {
-      any = true;
-      const skip = t.s!.skip_rate != null && main.s.skip_rate != null ? t.s!.skip_rate - main.s.skip_rate : null;
+    out.push(`${day}${main ? ` (main: "${main.p.hook}", ${main.s?.skip_rate ?? "–"}% skipped, to its own audience)` : ""}:`);
+    trials.forEach((t, i) => {
+      const what = t.p.preset?.startsWith("trial:") ? `${t.p.preset.slice(6)}: ` : "";
       const vr = per(t.s!.views, t.s!.reach);
-      const mvr = per(main.s.views, main.s.reach);
-      const better = skip != null && skip < -2 ? "kept more people past 3s" : skip != null && skip > 2 ? "lost more people in 3s" : "about the same in the first 3s";
       out.push(
-        `- ${day}: "${t.p.hook}" vs the main's "${main.p.hook}": ${better} (${skip == null ? "–" : `${skip > 0 ? "+" : ""}${skip.toFixed(1)} pts skipped`}), ${vr == null || mvr == null ? "–" : `${vr.toFixed(2)} vs ${mvr.toFixed(2)} views per account reached`}.`,
+        `${i + 1}. ${what}"${t.p.hook}": ${t.s!.skip_rate}% skipped in 3s, ${t.s!.avg_watch_ms == null ? "–" : `${(t.s!.avg_watch_ms / 1000).toFixed(1)}s`} avg watch, ${vr == null ? "–" : vr.toFixed(2)} views per account reached${t.p.graduated ? ", graduated" : ""}.`,
       );
-    }
+    });
   }
-  if (!any) out.push("No trial has 48h numbers yet.");
+  if (!any) out.push("No trial has numbers yet.");
 
-  // Formats by what they bring: devs on the map per 1k views (two posts or more to count).
+  // Formats by what they bring: devs on the map per 1k views (two posts or more to count). Mains only:
+  // a trial's format is its main's.
   out.push("", "## Formats", "");
   const byPreset = new Map<string, { posts: number; views: number; devs: number; skip: number[] }>();
-  for (const { p, s } of rows) {
+  for (const { p, s } of rows.filter((r) => r.p.kind === "main")) {
     const k = p.preset ?? "–";
     const f = byPreset.get(k) ?? { posts: 0, views: 0, devs: 0, skip: [] };
     f.posts++;
