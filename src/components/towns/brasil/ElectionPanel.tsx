@@ -346,7 +346,9 @@ export default function ElectionPanel({
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between px-1 text-[9px] text-muted">
         <span>Candidates</span>
-        {voting && <span className="tabular-nums">{fmt(total)} votes</span>}
+        <a href={`/town/${slug}/apuracao`} className="text-cream underline hover:text-lime">
+          {voting ? `Live count · ${fmt(total)} votes` : "Live count"}
+        </a>
       </div>
       {e.candidates.length === 0 ? (
         <p className="border-2 border-border px-3 py-3 text-[10px] normal-case text-muted">Nobody is running yet. Be the first.</p>
