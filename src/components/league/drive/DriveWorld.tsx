@@ -26,6 +26,7 @@ import Car, { type CarApi } from "./Car";
 import DriveCamera from "./DriveCamera";
 import Battle from "./Battle";
 import CrownMode, { type CrownApi, type CrownView } from "./CrownMode";
+import RallyMode, { type RallyApi, type RallyView } from "./RallyMode";
 import HonkFlash from "./HonkFlash";
 import RouteArrow from "./RouteArrow";
 import Lights from "./Lights";
@@ -103,6 +104,13 @@ export interface DriveWorldProps {
   crownApi: React.MutableRefObject<CrownApi | null>;
   /** Crown Rush state for the HUD. */
   onCrown: (v: CrownView) => void;
+  /** City races (the Brasil map): the HUD starts and joins them through this; null elsewhere. */
+  rally?: {
+    api: React.MutableRefObject<RallyApi | null>;
+    onView: (v: RallyView) => void;
+    /** The route's record (ms), when the HUD knows it: a faster finish sends its ghost. */
+    recordMs: React.MutableRefObject<number | null>;
+  };
   /** The town's floors (lib/league-city/smash). Signed in, every building but yours has no collider: the car drives through and breaks it. */
   smash?: SmashStore;
   /** Single-player preview: no drive room, no other cars. */
@@ -301,6 +309,7 @@ export default function DriveWorld({
   smash,
   offline = false,
   onTaste,
+  rally,
 }: DriveWorldProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -373,6 +382,9 @@ export default function DriveWorld({
   const contacts = useRef(new Map<string, number>());
   const battleSink = useRef<(e: BattleEvent) => void>(() => {});
   const crownSink = useRef<(e: BattleEvent) => void>(() => {});
+  const rallySink = useRef<(e: BattleEvent) => void>(() => {});
+  /** Where R puts the car during a city race (its last gate). */
+  const respawnAt = useRef<Spawn | null>(null);
   const crownHit = useRef<(id: string) => void>(() => {});
   const crownKnock = useRef<() => void>(() => {});
   const emoteSink = useRef<(from: string, e: number) => void>(() => {});
@@ -396,7 +408,7 @@ export default function DriveWorld({
       impact.current = { strength: Math.min(1, Math.hypot(x, z) / 12), at: performance.now() };
     },
     onEmote: (from, e) => emoteSink.current(from, e),
-    onBattle: (e) => (e.t === "crown" ? crownSink.current(e) : battleSink.current(e)),
+    onBattle: (e) => (e.t === "crown" ? crownSink.current(e) : e.t === "rally" || e.t === "rally_receipt" ? rallySink.current(e) : battleSink.current(e)),
     // Smash: the room asks the site who you are, and has the last word on the floors.
     auth: smash ? smashToken : undefined,
     onOther: smash
@@ -488,6 +500,7 @@ export default function DriveWorld({
             onRemoteHit={onRemoteHit}
             onHonk={honk}
             impact={impact}
+            respawnAt={respawnAt}
           >
             <Lights braking={() => !!car.current?.state.braking} />
           </Car>
@@ -523,6 +536,20 @@ export default function DriveWorld({
             onView={onCrown}
             telemetryRef={telemetryRef}
           />
+          {rally && (
+            <RallyMode
+              slug={slug}
+              carRef={car}
+              send={send}
+              selfId={selfId}
+              sinkRef={rallySink}
+              apiRef={rally.api}
+              onView={rally.onView}
+              telemetryRef={telemetryRef}
+              respawnAt={respawnAt}
+              recordMs={rally.recordMs}
+            />
+          )}
           {smash && (
             <Smash
               ref={smashApi}
