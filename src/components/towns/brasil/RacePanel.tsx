@@ -66,7 +66,7 @@ function useNow(on: boolean) {
 
 /**
  * The race's step in the Games menu: from the city the car is in, a route of
- * the length picked (1 2 3), another one (← →), the record and top three,
+ * the length picked (← → or 1 2 3), another city (R), the record and top three,
  * Enter to challenge, Esc back to the modes. A link (?race=) opens it on
  * that route.
  */
@@ -104,11 +104,16 @@ export function RacePicker({
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (e.repeat) return;
+      // ← → and 1 2 3 pick the length (the row of lengths reads left to right); R draws another city.
       const n = ["Digit1", "Digit2", "Digit3"].indexOf(e.code);
-      if (n >= 0) {
-        setLength(ORDER[n]);
-        setDraft(draw(layout, telemetry, ORDER[n]));
-      } else if (e.code === "ArrowLeft" || e.code === "ArrowRight" || e.code === "KeyA" || e.code === "KeyD") setDraft(draw(layout, telemetry, length));
+      const step = e.code === "ArrowLeft" || e.code === "KeyA" ? -1 : e.code === "ArrowRight" || e.code === "KeyD" ? 1 : 0;
+      const pick = n >= 0 ? ORDER[n] : step ? ORDER[Math.max(0, Math.min(ORDER.length - 1, ORDER.indexOf(length) + step))] : null;
+      if (pick) {
+        if (pick !== length) {
+          setLength(pick);
+          setDraft(draw(layout, telemetry, pick));
+        }
+      } else if (e.code === "KeyR") setDraft(draw(layout, telemetry, length));
       else if (e.code === "Enter") {
         if (draft.route) onStart(toRallyRoute(draft.route), draft.how);
       } else if (e.code === "Escape" || e.code === "Backspace") onBack();
@@ -196,8 +201,8 @@ export function RacePicker({
         delay={400}
         keys={[
           ["Enter", "challenge"],
-          ["← →", "other city"],
-          ["1 2 3", "length"],
+          ["← →", "length"],
+          ["R", "other city"],
           ["Esc", "back"],
         ]}
       />
