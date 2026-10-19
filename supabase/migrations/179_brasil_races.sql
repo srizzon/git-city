@@ -44,7 +44,7 @@ FROM public.brasil_race_results
 ORDER BY route_key, ms, created_at;
 
 ALTER TABLE public.brasil_points DROP CONSTRAINT IF EXISTS brasil_points_kind_check;
-ALTER TABLE public.brasil_points ADD CONSTRAINT brasil_points_kind_check CHECK (kind IN ('join', 'comment', 'invite', 'story', 'vote', 'race'));
+ALTER TABLE public.brasil_points ADD CONSTRAINT brasil_points_kind_check CHECK (kind IN ('join', 'comment', 'invite', 'story', 'vote', 'paint', 'race'));
 
 -- RLS on, no public policies: reads and writes go through the service role.
 ALTER TABLE public.brasil_race_results ENABLE ROW LEVEL SECURITY;
