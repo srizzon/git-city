@@ -213,9 +213,12 @@ export function useDrivePresence({
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: "bump", to, x, z }));
   };
 
-  const send = (msg: ClientMsg) => {
+  /** False when the room isn't connected (nothing was sent). */
+  const send = (msg: ClientMsg): boolean => {
     const ws = socket.current;
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    ws.send(JSON.stringify(msg));
+    return true;
   };
 
   return { remotes, drivers, sendBump, send, selfId };
