@@ -52,7 +52,7 @@ describe("checkText", () => {
   });
 
   it("fails an unverified @ in the caption and a watched reel without the parseable CTA", () => {
-    const spec = { ...base, header: { ...base.header, cta: [{ text: "comenta", size: "big" as const }] }, post: { caption: "oi @fulano", watch: true } };
+    const spec = { ...base, header: { ...base.header!, cta: [{ text: "comenta", size: "big" as const }] }, post: { caption: "oi @fulano", watch: true } };
     expect(fails(checkText(spec, ctx))).toEqual(expect.arrayContaining(["cta", "caption"]));
   });
 });

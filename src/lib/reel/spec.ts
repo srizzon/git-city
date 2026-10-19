@@ -60,7 +60,45 @@ const Roster = z.object({
   perPage: z.number().int().min(3).max(7).default(7),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster]);
+/** A number counting up in the header's place (e.g. buildings knocked down over a montage). */
+const Counter = z.object({
+  type: z.literal("counter"),
+  from: Anchor,
+  /** When it reaches its value. */
+  reach: Anchor,
+  to: Anchor,
+  value: z.union([z.number(), z.string()]),
+  label: z.string(),
+});
+
+/** A WANTED poster slammed in: a dev's photo in sepia, when and where. */
+const Poster = z.object({
+  type: z.literal("poster"),
+  from: Anchor,
+  to: Anchor.optional(),
+  title: z.string(),
+  login: z.string(),
+  when: z.string(),
+  where: z.string(),
+});
+
+/** The account's Instagram profile card, its Follow button tapped at `done` (the follower count goes up by one). */
+const Follow = z.object({
+  type: z.literal("follow"),
+  from: Anchor,
+  done: Anchor,
+  handle: z.string(),
+  name: z.string(),
+  /** The GitHub login whose photo is the profile picture. */
+  avatar: z.string(),
+  bio: z.array(z.string()).max(4),
+  link: z.string(),
+  posts: z.union([z.number(), z.string()]),
+  followers: z.union([z.number(), z.string()]),
+  following: z.union([z.number(), z.string()]),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({
@@ -79,7 +117,13 @@ const BayWorld = z.object({
   lot: z.string().optional(),
 });
 
-export const World = z.discriminatedUnion("type", [BrasilWorld, BayWorld]);
+/** One or more towns (a canvas each, cut between): stage name → town slug. Scenes say which with params.town. */
+const TownsWorld = z.object({
+  type: z.literal("towns"),
+  towns: z.record(z.string().regex(/^[a-z]+$/), z.string()),
+});
+
+export const World = z.discriminatedUnion("type", [BrasilWorld, BayWorld, TownsWorld]);
 export type World = z.infer<typeof World>;
 
 export const Scene = z.object({
@@ -96,6 +140,8 @@ export const Line = z.object({
   say: z.string().min(1).optional(),
   /** Seconds on the film's clock: the line is voiced alone at this time (a pause before it). */
   at: z.number().nonnegative().optional(),
+  /** Said but not captioned (e.g. while a poster says it). */
+  hidden: z.boolean().optional(),
 });
 
 export const ReelSpec = z.object({
@@ -109,11 +155,16 @@ export const ReelSpec = z.object({
   tail: z.number().nonnegative().default(1.4),
   bed: z.string().default("lofi-up-1.mp3"),
   bedVolume: z.number().positive().max(1).default(0.26),
-  header: z.object({
-    rule: z.array(HeaderLine).min(1),
-    cta: z.array(HeaderLine).min(1),
-    ctaAt: Anchor,
-  }),
+  /** The rule up top that turns into the call to action; a reel without one (a story told on its own) leaves it out. */
+  header: z
+    .object({
+      rule: z.array(HeaderLine).min(1),
+      cta: z.array(HeaderLine).min(1),
+      ctaAt: Anchor,
+    })
+    .optional(),
+  /** Extra sound effects (a scene's own, like a fall's thud, come with it). */
+  sounds: z.array(z.object({ at: Anchor, src: z.string(), gain: z.number().default(1), rate: z.number().optional() })).default([]),
   lines: z.array(Line).min(1),
   scenes: z.array(Scene).min(1),
   overlays: z.array(Overlay).default([]),

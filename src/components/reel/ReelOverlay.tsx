@@ -126,7 +126,7 @@ const outline = (w: number) => ({
   textShadow: `0 ${w / 2}cqw 0 #000`,
 });
 
-function HeaderLines({ lines }: { lines: ReelSpec["header"]["rule"] }) {
+function HeaderLines({ lines }: { lines: NonNullable<ReelSpec["header"]>["rule"] }) {
   return (
     <>
       {lines.map((l, i) => (
@@ -138,7 +138,8 @@ function HeaderLines({ lines }: { lines: ReelSpec["header"]["rule"] }) {
   );
 }
 
-const ease = (u: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
+const clamp = (u: number) => Math.min(1, Math.max(0, u));
+const ease = (u: number) => 1 - Math.pow(1 - clamp(u), 3);
 
 /**
  * Animates the panels each frame: a panel fades in from its moment and out
@@ -153,6 +154,33 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
     el.style.opacity = on ? String(Math.min(1, (t - p.from) / FADE, (p.to + 0.3 - t) / 0.3)) : "0";
     if (!on) return;
     const local = t - p.from;
+    if (p.kind === "counter") {
+      const n = Math.max(1, Math.min(p.value, Math.round(1 + ((t - p.from) / Math.max(0.001, p.reach - p.from)) * (p.value - 1))));
+      const num = el.querySelector<HTMLElement>("[data-n]");
+      if (num && num.textContent !== String(n)) num.textContent = String(n);
+      return;
+    }
+    if (p.kind === "poster") {
+      // Slammed in from big and tilted, then still.
+      const k = clamp(local / 0.16);
+      el.style.transform = `translate(-50%, 0) scale(${1.5 - 0.5 * k * k}) rotate(${-3 - 5 * (1 - k)}deg)`;
+      return;
+    }
+    if (p.kind === "follow") {
+      // Popped in, settling just under full size; its button tapped at `done`.
+      const k = clamp(local / 0.18);
+      el.style.transform = `translate(-50%, 0) scale(${0.88 * (0.6 + 0.4 * (1 - (1 - k) ** 3) + 0.06 * Math.sin(Math.PI * k))})`;
+      const done = t >= p.done;
+      const btn = el.querySelector<HTMLElement>("[data-follow]");
+      if (btn && btn.dataset.done !== String(done)) {
+        btn.dataset.done = String(done);
+        btn.textContent = done ? "Seguindo" : "Seguir";
+        btn.style.background = done ? "#262626" : "#0095f6";
+        const f = el.querySelector<HTMLElement>("[data-followers]");
+        if (f) f.textContent = done ? (f.dataset.after ?? f.textContent) : (f.dataset.before ?? f.textContent);
+      }
+      return;
+    }
     if (p.kind === "bars") {
       el.querySelectorAll<HTMLElement>("[data-bar]").forEach((bar, k) => {
         bar.style.transform = `scaleX(${ease((local - k * 0.08) / 0.5)})`;
@@ -175,8 +203,91 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
   });
 }
 
-/** The panels' markup: white outlined type and solid bars, no box (dark bands were rejected). */
+/** A panel by kind: a list (bars, roster), a counter, a poster or the profile card. */
 function Panel({ panel, index, photoOf }: { panel: ReelPanel; index: number; photoOf: (login: string) => string | null }) {
+  if (panel.kind === "bars" || panel.kind === "roster") return <ListPanel panel={panel} index={index} photoOf={photoOf} />;
+  if (panel.kind === "counter")
+    return (
+      <div data-panel={index} data-reel-box="counter" className="absolute text-center font-pixel uppercase text-white" style={{ left: "50%", transform: "translateX(-50%)", top: "15%", opacity: 0, ...outline(1.4) }}>
+        <p className="text-lime" style={{ fontSize: "16cqw", lineHeight: 1 }}>
+          <span data-n>1</span>
+        </p>
+        <p style={{ fontSize: "4.4cqw", lineHeight: 1, marginTop: "1.6cqw" }}>{panel.label}</p>
+      </div>
+    );
+  const avatar = (login: string, size: number) => `https://avatars.githubusercontent.com/${login}?s=${size}`;
+  if (panel.kind === "poster")
+    return (
+      <div
+        data-panel={index}
+        data-reel-box="poster"
+        className="absolute font-pixel uppercase"
+        style={{ left: "50%", top: "15%", width: "50cqw", opacity: 0, background: "#e8dcc8", color: "#2a1d12", border: "1.2cqw solid #2a1d12", boxShadow: "0 0 0 0.8cqw #e8dcc8", padding: "2.8cqw 2.6cqw 2.6cqw", textAlign: "center", transformOrigin: "50% 40%" }}
+      >
+        <p style={{ fontSize: "6cqw", lineHeight: 1 }}>{panel.title}</p>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar, drawn as it is */}
+        <img alt="" src={avatar(panel.login, 300)} style={{ display: "block", width: "26cqw", height: "26cqw", margin: "2.2cqw auto", border: "0.8cqw solid #2a1d12", filter: "sepia(0.9) contrast(1.15)" }} />
+        <p style={{ fontSize: "4.8cqw", lineHeight: 1, textTransform: "none" }}>{panel.login}</p>
+        <p style={{ fontSize: "4.4cqw", lineHeight: 1, marginTop: "2.6cqw", padding: "1.4cqw 0", background: "#2a1d12", color: "#e8dcc8" }}>{panel.when}</p>
+        <p style={{ fontSize: "3cqw", lineHeight: 1, marginTop: "1.6cqw" }}>{panel.where}</p>
+      </div>
+    );
+  // The account's own Instagram profile, as the app draws it in dark mode.
+  const sans = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  const plusOne = (n: string) => {
+    const v = Number(n.replace(/\D/g, ""));
+    return Number.isFinite(v) ? (v + 1).toLocaleString("pt-BR") : n;
+  };
+  return (
+    <div
+      data-panel={index}
+      data-reel-box="follow"
+      style={{ position: "absolute", left: "50%", top: "15%", width: "72cqw", transformOrigin: "50% 0", opacity: 0, background: "#000", color: "#f5f5f5", border: "0.3cqw solid #262626", borderRadius: "3cqw", padding: "4cqw", fontFamily: sans, boxShadow: "0 2cqw 6cqw rgba(0,0,0,0.6)" }}
+    >
+      <p style={{ fontSize: "4.6cqw", fontWeight: 700, lineHeight: 1 }}>{panel.handle}</p>
+      <div style={{ display: "flex", alignItems: "center", gap: "4cqw", marginTop: "3.4cqw" }}>
+        <div style={{ width: "19cqw", height: "19cqw", borderRadius: "50%", background: "#5dd67a", overflow: "hidden", flexShrink: 0 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- the account's GitHub photo */}
+          <img alt="" src={avatar(panel.avatar, 300)} style={{ display: "block", width: "100%", height: "100%" }} />
+        </div>
+        <div style={{ display: "flex", flex: 1, justifyContent: "space-between", textAlign: "center" }}>
+          {(
+            [
+              [panel.posts, "posts", false],
+              [panel.followers, "seguidores", true],
+              [panel.following, "seguindo", false],
+            ] as const
+          ).map(([n, label, live]) => (
+            <div key={label}>
+              <p data-followers={live || undefined} data-before={live ? n : undefined} data-after={live ? plusOne(n) : undefined} style={{ fontSize: "4.2cqw", fontWeight: 700, lineHeight: 1 }}>
+                {n}
+              </p>
+              <p style={{ fontSize: "2.8cqw", lineHeight: 1, marginTop: "1cqw" }}>{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p style={{ fontSize: "3.2cqw", fontWeight: 600, marginTop: "3cqw", lineHeight: 1.2 }}>{panel.name}</p>
+      <p style={{ fontSize: "3cqw", lineHeight: 1.35, marginTop: "0.8cqw" }}>
+        {panel.bio.map((l, i) => (
+          <span key={i} style={{ display: "block" }}>
+            {l}
+          </span>
+        ))}
+      </p>
+      <p style={{ fontSize: "3cqw", fontWeight: 600, marginTop: "0.8cqw", color: "#e0f1ff" }}>🔗 {panel.link}</p>
+      <div style={{ display: "flex", gap: "1.6cqw", marginTop: "3cqw" }}>
+        <span data-follow style={{ flex: 1, textAlign: "center", padding: "2.2cqw 0", borderRadius: "2cqw", fontSize: "3.4cqw", fontWeight: 600, background: "#0095f6", color: "#fff" }}>
+          Seguir
+        </span>
+        <span style={{ flex: 1, textAlign: "center", padding: "2.2cqw 0", borderRadius: "2cqw", fontSize: "3.4cqw", fontWeight: 600, background: "#262626", color: "#f5f5f5" }}>Mensagem</span>
+      </div>
+    </div>
+  );
+}
+
+/** The list panels' markup: white outlined type and solid bars, no box (dark bands were rejected). */
+function ListPanel({ panel, index, photoOf }: { panel: Extract<ReelPanel, { kind: "bars" | "roster" }>; index: number; photoOf: (login: string) => string | null }) {
   const type = "font-pixel uppercase text-white whitespace-nowrap";
   const max = panel.kind === "bars" ? Math.max(...panel.rows.map((r) => (typeof r.value === "number" ? r.value : Number(String(r.value).replace(/\D/g, "")) || 0)), 1) : 1;
   return (
@@ -336,7 +447,7 @@ export default function ReelOverlay({
 }: {
   clock: FilmClock;
   reel: Reel;
-  header: ReelSpec["header"];
+  header: ReelSpec["header"] | undefined;
   balloon: RefObject<HTMLDivElement | null>;
   /** A login's GitHub photo, for a balloon with no plate. */
   photoOf: (login: string) => string | null;
@@ -392,14 +503,16 @@ export default function ReelOverlay({
       {reel.panels.map((p, i) => (
         <Panel key={i} panel={p} index={i} photoOf={photoOf} />
       ))}
-      <div className={type} style={{ ...safe, top: "15%", ...outline(1.4) }}>
-        <div ref={rule} data-reel-box="header">
-          <HeaderLines lines={header.rule} />
+      {header && (
+        <div className={type} style={{ ...safe, top: "15%", ...outline(1.4) }}>
+          <div ref={rule} data-reel-box="header">
+            <HeaderLines lines={header.rule} />
+          </div>
+          <div ref={cta} data-reel-box="header" className="absolute inset-0 flex flex-col items-center justify-center" style={{ opacity: 0 }}>
+            <HeaderLines lines={header.cta} />
+          </div>
         </div>
-        <div ref={cta} data-reel-box="header" className="absolute inset-0 flex flex-col items-center justify-center" style={{ opacity: 0 }}>
-          <HeaderLines lines={header.cta} />
-        </div>
-      </div>
+      )}
 
       <div ref={balloon}>
         {reel.balloons.map((b, i) => (

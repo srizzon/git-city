@@ -34,15 +34,21 @@ function factValues(facts: unknown, out = new Set<string>()): Set<string> {
 /** Everything the viewer reads on screen. */
 function onScreen(spec: ReelSpec): string[] {
   return [
-    ...spec.header.rule.map((l) => l.text),
-    ...spec.header.cta.map((l) => l.text),
+    ...(spec.header ? [...spec.header.rule, ...spec.header.cta].map((l) => l.text) : []),
     ...spec.lines.map((l) => l.show),
     ...spec.overlays.flatMap((o) =>
       o.type === "balloon"
         ? [o.plate ?? "", ...o.badges.map((b) => b.sub)]
         : o.type === "bars"
           ? [o.title ?? "", ...o.rows.flatMap((r) => [r.label, String(r.value)])]
-          : [o.title ?? "", ...o.rows.map((r) => r.tag)],
+          : o.type === "roster"
+            ? [o.title ?? "", ...o.rows.map((r) => r.tag)]
+            : o.type === "counter"
+              ? [String(o.value), o.label]
+              : o.type === "poster"
+                ? [o.title, o.when, o.where]
+                : // The account's own profile card: its bio is the owner's, not the day's data.
+                  [],
     ),
   ].map((t) => t.replace(/\*/g, ""));
 }
@@ -124,7 +130,9 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   for (const text of onScreen(spec)) {
     for (const n of numbersIn(text)) if (!known.has(n)) fail("real data", `"${n}" on screen isn't a fact: "${text}"`);
   }
-  const logins = spec.overlays.flatMap((o) => (o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" ? o.rows.map((r) => r.login) : []));
+  const logins = spec.overlays.flatMap((o) =>
+    o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" ? o.rows.map((r) => r.login) : o.type === "poster" ? [o.login] : [],
+  );
   for (const login of logins) if (!known.has(login.toLowerCase())) fail("real data", `${login} on screen isn't in the facts.`);
 
   const first = spec.lines[0].show.replace(/\*/g, "");
@@ -134,10 +142,11 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   spec.scenes.forEach((s, i) => {
     if (!ctx.scenes.includes(s.scene)) fail("scenes", `"${s.scene}" isn't a scene of the ${spec.world.type} world (${ctx.scenes.join(", ")}).`);
     const prev = spec.scenes[i - 1];
-    if (prev && prev.scene === s.scene) fail("scenes", `"${s.scene}" twice in a row (scenes ${i} and ${i + 1}).`);
+    // A montage repeats its move on purpose.
+    if (prev && prev.scene === s.scene && !s.scene.startsWith("montage")) fail("scenes", `"${s.scene}" twice in a row (scenes ${i} and ${i + 1}).`);
   });
 
-  if (spec.post.watch && !spec.header.cta.some((l) => /\bseuuser [A-Z]{2}\b/i.test(l.text.replace(/\*/g, ""))))
+  if (spec.post.watch && !(spec.header?.cta ?? []).some((l) => /\bseuuser [A-Z]{2}\b/i.test(l.text.replace(/\*/g, ""))))
     fail("cta", "A watched reel's call to action must show the parseable `seuuser UF`.");
   for (const h of spec.post.caption.match(/@[\w.]+/g) ?? []) {
     if (!ctx.verifiedHandles.includes(h.slice(1).toLowerCase())) fail("caption", `${h} in the caption isn't a verified handle.`);
