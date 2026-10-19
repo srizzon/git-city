@@ -10,6 +10,8 @@ import RubbleFlags from "@/components/league/RubbleFlags";
 import { rampGeometry } from "@/components/league/LeagueToys";
 import { VehicleMesh } from "@/components/RaidSequence3D";
 import BossPreview from "@/components/BossPreview";
+import LeagueCrown3D from "@/components/LeagueCrown3D";
+import type { CityBuilding } from "@/lib/github";
 import { M_TO_UNIT, TURBO, WHEEL } from "@/lib/league-city/drive/tuning";
 import { WHEELS } from "@/lib/league-city/drive/vehicle";
 import { RAMP_BIG } from "@/lib/league-city/ramp";
@@ -37,8 +39,9 @@ import { cutAt, type Reel, type ReelCut } from "@/lib/reel/film";
 //   tower-fall  a tower (params.login) coming down, from low and wide
 //   fly-canyon  the fly-mode vehicle down the avenue between the towers, then up
 //   boss        the boss over the skyline, from the street looking up
+//   league-crown round a tower (params.login) wearing the week's town crown on its roof
 
-export const BAY_TAKES = ["car-cruise", "car-drift", "car-boost", "car-missile", "car-ramp", "crown-grab", "car-ram", "tower-fall", "fly-canyon", "boss"] as const;
+export const BAY_TAKES = ["car-cruise", "car-drift", "car-boost", "car-missile", "car-ramp", "crown-grab", "car-ram", "tower-fall", "fly-canyon", "boss", "league-crown"] as const;
 export const isTake = (kind: string) => (BAY_TAKES as readonly string[]).includes(kind);
 
 /** A downtown avenue between ~230-unit towers (found on the layout): where the takes happen. */
@@ -86,9 +89,11 @@ export interface BayTakesProps {
   clock: FilmClock;
   reel: Reel;
   store: SmashStore | null;
+  /** The city's buildings by login (lowercase). */
+  byLogin: ReadonlyMap<string, CityBuilding>;
 }
 
-export default function BayTakes({ clock, reel, store }: BayTakesProps) {
+export default function BayTakes({ clock, reel, store, byLogin }: BayTakesProps) {
   const car0 = useRef<THREE.Group>(null);
   const car1 = useRef<THREE.Group>(null);
   const wheels0 = useRef<(THREE.Object3D | null)[]>([]);
@@ -103,6 +108,11 @@ export default function BayTakes({ clock, reel, store }: BayTakesProps) {
   const st = useRef({ last: -1, spin: [0, 0], shake: 0 });
   const rampGeo = useMemo(() => rampGeometry(RAMP_BIG), []);
   const hasBoss = reel.cuts.some((c) => c.kind === "boss");
+  const crowned = useMemo(() => {
+    const cut = reel.cuts.find((c) => c.kind === "league-crown" && typeof c.params.login === "string");
+    return cut ? (byLogin.get((cut.params.login as string).toLowerCase()) ?? null) : null;
+  }, [reel, byLogin]);
+  const crownGroup = useRef<THREE.Group>(null);
 
   useFrame((three, delta) => {
     const camera = three.camera as THREE.PerspectiveCamera;
@@ -118,6 +128,7 @@ export default function BayTakes({ clock, reel, store }: BayTakesProps) {
     for (const c of cars) if (c.current) c.current.visible = false;
     for (const r of [missile, plane, crown, beam, ramp]) if (r.current) r.current.visible = false;
     if (boss.current) boss.current.visible = cut.kind === "boss";
+    if (crownGroup.current) crownGroup.current.visible = cut.kind === "league-crown";
     if (!isTake(cut.kind)) return;
     st.current.shake = Math.max(0, st.current.shake - dt * 2.2);
 
@@ -362,6 +373,17 @@ export default function BayTakes({ clock, reel, store }: BayTakesProps) {
         cam(s - 26, 0, y + 8 - 20 * climb, s + 30, 0, y + 30 * climb, 55);
         break;
       }
+      case "league-crown": {
+        if (!crowned) break;
+        // Round the roof, a little above it, closing in: the gold crown turning over the tower.
+        const h = crowned.height;
+        const a = 0.4 + 0.35 * t;
+        const d = 330 - 70 * smooth(clamp01(t / 3.5));
+        _pos.set(crowned.position[0] + Math.sin(a) * d, h + 110, crowned.position[2] + Math.cos(a) * d);
+        _look.set(crowned.position[0], h + 10, crowned.position[2]);
+        camera.fov = 50;
+        break;
+      }
       case "boss": {
         // From the street, the camera rises and tilts up to the boss over the end of the avenue.
         const u = smooth(clamp01(t / 2.8));
@@ -425,6 +447,11 @@ export default function BayTakes({ clock, reel, store }: BayTakesProps) {
       {hasBoss && (
         <group ref={boss} visible={false}>
           <BossPreview variant="duck" phase={1} position={bossAt} scale={15} />
+        </group>
+      )}
+      {crowned && (
+        <group ref={crownGroup} position={crowned.position} visible={false}>
+          <LeagueCrown3D width={crowned.width} height={crowned.height} depth={crowned.depth} />
         </group>
       )}
       {store && <RubbleFlags store={store} />}

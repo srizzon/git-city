@@ -34,6 +34,7 @@ export type ReelPanel =
   | { kind: "roster"; from: number; to: number; title: string | null; rows: { tag: string; login: string; lit: boolean }[]; perPage: number }
   | { kind: "counter"; from: number; reach: number; to: number; value: number; label: string }
   | { kind: "poster"; from: number; to: number; title: string; login: string; when: string; where: string }
+  | { kind: "profile"; from: number; to: number; login: string }
   | {
       kind: "follow";
       from: number;
@@ -139,6 +140,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
     }
     const to = o.to === undefined ? length : anchorAt(words, o.to, from);
     if (o.type === "poster") return [{ kind: "poster", from, to, title: o.title, login: o.login, when: o.when, where: o.where }];
+    if (o.type === "profile") return [{ kind: "profile", from, to, login: o.login }];
     if (o.type === "bars") return [{ kind: "bars", from, to, title: o.title ?? null, rows: o.rows.map((r) => ({ ...r, lit: !!r.lit })) }];
     return [{ kind: "roster", from, to, title: o.title ?? null, rows: o.rows.map((r) => ({ ...r, lit: !!r.lit })), perPage: o.perPage }];
   });

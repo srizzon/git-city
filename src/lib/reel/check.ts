@@ -47,6 +47,8 @@ function onScreen(spec: ReelSpec): string[] {
               ? [String(o.value), o.label]
               : o.type === "poster"
                 ? [o.title, o.when, o.where]
+                : o.type === "profile"
+                  ? []
                 : // The account's own profile card: its bio is the owner's, not the day's data.
                   [],
     ),
@@ -131,7 +133,7 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
     for (const n of numbersIn(text)) if (!known.has(n)) fail("real data", `"${n}" on screen isn't a fact: "${text}"`);
   }
   const logins = spec.overlays.flatMap((o) =>
-    o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" ? o.rows.map((r) => r.login) : o.type === "poster" ? [o.login] : [],
+    o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" ? o.rows.map((r) => r.login) : o.type === "poster" || o.type === "profile" ? [o.login] : [],
   );
   for (const login of logins) if (!known.has(login.toLowerCase())) fail("real data", `${login} on screen isn't in the facts.`);
 

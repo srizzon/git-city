@@ -111,7 +111,7 @@ export default function BayReelRig({ clock, reel, buildings, lot, colors, balloo
         <CityScene buildings={lone} colors={colors} introMode filmMode />
       </group>
       {store && targets.length > 0 && <CityScene buildings={targets} colors={colors} introMode filmMode smash={store} />}
-      {reel.cuts.some((c) => isTake(c.kind)) && <BayTakes clock={clock} reel={reel} store={store} />}
+      {reel.cuts.some((c) => isTake(c.kind)) && <BayTakes clock={clock} reel={reel} store={store} byLogin={byLogin} />}
     </>
   );
 }

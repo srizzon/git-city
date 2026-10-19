@@ -98,7 +98,15 @@ const Follow = z.object({
   following: z.union([z.number(), z.string()]),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow]);
+/** A building's card as the app shows it on a click: photo, name, level, rank and numbers (real, from the building). */
+const Profile = z.object({
+  type: z.literal("profile"),
+  login: z.string(),
+  from: Anchor,
+  to: Anchor.optional(),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({

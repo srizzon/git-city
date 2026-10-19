@@ -84,7 +84,7 @@ function exampleBuilding(spec: ReelSpec, residents: Resident[], record: Record<s
   return leagueBuildings(objects, new Map([[-1, own ?? plainBuilding(ex.login)]]))[0] ?? null;
 }
 
-function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps & { data: BrasilData; children: (photoOf: (login: string) => string | null) => ReactNode }) {
+function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps & { data: BrasilData; children: (photoOf: (login: string) => string | null, buildingOf: (login: string) => CityBuilding | null) => ReactNode }) {
   const { residents, cityDevs, example, norms } = data;
   const world = useMemo(() => {
     const layout = layoutFromResidents(residents);
@@ -102,6 +102,7 @@ function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps 
     [world.layout],
   );
   const photoOf = useCallback((login: string) => world.byLogin.get(login.toLowerCase())?.avatar_url ?? null, [world.byLogin]);
+  const buildingOf = useCallback((login: string) => world.byLogin.get(login.toLowerCase()) ?? null, [world.byLogin]);
   return (
     <>
       <div className="absolute inset-0">
@@ -114,7 +115,7 @@ function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps 
           rig={<BrasilReelRig clock={clock} reel={reel} example={world.example} byLogin={world.byLogin} capitalOf={capitalOf} balloon={balloon} />}
         />
       </div>
-      {children(photoOf)}
+      {children(photoOf, buildingOf)}
     </>
   );
 }
@@ -127,7 +128,7 @@ interface Bay {
   sfMap: SFRenderMap;
 }
 
-function BayStage({ spec, reel, clock, balloon, gen, children }: StageProps & { children: (photoOf: (login: string) => string | null) => ReactNode }) {
+function BayStage({ spec, reel, clock, balloon, gen, children }: StageProps & { children: (photoOf: (login: string) => string | null, buildingOf: (login: string) => CityBuilding | null) => ReactNode }) {
   const [city, setCity] = useState<Bay | null | undefined>(undefined);
   const lotLogin = spec.world.type === "bay" ? (spec.world.lot?.toLowerCase() ?? null) : null;
   useEffect(() => {
@@ -149,6 +150,7 @@ function BayStage({ spec, reel, clock, balloon, gen, children }: StageProps & { 
   const store = useMemo(() => (targets.length ? smashStoreFor(targets) : null), [targets, gen]);
   const standing = useMemo(() => (targets.length ? (city?.buildings ?? []).filter((b) => !targets.includes(b)) : (city?.buildings ?? [])), [city, targets]);
   const photoOf = useCallback((login: string) => (byLogin.has(login.toLowerCase()) ? `https://avatars.githubusercontent.com/${login}?s=160` : null), [byLogin]);
+  const buildingOf = useCallback((login: string) => byLogin.get(login.toLowerCase()) ?? null, [byLogin]);
   // The export waits until the canvas has drawn the city once (tools/export.mjs reads window.__ggReady):
   // the data lands first, the 88k buildings' first frame seconds later.
   useEffect(() => {
@@ -181,7 +183,7 @@ function BayStage({ spec, reel, clock, balloon, gen, children }: StageProps & { 
           rig={<BayReelRig clock={clock} reel={reel} buildings={city.buildings} lot={city.lot} colors={THEMES[0].building} balloon={balloon} store={store} targets={targets} />}
         />
       </div>
-      {children(photoOf)}
+      {children(photoOf, buildingOf)}
     </>
   );
 }
@@ -241,7 +243,9 @@ export default function ReelStudio({ spec, words, song, brasil, towns }: ReelStu
     };
   }, [clock]);
 
-  const overlay = (photoOf: (login: string) => string | null) => <ReelOverlay clock={clock} reel={reel} header={spec.header} balloon={balloon} photoOf={photoOf} />;
+  const overlay = (photoOf: (login: string) => string | null, buildingOf?: (login: string) => CityBuilding | null) => (
+    <ReelOverlay clock={clock} reel={reel} header={spec.header} balloon={balloon} photoOf={photoOf} buildingOf={buildingOf} />
+  );
   const stage = { spec, reel, clock, balloon, gen };
 
   return (

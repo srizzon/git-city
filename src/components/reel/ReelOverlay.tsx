@@ -4,6 +4,8 @@ import { useEffect, useRef, type RefObject } from "react";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import type { Reel, ReelBalloon, ReelPanel } from "@/lib/reel/film";
 import type { ReelSpec } from "@/lib/reel/spec";
+import type { CityBuilding } from "@/lib/github";
+import { levelProgress, rankFromLevel, tierFromLevel, xpForLevel } from "@/lib/xp";
 
 // A reel's words over its world: the rule fixed up top that turns into the
 // call to action, each caption line a word at a time as it is spoken
@@ -160,6 +162,12 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
       if (num && num.textContent !== String(n)) num.textContent = String(n);
       return;
     }
+    if (p.kind === "profile") {
+      // Slides up into place, as the app's card does on a click.
+      const k = ease(local / 0.25);
+      el.style.transform = `translate(-50%, ${(1 - k) * 8}cqw)`;
+      return;
+    }
     if (p.kind === "poster") {
       // Slammed in from big and tilted, then still.
       const k = clamp(local / 0.16);
@@ -203,9 +211,103 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
   });
 }
 
-/** A panel by kind: a list (bars, roster), a counter, a poster or the profile card. */
-function Panel({ panel, index, photoOf }: { panel: ReelPanel; index: number; photoOf: (login: string) => string | null }) {
+/** A building's card, laid out as the app's (home-client's building card), in container units. */
+function ProfilePanel({ index, b }: { index: number; b: CityBuilding }) {
+  const level = b.xp_level ?? 1;
+  const tier = tierFromLevel(level);
+  const rank = rankFromLevel(level);
+  const progress = levelProgress(b.xp_total ?? 0);
+  const xpNow = (b.xp_total ?? 0) - xpForLevel(level);
+  const xpNeed = xpForLevel(level + 1) - xpForLevel(level);
+  const stats = [
+    ["Rank", `#${b.rank}`],
+    ["Contribs", b.contributions.toLocaleString("en-US")],
+    ["Repos", b.public_repos.toLocaleString("en-US")],
+    ["Stars", b.total_stars.toLocaleString("en-US")],
+    ["+1s", (b.kudos_count ?? 0).toLocaleString("en-US")],
+    ["Visits", (b.visit_count ?? 0).toLocaleString("en-US")],
+  ];
+  return (
+    <div
+      data-panel={index}
+      data-reel-box="profile"
+      className="absolute border-border bg-bg-raised font-pixel"
+      style={{ left: "50%", top: "24%", width: "72cqw", borderWidth: "0.8cqw", opacity: 0, transform: "translate(-50%, 0)" }}
+    >
+      <div style={{ padding: "3.4cqw 3.8cqw 2.6cqw", background: `linear-gradient(135deg, ${tier.color}1c 0%, ${tier.color}06 55%, transparent 100%)` }}>
+        <div className="flex items-center" style={{ gap: "3cqw" }}>
+          {b.avatar_url && (
+            <div className="shrink-0" style={{ border: `0.5cqw solid ${tier.color}`, padding: "0.4cqw", background: `${tier.color}14` }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar, drawn as it is */}
+              <img src={b.avatar_url} alt="" className="border-border" style={{ width: "11cqw", height: "11cqw", borderWidth: "0.25cqw", imageRendering: "pixelated", display: "block" }} />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            {b.name && (
+              <p className="truncate text-cream" style={{ fontSize: "3.8cqw", lineHeight: 1.2 }}>
+                {b.name}
+              </p>
+            )}
+            <p className="truncate text-muted" style={{ fontSize: "2.8cqw", lineHeight: 1.4 }}>
+              @{b.login}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center" style={{ gap: "2.6cqw", margin: "0.4cqw 3.8cqw 2.6cqw" }}>
+        <span className="flex shrink-0 items-center justify-center font-bold" style={{ width: "8cqw", height: "8cqw", border: `0.5cqw solid ${tier.color}`, color: tier.color, background: `${tier.color}10`, fontSize: "3.2cqw" }}>
+          {level}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline" style={{ gap: "1.4cqw" }}>
+            <span className="truncate font-bold text-cream" style={{ fontSize: "2.8cqw" }}>
+              Lv {level} · {rank.title}
+            </span>
+            <span className="shrink-0 font-bold" style={{ fontSize: "2cqw", padding: "0.2cqw 1cqw", background: `${tier.color}22`, color: tier.color, letterSpacing: "0.1em" }}>
+              {tier.name.toUpperCase()}
+            </span>
+          </div>
+          <div className="bg-border" style={{ marginTop: "1cqw", height: "1.4cqw" }}>
+            <div className="h-full" style={{ width: `${Math.max(2, Math.round(progress * 100))}%`, background: tier.color }} />
+          </div>
+          <p className="text-dim" style={{ marginTop: "0.6cqw", fontSize: "2cqw" }}>
+            {xpNow.toLocaleString("en-US")} / {xpNeed.toLocaleString("en-US")} XP
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 border-border/50" style={{ gap: "0.25cqw", margin: "0 3.8cqw 3.8cqw", borderWidth: "0.25cqw", background: "color-mix(in srgb, var(--color-border) 30%, transparent)" }}>
+        {stats.map(([k, v]) => (
+          <div key={k} className="bg-bg-card text-center" style={{ padding: "2cqw" }}>
+            <div className="text-lime" style={{ fontSize: "3.4cqw" }}>
+              {v}
+            </div>
+            <div className="text-muted" style={{ fontSize: "2.2cqw", marginTop: "0.6cqw" }}>
+              {k}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A panel by kind: a list (bars, roster), a counter, a poster, a building's card or the profile card. */
+function Panel({
+  panel,
+  index,
+  photoOf,
+  buildingOf,
+}: {
+  panel: ReelPanel;
+  index: number;
+  photoOf: (login: string) => string | null;
+  buildingOf: (login: string) => CityBuilding | null;
+}) {
   if (panel.kind === "bars" || panel.kind === "roster") return <ListPanel panel={panel} index={index} photoOf={photoOf} />;
+  if (panel.kind === "profile") {
+    const b = buildingOf(panel.login);
+    return b ? <ProfilePanel index={index} b={b} /> : null;
+  }
   if (panel.kind === "counter")
     return (
       <div data-panel={index} data-reel-box="counter" className="absolute text-center font-pixel uppercase text-white" style={{ left: "50%", transform: "translateX(-50%)", top: "15%", opacity: 0, ...outline(1.4) }}>
@@ -444,6 +546,7 @@ export default function ReelOverlay({
   header,
   balloon,
   photoOf,
+  buildingOf = () => null,
 }: {
   clock: FilmClock;
   reel: Reel;
@@ -451,6 +554,8 @@ export default function ReelOverlay({
   balloon: RefObject<HTMLDivElement | null>;
   /** A login's GitHub photo, for a balloon with no plate. */
   photoOf: (login: string) => string | null;
+  /** A login's building, for its card (null where the world has no such building). */
+  buildingOf?: (login: string) => CityBuilding | null;
 }) {
   const line = useRef<HTMLParagraphElement>(null);
   const rule = useRef<HTMLDivElement>(null);
@@ -501,7 +606,7 @@ export default function ReelOverlay({
   return (
     <div ref={root} className="pointer-events-none absolute inset-0">
       {reel.panels.map((p, i) => (
-        <Panel key={i} panel={p} index={i} photoOf={photoOf} />
+        <Panel key={i} panel={p} index={i} photoOf={photoOf} buildingOf={buildingOf} />
       ))}
       {header && (
         <div className={type} style={{ ...safe, top: "15%", ...outline(1.4) }}>
