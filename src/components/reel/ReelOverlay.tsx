@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, type CSSProperties, type RefObject } from "react";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import type { Reel, ReelBalloon, ReelPanel } from "@/lib/reel/film";
 import type { ReelSpec } from "@/lib/reel/spec";
@@ -18,6 +18,10 @@ import { CircleUser, Clapperboard, Code2, Heart, House, Instagram, MapPin, Messa
 // top 14%, the bottom 35%, 6% at the sides and the bottom-right rail;
 // centred on the frame (never off-centre), between 14% and 65% down, at
 // most 72% wide.
+//
+// The "plates" look is the channel's own (samuelrizzondev's video kit): each
+// line on a near-black plate with a hard shadow, the headline typed behind a
+// green `>` in hard steps, and cards on its dotted dark background.
 
 const FADE = 0.15; // s
 /** How dark the scene goes behind a card. */
@@ -136,15 +140,96 @@ const outline = (w: number) => ({
   textShadow: `0 ${w / 2}cqw 0 #000`,
 });
 
-function HeaderLines({ lines, sizes = SIZE }: { lines: NonNullable<ReelSpec["header"]>["rule"]; sizes?: Record<keyof typeof SIZE, string> }) {
+function HeaderLines({ lines, sizes = SIZE, plates = false }: { lines: NonNullable<ReelSpec["header"]>["rule"]; sizes?: Record<keyof typeof SIZE, string>; plates?: boolean }) {
+  return (
+    <>
+      {lines.map((l, i) =>
+        plates ? (
+          <p key={i} data-size={l.size} style={{ ...PLATE, fontSize: PLATE_SIZE[l.size], color: l.size === "small" ? BRAND.muted : BRAND.ink, textTransform: l.plain ? "none" : undefined }}>
+            {segments(l.text).map((s, j) => (
+              <span key={j} style={s.lit ? { color: BRAND.green } : undefined}>
+                {s.text}
+              </span>
+            ))}
+          </p>
+        ) : (
+          <p key={i} data-size={l.size} style={{ fontSize: sizes[l.size], lineHeight: 1, marginTop: i ? (sizes === SIZE ? "1.8cqw" : "1cqw") : 0, textTransform: l.plain ? "none" : undefined }}>
+            <Lit text={l.text} />
+          </p>
+        ),
+      )}
+    </>
+  );
+}
+
+// The channel's tokens (video-editor brand.json): one font, ink on near-black, green for the key word.
+const BRAND = { bg: "#0c0d0b", ink: "#eceee6", muted: "#8d9288", green: "#5ce483", onGreen: "#0b1f12", dot: "#22241e" };
+const HARD = "1.1cqw 1.1cqw 0 rgba(0,0,0,.85)";
+const PLATE: CSSProperties = { display: "table", margin: "0 auto", background: BRAND.bg, color: BRAND.ink, boxShadow: HARD, padding: "1.4cqw 2.8cqw 1.8cqw", lineHeight: 1.1 };
+const PLATE_SIZE = { huge: "10cqw", big: "7.4cqw", small: "4.2cqw" } as const;
+const CAPTION_YELLOW = "#ffd84a";
+const CAPTION_SHADOW = [[-0.4, 0], [0.4, 0], [0, -0.4], [0, 0.4], [-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]].map(([x, y]) => `${x}cqw ${y}cqw 0 ${BRAND.bg}`).join(", ") + `, 0.8cqw 0.8cqw 0 ${BRAND.bg}`;
+/** Characters a second the headline types (his Terminal piece: two frames a character at 30 fps). */
+const HEAD_CPS = 15;
+
+const segments = (text: string) => text.split(/(\*[^*]+\*)/).filter(Boolean).map((s) => (s.startsWith("*") ? { text: s.slice(1, -1), lit: true } : { text: s, lit: false }));
+
+/**
+ * A headline beat on plates: each line on its own plate, the first behind a green `>`, the small
+ * ones muted and hung under it. Every character is drawn hidden and the draw loop shows them in
+ * order: a plate appears when its line starts typing and grows with it, the cursor right behind
+ * (his Terminal line, the one box that grows).
+ */
+function PlateLines({ lines }: { lines: NonNullable<ReelSpec["headline"]>[number]["lines"] }) {
+  let k = 0;
   return (
     <>
       {lines.map((l, i) => (
-        <p key={i} data-size={l.size} style={{ fontSize: sizes[l.size], lineHeight: 1, marginTop: i ? (sizes === SIZE ? "1.8cqw" : "1cqw") : 0, textTransform: l.plain ? "none" : undefined }}>
-          <Lit text={l.text} />
+        <p key={i} data-size={l.size} data-fs={PLATE_SIZE[l.size]} style={{ ...PLATE, fontSize: PLATE_SIZE[l.size], color: l.size === "small" ? BRAND.muted : BRAND.ink, textTransform: l.plain ? "none" : undefined }}>
+          {i === 0 && <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>}
+          {segments(l.text).flatMap((s, j) =>
+            [...s.text].map((c, n) => (
+              <span key={`${j}-${n}`} data-ch={k++} style={{ display: "none", color: s.lit ? BRAND.green : undefined }}>
+                {c}
+              </span>
+            )),
+          )}
+          <span data-cursor style={{ display: "inline-block", width: "0.5em", height: "0.85em", marginLeft: "0.3em", verticalAlign: "-0.08em", background: BRAND.green, visibility: "hidden" }} />
         </p>
       ))}
     </>
+  );
+}
+
+/** A full-frame card on the dotted background: its lines centred, a starred word in the green block, an image under them. */
+function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "card" }> }) {
+  const size = { huge: "13cqw", big: "8.5cqw", small: "4.6cqw" } as const;
+  return (
+    <div
+      data-panel={index}
+      className="absolute inset-0 flex flex-col items-center font-pixel uppercase"
+      style={{ zIndex: 5, opacity: 0, paddingTop: "30%", color: BRAND.ink, backgroundColor: BRAND.bg, backgroundImage: `radial-gradient(${BRAND.dot} 0.28cqw, transparent 0.3cqw)`, backgroundSize: "3cqw 3cqw" }}
+    >
+      <div data-reel-box="card" className="flex flex-col items-center text-center" style={{ gap: "3cqw", maxWidth: "72%" }}>
+        {panel.lines.map((l, i) => (
+          <p key={i} style={{ fontSize: size[l.size], lineHeight: 1.1, color: l.size === "small" ? BRAND.muted : BRAND.ink, textTransform: l.plain ? "none" : undefined }}>
+            {segments(l.text).map((s, j) =>
+              s.lit ? (
+                <span key={j} style={{ background: BRAND.green, color: BRAND.onGreen, padding: "0 0.25em", boxShadow: HARD }}>
+                  {s.text}
+                </span>
+              ) : (
+                <span key={j}>{s.text}</span>
+              ),
+            )}
+          </p>
+        ))}
+      </div>
+      {panel.image && (
+        // eslint-disable-next-line @next/next/no-img-element -- an image from the reels folder, drawn as it is
+        <img alt="" src={`/api/reels/file/${panel.image}`} style={{ marginTop: "6cqw", width: "72%", maxHeight: "40%", objectFit: "contain", imageRendering: "pixelated" }} />
+      )}
+    </div>
   );
 }
 
@@ -160,6 +245,11 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
   panels.forEach((p, i) => {
     const el = root.querySelector<HTMLElement>(`[data-panel="${i}"]`);
     if (!el) return;
+    // A card cuts in and out, no fade.
+    if (p.kind === "card") {
+      el.style.opacity = t >= p.from && t < p.to ? "1" : "0";
+      return;
+    }
     const on = t >= p.from && t < p.to + 0.3;
     el.style.opacity = on ? String(Math.min(1, (t - p.from) / FADE, (p.to + 0.3 - t) / 0.3)) : "0";
     if (!on) return;
@@ -824,6 +914,7 @@ function Panel({
   if (panel.kind === "points") return <PointsPanel index={index} panel={panel} />;
   if (panel.kind === "score") return <ScorePanel index={index} panel={panel} />;
   if (panel.kind === "phone") return <PhonePanel index={index} panel={panel} />;
+  if (panel.kind === "card") return <CardPanel index={index} panel={panel} />;
   if (panel.kind === "place") return <PlacePanel index={index} panel={panel} photo={photoOf(panel.login)} />;
   if (panel.kind === "profile") {
     const b = buildingOf(panel.login);
@@ -1094,9 +1185,15 @@ export default function ReelOverlay({
     const fit = () => {
       const max = el.clientWidth * 0.66;
       el.querySelectorAll<HTMLElement>("[data-headline] p").forEach((p) => {
-        const size = HEADLINE_SIZE[p.dataset.size as keyof typeof HEADLINE_SIZE];
+        const size = p.dataset.fs ?? HEADLINE_SIZE[p.dataset.size as keyof typeof HEADLINE_SIZE];
         p.style.fontSize = size;
-        const w = p.scrollWidth;
+        // A typed plate is measured whole: a copy with every character shown.
+        const full = p.cloneNode(true) as HTMLElement;
+        full.querySelectorAll<HTMLElement>("[data-ch]").forEach((c) => (c.style.display = ""));
+        Object.assign(full.style, { position: "absolute", visibility: "hidden", left: "0", top: "0" });
+        p.parentElement!.appendChild(full);
+        const w = full.scrollWidth;
+        full.remove();
         if (w > max) p.style.fontSize = `${(parseFloat(size) * max) / w}cqw`;
       });
     };
@@ -1110,9 +1207,12 @@ export default function ReelOverlay({
   useEffect(() => {
     let raf = 0;
     let shown = -1;
+    const plates = reel.look === "plates";
     const draw = () => {
       const t = beatOf(clock);
       const i = reel.lines.findIndex((l) => t >= l.from && t < l.to);
+      // While a card is up it is the frame: the captions, the header and the headline step aside.
+      const card = reel.panels.some((p) => p.kind === "card" && t >= p.from && t < p.to);
       const el = line.current;
       if (el) {
         if (i !== shown) {
@@ -1123,7 +1223,7 @@ export default function ReelOverlay({
               : reel.lines[i].words.map((w) => {
                   const s = document.createElement("span");
                   s.textContent = w.text;
-                  if (w.lit) s.style.color = "var(--color-lime)";
+                  if (w.lit) s.style.color = plates ? BRAND.green : "var(--color-lime)";
                   return s;
                 })),
           );
@@ -1133,11 +1233,13 @@ export default function ReelOverlay({
             (s as HTMLElement).style.display = t >= reel.lines[i].words[k].at ? "" : "none";
           });
         }
-        el.style.opacity = i < 0 ? "0" : "1";
+        // A line with nothing captioned yet (a hidden line, or before its first word) shows no empty plate.
+        const none = i < 0 || card || !reel.lines[i].words.some((w) => t >= w.at);
+        el.style.opacity = none ? "0" : "1";
       }
       const c = Math.min(1, Math.max(0, (t - reel.ctaAt) / FADE));
-      if (rule.current) rule.current.style.opacity = String(1 - c);
-      if (cta.current) cta.current.style.opacity = String(c);
+      if (rule.current) rule.current.style.opacity = String(card ? 0 : 1 - c);
+      if (cta.current) cta.current.style.opacity = String(card ? 0 : c);
       if (root.current) {
         drawPanels(root.current, reel.panels, t);
         // Behind a card or a list, the scene dims so it and the words over it read.
@@ -1150,9 +1252,29 @@ export default function ReelOverlay({
         reel.headline.forEach((h, k) => {
           const b = root.current!.querySelector<HTMLElement>(`[data-headline="${k}"]`);
           if (!b) return;
-          const on = t >= h.from && t < h.to;
+          const on = t >= h.from && t < h.to && !card;
           b.style.opacity = on ? "1" : "0";
-          if (on) b.style.transform = `translateX(-50%) scale(${1 + 0.06 * (1 - ease((t - h.from) / 0.18))})`;
+          if (!on) return;
+          if (!plates) {
+            b.style.transform = `translateX(-50%) scale(${1 + 0.06 * (1 - ease((t - h.from) / 0.18))})`;
+            return;
+          }
+          // Typed in hard steps, the cursor solid while it types and blinking after.
+          const n = Math.floor((t - h.from) * HEAD_CPS);
+          const total = b.querySelectorAll("[data-ch]").length;
+          const blink = n < total || Math.floor((t - h.from - total / HEAD_CPS) * 2.5) % 2 === 0;
+          const rows = [...b.querySelectorAll<HTMLElement>("p")];
+          rows.forEach((pl, q) => {
+            const chars = [...pl.querySelectorAll<HTMLElement>("[data-ch]")];
+            const first = Number(chars[0]?.dataset.ch ?? 0);
+            const last = first + chars.length;
+            pl.style.visibility = q === 0 || n > first ? "" : "hidden";
+            chars.forEach((ch) => (ch.style.display = Number(ch.dataset.ch) < n ? "" : "none"));
+            // The cursor sits on the line being typed, and stays on the last one once done.
+            const here = (n >= first && n < last) || (q === rows.length - 1 && n >= last);
+            const cursor = pl.querySelector<HTMLElement>("[data-cursor]");
+            if (cursor) cursor.style.visibility = here && blink ? "" : "hidden";
+          });
         });
       }
       raf = requestAnimationFrame(draw);
@@ -1162,6 +1284,7 @@ export default function ReelOverlay({
   }, [clock, reel]);
 
   const type = "absolute text-center font-pixel uppercase text-white whitespace-nowrap";
+  const plates = reel.look === "plates";
   const safe = { left: "50%", transform: "translateX(-50%)" } as const;
 
   return (
@@ -1170,18 +1293,24 @@ export default function ReelOverlay({
       {reel.panels.map((p, i) => (
         <Panel key={i} panel={p} index={i} photoOf={photoOf} buildingOf={buildingOf} big={reel.headline.length > 0} />
       ))}
-      {reel.headline.map((h, k) => (
-        <div key={k} data-headline={k} data-reel-box="header" className={type} style={{ ...safe, top: "16%", opacity: 0, transformOrigin: "50% 0", ...outline(1.4) }}>
-          <HeaderLines lines={h.lines} sizes={HEADLINE_SIZE} />
-        </div>
-      ))}
+      {reel.headline.map((h, k) =>
+        plates ? (
+          <div key={k} data-headline={k} data-reel-box="header" className={type} style={{ ...safe, top: "17%", opacity: 0 }}>
+            <PlateLines lines={h.lines} />
+          </div>
+        ) : (
+          <div key={k} data-headline={k} data-reel-box="header" className={type} style={{ ...safe, top: "16%", opacity: 0, transformOrigin: "50% 0", ...outline(1.4) }}>
+            <HeaderLines lines={h.lines} sizes={HEADLINE_SIZE} />
+          </div>
+        ),
+      )}
       {header && (
-        <div className={type} style={{ ...safe, top: "15%", ...outline(1.4) }}>
+        <div className={type} style={{ ...safe, top: "15%", ...(plates ? {} : outline(1.4)) }}>
           <div ref={rule} data-reel-box="header">
-            <HeaderLines lines={header.rule} />
+            <HeaderLines lines={header.rule} plates={plates} />
           </div>
           <div ref={cta} data-reel-box="header" className="absolute inset-0 flex flex-col items-center justify-center" style={{ opacity: 0 }}>
-            <HeaderLines lines={header.cta} />
+            <HeaderLines lines={header.cta} plates={plates} />
           </div>
         </div>
       )}
@@ -1211,7 +1340,12 @@ export default function ReelOverlay({
         data-reel-box="captions"
         className={`${type} flex flex-wrap justify-center`}
         // Under a headline the captions are the small spoken line; alone they carry the reel.
-        style={{ ...safe, top: "55%", width: "72%", whiteSpace: "normal", gap: reel.headline.length ? "0 2cqw" : "0 3cqw", fontSize: reel.headline.length ? "6cqw" : "7cqw", lineHeight: 1.3, opacity: 0, ...outline(1.8) }}
+        style={
+          plates
+            ? // His Captions piece: yellow, no plate, a dark outline and the kit's hard shadow.
+              { ...safe, top: "54%", width: "72%", whiteSpace: "normal", gap: "0 2cqw", fontSize: "6cqw", lineHeight: 1.3, opacity: 0, color: CAPTION_YELLOW, textShadow: CAPTION_SHADOW }
+            : { ...safe, top: "55%", width: "72%", whiteSpace: "normal", gap: reel.headline.length ? "0 2cqw" : "0 3cqw", fontSize: reel.headline.length ? "6cqw" : "7cqw", lineHeight: 1.3, opacity: 0, ...outline(1.8) }
+        }
       />
     </div>
   );

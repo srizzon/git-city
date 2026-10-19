@@ -197,7 +197,20 @@ const Pins = z.object({
   stagger: z.number().nonnegative().default(0.04),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone]);
+/**
+ * A full-frame card on the channel's dotted dark background (the opening hook, the closing call to
+ * action): its lines centred, a `*word*` in the green block, an optional image under them (under
+ * REELS_HOME). It cuts in and out; the captions and the headline step aside while it's up.
+ */
+const Card = z.object({
+  type: z.literal("card"),
+  from: Anchor,
+  to: Anchor.optional(),
+  lines: z.array(HeaderLine).min(1),
+  image: z.string().optional(),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({
@@ -279,6 +292,12 @@ export const ReelSpec = z.object({
   id: z.string().regex(/^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/),
   kind: z.enum(["main", "trial"]),
   preset: z.string().optional(),
+  /**
+   * How the words sit on the picture: "outline", white pixel type with a black outline over the scene;
+   * "plates", the channel's own look (samuelrizzondev's kit), each line on a dark plate with a hard
+   * shadow, the headline typed behind a green `>` like its Terminal piece.
+   */
+  look: z.enum(["outline", "plates"]).default("outline"),
   /** A trial written as a variation of another reel of the day: what it changes (set when the spec is read). */
   variation: Variation.optional(),
   world: World,
