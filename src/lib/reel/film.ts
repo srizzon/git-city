@@ -50,7 +50,7 @@ export type ReelPanel =
       from: number;
       to: number;
       lines: NonNullable<ReelSpec["header"]>["rule"];
-      draw: { kind: "map" } | { kind: "comment"; text: string; at: number } | { kind: "graph"; at: number } | { kind: "reel"; image: string; at: number } | null;
+      draw: { kind: "map" } | { kind: "comment"; text: string; at: number } | { kind: "graph"; at: number } | null;
       points: { at: number; value: string } | null;
       image: string | null;
     }

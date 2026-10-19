@@ -203,8 +203,8 @@ const Pins = z.object({
  * card, and under them one drawing in the channel's style:
  * - map: Brazil in dots, lighting up with the count;
  * - comment: the ink speech bubble, `text` typed into it from `at`;
- * - graph: a GitHub contribution graph, today's square lighting at `at`;
- * - reel: this reel in a window (`image`, a frame of it under REELS_HOME), its comment button tapped at `at`.
+ * - graph: a GitHub contribution graph, today's square lighting at `at`.
+ * What happens on Instagram (following, a reel playing) stays in Instagram's own UI (the phone, the follow card).
  * `points` pops a green block (`+5`) at its moment. An optional image goes under the lines (under
  * REELS_HOME). It cuts in and out; the captions and the headline step aside while it's up.
  */
@@ -218,7 +218,6 @@ const Card = z.object({
       z.object({ kind: z.literal("map") }),
       z.object({ kind: z.literal("comment"), text: z.string().min(1), at: Anchor }),
       z.object({ kind: z.literal("graph"), at: Anchor }),
-      z.object({ kind: z.literal("reel"), image: z.string().min(1), at: Anchor }),
     ])
     .optional(),
   points: z.object({ at: Anchor, value: z.string().min(1) }).optional(),

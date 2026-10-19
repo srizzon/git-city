@@ -288,21 +288,6 @@ function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
             })}
           </div>
         )}
-        {panel.draw?.kind === "reel" && (
-          // This reel in a window, the rail beside it (the comment button lights when it's tapped). The picture may run
-          // on into the bottom band; only words keep out of it.
-          <div className="flex items-center" style={{ gap: CARD_GAP.group }}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- a frame of the reel, from the reels folder */}
-            <img alt="" src={`/api/reels/file/${panel.draw.image}`} style={{ width: "52cqw", height: "92cqw", objectFit: "cover", border: `0.8cqw solid ${BRAND.ink}`, boxShadow: HARD }} />
-            <div className="flex flex-col items-center" style={{ gap: CARD_GAP.group }}>
-              <Heart style={{ width: "11cqw", height: "11cqw", color: BRAND.ink }} strokeWidth={2.5} />
-              <span data-tap style={{ display: "grid", placeItems: "center", width: "17cqw", height: "17cqw", boxShadow: HARD }}>
-                <MessageCircle style={{ width: "11cqw", height: "11cqw" }} strokeWidth={2.5} />
-              </span>
-              <Send style={{ width: "11cqw", height: "11cqw", color: BRAND.ink }} strokeWidth={2.5} />
-            </div>
-          </div>
-        )}
         {panel.points && (
           <div data-points style={{ fontSize: "14cqw", lineHeight: 1, background: BRAND.green, color: BRAND.onGreen, padding: "2cqw 4cqw", boxShadow: HARD, visibility: "hidden" }}>
             {panel.points.value}
@@ -344,16 +329,6 @@ function drawCard(el: HTMLElement, p: Extract<ReelPanel, { kind: "card" }>, t: n
     // Today's square lights in two hard steps: dim, then the brightest green.
     const sq = el.querySelector<HTMLElement>("[data-today]");
     if (sq) sq.style.background = t < draw.at ? CONTRIB[0] : t < draw.at + 0.1 ? CONTRIB[2] : CONTRIB[4];
-  }
-  if (draw?.kind === "reel") {
-    // The comment button: ink on the dark, then tapped (a frame bigger) and green from `at` on.
-    const tap = el.querySelector<HTMLElement>("[data-tap]");
-    if (tap) {
-      const on = t >= draw.at;
-      tap.style.background = on ? BRAND.green : BRAND.bg;
-      tap.style.color = on ? BRAND.onGreen : BRAND.ink;
-      tap.style.transform = on && t < draw.at + 0.08 ? "scale(1.2)" : "";
-    }
   }
   const pts = el.querySelector<HTMLElement>("[data-points]");
   if (pts && p.points) {
@@ -496,20 +471,15 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
       return;
     }
     if (p.kind === "follow") {
-      // Popped in, settling just under full size (in the channel's look it cuts in); its button tapped at `done`.
-      const hard = el.dataset.hard !== undefined;
+      // Popped in, settling just under full size; its button tapped at `done`.
       const k = clamp(local / 0.18);
-      if (!hard) el.style.transform = `translate(-50%, 0) scale(${0.88 * (0.6 + 0.4 * (1 - (1 - k) ** 3) + 0.06 * Math.sin(Math.PI * k))})`;
+      el.style.transform = `translate(-50%, 0) scale(${0.88 * (0.6 + 0.4 * (1 - (1 - k) ** 3) + 0.06 * Math.sin(Math.PI * k))})`;
       const done = t >= p.done;
       const btn = el.querySelector<HTMLElement>("[data-follow]");
       if (btn && btn.dataset.done !== String(done)) {
         btn.dataset.done = String(done);
         btn.textContent = done ? "Seguindo" : "Seguir";
-        btn.style.background = done ? (hard ? BRAND.bg : "#262626") : hard ? BRAND.green : "#0095f6";
-        if (hard) {
-          btn.style.color = done ? BRAND.ink : BRAND.onGreen;
-          btn.style.outline = done ? `0.4cqw solid ${BRAND.muted}` : "";
-        }
+        btn.style.background = done ? "#262626" : "#0095f6";
         const f = el.querySelector<HTMLElement>("[data-followers]");
         if (f) f.textContent = done ? (f.dataset.after ?? f.textContent) : (f.dataset.before ?? f.textContent);
       }
@@ -1124,36 +1094,6 @@ function Panel({
         <p style={{ fontSize: "4.8cqw", lineHeight: 1, textTransform: "none" }}>{panel.login}</p>
         <p style={{ fontSize: "4.4cqw", lineHeight: 1, marginTop: "2.6cqw", padding: "1.4cqw 0", background: "#2a1d12", color: "#e8dcc8" }}>{panel.when}</p>
         <p style={{ fontSize: "3cqw", lineHeight: 1, marginTop: "1.6cqw" }}>{panel.where}</p>
-      </div>
-    );
-  if (panel.kind === "follow" && plates)
-    return (
-      <div
-        data-panel={index}
-        data-hard
-        data-reel-box="follow"
-        className="font-pixel uppercase"
-        style={{ position: "absolute", left: "50%", top: big ? "27%" : "17%", width: "70cqw", boxSizing: "border-box", transform: "translateX(-50%)", opacity: 0, background: BRAND.bg, color: BRAND.ink, boxShadow: HARD, border: `0.4cqw solid ${BRAND.dot}`, padding: "4cqw" }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "3cqw" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- the account's photo */}
-          <img alt="" src={panel.avatar.includes("/") ? `/api/reels/file/${panel.avatar}` : `https://avatars.githubusercontent.com/${panel.avatar}?s=300`} style={{ width: "14cqw", height: "14cqw", border: `0.6cqw solid ${BRAND.green}`, flexShrink: 0 }} />
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: "3.4cqw", lineHeight: 1.1, textTransform: "none", whiteSpace: "nowrap" }}>
-              <span style={{ color: BRAND.green, marginRight: "0.4em" }}>&gt;</span>@{panel.handle}
-            </p>
-            <p style={{ fontSize: "3.4cqw", lineHeight: 1.2, marginTop: "2cqw", color: BRAND.muted }}>
-              <span data-followers data-before={panel.followers} data-after={(() => { const v = Number(panel.followers.replace(/\D/g, "")); return Number.isFinite(v) ? (v + 1).toLocaleString("pt-BR") : panel.followers; })()} style={{ color: BRAND.ink }}>
-                {panel.followers}
-              </span>{" "}
-              seguidores
-            </p>
-          </div>
-        </div>
-        <p style={{ fontSize: "3.2cqw", lineHeight: 1.35, marginTop: "3cqw", color: BRAND.muted }}>{panel.bio.join(" ")}</p>
-        <p data-follow style={{ marginTop: "3.4cqw", textAlign: "center", fontSize: "5cqw", padding: "1.6cqw 0", background: BRAND.green, color: BRAND.onGreen, boxShadow: HARD }}>
-          Seguir
-        </p>
       </div>
     );
   // The account's own Instagram profile, as the app draws it in dark mode.
