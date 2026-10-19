@@ -384,6 +384,58 @@ function SantinhosPanel({ index, panel }: { index: number; panel: Extract<ReelPa
   );
 }
 
+// ── Real code scrolling in a terminal ──
+/** Lines a second the code scrolls by, and a line's height (cqw). */
+const CODE_LPS = 22;
+const CODE_LINE = 4.4;
+
+function CodePanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "code" }> }) {
+  return (
+    <div data-panel={index} className="absolute inset-0 font-pixel" style={{ zIndex: 5, opacity: 0, background: "rgba(12,13,11,.62)" }}>
+      <div className="absolute flex flex-col" style={{ left: "6%", right: "6%", top: "15%", height: "50%", background: BRAND.bg, border: `0.5cqw solid ${BRAND.dot}`, boxShadow: HARD }}>
+        <div className="flex items-center" style={{ gap: "1.6cqw", padding: "2cqw 3cqw", borderBottom: `0.4cqw solid ${BRAND.dot}`, fontSize: "3.2cqw", color: BRAND.muted }}>
+          <span style={{ width: "2.4cqw", height: "2.4cqw", background: BRAND.dot }} />
+          <span style={{ width: "2.4cqw", height: "2.4cqw", background: BRAND.dot }} />
+          <span style={{ width: "2.4cqw", height: "2.4cqw", background: BRAND.dot }} />
+          <span style={{ marginLeft: "2cqw" }}>{panel.file}</span>
+        </div>
+        <div className="relative flex-1 overflow-hidden" style={{ padding: "0 3cqw" }}>
+          <div data-scroll style={{ fontSize: "2.9cqw", lineHeight: `${CODE_LINE}cqw`, color: BRAND.ink, whiteSpace: "pre" }}>
+            {[...panel.lines, ...panel.lines].map((l, i) => (
+              <div key={i} style={{ color: /^\s*(\/\/|\*|\/\*)/.test(l) ? BRAND.muted : undefined }}>
+                {l || " "}
+              </div>
+            ))}
+          </div>
+        </div>
+        {panel.commit && (
+          <p className="uppercase" style={{ padding: "2.4cqw 3cqw", borderTop: `0.4cqw solid ${BRAND.dot}`, fontSize: "4cqw", color: BRAND.ink, whiteSpace: "nowrap", overflow: "hidden" }}>
+            <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>
+            <span data-commit />
+            <span data-cursor style={{ display: "inline-block", width: "0.5em", height: "0.85em", marginLeft: "0.2em", verticalAlign: "-0.08em", background: BRAND.green }} />
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function drawCode(el: HTMLElement, p: Extract<ReelPanel, { kind: "code" }>, t: number) {
+  const local = t - p.from;
+  // Scrolls fast, then stops when the commit starts typing.
+  const stop = p.commitAt ?? p.to;
+  const run = Math.min(local, stop - p.from);
+  const scroll = el.querySelector<HTMLElement>("[data-scroll]");
+  if (scroll) scroll.style.transform = `translateY(-${(run * CODE_LPS * CODE_LINE) % (p.lines.length * CODE_LINE)}cqw)`;
+  const commit = el.querySelector<HTMLElement>("[data-commit]");
+  if (commit && p.commit) {
+    const typed = p.commit.slice(0, Math.max(0, Math.floor((t - stop) * LINE_CPS * 1.6)));
+    if (commit.textContent !== typed) commit.textContent = typed;
+    const cursor = el.querySelector<HTMLElement>("[data-cursor]");
+    if (cursor) cursor.style.visibility = typed.length < p.commit.length || Math.floor(t * 2.5) % 2 === 0 ? "" : "hidden";
+  }
+}
+
 // ── The vote count, raced ──
 /** Share of the overlay the votes take to land (the rest holds the final count), a row's height (cqw) and a swap's length (s). */
 const RACE_SHARE = 0.65;
@@ -695,19 +747,22 @@ const ARROW = [
   "....########",
   "............",
 ];
-/** Where Instagram's Reels screen puts the comment button (the right rail), as stage fractions. */
-const COMMENT_BUTTON = { x: 0.915, y: 0.745 };
+/** Where Instagram's Reels screen puts the comment button (the right rail) and the account's name (bottom left), as stage fractions. */
+const POINT_AT = { comment: { x: 0.915, y: 0.745 }, profile: { x: 0.2, y: 0.865 } } as const;
 
 /** The arrow at the viewer's own comment button and its label: the tip on the button, the label up and left of it. */
-function PointerPanel({ index, label }: { index: number; label: string }) {
+function PointerPanel({ index, label, target }: { index: number; label: string; target: "comment" | "profile" }) {
+  const at = POINT_AT[target];
+  // The comment button is down and right: the arrow comes from up-left. The name is down and left: mirrored.
+  const left = target === "profile";
   return (
     <div data-panel={index} className="absolute inset-0 font-pixel uppercase" style={{ opacity: 0 }}>
-      <div data-arrow className="absolute" style={{ left: `${COMMENT_BUTTON.x * 100}%`, top: `${COMMENT_BUTTON.y * 100}%`, width: "30cqw", transform: "translate(-100%, -91%)" }}>
+      <div data-arrow className="absolute" style={{ left: `${at.x * 100}%`, top: `${at.y * 100}%`, width: "30cqw", transform: left ? "translate(0, -91%) scaleX(-1)" : "translate(-100%, -91%)" }}>
         <svg viewBox="-0.5 -0.5 13 13" shapeRendering="crispEdges" style={{ display: "block", width: "100%" }} aria-hidden>
           {ARROW.flatMap((row, y) => [...row].map((c, x) => (c === "#" ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={BRAND.green} stroke={BRAND.bg} strokeWidth={0.25} paintOrder="stroke" /> : null)))}
         </svg>
       </div>
-      <p data-reel-box="pointer" className="absolute" style={{ left: "50%", top: "40%", transform: "translateX(-50%)", fontSize: "13cqw", lineHeight: 1, background: BRAND.green, color: BRAND.onGreen, padding: "2cqw 4cqw", boxShadow: HARD }}>
+      <p data-reel-box="pointer" className="absolute" style={{ left: "50%", top: "40%", transform: "translateX(-50%)", whiteSpace: "nowrap", fontSize: label.length > 8 ? "5.2cqw" : "13cqw", lineHeight: 1, background: BRAND.green, color: BRAND.onGreen, padding: "2cqw 4cqw", boxShadow: HARD }}>
         {label}
       </p>
     </div>
@@ -767,6 +822,12 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
   panels.forEach((p, i) => {
     const el = root.querySelector<HTMLElement>(`[data-panel="${i}"]`);
     if (!el) return;
+    if (p.kind === "code") {
+      const up = t >= p.from && t < p.to;
+      el.style.opacity = up ? "1" : "0";
+      if (up) drawCode(el, p, t);
+      return;
+    }
     if (p.kind === "race") {
       const up = t >= p.from && t < p.to;
       el.style.opacity = up ? "1" : "0";
@@ -796,7 +857,11 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
     if (p.kind === "pointer") {
       el.style.opacity = t >= p.from && t < p.to ? "1" : "0";
       const arrow = el.querySelector<HTMLElement>("[data-arrow]");
-      if (arrow) arrow.style.marginLeft = arrow.style.marginTop = Math.floor((t - p.from) / 0.18) % 2 ? "-2.4cqw" : "0";
+      if (arrow) {
+        const tap = Math.floor((t - p.from) / 0.18) % 2 ? "2.4cqw" : "0";
+        arrow.style.marginLeft = p.target === "profile" ? tap : tap === "0" ? "0" : `-${tap}`;
+        arrow.style.marginTop = tap === "0" ? "0" : `-${tap}`;
+      }
       return;
     }
     // A card cuts in and out, no fade.
@@ -1506,7 +1571,8 @@ function Panel({
   if (panel.kind === "santinhos") return <SantinhosPanel index={index} panel={panel} />;
   if (panel.kind === "carousel") return <CarouselPanel index={index} panel={panel} />;
   if (panel.kind === "race") return <RacePanel index={index} panel={panel} />;
-  if (panel.kind === "pointer") return <PointerPanel index={index} label={panel.label} />;
+  if (panel.kind === "pointer") return <PointerPanel index={index} label={panel.label} target={panel.target} />;
+  if (panel.kind === "code") return <CodePanel index={index} panel={panel} />;
   if (panel.kind === "counter" && plates)
     return (
       <div data-panel={index} data-reel-box="counter" className="absolute font-pixel uppercase" style={{ left: "50%", transform: "translateX(-50%)", top: "17%", opacity: 0 }}>
@@ -1822,7 +1888,7 @@ export default function ReelOverlay({
       const t = beatOf(clock);
       const i = reel.lines.findIndex((l) => t >= l.from && t < l.to);
       // While a card is up it is the frame: the captions, the header and the headline step aside.
-      const card = reel.panels.some((p) => (p.kind === "card" || p.kind === "urna" || p.kind === "santinhos" || p.kind === "carousel" || p.kind === "race") && t >= p.from && t < p.to);
+      const card = reel.panels.some((p) => (p.kind === "card" || p.kind === "urna" || p.kind === "santinhos" || p.kind === "carousel" || p.kind === "race" || p.kind === "code") && t >= p.from && t < p.to);
       const el = line.current;
       if (el) {
         if (i !== shown) {

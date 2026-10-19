@@ -240,6 +240,23 @@ const Pointer = z.object({
   from: Anchor,
   to: Anchor.optional(),
   label: z.string().min(1),
+  /** What it points at on the viewer's Reels screen: the comment button, or the account's name (the profile, the link in bio). */
+  target: z.enum(["comment", "profile"]).default("comment"),
+});
+
+/**
+ * Real source code scrolling fast in a terminal window (the feature being built), then `commit`
+ * typed on the bottom line behind a green `>`. `lines` are copied from the repo, never made up.
+ */
+const Code = z.object({
+  type: z.literal("code"),
+  from: Anchor,
+  to: Anchor.optional(),
+  file: z.string(),
+  lines: z.array(z.string()).min(5),
+  commit: z.string().optional(),
+  /** When the commit starts typing. */
+  commitAt: Anchor.optional(),
 });
 
 /**
@@ -308,7 +325,7 @@ const Race = z.object({
   label: z.string().optional(),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna, Santinhos, Carousel, Race]);
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna, Santinhos, Carousel, Race, Code]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({

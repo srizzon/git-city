@@ -59,6 +59,8 @@ function onScreen(spec: ReelSpec): string[] {
                   ? [o.value]
                 : o.type === "score"
                   ? [o.value]
+                : o.type === "code"
+                  ? []
                 : o.type === "race"
                   ? [...o.rows.map((r) => r.number), ...(o.label ? [o.label] : [])]
                 : o.type === "carousel"

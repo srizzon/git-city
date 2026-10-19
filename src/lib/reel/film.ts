@@ -46,7 +46,8 @@ export type ReelPanel =
       screens: { at: number; until: number; kind: string; parts: { at: number; text: string }[]; send: number | null; points: { at: number; value: string } | null; image: string | null; posted: string[] }[];
     }
   | { kind: "score"; from: number; to: number; icon: string; value: string }
-  | { kind: "pointer"; from: number; to: number; label: string }
+  | { kind: "pointer"; from: number; to: number; label: string; target: "comment" | "profile" }
+  | { kind: "code"; from: number; to: number; file: string; lines: string[]; commit: string | null; commitAt: number | null }
   | { kind: "race"; from: number; to: number; rows: { number: string; login: string; avatar: string }[]; events: string[]; label: string | null }
   | { kind: "carousel"; from: number; to: number; cards: { number: string; login: string; avatar: string }[]; stops: { at: number; number: string }[] }
   | { kind: "santinhos"; from: number; to: number; cards: { number: string; login: string; avatar: string }[]; hero: string | null; slamAt: number; label: string | null }
@@ -231,7 +232,8 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
           points: o.points ? { at: anchorAt(words, o.points.at, from), value: o.points.value } : null,
         },
       ];
-    if (o.type === "pointer") return [{ kind: "pointer", from, to, label: o.label }];
+    if (o.type === "pointer") return [{ kind: "pointer", from, to, label: o.label, target: o.target }];
+    if (o.type === "code") return [{ kind: "code", from, to, file: o.file, lines: o.lines, commit: o.commit ?? null, commitAt: o.commitAt === undefined ? null : anchorAt(words, o.commitAt, from) }];
     if (o.type === "score") return [{ kind: "score", from, to, icon: o.icon, value: o.value }];
     if (o.type === "card") {
       const d = o.draw;
