@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
+import { useBeforePhysicsStep } from "@react-three/rapier";
 import * as THREE from "three";
 import type { RallyRoute, RallyState } from "@/lib/league-city/drive/rally";
 import type { ClientMsg } from "@/lib/league-city/drive/net";
@@ -147,18 +148,16 @@ function gatePose(route: RallyRoute, k: number): { x: number; z: number; yaw: nu
   return { x: x * M_TO_UNIT, z: z * M_TO_UNIT, yaw: Math.atan2(x - px, z - pz), face: Math.atan2(px - x, pz - z) };
 }
 
-/** The start line: ahead of the front row along its heading (m → units), facing the grid. */
-function startPose(route: RallyRoute): { x: number; z: number; face: number } {
+/** The start line (units, facing the grid): from the map when the page knows it, else just ahead of the front row. */
+function startPose(route: RallyRoute, fromMap: { x: number; z: number; rot: number } | null): { x: number; z: number; face: number } {
   const [x, z, rot] = route.grid[0];
-  const r = (rot * Math.PI) / 180;
+  const [x2, z2] = route.grid[1] ?? route.grid[0];
+  const p = fromMap ?? { x: (x + x2) / 2, z: (z + z2) / 2, rot };
+  const r = (p.rot * Math.PI) / 180;
   const fx = Math.sin(r);
   const fz = -Math.cos(r);
-  const lead = 8;
-  // The front row sits ROUTE.lane either side of the line's middle: step back to it.
-  const [x2, z2] = route.grid[1] ?? route.grid[0];
-  const mx = (x + x2) / 2;
-  const mz = (z + z2) / 2;
-  return { x: (mx + fx * lead) * M_TO_UNIT, z: (mz + fz * lead) * M_TO_UNIT, face: Math.atan2(-fx, -fz) };
+  const lead = fromMap ? 0 : 4;
+  return { x: (p.x + fx * lead) * M_TO_UNIT, z: (p.z + fz * lead) * M_TO_UNIT, face: Math.atan2(-fx, -fz) };
 }
 
 async function saveFinish(slug: string, token: string, ghost: GhostRun | null): Promise<RallySaved> {
@@ -188,6 +187,7 @@ export default function RallyMode({
   telemetryRef,
   respawnAt,
   recordMs,
+  startLine,
 }: {
   slug: string;
   carRef: React.MutableRefObject<CarApi | null>;
@@ -201,6 +201,8 @@ export default function RallyMode({
   respawnAt: React.MutableRefObject<Spawn | null>;
   /** The route's record (ms) when known: a faster finish sends its ghost along. */
   recordMs?: React.MutableRefObject<number | null>;
+  /** Where the route's start line is (m), from the map. */
+  startLine?: (route: RallyRoute) => { x: number; z: number; rot: number } | null;
 }) {
   const [rally, setRally] = useState<RallyState | null>(null);
   const state = useRef<RallyState | null>(null);
@@ -320,6 +322,32 @@ export default function RallyMode({
 
   const ghostColor = useMemo(() => "#9bf6ff", []);
 
+  // Held on your slot until the lights go out: before every physics step, so
+  // revving on the grid never moves the car (snapping it back after a frame
+  // made it hop).
+  const placed = useRef<string | null>(null);
+  useBeforePhysicsStep(() => {
+    const s = state.current;
+    const c = carRef.current;
+    const me = selfId.current;
+    const mine = s && me ? s.racers[me] : undefined;
+    if (!s || !c || !mine || !s.route || s.phase !== "countdown") {
+      placed.current = null;
+      return;
+    }
+    const [x, z, rot] = s.route.grid[mine.slot] ?? s.route.grid[0];
+    if (placed.current !== s.id) {
+      placeCar(c.body, x, z, headingFromRot(rot));
+      placed.current = s.id;
+      return;
+    }
+    const p = c.body.translation();
+    c.body.setTranslation({ x, y: p.y, z }, true);
+    const v = c.body.linvel();
+    c.body.setLinvel({ x: 0, y: v.y, z: 0 }, true);
+    c.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  });
+
   useFrame(() => {
     const s = state.current;
     const c = carRef.current;
@@ -350,13 +378,7 @@ export default function RallyMode({
 
     if (!c) return;
     const serverNow = Date.now() + offset.current;
-    // Held on your slot until the lights go out.
-    if (s.phase === "countdown") {
-      const [x, z, rot] = route.grid[mine.slot] ?? route.grid[0];
-      const p = c.body.translation();
-      if (Math.hypot(p.x - x, p.z - z) > 0.4 || Math.hypot(c.body.linvel().x, c.body.linvel().z) > 0.5) placeCar(c.body, x, z, headingFromRot(rot));
-      return;
-    }
+    if (s.phase === "countdown") return;
     // Live: record your drive for the ghost, from lights out.
     if (!recorder.current.running && serverNow >= s.startsAt) recorder.current.begin(s.startsAt);
     const p = c.body.translation();
@@ -368,7 +390,7 @@ export default function RallyMode({
   const me = rally && selfIdNow(selfId) ? rally.racers[selfIdNow(selfId)!] : undefined;
   const racing = !!(rally && route && me && !me.gone && (rally.phase === "countdown" || (rally.phase === "live" && me.ms === null)));
   const next = me ? Math.min(me.next, (route?.gates.length ?? 1) - 1) : 0;
-  const start = route ? startPose(route) : null;
+  const start = useMemo(() => (route ? startPose(route, startLine?.(route) ?? null) : null), [route, startLine]);
   return (
     <>
       {racing && route && start && rally?.phase === "countdown" && (

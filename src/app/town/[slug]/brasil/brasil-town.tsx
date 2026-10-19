@@ -17,7 +17,7 @@ import type { RallyApi, RallyView } from "@/components/league/drive/RallyMode";
 import RacePanel, { RacePicker, raceActive } from "@/components/towns/brasil/RacePanel";
 import { GameMenu, type GameMode } from "@/components/games/kit";
 import { Crown as CrownIcon, Flag as FlagIcon, Map as DriftIcon } from "lucide-react";
-import { cityByKey, parseRouteKey } from "@/lib/towns/brasil-race";
+import { cityByKey, parseRouteKey, raceRoute, startLine } from "@/lib/towns/brasil-race";
 import type { RouteRecord } from "@/lib/towns/brasil-race-server";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
 import { useTouch } from "@/components/towns/useDesktop";
@@ -113,6 +113,14 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const rallyApi = useRef<RallyApi | null>(null);
   const [rallyView, setRallyView] = useState<RallyView | null>(null);
   const raceRecordRef = useRef<number | null>(null);
+  /** A race's start line, from the map's own route between its cities. */
+  const raceStartLine = useCallback(
+    (r: { from: string; to: string }) => {
+      const built = raceRoute(layout, r.from, r.to);
+      return built ? startLine(built) : null;
+    },
+    [layout],
+  );
   /** ?race=<route>: a beaten record's email opens that route's race. */
   const [pendingRace, setPendingRace] = useState<string | null>(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("race")));
   /** The Games menu (G): closed, its list of modes, or the race's step (with a route from a link). */
@@ -550,9 +558,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       crownApi,
       onCrown: setCrownView,
       onTaste: viewerLogin ? undefined : onTaste,
-      rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef },
+      rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef, startLine: raceStartLine },
     }),
-    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, games],
+    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, games, raceStartLine],
   );
   // The drive minimap: the map around the car, and your building.
   const driveMap = useMemo(
