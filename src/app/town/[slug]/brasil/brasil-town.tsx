@@ -1000,7 +1000,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       {drift.overlay}
       <div aria-hidden className={`pointer-events-none fixed inset-0 z-[60] bg-bg transition-opacity duration-300 ${curtain ? "opacity-100" : "opacity-0"}`} />
       {driving && driveReady && <AreaTitle telemetry={telemetry} cities={world.allCities} />}
-      {driving && driveReady && <PaintHud board={paint.board} me={paint.me} news={paint.news} self={paint.self} signedIn={!!viewerLogin} touch={touchUi} />}
+      {driving && driveReady && crownView?.crown.phase !== "countdown" && crownView?.crown.phase !== "live" && <PaintHud board={paint.board} me={paint.me} news={paint.news} self={paint.self} signedIn={!!viewerLogin} touch={touchUi} />}
       {driving && taste && <GuestGate reason="taste" town="Brasil" login={taste} onSignIn={tasteSignIn} onContinue={() => setTaste(null)} />}
       {driving && (
         <DriveHud
