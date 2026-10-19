@@ -80,6 +80,8 @@ export class SmashRoom {
   private lastSave = 0;
   private lastContrib = 0;
   readonly drivers = new Map<string, SmashDriver>();
+  /** Told whenever a driver's auth comes back with a developer (the State War paints with it). */
+  onAuthed: ((id: string, login: string, devId: number, conn: Connection) => void) | null = null;
 
   constructor(
     private room: Room,
@@ -174,6 +176,7 @@ export class SmashRoom {
       this.floorsToday.seed(d.login, Number(me.floorsToday) || 0, Date.now());
       const floors = this.floorsToday.today(d.login, Date.now());
       conn.send(JSON.stringify({ t: "smash_me", can: d.canSmash, home: me.home === true, login: d.login, floors } satisfies ServerMsg));
+      if (Number.isSafeInteger(me.devId) && me.devId > 0) this.onAuthed?.(id, d.login, me.devId, conn);
     } catch (err) {
       console.error("[smash] auth", err);
     } finally {
@@ -368,7 +371,7 @@ export class SmashRoom {
   }
 }
 
-async function sign(secret: string, data: string): Promise<string> {
+export async function sign(secret: string, data: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(data)));
