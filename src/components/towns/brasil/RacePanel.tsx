@@ -1,34 +1,35 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flag, X } from "lucide-react";
+import { Flag } from "lucide-react";
 import posthog from "posthog-js";
-import { RALLY, rallyStandings, type RallyRoute } from "@/lib/league-city/drive/rally";
-import type { DriverInfo } from "@/lib/league-city/drive/net";
+import { RALLY, rallyStandings, type RallyRoute, type RallyState } from "@/lib/league-city/drive/rally";
 import type { DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { UNIT_TO_M } from "@/lib/league-city/drive/tuning";
 import { formatLap } from "@/lib/league-city/race/laps";
 import type { BrasilLayout } from "@/lib/towns/brasil-map";
-import { LENGTHS, cityByKey, nearestCity, parseRouteKey, pickDestination, raceRoute, toRallyRoute, type RaceLength, type RaceRoute } from "@/lib/towns/brasil-race";
+import { cityByKey, nearestCity, parseRouteKey, pickDestination, raceRoute, toRallyRoute, type RaceLength, type RaceRoute } from "@/lib/towns/brasil-race";
 import type { RallyView } from "@/components/league/drive/RallyMode";
-import { HUD_BOX } from "@/components/league/hud/shared";
+import { Band } from "@/components/games/ui";
+import { GameClock, GameInvite, GameOnBand, GameResults, GameStandings, Keys, LIGHTS, T, type ResultRow, type StandingRow } from "@/components/games/kit";
 
-// The race HUD on the Brasil map. Idle: a Race button; it opens the picker
-// (how long, then the route it drew: its cities, length, gates and record).
-// Then the invite everyone else gets, the lights, your time, gate and place
-// while you race, and the results: places, your best and place on the
-// route, the record, and the points it paid your state. Rematch races the
-// same route again.
+// The Brasil map's city race in the car games' kit (components/games): the
+// race's step in the Games menu (how long, the route it drew, its record and
+// top three), then the invite card, the race clock with the lights in it and
+// the order on the left, and the centered results. Rematch races the same
+// route again.
 
 const PLACE = ["1st", "2nd", "3rd"];
 const place = (n: number) => PLACE[n - 1] ?? `${n}th`;
 const km = (m: number) => `${(m / 1000).toFixed(1)} km`;
-const secs = (ms: number) => Math.max(0, Math.ceil(ms / 1000));
 const LENGTH_LABEL: Record<RaceLength, [string, string]> = {
   short: ["Short", "~1 min"],
   medium: ["Medium", "~2 min"],
   long: ["Long", "~4 min"],
 };
+const ORDER: RaceLength[] = ["short", "medium", "long"];
+/** A split shows this long after each gate (ms). */
+const SPLIT_MS = 3000;
 
 /** A route's board, fetched when its key changes. */
 function useBoard(slug: string, key: string | null) {
@@ -47,375 +48,357 @@ function useBoard(slug: string, key: string | null) {
   return board && board.key === key ? board.rows : null;
 }
 
-export default function RacePanel({
+/** Ticks while something on screen counts. */
+function useNow(on: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!on) return;
+    let raf = 0;
+    const tick = () => {
+      setNow(Date.now());
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [on]);
+  return now;
+}
+
+/**
+ * The race's step in the Games menu: from the city the car is in, a route of
+ * the length picked (1 2 3), another one (← →), the record and top three,
+ * Enter to challenge, Esc back to the modes. A link (?race=) opens it on
+ * that route.
+ */
+export function RacePicker({
   slug,
   layout,
-  view,
   telemetry,
-  drivers,
-  touch = false,
-  pending,
-  onRecord,
+  others,
+  initial,
   onStart,
-  onJoin,
-  onPendingDone,
+  onBack,
 }: {
   slug: string;
   layout: BrasilLayout;
-  view: RallyView | null;
   telemetry: DriveTelemetry;
-  drivers: DriverInfo[];
-  touch?: boolean;
-  /** A route key from a link (?race=): its card opens right away. */
-  pending: string | null;
-  /** The race's route record (ms) once its board is in: the car sends its ghost when it beats it. */
-  onRecord: (ms: number | null) => void;
-  onStart: (route: RallyRoute) => void;
-  onJoin: () => void;
-  onPendingDone: () => void;
+  /** How many others drive here (they get the invite). */
+  others: number;
+  /** A route key from a link. */
+  initial: string | null;
+  onStart: (route: RallyRoute, how: string) => void;
+  onBack: () => void;
 }) {
-  const [now, setNow] = useState(() => Date.now());
+  const [length, setLength] = useState<RaceLength>("medium");
+  const [draft, setDraft] = useState<{ route: RaceRoute | null; problem: string | null; how: string }>(() => {
+    const k = initial ? parseRouteKey(initial) : null;
+    const r = k ? raceRoute(layout, k.from, k.to) : null;
+    if (r) return { route: r, problem: r.key !== initial ? "The road between these cities changed: this is a fresh board." : null, how: "link" };
+    return draw(layout, telemetry, "medium");
+  });
+  const board = useBoard(slug, draft.route?.key ?? null);
+  const record = board?.[0] ?? null;
+  const name = (key: string) => cityByKey(layout, key)?.name ?? "?";
+  const from = draft.route ? name(draft.route.from) : (nearestCity(layout, telemetry.radar.x * UNIT_TO_M, telemetry.radar.z * UNIT_TO_M)?.name ?? "here");
+
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 100);
-    return () => clearInterval(t);
-  }, []);
-  const [picking, setPicking] = useState(false);
-  const [draft, setDraft] = useState<{ route: RaceRoute; length: RaceLength | null } | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [closedRace, setClosedRace] = useState<string | null>(null);
-  // The last race's results stay up after the room moves on, until closed or the next race.
-  const [results, setResults] = useState<RallyView["rally"] | null>(() => (view?.rally.phase === "over" && view.you && view.rally.racers[view.you] ? view.rally : null));
-  const [seenView, setSeenView] = useState(view);
-  if (seenView !== view) {
-    setSeenView(view);
+    const on = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const n = ["Digit1", "Digit2", "Digit3"].indexOf(e.code);
+      if (n >= 0) {
+        setLength(ORDER[n]);
+        setDraft(draw(layout, telemetry, ORDER[n]));
+      } else if (e.code === "ArrowLeft" || e.code === "ArrowRight" || e.code === "KeyA" || e.code === "KeyD") setDraft(draw(layout, telemetry, length));
+      else if (e.code === "Enter") {
+        if (draft.route) onStart(toRallyRoute(draft.route), draft.how);
+      } else if (e.code === "Escape" || e.code === "Backspace") onBack();
+      else if (e.code === "KeyG") onBack();
+      else return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    window.addEventListener("keydown", on, true);
+    return () => window.removeEventListener("keydown", on, true);
+  }, [layout, telemetry, length, draft, onStart, onBack]);
+
+  return (
+    <>
+      <Band className="px-4 py-2 text-lime" style={{ fontSize: T.small }}>
+        Race · from {from}
+      </Band>
+      <div className="grid grid-cols-3 gap-1.5">
+        {ORDER.map((l, i) => (
+          <button
+            key={l}
+            type="button"
+            aria-pressed={l === length}
+            onClick={() => {
+              setLength(l);
+              setDraft(draw(layout, telemetry, l));
+            }}
+            className="outline-none active:translate-y-px"
+          >
+            <Band tone={l === length ? "cream" : "dark"} delay={40 + i * 30} className="min-h-11 w-full flex-col gap-1 px-3 py-2" style={{ fontSize: T.small }}>
+              <span>
+                {i + 1} · {LENGTH_LABEL[l][0]}
+              </span>
+              <span className="normal-case opacity-70">{LENGTH_LABEL[l][1]}</span>
+            </Band>
+          </button>
+        ))}
+      </div>
+      {draft.route ? (
+        <>
+          <Band tone="lime" delay={80} className="flex-col items-start gap-1 px-5 py-3 leading-none" style={{ fontSize: T.big }}>
+            <span>{name(draft.route.from)}</span>
+            <span className="opacity-60">→ {name(draft.route.to)}</span>
+          </Band>
+          <Band delay={140} className="flex-wrap gap-x-3 gap-y-1 px-4 py-2.5 normal-case text-muted" style={{ fontSize: T.small }}>
+            <span>
+              {km(draft.route.length)} · {draft.route.gates.length} gates
+            </span>
+            <span>
+              {board === null ? "…" : record ? (
+                <>
+                  record <span className="text-cream">{formatLap(record.ms)}</span> @{record.login}
+                </>
+              ) : (
+                "no record yet"
+              )}
+            </span>
+          </Band>
+          {board?.slice(0, 3).map((b, i) => (
+            <Band key={b.login} delay={200 + i * 40} className="justify-between gap-6 px-4 py-2 tabular-nums" style={{ fontSize: T.small }}>
+              <span className="min-w-0 truncate normal-case">
+                {i + 1}. @{b.login}
+              </span>
+              <span>{formatLap(b.ms)}</span>
+            </Band>
+          ))}
+        </>
+      ) : null}
+      {(draft.problem || !draft.route) && (
+        <Band delay={140} className="px-4 py-2.5 normal-case text-muted" style={{ fontSize: T.small }}>
+          {draft.problem ?? "No road from this city reaches another one. Drive to a bigger city."}
+        </Band>
+      )}
+      <Band delay={320} className="px-4 py-2 normal-case text-dim" style={{ fontSize: T.small }}>
+        {others > 0 ? `Everyone driving here gets ${RALLY.invite / 1000} s to join.` : "Nobody else is driving here: you race the record's ghost."}
+      </Band>
+      {draft.route && (
+        <button type="button" onClick={() => draft.route && onStart(toRallyRoute(draft.route), draft.how)} className="outline-none active:translate-y-px">
+          <Band tone="lime" delay={360} className="min-h-11 w-full justify-center gap-3 px-4 py-2.5" style={{ fontSize: T.body }}>
+            Challenge
+          </Band>
+        </button>
+      )}
+      <Keys
+        delay={400}
+        keys={[
+          ["Enter", "challenge"],
+          ["← →", "other city"],
+          ["1 2 3", "length"],
+          ["Esc", "back"],
+        ]}
+      />
+    </>
+  );
+}
+
+/** A route of this length from the city the car is in. */
+function draw(layout: BrasilLayout, telemetry: DriveTelemetry, length: RaceLength): { route: RaceRoute | null; problem: string | null; how: string } {
+  const r = telemetry.radar;
+  const from = nearestCity(layout, r.x * UNIT_TO_M, r.z * UNIT_TO_M);
+  const to = from && pickDestination(layout, from, length);
+  const route = from && to ? raceRoute(layout, from.key, to.key) : null;
+  if (!route || route.gates.length > RALLY.maxGates) return { route: null, problem: null, how: length };
+  return { route, problem: null, how: length };
+}
+
+/** The race once it's on: the invite, the clock and the order, the results. */
+export default function RacePanel({
+  layout,
+  view,
+  yourUf,
+  onJoin,
+  onRematch,
+}: {
+  layout: BrasilLayout;
+  view: RallyView | null;
+  /** Your state (its points go up). */
+  yourUf: string | null;
+  onJoin: () => void;
+  /** Race the same route again. */
+  onRematch: (route: RallyRoute) => void;
+}) {
+  const rally = view?.rally ?? null;
+  const you = view?.you ?? null;
+  const counting = !!rally && rally.phase !== "idle";
+  const now = useNow(counting);
+  const serverNow = now + (view?.offset ?? 0);
+
+  // The last race's results stay up after the room moves on, until Esc or the next race.
+  const [results, setResults] = useState<RallyState | null>(() => finishedRace(view));
+  const [closed, setClosed] = useState<string | null>(null);
+  const [seen, setSeen] = useState(view);
+  if (seen !== view) {
+    setSeen(view);
     const r = view?.rally;
-    if (r?.phase === "over" && view?.you && r.racers[view.you]) setResults(r);
+    const done = finishedRace(view);
+    if (done) setResults(done);
     else if (r && (r.phase === "invite" || r.phase === "countdown") && results) setResults(null);
   }
 
-  const rally = view?.rally ?? null;
-  const you = view?.you ?? null;
-  const serverNow = now + (view?.offset ?? 0);
-  const route = rally?.route ?? null;
-  const mine = rally && you ? rally.racers[you] : undefined;
-  const busy = !!rally && (rally.phase === "invite" || rally.phase === "countdown" || rally.phase === "live");
-  const boardKey = draft?.route.key ?? (rally && rally.phase !== "idle" ? (route?.key ?? null) : null);
-  const board = useBoard(slug, boardKey);
-  const record = board?.[0] ?? null;
-  useEffect(() => {
-    if (route && board && boardKey === route.key) onRecord(board[0]?.ms ?? null);
-  }, [route, board, boardKey, onRecord]);
-
   const cityName = (key: string) => cityByKey(layout, key)?.name ?? "?";
   const routeName = (r: { from: string; to: string }) => `${cityName(r.from)} → ${cityName(r.to)}`;
-  const nameOf = (id: string) => (id === you ? "You" : (rally?.racers[id]?.name.replace(/^guest-.*/, "guest") ?? "someone"));
 
-  /** Draw a route of this length from the city the car is in. */
-  const draw = (length: RaceLength) => {
-    const r = telemetry.radar;
-    const from = nearestCity(layout, r.x * UNIT_TO_M, r.z * UNIT_TO_M);
-    const to = from && pickDestination(layout, from, length);
-    const built = from && to ? raceRoute(layout, from.key, to.key) : null;
-    if (!built || built.gates.length > RALLY.maxGates) {
-      setProblem("No road out of this city reaches another one. Drive to a bigger city.");
-      return;
-    }
-    setProblem(null);
-    setDraft({ route: built, length });
-  };
-
-  // A link to a route (a beaten record's email): its card, ready to start.
-  const [seenPending, setSeenPending] = useState<string | null>(null);
-  if (pending && pending !== seenPending) {
-    setSeenPending(pending);
-    const k = parseRouteKey(pending);
-    const built = k ? raceRoute(layout, k.from, k.to) : null;
-    if (built) {
-      setPicking(true);
-      setDraft({ route: built, length: null });
-      setProblem(built.key !== pending ? "The road between these cities changed: this is a fresh board." : null);
-    }
-  }
-  useEffect(() => {
-    if (pending) onPendingDone();
-  }, [pending, onPendingDone]);
-
-  const start = (r: RaceRoute) => {
-    onStart(toRallyRoute(r));
-    posthog.capture("brasil_race_started", { km: Math.round(r.length / 100) / 10, gates: r.gates.length, length: draft?.length ?? "link", others: drivers.length });
-    setPicking(false);
-    setDraft(null);
-  };
-
-  // ── Countdown: the lights. ─────────────────────────────────
-  if (rally?.phase === "countdown" && route && mine) {
-    const lit = Math.max(0, Math.min(RALLY.lights, Math.floor((serverNow - rally.lightsAt) / RALLY.lightMs) + 1));
+  // ── Results (and waiting for the others past the line) ─────
+  if (results?.route && you && results.racers[you] && closed !== results.id) {
+    const r = results.phase === "live" && rally?.id === results.id ? rally : results;
+    const route = r.route!;
+    const order = rallyStandings(r);
+    const mine = r.racers[you];
+    const myPlace = r.order.indexOf(you) + 1;
+    const winner = r.order[0] ? r.racers[r.order[0]].ms : null;
+    const saved = view?.saved ?? null;
+    const news: [string, string][] = [];
+    const pts = saved?.state === "saved" ? saved.points : 0;
+    const uf = yourUf ? ` · ${yourUf}` : "";
+    if (saved?.state === "saved" && saved.newRecord) news.push(["New route record", pts > 0 ? `+${pts} pts${uf}` : ""]);
+    else if (pts > 0) news.push(["Points for your state", `+${pts}${uf}`]);
+    const live = r.phase === "live";
+    const status =
+      saved?.state === "saving"
+        ? "Saving your time…"
+        : saved?.state === "guest"
+          ? "Sign in to save your time and score points."
+          : saved?.state === "error"
+            ? saved.message
+            : live
+              ? `The others have ${Math.max(0, Math.ceil((r.endsAt - serverNow) / 1000))}s`
+              : saved?.state === "saved"
+                ? `Your best ${formatLap(saved.best)} · #${saved.rank} on this route`
+                : null;
+    const rows: ResultRow[] = order.map((id) => {
+      const x = r.racers[id];
+      const fin = r.order.indexOf(id);
+      return {
+        id,
+        name: x.name,
+        you: id === you,
+        place: fin >= 0 ? `P${fin + 1}` : "–",
+        value:
+          x.ms !== null && x.ms > 0
+            ? fin === 0 || winner === null
+              ? formatLap(x.ms)
+              : `+${((x.ms - winner) / 1000).toFixed(3)}`
+            : x.ms === -1
+              ? "untimed"
+              : x.gone
+                ? "left"
+                : live
+                  ? `${x.next}/${route.gates.length}`
+                  : "DNF",
+      };
+    });
+    const busy = rally?.phase === "invite" || rally?.phase === "countdown" || (rally?.phase === "live" && rally.id !== results.id);
     return (
-      <div className="absolute inset-x-0 top-[24%] flex flex-col items-center gap-3 text-cream">
-        <p className="text-[10px] text-muted">{routeName(route)} · {km(route.length)}</p>
-        <div className={`${HUD_BOX} flex gap-2 px-3 py-2`}>
-          {Array.from({ length: RALLY.lights }, (_, i) => (
-            <span key={i} className={`size-6 border-2 border-border ${serverNow >= rally.lightsAt && i < lit ? "bg-[#ff4f4f]" : "bg-bg"}`} />
-          ))}
-        </div>
-        <p className="text-[9px] normal-case text-muted">{record ? `Record ${formatLap(record.ms)} by @${record.login}` : "No record on this route yet"}</p>
-      </div>
+      <GameResults
+        title={routeName(route)}
+        place={myPlace > 0 ? `${place(myPlace)} of ${order.length}` : mine.ms === -1 ? "Finished, untimed" : "Didn't finish"}
+        time={mine.ms !== null && mine.ms > 0 ? formatLap(mine.ms) : null}
+        news={news}
+        status={status}
+        rows={rows}
+        again="Rematch"
+        onAgain={busy || live ? null : () => onRematch(route)}
+        onClose={() => setClosed(results.id)}
+      />
     );
   }
 
-  // ── Live. ──────────────────────────────────────────────────
-  if (rally?.phase === "live" && route) {
-    const t = Math.max(0, serverNow - rally.startsAt);
-    if (!mine || mine.gone) {
-      const n = Object.values(rally.racers).filter((r) => !r.gone).length;
-      return (
-        <div className={`${HUD_BOX} absolute left-1/2 top-16 max-sm:top-[7.5rem] -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[9px] text-muted`}>
-          <Flag size={11} className="mr-1.5 inline text-lime" aria-hidden />
-          Race on: {routeName(route)} · {n} racing
-        </div>
-      );
-    }
-    const order = rallyStandings(rally);
-    const pos = order.indexOf(you!) + 1;
-    const shown = order.slice(0, 3);
-    if (!shown.includes(you!)) shown[shown.length - 1] = you!;
-    const gates = route.gates.length;
-    const go = t < 1200;
-    if (mine.ms !== null) {
-      return (
-        <div className={`${HUD_BOX} absolute left-1/2 top-4 max-sm:top-[4.25rem] flex -translate-x-1/2 flex-col items-center gap-1 px-4 py-2 text-cream`}>
-          <p className="text-[10px] text-muted">{mine.ms > 0 ? `Finished ${place(rally.order.indexOf(you!) + 1)}` : "Finished, untimed"}</p>
-          {mine.ms > 0 && <p className="text-xl tabular-nums">{formatLap(mine.ms)}</p>}
-          <SavedLine saved={view?.saved ?? null} />
-          <p className="text-[8px] normal-case text-dim">Results in {secs(rally.endsAt - serverNow)}s</p>
-        </div>
-      );
-    }
-    return (
-      <>
-        {go && <p className="absolute inset-x-0 top-[26%] text-center text-6xl text-lime [text-shadow:0_3px_0_#000]">GO</p>}
-        <div className={`${HUD_BOX} absolute left-1/2 top-4 max-sm:top-[4.25rem] flex -translate-x-1/2 flex-col gap-1.5 px-3 py-2 text-[9px]`}>
-          <p className="flex items-center justify-between gap-5 text-cream">
-            <span className="flex items-center gap-1.5">
-              <Flag size={11} className="text-lime" aria-hidden />
-              {cityName(route.to)}
-            </span>
-            <span className="text-sm tabular-nums">{formatLap(t)}</span>
-          </p>
-          <p className="flex justify-between gap-5 text-muted">
-            <span>
-              Gate {Math.min(mine.next + 1, gates)}/{gates}
-            </span>
-            {order.length > 1 && (
-              <span className="text-cream">
-                {place(pos)} of {order.length}
-              </span>
-            )}
-          </p>
-          {order.length > 1 && (
-            <ul className="flex flex-col gap-0.5 border-t-2 border-border pt-1">
-              {shown.map((id) => (
-                <li key={id} className={`flex justify-between gap-5 ${id === you ? "text-cream" : "text-muted"}`}>
-                  <span>
-                    {order.indexOf(id) + 1}. {nameOf(id)}
-                  </span>
-                  <span className="tabular-nums">{rally.racers[id].ms !== null ? (rally.racers[id].ms! > 0 ? formatLap(rally.racers[id].ms!) : "in") : `${rally.racers[id].next}/${gates}`}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {mine.void && <p className="normal-case text-[#ff7e7e]">Too fast somewhere: this run isn&apos;t timed.</p>}
-        </div>
-        {!touch && <p className="absolute bottom-20 left-1/2 -translate-x-1/2 text-[8px] normal-case text-dim">R: back to the last gate</p>}
-      </>
-    );
-  }
+  if (!rally?.route) return null;
+  const route = rally.route;
+  const mine = you ? rally.racers[you] : undefined;
+  const n = Object.keys(rally.racers).length;
 
-  // ── Invite. ────────────────────────────────────────────────
-  if (rally?.phase === "invite" && route) {
-    const left = secs(rally.inviteEnds - serverNow);
-    const n = Object.keys(rally.racers).length;
-    if (mine) {
-      return (
-        <div className={`${HUD_BOX} absolute left-1/2 top-16 max-sm:top-[7.5rem] flex -translate-x-1/2 flex-col items-center gap-0.5 whitespace-nowrap px-4 py-2 text-[9px]`}>
-          <p className="text-cream">{routeName(route)}</p>
-          <p className="normal-case text-muted">
-            Waiting for racers · {left}s · {n} in
-          </p>
-        </div>
-      );
-    }
+  // ── Invite ─────────────────────────────────────────────────
+  if (rally.phase === "invite") {
     const by = rally.by ? rally.racers[rally.by]?.name : null;
     return (
-      <div className={`${HUD_BOX} absolute left-1/2 top-16 max-sm:top-[7.5rem] flex -translate-x-1/2 items-center gap-4 px-3 py-2 text-[9px] max-sm:w-[calc(100vw-2rem)]`}>
-        <span className="min-w-0 flex-1 sm:whitespace-nowrap">
-          <span className="block text-cream">{by && !by.startsWith("guest-") ? `@${by}` : "Someone"} started a race</span>
-          <span className="block normal-case text-muted">
-            {routeName(route)} · {km(route.length)}
-            {record ? ` · record ${formatLap(record.ms)}` : ""}
-          </span>
-        </span>
-        <button
-          type="button"
-          onClick={() => {
-            onJoin();
-            posthog.capture("brasil_race_joined", { racers: n + 1 });
-          }}
-          className="btn-press min-h-10 shrink-0 bg-lime px-3 text-[10px] text-bg"
-        >
-          Join · {left}
-        </button>
-      </div>
+      <GameInvite
+        kind="Race"
+        icon={Flag}
+        title={routeName(route)}
+        lines={[`${by && !by.startsWith("guest-") ? `@${by}` : "Someone"} · ${km(route.length)} · ${n} in`]}
+        endsAt={rally.inviteEnds}
+        serverNow={serverNow}
+        total={RALLY.invite}
+        action={mine ? `Waiting for racers · ${n} in` : "Join race"}
+        onJoin={
+          mine
+            ? null
+            : () => {
+                onJoin();
+                posthog.capture("brasil_race_joined", { racers: n + 1 });
+              }
+        }
+      />
     );
   }
 
-  // ── Results. ───────────────────────────────────────────────
-  if (results?.route && you && results.racers[you] && closedRace !== results.id && !busy) {
-    const rally = results;
-    const route = results.route;
-    const order = rallyStandings(rally);
-    const myPlace = rally.order.indexOf(you) + 1;
-    const saved = view?.saved ?? null;
+  // ── Somebody else's race ───────────────────────────────────
+  if (!mine || mine.gone) {
+    if (rally.phase !== "countdown" && rally.phase !== "live") return null;
     return (
-      <div className="pointer-events-none absolute inset-x-0 top-[14%] flex flex-col items-center gap-3 px-4 text-cream">
-        <p className="text-2xl tracking-[0.15em]">{myPlace === 1 && order.length > 1 ? "You win!" : myPlace > 0 ? place(myPlace) : "Didn't finish"}</p>
-        <div className={`${HUD_BOX} flex w-full max-w-[340px] flex-col gap-2 px-4 py-3 text-[10px]`}>
-          <p className="flex items-center justify-between text-muted">
-            <span>{routeName(route)}</span>
-            <button type="button" aria-label="Close" onClick={() => setClosedRace(rally.id)} className="-mr-2 flex size-9 items-center justify-center hover:text-cream">
-              <X size={14} aria-hidden />
-            </button>
-          </p>
-          <ul className="flex flex-col gap-1">
-            {order.slice(0, 8).map((id) => {
-              const r = rally.racers[id];
-              const fin = rally.order.indexOf(id);
-              return (
-                <li key={id} className={`flex justify-between gap-6 ${id === you ? "text-cream" : "text-muted"}`}>
-                  <span>
-                    {fin >= 0 ? `${fin + 1}.` : "–"} {nameOf(id)}
-                  </span>
-                  <span className="tabular-nums">{r.ms !== null && r.ms > 0 ? formatLap(r.ms) : r.ms === -1 ? "untimed" : "DNF"}</span>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="border-t-2 border-border pt-2">
-            <SavedLine saved={saved} />
-            {saved?.state === "saved" && (
-              <p className="mt-1 normal-case text-muted">
-                Your best {formatLap(saved.best)} · #{saved.rank} on this route
-                {saved.record && !saved.newRecord ? ` · record ${formatLap(saved.record.ms)} @${saved.record.login}` : ""}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              const r = raceRoute(layout, route.from, route.to);
-              if (r) start(r);
-            }}
-            className="btn-press pointer-events-auto mt-1 min-h-10 bg-lime text-[10px] text-bg"
-          >
-            Rematch
-          </button>
-        </div>
-      </div>
+      <GameOnBand icon={Flag}>
+        Race on: {routeName(route)} · {Object.values(rally.racers).filter((r) => !r.gone).length} racing
+      </GameOnBand>
     );
   }
 
-  if (busy) return null;
-
-  // ── Idle: the button, and the picker it opens. ─────────────
-  if (!picking) {
-    return (
-      <button
-        type="button"
-        onClick={() => setPicking(true)}
-        className={`${HUD_BOX} btn-press absolute left-1/2 top-16 max-sm:top-[7.5rem] flex -translate-x-1/2 items-center gap-2 px-3 py-2 text-[10px] text-lime hover:text-cream`}
-      >
-        <Flag size={12} aria-hidden />
-        Race
-      </button>
-    );
-  }
-  const close = () => {
-    setPicking(false);
-    setDraft(null);
-    setProblem(null);
-  };
+  // ── The grid and the race ──────────────────────────────────
+  if (rally.phase !== "countdown" && rally.phase !== "live") return null;
+  const order = rallyStandings(rally);
+  const gates = route.gates.length;
+  const grid = rally.phase === "countdown";
+  const rows: StandingRow[] = (grid ? Object.entries(rally.racers).sort((a, b) => a[1].slot - b[1].slot).map(([id]) => id) : order).map((id) => {
+    const x = rally.racers[id];
+    return { id, name: x.name, you: id === you, value: grid ? "" : x.ms !== null ? "in" : `${x.next}/${gates}` };
+  });
+  const lit = grid ? Math.max(0, Math.min(LIGHTS, Math.floor((serverNow - rally.lightsAt) / RALLY.lightMs) + 1)) : null;
+  const t = Math.max(0, serverNow - rally.startsAt);
+  // The split at the last gate you went through, against the record's, for a moment.
+  const k = mine.next - 1;
+  const mineAt = k >= 0 ? view?.gateTimes[k] : undefined;
+  const theirs = k >= 0 ? view?.recordSplits?.[k] : undefined;
+  const split = mineAt !== undefined && theirs !== undefined && t - mineAt < SPLIT_MS ? mineAt - theirs : null;
+  const pos = order.indexOf(you!) + 1;
   return (
-    <div className={`${HUD_BOX} absolute left-1/2 top-16 max-sm:top-[7.5rem] flex w-[300px] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col gap-2 px-3 py-3 text-[10px]`}>
-      <p className="flex items-center justify-between text-cream">
-        <span className="flex items-center gap-1.5">
-          <Flag size={12} className="text-lime" aria-hidden />
-          {draft ? routeName(draft.route) : "Race to another city"}
-        </span>
-        <button type="button" aria-label="Close" onClick={close} className="-mr-2 flex size-9 items-center justify-center text-muted hover:text-cream">
-          <X size={14} aria-hidden />
-        </button>
-      </p>
-      {draft ? (
-        <>
-          <p className="normal-case text-muted">
-            {km(draft.route.length)} · {draft.route.gates.length} gates · {board === null ? "…" : record ? `record ${formatLap(record.ms)} by @${record.login}` : "no record yet"}
-          </p>
-          {board && board.length > 1 && (
-            <ol className="flex flex-col gap-0.5 normal-case text-dim">
-              {board.slice(0, 3).map((b, i) => (
-                <li key={b.login} className="flex justify-between">
-                  <span>
-                    {i + 1}. @{b.login}
-                  </span>
-                  <span className="tabular-nums">{formatLap(b.ms)}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-          {problem && <p className="normal-case text-dim">{problem}</p>}
-          <p className="normal-case text-dim">{drivers.length > 0 ? `Everyone driving here gets ${RALLY.invite / 1000} s to join.` : "Nobody else is driving here: you race the record's ghost."}</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => (draft.length ? draw(draft.length) : setDraft(null))} className="btn-press min-h-10 border-2 border-border text-muted hover:text-cream">
-              Other city
-            </button>
-            <button type="button" onClick={() => start(draft.route)} className="btn-press min-h-10 bg-lime text-bg">
-              Start race
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(LENGTHS) as RaceLength[]).map((l) => (
-              <button key={l} type="button" onClick={() => draw(l)} className="btn-press flex min-h-12 flex-col items-center justify-center gap-0.5 border-2 border-border text-cream hover:border-lime">
-                {LENGTH_LABEL[l][0]}
-                <span className="text-[8px] normal-case text-muted">{LENGTH_LABEL[l][1]}</span>
-              </button>
-            ))}
-          </div>
-          {problem && <p className="normal-case text-dim">{problem}</p>}
-          <p className="normal-case text-dim">From the city you&apos;re in to another, through gates. Finishing scores points for your state.</p>
-        </>
-      )}
-    </div>
+    <>
+      <GameClock
+        label={grid ? `Grid · P${mine.slot + 1} of ${n}` : `Gate ${Math.min(mine.next + 1, gates)}/${gates}${n > 1 ? ` · P${pos}/${n}` : ""}`}
+        lit={lit}
+        ms={t}
+        split={grid ? null : split}
+        go={!grid && t < 1200}
+        note={mine.void ? <Band className="px-3 py-1 normal-case text-[#ff7e7e]" style={{ fontSize: T.small }}>Too fast somewhere: this run isn&apos;t timed.</Band> : null}
+      />
+      {n > 1 && <GameStandings rows={rows} />}
+    </>
   );
 }
 
-function SavedLine({ saved }: { saved: RallyView["saved"] }) {
-  if (!saved) return null;
-  if (saved.state === "saving") return <p className="normal-case text-muted">Saving your time…</p>;
-  if (saved.state === "guest") return <p className="normal-case text-muted">Sign in to save your time and score points.</p>;
-  if (saved.state === "error") return <p className="normal-case text-[#ff7e7e]">{saved.message}</p>;
-  return (
-    <p className="text-lime">
-      {saved.newRecord ? "New route record! " : ""}
-      {saved.points > 0 ? `+${saved.points} pts for your state` : saved.newRecord ? "" : "Saved"}
-    </p>
-  );
+/** The race you're past the line in (or that just ended), for the results. */
+function finishedRace(view: RallyView | null): RallyState | null {
+  const r = view?.rally;
+  const mine = r && view?.you ? r.racers[view.you] : undefined;
+  return r && mine && (r.phase === "over" || (r.phase === "live" && mine.ms !== null)) ? r : null;
 }
 
-/** For the page: whether the race HUD has the top of the screen (Crown Rush steps aside). */
+/** Whether the race has the screen (the drive HUD's own top pieces step aside). */
 export function raceActive(view: RallyView | null): boolean {
-  const p = view?.rally.phase;
-  return p === "invite" || p === "countdown" || p === "live";
+  const r = view?.rally;
+  if (!r || !view?.you || !r.racers[view.you]) return false;
+  return r.phase === "countdown" || r.phase === "live";
 }
