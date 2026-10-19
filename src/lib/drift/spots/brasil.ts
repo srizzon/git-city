@@ -1,11 +1,12 @@
-// Brasil Drift: the Brasil town's own track, out on open land between São
-// Paulo and Mato Grosso do Sul (lib/towns/brasil-drift.ts). Interlagos cut
+// Brasil Drift: the Brasil town's own track, on its own island in the
+// south-east's sea, off the coast between São Paulo and Rio
+// (lib/towns/brasil-drift.ts). Interlagos cut
 // down to a drift course and run the same way round: the start straight into
 // the S do Senna, the Curva do Sol onto a short Reta Oposta, the Descida do
 // Lago, the Ferradura and the Laranjinha, the Pinheirinho hairpin, the Bico
 // de Pato, the Mergulho, then the Junção and the long Subida dos Boxes back
 // to the line. Dry asphalt. Laid facing west so the line sits on the site's
-// north side, by the highway. Not on the /drift list: you drive to it.
+// north side, by the shore. Not on the /drift list: you drive to it.
 
 import { SPRINT } from "../../league-city/race/track";
 import { DRIFT_CENTER_M, DRIFT_HEADING } from "../../towns/brasil-drift";
@@ -49,7 +50,7 @@ export const BRASIL_DRIFT: LiveSpot = {
   id: "brasil",
   status: "live",
   name: "Brasil Drift",
-  tagline: "Interlagos cut down to a drift course, on open land between São Paulo and Mato Grosso do Sul.",
+  tagline: "Interlagos cut down to a drift course, on an island off the coast between São Paulo and Rio.",
   track: {
     ...SPRINT,
     id: "brasil",

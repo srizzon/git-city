@@ -33,6 +33,7 @@ import { usePerfMode } from "@/lib/perfMode";
 import { stateOf, type CityLayout, type UF } from "@/lib/towns/brasil-map";
 import type { BoardRowLite } from "@/components/drift/DriftTitle";
 import { DriftSite, DriftTag } from "./BrasilDrift";
+import { DRIFT_SITE } from "@/lib/towns/brasil-drift";
 
 // The Brasil town: the country on its real outline under the towns' night
 // sky, a pale coast, the states' borders dashed in lime, every city someone
@@ -42,7 +43,7 @@ import { DriftSite, DriftTag } from "./BrasilDrift";
 // capitals, closer in more cities, up close every one on screen; where two
 // would overlap the one with more devs wins. A tag flies the camera to its city. The camera is a map's: drag to pan,
 // right-drag to turn, scroll to zoom. Drive mode is the towns' (DriveWorld).
-// Between São Paulo and Rio lies the drift track (BrasilDrift): crossing its
+// Off the coast between São Paulo and Rio, on its own island, lies the drift track (BrasilDrift): crossing its
 // START line swaps the town's car for a drift run (DriftWorld) right there.
 
 const DriveWorld = dynamic(() => import("@/components/league/drive/DriveWorld"), { ssr: false, loading: () => null });
@@ -163,13 +164,31 @@ function Ground({ island, geo }: { island: CityLayout; geo: Geo }) {
     return ring;
   }, [ir]);
   const isle = useMemo(() => new THREE.ShapeGeometry(shapeOf(shore)), [shore]);
+  // The drift track's island: a rounded shore just round its site.
+  const track = useMemo(() => {
+    const [cx, cz] = lotToWorld((DRIFT_SITE.x0 + DRIFT_SITE.x1) / 2, (DRIFT_SITE.z0 + DRIFT_SITE.z1) / 2);
+    const rx = ((DRIFT_SITE.x1 - DRIFT_SITE.x0) / 2 + 1.5) * LOT;
+    const rz = ((DRIFT_SITE.z1 - DRIFT_SITE.z0) / 2 + 1.5) * LOT;
+    const ring: [number, number][] = [];
+    for (let i = 0; i < 64; i++) {
+      const a = (i / 64) * Math.PI * 2;
+      // A squircle: square enough to hold the track, round enough to read as an island.
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      const k = 1 + 0.04 * Math.sin(4 * a + 0.7);
+      ring.push([cx + Math.sign(c) * Math.abs(c) ** 0.5 * rx * k, cz + Math.sign(sn) * Math.abs(sn) ** 0.5 * rz * k]);
+    }
+    return { land: new THREE.ShapeGeometry(shapeOf(ring)), sand: ribbon(ring, 150, true) };
+  }, []);
   const sand = useMemo(() => ribbon(shore, 150, true), [shore]);
   useEffect(
     () => () => {
       isle.dispose();
       sand.dispose();
+      track.land.dispose();
+      track.sand.dispose();
     },
-    [isle, sand],
+    [isle, sand, track],
   );
   const { bounds } = geo;
   const cx = (bounds.minX + bounds.maxX) / 2;
@@ -197,6 +216,12 @@ function Ground({ island, geo }: { island: CityLayout; geo: Geo }) {
         <mesh key={`river-${i}`} geometry={g} position={[0, -0.4, 0]} material={water} />
       ))}
       <primitive object={borders} position={[0, 0.4, 0]} />
+      <mesh geometry={track.sand} position={[0, -4, 0]}>
+        <meshStandardMaterial color={COAST} roughness={1} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh geometry={track.land} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1, 0]}>
+        <meshStandardMaterial color={LAND} emissive={LAND} emissiveIntensity={0.2} roughness={0.95} side={THREE.DoubleSide} />
+      </mesh>
       <group position={[ix, 0, iz]}>
         <mesh geometry={sand} position={[0, -4, 0]}>
           <meshStandardMaterial color={COAST} roughness={1} side={THREE.DoubleSide} />
