@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Car, ChevronLeft, Landmark, Map as MapIcon, PaintRoller, Trophy } from "lucide-react";
+import { Building2, Car, ChevronLeft, Landmark, Map as MapIcon, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import posthog from "posthog-js";
@@ -970,17 +970,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               Vote
             </button>
           )}
-          {yours ? (
-            <button type="button" disabled={launching} onClick={startPaint} className={`${bar} disabled:opacity-40`}>
-              <PaintRoller size={16} className="sm:hidden" aria-hidden />
-              Paint
-            </button>
-          ) : (
-            <button type="button" disabled={launching || world.devs === 0} onClick={() => startDrive()} className={`${bar} disabled:opacity-40`}>
-              <Car size={16} className="sm:hidden" aria-hidden />
-              Drive
-            </button>
-          )}
+          <button type="button" disabled={launching || world.devs === 0} onClick={() => startDrive()} className={`${bar} disabled:opacity-40`}>
+            <Car size={16} className="sm:hidden" aria-hidden />
+            Drive
+          </button>
           <button
             type="button"
             onClick={() => {
