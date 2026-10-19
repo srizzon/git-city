@@ -75,6 +75,8 @@ export interface BrasilTownProps {
   startPick?: boolean;
   /** The week's points the offices come from (last closed week, or this week so far before the first one closes), and this week's. */
   week: BrasilWeek;
+  /** Each state's founder (login by UF): the first dev ever in it, kept when they move. */
+  stateFounders?: Partial<Record<UF, string>>;
   /** The presidential race and who's in office (null while the presidency is off). */
   election: ElectionView | null;
   /** The presidential count for the corner widget (null while the presidency is off). */
@@ -95,7 +97,7 @@ const HUD_BG = "bg-bg/90";
 const HUD_EDGE = "border-border";
 const HUD_SOFT = "text-muted";
 
-export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, grewAt = null, week: officeWeek, election, count = null, startVote = null }: BrasilTownProps) {
+export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, grewAt = null, week: officeWeek, election, count = null, startVote = null, stateFounders = {} }: BrasilTownProps) {
   const router = useRouter();
   const camera = useRef<CameraApi | null>(null);
   const cameraStore = useMemo(() => createCameraStore(), []);
@@ -167,7 +169,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const { objects, byDevId } = brasilWorld(layout, (dev) => byLogin.get(dev.login.toLowerCase()) ?? plainBuilding(dev.login), 1);
     const buildings = leagueBuildings(objects, scaleTownHeights(byDevId));
     const placed = new Map(buildings.map((b) => [b.loginLower, b]));
-    const states = stateStats(layout, placed, now);
+    const states = stateStats(layout, placed, now, stateFounders);
+    // The state each founder founded (login lowercase), for their card's seal.
+    const foundedState = new Map(Object.entries(stateFounders).map(([uf, login]) => [login!.toLowerCase(), uf as UF]));
     const devs = [...layout.cities, layout.island].reduce((n, c) => n + c.devs.length, 0);
     const founded = layout.cities.filter((c) => c.devs.length > 0).length;
     // Each resident's state and whether they founded their city, for their card.
@@ -192,8 +196,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const plateOffice = new Map([...offices.byLogin].map(([l, os]) => [l, SHORT[os[0].kind]]));
     // Each state's place in the week's race: the States table's order.
     const racePlace = new Map([...states].sort((a, b) => (statePoints[b.uf] ?? 0) - (statePoints[a.uf] ?? 0) || b.devs - a.devs || a.name.localeCompare(b.name)).map((st, i) => [st.uf, i + 1]));
-    return { objects, buildings, placed, states, devs, founded, ufOf, allCities, cityByKey, cityBySlug, cityOfLogin, week, arrivals, fresh, offices, plateOffice, statePoints, racePlace };
-  }, [layout, cityDevs, cityNorms, now, officeWeek, election]);
+    return { objects, buildings, placed, states, devs, founded, ufOf, allCities, cityByKey, cityBySlug, cityOfLogin, week, arrivals, fresh, offices, plateOffice, statePoints, racePlace, foundedState };
+  }, [layout, cityDevs, cityNorms, now, officeWeek, election, stateFounders]);
 
   const smash = useMemo(() => smashStoreFor(world.buildings), [world.buildings]);
 
@@ -1094,6 +1098,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               login={focused.loginLower}
               city={world.cityOfLogin.get(focused.loginLower) ?? null}
               offices={world.offices.byLogin.get(focused.loginLower) ?? []}
+              foundedState={world.foundedState.get(focused.loginLower) ?? null}
               onCity={openCity}
               onState={openState}
               onMove={viewerLogin?.toLowerCase() === focused.loginLower ? () => openPicker(null) : undefined}
@@ -1300,12 +1305,13 @@ function InviteButton({ login, city, founder, townPath, onPickCity }: { login: s
 }
 
 /** Where a resident lives, said once: their city (a click flies there), its state, Move on yours, and what they are there as seals. */
-function PlaceRow({ login, city, offices, onCity, onState, onMove }: { login: string; city: CityLayout | null; offices: Office[]; onCity: (c: CityLayout) => void; onState: (uf: UF) => void; onMove?: () => void }) {
+function PlaceRow({ login, city, offices, foundedState = null, onCity, onState, onMove }: { login: string; city: CityLayout | null; offices: Office[]; foundedState?: UF | null; onCity: (c: CityLayout) => void; onState: (uf: UF) => void; onMove?: () => void }) {
   const island = !city || city.ibge === null;
   const at = city ? city.devs.findIndex((d) => d.dev.login.toLowerCase() === login) : -1;
   const founder = !island && at >= 0 && city!.devs[at].founder;
   // The city is on the line above: a mayor's seal needs no name.
-  const seals = [...(founder ? ["Founder"] : []), ...offices.map((o) => (o.kind === "mayor" ? "Mayor" : officeLabel(o)))];
+  // The state they founded (forever, wherever they live now), then the city they founded.
+  const seals = [...(foundedState ? [`Founder ${foundedState}`] : []), ...(founder ? ["Founder"] : []), ...offices.map((o) => (o.kind === "mayor" ? "Mayor" : officeLabel(o)))];
   return (
     <div className="mx-4 mb-3 border-2 border-border px-3 py-2.5">
       <div className="flex items-baseline justify-between gap-2">

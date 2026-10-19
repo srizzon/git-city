@@ -18,7 +18,7 @@ import {
 import { getLapBoard } from "@/lib/league-city/race/board";
 import { TRACK_ID } from "@/lib/league-city/race/track";
 import { getCityDevsByIds, getCityNorms, getLeagueCityDevs, getLeaguePageData, getTownRanking, townPlace } from "@/lib/leagues/queries";
-import { getBrasilLayout, getBrasilWeek } from "@/lib/towns/brasil-server";
+import { getBrasilLayout, getBrasilStateFounders, getBrasilWeek } from "@/lib/towns/brasil-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getCount, getElection } from "@/lib/towns/brasil-election-server";
 import { PRESIDENCY_ON } from "@/lib/towns/brasil-election";
@@ -92,12 +92,13 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   // The Brasil town is drawn as the map of Brazil: its own page.
   if (league.map === "brasil") {
     const { layout, residents, grewAt } = await getBrasilLayout(league.id);
-    const [cityDevs, cityNorms, week, election, count] = await Promise.all([
+    const [cityDevs, cityNorms, week, election, count, stateFounders] = await Promise.all([
       getCityDevsByIds(residents.map((r) => r.dev.id)),
       getCityNorms(),
       getBrasilWeek(league.id),
       PRESIDENCY_ON ? getElection(league.id, viewer) : Promise.resolve(null),
       PRESIDENCY_ON ? getCount(league.id) : Promise.resolve(null),
+      getBrasilStateFounders(league.id),
     ]);
     const home = viewer ? residents.find((r) => r.dev.id === viewer.id) : undefined;
     // Whether they named their city or only a state (then the map asks them once).
@@ -122,6 +123,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
         week={week}
         election={election}
         count={count}
+        stateFounders={stateFounders}
       />
     );
   }

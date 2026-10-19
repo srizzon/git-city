@@ -1,6 +1,6 @@
 // What the Brasil town's panels show about a state, from the layout and the
 // residents' buildings: every dev who lives in it (all its cities), its
-// cities biggest first, its capital's founder, its place, its contributions
+// cities biggest first, its founder (the first dev ever in it, kept when they move), its place, its contributions
 // and who came this week.
 
 import type { CityBuilding } from "@/lib/github";
@@ -25,7 +25,7 @@ export interface StateStats {
   top: string[];
 }
 
-export function stateStats(layout: BrasilLayout, byLogin: ReadonlyMap<string, CityBuilding>, now: number): StateStats[] {
+export function stateStats(layout: BrasilLayout, byLogin: ReadonlyMap<string, CityBuilding>, now: number, founders: Partial<Record<UF, string>> = {}): StateStats[] {
   const all = [...layout.cities, layout.island];
   const rows = STATES.map((s) => {
     const devs = all.flatMap((c) => c.devs.filter((d) => d.dev.uf === s.uf));
@@ -38,7 +38,7 @@ export function stateStats(layout: BrasilLayout, byLogin: ReadonlyMap<string, Ci
       capital,
       cities,
       devs: devs.length,
-      founder: capital.devs.find((d) => d.founder)?.dev.login ?? null,
+      founder: founders[s.uf] ?? capital.devs.find((d) => d.founder)?.dev.login ?? null,
       contributions: devs.reduce((n, d) => n + contrib(d.dev.login), 0),
       newThisWeek: devs.filter((d) => now - d.at < WEEK_MS).length,
       place: 0,
