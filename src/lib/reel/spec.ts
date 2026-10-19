@@ -260,6 +260,10 @@ const Urna = z.object({
   confirmAt: Anchor.optional(),
   /** A terminal plate over the machine. */
   label: z.string().optional(),
+  /** It rises into the frame from below in hard steps, instead of cutting in. */
+  enter: z.boolean().default(false),
+  /** A green block (`+10`) that drops onto the machine at its moment. */
+  points: z.object({ at: Anchor, value: z.string().min(1) }).optional(),
 });
 
 /**

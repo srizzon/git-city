@@ -66,7 +66,7 @@ function onScreen(spec: ReelSpec): string[] {
                 : o.type === "santinhos"
                   ? [...o.cards.map((c) => c.number), ...(o.label ? [o.label] : [])]
                 : o.type === "urna"
-                  ? [o.number, ...(o.label ? [o.label] : [])]
+                  ? [o.number, ...(o.label ? [o.label] : []), ...(o.points ? [o.points.value] : [])]
                 : o.type === "pointer"
                   ? [o.label]
                 : o.type === "card"

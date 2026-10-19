@@ -50,7 +50,7 @@ export type ReelPanel =
   | { kind: "race"; from: number; to: number; rows: { number: string; login: string; avatar: string }[]; events: string[]; label: string | null }
   | { kind: "carousel"; from: number; to: number; cards: { number: string; login: string; avatar: string }[]; stops: { at: number; number: string }[] }
   | { kind: "santinhos"; from: number; to: number; cards: { number: string; login: string; avatar: string }[]; hero: string | null; slamAt: number; label: string | null }
-  | { kind: "urna"; from: number; to: number; number: string; login: string; avatar: string; uf: string | null; typeAt: number; confirmAt: number | null; label: string | null }
+  | { kind: "urna"; from: number; to: number; number: string; login: string; avatar: string; uf: string | null; typeAt: number; confirmAt: number | null; label: string | null; enter: boolean; points: { at: number; value: string } | null }
   | {
       kind: "card";
       from: number;
@@ -227,6 +227,8 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
           typeAt: anchorAt(words, o.typeAt, from),
           confirmAt: o.confirmAt === undefined ? null : anchorAt(words, o.confirmAt, from),
           label: o.label ?? null,
+          enter: o.enter,
+          points: o.points ? { at: anchorAt(words, o.points.at, from), value: o.points.value } : null,
         },
       ];
     if (o.type === "pointer") return [{ kind: "pointer", from, to, label: o.label }];

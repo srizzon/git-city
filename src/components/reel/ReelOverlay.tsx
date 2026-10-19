@@ -574,8 +574,8 @@ function UrnaPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
     </span>
   );
   return (
-    <div data-panel={index} className="absolute inset-0 font-pixel uppercase" style={{ zIndex: 5, opacity: 0, backgroundColor: BRAND.bg, backgroundImage: `radial-gradient(${BRAND.dot} 0.28cqw, transparent 0.3cqw)`, backgroundSize: "3cqw 3cqw" }}>
-      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: "15%", gap: CARD_GAP.line }}>
+    <div data-panel={index} className="absolute inset-0 font-pixel uppercase" style={{ zIndex: 5, opacity: 0, background: "rgba(12,13,11,.62)" }}>
+      <div data-urna-body className="absolute inset-x-0 flex flex-col items-center" style={{ top: "15%", gap: CARD_GAP.line }}>
         {panel.label && (
           <p data-reel-box="urna" style={{ ...PLATE, fontSize: "3.9cqw", whiteSpace: "nowrap" }}>
             <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>
@@ -618,6 +618,11 @@ function UrnaPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
             <div data-fim className="absolute inset-0 flex items-center justify-center" style={{ fontSize: "20cqw", letterSpacing: "0.1em", visibility: "hidden" }}>
               FIM
             </div>
+            {panel.points && (
+              <div data-points className="absolute" style={{ right: "-4cqw", top: "-6cqw", fontSize: "13cqw", lineHeight: 1, background: BRAND.green, color: BRAND.onGreen, padding: "2cqw 3.4cqw", boxShadow: HARD, visibility: "hidden" }}>
+                {panel.points.value}
+              </div>
+            )}
           </div>
           {/* The keypad. */}
           <div className="flex flex-col" style={{ marginTop: "3cqw", background: URNA.pad, padding: "2.4cqw", gap: "1.8cqw" }}>
@@ -659,6 +664,20 @@ function drawUrna(el: HTMLElement, p: Extract<ReelPanel, { kind: "urna" }>, t: n
   const end = el.querySelector<HTMLElement>("[data-fim]");
   if (vote) vote.style.visibility = fim ? "hidden" : "";
   if (end) end.style.visibility = fim ? "" : "hidden";
+  // Rising in: from below the frame to its place in five hard steps.
+  const body = el.querySelector<HTMLElement>("[data-urna-body]");
+  if (body) {
+    // Rising in from below in five hard steps, then a slow push in for the rest of the take: it never sits still.
+    const rise = p.enter ? (1 - Math.floor(clamp((t - p.from) / 0.35) * 5) / 5) * 120 : 0;
+    body.style.transform = `translateY(${rise}cqw) scale(${1 + 0.1 * clamp((t - p.from) / Math.max(0.1, p.to - p.from))})`;
+    body.style.transformOrigin = "50% 30%";
+  }
+  const pts = el.querySelector<HTMLElement>("[data-points]");
+  if (pts && p.points) {
+    // The block drops onto the machine at its word: one frame big, then its size.
+    pts.style.visibility = t >= p.points.at ? "" : "hidden";
+    pts.style.transform = t < p.points.at + 0.08 ? "scale(1.25)" : "";
+  }
 }
 
 // A pixel arrow drawn on the diagonal, pointing down and right, its tip at the bottom-right corner (a 12x12 grid; never a rotated one, which breaks the pixels).
