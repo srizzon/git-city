@@ -47,6 +47,7 @@ export type ReelPanel =
     }
   | { kind: "score"; from: number; to: number; icon: string; value: string }
   | { kind: "pointer"; from: number; to: number; label: string }
+  | { kind: "urna"; from: number; to: number; number: string; login: string; avatar: string; uf: string | null; typeAt: number; confirmAt: number | null; label: string | null }
   | {
       kind: "card";
       from: number;
@@ -203,6 +204,21 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
       });
       return [{ kind: "phone", from, to, screens }];
     }
+    if (o.type === "urna")
+      return [
+        {
+          kind: "urna",
+          from,
+          to,
+          number: o.number,
+          login: o.login,
+          avatar: o.avatar,
+          uf: o.uf ?? null,
+          typeAt: anchorAt(words, o.typeAt, from),
+          confirmAt: o.confirmAt === undefined ? null : anchorAt(words, o.confirmAt, from),
+          label: o.label ?? null,
+        },
+      ];
     if (o.type === "pointer") return [{ kind: "pointer", from, to, label: o.label }];
     if (o.type === "score") return [{ kind: "score", from, to, icon: o.icon, value: o.value }];
     if (o.type === "card") {

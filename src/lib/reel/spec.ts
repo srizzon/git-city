@@ -242,7 +242,27 @@ const Pointer = z.object({
   label: z.string().min(1),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer]);
+/**
+ * The game's voting machine filling the frame (its look, from the Vote panel): the keypad types
+ * `number` one key at a time from `typeAt`, the candidate's photo and login come up on the screen
+ * with the last digit, and CONFIRMA at `confirmAt` turns the screen to FIM.
+ */
+const Urna = z.object({
+  type: z.literal("urna"),
+  from: Anchor,
+  to: Anchor.optional(),
+  /** Its two digits ("53", "01"), or a {facts.x} that fills to them. */
+  number: z.string().min(1),
+  login: z.string(),
+  avatar: z.string(),
+  uf: z.string().nullable().optional(),
+  typeAt: Anchor,
+  confirmAt: Anchor.optional(),
+  /** A terminal plate over the machine. */
+  label: z.string().optional(),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({

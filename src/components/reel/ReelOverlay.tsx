@@ -304,6 +304,106 @@ function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
   );
 }
 
+// The game's voting machine (ElectionPanel's look and colours), drawn big for a reel.
+const URNA = { casing: "#d9dad4", edge: "#8d8d87", screen: "#eef0ea", frame: "#9a9a94", ink: "#1b1d22", pad: "#3a3c42", key: "#25272c", green: "#3fae49", orange: "#e4572e" };
+/** Seconds between one key and the next, and how long a pressed key stays down. */
+const KEY_EVERY = 0.35;
+const KEY_DOWN = 0.12;
+
+function UrnaPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "urna" }> }) {
+  const key = (label: string) => (
+    <span key={label} data-key={label} className="flex items-center justify-center" style={{ height: "11cqw", fontSize: "6cqw", background: URNA.key, color: "#fff", borderRadius: "0.6cqw", boxShadow: "0 1cqw 0 #0b0c0e" }}>
+      {label}
+    </span>
+  );
+  return (
+    <div data-panel={index} className="absolute inset-0 font-pixel uppercase" style={{ zIndex: 5, opacity: 0, backgroundColor: BRAND.bg, backgroundImage: `radial-gradient(${BRAND.dot} 0.28cqw, transparent 0.3cqw)`, backgroundSize: "3cqw 3cqw" }}>
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: "15%", gap: CARD_GAP.line }}>
+        {panel.label && (
+          <p data-reel-box="urna" style={{ ...PLATE, fontSize: "3.9cqw", whiteSpace: "nowrap" }}>
+            <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>
+            {panel.label}
+          </p>
+        )}
+        <div style={{ width: "88cqw", marginTop: "3cqw", background: URNA.casing, border: `0.5cqw solid ${URNA.edge}`, padding: "3cqw", boxShadow: `0 1.6cqw 0 #6f706b`, color: URNA.ink }}>
+          {/* The screen: the vote being typed, then FIM. */}
+          <div className="relative" style={{ height: "56cqw", background: URNA.screen, border: `0.7cqw solid ${URNA.frame}`, padding: "3cqw" }}>
+            <div data-vote className="flex h-full flex-col">
+              <div className="flex" style={{ gap: "3cqw" }}>
+                <div className="flex flex-1 flex-col normal-case" style={{ gap: "2cqw" }}>
+                  <span style={{ fontSize: "3cqw" }} className="uppercase">Seu voto para</span>
+                  <span style={{ fontSize: "5.4cqw" }} className="uppercase">Presidente</span>
+                  <span className="flex items-center" style={{ gap: "2cqw", fontSize: "3.4cqw" }}>
+                    Número:
+                    {[0, 1].map((k) => (
+                      <span key={k} data-digit={k} className="flex items-center justify-center" style={{ width: "9cqw", height: "12cqw", border: `0.5cqw solid ${URNA.ink}`, background: "rgba(255,255,255,.6)", fontSize: "8cqw" }} />
+                    ))}
+                  </span>
+                  <span data-picked style={{ fontSize: "3.6cqw", lineHeight: 1.5, visibility: "hidden" }}>
+                    Nome: @{panel.login}
+                    {panel.uf && (
+                      <>
+                        <br />
+                        Estado: {panel.uf}
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div style={{ width: "22cqw", height: "27cqw", border: `0.5cqw solid ${URNA.frame}`, background: "rgba(255,255,255,.5)", overflow: "hidden" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- the candidate's GitHub photo */}
+                  <img data-picked alt="" src={panel.avatar} style={{ width: "100%", height: "100%", objectFit: "cover", visibility: "hidden" }} />
+                </div>
+              </div>
+              <div className="mt-auto normal-case" style={{ borderTop: `0.5cqw solid ${URNA.ink}`, paddingTop: "1.4cqw", fontSize: "2.8cqw", lineHeight: 1.5 }}>
+                Aperte a tecla: <span style={{ color: "#1f7a2c" }}>VERDE</span> para CONFIRMAR
+              </div>
+            </div>
+            <div data-fim className="absolute inset-0 flex items-center justify-center" style={{ fontSize: "20cqw", letterSpacing: "0.1em", visibility: "hidden" }}>
+              FIM
+            </div>
+          </div>
+          {/* The keypad. */}
+          <div className="flex flex-col" style={{ marginTop: "3cqw", background: URNA.pad, padding: "2.4cqw", gap: "1.8cqw" }}>
+            <div className="grid grid-cols-3" style={{ gap: "1.8cqw" }}>
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(key)}
+              <span />
+              {key("0")}
+              <span />
+            </div>
+            <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 1.25fr", gap: "1.8cqw", marginTop: "1cqw" }}>
+              <span className="flex items-center justify-center" style={{ height: "10cqw", fontSize: "3.4cqw", background: "#fff", borderRadius: "0.6cqw", boxShadow: `0 1cqw 0 ${URNA.frame}` }}>Branco</span>
+              <span className="flex items-center justify-center" style={{ height: "10cqw", fontSize: "3.4cqw", background: URNA.orange, borderRadius: "0.6cqw", boxShadow: "0 1cqw 0 #8f3219" }}>Corrige</span>
+              <span data-key="confirma" className="flex items-center justify-center" style={{ height: "11cqw", fontSize: "3.4cqw", background: URNA.green, color: "#0d2a10", borderRadius: "0.6cqw", boxShadow: "0 1cqw 0 #21672a" }}>Confirma</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Each frame of the machine: keys going down as they're pressed, the digits and the candidate coming up, FIM after CONFIRMA. */
+function drawUrna(el: HTMLElement, p: Extract<ReelPanel, { kind: "urna" }>, t: number) {
+  const presses = [...p.number].map((d, i) => ({ key: d, at: p.typeAt + i * KEY_EVERY }));
+  if (p.confirmAt !== null) presses.push({ key: "confirma", at: p.confirmAt });
+  el.querySelectorAll<HTMLElement>("[data-key]").forEach((k) => {
+    const down = presses.some((x) => x.key === k.dataset.key && t >= x.at && t < x.at + KEY_DOWN);
+    k.style.transform = down ? "translateY(0.8cqw)" : "";
+    k.style.filter = down ? "brightness(1.5)" : "";
+  });
+  const typed = presses.filter((x) => x.key !== "confirma" && t >= x.at).length;
+  el.querySelectorAll<HTMLElement>("[data-digit]").forEach((d) => {
+    const v = Number(d.dataset.digit) < typed ? p.number[Number(d.dataset.digit)] : "";
+    if (d.textContent !== v) d.textContent = v;
+  });
+  el.querySelectorAll<HTMLElement>("[data-picked]").forEach((x) => (x.style.visibility = typed >= 2 ? "" : "hidden"));
+  const fim = p.confirmAt !== null && t >= p.confirmAt + 0.15;
+  const vote = el.querySelector<HTMLElement>("[data-vote]");
+  const end = el.querySelector<HTMLElement>("[data-fim]");
+  if (vote) vote.style.visibility = fim ? "hidden" : "";
+  if (end) end.style.visibility = fim ? "" : "hidden";
+}
+
 // A pixel arrow drawn on the diagonal, pointing down and right, its tip at the bottom-right corner (a 12x12 grid; never a rotated one, which breaks the pixels).
 const ARROW = [
   "###.........",
@@ -391,6 +491,13 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
   panels.forEach((p, i) => {
     const el = root.querySelector<HTMLElement>(`[data-panel="${i}"]`);
     if (!el) return;
+    // The machine cuts in and out like a card.
+    if (p.kind === "urna") {
+      const up = t >= p.from && t < p.to;
+      el.style.opacity = up ? "1" : "0";
+      if (up) drawUrna(el, p, t);
+      return;
+    }
     // The arrow cuts in and taps toward the button in hard steps.
     if (p.kind === "pointer") {
       el.style.opacity = t >= p.from && t < p.to ? "1" : "0";
@@ -1101,6 +1208,7 @@ function Panel({
   if (panel.kind === "score") return <ScorePanel index={index} panel={panel} />;
   if (panel.kind === "phone") return <PhonePanel index={index} panel={panel} />;
   if (panel.kind === "card") return <CardPanel index={index} panel={panel} />;
+  if (panel.kind === "urna") return <UrnaPanel index={index} panel={panel} />;
   if (panel.kind === "pointer") return <PointerPanel index={index} label={panel.label} />;
   if (panel.kind === "counter" && plates)
     return (
@@ -1417,7 +1525,7 @@ export default function ReelOverlay({
       const t = beatOf(clock);
       const i = reel.lines.findIndex((l) => t >= l.from && t < l.to);
       // While a card is up it is the frame: the captions, the header and the headline step aside.
-      const card = reel.panels.some((p) => p.kind === "card" && t >= p.from && t < p.to);
+      const card = reel.panels.some((p) => (p.kind === "card" || p.kind === "urna") && t >= p.from && t < p.to);
       const el = line.current;
       if (el) {
         if (i !== shown) {
