@@ -821,6 +821,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   // The Games menu's modes: a city race, Crown Rush (with someone else here), the drift track (the arrow takes you).
   const raceBusy = !!rallyView && (rallyView.rally.phase === "invite" || rallyView.rally.phase === "countdown" || rallyView.rally.phase === "live");
   const crownBusy = !!crownView && (crownView.crown.phase === "countdown" || crownView.crown.phase === "live");
+  // The loading band's live line: a race still taking racers, else how many drive here.
+  const startNote = liveRace?.route ? `${here} driving · race to ${cityByKey(layout, liveRace.route.to)?.name ?? "?"} open` : here > 1 ? `${here} driving here now` : null;
   const showMission = driving && driveReady && !missionDone && !!paint.me?.uf && !racing && !crownBusy && !games;
   const gameModes: GameMode[] = [
     { id: "race", icon: FlagIcon, name: "Race", line: "To another city. Everyone starts together.", need: "1+", blocked: raceBusy ? "A race is on. Join the next one." : crownBusy ? "Crown rush is on." : null },
@@ -887,7 +889,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     // Once per page load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const bar = "flex flex-col items-center justify-center gap-1 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
+  const bar = "flex min-h-[60px] flex-col items-center justify-center gap-1.5 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
 
   return (
     <main className="fixed inset-0 bg-bg font-pixel uppercase text-cream">
@@ -1085,43 +1087,28 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         />
       )}
 
-      {/* The bar: a row of words on a desktop, a tab bar of icons on a phone. */}
-      {/* Over the bar: a race anyone can still join, else the one big thing to do here, Drive. */}
-      {!inCar && !state && !focused && !panel && !picker && (
+      {/* Over the bar: a race anyone can still join. */}
+      {!inCar && !state && !focused && !panel && !picker && liveRace && (
         <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[112px]">
-          {liveRace ? (
-            <LiveRace
-              race={liveRace}
-              offset={watchRace?.offset ?? 0}
-              name={(k) => cityByKey(layout, k)?.name ?? "?"}
-              onJoin={() => {
-                const from = cityByKey(layout, liveRace.route?.from ?? "");
-                posthog.capture("brasil_live_race_clicked", { racers: Object.keys(liveRace.racers).length });
-                setJoinRace(liveRace.id);
-                startDrive(from ? { x: from.hub[0] * LOT, z: from.hub[1] * LOT } : undefined);
-              }}
-            />
-          ) : (
-            <button
-              type="button"
-              disabled={launching || world.devs === 0}
-              onClick={() => {
-                posthog.capture("brasil_drive_button_clicked");
-                startDrive();
-              }}
-              className="pointer-events-auto flex min-h-14 items-center gap-3 bg-lime px-8 text-bg shadow-[0_8px_0_rgba(0,0,0,0.35)] transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40"
-              style={{ fontSize: T.big }}
-            >
-              <Car size={22} aria-hidden /> Drive
-            </button>
-          )}
+          <LiveRace
+            race={liveRace}
+            offset={watchRace?.offset ?? 0}
+            name={(k) => cityByKey(layout, k)?.name ?? "?"}
+            onJoin={() => {
+              const from = cityByKey(layout, liveRace.route?.from ?? "");
+              posthog.capture("brasil_live_race_clicked", { racers: Object.keys(liveRace.racers).length });
+              setJoinRace(liveRace.id);
+              startDrive(from ? { x: from.hub[0] * LOT, z: from.hub[1] * LOT } : undefined);
+            }}
+          />
         </div>
       )}
 
+      {/* The bar: a row of words on a desktop, a tab bar of icons on a phone; Drive raised in the middle. */}
       {!inCar && (
-        <nav className={`pointer-events-auto absolute inset-x-0 bottom-0 grid ${election ? "grid-cols-4" : "grid-cols-3"} gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
+        <nav className={`pointer-events-auto absolute inset-x-0 bottom-0 grid ${election ? "grid-cols-5" : "grid-cols-4"} items-end gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
           <button type="button" onClick={() => openPanel("states")} className={bar}>
-            <Trophy size={16} className="sm:hidden" aria-hidden />
+            <Trophy size={18} className="sm:hidden" aria-hidden />
             States
           </button>
           <button
@@ -1135,16 +1122,26 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             }}
             className={bar}
           >
-            <MapIcon size={16} className="sm:hidden" aria-hidden />
+            <MapIcon size={18} className="sm:hidden" aria-hidden />
             Brazil
           </button>
+          {/* Drive is the bar's middle, lime and raised over it: the one thing to do here. */}
+          <button
+            type="button"
+            disabled={launching || world.devs === 0}
+            onClick={() => {
+              posthog.capture("brasil_drive_button_clicked");
+              startDrive();
+            }}
+            className="-mt-5 flex min-h-[80px] flex-col items-center justify-center gap-1.5 bg-lime text-[10px] text-bg shadow-[0_-6px_0_rgba(0,0,0,0.25)] transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40 sm:-mt-0 sm:h-14 sm:min-h-0 sm:flex-row sm:gap-2.5 sm:px-7 sm:text-sm sm:shadow-none"
+          >
+            <Car size={24} className="sm:size-5" aria-hidden />
+            Drive
+          </button>
           {election && (
-            // While the vote is open it's the loudest thing on the bar after your building: lime, with a live dot.
-            <button type="button" onClick={() => openVote()} className={election.phase === "voting" ? bar.replace("bg-[#141417] py-2 text-[9px] text-cream hover:text-lime", "bg-[#141417] py-2 text-[9px] text-lime ring-2 ring-inset ring-lime") : bar}>
-              <span className="flex items-center gap-1.5">
-                {election.phase === "voting" && <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden />}
-                <Landmark size={16} className="sm:hidden" aria-hidden />
-              </span>
+            <button type="button" onClick={() => openVote()} className={`${bar} relative`}>
+              {election.phase === "voting" && <span className="absolute right-[30%] top-3 h-1.5 w-1.5 animate-pulse bg-red-500 sm:static sm:order-first" aria-hidden />}
+              <Landmark size={18} className="sm:hidden" aria-hidden />
               Vote
             </button>
           )}
@@ -1156,16 +1153,19 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               if (mine) openBuilding(mine);
               else openPicker(null);
             }}
-            className="flex flex-col items-center justify-center gap-1 bg-lime py-2 text-[9px] text-bg sm:h-10 sm:flex-row sm:gap-2 sm:px-4 sm:py-0 sm:text-[11px]"
+            className={bar}
           >
-            {yours ? <span className="h-3 w-3 border border-bg/40 sm:h-2.5 sm:w-2.5" style={{ background: swatchOf(yours) }} aria-hidden /> : <Building2 size={16} className="sm:hidden" aria-hidden />}
+            {yours ? <span className="h-3.5 w-3.5 border border-bg/40 sm:h-2.5 sm:w-2.5" style={{ background: swatchOf(yours) }} aria-hidden /> : <Building2 size={18} className="sm:hidden" aria-hidden />}
             {home ? (
-              "My building"
-            ) : (
               <>
+                <span className="sm:hidden">Mine</span>
+                <span className="max-sm:hidden">My building</span>
+              </>
+            ) : (
+              <span className="text-lime">
                 <span className="sm:hidden">Put mine</span>
                 <span className="max-sm:hidden">Put my building</span>
-              </>
+              </span>
             )}
           </button>
         </nav>
@@ -1198,6 +1198,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onStartCrown={() => crownApi.current?.start()}
           gameOn={racing || !!games}
           phoneLow={showMission}
+          startNote={startNote}
           onGames={racing ? undefined : () => setGames({ step: "modes" })}
           onResume={() => setPaused(false)}
           onCamera={toggleCamera}
