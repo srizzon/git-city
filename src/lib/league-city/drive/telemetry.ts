@@ -37,6 +37,8 @@ export interface DriveRoute {
   z: number;
   /** Close enough to count as there, city units from the center. */
   reach: number;
+  /** false: only the minimap shows it, no arrow over the car (a city race's gates show the way). */
+  arrow?: boolean;
 }
 
 export interface RadarCar {

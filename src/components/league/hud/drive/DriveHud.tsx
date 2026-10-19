@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, LogIn, Plus, Volume1, Volume2, VolumeX, X } from "lucide-react";
+import { Camera, Gamepad2, LogIn, Plus, Volume1, Volume2, VolumeX, X } from "lucide-react";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { HUD_BOX } from "../shared";
@@ -56,7 +56,8 @@ export default function DriveHud({
   map,
   emoteLog,
   onStartCrown,
-  crownHidden = false,
+  gameOn = false,
+  onGames,
   children,
   onVolume,
   onEmote,
@@ -91,8 +92,10 @@ export default function DriveHud({
   /** The room's last reactions, oldest first. */
   emoteLog: EmoteLog;
   onStartCrown: () => void;
-  /** Another game has the top of the screen (a city race): Crown Rush steps aside. */
-  crownHidden?: boolean;
+  /** A car game has the screen (a city race you're in): the drivers list and Crown Rush step aside. */
+  gameOn?: boolean;
+  /** The Games menu (G): a button leads the top-right toolbar. Without it, Crown Rush keeps its own Start. */
+  onGames?: () => void;
   /** A town's own HUD pieces (the Brasil map's races), over the rest. */
   children?: React.ReactNode;
   onVolume: (v: number) => void;
@@ -146,7 +149,7 @@ export default function DriveHud({
       {/* First, so every other piece of the HUD sits above the steering layer. */}
       {ready && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} />}
 
-      {ready && entered && !touch && (
+      {ready && entered && !touch && !gameOn && (
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`} style={enter(0)}>
           <p className="flex items-center gap-2 text-cream">
             <span className="h-1.5 w-1.5 animate-pulse bg-lime" aria-hidden />
@@ -178,6 +181,11 @@ export default function DriveHud({
             <X {...ICON} aria-hidden />
           </button>
           <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border`}>
+            {onGames && (
+              <button type="button" onClick={onGames} aria-label="Games" className={`${ICON_BTN} w-11 py-2.5 text-lime`}>
+                <Gamepad2 {...ICON} aria-hidden />
+              </button>
+            )}
             {join && (
               <button type="button" onClick={join.onClick} className={`${SEG} gap-2 px-3 py-2.5 text-[10px] text-lime`}>
                 {join.signIn ? <LogIn {...ICON} aria-hidden /> : <Plus {...ICON} aria-hidden />}
@@ -193,6 +201,13 @@ export default function DriveHud({
 
       {entered && !touch && (
         <div className={`${HUD_BOX} absolute right-4 top-4 flex items-stretch divide-x-2 divide-border`} style={enter(0.12)}>
+          {onGames && (
+            <button type="button" onClick={onGames} title="Games (G)" className={`${SEG} gap-2 px-3 py-2 text-[10px] text-lime hover:text-cream`}>
+              <Gamepad2 {...ICON} aria-hidden />
+              <span>Games</span>
+              <span className="bg-cream px-1 text-[8px] leading-[1.4] text-bg">G</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onCamera}
@@ -271,7 +286,7 @@ export default function DriveHud({
         <div
           className={`absolute bottom-20 left-4 text-[9px] leading-loose text-muted transition-opacity duration-700 ${hints ? "opacity-100" : "opacity-0"}`}
         >
-          {CONTROLS.map(([k, v]) => (
+          {[...CONTROLS, ...(onGames ? ([["G", "games: race, crown rush"]] as [string, string][]) : [])].map(([k, v]) => (
             <div key={k}>
               <span className="text-cream">{k}</span> {v}
             </div>
@@ -286,7 +301,7 @@ export default function DriveHud({
         </div>
       )}
 
-      {ready && entered && !crownHidden && <CrownPanel crown={crown?.crown ?? null} offset={crown?.offset ?? 0} you={crown?.you ?? null} drivers={drivers} touch={touch} onStart={onStartCrown} />}
+      {ready && entered && !gameOn && <CrownPanel crown={crown?.crown ?? null} offset={crown?.offset ?? 0} you={crown?.you ?? null} drivers={drivers} touch={touch} idle={!onGames} onStart={onStartCrown} />}
       {ready && entered && children}
 
       {/* Last, so they blur and cover the rest of the HUD. */}

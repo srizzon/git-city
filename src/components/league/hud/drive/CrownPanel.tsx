@@ -35,6 +35,7 @@ export default function CrownPanel({
   you,
   drivers,
   touch = false,
+  idle = true,
   onStart,
 }: {
   crown: CrownState | null;
@@ -42,6 +43,8 @@ export default function CrownPanel({
   you: string | null;
   drivers: DriverInfo[];
   touch?: boolean;
+  /** false: no Start button while nothing runs (a Games menu starts it). */
+  idle?: boolean;
   onStart: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
@@ -143,7 +146,7 @@ export default function CrownPanel({
     );
   }
 
-  if (touch) return null;
+  if (touch || !idle) return null;
   return (
     <div className="pointer-events-auto absolute left-1/2 top-4 -translate-x-1/2">
       {canStart ? (
