@@ -198,18 +198,28 @@ const Pins = z.object({
 });
 
 /**
- * A full-frame card on the channel's dotted dark background (the opening hook, the closing call to
- * action). It moves from its first frame: its lines type in, a number in a `*block*` counts up
- * from 0 over the card, and with `map` Brazil is drawn in dots that light up with the count. An
- * optional image goes under the lines (under REELS_HOME). It cuts in and out; the captions and the
- * headline step aside while it's up.
+ * A full-frame card on the channel's dotted dark background that draws what the voice is saying
+ * (how to score, a rule): its lines type in, a number in a `*block*` counts up from 0 over the
+ * card, and under them one drawing in the channel's style:
+ * - map: Brazil in dots, lighting up with the count;
+ * - comment: the ink speech bubble, `text` typed into it from `at`;
+ * - graph: a GitHub contribution graph, today's square lighting at `at`.
+ * `points` pops a green block (`+5`) at its moment. An optional image goes under the lines (under
+ * REELS_HOME). It cuts in and out; the captions and the headline step aside while it's up.
  */
 const Card = z.object({
   type: z.literal("card"),
   from: Anchor,
   to: Anchor.optional(),
   lines: z.array(HeaderLine).min(1),
-  map: z.boolean().default(false),
+  draw: z
+    .discriminatedUnion("kind", [
+      z.object({ kind: z.literal("map") }),
+      z.object({ kind: z.literal("comment"), text: z.string().min(1), at: Anchor }),
+      z.object({ kind: z.literal("graph"), at: Anchor }),
+    ])
+    .optional(),
+  points: z.object({ at: Anchor, value: z.string().min(1) }).optional(),
   image: z.string().optional(),
 });
 
