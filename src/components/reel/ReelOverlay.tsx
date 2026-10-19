@@ -218,6 +218,8 @@ const BRAZIL_DOTS = (() => {
   return { dots, w: cols, h: Math.ceil((maxZ - minZ) / step) };
 })();
 
+/** A card's spacing scale: between the lines of its words, and between its groups (words, drawing, points). */
+const CARD_GAP = { line: "2cqw", group: "7cqw" };
 /** The card's contribution graph: weeks across. */
 const GRAPH_WEEKS = 12;
 
@@ -233,7 +235,7 @@ const numberOf = (s: string) => Number((NUMBER.exec(s)?.[0] ?? "0").replace(/\./
  * light with the count: the hook moves from its first frame.
  */
 function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "card" }> }) {
-  const size = { huge: "9.5cqw", big: "8cqw", small: "4.6cqw" } as const;
+  const size = { huge: "10cqw", big: "8.6cqw", small: "4.6cqw" } as const;
   let k = 0;
   return (
     <div
@@ -241,72 +243,74 @@ function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
       className="absolute inset-0 font-pixel uppercase"
       style={{ zIndex: 5, opacity: 0, color: BRAND.ink, backgroundColor: BRAND.bg, backgroundImage: `radial-gradient(${BRAND.dot} 0.28cqw, transparent 0.3cqw)`, backgroundSize: "3cqw 3cqw" }}
     >
-      {/* Everything centred in the safe band, between the top 14% and the bottom 35%. */}
-      <div className="absolute inset-x-0 flex flex-col items-center justify-center" style={{ top: "14%", bottom: "35%" }}>
-      <div data-reel-box="card" className="flex flex-col items-center text-center" style={{ gap: "3cqw", maxWidth: "72%" }}>
-        {panel.lines.map((l, i) => (
-          <p key={i} style={{ fontSize: size[l.size], lineHeight: 1.1, color: l.size === "small" ? BRAND.muted : BRAND.ink, textTransform: l.plain ? "none" : undefined }}>
-            {segments(l.text).map((s, j) =>
-              s.lit ? (
-                <span key={j} data-ch={k++} data-count={NUMBER.test(s.text) ? s.text : undefined} style={{ display: "none", background: BRAND.green, color: BRAND.onGreen, padding: "0 0.25em", boxShadow: HARD }}>
-                  {s.text}
-                </span>
-              ) : (
-                [...s.text].map((c, n) => (
-                  <span key={`${j}-${n}`} data-ch={k++} style={{ display: "none" }}>
-                    {c}
+      {/* One column from 16% down, on one spacing scale: the words, then the drawing, then the points. */}
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: "16%", gap: CARD_GAP.group }}>
+        <div data-reel-box="card" className="flex flex-col items-center text-center" style={{ gap: CARD_GAP.line, maxWidth: "72%" }}>
+          {panel.lines.map((l, i) => (
+            // Every character keeps its place while it types in, so the centred line never shifts.
+            <p key={i} style={{ fontSize: size[l.size], lineHeight: 1.5, color: l.size === "small" ? BRAND.muted : BRAND.ink, textTransform: l.plain ? "none" : undefined }}>
+              {segments(l.text).map((s, j) =>
+                s.lit ? (
+                  <span key={j} data-ch={k++} data-count={NUMBER.test(s.text) ? s.text : undefined} style={{ visibility: "hidden", background: BRAND.green, color: BRAND.onGreen, padding: "0.1em 0.3em", boxShadow: HARD }}>
+                    {s.text}
                   </span>
-                ))
-              ),
-            )}
-          </p>
-        ))}
-      </div>
-      {panel.draw?.kind === "map" && (
-        <svg viewBox={`-1 -1 ${BRAZIL_DOTS.w + 2} ${BRAZIL_DOTS.h + 2}`} style={{ marginTop: "7cqw", width: "64%" }}>
-          {BRAZIL_DOTS.dots.map((d, i) => (
-            <rect key={i} data-dot={d.order} x={d.x - 0.4} y={d.y - 0.4} width={0.8} height={0.8} fill={BRAND.dot} />
+                ) : (
+                  [...s.text].map((c, n) => (
+                    <span key={`${j}-${n}`} data-ch={k++} style={{ visibility: "hidden" }}>
+                      {c}
+                    </span>
+                  ))
+                ),
+              )}
+            </p>
           ))}
-        </svg>
-      )}
-      {panel.draw?.kind === "comment" && (
-        // The brand's ink speech bubble with dark pixel text, a pixel tail under its left side.
-        <div className="relative" style={{ marginTop: "8cqw", background: BRAND.ink, color: BRAND.bg, boxShadow: HARD, padding: "3.5cqw 4cqw", width: "70%", boxSizing: "border-box", fontSize: "4.8cqw", textTransform: "none", whiteSpace: "nowrap" }}>
-          <span data-typed />
-          <span data-caret style={{ display: "inline-block", width: "0.5em", height: "0.9em", marginLeft: "0.15em", verticalAlign: "-0.1em", background: BRAND.bg }} />
-          <span className="absolute" style={{ left: "8%", top: "100%", width: "4cqw", height: "4cqw", background: BRAND.ink, clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />
         </div>
-      )}
-      {panel.draw?.kind === "graph" && (
-        <div style={{ marginTop: "9cqw", background: BRAND.bg, boxShadow: HARD, border: `0.4cqw solid ${BRAND.dot}`, padding: "2.4cqw", display: "grid", gridTemplateColumns: `repeat(${GRAPH_WEEKS}, 4.2cqw)`, gridAutoFlow: "column", gridTemplateRows: "repeat(7, 4.2cqw)", gap: "1cqw" }}>
-          {Array.from({ length: GRAPH_WEEKS * 7 }, (_, i) => {
-            const today = i === GRAPH_WEEKS * 7 - 7 + CONTRIB_TODAY;
-            return <i key={i} data-today={today || undefined} style={{ background: i > GRAPH_WEEKS * 7 - 7 + CONTRIB_TODAY ? "transparent" : today ? CONTRIB[0] : CONTRIB[contribLevel(Math.floor(i / 7), i % 7)] }} />;
-          })}
-        </div>
-      )}
-      {panel.draw?.kind === "reel" && (
-        // This reel in a window, the rail beside it; the comment button lights when it's tapped.
-        <div className="flex items-end" style={{ marginTop: "7cqw", gap: "3cqw" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- a frame of the reel, from the reels folder */}
-          <img alt="" src={`/api/reels/file/${panel.draw.image}`} style={{ width: "30cqw", height: "53cqw", objectFit: "cover", border: `0.6cqw solid ${BRAND.ink}`, boxShadow: HARD }} />
-          <div className="flex flex-col items-center" style={{ gap: "4cqw", marginBottom: "4cqw" }}>
-            <Heart style={{ width: "8cqw", height: "8cqw", color: BRAND.ink }} strokeWidth={2.5} />
-            <span data-tap style={{ display: "grid", placeItems: "center", width: "12cqw", height: "12cqw", boxShadow: HARD }}>
-              <MessageCircle style={{ width: "8cqw", height: "8cqw" }} strokeWidth={2.5} />
-            </span>
-            <Send style={{ width: "8cqw", height: "8cqw", color: BRAND.ink }} strokeWidth={2.5} />
+        {panel.draw?.kind === "map" && (
+          <svg viewBox={`-1 -1 ${BRAZIL_DOTS.w + 2} ${BRAZIL_DOTS.h + 2}`} style={{ width: "80%" }}>
+            {BRAZIL_DOTS.dots.map((d, i) => (
+              <rect key={i} data-dot={d.order} x={d.x - 0.4} y={d.y - 0.4} width={0.8} height={0.8} fill={BRAND.dot} />
+            ))}
+          </svg>
+        )}
+        {panel.draw?.kind === "comment" && (
+          // The brand's ink speech bubble with dark pixel text, a pixel tail under its left side.
+          <div className="relative" style={{ background: BRAND.ink, color: BRAND.bg, boxShadow: HARD, padding: "5cqw", width: "86cqw", boxSizing: "border-box", fontSize: "6.4cqw", lineHeight: 1, textTransform: "none", whiteSpace: "nowrap" }}>
+            <span data-typed />
+            <span data-caret style={{ display: "inline-block", width: "0.5em", height: "1em", marginLeft: "0.15em", verticalAlign: "-0.1em", background: BRAND.bg }} />
+            <span className="absolute" style={{ left: "8%", top: "100%", width: "6cqw", height: "6cqw", background: BRAND.ink, clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />
           </div>
-        </div>
-      )}
-      {panel.points && (
-        <div data-points style={{ marginTop: "7cqw", fontSize: "10cqw", background: BRAND.green, color: BRAND.onGreen, padding: "0.5cqw 3cqw", boxShadow: HARD, visibility: "hidden" }}>
-          {panel.points.value}
-        </div>
-      )}
-      {panel.image && (
-        // eslint-disable-next-line @next/next/no-img-element -- an image from the reels folder, drawn as it is
-          <img alt="" src={`/api/reels/file/${panel.image}`} style={{ marginTop: "6cqw", width: "72%", maxHeight: "40%", objectFit: "contain", imageRendering: "pixelated" }} />
+        )}
+        {panel.draw?.kind === "graph" && (
+          <div style={{ background: BRAND.bg, boxShadow: HARD, border: `0.4cqw solid ${BRAND.dot}`, padding: "3cqw", display: "grid", gridTemplateColumns: `repeat(${GRAPH_WEEKS}, 5cqw)`, gridAutoFlow: "column", gridTemplateRows: "repeat(7, 5cqw)", gap: "1.2cqw" }}>
+            {Array.from({ length: GRAPH_WEEKS * 7 }, (_, i) => {
+              const today = i === GRAPH_WEEKS * 7 - 7 + CONTRIB_TODAY;
+              return <i key={i} data-today={today || undefined} style={{ background: i > GRAPH_WEEKS * 7 - 7 + CONTRIB_TODAY ? "transparent" : today ? CONTRIB[0] : CONTRIB[contribLevel(Math.floor(i / 7), i % 7)] }} />;
+            })}
+          </div>
+        )}
+        {panel.draw?.kind === "reel" && (
+          // This reel in a window, the rail beside it (the comment button lights when it's tapped). The picture may run
+          // on into the bottom band; only words keep out of it.
+          <div className="flex items-center" style={{ gap: CARD_GAP.group }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- a frame of the reel, from the reels folder */}
+            <img alt="" src={`/api/reels/file/${panel.draw.image}`} style={{ width: "52cqw", height: "92cqw", objectFit: "cover", border: `0.8cqw solid ${BRAND.ink}`, boxShadow: HARD }} />
+            <div className="flex flex-col items-center" style={{ gap: CARD_GAP.group }}>
+              <Heart style={{ width: "11cqw", height: "11cqw", color: BRAND.ink }} strokeWidth={2.5} />
+              <span data-tap style={{ display: "grid", placeItems: "center", width: "17cqw", height: "17cqw", boxShadow: HARD }}>
+                <MessageCircle style={{ width: "11cqw", height: "11cqw" }} strokeWidth={2.5} />
+              </span>
+              <Send style={{ width: "11cqw", height: "11cqw", color: BRAND.ink }} strokeWidth={2.5} />
+            </div>
+          </div>
+        )}
+        {panel.points && (
+          <div data-points style={{ fontSize: "14cqw", lineHeight: 1, background: BRAND.green, color: BRAND.onGreen, padding: "2cqw 4cqw", boxShadow: HARD, visibility: "hidden" }}>
+            {panel.points.value}
+          </div>
+        )}
+        {panel.image && (
+          // eslint-disable-next-line @next/next/no-img-element -- an image from the reels folder, drawn as it is
+          <img alt="" src={`/api/reels/file/${panel.image}`} style={{ width: "72%", maxHeight: "40%", objectFit: "contain", imageRendering: "pixelated" }} />
         )}
       </div>
     </div>
@@ -317,7 +321,7 @@ function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
 function drawCard(el: HTMLElement, p: Extract<ReelPanel, { kind: "card" }>, t: number) {
   const local = t - p.from;
   const n = Math.floor(local * CARD_CPS);
-  el.querySelectorAll<HTMLElement>("[data-ch]").forEach((c) => (c.style.display = Number(c.dataset.ch) < n ? "" : "none"));
+  el.querySelectorAll<HTMLElement>("[data-ch]").forEach((c) => (c.style.visibility = Number(c.dataset.ch) < n ? "" : "hidden"));
   // The count runs over the card, ending a beat before it cuts away.
   const span = Math.max(0.3, p.to - p.from - 0.3);
   const u = Math.floor(clamp(local / span) * COUNT_STEPS) / COUNT_STEPS;
