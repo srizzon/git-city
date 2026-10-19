@@ -117,6 +117,8 @@ export default function DriveHud({
   const [hints, setHints] = useState(true);
   // First drive: the HUD waits for your first move.
   const [entered, setEntered] = useState(!firstRun);
+  /** The loading band is gone (no band on the intro's first run): the controls take the bottom. */
+  const [loaded, setLoaded] = useState(firstRun);
   const enter = firstRun ? (delay: number) => ({ animation: `fade-in 0.45s ease-out ${delay}s both` }) : () => undefined;
 
   useEffect(() => {
@@ -153,7 +155,7 @@ export default function DriveHud({
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
       {/* First, so every other piece of the HUD sits above the steering layer. */}
-      {ready && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} />}
+      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} />}
 
       {ready && entered && !touch && !gameOn && (
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`} style={enter(0)}>
@@ -191,8 +193,8 @@ export default function DriveHud({
               <Users {...ICON} aria-hidden /> {drivers.length + 1}
             </span>
             {onGames && (
-              <button type="button" onClick={onGames} aria-label="Games" className={`${ICON_BTN} w-11 py-2.5 text-lime`}>
-                <Gamepad2 {...ICON} aria-hidden />
+              <button type="button" onClick={onGames} className="flex items-center gap-1.5 bg-lime px-3 py-2.5 text-[10px] text-bg active:translate-y-px">
+                <Gamepad2 {...ICON} aria-hidden /> Games
               </button>
             )}
             {join && (
@@ -292,13 +294,13 @@ export default function DriveHud({
       {ready && entered && !touch && <Dash telemetry={telemetry} style={enter(0.24)} />}
 
       {/* Phone: the minimap under the top bar with others' reactions under it, and the six reactions over the controls. */}
-      {ready && entered && touch && (
+      {ready && loaded && entered && touch && (
         <div className={`absolute left-4 flex flex-col items-start gap-2 ${phoneLow ? "top-[calc(max(1rem,env(safe-area-inset-top))+9.5rem)]" : "top-[calc(max(1rem,env(safe-area-inset-top))+7.75rem)]"}`}>
           <Minimap telemetry={telemetry} buildings={map.buildings} objects={map.objects} home={map.home} size={104} layer={map.layer} />
           <ReactionLog log={emoteLog} align="start" />
         </div>
       )}
-      {ready && entered && touch && (
+      {ready && loaded && entered && touch && (
         <div className="absolute inset-x-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+162px)] flex justify-center">
           <ReactionBar on={!paused} onEmote={onEmote} big />
         </div>
@@ -327,7 +329,7 @@ export default function DriveHud({
       {ready && entered && children}
 
       {/* Last, so they blur and cover the rest of the HUD. */}
-      {!firstRun && <StartScreen ready={ready} touch={touch} note={startNote} />}
+      {!firstRun && <StartScreen ready={ready} touch={touch} note={startNote} onGone={() => setLoaded(true)} />}
       {paused && ready && (
         <PauseMenu camera={camera} muted={muted} onResume={onResume} onCamera={onCamera} onMute={onMute} onExit={onExit} />
       )}

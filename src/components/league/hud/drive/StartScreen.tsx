@@ -16,7 +16,18 @@ import { T } from "@/components/games/kit";
 /** Shown at least this long, so a fast load doesn't flash. */
 const MIN_MS = 1200;
 
-export default function StartScreen({ ready, note = null }: { ready: boolean; touch?: boolean; /** What's going on here, over the band ("4 driving · a race starts in 12s"). */ note?: string | null }) {
+export default function StartScreen({
+  ready,
+  note = null,
+  onGone,
+}: {
+  ready: boolean;
+  touch?: boolean;
+  /** What's going on here, over the band ("4 driving · a race starts in 12s"). */
+  note?: string | null;
+  /** The band has faded out: the controls can come up where it was. */
+  onGone?: () => void;
+}) {
   const [progress, setProgress] = useState(0);
   const [gone, setGone] = useState(false);
   const [minPassed, setMinPassed] = useState(false);
@@ -30,7 +41,10 @@ export default function StartScreen({ ready, note = null }: { ready: boolean; to
 
   useEffect(() => {
     if (done) {
-      const t = setTimeout(() => setGone(true), 450);
+      const t = setTimeout(() => {
+        setGone(true);
+        onGone?.();
+      }, 450);
       return () => clearTimeout(t);
     }
     let raf = 0;
@@ -43,6 +57,8 @@ export default function StartScreen({ ready, note = null }: { ready: boolean; to
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
+    // onGone is read once, when the band goes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
 
   if (gone) return null;
