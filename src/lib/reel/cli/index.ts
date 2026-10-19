@@ -22,11 +22,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFile
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import type { Word } from "@trailer-kit/narration";
-import { BRASIL_SCENES } from "@/components/reel/brasil/scenes";
-import { BAY_SCENES } from "@/components/reel/bay/scenes";
-import { BAY_TAKES } from "@/components/reel/bay/BayTakes";
-import { BRASIL_TAKES } from "@/components/reel/brasil/BrasilTakes";
-import { TOWN_SCENES } from "@/components/reel/towns/TownReelRig";
 import { checkPicture, checkText, checkTimed, type FrameReport, type Issue } from "../check";
 import { readConfig, type ReelsConfig } from "../config";
 import { computeFacts, loadFactsInput } from "../facts";
@@ -35,6 +30,7 @@ import { filled, ReelSpec, specDir } from "../spec";
 import { isAtLeast, readStatus, setError, setState, writeStatus } from "../status";
 import { busiestHour, scheduleReel } from "../schedule";
 import { bedOf } from "../beds";
+import { WORLD_SCENES } from "../scenes";
 import { fillLog, weeklyReport, type PostRow, type StatRow } from "../report";
 import { onlineFollowers } from "@/lib/instagram";
 import { mix, narrate } from "../voice";
@@ -42,7 +38,7 @@ import { anchorAt } from "@trailer-kit/narration";
 
 const ROOT = process.cwd();
 const EXPORT = path.join(ROOT, ".claude/skills/gg/kit/tools/export.mjs");
-const SCENES: Record<string, readonly string[]> = { brasil: [...BRASIL_SCENES, ...BRASIL_TAKES], bay: [...BAY_SCENES, ...BAY_TAKES], towns: TOWN_SCENES };
+const SCENES = WORLD_SCENES;
 
 function home(): string {
   const h = process.env.REELS_HOME;
@@ -71,8 +67,15 @@ function allIds(): string[] {
 function mainOf(spec: ReelSpec): ReelSpec | null {
   if (spec.kind === "main") return null;
   const date = specDir(spec.id).date;
-  const main = allIds().filter((id) => id.startsWith(date)).map(loadSpec).find((s) => s.kind === "main");
-  return main ?? null;
+  for (const id of allIds().filter((x) => x.startsWith(date) && x !== spec.id)) {
+    try {
+      const s = loadSpec(id);
+      if (s.kind === "main") return s;
+    } catch {
+      // A spec this engine can't read (another worktree's newer overlays): not comparable.
+    }
+  }
+  return null;
 }
 
 const words = (id: string): Word[] | null => {
@@ -87,9 +90,13 @@ function report(issues: Issue[]): boolean {
 }
 
 function textIssues(spec: ReelSpec, config: ReelsConfig): Issue[] {
+  // Other reels' first lines, read raw: a spec from a newer engine (another worktree's) still counts.
   const priorHooks = allIds()
     .filter((id) => id !== spec.id)
-    .map((id) => loadSpec(id).lines[0].show.replace(/\*/g, ""));
+    .flatMap((id) => {
+      const raw = JSON.parse(readFileSync(path.join(dirOf(id), "spec.json"), "utf8")) as { lines?: { show?: string }[] };
+      return raw.lines?.[0]?.show ? [raw.lines[0].show.replace(/\*/g, "")] : [];
+    });
   return checkText(spec, {
     scenes: SCENES[spec.world.type] ?? [],
     priorHooks,

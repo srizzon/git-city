@@ -227,6 +227,6 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
 }
 
 /** The scenes this world plays (the validator checks specs against it). */
-export const BRASIL_SCENES = ["overview", "dive", "lot-rise", "orbit", "wide", "pullback"] as const;
+export { BRASIL_SCENES } from "@/lib/reel/scenes";
 /** Scenes that frame the whole country: no balloon over a roof. */
 export const WIDE_SCENES = new Set(["overview", "dive", "wide"]);

@@ -70,7 +70,7 @@ const ORBITS: Record<"drop" | "push-in" | "facade-rise" | "sweep" | "away" | "lo
   ],
 };
 
-export const BAY_SCENES = ["fly", "rise-out", "drop", "push-in", "facade-rise", "sweep", "away", "lot", "pullback"] as const;
+export { BAY_SCENES } from "@/lib/reel/scenes";
 /** Scenes with no balloon over a roof. */
 export const BAY_WIDE = new Set(["fly", "rise-out", "away"]);
 

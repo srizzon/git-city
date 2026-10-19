@@ -31,8 +31,6 @@ import { placeBalloon } from "@/components/reel/ReelOverlay";
 //   circle       on round it, slower                               params: login
 //   pull-off     pulling off it                                    params: login
 
-export const TOWN_SCENES = ["tower", "collapse", "flag", "montage-hit", "intact", "circle", "pull-off"] as const;
-
 const DEBRIS = ["#1c2233", "#2a3147", "#ffd76a", "#ffe9a8", "#8fa3c7", "#3a4462"];
 const CAR_COLOR = "#e07a4f";
 const SPEED = 80;

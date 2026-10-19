@@ -18,6 +18,7 @@ import { RAMP_BIG } from "@/lib/league-city/ramp";
 import type { SmashStore } from "@/lib/league-city/smash";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import { cutAt, type Reel, type ReelCut } from "@/lib/reel/film";
+import { BAY_TAKES } from "@/lib/reel/scenes";
 
 // Gameplay takes in the home city, staged on a real downtown avenue and
 // played off the film's clock: cars cruising, drifting, boosting, firing a
@@ -44,7 +45,6 @@ import { cutAt, type Reel, type ReelCut } from "@/lib/reel/film";
 // (low by the rear wheel), top, drone (high behind), pass (fixed, it goes by), orbit, below.
 //   league-crown round a tower (params.login) wearing the week's town crown on its roof
 
-export const BAY_TAKES = ["car-cruise", "car-drift", "car-boost", "car-missile", "car-ramp", "crown-grab", "car-ram", "tower-fall", "fly-canyon", "boss", "league-crown"] as const;
 export const isTake = (kind: string) => (BAY_TAKES as readonly string[]).includes(kind);
 
 /** A downtown avenue between ~230-unit towers (found on the layout): where the takes happen. */

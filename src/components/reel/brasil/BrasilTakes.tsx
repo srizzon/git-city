@@ -12,6 +12,7 @@ import type { LiveSpot } from "@/lib/drift/spots/types";
 import type { TrackSample } from "@/lib/league-city/race/track";
 import { beatOf, type FilmClock } from "@trailer-kit/clock";
 import { cutAt, type Reel } from "@/lib/reel/film";
+import { BRASIL_TAKES } from "@/lib/reel/scenes";
 
 // Drift takes on the Brasil map's own track (Interlagos cut down to a drift
 // course, lib/drift/spots/brasil), played off the film's clock: a car runs
@@ -24,7 +25,6 @@ import { cutAt, type Reel } from "@/lib/reel/film";
 //
 // params.from: where on the lap the take starts (m from the line; default the S do Senna).
 
-export const BRASIL_TAKES = ["track-drift", "track-top", "track-wide"] as const;
 export const isBrasilTake = (kind: string) => (BRASIL_TAKES as readonly string[]).includes(kind);
 
 const COURSE = courseOf(getLiveSpot("brasil") as LiveSpot);
