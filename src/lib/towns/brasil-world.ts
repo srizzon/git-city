@@ -14,7 +14,7 @@ import { RAMP } from "../league-city/ramp";
 import { faceRoad, lotKey } from "../league-city/placement";
 import type { CityObject, TreeType } from "../league-city/types";
 import { inDriftSite } from "./brasil-drift";
-import { STATE_RINGS, inState, onLand } from "./brasil-geo";
+import { geoAt } from "./brasil-geo";
 import { CITY, ranking, type BrasilLayout, type MapDev, type UF } from "./brasil-map";
 
 const STREET_TREES: TreeType[] = ["tree_default", "tree_oak", "tree_detailed"];
@@ -38,6 +38,7 @@ export interface BrasilWorld {
  */
 export function brasilWorld(layout: BrasilLayout, building: (dev: MapDev, founder: boolean) => CityBuilding, seed = 1): BrasilWorld {
   const rand = rng(seed);
+  const geo = geoAt(layout.scale);
   const objects: CityObject[] = [];
   const byDevId = new Map<number, CityBuilding>();
   const item = (id: string, type: CityObject["item_type"], x: number, z: number, extra: Partial<CityObject> = {}) =>
@@ -60,7 +61,7 @@ export function brasilWorld(layout: BrasilLayout, building: (dev: MapDev, founde
 
   layout.highways.forEach(([x, z], i) => item(`h${i}`, "road", x, z));
   for (const city of all) {
-    const tag = city.uf ?? "isl";
+    const tag = city.key;
     const roads = new Set(city.roads.map(([x, z]) => lotKey(x, z)));
     city.roads.forEach(([x, z], i) => item(`r-${tag}-${i}`, "road", x, z));
     for (const d of city.devs) {
@@ -106,15 +107,15 @@ export function brasilWorld(layout: BrasilLayout, building: (dev: MapDev, founde
       const wx = (hx + Math.cos(a) * r) * LOT;
       const wz = (hz + Math.sin(a) * r) * LOT;
       const lot = lotKey(Math.round(wx / LOT), Math.round(wz / LOT));
-      if (built.has(lot) || !onLand(wx, wz)) continue;
-      tree(`wd-${city.uf}-${k}`, WOODS, wx, wz);
+      if (built.has(lot) || !geo.onLand(wx, wz)) continue;
+      tree(`wd-${city.key}-${k}`, WOODS, wx, wz);
     }
   }
 
   // Copses out in the country (once per state), clear of the cities.
-  for (const city of layout.cities.filter((c) => !c.second)) {
+  for (const city of layout.cities.filter((c) => c.capital)) {
     const uf = city.uf as UF;
-    const ring = STATE_RINGS[uf][0];
+    const ring = geo.stateRings[uf][0];
     const xs = ring.map((p) => p[0]);
     const zs = ring.map((p) => p[1]);
     const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
@@ -122,7 +123,7 @@ export function brasilWorld(layout: BrasilLayout, building: (dev: MapDev, founde
     for (let k = 0, tries = 0; k < copses && tries < copses * 8; tries++) {
       const wx = x0 + rand() * (x1 - x0);
       const wz = z0 + rand() * (z1 - z0);
-      if (!inState(uf, wx, wz) || built.has(lotKey(Math.round(wx / LOT), Math.round(wz / LOT)))) continue;
+      if (!geo.inState(uf, wx, wz) || built.has(lotKey(Math.round(wx / LOT), Math.round(wz / LOT)))) continue;
       k++;
       for (let t = 0; t < 6; t++) tree(`w-${uf}-${k}-${t}`, WOODS, wx + (rand() - 0.5) * 180, wz + (rand() - 0.5) * 180);
     }
@@ -140,7 +141,8 @@ export function brasilWorld(layout: BrasilLayout, building: (dev: MapDev, founde
 
   const top = ranking(layout)[0];
   if (top) {
-    const lead = layout.cities.find((c) => c.uf === top.uf && !c.second)!;
+    // Over the state's biggest city.
+    const lead = layout.cities.filter((c) => c.uf === top.uf).sort((a, b) => b.devs.length - a.devs.length || Number(b.capital) - Number(a.capital))[0];
     const [x, z] = lead.center;
     item("blimp-lead", "blimp", x, z, { px: x * LOT, pz: z * LOT, props: { text: `${top.uf} LEADS · ${top.devs} DEVS`, color: "#c8e64a", bg: "#0b0f19", alt: 220 } });
   }
@@ -176,7 +178,7 @@ export function brasilWorld(layout: BrasilLayout, building: (dev: MapDev, founde
     const set = new Set(city.roads.map(([x, z]) => lotKey(x, z)));
     const runs = city.roads.filter(([x, z]) => straight(set, x, z) !== null && !highwaySet.has(lotKey(x, z)));
     if (runs.length < 4) continue;
-    const tag = city.uf ? `${city.uf}${city.second ? 2 : 1}` : "isl";
+    const tag = city.key;
     const [hx, hz] = runs[Math.floor(runs.length / 3)];
     hill(`hill-${tag}`, hx, hz, straight(set, hx, hz)!);
     const [px, pz] = runs[Math.floor((runs.length * 2) / 3)];

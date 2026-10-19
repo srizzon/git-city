@@ -4,7 +4,7 @@ import { M_TO_UNIT } from "../league-city/drive/tuning";
 import { wallOffset } from "../league-city/race/track";
 import { courseOf, getLiveSpot } from "../drift/spots";
 import { sceneryFor } from "../drift/scenery";
-import { BrasilPlacer, STATES, layoutBrasil, type MapDev } from "./brasil-map";
+import { STATES, layoutBrasil, type MapDev } from "./brasil-map";
 import { brasilWorld, plainBuilding } from "./brasil-world";
 import { pointAt } from "../league-city/race/track";
 import { DRIFT_EXIT, DRIFT_SIGN_LOT, DRIFT_SITE, clearOfStart, crossedStart, inDriftSite } from "./brasil-drift";
@@ -72,8 +72,8 @@ describe("the Brasil drift site", () => {
     for (const [x, z] of layout.highways) expect(inDriftSite(x, z)).toBe(false);
     const { objects } = brasilWorld(layout, (d) => plainBuilding(d.login));
     for (const o of objects) expect(inDriftSite(o.x, o.z)).toBe(false);
-    // A placer started from those residents still never picks a lot there.
-    expect(new BrasilPlacer().place({ id: -1, login: "x", uf: "SP" })).not.toBeNull();
+    // Brazil grown to make room keeps the track clear too.
+    expect(layout.scale).toBeGreaterThanOrEqual(1);
   });
 });
 

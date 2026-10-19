@@ -257,6 +257,8 @@ export interface LandGrid {
   d: number;
   /** 1: land, a lot clear of the sea. */
   cells: Uint8Array;
+  /** How many lots are land. */
+  land: number;
 }
 
 const grids = new Map<number, LandGrid>();
@@ -290,14 +292,16 @@ export function landGrid(scale: number): LandGrid {
   }
   // A lot clear of the coast: land, and land all round it.
   const cells = new Uint8Array(w * d);
+  let land = 0;
   for (let j = 1; j < d - 1; j++) {
     for (let i = 1; i < w - 1; i++) {
       let ok = 1;
       for (let dj = -1; dj <= 1 && ok; dj++) for (let di = -1; di <= 1 && ok; di++) ok = raw[(j + dj) * w + i + di];
       cells[j * w + i] = ok;
+      land += ok;
     }
   }
-  const grid = { x0, z0, w, d, cells };
+  const grid = { x0, z0, w, d, cells, land };
   grids.set(scale, grid);
   return grid;
 }

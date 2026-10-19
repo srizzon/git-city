@@ -8,6 +8,7 @@
 // Pure. The list is big (~90 KB gzipped): the client loads it on demand.
 
 import RAW from "./br-cities.json";
+import { normalize, slugOf } from "./br-slug";
 import type { UF } from "./brasil-map";
 
 export interface BrCity {
@@ -37,18 +38,10 @@ export const cityOf = (ibge: number): BrCity | undefined => BY_IBGE.get(ibge);
 /** Each state's capital. */
 export const CAPITAL_OF = new Map(CITIES.filter((c) => c.capital).map((c) => [c.uf, c]));
 
-/** Lowercase, no accents, words split by single spaces: "São José-dos Campos" → "sao jose dos campos". */
-export function normalize(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
+export { normalize };
 
 /** The city's address in links: "campinas-sp". */
-export const citySlug = (c: BrCity) => `${normalize(c.name).replace(/ /g, "-")}-${c.uf.toLowerCase()}`;
+export const citySlug = (c: BrCity) => slugOf(c.name, c.uf);
 
 const BY_SLUG = new Map(CITIES.map((c) => [citySlug(c), c]));
 export const cityBySlug = (slug: string): BrCity | undefined => BY_SLUG.get(slug.toLowerCase());
