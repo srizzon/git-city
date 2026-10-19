@@ -130,7 +130,7 @@ export default function ApuracaoWidget({ slug, initial, onVote }: { slug: string
           )}
         </button>
         {open && (
-          <Panel title="Apuração" onClose={() => setOpen(false)}>
+          <Panel title="Apuração" onClose={() => setOpen(false)} above>
             <div className="mb-2 text-[9px]">{status}</div>
             {full}
           </Panel>

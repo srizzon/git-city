@@ -455,7 +455,7 @@ export default function ElectionPanel({
       {body}
     </Board>
   ) : (
-    <Panel title="President" onClose={onClose}>
+    <Panel title="President" onClose={onClose} above>
       {body}
     </Panel>
   );
