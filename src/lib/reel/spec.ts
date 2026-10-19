@@ -263,16 +263,16 @@ const Urna = z.object({
 });
 
 /**
- * Campaign flyers (santinhos) raining over the frame from the first frame, each a candidate's
- * photo, ballot number and login, falling and turning at its own pace; at `slamAt` the `hero`
- * (a ballot number) slams into the middle, big, with `label` on a terminal plate over it.
+ * Campaign flyers (santinhos) raining over the dimmed world from the first frame, each a
+ * candidate's photo, ballot number and login, falling and turning at its own pace; at `slamAt`
+ * `label` slams into the middle on a big terminal plate (or, with `hero`, that candidate's flyer).
  */
 const Santinhos = z.object({
   type: z.literal("santinhos"),
   from: Anchor,
   to: Anchor.optional(),
   cards: z.array(z.object({ number: z.string(), login: z.string(), avatar: z.string() })).min(3),
-  hero: z.string(),
+  hero: z.string().optional(),
   slamAt: Anchor,
   label: z.string().optional(),
 });

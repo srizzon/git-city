@@ -97,7 +97,7 @@ export function placeBalloon(
 export function overlayBoxes(stage: HTMLElement): { name: string; x: number; y: number; w: number; h: number }[] {
   const s = stage.getBoundingClientRect();
   return [...stage.querySelectorAll<HTMLElement>("[data-reel-box]")].flatMap((el) => {
-    if (Number(el.style.opacity || 1) < 0.5) return [];
+    if (Number(el.style.opacity || 1) < 0.5 || getComputedStyle(el).visibility === "hidden") return [];
     // A box inside a panel (the phone's screen) shows only while its panel does.
     const panel = el.closest<HTMLElement>("[data-panel]");
     if (panel && Number(panel.style.opacity || 1) < 0.5) return [];
@@ -332,9 +332,10 @@ function Santinho({ card, size }: { card: { number: string; login: string; avata
 }
 
 function SantinhosPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "santinhos" }> }) {
-  const hero = panel.cards.find((c) => c.number === panel.hero) ?? panel.cards[0];
+  const hero = panel.hero ? (panel.cards.find((c) => c.number === panel.hero) ?? null) : null;
   return (
-    <div data-panel={index} className="absolute inset-0 overflow-hidden" style={{ zIndex: 5, opacity: 0, backgroundColor: BRAND.bg, backgroundImage: `radial-gradient(${BRAND.dot} 0.28cqw, transparent 0.3cqw)`, backgroundSize: "3cqw 3cqw" }}>
+    // The world stays behind, dimmed, so the rain falls over the map.
+    <div data-panel={index} className="absolute inset-0 overflow-hidden" style={{ zIndex: 5, opacity: 0, background: "rgba(12,13,11,.62)" }}>
       {Array.from({ length: FLYERS }, (_, i) => {
         const f = flyerPath(i);
         return (
@@ -343,17 +344,35 @@ function SantinhosPanel({ index, panel }: { index: number; panel: Extract<ReelPa
           </div>
         );
       })}
-      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: "15%", gap: CARD_GAP.group }}>
-        {panel.label && (
-          <p data-reel-box="santinhos" data-slam-label className="font-pixel uppercase" style={{ ...PLATE, fontSize: "3.9cqw", whiteSpace: "nowrap", visibility: "hidden" }}>
-            <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>
-            {panel.label}
-          </p>
-        )}
-        <div data-hero style={{ visibility: "hidden" }}>
-          <Santinho card={hero} size="52cqw" />
+      {hero ? (
+        <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: "15%", gap: CARD_GAP.group }}>
+          {panel.label && (
+            <p data-reel-box="santinhos" data-slam-label className="font-pixel uppercase" style={{ ...PLATE, fontSize: "3.9cqw", whiteSpace: "nowrap", visibility: "hidden" }}>
+              <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>
+              {panel.label}
+            </p>
+          )}
+          <div data-hero style={{ visibility: "hidden" }}>
+            <Santinho card={hero} size="52cqw" />
+          </div>
         </div>
-      </div>
+      ) : (
+        // No hero: the label itself is what lands, big, on its plate.
+        <div className="absolute inset-x-0 flex justify-center" style={{ top: "34%" }}>
+          <div data-hero data-reel-box="santinhos" className="font-pixel uppercase" style={{ ...PLATE, maxWidth: "72%", fontSize: "8.4cqw", lineHeight: 1.3, textAlign: "center", padding: "3cqw 4cqw", visibility: "hidden" }}>
+            <span style={{ color: BRAND.green, marginRight: "0.5em" }}>&gt;</span>
+            {(panel.label ?? "").split(/(\*[^*]+\*)/).map((part, i) =>
+              part.startsWith("*") ? (
+                <span key={i} style={{ color: BRAND.green }}>
+                  {part.slice(1, -1)}
+                </span>
+              ) : (
+                part
+              ),
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -377,7 +396,7 @@ function drawSantinhos(el: HTMLElement, p: Extract<ReelPanel, { kind: "santinhos
   if (hero) {
     hero.style.visibility = t >= p.slamAt ? "" : "hidden";
     // From big and tilted down to its size, a little turned: it lands.
-    hero.style.transform = `scale(${1 + 1.6 * (1 - ease(k))}) rotate(${-4 - 10 * (1 - k)}deg)`;
+    hero.style.transform = `scale(${1 + 1.6 * (1 - ease(k))}) rotate(${(p.hero ? -4 : -2) - 10 * (1 - k)}deg)`;
   }
   if (label) label.style.visibility = t >= p.slamAt + 0.15 ? "" : "hidden";
 }
