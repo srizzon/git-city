@@ -47,6 +47,7 @@ export type ReelPanel =
     }
   | { kind: "score"; from: number; to: number; icon: string; value: string }
   | { kind: "pointer"; from: number; to: number; label: string }
+  | { kind: "santinhos"; from: number; to: number; cards: { number: string; login: string; avatar: string }[]; hero: string; slamAt: number; label: string | null }
   | { kind: "urna"; from: number; to: number; number: string; login: string; avatar: string; uf: string | null; typeAt: number; confirmAt: number | null; label: string | null }
   | {
       kind: "card";
@@ -204,6 +205,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
       });
       return [{ kind: "phone", from, to, screens }];
     }
+    if (o.type === "santinhos") return [{ kind: "santinhos", from, to, cards: o.cards, hero: o.hero, slamAt: anchorAt(words, o.slamAt, from), label: o.label ?? null }];
     if (o.type === "urna")
       return [
         {

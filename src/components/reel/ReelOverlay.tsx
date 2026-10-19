@@ -304,6 +304,84 @@ function CardPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, 
   );
 }
 
+// ── Santinhos: campaign flyers raining over the frame ──
+/** How many flyers fall, and over how long they keep coming (seconds). */
+const FLYERS = 28;
+const FLYER_SPREAD = 3.2;
+
+/** A flyer's fall: when it enters, where across, how fast, how it turns (fixed per index, so every render matches). */
+function flyerPath(i: number) {
+  const r = (k: number) => {
+    const x = Math.sin((i + 1) * 12.9898 + k * 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  // A third of them already falling at the first frame: the rain is on screen from the start.
+  return { start: (i / FLYERS) * FLYER_SPREAD - 1.1 - 0.35 * r(1), x: 4 + r(2) * 74, speed: 70 + r(3) * 45, turn0: -35 + r(4) * 70, spin: (r(5) - 0.5) * 160, sway: 2 + r(6) * 4, size: 22 + r(7) * 8 };
+}
+
+function Santinho({ card, size }: { card: { number: string; login: string; avatar: string }; size: string }) {
+  return (
+    <div className="flex flex-col items-center font-pixel uppercase" style={{ width: size, background: BRAND.ink, color: BRAND.bg, padding: "0.06em", boxShadow: HARD, fontSize: `calc(${size} / 6)` }}>
+      <span style={{ fontSize: "0.42em", padding: "0.3em 0", letterSpacing: "0.05em" }}>Presidente</span>
+      {/* eslint-disable-next-line @next/next/no-img-element -- the candidate's GitHub photo */}
+      <img alt="" src={card.avatar} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
+      <span style={{ width: "100%", textAlign: "center", background: BRAND.green, color: BRAND.onGreen, fontSize: "1.5em", lineHeight: 1.15 }}>{card.number}</span>
+      <span style={{ fontSize: "0.36em", padding: "0.35em 0 0.3em", textTransform: "none", maxWidth: "100%", overflow: "hidden", whiteSpace: "nowrap" }}>@{card.login}</span>
+    </div>
+  );
+}
+
+function SantinhosPanel({ index, panel }: { index: number; panel: Extract<ReelPanel, { kind: "santinhos" }> }) {
+  const hero = panel.cards.find((c) => c.number === panel.hero) ?? panel.cards[0];
+  return (
+    <div data-panel={index} className="absolute inset-0 overflow-hidden" style={{ zIndex: 5, opacity: 0, backgroundColor: BRAND.bg, backgroundImage: `radial-gradient(${BRAND.dot} 0.28cqw, transparent 0.3cqw)`, backgroundSize: "3cqw 3cqw" }}>
+      {Array.from({ length: FLYERS }, (_, i) => {
+        const f = flyerPath(i);
+        return (
+          <div key={i} data-fly={i} className="absolute" style={{ left: `${f.x}%`, top: 0, visibility: "hidden" }}>
+            <Santinho card={panel.cards[i % panel.cards.length]} size={`${f.size}cqw`} />
+          </div>
+        );
+      })}
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: "15%", gap: CARD_GAP.group }}>
+        {panel.label && (
+          <p data-reel-box="santinhos" data-slam-label className="font-pixel uppercase" style={{ ...PLATE, fontSize: "3.9cqw", whiteSpace: "nowrap", visibility: "hidden" }}>
+            <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>
+            {panel.label}
+          </p>
+        )}
+        <div data-hero style={{ visibility: "hidden" }}>
+          <Santinho card={hero} size="52cqw" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Each frame of the rain: every flyer falling and turning from its start; the hero slamming in big at `slamAt`. */
+function drawSantinhos(el: HTMLElement, p: Extract<ReelPanel, { kind: "santinhos" }>, t: number) {
+  const local = t - p.from;
+  el.querySelectorAll<HTMLElement>("[data-fly]").forEach((x) => {
+    const f = flyerPath(Number(x.dataset.fly));
+    const s = local - f.start;
+    const y = -45 + s * f.speed;
+    const on = s >= 0 && y < 110;
+    x.style.visibility = on ? "" : "hidden";
+    if (!on) return;
+    x.style.top = `${y}%`;
+    x.style.transform = `translateX(${Math.sin(s * 3 + f.x) * f.sway}cqw) rotate(${f.turn0 + f.spin * s}deg)`;
+  });
+  const hero = el.querySelector<HTMLElement>("[data-hero]");
+  const label = el.querySelector<HTMLElement>("[data-slam-label]");
+  const k = clamp((t - p.slamAt) / 0.18);
+  if (hero) {
+    hero.style.visibility = t >= p.slamAt ? "" : "hidden";
+    // From big and tilted down to its size, a little turned: it lands.
+    hero.style.transform = `scale(${1 + 1.6 * (1 - ease(k))}) rotate(${-4 - 10 * (1 - k)}deg)`;
+  }
+  if (label) label.style.visibility = t >= p.slamAt + 0.15 ? "" : "hidden";
+}
+
 // The game's voting machine (ElectionPanel's look and colours), drawn big for a reel.
 const URNA = { casing: "#d9dad4", edge: "#8d8d87", screen: "#eef0ea", frame: "#9a9a94", ink: "#1b1d22", pad: "#3a3c42", key: "#25272c", green: "#3fae49", orange: "#e4572e" };
 /** Seconds between one key and the next, and how long a pressed key stays down. */
@@ -491,6 +569,12 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
   panels.forEach((p, i) => {
     const el = root.querySelector<HTMLElement>(`[data-panel="${i}"]`);
     if (!el) return;
+    if (p.kind === "santinhos") {
+      const up = t >= p.from && t < p.to;
+      el.style.opacity = up ? "1" : "0";
+      if (up) drawSantinhos(el, p, t);
+      return;
+    }
     // The machine cuts in and out like a card.
     if (p.kind === "urna") {
       const up = t >= p.from && t < p.to;
@@ -1209,6 +1293,7 @@ function Panel({
   if (panel.kind === "phone") return <PhonePanel index={index} panel={panel} />;
   if (panel.kind === "card") return <CardPanel index={index} panel={panel} />;
   if (panel.kind === "urna") return <UrnaPanel index={index} panel={panel} />;
+  if (panel.kind === "santinhos") return <SantinhosPanel index={index} panel={panel} />;
   if (panel.kind === "pointer") return <PointerPanel index={index} label={panel.label} />;
   if (panel.kind === "counter" && plates)
     return (
@@ -1525,7 +1610,7 @@ export default function ReelOverlay({
       const t = beatOf(clock);
       const i = reel.lines.findIndex((l) => t >= l.from && t < l.to);
       // While a card is up it is the frame: the captions, the header and the headline step aside.
-      const card = reel.panels.some((p) => (p.kind === "card" || p.kind === "urna") && t >= p.from && t < p.to);
+      const card = reel.panels.some((p) => (p.kind === "card" || p.kind === "urna" || p.kind === "santinhos") && t >= p.from && t < p.to);
       const el = line.current;
       if (el) {
         if (i !== shown) {

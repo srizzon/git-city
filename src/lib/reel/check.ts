@@ -58,6 +58,8 @@ function onScreen(spec: ReelSpec): string[] {
                   ? [o.value]
                 : o.type === "score"
                   ? [o.value]
+                : o.type === "santinhos"
+                  ? [...o.cards.map((c) => c.number), ...(o.label ? [o.label] : [])]
                 : o.type === "urna"
                   ? [o.number, ...(o.label ? [o.label] : [])]
                 : o.type === "pointer"
@@ -155,7 +157,7 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
     for (const n of numbersIn(plain)) if (!known.has(n)) fail("real data", `"${n}" on screen isn't a fact: "${text}"`);
   }
   const logins = spec.overlays.flatMap((o) =>
-    o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" || o.type === "pins" ? o.rows.map((r) => r.login) : o.type === "poster" || o.type === "profile" || o.type === "place" || o.type === "urna" ? [o.login] : [],
+    o.type === "balloon" ? (o.target === "example" ? [] : [o.target.login]) : o.type === "roster" || o.type === "pins" ? o.rows.map((r) => r.login) : o.type === "poster" || o.type === "profile" || o.type === "place" || o.type === "urna" ? [o.login] : o.type === "santinhos" ? o.cards.map((c) => c.login) : [],
   );
   for (const login of logins) if (!known.has(login.toLowerCase())) fail("real data", `${login} on screen isn't in the facts.`);
 

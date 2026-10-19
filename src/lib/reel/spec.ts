@@ -262,7 +262,22 @@ const Urna = z.object({
   label: z.string().optional(),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna]);
+/**
+ * Campaign flyers (santinhos) raining over the frame from the first frame, each a candidate's
+ * photo, ballot number and login, falling and turning at its own pace; at `slamAt` the `hero`
+ * (a ballot number) slams into the middle, big, with `label` on a terminal plate over it.
+ */
+const Santinhos = z.object({
+  type: z.literal("santinhos"),
+  from: Anchor,
+  to: Anchor.optional(),
+  cards: z.array(z.object({ number: z.string(), login: z.string(), avatar: z.string() })).min(3),
+  hero: z.string(),
+  slamAt: Anchor,
+  label: z.string().optional(),
+});
+
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna, Santinhos]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({
