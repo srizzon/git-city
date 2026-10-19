@@ -108,6 +108,19 @@ export type PlaceOutcome = {
   founded: boolean;
 };
 
+/**
+ * Each state's founder (login by UF): the first dev who ever arrived in it, kept
+ * (brasil_state_founders) whatever city they move to later.
+ */
+export async function getBrasilStateFounders(leagueId: string): Promise<Partial<Record<UF, string>>> {
+  const { data } = await getSupabaseAdmin()
+    .from("brasil_state_founders")
+    .select("uf, developers(github_login)")
+    .eq("league_id", leagueId)
+    .returns<{ uf: UF; developers: { github_login: string } | null }[]>();
+  return Object.fromEntries((data ?? []).flatMap((r) => (r.developers ? [[r.uf, r.developers.github_login]] : [])));
+}
+
 /** The city a dev named only by state goes to: its capital. */
 export const cityForState = (uf: UF | null): number | null => (uf ? capitalIbge(uf) : null);
 
@@ -158,6 +171,9 @@ export async function placeBrasilResident(
     if (!error) {
       invalidateLeague(league.id);
       if (!there) await awardPoints(dev.id, "join", String(dev.id));
+      // The first dev ever in a state founds it, for good (a later move doesn't pass it on).
+      if (info?.uf)
+        await sb.from("brasil_state_founders").upsert({ league_id: league.id, uf: info.uf, developer_id: dev.id }, { onConflict: "league_id,uf", ignoreDuplicates: true });
       if (grew) console.info(`[brasil] the map grew to ${map.scale}`);
       return { status: there ? "moved" : "added", city, founded: !island && before === 0 };
     }

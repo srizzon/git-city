@@ -12,9 +12,9 @@
 // recalcs): a few reads, the rest computed here.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { STATES, layoutFromState, type BrasilLayout, type Resident } from "@/lib/towns/brasil-map";
+import { STATES, layoutFromState, type BrasilLayout, type Resident, type UF } from "@/lib/towns/brasil-map";
 import { brasilOffices } from "@/lib/towns/brasil-roles";
-import { BRASIL_SLUG, getBrasilWeek, readMapState, type BrasilWeek } from "@/lib/towns/brasil-server";
+import { BRASIL_SLUG, getBrasilStateFounders, getBrasilWeek, readMapState, type BrasilWeek } from "@/lib/towns/brasil-server";
 import { getCount, type Count } from "@/lib/towns/brasil-election-server";
 
 export interface DevRow {
@@ -38,12 +38,14 @@ export interface FactsInput {
   comments: CommentRow[];
   week: BrasilWeek;
   count: Count | null;
+  /** Each state's founder (the first dev ever in it, kept when they move). */
+  stateFounders?: Partial<Record<UF, string>>;
   now: number;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
 
-export function computeFacts({ layout, residents, devs, comments, week, count, now }: FactsInput) {
+export function computeFacts({ layout, residents, devs, comments, week, count, stateFounders = {}, now }: FactsInput) {
   const dev = new Map(devs.map((d) => [d.github_login.toLowerCase(), d]));
   const of = (login: string) => dev.get(login.toLowerCase());
   const fresh = residents.filter((r) => now - r.at < DAY);
@@ -69,7 +71,7 @@ export function computeFacts({ layout, residents, devs, comments, week, count, n
       devs: mine.length,
       new24h: mine.filter((r) => now - r.at < DAY).length,
       cities: layout.cities.filter((c) => c.uf === s.uf && c.devs.length > 0).length,
-      founder: capital?.devs.find((d) => d.founder)?.dev.login ?? null,
+      founder: stateFounders[s.uf] ?? capital?.devs.find((d) => d.founder)?.dev.login ?? null,
       biggest: top,
       language: lang ? { name: lang[0], devs: lang[1] } : null,
       streak: streak && streak[1] > 0 ? { login: streak[0], days: streak[1] } : null,
@@ -161,11 +163,12 @@ export async function loadFactsInput(sb: SupabaseClient, now: number): Promise<F
     if (e) throw new Error(`developers: ${e.message}`);
     devs.push(...((data ?? []) as DevRow[]));
   }
-  const [comments, week, count] = await Promise.all([
+  const [comments, week, count, stateFounders] = await Promise.all([
     paged<CommentRow>((a, b) => sb.from("brasil_comments").select("reel, outcome, created_at").range(a, b)),
     getBrasilWeek(league.id),
     // The presidency can be off (no vote yet): no count is no facts, not a failure.
     getCount(league.id).catch(() => null),
+    getBrasilStateFounders(league.id),
   ]);
-  return { layout: layoutFromState(state), residents: state.residents, devs, comments, week, count, now };
+  return { layout: layoutFromState(state), residents: state.residents, devs, comments, week, count, stateFounders, now };
 }

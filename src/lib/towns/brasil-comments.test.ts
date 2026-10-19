@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseComment, replyFor } from "./brasil-comments";
+import { parseComment, pickReading, replyFor } from "./brasil-comments";
 
 describe("parseComment", () => {
   it.each([
@@ -11,7 +11,8 @@ describe("parseComment", () => {
     ["sou de Recife PE @maria-dev", { login: "maria-dev", uf: "PE", place: "sou de recife" }],
     ["@joao rio grande do sul", { login: "joao", uf: "RS", place: null }],
     ["coloca eu aqui @ana-b, Minas Gerais", { login: "ana-b", uf: "MG", place: null }],
-    ["@pedro", { login: "pedro", uf: null, place: null }],
+    // An @ alone tags a friend (the reels ask for "seuuser Cidade" and "@amigo" for friends).
+    ["@pedro", { login: null, uf: null, place: null }],
     ["Bahia!", { login: null, uf: "BA", place: null }],
     ["top demais kkkk", { login: null, uf: null, place: null }],
     ["Slickinh0", { login: "slickinh0", uf: null, place: null }],
@@ -34,8 +35,27 @@ describe("parseComment", () => {
     ["@amigo seuuser campinas", { login: "seuuser", uf: null, place: "campinas" }],
     ["@srizzon SP @maria", { login: "srizzon", uf: "SP", place: null }],
     ["@srizzon campinas @maria", { login: "srizzon", uf: null, place: "campinas" }],
+    // Real comments under Brasil Dia 2 (2026-10-19).
+    ["@vitor.mb_", { login: null, uf: null, place: null }],
+    ["@l.costadias", { login: null, uf: null, place: null }],
+    ["@julinhodev", { login: null, uf: null, place: null }],
+    ["@luisphillipe87 @matheus_fontenele", { login: null, uf: null, place: null }],
+    ["@offthype rodou ?", { login: null, uf: null, place: null }],
+    ["Cigano-agi, Blumenau \n\n@guilhermearoxo.ia", { login: "cigano-agi", uf: null, place: "blumenau" }],
+    ["Agustin mineiros go", { login: "agustin", uf: "GO", place: "mineiros" }],
+    ["MuriloDev07 Paraíba, não sei se já adicionou", { login: "murilodev07", uf: "PB", place: null }],
+    ["@millersantosbr Maceió", { login: "millersantosbr", uf: null, place: "maceio" }],
   ])("%s", (text, want) => {
     expect(parseComment(text)).toEqual(want);
+  });
+
+  it("reads a lone @ as the commenter's username only when asked (they aren't on the map yet)", () => {
+    expect(parseComment("@chicoduartec", { loneHandle: true }).login).toBe("chicoduartec");
+    expect(parseComment("@chicoduartec").login).toBeNull();
+    expect(parseComment("@vitor.mb_", { loneHandle: true }).login).toBeNull();
+    expect(parseComment("@a @b", { loneHandle: true }).login).toBeNull();
+    expect(parseComment("voto @gemison.x07").login).toBeNull();
+    expect(parseComment("@p.ferraz3 up").login).toBeNull();
   });
 
   it("never takes a state's sigla for a username", () => {
@@ -104,5 +124,25 @@ describe("replyFor with cities", () => {
     const r = replyFor("which_city", "joao", null, "brasil", null, { city: "Santa Rita", founded: false, options: ["MA", "PB"] })!;
     expect(r).toBe("joao, qual Santa Rita? Tem em MA e PB. Responde com o estado que eu coloco 😉");
     expect(r).not.toContain("@");
+  });
+});
+
+describe("pickReading", () => {
+  const none = { login: null, uf: null, place: null };
+  it("drops a login the model took from a friend's tag", () => {
+    expect(pickReading("@offthype rodou ?", { login: "rodou", uf: null, place: null }, none).login).toBeNull();
+    expect(pickReading("@luisphillipe87 @matheus_fontenele", { login: "luisphillipe87", uf: null, place: null }, none).login).toBeNull();
+  });
+  it("drops a login cut out of an Instagram handle", () => {
+    const rules = { login: "cigano-agi", uf: null, place: "blumenau" };
+    expect(pickReading("Cigano-agi, Blumenau @guilhermearoxo.ia", { login: "guilhermearoxo", uf: null, place: null }, rules)).toEqual(rules);
+  });
+  it("takes the rules' login next to a place when the model finds none", () => {
+    const rules = { login: "agustin", uf: "GO" as const, place: "mineiros" };
+    expect(pickReading("Agustin mineiros go", { login: null, uf: "GO", place: "mineiros" }, rules)).toEqual(rules);
+  });
+  it("keeps the model's reading otherwise", () => {
+    const model = { login: "millersantosbr", uf: "AL" as const, place: "Maceió" };
+    expect(pickReading("@millersantosbr Maceió", model, { login: "millersantosbr", uf: null, place: "maceio" })).toBe(model);
   });
 });
