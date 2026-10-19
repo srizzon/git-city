@@ -11,7 +11,7 @@ import type { BrasilLayout } from "@/lib/towns/brasil-map";
 import { cityByKey, nearestCity, parseRouteKey, pickDestination, raceRoute, toRallyRoute, type RaceLength, type RaceRoute } from "@/lib/towns/brasil-race";
 import type { RallyView } from "@/components/league/drive/RallyMode";
 import { Band } from "@/components/games/ui";
-import { GameClock, GameInvite, GameOnBand, GameResults, GameStandings, Keys, LIGHTS, T, type ResultRow, type StandingRow } from "@/components/games/kit";
+import { GameClock, GameInvite, GameOnBand, GameResults, GameStandings, KEYS_ONLY, Keys, LIGHTS, T, type ResultRow, type StandingRow } from "@/components/games/kit";
 import { Chip } from "@/components/games/ui";
 
 // The Brasil map's city race in the car games' kit (components/games): the
@@ -197,7 +197,10 @@ export function RacePicker({
       <div className="grid grid-cols-2 gap-1.5">
         <button type="button" onClick={() => setDraft(draw(layout, telemetry, length))} className="outline-none active:translate-y-px">
           <Band delay={340} className="min-h-11 w-full justify-center gap-2 px-3 py-2.5 text-cream" style={{ fontSize: T.small }}>
-            <Chip>R</Chip> Other city
+            <span className={KEYS_ONLY}>
+              <Chip>R</Chip>
+            </span>{" "}
+            Other city
           </Band>
         </button>
         {draft.route && (
