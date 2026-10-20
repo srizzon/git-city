@@ -189,9 +189,9 @@ export default function ProjectsCard({
           type="button"
           onClick={() => setSheet(true)}
           aria-label="Projects this week"
-          className="pointer-events-auto absolute right-3 top-[104px] z-20 flex max-w-[48vw] items-center gap-2 border-2 border-border bg-bg/90 px-2.5 py-1.5 font-pixel text-[9px] uppercase backdrop-blur-sm"
+          className="pointer-events-auto absolute right-3 top-[104px] z-20 flex h-9 w-[calc(50%-16px)] items-center gap-2 border-[3px] border-border bg-bg/90 px-2.5 font-pixel text-[9px] uppercase backdrop-blur-sm"
         >
-          <span className="text-lime">Projects</span>
+          <span className="shrink-0 text-lime">Projects</span>
           {lead ? <span className="truncate normal-case text-cream">{lead.name}</span> : <span className="text-muted">Share yours</span>}
         </button>
         {sheet && (
