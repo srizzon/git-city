@@ -85,7 +85,7 @@ export async function GET(req: Request) {
       ? (
           await getSupabaseAdmin()
             .from("brasil_projects")
-            .select("name, developers(github_login)")
+            .select("name, developers:developers!brasil_projects_developer_id_fkey(github_login)")
             .eq("league_id", league.id)
             .eq("slug", projectSlug)
             .eq("status", "live")

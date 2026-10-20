@@ -60,7 +60,7 @@ interface ProjectRow {
 }
 
 const COLUMNS =
-  "id, league_id, developer_id, slug, name, tagline, description, url, url_host, repo, category, icon_url, cover_url, uf, ibge, status, status_reason, appealed, launch_week, votes_counted, votes_total, visits, live_at, created_at, updated_at, developers(github_login, avatar_url)";
+  "id, league_id, developer_id, slug, name, tagline, description, url, url_host, repo, category, icon_url, cover_url, uf, ibge, status, status_reason, appealed, launch_week, votes_counted, votes_total, visits, live_at, created_at, updated_at, developers:developers!brasil_projects_developer_id_fkey(github_login, avatar_url)";
 
 export interface Viewer {
   id: number;
@@ -177,7 +177,8 @@ export async function getCardData(leagueId: string, viewerId: number | null): Pr
 
 /** A project by its slug, as the viewer sees it: live to everyone, any status to its maker. */
 export async function getProject(leagueId: string, slug: string, viewer: Viewer | null): Promise<(ProjectCard & { status: ProjectStatus; reason: string | null; mine: boolean }) | null> {
-  const { data } = await sb().from("brasil_projects").select(COLUMNS).eq("league_id", leagueId).eq("slug", slug).maybeSingle<ProjectRow>();
+  const { data, error } = await sb().from("brasil_projects").select(COLUMNS).eq("league_id", leagueId).eq("slug", slug).maybeSingle<ProjectRow>();
+  if (error) throw new Error(`projects get: ${error.message}`);
   if (!data) return null;
   const mine = viewer?.id === data.developer_id;
   if (data.status !== "live" && !mine) return null;
@@ -202,7 +203,8 @@ export interface MyProject extends ProjectCard {
 
 /** The viewer's own projects, every status but removed, newest first. */
 export async function myProjects(leagueId: string, viewer: Viewer): Promise<MyProject[]> {
-  const { data } = await sb().from("brasil_projects").select(COLUMNS).eq("league_id", leagueId).eq("developer_id", viewer.id).neq("status", "removed").order("created_at", { ascending: false }).returns<ProjectRow[]>();
+  const { data, error } = await sb().from("brasil_projects").select(COLUMNS).eq("league_id", leagueId).eq("developer_id", viewer.id).neq("status", "removed").order("created_at", { ascending: false }).returns<ProjectRow[]>();
+  if (error) throw new Error(`projects mine: ${error.message}`);
   const rows = data ?? [];
   const week = projectWeek(new Date());
   const ranks = rows.some((r) => r.launch_week === week) ? await weekRanks(leagueId, week) : new Map<number, number>();
@@ -213,7 +215,7 @@ export async function myProjects(leagueId: string, viewer: Viewer): Promise<MyPr
 export async function winsByLogin(leagueId: string): Promise<Record<string, { week: string; name: string; slug: string }>> {
   const { data } = await sb()
     .from("brasil_project_weeks")
-    .select("week, brasil_projects!inner(name, slug, status, developers(github_login))")
+    .select("week, brasil_projects!inner(name, slug, status, developers:developers!brasil_projects_developer_id_fkey(github_login))")
     .eq("league_id", leagueId)
     .eq("rank", 1)
     .order("week", { ascending: false })
