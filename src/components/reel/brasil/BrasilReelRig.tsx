@@ -23,6 +23,9 @@ import BrasilTakes, { isBrasilTake } from "./BrasilTakes";
 // The map's own night (BrasilScene): greens, lime windows. The example building wears it too.
 const NIGHT = townEmerald().theme;
 
+/** An empty city's dot: hot red, unlit, so it reads on the green map at any distance. */
+const EMPTY_DOT = new THREE.MeshBasicMaterial({ color: "#ff3b4e", toneMapped: false });
+
 /** The crown comes down from this far above its place, over this long. */
 const CROWN_DROP = { h: 160, s: 0.9 };
 
@@ -41,10 +44,12 @@ export interface BrasilReelRigProps {
   byLogin: ReadonlyMap<string, CityBuilding>;
   /** Where a state's capital square is, in world units. */
   capitalOf: (uf: string) => [number, number] | null;
+  /** Where the cities nobody lives in stand, for an empties overlay. */
+  empty?: readonly [number, number][];
   balloon: RefObject<HTMLDivElement | null>;
 }
 
-export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, capitalOf, balloon }: BrasilReelRigProps) {
+export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, capitalOf, empty = [], balloon }: BrasilReelRigProps) {
   const { size } = useThree();
   const lone = useMemo(() => (example ? [example] : []), [example]);
   const buildTo = useRef(0);
@@ -110,6 +115,11 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
       }),
     [reel, capitalOf],
   );
+  // The empty cities: a flat dot each, popping in on its own turn (a scattered order, the same every render).
+  const dots = useRef<THREE.InstancedMesh>(null);
+  const dotTurn = useMemo(() => empty.map((_, i) => ((i * 2654435761) % 4294967296) / 4294967296), [empty]);
+  const dotSize = (bounds.maxX - bounds.minX) / 260;
+  const dotM = useMemo(() => new THREE.Matrix4(), []);
   const crownBox = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
   const crownGold = useMemo(() => new THREE.MeshStandardMaterial({ color: "#ffd24a", emissive: "#ffb800", emissiveIntensity: 1.2, toneMapped: false }), []);
   const crownGem = useMemo(() => new THREE.MeshStandardMaterial({ color: "#ff3b6b", emissive: "#ff1f55", emissiveIntensity: 1.4, toneMapped: false }), []);
@@ -157,6 +167,23 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
         slab.current.position.y = built + 0.6;
       }
       if (share >= 1 !== finished) setFinished(share >= 1);
+    }
+
+    // The empty cities pop in over [from, reach], each with a small overshoot, and stay until `to`.
+    const mesh = dots.current;
+    const e = reel.empties.find((x) => t >= x.from && t < x.to + 0.3);
+    if (mesh) {
+      mesh.visible = !!e;
+      if (e) {
+        const out = Math.min(1, Math.max(0, (e.to + 0.3 - t) / 0.3));
+        empty.forEach(([x, z], i) => {
+          const pop = Math.min(1, Math.max(0, (t - (e.from + dotTurn[i] * (e.reach - e.from))) / 0.25));
+          const s = pop <= 0 ? 0 : (1 + 2.7 * Math.pow(pop - 1, 3) + 1.7 * Math.pow(pop - 1, 2)) * out * dotSize;
+          dotM.makeScale(Math.max(1e-4, s), Math.max(1e-4, s * 0.15), Math.max(1e-4, s)).setPosition(x, 4, z);
+          mesh.setMatrixAt(i, dotM);
+        });
+        mesh.instanceMatrix.needsUpdate = true;
+      }
     }
 
     // Photos pinned over capitals: each pops in on its turn in the wave, standing on its capital.
@@ -212,16 +239,21 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
       ))}
     </group>
   ));
+  const emptied = empty.length ? (
+    <instancedMesh ref={dots} args={[crownBox, EMPTY_DOT, empty.length]} visible={false} frustumCulled={false} />
+  ) : null;
   if (!example) return (
     <group>
       {takes}
       {crowned}
+      {emptied}
     </group>
   );
   return (
     <group>
       {takes}
       {crowned}
+      {emptied}
       <CityScene buildings={lone} colors={NIGHT.building} introMode filmMode={finished} buildTo={buildTo} />
       <mesh ref={slab} position={[example.position[0], 0, example.position[2]]} visible={false}>
         <boxGeometry args={[example.width + 1, 1.2, example.depth + 1]} />

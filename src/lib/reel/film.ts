@@ -27,13 +27,14 @@ export interface ReelBalloon {
   plate: string | null;
   drop: boolean;
   badges: { kind: string; at: number; sub: string }[];
+  photoOnBadge: boolean;
 }
 
 /** A panel between the header and the captions: a ranking as bars, or a list of people a page at a time. */
 export type ReelPanel =
   | { kind: "bars"; from: number; to: number; title: string | null; rows: { label: string; value: number | string; lit: boolean }[] }
   | { kind: "roster"; from: number; to: number; title: string | null; rows: { tag: string; login: string; lit: boolean }[]; perPage: number }
-  | { kind: "counter"; from: number; reach: number; to: number; value: number; label: string }
+  | { kind: "counter"; from: number; reach: number; to: number; start: number; value: number; label: string }
   | { kind: "poster"; from: number; to: number; title: string; login: string; when: string; where: string }
   | { kind: "profile"; from: number; to: number; login: string }
   | { kind: "comment"; from: number; to: number; handle: string; parts: { at: number; text: string }[] }
@@ -106,6 +107,7 @@ export interface Reel {
   balloons: ReelBalloon[];
   panels: ReelPanel[];
   pins: ReelPins[];
+  empties: { from: number; reach: number; to: number }[];
   look: ReelSpec["look"];
 }
 
@@ -152,14 +154,16 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
         plate: o.plate ?? null,
         drop: o.drop,
         badges: o.badges.map((b) => ({ kind: b.kind, at: anchorAt(words, b.at, from), sub: b.sub })),
+        photoOnBadge: o.photoOnBadge,
       };
     });
   const panels: ReelPanel[] = spec.overlays.flatMap((o): ReelPanel[] => {
-    if (o.type === "balloon" || o.type === "pins") return [];
+    if (o.type === "balloon" || o.type === "pins" || o.type === "empties") return [];
     const from = anchorAt(words, o.from);
     if (o.type === "counter") {
-      const value = typeof o.value === "number" ? o.value : Number(String(o.value).replace(/\D/g, ""));
-      return [{ kind: "counter", from, reach: anchorAt(words, o.reach, from), to: anchorAt(words, o.to, from), value, label: o.label }];
+      const count = (v: number | string) => (typeof v === "number" ? v : Number(String(v).replace(/\D/g, "")));
+      const value = count(o.value);
+      return [{ kind: "counter", from, reach: anchorAt(words, o.reach, from), to: anchorAt(words, o.to, from), start: o.start === undefined ? 1 : count(o.start), value, label: o.label }];
     }
     if (o.type === "follow") {
       const str = (v: number | string) => (typeof v === "number" ? v.toLocaleString("pt-BR") : v);
@@ -258,6 +262,11 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
     const from = anchorAt(words, o.from);
     return [{ from, to: o.to === undefined ? length : anchorAt(words, o.to, from), stagger: o.stagger, rows: o.rows }];
   });
+  const empties = spec.overlays.flatMap((o) => {
+    if (o.type !== "empties") return [];
+    const from = anchorAt(words, o.from);
+    return [{ from, reach: anchorAt(words, o.reach, from), to: o.to === undefined ? length : anchorAt(words, o.to, from) }];
+  });
   const sounds: SoundCue[] = [
     ...cuts.flatMap((c) => (SCENE_SOUNDS[c.kind] ? [{ beat: c.from + SCENE_SOUNDS[c.kind].at, src: THUD, gain: SCENE_SOUNDS[c.kind].gain, rate: SCENE_SOUNDS[c.kind].rate }] : [])),
     ...spec.sounds.map((x) => ({ beat: anchorAt(words, x.at), src: x.src, gain: x.gain, rate: x.rate })),
@@ -273,7 +282,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
     ...(song ? { song: { src: song, offset: 0 } } : {}),
     frameAt: (beat) => frameOf(shots, beat),
   };
-  return { film, shots, length, cuts, lines, ctaAt: spec.header ? anchorAt(words, spec.header.ctaAt) : Infinity, headline, balloons, panels, pins, look: spec.look };
+  return { film, shots, length, cuts, lines, ctaAt: spec.header ? anchorAt(words, spec.header.ctaAt) : Infinity, headline, balloons, panels, pins, empties, look: spec.look };
 }
 
 /** The cut under way at `t` seconds, and how far into it (0–1). */

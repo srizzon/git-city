@@ -20,7 +20,7 @@ const HeaderLine = z.object({
 });
 
 const Badge = z.object({
-  kind: z.enum(["governor", "senator", "mayor", "president", "founder"]),
+  kind: z.enum(["governor", "senator", "mayor", "president", "founder", "resident"]),
   at: Anchor,
   /** The small line under the title, e.g. "seuuser · SP · esta semana". */
   sub: z.string(),
@@ -38,6 +38,8 @@ const Balloon = z.object({
   /** The plate as a comment (the ink speech bubble) that drops onto its building's lot from above, in hard steps. */
   drop: z.boolean().default(false),
   badges: z.array(Badge).default([]),
+  /** The GitHub photo stays on the badges, left of them, so the office reads as this person's. */
+  photoOnBadge: z.boolean().default(false),
 });
 
 /** A ranking as bars between the header and the captions (the state race). */
@@ -71,6 +73,8 @@ const Counter = z.object({
   reach: Anchor,
   to: Anchor,
   value: z.union([z.number(), z.string()]),
+  /** Where it starts counting from (yesterday's total, so it climbs by the day's arrivals); default 1. */
+  start: z.union([z.number(), z.string()]).optional(),
   label: z.string(),
 });
 
@@ -201,6 +205,17 @@ const Pins = z.object({
 });
 
 /**
+ * The cities nobody lives in yet (a world with a map), each a dot on its place, popping in one after
+ * another in a scattered order from `from` until `reach`, all on the map until `to`: what's still free.
+ */
+const Empties = z.object({
+  type: z.literal("empties"),
+  from: Anchor,
+  reach: Anchor,
+  to: Anchor.optional(),
+});
+
+/**
  * A full-frame card on the channel's dotted dark background that draws what the voice is saying
  * (how to score, a rule): its lines type in, a number in a `*block*` counts up from 0 over the
  * card, and under them one drawing in the channel's style:
@@ -325,7 +340,7 @@ const Race = z.object({
   label: z.string().optional(),
 });
 
-export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Place, Points, Score, Phone, Card, Pointer, Urna, Santinhos, Carousel, Race, Code]);
+export const Overlay = z.discriminatedUnion("type", [Balloon, Bars, Roster, Counter, Poster, Follow, Profile, Comment, Contrib, Pins, Empties, Place, Points, Score, Phone, Card, Pointer, Urna, Santinhos, Carousel, Race, Code]);
 export type Overlay = z.infer<typeof Overlay>;
 
 const BrasilWorld = z.object({

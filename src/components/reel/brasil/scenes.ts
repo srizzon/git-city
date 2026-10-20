@@ -19,7 +19,8 @@
 //              params.login it opens close on that building and pulls out to the country by params.to;
 //              with params.start "previous" it pulls out from wherever the last take left the camera.
 //   fill       over a capital (params.uf) while the map fills up in the order people arrived
-//              (params.from → params.to), the camera easing in and turning
+//              (params.from → params.to; params.start: how many already stand; params.near: closer),
+//              the camera easing in and turning
 //   facade-rise from the street, up the target's facade to its roof (a tall tower; a short one is boxed in)
 //   drop       from high over the city, steeply down onto the target's roof (a short building among towers)
 //   push-in    a quick push in on the target's roof, from high and behind
@@ -298,7 +299,8 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
     }
     case "fill": {
       const target = world.targetOf(cut);
-      return orbitPose(target, FILL, ease(u), 1);
+      // params.near: a share of the usual distance (0.5 = twice as close, the new buildings read as they go up).
+      return orbitPose(target, FILL, ease(u), typeof cut.params.near === "number" ? cut.params.near : 1);
     }
     case "facade-rise": {
       const target = world.targetOf(cut);

@@ -8,6 +8,7 @@ import { lotToWorld } from "@/lib/league-city/grid";
 import { fetchHomeSnapshot, loadSFMap } from "@/lib/city-snapshot-client";
 import { sfRenderMap } from "@/lib/city-sf-layout";
 import { waitForCityFrame } from "@/lib/city-first-frame";
+import { skipCityRise } from "@/components/InstancedBuildings";
 import { beatOf, Transport, type FilmClock } from "@trailer-kit/clock";
 import type { Word } from "@trailer-kit/narration";
 import Studio from "@trailer-kit/Studio";
@@ -23,9 +24,13 @@ import type { LeagueCity } from "@/lib/league-city/service";
 import { brasilWorld, plainBuilding } from "@/lib/towns/brasil-world";
 import type { BrasilLayout } from "@/lib/towns/brasil-map";
 import { geoAt } from "@/lib/towns/brasil-geo";
+import { CITIES } from "@/lib/towns/br-cities";
 import type { CityObject } from "@/lib/league-city/types";
 import { reelOf, type Reel } from "@/lib/reel/film";
 import type { ReelSpec } from "@/lib/reel/spec";
+
+// A reel films the city as it stands: buildings never rise in one by one at its first frame.
+skipCityRise();
 
 // A reel spec played in its world, in the trailer kit's studio, with the
 // overlay's words over it. 9:16, exported at --size 1080x1920.
@@ -103,12 +108,15 @@ function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps 
     [world.layout],
   );
   // A fill cut: how many buildings stand (in the order people arrived), stepped so the city redraws a few dozen times, not every frame.
+  // params.start: how many already stand when it begins (yesterday's total, so only the day's arrivals go up).
   const fill = reel.cuts.find((c) => c.kind === "fill") ?? null;
   const arrived = useMemo(() => {
     const at = new Map([...world.layout.cities, world.layout.island].flatMap((c) => c.devs.map((d) => [d.dev.login.toLowerCase(), d.at] as const)));
     return [...world.buildings].sort((a, b) => (at.get(a.loginLower) ?? 0) - (at.get(b.loginLower) ?? 0));
   }, [world.buildings, world.layout]);
-  const [standing, setStanding] = useState(fill ? 0 : arrived.length);
+  const fillStart = fill && typeof fill.params.start === "number" ? Math.min(fill.params.start, arrived.length) : 0;
+  // Infinity: the whole map (outside the fill's cut, and before the buildings have loaded).
+  const [standing, setStanding] = useState(fill && fill.from <= 0 ? fillStart : Infinity);
   useEffect(() => {
     if (!fill) return;
     const from = typeof fill.params.from === "number" ? fill.params.from : fill.from;
@@ -116,14 +124,23 @@ function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps 
     const steps = 40;
     let raf = 0;
     const tick = () => {
-      const k = Math.min(1, Math.max(0, (beatOf(clock) - from) / Math.max(1e-6, to - from)));
-      setStanding(Math.round((Math.floor(k * steps) / steps) * arrived.length));
+      const t = beatOf(clock);
+      const k = Math.min(1, Math.max(0, (t - from) / Math.max(1e-6, to - from)));
+      // Outside its cut the map stands whole (a take before it films today's arrivals too).
+      setStanding(t < fill.from || t >= fill.to ? Infinity : fillStart + Math.round((Math.floor(k * steps) / steps) * (arrived.length - fillStart)));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [fill, arrived, clock]);
+  }, [fill, fillStart, arrived, clock]);
   const shown = useMemo(() => (!fill || standing >= arrived.length ? world.buildings : arrived.slice(0, standing)), [fill, standing, arrived, world.buildings]);
+  // The cities nobody lived in at the reel's moment, where they stand on the map (for an empties overlay).
+  const empty = useMemo(() => {
+    if (!reel.empties.length) return [];
+    const lived = new Set(world.layout.cities.filter((c) => c.devs.length > 0).map((c) => c.ibge));
+    const geo = geoAt(world.layout.scale);
+    return CITIES.filter((c) => !lived.has(c.ibge)).map((c) => geo.project(c.at));
+  }, [reel.empties.length, world.layout]);
   const photoOf = useCallback((login: string) => world.byLogin.get(login.toLowerCase())?.avatar_url ?? null, [world.byLogin]);
   const buildingOf = useCallback((login: string) => world.byLogin.get(login.toLowerCase()) ?? null, [world.byLogin]);
   return (
@@ -137,7 +154,7 @@ function BrasilStage({ spec, reel, clock, balloon, data, children }: StageProps 
           island={world.layout.island}
           objects={world.objects}
           buildings={shown}
-          rig={<BrasilReelRig clock={clock} reel={reel} bounds={geoAt(world.layout.scale).bounds} example={world.example} byLogin={world.byLogin} capitalOf={capitalOf} balloon={balloon} />}
+          rig={<BrasilReelRig clock={clock} reel={reel} bounds={geoAt(world.layout.scale).bounds} example={world.example} byLogin={world.byLogin} capitalOf={capitalOf} empty={empty} balloon={balloon} />}
         />
       </div>
       {children(photoOf, buildingOf)}

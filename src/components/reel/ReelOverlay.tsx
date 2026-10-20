@@ -29,7 +29,7 @@ const FADE = 0.15; // s
 /** How dark the scene goes behind a card. */
 const DIM = 0.55;
 
-type BadgeKind = "governor" | "senator" | "mayor" | "president" | "founder";
+type BadgeKind = "governor" | "senator" | "mayor" | "president" | "founder" | "resident";
 
 /** Each office's title and pixel icon ([x, y, w, h] on an 8×8 grid). */
 const BADGES: Record<BadgeKind, { title: string; color: string; pixels: number[][] }> = {
@@ -43,6 +43,8 @@ const BADGES: Record<BadgeKind, { title: string; color: string; pixels: number[]
   mayor: { title: "prefeito", color: "var(--color-cream)", pixels: [[3, 0, 2, 1], [2, 1, 4, 1], [1, 2, 6, 1], [1, 3, 6, 5]] },
   // A flag on its pole.
   founder: { title: "fundador", color: "var(--color-cream)", pixels: [[1, 0, 1, 8], [2, 1, 5, 1], [2, 2, 4, 1], [2, 3, 5, 1], [2, 4, 4, 1], [0, 7, 3, 1]] },
+  // A building, for a dev with no office (a card in the same shape as an office's).
+  resident: { title: "morador", color: "var(--color-cream)", pixels: [[2, 0, 4, 8], [1, 7, 6, 1]] },
 };
 
 /** Ease-out-back: past full size, then settles. */
@@ -966,7 +968,7 @@ function drawPanels(root: HTMLElement, panels: readonly ReelPanel[], t: number) 
       return;
     }
     if (p.kind === "counter") {
-      const n = Math.max(1, Math.min(p.value, Math.round(1 + ((t - p.from) / Math.max(0.001, p.reach - p.from)) * (p.value - 1))));
+      const n = Math.max(p.start, Math.min(p.value, Math.round(p.start + ((t - p.from) / Math.max(0.001, p.reach - p.from)) * (p.value - p.start))));
       const num = el.querySelector<HTMLElement>("[data-n]");
       const text = n.toLocaleString("pt-BR");
       if (num && num.textContent !== text) num.textContent = text;
@@ -1576,7 +1578,8 @@ function Panel({
   if (panel.kind === "counter" && plates)
     return (
       <div data-panel={index} data-reel-box="counter" className="absolute font-pixel uppercase" style={{ left: "50%", transform: "translateX(-50%)", top: "17%", opacity: 0 }}>
-        <p style={{ ...PLATE, fontSize: "7.4cqw", whiteSpace: "nowrap" }}>
+        {/* A long count and label set smaller, so the plate stays inside the safe zone (a pixel glyph is ~0.7em wide). */}
+        <p style={{ ...PLATE, fontSize: `${Math.min(7.4, 68 / (0.7 * (panel.value.toLocaleString("pt-BR").length + panel.label.length + 4.5))).toFixed(2)}cqw`, whiteSpace: "nowrap" }}>
           <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>
           <span data-n style={{ color: BRAND.green }}>1</span>
           {` ${panel.label}`}
@@ -1789,8 +1792,8 @@ function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf
               (b.plate ?? "")
             )}
           </div>
-          {b.badges.map((b, i) => {
-            const look = BADGES[b.kind as BadgeKind];
+          {b.badges.map((badge, i) => {
+            const look = BADGES[badge.kind as BadgeKind];
             return (
               <div
                 key={i}
@@ -1808,15 +1811,22 @@ function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf
                   whiteSpace: "nowrap",
                 }}
               >
-                <svg viewBox="0 0 8 8" shapeRendering="crispEdges" style={{ width: "9cqw", height: "9cqw", flexShrink: 0 }}>
-                  {look.pixels.map(([x, y, w, h]) => (
-                    <rect key={`${x}-${y}`} x={x} y={y} width={w} height={h} fill={look.color} />
-                  ))}
-                </svg>
+                {b.photoOnBadge && photo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photo} alt="" style={{ width: "13cqw", height: "13cqw", display: "block", flexShrink: 0, imageRendering: "pixelated", border: `0.5cqw solid ${look.color}` }} />
+                )}
+                {/* With the photo on it, the photo is the badge's picture: no office icon beside it. */}
+                {!(b.photoOnBadge && photo) && (
+                  <svg viewBox="0 0 8 8" shapeRendering="crispEdges" style={{ width: "9cqw", height: "9cqw", flexShrink: 0 }}>
+                    {look.pixels.map(([x, y, w, h]) => (
+                      <rect key={`${x}-${y}`} x={x} y={y} width={w} height={h} fill={look.color} />
+                    ))}
+                  </svg>
+                )}
                 <div>
                   <p style={{ fontSize: "6.4cqw", lineHeight: 1, color: look.color }}>{look.title}</p>
                   <p className="text-muted" style={{ fontSize: "3cqw", lineHeight: 1, marginTop: "1.6cqw", textTransform: "none" }}>
-                    {b.sub}
+                    {badge.sub}
                   </p>
                 </div>
               </div>
