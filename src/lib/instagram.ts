@@ -126,6 +126,7 @@ export function validInstagramSignature(body: string, header: string | null): bo
 export interface IgComment {
   id: string;
   text: string;
+  timestamp?: string;
   from?: { id: string; username?: string };
   replies?: { data: IgComment[] };
 }
@@ -136,7 +137,7 @@ export async function instagramComments(mediaId: string, pages = 4): Promise<IgC
   let after: string | undefined;
   for (let i = 0; i < pages; i++) {
     const page = await graph<{ data: IgComment[]; paging?: { cursors?: { after?: string }; next?: string } }>(`/${mediaId}/comments`, {
-      fields: "id,text,from,replies{id,text,from}",
+      fields: "id,text,timestamp,from,replies{id,text,timestamp,from}",
       limit: "50",
       ...(after ? { after } : {}),
     });
@@ -145,6 +146,11 @@ export async function instagramComments(mediaId: string, pages = 4): Promise<IgC
     if (!after) break;
   }
   return out;
+}
+
+/** One comment's text (null when it's gone). */
+export async function instagramCommentText(commentId: string): Promise<string | null> {
+  return graph<{ text?: string }>(`/${commentId}`, { fields: "text" }).then((c) => c.text ?? null, () => null);
 }
 
 /** A thread: the top-level comment then its replies, oldest first, each with who wrote it (at most 8 replies, the latest). */

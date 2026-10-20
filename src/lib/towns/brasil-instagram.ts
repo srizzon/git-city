@@ -22,12 +22,12 @@
 // unanswered); LIMITS.modelPerDay model reads a day for everyone. Server only.
 
 import { getSupabaseAdmin } from "../supabase";
-import { instagramComments, instagramMe, instagramThread, instagramUsernameOf, replyToComment } from "../instagram";
+import { instagramCommentText, instagramComments, instagramMe, instagramThread, instagramUsernameOf, replyToComment } from "../instagram";
 import { getLeagueBySlug } from "../leagues/service";
-import { BRASIL_SLUG, importBrasilComment, type ReelKind } from "./brasil-server";
-import { parseComment, parseVote, pickReading, replyFor, voteReply } from "./brasil-comments";
+import { BRASIL_SLUG, importBrasilComment, type ImportResult, type ReelKind } from "./brasil-server";
+import { parseComment, parseVote, pickReading, replyFor, voteIn, voteReply, voteRoute } from "./brasil-comments";
 import { candidateByNumber, castVote } from "./brasil-election-server";
-import type { UF } from "./brasil-map";
+import { ptState, type UF } from "./brasil-map";
 import { answeredCity, confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
 import { captureServer } from "../posthog-server";
 import { creditComment, creditStory, residentOfInstagram } from "./brasil-points-server";
@@ -73,16 +73,27 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
     const id = `ig:${c.id}`;
     const credit = () => creditComment(league.id, { id, igUser: c.igUser, text: c.text }, own).catch((err) => console.error("[brasil] comment points", c.id, err));
     const w = watched.get(c.mediaId);
-    // A ballot number votes for president, on any of the account's posts.
-    const vote = parseVote(c.text);
-    if (vote !== null && c.igUser) {
+    // A vote for president, on any of the account's posts: a ballot number (voteRoute), or the answer of
+    // someone whose vote waits for them to be on the map ("seuuser Recife" under our "not on the map").
+    if (c.igUser) {
       try {
-        if (await voteByComment(league.id, { id, reel: w?.reel ?? c.mediaId, igUser: c.igUser, replyTo: c.parentId ?? c.id }, vote)) fresh++;
-        await credit();
+        let route = voteRoute(c.text, !!w);
+        if (route?.loose && !(await candidateByNumber(route.number))) route = null;
+        // Their answer is a reply under our ask; a new comment counts only when it names a username and a
+        // place ("GustavoSousa01 Fortaleza"), so a lone "@amigo" never makes them someone else.
+        if (!route && (c.parentId || answersAsk(c.text, own))) {
+          const waiting = await waitingVote(league.id, c.igUser, id);
+          if (waiting !== null) route = { number: waiting, join: c.text, loose: false };
+        }
+        if (route) {
+          if (await voteByComment(league, { ...c, igUser: c.igUser, reel: w?.reel ?? c.mediaId }, route.number, route.join, own)) fresh++;
+          await credit();
+          continue;
+        }
       } catch (err) {
         console.error("[brasil] instagram vote", c.id, err);
+        continue;
       }
-      continue;
     }
     if (!w) {
       await credit();
@@ -139,37 +150,99 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
   return fresh;
 }
 
+/** A top-level comment that gives a username beside a place, the way our ask says. */
+function answersAsk(text: string, own: string): boolean {
+  const mine = new RegExp(`@${own.replace(/[.]/g, "\\.")}\\b`, "gi");
+  if (/@/.test(text.replace(mine, ""))) return false;
+  const p = parseComment(text, { ignore: [own] });
+  return !!p.login && !!(p.uf || p.place);
+}
+
+/**
+ * Someone off the map who voted in a comment and was told to give their username: the number they voted
+ * for, so their next comment (that answer) puts them on the map and counts it. Null when nothing waits.
+ * Looks at their last few comments of the week on posts that aren't join reels (the vote's), newest first.
+ */
+async function waitingVote(leagueId: string, igUser: string, except: string): Promise<number | null> {
+  const { data: rows } = await getSupabaseAdmin()
+    .from("brasil_comments")
+    .select("id, outcome, reel")
+    .eq("ig_user", igUser)
+    .neq("id", except)
+    .gte("created_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(5)
+    .returns<{ id: string; outcome: string; reel: string }[]>();
+  const theirs = (rows ?? []).filter((r) => r.outcome.startsWith("vote") || r.outcome === "voted" || !r.reel.startsWith("http"));
+  if (!theirs.length || (await residentOfInstagram(leagueId, igUser))) return null;
+  for (const r of theirs.slice(0, 3)) {
+    if (r.outcome === "voted" || r.outcome === "vote_refused") return null;
+    const text = await instagramCommentText(r.id.replace(/^ig:/, ""));
+    const n = text ? (parseVote(text) ?? voteIn(text)?.number ?? null) : null;
+    if (n !== null) return n;
+  }
+  return null;
+}
+
 /**
  * A comment's vote, cast as the Instagram account's dev on the map (the one its comments put there).
- * An account not on the map yet doesn't vote: the reply says how to get on it. One vote a person, as
- * on the site: a later one replaces it. False when the comment was already handled.
+ * Someone not on the map yet joins with the same comment when it names a username (`join`: "IanAkiles
+ * Manaus 32", or the answer to our "not on the map"); otherwise the reply says how, and their answer
+ * counts this vote (waitingVote). One vote a person, as on the site: a later one replaces it. False when
+ * the comment was already handled.
  */
-async function voteByComment(leagueId: string, c: { id: string; reel: string; igUser: string; replyTo: string }, number: number): Promise<boolean> {
+async function voteByComment(
+  league: { id: string },
+  c: IncomingComment & { igUser: string; reel: string },
+  number: number,
+  join: string | null,
+  own: string,
+): Promise<boolean> {
   const sb = getSupabaseAdmin();
-  const { error: taken } = await sb.from("brasil_comments").insert({ id: c.id, reel: c.reel, ig_user: c.igUser, outcome: "vote_unlinked" });
+  const id = `ig:${c.id}`;
+  const { error: taken } = await sb.from("brasil_comments").insert({ id, reel: c.reel, ig_user: c.igUser, outcome: "vote_unlinked" });
   if (taken) return false;
-  const dev = await residentOfInstagram(leagueId, c.igUser);
-  let reply: string;
-  if (!dev) reply = voteReply("unlinked", number);
-  else {
-    const why = await castVote(leagueId, { id: dev.id, github_login: dev.login }, number);
-    if (why) {
-      await sb.from("brasil_comments").update({ outcome: "vote_refused", developer_id: dev.id }).eq("id", c.id);
-      reply = voteReply(why.startsWith("Nobody") ? "number" : why.includes("days old") ? "young" : "closed", number);
-    } else {
-      await sb.from("brasil_comments").update({ outcome: "voted", developer_id: dev.id }).eq("id", c.id);
-      reply = voteReply("voted", number, (await candidateByNumber(number))?.login ?? null);
+  let dev = await residentOfInstagram(league.id, c.igUser);
+  let joined: ImportResult | null = null;
+  let suggestion: string | null = null;
+  if (!dev && join) {
+    // A lone @handle is their username only as the answer to our ask (a reply); elsewhere it tags a friend.
+    const { reader, ...parsed } = await read({ ...c, text: join }, own, !!c.parentId);
+    if (parsed.login) {
+      joined = await importBrasilComment(league, { id, reel: c.reel, kind: "brasil", igUser: c.igUser, text: join, parsed, claimed: true });
+      await captureServer(`ig:${c.igUser}`, "brasil_comment_imported", { outcome: joined.outcome, reader, kind: "vote", reply: !!c.parentId });
+      if (joined.outcome === "added" && joined.login) await captureServer(joined.login, "brasil_resident_added", { uf: joined.uf, source: "instagram" });
+      if (joined.outcome === "added" || joined.outcome === "already") dev = await residentOfInstagram(league.id, c.igUser);
+      if (joined.outcome === "unknown_user" && joined.login) suggestion = await suggestLogin(joined.login);
     }
   }
-  await captureServer(`ig:${c.igUser}`, "brasil_comment_vote", { linked: !!dev, number });
+  // The log keeps what joining did (residentOfInstagram reads "added" and "already"); a plain vote logs the vote.
+  const logVote = (outcome: "voted" | "vote_refused") => (joined ? null : sb.from("brasil_comments").update({ outcome, developer_id: dev?.id ?? null }).eq("id", id));
+  let reply: string | null;
+  if (dev) {
+    const why = await castVote(league.id, { id: dev.id, github_login: dev.login }, number);
+    if (why) {
+      await logVote("vote_refused");
+      reply = voteReply(why.startsWith("Nobody") ? "number" : why.includes("days old") ? "young" : "closed", number);
+    } else {
+      await logVote("voted");
+      const where = joined?.city ? `em ${joined.city}` : joined?.uf ? ptState(joined.uf, "in") : "na ilha";
+      reply = voteReply("voted", number, (await candidateByNumber(number))?.login ?? null, joined ? { login: dev.login, where } : null);
+    }
+  } else if (joined && joined.outcome !== "added" && joined.outcome !== "already") {
+    // Couldn't join with it (a username GitHub doesn't have, "which Santa Rita?"): that reply; the vote keeps waiting.
+    reply = replyFor(joined.outcome, joined.login, joined.uf, "brasil", suggestion, { city: joined.city, founded: joined.founded, options: joined.options });
+  } else reply = voteReply("unlinked", number);
+  await captureServer(`ig:${c.igUser}`, "brasil_comment_vote", { linked: !!dev, joined: !!joined, number });
+  if (!reply) return true;
   const { count } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", c.igUser).gte("replied_at", hourAgo());
   if ((count ?? 0) >= LIMITS.repliesPerUserHour) return true;
   if (process.env.VERCEL_ENV !== "production") {
-    console.info(`[brasil] would reply to ${c.replyTo}: ${reply}`);
+    console.info(`[brasil] would reply to ${c.parentId ?? c.id}: ${reply}`);
     return true;
   }
-  await replyToComment(c.replyTo, reply);
-  await sb.from("brasil_comments").update({ replied_at: new Date().toISOString() }).eq("id", c.id);
+  await replyToComment(c.parentId ?? c.id, reply);
+  await sb.from("brasil_comments").update({ replied_at: new Date().toISOString() }).eq("id", id);
   return true;
 }
 
@@ -233,24 +306,42 @@ async function importedIds(ids: string[]): Promise<Set<string>> {
   return seen;
 }
 
-/** Reads every watched reel's comments and imports the ones not seen yet. */
+/** Reads every watched reel's comments, and the week's vote posts', and imports the ones not seen yet. */
 export async function syncBrasilReels(ownUserId: string | null): Promise<{ reels: number; fresh: number }> {
-  const { data: reels } = await getSupabaseAdmin().from("brasil_reels").select("media_id").eq("watching", true);
-  if (!reels?.length) return { reels: 0, fresh: 0 };
+  const sb = getSupabaseAdmin();
+  const { data: watchedReels } = await sb.from("brasil_reels").select("media_id").eq("watching", true);
+  // The posts people voted on this week (logged by their media id, not a reel's link): their comments too.
+  const { data: votedOn } = await sb
+    .from("brasil_comments")
+    .select("reel")
+    .in("outcome", ["voted", "vote_unlinked", "vote_refused"])
+    .not("reel", "like", "http%")
+    .gte("created_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
+    .limit(1000);
+  const reels = [...new Set([...(watchedReels ?? []).map((r: { media_id: string }) => r.media_id), ...(votedOn ?? []).map((r: { reel: string }) => r.reel)])].map((media_id) => ({ media_id }));
+  if (!reels.length) return { reels: 0, fresh: 0 };
   // The account's own comments (its replies) must never count: without the stored account, ask Instagram who it is.
   const me = ownUserId ? null : await instagramMe();
   const own = { id: ownUserId ?? me?.user_id ?? null, username: me?.username?.toLowerCase() ?? null };
   let fresh = 0;
-  for (const { media_id } of (reels ?? []) as { media_id: string }[]) {
+  for (const { media_id } of reels) {
     const all = await instagramComments(media_id);
-    const flat: IncomingComment[] = all.flatMap((c) => [
-      { id: c.id, mediaId: media_id, text: c.text, igUser: c.from?.username?.toLowerCase() ?? null, from: c.from?.id },
-      ...(c.replies?.data ?? []).map((r) => ({ id: r.id, mediaId: media_id, text: r.text, igUser: r.from?.username?.toLowerCase() ?? null, from: r.from?.id, parentId: c.id })),
-    ]).filter((c) => c.from && c.from !== own.id && (!own.username || c.igUser !== own.username));
+    // Replies come twice: under their comment (often without who wrote them) and in the list on their own
+    // (with who, but not what they answer). One of each, with both.
+    const parentOf = new Map(all.flatMap((c) => (c.replies?.data ?? []).map((r) => [r.id, c.id] as const)));
+    const byId = new Map<string, IncomingComment & { from?: string; at?: string }>();
+    for (const c of all) {
+      const parentId = parentOf.get(c.id);
+      byId.set(c.id, { id: c.id, mediaId: media_id, text: c.text, igUser: c.from?.username?.toLowerCase() ?? null, from: c.from?.id, at: c.timestamp, ...(parentId ? { parentId } : {}) });
+      for (const r of c.replies?.data ?? []) {
+        if (!byId.has(r.id) || !byId.get(r.id)!.from) byId.set(r.id, { id: r.id, mediaId: media_id, text: r.text, igUser: r.from?.username?.toLowerCase() ?? null, from: r.from?.id, at: r.timestamp, parentId: c.id });
+      }
+    }
+    const flat = [...byId.values()].filter((c) => c.from && c.from !== own.id && (!own.username || c.igUser !== own.username));
     // Skip the ones already imported up front: the claim insert would refuse them anyway, but one failed insert per old comment every sync filled the db log with errors.
     const seen = await importedIds(flat.map((c) => `ig:${c.id}`));
     // Oldest first, so the first to comment is the first on the map.
-    fresh += await handleBrasilComments(flat.filter((c) => !seen.has(`ig:${c.id}`)).reverse());
+    fresh += await handleBrasilComments(flat.filter((c) => !seen.has(`ig:${c.id}`)).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? "")));
   }
-  return { reels: reels?.length ?? 0, fresh };
+  return { reels: reels.length, fresh };
 }
