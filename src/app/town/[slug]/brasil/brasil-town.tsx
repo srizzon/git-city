@@ -159,6 +159,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const [driveSpawn, setDriveSpawn] = useState<Spawn | null>(null);
   /** Dark between the town's car and the drift run, both ways, while the next world loads. */
   const [curtain, setCurtain] = useState<"drift" | "city" | null>(null);
+  // The election as last read by the machine, so the count's corner card knows your vote after you close it.
+  const [electionNow, setElectionNow] = useState(election);
   const [panel, setPanel] = useState<PanelId>(startVote && election ? "election" : null);
   /** The number the voting machine opens with, and a key to open it fresh with another. */
   const [vote, setVote] = useState<{ number: number | null; key: number }>({ number: typeof startVote === "number" ? startVote : null, key: 0 });
@@ -1207,13 +1209,14 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         />
       )}
 
-      {count && !inCar && !state && !focused && !panel && !picker && <ApuracaoWidget slug={league.slug} initial={count} onVote={(n) => openVote(n)} />}
+      {count && !inCar && !state && !focused && !panel && !picker && <ApuracaoWidget slug={league.slug} initial={count} myVote={electionNow?.viewer?.votedFor?.number ?? null} onVote={(n) => openVote(n)} />}
 
       {panel === "election" && election && (
         <ElectionPanel
           key={vote.key}
           slug={league.slug}
-          initial={election}
+          initial={electionNow ?? election}
+          onVoted={setElectionNow}
           startNumber={vote.number}
           signedIn={!!viewerLogin}
           ufOf={(login) => {

@@ -71,6 +71,7 @@ export default function ElectionPanel({
   ufOf,
   onSignIn,
   onPutOnMap,
+  onVoted,
   onClose,
 }: {
   slug: string;
@@ -84,6 +85,8 @@ export default function ElectionPanel({
   onSignIn: (number: number | null) => void;
   /** Put your building on the map, then come back here with this number typed. */
   onPutOnMap: (number: number | null) => void;
+  /** Every fresh read, so the map outside the machine knows your vote too. */
+  onVoted?: (view: ElectionView) => void;
   onClose: () => void;
 }) {
   const wide = useWide();
@@ -94,6 +97,10 @@ export default function ElectionPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, tick] = useState(0);
+
+  useEffect(() => {
+    onVoted?.(e);
+  }, [e, onVoted]);
 
   const refresh = useCallback(() => {
     fetch(`/api/towns/${slug}/brasil/election`, { cache: "no-store" })
@@ -137,6 +144,9 @@ export default function ElectionPanel({
   const me = e.viewer;
   const picked = typed.length === 2 ? (e.candidates.find((c) => c.number === Number(typed)) ?? null) : null;
   const typedNumber = typed.length === 2 ? Number(typed) : null;
+  // Your vote, with its face: shown on the screen until you type another number.
+  const mine = me?.votedFor ? (e.candidates.find((c) => c.number === me.votedFor!.number) ?? null) : null;
+  const showVoted = fim || (voting && !!mine && typed.length === 0);
 
   // Whether CONFIRMA can go through, and (for the screen) what stands in the way when it can't.
   const blocked = !voting || !signedIn || !me?.onMap || !!me?.cantVote;
@@ -211,7 +221,7 @@ export default function ElectionPanel({
   // ── The machine's screen ──
   const footer = fim ? null : typed.length < 2 ? (
     <>
-      {me?.votedFor && typed.length === 0 ? `Seu voto: ${ballot(me.votedFor.number)} · @${me.votedFor.login}. Digite outro número para trocar.` : typed.length === 1 ? "Mais um dígito." : "Digite o número do seu candidato."}
+      {typed.length === 1 ? "Mais um dígito." : "Digite o número do seu candidato."}
       {why && <span className="mt-1 block text-[#c4561c]">{why.text}</span>}
     </>
   ) : !picked ? (
@@ -244,15 +254,29 @@ export default function ElectionPanel({
             <span className="block h-full w-1/2 animate-pulse bg-[#1f7a2c]" />
           </span>
         </div>
-      ) : fim ? (
+      ) : showVoted ? (
         <div className="m-auto flex flex-col items-center gap-3 text-center">
-          <span className="text-5xl leading-none tracking-widest">FIM</span>
-          <span className="text-[9px] normal-case">{me?.votedFor ? `Your vote: ${ballot(me.votedFor.number)} · @${me.votedFor.login}` : "Voto em branco · no vote"}</span>
-          {me?.votedFor && (
+          {fim ? <span className="text-5xl leading-none tracking-widest">FIM</span> : <span className="text-[11px] uppercase">Você já votou</span>}
+          {mine ? (
+            <span className="flex items-center gap-3 text-left">
+              <span className="h-[52px] w-[42px] shrink-0 overflow-hidden border-2 border-[#9a9a94] bg-white/50">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar, cropped to the machine's portrait frame */}
+                {mine.avatar_url && <img src={mine.avatar_url} alt="" className="h-full w-full object-cover" />}
+              </span>
+              <span className="flex flex-col gap-1">
+                <span className="text-lg leading-none tabular-nums">{ballot(mine.number)}</span>
+                <span className="text-[10px] normal-case">@{mine.login}</span>
+              </span>
+            </span>
+          ) : (
+            <span className="text-[9px] normal-case">Voto em branco · no vote</span>
+          )}
+          {mine && (
             <button type="button" onClick={() => share("vote")} className="btn-press bg-[#1b1d22] px-4 py-2 text-[10px] uppercase text-lime">
               {copied === "vote" ? "Link copied" : "Share my vote"}
             </button>
           )}
+          {!fim && <span className="text-[8px] normal-case">Digite outro número para trocar.</span>}
         </div>
       ) : (
         <>
