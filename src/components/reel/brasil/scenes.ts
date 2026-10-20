@@ -233,7 +233,7 @@ function turnFor(cut: ReelCut, target: Target, keys: Orbit[], H: number, world: 
 export const balloonClear = (target: Target) => 8 + (target.crown ? CROWN_H : target.items ? ITEMS_H : 0);
 
 /** How far under the horizon the frame's top edge stays on a move round a building (degrees): no sky, no black band. */
-const NO_SKY = 14;
+const NO_SKY = 20;
 
 /**
  * Raises the camera (same distance across) until, aimed with the point `height` up the target `y` down

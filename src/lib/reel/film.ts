@@ -34,7 +34,7 @@ export interface ReelBalloon {
 export type ReelPanel =
   | { kind: "bars"; from: number; to: number; title: string | null; rows: { label: string; value: number | string; lit: boolean }[] }
   | { kind: "roster"; from: number; to: number; title: string | null; rows: { tag: string; login: string; lit: boolean }[]; perPage: number }
-  | { kind: "counter"; from: number; reach: number; to: number; start: number; value: number; label: string }
+  | { kind: "counter"; from: number; reach: number; to: number; start: number; value: number; prefix: string; label: string }
   | { kind: "poster"; from: number; to: number; title: string; login: string; when: string; where: string }
   | { kind: "profile"; from: number; to: number; login: string }
   | { kind: "comment"; from: number; to: number; handle: string; parts: { at: number; text: string }[] }
@@ -164,7 +164,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
     if (o.type === "counter") {
       const count = (v: number | string) => (typeof v === "number" ? v : Number(String(v).replace(/\D/g, "")));
       const value = count(o.value);
-      return [{ kind: "counter", from, reach: anchorAt(words, o.reach, from), to: anchorAt(words, o.to, from), start: o.start === undefined ? 1 : count(o.start), value, label: o.label }];
+      return [{ kind: "counter", from, reach: anchorAt(words, o.reach, from), to: anchorAt(words, o.to, from), start: o.start === undefined ? 1 : count(o.start), value, prefix: o.prefix ?? "", label: o.label }];
     }
     if (o.type === "follow") {
       const str = (v: number | string) => (typeof v === "number" ? v.toLocaleString("pt-BR") : v);

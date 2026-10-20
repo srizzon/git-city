@@ -75,6 +75,8 @@ const Counter = z.object({
   value: z.union([z.number(), z.string()]),
   /** Where it starts counting from (yesterday's total, so it climbs by the day's arrivals); default 1. */
   start: z.union([z.number(), z.string()]).optional(),
+  /** Text before the number ("PE 117 ×"), so a score keeps one order while one side counts. */
+  prefix: z.string().optional(),
   label: z.string(),
 });
 
