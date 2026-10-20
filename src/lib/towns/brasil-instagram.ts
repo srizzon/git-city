@@ -82,7 +82,7 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
         // Their answer is a reply under our ask; a new comment counts only when it names a username and a
         // place ("GustavoSousa01 Fortaleza"), so a lone "@amigo" never makes them someone else.
         if (!route && (c.parentId || answersAsk(c.text, own))) {
-          const waiting = await waitingVote(league.id, c.igUser, id);
+          const waiting = await waitingVote(c.igUser, id);
           if (waiting !== null) route = { number: waiting, join: c.text, loose: false };
         }
         if (route) {
@@ -92,6 +92,7 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
         }
       } catch (err) {
         console.error("[brasil] instagram vote", c.id, err);
+        await release(id);
         continue;
       }
     }
@@ -129,7 +130,17 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
       await captureServer(c.igUser ? `ig:${c.igUser}` : `ig-comment:${c.id}`, "brasil_comment_imported", { outcome: r.outcome, reader, kind: w.kind, reply: !!c.parentId });
       if (r.outcome === "added" && r.login) await captureServer(r.login, w.kind === "brasil" ? "brasil_resident_added" : "city_building_from_comment", { uf: r.uf, source: "instagram" });
       const suggestion = r.outcome === "unknown_user" && r.login ? await suggestLogin(r.login) : null;
-      const reply = replyFor(r.outcome, r.login, r.uf, w.kind, suggestion, { city: r.city, founded: r.founded, options: r.options });
+      let reply = replyFor(r.outcome, r.login, r.uf, w.kind, suggestion, { city: r.city, founded: r.founded, options: r.options });
+      // On the map now: a vote they made from off it counts.
+      if ((r.outcome === "added" || r.outcome === "already") && c.igUser && w.kind === "brasil") {
+        const waiting = await waitingVote(c.igUser, id);
+        const dev = waiting !== null ? await residentOfInstagram(league.id, c.igUser) : null;
+        if (waiting !== null && dev && !(await castVote(league.id, { id: dev.id, github_login: dev.login }, waiting))) {
+          const where = r.city ? `em ${r.city}` : r.uf ? ptState(r.uf, "in") : "na ilha";
+          reply = voteReply("voted", waiting, (await candidateByNumber(waiting))?.login ?? null, { login: dev.login, where });
+          await captureServer(`ig:${c.igUser}`, "brasil_comment_vote", { linked: true, joined: true, number: waiting, waited: true });
+        }
+      }
       if (!reply) continue;
       if (c.igUser) {
         const { count } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", c.igUser).gte("replied_at", hourAgo());
@@ -144,10 +155,29 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
       await sb.from("brasil_comments").update({ replied_at: new Date().toISOString() }).eq("id", id);
       await captureServer(c.igUser ? `ig:${c.igUser}` : `ig-comment:${c.id}`, "brasil_reply_sent", { outcome: r.outcome, suggested: !!suggestion, kind: w.kind });
     } catch (err) {
+      // Free the claim so the next sync tries again: kept, it read "no_login" for good (a username GitHub
+      // has, put nowhere, because the map's write or GitHub failed that once).
       console.error("[brasil] instagram comment", c.id, err);
+      await release(id);
     }
   }
   return fresh;
+}
+
+/**
+ * Lets a comment be read again by the next sync: its claim goes while it's still only a claim (nothing
+ * placed, voted or answered), so a failure after that (a reply Instagram refused) isn't redone forever.
+ */
+async function release(id: string): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("brasil_comments")
+    .delete()
+    .eq("id", id)
+    .in("outcome", ["no_login", "vote_unlinked"])
+    .is("github_login", null)
+    .is("developer_id", null)
+    .is("replied_at", null);
+  if (error) console.error("[brasil] release claim", id, error.message);
 }
 
 /** A top-level comment that gives a username beside a place, the way our ask says. */
@@ -159,11 +189,12 @@ function answersAsk(text: string, own: string): boolean {
 }
 
 /**
- * Someone off the map who voted in a comment and was told to give their username: the number they voted
- * for, so their next comment (that answer) puts them on the map and counts it. Null when nothing waits.
- * Looks at their last few comments of the week on posts that aren't join reels (the vote's), newest first.
+ * Someone who voted in a comment while off the map and was told to give their username: the number they
+ * voted for, so the comment that puts them on the map (that answer, or one on a join reel) counts it.
+ * Null when nothing waits. Looks at their last few comments of the week on posts that aren't join reels
+ * (the vote's), newest first; a vote counted since ends the wait.
  */
-async function waitingVote(leagueId: string, igUser: string, except: string): Promise<number | null> {
+async function waitingVote(igUser: string, except: string): Promise<number | null> {
   const { data: rows } = await getSupabaseAdmin()
     .from("brasil_comments")
     .select("id, outcome, reel")
@@ -173,8 +204,7 @@ async function waitingVote(leagueId: string, igUser: string, except: string): Pr
     .order("created_at", { ascending: false })
     .limit(5)
     .returns<{ id: string; outcome: string; reel: string }[]>();
-  const theirs = (rows ?? []).filter((r) => r.outcome.startsWith("vote") || r.outcome === "voted" || !r.reel.startsWith("http"));
-  if (!theirs.length || (await residentOfInstagram(leagueId, igUser))) return null;
+  const theirs = (rows ?? []).filter((r) => r.outcome.startsWith("vote") || !r.reel.startsWith("http"));
   for (const r of theirs.slice(0, 3)) {
     if (r.outcome === "voted" || r.outcome === "vote_refused") return null;
     const text = await instagramCommentText(r.id.replace(/^ig:/, ""));
@@ -223,7 +253,7 @@ async function voteByComment(
     const why = await castVote(league.id, { id: dev.id, github_login: dev.login }, number);
     if (why) {
       await logVote("vote_refused");
-      reply = voteReply(why.startsWith("Nobody") ? "number" : why.includes("days old") ? "young" : "closed", number);
+      reply = voteReply(why.startsWith("Nobody") ? "number" : why.includes("days old") ? "young" : why.startsWith("Put your building") ? "unlinked" : "closed", number);
     } else {
       await logVote("voted");
       const where = joined?.city ? `em ${joined.city}` : joined?.uf ? ptState(joined.uf, "in") : "na ilha";
