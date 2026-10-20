@@ -182,7 +182,7 @@ export default function ProjectSheet({
           <ProjectIcon project={p} size={40} />
           <div className="min-w-0 flex-1">
             <h3 className="break-words text-[13px] normal-case leading-tight text-cream">{p.name}</h3>
-            <p className="mt-1 text-[11px] normal-case leading-snug text-warm">{p.tagline}</p>
+            <p className="mt-1 font-sans text-[13px] normal-case leading-snug text-warm">{p.tagline}</p>
             <p className="mt-1.5 text-[9px] text-muted">
               {categoryLabel(p.category)} · <span className="normal-case">{p.host}</span>
             </p>
@@ -221,7 +221,7 @@ export default function ProjectSheet({
           )}
         </div>
 
-        {p.description && <p className="whitespace-pre-line text-[11px] normal-case leading-relaxed text-warm">{p.description}</p>}
+        {p.description && <p className="whitespace-pre-line font-sans text-[13px] normal-case leading-relaxed text-warm">{p.description}</p>}
 
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar */}

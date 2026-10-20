@@ -17,10 +17,11 @@ import { ProjectIcon, VoteButton, adHref, api } from "./projects-ui";
 
 const POLL_MS = 60_000;
 
+/** Room for the card beside the centered search bar (the apuração card takes the left). */
 function useWide(): boolean {
   const [wide, setWide] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 640px)");
+    const mq = window.matchMedia("(min-width: 1100px)");
     const on = () => setWide(mq.matches);
     on();
     mq.addEventListener("change", on);
@@ -43,7 +44,7 @@ function AdRow({ slug, ad, onOffer }: { slug: string; ad: AdCard | null; onOffer
       {ad ? <ProjectIcon project={{ icon: ad.icon, maker: { login: "", avatar: null } }} size={22} /> : <span className="h-[22px] w-[22px] shrink-0 border border-dashed border-[#f0b429]/60" aria-hidden />}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[9px] text-cream">{ad ? ad.name : "Your project here"}</span>
-        <span className="block truncate text-[10px] normal-case text-muted">{ad ? ad.tagline : "#1 on the map for a week"}</span>
+        <span className="block truncate text-[10px] normal-case text-muted">{ad ? ad.tagline : "#1 here for a week"}</span>
       </span>
       <span className="flex min-h-7 min-w-[46px] shrink-0 items-center justify-center border-2 border-[#f0b429]/70 text-[9px] text-[#f0b429]">{ad ? <ArrowUpRight size={12} aria-label="Visit" /> : "Get"}</span>
     </>
