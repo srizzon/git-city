@@ -37,7 +37,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     url: n.url,
     name: fit(title, LIMITS.name),
     tagline: fit(r?.description ?? p?.description ?? "", LIMITS.tagline),
-    description: fit(p?.description && p.description !== r?.description ? p.description : "", LIMITS.description),
+    // GitHub's page description is the repo's own plus " - owner/name": the tagline already says it.
+    description: fit(p?.description && !(r?.description && p.description.includes(r.description)) ? p.description : "", LIMITS.description),
     repo: r?.repo ?? null,
     icon: p?.icon ?? null,
     cover: p?.image ?? null,

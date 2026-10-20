@@ -101,7 +101,7 @@ export default function ShareProjectSheet({
     }
     const p = r.data;
     setForm((f) => ({ ...f, url: p.url, name: f.name || p.name, tagline: f.tagline || p.tagline, description: f.description || p.description, repo: f.repo || (p.repo ?? "") }));
-    setNote(p.readable ? null : `We couldn't read the page${p.note ? ` (${p.note})` : ""}. Fill it in yourself; it'll be checked when you post.`);
+    setNote(!p.readable ? `We couldn't read the page${p.note ? ` (${p.note})` : ""}. Fill it in yourself; it'll be checked when you post.` : !p.name || !p.tagline ? "The page didn't say much. Fill in what's missing." : null);
     posthog.capture("project_prefilled", { readable: p.readable, has_repo: !!p.repo });
     setStep("form");
   };
