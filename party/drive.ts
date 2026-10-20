@@ -60,7 +60,6 @@ import { raceId, signRallyReceipt } from "./rallyToken";
 import { parseSmash } from "../src/lib/league-city/smash-net";
 import { JumpWatch, seenHash } from "../src/lib/league-city/smash-floors";
 import { SmashRoom } from "./smash";
-import { PaintRoom } from "./paint";
 import { LIVE_SECRET_HEADER, createReporter, type TownLive } from "../src/lib/towns/live";
 
 // ─── League city driving ────────────────────────────────────
@@ -89,9 +88,6 @@ import { LIVE_SECRET_HEADER, createReporter, type TownLive } from "../src/lib/to
 // one "cars" message each WATCH_MS instead of each car's 15 Hz stream, so a
 // crowd watching costs a few messages a second, not drivers × watchers × 15.
 // They never count toward MAX_DRIVERS and nothing they send is read.
-//
-// State War (party/paint.ts): on the Brasil map the room is also the authority
-// on the paint: it builds each signed-in driver's trail from their stream.
 //
 // Live count: how many drive and watch here goes to the town tally
 // (party/townlive) on every change, batched, for the /towns cards.
@@ -230,7 +226,6 @@ export class DriveServer extends PartyRoom {
   }
 
   private smash: SmashRoom;
-  private paint: PaintRoom;
   private live = createReporter((l) => void this.reportLive(l));
 
   /** Tell the town tally who's here (best effort). */
@@ -260,8 +255,6 @@ export class DriveServer extends PartyRoom {
       const s = this.drivers.get(id)?.state;
       return s ? { x: s[0], z: s[2], speed: s[7], flags: s[10] } : null;
     });
-    this.paint = new PaintRoom(this.room);
-    this.smash.onAuthed = (id, login, devId, conn) => void this.paint.authed(id, login, devId, conn);
   }
 
   onConnect(conn: Connection, ctx: ConnectionContext) {
@@ -280,10 +273,6 @@ export class DriveServer extends PartyRoom {
           })
           .catch(() => {});
       }
-    }
-    if (this.paint.enabled) {
-      void this.paint.greet(conn);
-      this.paint.wake();
     }
     if (watch) {
       this.watchers.add(conn.id);
@@ -336,7 +325,6 @@ export class DriveServer extends PartyRoom {
       d.lastState = now;
       d.state = encodeState(s);
       if (d.jumps.see({ x: s.x, z: s.z, at: now })) this.smash.jumped(sender.id, now);
-      this.paint.moved(sender.id, s.x, s.z, now);
       this.rallyState(sender.id, s.x, s.z, now);
       this.room.broadcast(JSON.stringify(["s", sender.id, ...d.state]), [sender.id, ...this.watchers]);
       return;
@@ -492,7 +480,6 @@ export class DriveServer extends PartyRoom {
     }
     this.drivers.set(sender.id, { name, state: null, lastState: 0, lastBump: 0, held: null, lastTake: 0, lastUse: 0, lastEmote: 0, jumps: new JumpWatch() });
     this.smash.join(sender.id);
-    this.paint.join(sender.id);
     this.countChanged();
     this.room.broadcast(JSON.stringify({ t: "join", id: sender.id, name } satisfies ServerMsg), [sender.id]);
   }
@@ -500,7 +487,6 @@ export class DriveServer extends PartyRoom {
   onClose(conn: Connection) {
     const watched = this.watchers.delete(conn.id);
     this.smash.leave(conn.id);
-    this.paint.leave(conn.id);
     const at = this.where(conn.id) ?? [this.crown.x, this.crown.z];
     if (!this.drivers.delete(conn.id)) {
       if (watched) this.countChanged();

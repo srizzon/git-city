@@ -15,7 +15,7 @@ export const POINTS = {
   story: 20,
   coded: 10,
   vote: 10,
-  /** Per point: the State War pays one for every PAINT.lotsPerPoint lots, PAINT.dayCap a day (lib/towns/brasil-paint). */
+  /** The State War (removed 2026-10-19): its points already earned still count. */
   paint: 1,
   /** Finishing a race with another signed-in racer (more for winning and records: RACE_POINTS). */
   race: 3,

@@ -61,8 +61,6 @@ export interface DriverInfo {
 
 /** A box slot's generation and how long until it's back (ms, 0 = there now). */
 import type { CrownState } from "./crown";
-import type { LostWhy, PaintGeom } from "../../towns/brasil-paint";
-import type { UF } from "../../towns/brasil-map";
 import type { RallyRoute, RallyState } from "./rally";
 
 export interface BoxState {
@@ -125,18 +123,6 @@ export type ServerMsg =
   | { t: "damage"; b: string; r: number[]; by?: string | null; s?: number }
   /** Smash: every damaged building [login, rows, by, shield end], when the room loads or you arrive. */
   | { t: "damage_all"; list: [string, number[], string | null, number][] }
-  /** State War (Brasil): the board as runs of state numbers (buildings' lots left out, `hm` those apart), the land that paints, the week, and every live trail [id, state, cells]. */
-  | { t: "paint_all"; g: PaintGeom | null; r: number[]; hm?: number[]; land: number; wk: string; tr: [string, number, number[]][] }
-  /** State War: cells `a` added to `id`'s trail (state `s`). */
-  | { t: "paint_trail"; id: string; s: number; a: number[] }
-  /** State War: `id`'s trail is gone, nothing painted. */
-  | { t: "paint_lost"; id: string; why: LostWhy }
-  /** State War: `by` closed a loop; cells `c` are state `s`'s now. */
-  | { t: "paint_fill"; s: number; c: number[]; by: string }
-  /** State War: your state (null: no building in a state, you don't paint) and your painting points today. */
-  | { t: "paint_me"; uf: UF | null; pts: number; cap: number }
-  /** State War: your loop took `n` lots and `v` from other states; `add` points, `pts` today. */
-  | { t: "paint_got"; n: number; v: number; add: number; pts: number; cap: number }
   | ["s", string, ...number[]];
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
