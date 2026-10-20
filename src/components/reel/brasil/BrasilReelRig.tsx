@@ -137,7 +137,8 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
       if (!g) return;
       g.visible = c === cut;
       if (c !== cut) return;
-      const drop = (1 - ease(Math.min(1, (t - c.from) / CROWN_DROP.s))) * CROWN_DROP.h;
+      // A crown on the first frame is already on its roof (a hook shows its subject, not a prop falling into frame).
+      const drop = c.from <= 0 ? 0 : (1 - ease(Math.min(1, (t - c.from) / CROWN_DROP.s))) * CROWN_DROP.h;
       g.position.set(b.position[0], b.height + 14 + CROWN_CELL * 2.5 + drop + Math.sin(t * 2.2) * CROWN_CELL * 0.25, b.position[2]);
       g.rotation.y = Math.atan2(pose.pos.x - b.position[0], pose.pos.z - b.position[2]) + Math.sin(t * 1.4) * 0.25;
     });
@@ -224,7 +225,8 @@ export default function BrasilReelRig({ clock, reel, bounds, example, byLogin, c
     placeBalloon(balloon.current, bi, {
       left: ((pin.x + 1) / 2) * 100,
       top: ((1 - pin.y) / 2) * 100,
-      opacity: Math.min(1, (t - b.from) / 0.15) * Math.max(0, Math.min(1, 1 - (t - b.to) / 0.4)),
+      // A balloon from the first frame is there already (the hook's subject on frame 0), not fading in.
+      opacity: (b.from <= 0 ? 1 : Math.min(1, (t - b.from) / 0.15)) * Math.max(0, Math.min(1, 1 - (t - b.to) / 0.4)),
       badges: b.badges.map((x) => x.at),
       t,
       roof,

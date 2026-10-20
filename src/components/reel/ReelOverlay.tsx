@@ -29,7 +29,7 @@ const FADE = 0.15; // s
 /** How dark the scene goes behind a card. */
 const DIM = 0.55;
 
-type BadgeKind = "governor" | "senator" | "mayor" | "president" | "founder" | "resident";
+type BadgeKind = "governor" | "senator" | "mayor" | "president" | "founder" | "resident" | "leader";
 
 /** Each office's title and pixel icon ([x, y, w, h] on an 8×8 grid). */
 const BADGES: Record<BadgeKind, { title: string; color: string; pixels: number[][] }> = {
@@ -44,6 +44,8 @@ const BADGES: Record<BadgeKind, { title: string; color: string; pixels: number[]
   // A flag on its pole.
   founder: { title: "fundador", color: "var(--color-cream)", pixels: [[1, 0, 1, 8], [2, 1, 5, 1], [2, 2, 4, 1], [2, 3, 5, 1], [2, 4, 4, 1], [0, 7, 3, 1]] },
   // A building, for a dev with no office (a card in the same shape as an office's).
+  // An arrow up: whoever has the most points in the state this week.
+  leader: { title: "líder", color: "var(--color-lime)", pixels: [[3, 0, 2, 1], [2, 1, 4, 1], [1, 2, 6, 1], [3, 3, 2, 5]] },
   resident: { title: "morador", color: "var(--color-cream)", pixels: [[2, 0, 4, 8], [1, 7, 6, 1]] },
 };
 
@@ -80,7 +82,8 @@ export function placeBalloon(
   // A dropped comment falls onto its lot from above in five hard steps.
   const drop = el.dataset.drop ? Math.floor(clamp((at.t - Number(el.dataset.drop)) / 0.4) * 5) / 5 : 1;
   el.style.top = `${at.top - (1 - drop) * 40}%`;
-  const ks = at.badges.map((m) => back(Math.min(1, Math.max(0, (at.t - m) / 0.4))));
+  // A badge due at the first frame is already up; later ones pop in.
+  const ks = at.badges.map((m) => (m <= 0 ? 1 : back(Math.min(1, Math.max(0, (at.t - m) / 0.4)))));
   const show = (key: string, k: number) => {
     const c = el.querySelector<HTMLElement>(`[data-tag="${key}"]`);
     if (!c) return;
@@ -174,6 +177,16 @@ const HARD = "1.1cqw 1.1cqw 0 rgba(0,0,0,.85)";
 const PLATE: CSSProperties = { display: "table", margin: "0 auto", background: BRAND.bg, color: BRAND.ink, boxShadow: HARD, padding: "1.4cqw 2.8cqw 1.8cqw", lineHeight: 1.1 };
 const PLATE_SIZE = { giant: "14cqw", huge: "10cqw", big: "7.4cqw", small: "4.2cqw" } as const;
 const CAPTION_YELLOW = "#ffd84a";
+
+/** A short text with its `*key*` words in the brand green (counter labels, a score's prefix). */
+const unlit = (text: string) => text.replace(/\*/g, "");
+function LitText({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\*[^*]+\*)/).map((s, i) => (s.startsWith("*") ? <span key={i} style={{ color: BRAND.green }}>{s.slice(1, -1)}</span> : s))}
+    </>
+  );
+}
 const CAPTION_SHADOW = [[-0.4, 0], [0.4, 0], [0, -0.4], [0, 0.4], [-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]].map(([x, y]) => `${x}cqw ${y}cqw 0 ${BRAND.bg}`).join(", ") + `, 0.8cqw 0.8cqw 0 ${BRAND.bg}`;
 
 const segments = (text: string) => text.split(/(\*[^*]+\*)/).filter(Boolean).map((s) => (s.startsWith("*") ? { text: s.slice(1, -1), lit: true } : { text: s, lit: false }));
@@ -1578,11 +1591,19 @@ function Panel({
   if (panel.kind === "counter" && plates)
     return (
       <div data-panel={index} data-reel-box="counter" className="absolute font-pixel uppercase" style={{ left: "50%", transform: "translateX(-50%)", top: "17%", opacity: 0 }}>
-        {/* A long count and label set smaller, so the plate stays inside the safe zone (a pixel glyph is ~0.7em wide). */}
-        <p style={{ ...PLATE, fontSize: `${Math.min(7.4, 68 / (0.7 * (panel.value.toLocaleString("pt-BR").length + panel.label.length + 4.5))).toFixed(2)}cqw`, whiteSpace: "nowrap" }}>
-          <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>
+        {/* A score ("PE 117" over "116 BA") takes two short lines, each as big as a headline line; a bare count
+            and label set smaller when long, so the plate stays inside the safe zone (a pixel glyph is ~0.7em wide). */}
+        {panel.prefix && (
+          <p style={{ ...PLATE, fontSize: `${Math.min(10, 64 / (0.7 * (unlit(panel.prefix).length + 2))).toFixed(2)}cqw`, whiteSpace: "nowrap" }}>
+            <LitText text={panel.prefix} />
+          </p>
+        )}
+        <p style={{ ...PLATE, fontSize: `${Math.min(panel.prefix ? 10 : 7.4, 64 / (0.7 * (panel.value.toLocaleString("pt-BR").length + unlit(panel.label).length + (panel.prefix ? 2.5 : 4.5)))).toFixed(2)}cqw`, whiteSpace: "nowrap", marginTop: panel.prefix ? "1.6cqw" : undefined }}>
+          {!panel.prefix && <span style={{ color: BRAND.green, marginRight: "0.6em" }}>&gt;</span>}
           <span data-n style={{ color: BRAND.green }}>1</span>
-          {` ${panel.label}`}
+          <span style={{ marginLeft: "0.5em" }}>
+            <LitText text={panel.label} />
+          </span>
           <span style={{ display: "inline-block", width: "0.5em", height: "0.85em", marginLeft: "0.3em", verticalAlign: "-0.08em", background: BRAND.green }} />
         </p>
       </div>
@@ -1806,6 +1827,8 @@ function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf
                   gap: "2.2cqw",
                   border: `0.7cqw solid ${look.color}`,
                   padding: "2cqw 2.8cqw 2cqw 2.2cqw",
+                  // A person's card: one width for everyone in the reel, so two of them read as the same card.
+                  width: b.photoOnBadge ? "72cqw" : undefined,
                   opacity: 0,
                   transformOrigin: "50% 100%",
                   whiteSpace: "nowrap",
@@ -1813,7 +1836,7 @@ function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf
               >
                 {b.photoOnBadge && photo && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photo} alt="" style={{ width: "13cqw", height: "13cqw", display: "block", flexShrink: 0, imageRendering: "pixelated", border: `0.5cqw solid ${look.color}` }} />
+                  <img src={photo} alt="" style={{ width: "13cqw", height: "13cqw", objectFit: "cover", display: "block", flexShrink: 0, imageRendering: "pixelated", border: `0.5cqw solid ${look.color}` }} />
                 )}
                 {/* With the photo on it, the photo is the badge's picture: no office icon beside it. */}
                 {!(b.photoOnBadge && photo) && (
@@ -1825,8 +1848,17 @@ function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf
                 )}
                 <div>
                   <p style={{ fontSize: "6.4cqw", lineHeight: 1, color: look.color }}>{look.title}</p>
-                  <p className="text-muted" style={{ fontSize: "3cqw", lineHeight: 1, marginTop: "1.6cqw", textTransform: "none" }}>
-                    {badge.sub}
+                  {/* A line break in the sub starts a second line; lines never wrap (the safe-zone check catches one too long). */}
+                  <p className="text-muted" style={{ fontSize: b.photoOnBadge ? "3.1cqw" : "3cqw", lineHeight: 1.25, marginTop: "1.6cqw", textTransform: "none", whiteSpace: "pre" }}>
+                    {/* A person's first line is their @: in ink, the line that makes them findable. */}
+                    {b.photoOnBadge && badge.sub.includes("\n") ? (
+                      <>
+                        <span style={{ color: BRAND.ink, fontSize: "1.5em" }}>{badge.sub.split("\n")[0]}</span>
+                        {"\n" + badge.sub.split("\n").slice(1).join("\n")}
+                      </>
+                    ) : (
+                      badge.sub
+                    )}
                   </p>
                 </div>
               </div>
@@ -1909,7 +1941,8 @@ export default function ReelOverlay({
               : reel.lines[i].words.map((w) => {
                   const s = document.createElement("span");
                   s.textContent = w.text;
-                  if (w.lit) s.style.color = plates ? BRAND.green : "var(--color-lime)";
+                  // On plates the captions are yellow over the green map: the lit word goes white, lime would vanish into the ground.
+                  if (w.lit) s.style.color = plates ? BRAND.ink : "var(--color-lime)";
                   return s;
                 })),
           );
@@ -1993,15 +2026,16 @@ export default function ReelOverlay({
         {/* Photos the rig pins over capitals on the map (it moves and pops them each frame). */}
         {reel.pins.flatMap((g, i) =>
           g.rows.map((r, k) => (
-            // eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar, drawn as it is
-            <img
-              key={`${i}-${k}`}
-              data-pin={`${i}-${k}`}
-              alt=""
-              src={photoOf(r.login) ?? `https://avatars.githubusercontent.com/${r.login}?s=96`}
-              className="absolute"
-              style={{ width: "5.6cqw", height: "5.6cqw", border: "0.5cqw solid #000", outline: "0.35cqw solid var(--color-lime)", opacity: 0, transform: "translate(-50%, -100%)" }}
-            />
+            // The photo's foot stands on the capital; the label hangs under it, outside the box the rig anchors.
+            <div key={`${i}-${k}`} data-pin={`${i}-${k}`} className="absolute font-pixel uppercase" style={{ opacity: 0, transform: "translate(-50%, -100%)" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar, drawn as it is */}
+              <img
+                alt=""
+                src={photoOf(r.login) ?? `https://avatars.githubusercontent.com/${r.login}?s=96`}
+                style={{ width: `${g.size}cqw`, height: `${g.size}cqw`, objectFit: "cover", border: `${g.size * 0.09}cqw solid #000`, outline: `${g.size * 0.06}cqw solid var(--color-lime)` }}
+              />
+              {r.label && <p className="absolute left-1/2" style={{ ...PLATE, top: "100%", marginTop: `${g.size * 0.12}cqw`, transform: "translateX(-50%)", fontSize: `${g.size * 0.3}cqw`, whiteSpace: "nowrap" }}>{r.label}</p>}
+            </div>
           )),
         )}
       </div>
@@ -2014,7 +2048,7 @@ export default function ReelOverlay({
         style={
           plates
             ? // His Captions piece: yellow, no plate, a dark outline and the kit's hard shadow.
-              { ...safe, top: "54%", width: "72%", whiteSpace: "normal", gap: "0 2cqw", fontSize: "6cqw", lineHeight: 1.3, opacity: 0, color: CAPTION_YELLOW, textShadow: CAPTION_SHADOW }
+              { ...safe, top: "54%", width: "72%", whiteSpace: "normal", gap: "0 2cqw", fontSize: "7cqw", lineHeight: 1.3, opacity: 0, color: CAPTION_YELLOW, textShadow: CAPTION_SHADOW }
             : { ...safe, top: "55%", width: "72%", whiteSpace: "normal", gap: reel.headline.length ? "0 2cqw" : "0 3cqw", fontSize: reel.headline.length ? "6cqw" : "7cqw", lineHeight: 1.3, opacity: 0, ...outline(1.8) }
         }
       />

@@ -46,14 +46,16 @@ function onScreen(spec: ReelSpec): string[] {
           : o.type === "roster"
             ? [o.title ?? "", ...o.rows.map((r) => r.tag)]
             : o.type === "counter"
-              ? [String(o.value), o.label]
+              ? [String(o.value), o.prefix ?? "", o.label]
               : o.type === "poster"
                 ? [o.title, o.when, o.where]
                 : o.type === "profile" || o.type === "contrib"
                   ? []
                 : o.type === "comment"
                   ? [o.handle, ...o.parts.map((x) => x.text)]
-                : o.type === "pins" || o.type === "empties"
+                : o.type === "pins"
+                  ? o.rows.map((r) => r.label ?? "")
+                : o.type === "empties"
                   ? []
                 : o.type === "place"
                   ? [o.value]
@@ -83,6 +85,7 @@ function onScreen(spec: ReelSpec): string[] {
   ].map((t) => t.replace(/\*/g, ""));
 }
 
+const ORDINALS = ["", "primeiro", "segundo", "terceiro", "quarto", "quinto", "sexto", "sétimo", "oitavo", "nono", "décimo"];
 const UNITS = ["zero", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez", "onze", "doze", "treze", "catorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
 const TENS = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
 const HUNDREDS = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
@@ -152,8 +155,10 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
     const said = ` ${bare(l.say.replace(/[-–]/g, " ")).length ? l.say.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim() : ""} `;
     // A count of something feminine is said in the feminine ("quatrocentas cidades"); read it as the plain number.
     const counted = said.replace(/entas /g, "entos ").replace(/ uma /g, " um ").replace(/ duas /g, " dois ");
-    for (const n of numbersIn(l.show.replace(/\*/g, ""))) {
-      const words = spokenNumber(n);
+    const shown = l.show.replace(/\*/g, "");
+    for (const n of numbersIn(shown)) {
+      // "5º" is said as an ordinal ("quinto").
+      const words = shown.includes(`${n}º`) ? (ORDINALS[Number(n)] ?? null) : spokenNumber(n);
       if (words && !counted.includes(` ${words} `)) fail("real data", `Line ${i + 1} shows ${n} but says "${l.say}" (${n} is "${words}").`);
     }
   });
@@ -171,7 +176,8 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   for (const login of logins) if (!known.has(login.toLowerCase())) fail("real data", `${login} on screen isn't in the facts.`);
 
   const first = spec.lines[0].show.replace(/\*/g, "");
-  if (words(first).length > 3 && !/^\d/.test(first)) warn("hook", `The first line is ${words(first).length} words: open on a number alone or a provocation.`);
+  // P1: open on a real person with a stake; the ask or a greeting first lost the most viewers in our trials (76% skipped).
+  if (/^(comenta|segue|marca|oi|olá|fala|e aí)\b/i.test(first)) fail("hook", `The reel opens on the ask or a greeting ("${first}"): open on a real person with a stake (P1).`);
   // A variation that keeps the main's spoken hook shares it on purpose.
   const ownHook = !spec.variation || spec.variation.test === "voice";
   if (ownHook && ctx.priorHooks.map(bare).includes(hookOf(spec))) fail("hook", `The hook "${first}" was used before.`);
@@ -187,10 +193,12 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   // The call to action: the header's, else the last headline beat and the last comment typed (a card or the phone).
   const last = [...spec.overlays].reverse().find((o) => o.type === "comment" || o.type === "phone");
   const typed = !last ? [] : last.type === "comment" ? [last.parts.map((x) => x.text).join("")] : last.screens.flatMap((x) => [...x.posted, x.parts.map((y) => y.text).join("")]);
-  const cta = [...(spec.header?.cta ?? spec.headline?.[spec.headline.length - 1].lines ?? []).map((l) => l.text), ...typed];
+  const ctaLines = (spec.header?.cta ?? spec.headline?.[spec.headline.length - 1].lines ?? []).map((l) => l.text);
+  // A comment split over two big lines ("seuuser" / "Joinville") reads as one.
+  const cta = [...ctaLines, ctaLines.join(" "), ...typed];
   if (spec.post.watch && !cta.some((t) => /\bseuuser (?:[A-Z]{2}\b|[A-ZÀ-Ú][a-zà-ú])/.test(t.replace(/\*/g, ""))))
     fail("cta", "A watched reel's call to action must show the parseable `seuuser UF` or `seuuser Cidade`.");
-  for (const h of spec.post.caption.match(/@[\w.]+/g) ?? []) {
+  for (const h of (spec.post.caption.match(/@[\w.]+/g) ?? []).map((x) => x.replace(/\.+$/, ""))) {
     if (!ctx.verifiedHandles.includes(h.slice(1).toLowerCase())) fail("caption", `${h} in the caption isn't a verified handle.`);
   }
 
@@ -248,7 +256,8 @@ export function checkTimed(raw: ReelSpec, voice: readonly Word[], mainLength?: n
         out.push({ level: "fail", rule: "typing", message: `"${x.what.replace(/\*/g, "")}" finishes typing at ${done.toFixed(1)}s, ${(x.to - done).toFixed(1)}s before its cut (${READ_HOLD}s to read).` });
     }
     const talk = voice[voice.length - 1][2] - voice[0][1];
-    if (talk < 15 || talk > 22) out.push({ level: "fail", rule: "length", message: `${talk.toFixed(1)}s of narration (15–22s).` });
+    // No target length (P4: length follows the content; our top reels ran 21–67s): only the extremes get a look.
+    if (talk < 8 || talk > 90) out.push({ level: "warn", rule: "length", message: `${talk.toFixed(1)}s of narration: is every beat earning its seconds (P4)?` });
     if (voice[0][1] > 2) out.push({ level: "fail", rule: "hook", message: `The first word comes at ${voice[0][1].toFixed(1)}s: the hook must land in the first 2s.` });
     if (spec.kind === "trial" && !spec.variation && mainLength !== undefined && Math.abs(reel.length - mainLength) < 3)
       out.push({ level: "fail", rule: "trial", message: `${reel.length.toFixed(1)}s vs the main's ${mainLength.toFixed(1)}s: a trial differs by 3s or more.` });

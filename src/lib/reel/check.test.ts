@@ -66,9 +66,11 @@ describe("checkText", () => {
 });
 
 describe("checkTimed", () => {
-  it("fails narration outside 15–22s", () => {
-    const words = ["Onze", "devs.", "separam", "Pernambuco", "do", "Ceará.", "Comenta", "seu", "user."].map((w, i): [string, number, number] => [w, 0.4 + i, 0.9 + i]);
-    expect(fails(checkTimed(base, words))).toEqual(["length"]);
+  it("only warns on a very short narration (no target length)", () => {
+    const words = ["Onze", "devs.", "separam", "Pernambuco", "do", "Ceará.", "Comenta", "seu", "user."].map((w, i): [string, number, number] => [w, 0.4 + i * 0.5, 0.8 + i * 0.5]);
+    const issues = checkTimed(base, words);
+    expect(fails(issues)).toEqual([]);
+    expect(issues.some((i) => i.rule === "length" && i.level === "warn")).toBe(true);
   });
 });
 

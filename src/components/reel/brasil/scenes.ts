@@ -232,6 +232,22 @@ function turnFor(cut: ReelCut, target: Target, keys: Orbit[], H: number, world: 
 /** How far over a roof its balloon's foot stands: over its items, when it has some. */
 export const balloonClear = (target: Target) => 8 + (target.crown ? CROWN_H : target.items ? ITEMS_H : 0);
 
+/** How far under the horizon the frame's top edge stays on a move round a building (degrees): no sky, no black band. */
+const NO_SKY = 20;
+
+/**
+ * Raises the camera (same distance across) until, aimed with the point `height` up the target `y` down
+ * the frame, it looks down steeply enough that the frame's top edge is under the horizon (Sam,
+ * 2026-10-20: on a building, the camera always a little turned down). params.sky: true keeps the sky.
+ */
+function lookDown(p: Pose, target: Target, height: number, y: number, cut: ReelCut) {
+  if (cut.params.sky === true) return;
+  const d = Math.hypot(target.x - p.pos.x, target.z - p.pos.z);
+  const above = Math.atan((1 - 2 * y) * Math.tan(THREE.MathUtils.degToRad(FOV / 2)));
+  const need = height + d * Math.tan(THREE.MathUtils.degToRad(FOV / 2 + NO_SKY) - above);
+  if (p.pos.y < need) p.pos.y = need;
+}
+
 /** Tilts the camera so the point `height` up the target shows `y` (0 top – 1 bottom) down the frame. */
 function aimAt(p: Pose, target: Target, height: number, y: number) {
   const flat = Math.hypot(p.look.x - p.pos.x, p.look.z - p.pos.z);
@@ -322,7 +338,9 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
       const p = orbitPose(target, ORBITS[cut.kind], cut.kind === "crown" ? u : 1 - Math.pow(1 - u, 3), H, turn);
       // With the crown on, the balloon a little higher so the crown under it clears the captions.
       // params.y: where the roof's balloon point sits down the frame (under a big card, lower).
-      aimAt(p, target, target.height + balloonClear(target), typeof cut.params.y === "number" ? cut.params.y : target.crown ? 0.36 : 0.42);
+      const roofY = typeof cut.params.y === "number" ? cut.params.y : target.crown ? 0.36 : 0.42;
+      lookDown(p, target, target.height + balloonClear(target), roofY, cut);
+      aimAt(p, target, target.height + balloonClear(target), roofY);
       return p;
     }
     case "lot-rise":
@@ -339,11 +357,18 @@ export function poseAt(cuts: readonly ReelCut[], i: number, u: number, world: Sc
       if (world.isRise(cut)) {
         p.look.y = THREE.MathUtils.lerp(0.15 * H, p.look.y, Math.min(1, world.riseAt(t) * 4));
         // From above, the roof as it goes up held over the captions, under the header.
-        if (keys === LOT_HIGH) aimAt(p, target, H + 8, THREE.MathUtils.lerp(0.55, 0.46, world.riseAt(t)));
+        if (keys === LOT_HIGH) {
+          const y = THREE.MathUtils.lerp(0.55, 0.46, world.riseAt(t));
+          lookDown(p, target, H + 8, y, cut);
+          aimAt(p, target, H + 8, y);
+        }
       }
       // A finished building: its roof held at a set height on screen, under its balloon and the
       // header, above the captions (higher with roof items, whose balloon stands taller).
-      else aimAt(p, target, target.height + balloonClear(target), 0.36);
+      else {
+        lookDown(p, target, target.height + balloonClear(target), 0.36, cut);
+        aimAt(p, target, target.height + balloonClear(target), 0.36);
+      }
       return p;
     }
     case "wide": {
