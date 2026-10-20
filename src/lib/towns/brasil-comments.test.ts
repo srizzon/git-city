@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseComment, pickReading, replyFor } from "./brasil-comments";
+import { parseComment, parseVote, pickReading, replyFor, voteReply } from "./brasil-comments";
 
 describe("parseComment", () => {
   it.each([
@@ -144,5 +144,29 @@ describe("pickReading", () => {
   it("keeps the model's reading otherwise", () => {
     const model = { login: "millersantosbr", uf: "AL" as const, place: "Maceió" };
     expect(pickReading("@millersantosbr Maceió", model, { login: "millersantosbr", uf: null, place: "maceio" })).toBe(model);
+  });
+});
+
+describe("parseVote", () => {
+  it.each([
+    ["53", 53],
+    ["voto 53", 53],
+    ["Voto no 32", 32],
+    ["meu voto é o 01", 1],
+    ["vou de 32!", 32],
+    ["#53", 53],
+    ["01 🗳️", 1],
+    ["nº 53", 53],
+  ])("%s votes %i", (text, n) => expect(parseVote(text)).toBe(n));
+
+  it.each(["srizzon SP", "53 anos de código", "sp 32", "0", "100", "votei no guanabara", "seuuser 53"])("%s isn't a vote", (text) => expect(parseVote(text)).toBeNull());
+});
+
+describe("voteReply", () => {
+  it("names the number on two digits and the candidate", () => {
+    expect(voteReply("voted", 1, "srizzon")).toContain("Voto no 01 (srizzon) registrado");
+  });
+  it("tells an account off the map how to get on it", () => {
+    expect(voteReply("unlinked", 53)).toContain("seuuser Recife");
   });
 });

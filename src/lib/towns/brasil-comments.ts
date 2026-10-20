@@ -191,3 +191,32 @@ export function replyFor(outcome: string, login: string | null, uf: UF | null, k
   if (outcome === "already") return pick([`O ${login} já tava no mapa! Link na bio pra achar teu prédio 🏙️`, `${login} já mora no mapa 😎 Link na bio pra ver`, `Esse já tava lá! Prédio do ${login} no link da bio 🇧🇷`]);
   return null;
 }
+
+// ─── A vote in a comment ────────────────────────────────────
+// "voto 53", "53", "vou de 32", "meu voto é o 01": a comment that is a ballot
+// number (with only voting words round it) votes for president, as the
+// Instagram account's dev on the map (brasil-instagram.ts). Anything else
+// stays a comment.
+
+const VOTE = /^(?:(?:meu\s+)?voto(?:\s+(?:é|e|no|na|pro|pra))?(?:\s+o)?|vou\s+de|vote|é\s+o|#|n[ºo°]\.?)?\s*(\d{1,2})\s*[!.🗳️✅👍🔥💚]*$/iu;
+
+/** The ballot number a comment votes for, or null when it isn't a vote. */
+export function parseVote(text: string): number | null {
+  const m = VOTE.exec(text.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n >= 1 && n <= 99 ? n : null;
+}
+
+/**
+ * The reply to a vote: "voted" (with the candidate's login), "unlinked" (the Instagram account isn't
+ * on the map yet), or a refusal: "number" (nobody has it), "young" (GitHub account too new), "closed".
+ */
+export function voteReply(outcome: "voted" | "unlinked" | "number" | "young" | "closed", number: number, login: string | null = null): string {
+  const nn = String(number).padStart(2, "0");
+  if (outcome === "voted") return `Voto no ${nn}${login ? ` (${login})` : ""} registrado 🗳️ Dá pra trocar até domingo, 21h`;
+  if (outcome === "unlinked") return `Seu Instagram ainda não tá no mapa 😕 Comenta seu user do GitHub e sua cidade (ex: seuuser Recife) e depois o número de novo`;
+  if (outcome === "number") return `Não tem candidato ${nn} 🤔 Os números tão na urna, no link da bio`;
+  if (outcome === "young") return `Sua conta do GitHub precisa ter 30 dias pra votar 😕`;
+  return `A votação não tá aberta agora`;
+}
