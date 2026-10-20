@@ -374,7 +374,7 @@ export default function ProjectSheet({
             }}
             className="btn-press flex min-h-9 items-center justify-center gap-1.5 border-2 border-red-400 text-[10px] text-red-400"
           >
-            Take it down for good
+            Delete? This week&apos;s slot doesn&apos;t come back
           </button>
         ) : (
           <button

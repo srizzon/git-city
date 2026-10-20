@@ -190,7 +190,7 @@ export default function ProjectBoard({
       )}
       {confirmDelete ? (
         <button type="button" onClick={onDelete} className="btn-press flex h-8 items-center gap-1.5 border-2 border-red-400 px-2.5 text-[9px] text-red-400">
-          Take it down for good
+          Delete? This week&apos;s slot doesn&apos;t come back
         </button>
       ) : (
         <button type="button" onClick={() => setConfirmDelete(true)} className="btn-press flex h-8 items-center gap-1.5 border-2 border-border px-2.5 text-[9px] text-muted hover:text-cream">

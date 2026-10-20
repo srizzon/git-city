@@ -57,7 +57,7 @@ import { brasilWorld, plainBuilding } from "@/lib/towns/brasil-world";
 import { brasilOffices, officeLabel, type Office } from "@/lib/towns/brasil-roles";
 import type { BrasilWeek } from "@/lib/towns/brasil-server";
 import type { Count, ElectionView } from "@/lib/towns/brasil-election-server";
-import type { CardData } from "@/lib/towns/brasil-projects-server";
+import type { Blocked, CardData } from "@/lib/towns/brasil-projects-server";
 import type { ProjectCard } from "@/lib/towns/brasil-projects";
 import ProjectsCard from "@/components/towns/brasil/ProjectsCard";
 import ProjectSheet, { type ProjectView } from "@/components/towns/brasil/ProjectSheet";
@@ -110,7 +110,7 @@ export interface BrasilTownProps {
 }
 
 /** The projects' sheets on the right: one project, the share form (or an edit), the ad request. */
-type ProjOverlay = { kind: "project"; slug: string; initial?: ProjectCard; from: string } | { kind: "share"; editing?: ProjectView } | { kind: "ad" } | null;
+type ProjOverlay = { kind: "project"; slug: string; initial?: ProjectCard; from: string } | { kind: "share"; editing?: ProjectView; blocked?: Blocked | null } | { kind: "ad" } | null;
 
 type PanelId = "states" | "election" | null;
 const DriveHud = dynamic(() => import("@/components/league/hud/drive/DriveHud"), { ssr: false });
@@ -538,9 +538,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   }, [startProject]);
   useEffect(() => {
     if (!startSheet) return;
-    const t = setTimeout(() => setProj(startSheet === "ad" ? { kind: "ad" } : { kind: "share" }), 600);
+    // The page read whether they can post with the card: the form opens on the right screen.
+    const t = setTimeout(() => setProj(startSheet === "ad" ? { kind: "ad" } : { kind: "share", blocked: projects?.me ? projects.me.blocked : undefined }), 600);
     return () => clearTimeout(t);
-  }, [startSheet]);
+  }, [startSheet, projects]);
 
   useEffect(() => {
     if (state) askRecords();
@@ -855,13 +856,13 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setPicker(null);
     setProj({ kind: "project", slug, from, initial });
   };
-  const openShare = (editing?: ProjectView) => {
+  const openShare = (editing?: ProjectView, blocked?: Blocked | null) => {
     setState(null);
     setFocused(null);
     setBackTo(null);
     setPanel(null);
     setPicker(null);
-    setProj({ kind: "share", editing });
+    setProj({ kind: "share", editing, blocked });
   };
   const signIn = () => {
     posthog.capture("brasil_signin_clicked", { for_login: picker?.forLogin ?? null });
@@ -1280,7 +1281,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           viewerLogin={viewerLogin}
           refreshKey={projectsKey}
           onOpen={(p) => openProject(p.slug, "card", p)}
-          onShare={() => openShare()}
+          onShare={(blocked) => openShare(undefined, blocked)}
+          onOpenSlug={(slug) => openProject(slug, "card_mine")}
           onOffer={() => {
             setPanel(null);
             setProj({ kind: "ad" });
@@ -1311,8 +1313,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           slug={league.slug}
           signedIn={!!viewerLogin}
           editing={proj.editing}
+          blocked={proj.blocked}
           onSignIn={() => signInForProject(null)}
           onPutOnMap={() => openPicker(null)}
+          onOpenProject={(slug) => openProject(slug, "share_blocked")}
           onClose={() => setProj(null)}
           onDone={() => setProjectsKey((k) => k + 1)}
         />
@@ -1403,7 +1407,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             {(projectWins[focused.loginLower] || viewerLogin?.toLowerCase() === focused.loginLower) && (
               <div className="mx-4 mb-3 flex flex-col gap-2">
                 {projectWins[focused.loginLower] && <ProjectWin win={projectWins[focused.loginLower]} onOpen={(slug) => openProject(slug, "building")} />}
-                {viewerLogin?.toLowerCase() === focused.loginLower && <MyProjects slug={league.slug} refreshKey={projectsKey} onOpen={(slug) => openProject(slug, "my_building")} onShare={() => openShare()} />}
+                {viewerLogin?.toLowerCase() === focused.loginLower && <MyProjects slug={league.slug} refreshKey={projectsKey} onOpen={(slug) => openProject(slug, "my_building")} onShare={(blocked) => openShare(undefined, blocked)} />}
               </div>
             )}
             </>

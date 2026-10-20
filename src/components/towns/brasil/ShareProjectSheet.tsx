@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
 import posthog from "posthog-js";
-import { CATEGORIES, LIMITS, type Category } from "@/lib/towns/brasil-projects";
-import type { MyProject } from "@/lib/towns/brasil-projects-server";
+import { CATEGORIES, LIMITS, launchWeekFor, opensText, projectWeek, type Category } from "@/lib/towns/brasil-projects";
+import type { Blocked, MyProject } from "@/lib/towns/brasil-projects-server";
 import { Share, statusOf, type ProjectView } from "./ProjectSheet";
 import { Overlay, api, postJson } from "./projects-ui";
 
@@ -25,7 +25,6 @@ interface Prefill {
   note: string | null;
 }
 
-type Blocked = { code: string; error: string } | null;
 
 interface Form {
   url: string;
@@ -58,8 +57,10 @@ export default function ShareProjectSheet({
   editing,
   onSignIn,
   onPutOnMap,
+  onOpenProject,
   onClose,
   onDone,
+  blocked: known,
 }: {
   slug: string;
   signedIn: boolean;
@@ -67,12 +68,16 @@ export default function ShareProjectSheet({
   editing?: ProjectView | MyProject | null;
   onSignIn: () => void;
   onPutOnMap: () => void;
+  /** Open one of their projects (the one that used the week). */
+  onOpenProject: (slug: string) => void;
   onClose: () => void;
   /** Something was posted or changed: the card reads again. */
   onDone: () => void;
+  /** Whether they can post, when the map already knows it (the card read it): null can, undefined unknown. */
+  blocked?: Blocked | null;
 }) {
-  // Whether they can post is read in the background: the form shows at once, and only a "no" replaces it.
-  const [blocked, setBlocked] = useState<Blocked>(null);
+  // Known (from the map's card): the right screen at once. Unknown: read it before showing anything but the frame.
+  const [blocked, setBlocked] = useState<Blocked | null | undefined>(editing ? null : known);
   const [step, setStep] = useState<"link" | "form" | "sending" | "result">(editing ? "form" : "link");
   const [form, setForm] = useState<Form>(editing ? { url: editing.url, name: editing.name, tagline: editing.tagline, description: editing.description, repo: editing.repo ?? "", category: editing.category } : empty);
   const [busy, setBusy] = useState(false);
@@ -81,12 +86,12 @@ export default function ShareProjectSheet({
   const [result, setResult] = useState<MyProject | null>(null);
 
   useEffect(() => {
-    if (editing || !signedIn) return;
+    if (editing || !signedIn || known !== undefined) return;
     fetch(`${api(slug)}?view=mine`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((j: { blocked: Blocked }) => setBlocked(j.blocked))
+      .then((j: { blocked: Blocked | null }) => setBlocked(j.blocked))
       .catch(() => setBlocked(null));
-  }, [slug, signedIn, editing]);
+  }, [slug, signedIn, editing, known]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -127,12 +132,14 @@ export default function ShareProjectSheet({
   };
 
   const title = editing ? "Edit project" : "Share your project";
+  const [now] = useState(() => Date.now());
+  const lateWeek = launchWeekFor(new Date(now)) !== projectWeek(new Date(now));
 
   if (!signedIn)
     return (
       <Overlay title={title} onClose={onClose}>
         <div className="flex flex-col gap-3">
-          <p className="text-[11px] normal-case leading-relaxed text-warm">Post what you built. Everyone upvotes, and the week&apos;s top 3 show here on the map and win points.</p>
+          <p className="text-[11px] normal-case leading-relaxed text-warm">Post what you built. Devs upvote it, and the week&apos;s top 3 show on the map and win points.</p>
           <button type="button" onClick={onSignIn} className="btn-press min-h-10 bg-lime text-[10px] text-bg">
             Sign in with GitHub
           </button>
@@ -140,19 +147,45 @@ export default function ShareProjectSheet({
       </Overlay>
     );
 
-  if (blocked)
+  // Rare: opened from somewhere that didn't know yet. The frame only, for the moment it takes.
+  if (blocked === undefined) return <Overlay title={title} onClose={onClose}>{null}</Overlay>;
+
+  if (blocked) {
+    const btn = "btn-press flex min-h-10 flex-1 items-center justify-center border-2 text-[10px]";
     return (
       <Overlay title={title} onClose={onClose}>
-        <div className="flex flex-col gap-3">
-          <p className="text-[11px] normal-case leading-relaxed text-warm">{blocked.error}</p>
+        <div className="flex flex-col gap-4">
+          <p className="text-[12px] normal-case leading-relaxed text-cream">
+            {blocked.project?.status === "removed" ? "You deleted this week's project. A deleted one still uses the week." : blocked.error}
+          </p>
+          {blocked.project && (
+            <div className="flex items-center justify-between gap-3 border-2 border-border bg-bg-raised px-3 py-2.5">
+              <span className="min-w-0">
+                <span className="block truncate text-[11px] normal-case text-cream">{blocked.project.name}</span>
+                <span className={`text-[9px] ${statusOf(blocked.project.status).tone}`}>{statusOf(blocked.project.status).label}</span>
+              </span>
+              {blocked.project.status !== "removed" && (
+                <button type="button" onClick={() => onOpenProject(blocked.project!.slug)} className="btn-press shrink-0 border-2 border-lime px-3 py-1.5 text-[9px] text-lime hover:bg-lime hover:text-bg">
+                  Open it
+                </button>
+              )}
+            </div>
+          )}
+          {blocked.opens && (
+            <p className="text-[10px] text-muted">
+              Next one from <span className="text-cream">{opensText(blocked.opens)}</span>
+            </p>
+          )}
           {blocked.code === "not_on_map" && (
-            <button type="button" onClick={onPutOnMap} className="btn-press min-h-10 bg-lime text-[10px] text-bg">
+            <button type="button" onClick={onPutOnMap} className={`${btn} border-lime bg-lime text-bg`}>
               Put my building
             </button>
           )}
+          {blocked.code === "week_limit" && blocked.project?.status !== "removed" && <p className="text-[9px] normal-case text-dim">One project a week. Editing it is free; deleting it doesn&apos;t give the week back.</p>}
         </div>
       </Overlay>
     );
+  }
 
   if (step === "result" && result) {
     const st = statusOf(result.status);
@@ -164,7 +197,7 @@ export default function ShareProjectSheet({
               <p className="flex items-center gap-2 text-[12px] text-lime">
                 <Check size={16} strokeWidth={3} aria-hidden /> {editing ? "Saved" : "It's live"}
               </p>
-              <p className="text-[11px] normal-case leading-relaxed text-warm">{editing ? `${result.name} is up to date.` : `${result.name} competes this week until Sunday 21h. The top 3 win points. Bring votes:`}</p>
+              <p className="text-[11px] normal-case leading-relaxed text-warm">{editing ? `${result.name} is up to date.` : `${result.name} competes ${result.week && result.week !== projectWeek(new Date(now)) ? "next week, from Sunday 21h" : "this week, until Sunday 21h"}. The top 3 win points. Bring votes:`}</p>
               <Share slug={slug} p={result} />
             </>
           ) : result.status === "review" ? (
@@ -210,7 +243,7 @@ export default function ShareProjectSheet({
             void prefill();
           }}
         >
-          <p className="text-[11px] normal-case leading-relaxed text-warm">Paste the link. We fill the rest from the page and you fix what&apos;s wrong.</p>
+          <p className="text-[11px] normal-case leading-relaxed text-warm">Paste the link. We fill in the rest from the page; you fix what&apos;s wrong.</p>
           <Field label="Link (site, app or GitHub repo)">
             <input id="project-url" className={input} value={form.url} onChange={(e) => set("url", e.target.value)} placeholder="https://" inputMode="url" autoComplete="url" autoFocus maxLength={LIMITS.url} />
           </Field>
@@ -218,7 +251,11 @@ export default function ShareProjectSheet({
           <button type="submit" disabled={busy || !form.url.trim()} className="btn-press flex min-h-10 items-center justify-center gap-1.5 bg-lime text-[10px] text-bg disabled:opacity-50">
             {busy ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <ArrowRight size={13} aria-hidden />} {busy ? "Reading the page" : "Continue"}
           </button>
-          <p className="text-[9px] normal-case text-muted">One project a week. Betting, casino and get-rich links are refused.</p>
+          <ul className="flex flex-col gap-1 border-t-2 border-border pt-3 text-[9px] normal-case text-muted">
+            <li>· One project a week. Editing it is free; deleting it doesn&apos;t give the week back.</li>
+            <li>· {lateWeek ? "Posted now, it competes next week (this one closes in under a day)." : "It competes this week, until Sunday 21h (Brasília)."}</li>
+            <li>· Betting, casino and get-rich links are refused.</li>
+          </ul>
         </form>
       </Overlay>
     );

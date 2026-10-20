@@ -19,6 +19,9 @@ import {
   podium,
   projectSlug,
   projectWeek,
+  launchWeekFor,
+  slotWeekOf,
+  COUNTED_MIN_DAYS,
   rankWeek,
   repoOfUrl,
   weekClosesAt,
@@ -165,14 +168,17 @@ export interface CardData {
   mode: "ranked" | "new";
   count: number;
   ad: AdCard | null;
+  /** Signed in: whether they can post now (null) or why not, so Share yours opens on the right screen at once. */
+  me: { blocked: Blocked | null } | null;
 }
 
 /** What the map's top-right card shows. */
-export async function getCardData(leagueId: string, viewerId: number | null): Promise<CardData> {
-  const list = await listProjects(leagueId, { tab: "week", viewerId, limit: 200 });
+export async function getCardData(leagueId: string, viewer: Viewer | null): Promise<CardData> {
+  const viewerId = viewer?.id ?? null;
+  const [list, blocked] = await Promise.all([listProjects(leagueId, { tab: "week", viewerId, limit: 200 }), viewer ? cannotPost(leagueId, viewer) : Promise.resolve(null)]);
   const ranked = list.rows.filter((r) => r.votes > 0);
   const top = ranked.length >= 3 || list.rows.length <= 3 ? list.rows.slice(0, 3) : [...ranked, ...[...list.rows].filter((r) => r.votes === 0).sort((a, b) => (b.liveAt ?? 0) - (a.liveAt ?? 0))].slice(0, 3);
-  return { week: list.week, closesAt: list.closesAt, top, mode: ranked.length ? "ranked" : "new", count: list.rows.length, ad: await currentAd(leagueId) };
+  return { week: list.week, closesAt: list.closesAt, top, mode: ranked.length ? "ranked" : "new", count: list.rows.length, ad: await currentAd(leagueId), me: viewer ? { blocked } : null };
 }
 
 /** A project by its slug, as the viewer sees it: live to everyone, any status to its maker. */
@@ -238,23 +244,49 @@ interface MakerRow {
   contributions: number | null;
 }
 
-/** Why the viewer can't post right now, or null when they can. */
-export async function cannotPost(leagueId: string, viewer: Viewer): Promise<{ code: "not_on_map" | "banned" | "young" | "week_limit" | "live_limit"; error: string } | null> {
+export type BlockCode = "not_on_map" | "banned" | "young" | "week_limit" | "live_limit" | "refusals";
+
+/** Why the viewer can't post right now: a line for them, and what helps (their project, when it opens). */
+export interface Blocked {
+  code: BlockCode;
+  error: string;
+  /** The project that used this week's slot. */
+  project?: { slug: string; name: string; status: ProjectStatus } | null;
+  /** When they can post again (a week's Monday, UTC). */
+  opens?: string | null;
+}
+
+/**
+ * Why the viewer can't post a new project now, or null when they can.
+ * except: a project being edited, which doesn't count against itself.
+ * The slot is the week a new post would compete in (launchWeekFor): one
+ * project a week, a deleted one still counts (no post, delete, post again),
+ * a refused one doesn't; LIMITS.refusalsPerWeek refused tries close the week.
+ */
+export async function cannotPost(leagueId: string, viewer: Viewer, except: number | null = null): Promise<Blocked | null> {
+  const now = new Date();
+  const target = launchWeekFor(now);
   const [resident, ban, dev, mine] = await Promise.all([
     sb().from("brasil_residents").select("developer_id, lx").eq("league_id", leagueId).eq("developer_id", viewer.id).maybeSingle<{ developer_id: number; lx: number | null }>(),
     sb().from("brasil_project_bans").select("developer_id").eq("developer_id", viewer.id).maybeSingle(),
     sb().from("developers").select("id, github_login, account_created_at, contributions").eq("id", viewer.id).maybeSingle<MakerRow>(),
-    sb().from("brasil_projects").select("status, launch_week, created_at").eq("league_id", leagueId).eq("developer_id", viewer.id).neq("status", "removed"),
+    sb().from("brasil_projects").select("id, slug, name, status, launch_week, created_at").eq("league_id", leagueId).eq("developer_id", viewer.id),
   ]);
-  if (!resident.data || resident.data.lx === null) return { code: "not_on_map", error: "Put your building on the map first." };
-  if (ban.data) return { code: "banned", error: "You can't post projects." };
-  if (dev.data && !canPostAccount(dev.data)) return { code: "young", error: "Your GitHub account needs to be 30 days old to post." };
-  const week = projectWeek(new Date());
-  const rows = (mine.data ?? []) as { status: ProjectStatus; launch_week: string | null; created_at: string }[];
-  // A project counts toward this week from the moment it's posted (checking, in review or live), not only once it's live.
-  const thisWeek = rows.filter((r) => r.launch_week === week || (!r.launch_week && projectWeek(new Date(r.created_at)) === week && r.status !== "rejected")).length;
-  if (thisWeek >= LIMITS.launchesPerWeek) return { code: "week_limit", error: "One project a week. Post the next one on Monday." };
-  if (rows.filter((r) => r.status === "live" || r.status === "review" || r.status === "checking").length >= LIMITS.livePerDev) return { code: "live_limit", error: `${LIMITS.livePerDev} projects up at once. Take one down to post another.` };
+  if (!resident.data || resident.data.lx === null) return { code: "not_on_map", error: "Projects come from devs on the map. Put your building first, then share what you built." };
+  if (ban.data) return { code: "banned", error: "You can't post projects anymore." };
+  if (dev.data && !canPostAccount(dev.data)) {
+    const from = new Date(Date.parse(dev.data.account_created_at!) + COUNTED_MIN_DAYS * 86_400_000);
+    return { code: "young", error: `Your GitHub account is new. You can post from ${from.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "America/Sao_Paulo" })}.` };
+  }
+  type Row = { id: number; slug: string; name: string; status: ProjectStatus; launch_week: string | null; created_at: string };
+  const rows = ((mine.data ?? []) as Row[]).filter((r) => r.id !== except);
+  const next = projectWeek(new Date(weekClosesAt(target)));
+  const used = rows.find((r) => r.status !== "rejected" && slotWeekOf(r) === target);
+  if (used) return { code: "week_limit", error: "You already posted this week's project.", project: { slug: used.slug, name: used.name, status: used.status }, opens: next };
+  const refused = rows.filter((r) => r.status === "rejected" && slotWeekOf(r) === target).length;
+  if (refused >= LIMITS.refusalsPerWeek) return { code: "refusals", error: `${LIMITS.refusalsPerWeek} tries were refused this week.`, opens: next };
+  if (rows.filter((r) => r.status === "live" || r.status === "review" || r.status === "checking").length >= LIMITS.livePerDev)
+    return { code: "live_limit", error: `You have ${LIMITS.livePerDev} projects up. Take one down to post a new one.` };
   return null;
 }
 
@@ -272,7 +304,7 @@ async function applyScreening(row: { id: number; launch_week: string | null; liv
   const now = new Date();
   const patch: Record<string, unknown> = { ...extra, status, status_reason: status === "live" ? null : (s.reason ?? (forceReview ? "New link: waiting for a look" : null)), checked_at: now.toISOString(), updated_at: now.toISOString() };
   if (status === "live" && !row.launch_week) {
-    patch.launch_week = projectWeek(now);
+    patch.launch_week = launchWeekFor(now);
     patch.live_at = now.toISOString();
   }
   const { error } = await sb().from("brasil_projects").update(patch).eq("id", row.id);
@@ -311,7 +343,7 @@ export async function createProject(league: { id: string }, viewer: Viewer, inpu
     .select("id, launch_week, live_at")
     .single<{ id: number; launch_week: string | null; live_at: string | null }>();
   if (error) {
-    if (error.code === "23505") return { error: "That link is already posted." };
+    if (error.code === "23505") return { error: "That link is already on the map. If it's yours, report it from its page." };
     throw new Error(`projects insert: ${error.message}`);
   }
   const s = await screenProject({ ...input, repo }, { login: viewer.github_login });
@@ -330,6 +362,11 @@ export async function editProject(league: { id: string }, viewer: Viewer, id: nu
   const { data: row } = await sb().from("brasil_projects").select("id, developer_id, url, status, launch_week, live_at, repo").eq("id", id).eq("league_id", league.id).maybeSingle<{ id: number; developer_id: number; url: string; status: ProjectStatus; launch_week: string | null; live_at: string | null; repo: string | null }>();
   if (!row || row.developer_id !== viewer.id || row.status === "removed") return { error: "Project not found." };
   if (row.status === "hidden") return { error: "This project is hidden while we take a look." };
+  if (row.status === "rejected") {
+    // Sending a refused project again is a new try: it takes the week's slot like a new post.
+    const blocked = await cannotPost(league.id, viewer, row.id);
+    if (blocked && blocked.code !== "live_limit") return { error: blocked.code === "week_limit" ? "You already posted this week's project. Send this one again next week." : blocked.error };
+  }
   const linkChanged = row.url !== input.url || (input.repo ?? null) !== (row.repo ?? null);
   const repo = input.repo ?? repoOfUrl(input.url);
   const words = { name: input.name, tagline: input.tagline, description: input.description, category: input.category };
@@ -341,7 +378,7 @@ export async function editProject(league: { id: string }, viewer: Viewer, id: nu
     const status = await applyScreening(row, s, extra, linkChanged && row.status !== "rejected" && !!row.launch_week);
     await captureServer(viewer.github_login, "project_checked", { project_id: row.id, outcome: status, on: linkChanged ? "edit_link" : "edit_words" });
   } catch (err) {
-    if (String(err).includes("duplicate key")) return { error: "That link is already posted." };
+    if (String(err).includes("duplicate key")) return { error: "That link is already on the map. If it's yours, report it from its page." };
     throw err;
   }
   return { project: (await myProjects(league.id, viewer)).find((p) => p.id === row.id)! };
@@ -571,7 +608,7 @@ export async function adminDecide(leagueId: string, id: number, action: "approve
   const status: ProjectStatus = action === "approve" ? "live" : action === "reject" ? "rejected" : "hidden";
   const patch: Record<string, unknown> = { status, status_reason: status === "live" ? null : (reason?.slice(0, 200) ?? (status === "rejected" ? "It doesn't fit Git City." : "Hidden by the admin")), updated_at: now.toISOString() };
   if (status === "live" && !row.launch_week) {
-    patch.launch_week = projectWeek(now);
+    patch.launch_week = launchWeekFor(now);
     patch.live_at = now.toISOString();
   }
   const { error } = await sb().from("brasil_projects").update(patch).eq("id", id);

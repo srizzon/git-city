@@ -19,7 +19,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   if (!league) return NextResponse.json({ error: "Town not found." }, { status: 404 });
   const q = new URL(req.url).searchParams;
   const viewer = await getViewer();
-  if (q.get("view") === "card") return NextResponse.json(await getCardData(league.id, viewer?.id ?? null));
+  if (q.get("view") === "card") return NextResponse.json(await getCardData(league.id, viewer));
   if (q.get("view") === "mine") {
     if (!viewer) return NextResponse.json({ projects: [], blocked: { code: "signed_out", error: "Sign in first." } });
     const [projects, blocked] = await Promise.all([myProjects(league.id, viewer), cannotPost(league.id, viewer)]);
