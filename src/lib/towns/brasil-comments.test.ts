@@ -206,6 +206,18 @@ describe("parseComment, answers to our ask on the vote post", () => {
   });
 });
 
+describe("pickReading, the model's misses from 2026-10-19/20", () => {
+  const read = (text: string, model: { login: string | null; uf: null; place: null }) => pickReading(text, model, parseComment(text)).login;
+  it("keeps the username the rules found beside the place", () => {
+    expect(read("Luisdbrito7 Maranhão", { login: "luisdbrito", uf: null, place: null })).toBe("luisdbrito7");
+    expect(read("Frutal mg / AlbertoGRB", { login: "frutal", uf: null, place: null })).toBe("albertogrb");
+  });
+  it("trusts the model's no in a sentence", () => {
+    expect(read("Obrigado por segurar Pernambuco dney_010_", { login: null, uf: null, place: null })).toBeNull();
+    expect(read("kallebecorrea-svg Ijuí Rio Grande do Sul", { login: null, uf: null, place: null })).toBe("kallebecorrea-svg");
+  });
+});
+
 describe("voteRoute", () => {
   it("counts a number among words on the vote post, joining with the rest", () => {
     expect(voteRoute("IanAkiles Manaus 32", false)).toEqual({ number: 32, join: "IanAkiles Manaus", loose: true });

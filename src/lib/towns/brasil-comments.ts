@@ -38,6 +38,13 @@ const LAUGH = /^(k{2,}|(ha){2,}h?|(rs){2,}|(he){2,})$/;
 
 const STATE_NAMES: [string, UF][] = STATES.map((s) => [fold(s.name), s.uf] as [string, UF]).sort((a, b) => b[0].length - a[0].length);
 
+/** How many words a comment has besides its username, its state and its place. */
+function leftover(text: string, r: ParsedComment): number {
+  const state = r.uf ? fold(STATES.find((s) => s.uf === r.uf)?.name ?? "") : "";
+  const known = new Set([r.login, r.uf?.toLowerCase(), ...state.split(" "), ...fold(r.place ?? "").split(" ")]);
+  return fold(text).split(/[\s,;:|/()!?.]+/).map((w) => w.replace(/^[-@]+|-+$/g, "")).filter((w) => w && !known.has(w)).length;
+}
+
 /**
  * The model's reading of a comment, checked against the rules': a login it took from a friend's tag
  * (an @handle with nothing else, or the start of an Instagram handle like "@guilherme.ia") gives way to
@@ -45,13 +52,18 @@ const STATE_NAMES: [string, UF][] = STATES.map((s) => [fold(s.name), s.uf] as [s
  */
 export function pickReading<T extends ParsedComment>(text: string, model: T | null, rules: ParsedComment): T | ParsedComment {
   if (!model) return rules;
+  // The rules' username written beside a place beats a different one from the model, which drops a
+  // digit ("Luisdbrito7 Maranhão" → luisdbrito) or takes the city ("Frutal mg / AlbertoGRB" → frutal).
+  if (rules.login && (rules.uf || rules.place) && model.login && model.login !== rules.login) return rules;
   if (model.login) {
     const handles = [...text.toLowerCase().matchAll(/@([a-z0-9._]+)/g)].map((m) => m[1]);
     const insideIgHandle = handles.some((h) => h !== model.login && h.startsWith(model.login!) && /[._]/.test(h));
     const tagOnly = handles.length > 0 && !model.uf && !model.place && !rules.login;
     if (insideIgHandle || tagOnly) return rules;
   }
-  if (!model.login && rules.login && (rules.uf || rules.place)) return rules;
+  // A model that finds no username loses to the rules only in a short comment: in a sentence ("Obrigado por
+  // segurar Pernambuco") the word beside the state is just a word.
+  if (!model.login && rules.login && (rules.uf || rules.place) && leftover(text, rules) <= 1) return rules;
   return model;
 }
 
