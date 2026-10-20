@@ -30,7 +30,7 @@ export default function TermsPage() {
           Terms of <span style={{ color: ACCENT }}>Service</span>
         </h1>
         <p className="mt-2 text-[10px] text-muted normal-case">
-          Last updated: September 28, 2026
+          Last updated: October 20, 2026
         </p>
         <p className="mt-1 text-[10px] text-muted normal-case">
           {LEGAL_NAME} is operated by {LEGAL_RAZAO_SOCIAL} (CNPJ {LEGAL_CNPJ},{" "}
@@ -157,6 +157,13 @@ export default function TermsPage() {
               We may, at our sole discretion, refuse, remove, or moderate
               content that violates these Terms or that we deem inappropriate,
               including after it is published.
+            </p>
+            <p className="mt-2">
+              Projects you post on the Brasil map are checked before and after
+              they show, automatically (including by an AI model that reads the
+              page you link to) and by a person. Links to betting, gambling,
+              scams, malware or adult content are refused or taken down, and
+              posting them can end your right to post.
             </p>
           </Section>
 
