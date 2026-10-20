@@ -50,6 +50,7 @@ import { BrasilPicker, BrasilRanking, BrasilSearchBar } from "@/components/towns
 import ElectionPanel from "@/components/towns/brasil/ElectionPanel";
 import ApuracaoWidget from "@/components/towns/brasil/ApuracaoWidget";
 import StateCard from "@/components/towns/brasil/StateCard";
+import CityCard from "@/components/towns/brasil/CityCard";
 import { stateStats, swatchOf, weekCrown, type StateStats } from "@/components/towns/brasil/stats";
 import { stateOf, type BrasilLayout, type CityLayout, type UF } from "@/lib/towns/brasil-map";
 import type { BrCity } from "@/lib/towns/br-cities";
@@ -185,6 +186,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** Sent to put a building on the map from the voting machine: come back to it (with this number) once it's there. */
   const backToVote = useRef<{ number: number | null } | null>(null);
   const [state, setState] = useState<StateStats | null>(null);
+  /** A city's card (not a capital: a capital opens its state). */
+  const [city, setCity] = useState<CityLayout | null>(null);
   const [focused, setFocused] = useState<CityBuilding | null>(null);
   /** The state card a building was opened from: closing the building brings it back. */
   const [backTo, setBackTo] = useState<StateStats | null>(null);
@@ -222,6 +225,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setBackTo(null);
     setPicker(null);
     setProj(null);
+    setCity(null);
     setPanel(p);
   };
   /** The picker takes over: cards and panels close. */
@@ -231,6 +235,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setBackTo(null);
     setPanel(null);
     setProj(null);
+    setCity(null);
     setJoining({ pending: null, error: null });
     setPicker({ forLogin, query });
     posthog.capture("brasil_picker_opened", { signed_in: !!viewerLogin, on_map: !!home });
@@ -430,6 +435,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       setPanel(null);
       setPicker(null);
       setProj(null);
+      setCity(null);
       setState(s);
       camera.current?.flyTo(s.capital.center, s.capital.radius);
     },
@@ -442,6 +448,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       setState(null);
       setPanel(null);
       setProj(null);
+      setCity(null);
       setFocused(b);
       mapNav.send({ type: "flyTo", x: b.position[0], z: b.position[2], distance: 700 });
     },
@@ -455,6 +462,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setPanel(null);
     setPicker(null);
     setProj(null);
+    setCity(null);
     camera.current?.flyTo(null);
   }, []);
   // Back (the phone's, or ‹ after a step this page took): show what the address says.
@@ -490,6 +498,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       setFocused(null);
       setPanel(null);
       setPicker(null);
+      setProj(null);
+      setCity(c);
       camera.current?.flyTo(c.center, c.radius);
     },
     [openState, pushUrl],
@@ -854,6 +864,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setBackTo(null);
     setPanel(null);
     setPicker(null);
+    setCity(null);
     setProj({ kind: "project", slug, from, initial });
   };
   const openShare = (editing?: ProjectView, blocked?: Blocked | null) => {
@@ -862,6 +873,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setBackTo(null);
     setPanel(null);
     setPicker(null);
+    setCity(null);
     setProj({ kind: "share", editing, blocked });
   };
   const signIn = () => {
@@ -1273,7 +1285,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
 
       {count && !inCar && !state && !focused && !panel && !picker && <ApuracaoWidget slug={league.slug} initial={count} myVote={electionNow?.viewer?.votedFor?.number ?? null} onVote={(n) => openVote(n)} />}
 
-      {!inCar && !state && !focused && !panel && !picker && !proj && (
+      {!inCar && !state && !city && !focused && !panel && !picker && !proj && (
         <ProjectsCard
           slug={league.slug}
           initial={projects}
@@ -1358,9 +1370,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           }}
           onPickCity={(c) => {
             posthog.capture("brasil_city_opened", { city: c.ibge, from: "state_card" });
-            setState(null);
-            camera.current?.flyTo(c.center, c.radius);
-            if (c.slug) pushUrl(`cidade=${c.slug}`);
+            openCity(c);
           }}
           onDriveHere={state.devs > 0 ? () => startDrive() : undefined}
           week={world.week}
@@ -1383,6 +1393,31 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           }}
           onClose={() => {
             setState(null);
+            replaceUrl("");
+          }}
+        />
+      )}
+      {city && !inCar && !focused && (
+        <CityCard
+          key={city.key}
+          city={city}
+          byLogin={world.placed}
+          townPath={`/town/${league.slug}`}
+          mayor={world.offices.mayors.get(city.key)?.login ?? null}
+          totals={officeWeek.totals}
+          place={city.uf ? layout.cities.filter((x) => x.uf === city.uf && x.devs.length > 0).sort((a, b) => b.devs.length - a.devs.length).findIndex((x) => x.key === city.key) + 1 || null : null}
+          now={now}
+          onPickDev={(login) => {
+            const b = world.placed.get(login.toLowerCase());
+            if (b) openBuilding(b);
+          }}
+          onState={(uf) => {
+            posthog.capture("brasil_state_opened", { uf, from: "city_card" });
+            openState(uf);
+          }}
+          onDriveHere={() => startDrive()}
+          onClose={() => {
+            setCity(null);
             replaceUrl("");
           }}
         />
