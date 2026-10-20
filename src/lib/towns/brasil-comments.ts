@@ -61,9 +61,10 @@ export function pickReading<T extends ParsedComment>(text: string, model: T | nu
  */
 export function parseComment(text: string, opts: { ignore?: string[]; reply?: boolean; loneHandle?: boolean } = {}): ParsedComment {
   let raw = text.trim();
-  // The account's own @ is never the username, nor the @ Instagram puts at the start of a reply.
-  for (const handle of opts.ignore ?? []) raw = raw.replace(new RegExp(`@${handle.replace(/[.]/g, "\\.")}\\b`, "gi"), " ").trim();
+  // The @ Instagram puts at the start of a reply is never the username (taken first: it's often the
+  // account's own, and "@account @login João Pessoa" must keep the login), nor the account's own @.
   if (opts.reply) raw = raw.replace(/^@[a-z0-9._]+\s*/i, "").trim();
+  for (const handle of opts.ignore ?? []) raw = raw.replace(new RegExp(`@${handle.replace(/[.]/g, "\\.")}\\b`, "gi"), " ").trim();
   const lower = fold(raw);
 
   // The state: a full name first ("rio grande do sul" before "rio de janeiro" can't clash: longest first), else a UF word.
@@ -208,14 +209,65 @@ export function parseVote(text: string): number | null {
   return n >= 1 && n <= 99 ? n : null;
 }
 
+// A vote among other words: "IanAkiles Manaus 32" (joining and voting at
+// once), "Vamos votar kkkkkk 32", "Boraaa de 01!!", "Bora @amigo 34 🔥". One
+// ballot number on its own in the comment (keycaps like 0️⃣1️⃣ count), never
+// part of a word, a time or an age ("21h", "53 anos"). `worded`: a voting word
+// is in it, so it reads as a vote even where comments are for joining.
+
+const VOTE_WORDS = /(?:^|[^\p{L}])(?:vot\p{L}*|n[uú]mero|candidat\p{L}*|bora+\s+de|vou\s+de|fechad[oa]\s+com|é\s+o)(?![\p{L}])/iu;
+const BALLOT = /(?<![\p{L}\p{N}@#/.,:_-])(?<!R\$\s*)(\d{1,2})(?![\p{L}\p{N}]|[.,:]\d|\s*(?:anos?|%|mil|reais|horas?|min)(?![\p{L}]))/giu;
+
+export interface VoteInText {
+  number: number;
+  /** The comment without the number and the voting words: a username and a city, maybe. */
+  rest: string;
+  worded: boolean;
+}
+
+/** A ballot number inside a longer comment, or null when it has none or more than one. */
+export function voteIn(text: string): VoteInText | null {
+  const t = text.replace(/(\d)\uFE0F?\u20E3/g, "$1");
+  const found = [...t.matchAll(BALLOT)].map((m) => Number(m[1]));
+  const distinct = [...new Set(found)];
+  if (distinct.length !== 1 || distinct[0] < 1 || distinct[0] > 99) return null;
+  const rest = t
+    .replace(BALLOT, " ")
+    .replace(new RegExp(VOTE_WORDS.source, "giu"), " ")
+    .replace(/[!🗳️✅👍🔥💚😂—-]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return { number: distinct[0], rest, worded: VOTE_WORDS.test(t) };
+}
+
 /**
- * The reply to a vote: "voted" (with the candidate's login), "unlinked" (the Instagram account isn't
- * on the map yet), or a refusal: "number" (nobody has it), "young" (GitHub account too new), "closed".
+ * Whether a comment votes, and with what: a bare number always does; a number among other words does
+ * where comments aren't for joining (`watched` false: the vote post), with a voting word, or next to a
+ * username (joining and voting at once). `join`: the words to join with, when they name a username. `loose` votes only count when
+ * the number is a candidate's (the caller checks), so "a 32 do meu time" doesn't vote for a stranger.
  */
-export function voteReply(outcome: "voted" | "unlinked" | "number" | "young" | "closed", number: number, login: string | null = null): string {
+export function voteRoute(text: string, watched: boolean): { number: number; join: string | null; loose: boolean } | null {
+  const strict = parseVote(text);
+  if (strict !== null) return { number: strict, join: null, loose: false };
+  const v = voteIn(text);
+  if (!v) return null;
+  // An @ in a vote is a friend being called to vote ("Bora @amigo 34"), never the commenter's username.
+  const rest = v.rest.replace(/@[a-z0-9._-]+/gi, " ").replace(/\s+/g, " ").trim();
+  const join = rest && parseComment(rest).login ? rest : null;
+  if (v.worded || !watched || join) return { number: v.number, join, loose: true };
+  return null;
+}
+
+/**
+ * The reply to a vote: "voted" (with the candidate's login; `joined`: the same comment just put them
+ * on the map), "unlinked" (the Instagram account isn't on the map yet: their answer puts them there and
+ * counts this vote), or a refusal: "number" (nobody has it), "young" (GitHub account too new), "closed".
+ */
+export function voteReply(outcome: "voted" | "unlinked" | "number" | "young" | "closed", number: number, login: string | null = null, joined: { login: string; where: string } | null = null): string {
   const nn = String(number).padStart(2, "0");
+  if (outcome === "voted" && joined) return `Pronto! ${joined.login} tá no mapa ${joined.where} e teu voto no ${nn}${login ? ` (${login})` : ""} tá registrado 🗳️ Dá pra trocar até domingo, 21h`;
   if (outcome === "voted") return `Voto no ${nn}${login ? ` (${login})` : ""} registrado 🗳️ Dá pra trocar até domingo, 21h`;
-  if (outcome === "unlinked") return `Seu Instagram ainda não tá no mapa 😕 Comenta seu user do GitHub e sua cidade (ex: seuuser Recife) e depois o número de novo`;
+  if (outcome === "unlinked") return `Seu Instagram ainda não tá no mapa 😕 Responde aqui com seu user do GitHub e sua cidade (ex: seuuser Recife) que eu te coloco e conto teu voto no ${nn}`;
   if (outcome === "number") return `Não tem candidato ${nn} 🤔 Os números tão na urna, no link da bio`;
   if (outcome === "young") return `Sua conta do GitHub precisa ter 30 dias pra votar 😕`;
   return `A votação não tá aberta agora`;

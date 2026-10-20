@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseComment, parseVote, pickReading, replyFor, voteReply } from "./brasil-comments";
+import { parseComment, parseVote, pickReading, replyFor, voteIn, voteReply, voteRoute } from "./brasil-comments";
 
 describe("parseComment", () => {
   it.each([
@@ -162,11 +162,79 @@ describe("parseVote", () => {
   it.each(["srizzon SP", "53 anos de código", "sp 32", "0", "100", "votei no guanabara", "seuuser 53"])("%s isn't a vote", (text) => expect(parseVote(text)).toBeNull());
 });
 
+// Eval: every comment on the vote post (2026-10-20) that wasn't a bare number, and what it should count as.
+describe("voteIn, the vote post's comments", () => {
+  it.each([
+    ["Eu voto no desconhecido então, número 53", 53, true],
+    ["devWelby 48 — O dev que o Brasil precisa! Menos bugs, mais features. Menos reuniões, mais entregas. Mais café, menos exceptions. Votem 48", 48, true],
+    ["Boraaaaaa de 01!! kkk kk #RizzonPresidente", 1, true],
+    ["Vamos votar kkkkkk 32", 32, true],
+    ["Bora @manodeyvin 34 🔥😂", 34, false],
+    ["IanAkiles Manaus 32", 32, false],
+    ["@gustavoguanabara (vote 46)", 46, true],
+    ["Vote 01. Minha proposta é ter bolsa claude para todos os devs! 0️⃣1️⃣", 1, true],
+    ["seuuser 53", 53, false],
+  ])("%s votes %i", (text, n, worded) => {
+    const v = voteIn(text);
+    expect(v?.number).toBe(n);
+    expect(v?.worded).toBe(worded);
+  });
+
+  it("leaves the username and the city for joining", () => {
+    expect(voteIn("IanAkiles Manaus 32")?.rest).toBe("IanAkiles Manaus");
+    expect(voteIn("voto 32 srizzon Recife")?.rest).toBe("srizzon Recife");
+  });
+
+  it.each([
+    "Onde vota?0",
+    "@samuelrizzondev @Matte0dev João pessoa",
+    "@samuelrizzondev  GustavoSousa01 Fortaleza",
+    "@gustavoguanabara",
+    "fecha domingo 21h",
+    "tenho 32 anos",
+    "32 ou 34?",
+    "2026",
+    "srizzon SP",
+    "R$ 50",
+  ])("%s has no vote", (text) => expect(voteIn(text)).toBeNull());
+});
+
+describe("parseComment, answers to our ask on the vote post", () => {
+  it("keeps the login after the account's @ that starts a reply", () => {
+    expect(parseComment("@samuelrizzondev @Matte0dev João pessoa", { ignore: ["samuelrizzondev"], reply: true, loneHandle: true })).toMatchObject({ login: "matte0dev" });
+    expect(parseComment("@samuelrizzondev  GustavoSousa01 Fortaleza", { ignore: ["samuelrizzondev"], reply: true, loneHandle: true })).toMatchObject({ login: "gustavosousa01" });
+  });
+});
+
+describe("voteRoute", () => {
+  it("counts a number among words on the vote post, joining with the rest", () => {
+    expect(voteRoute("IanAkiles Manaus 32", false)).toEqual({ number: 32, join: "IanAkiles Manaus", loose: true });
+    // The @ is a friend called to vote, not the commenter.
+    expect(voteRoute("Bora @manodeyvin 34 🔥😂", false)).toEqual({ number: 34, join: null, loose: true });
+    expect(voteRoute("Eu voto no desconhecido então, número 53", false)).toEqual({ number: 53, join: null, loose: true });
+  });
+  it("on a join reel, needs a voting word or a username beside the number", () => {
+    expect(voteRoute("Vamos votar kkkkkk 32", true)).toMatchObject({ number: 32 });
+    expect(voteRoute("srizzon recife 32", true)).toMatchObject({ number: 32, join: "srizzon recife" });
+    expect(voteRoute("top demais 10/10 kkk 32", true)).toBeNull();
+  });
+  it("a bare number is a vote anywhere, with nothing to join", () => {
+    expect(voteRoute("53", true)).toEqual({ number: 53, join: null, loose: false });
+  });
+  it("a comment without a number isn't a vote", () => {
+    expect(voteRoute("@samuelrizzondev  GustavoSousa01 Fortaleza", false)).toBeNull();
+  });
+});
+
 describe("voteReply", () => {
   it("names the number on two digits and the candidate", () => {
     expect(voteReply("voted", 1, "srizzon")).toContain("Voto no 01 (srizzon) registrado");
   });
-  it("tells an account off the map how to get on it", () => {
+  it("tells an account off the map how to get on it, and that the vote waits", () => {
     expect(voteReply("unlinked", 53)).toContain("seuuser Recife");
+    expect(voteReply("unlinked", 53)).toContain("53");
+  });
+  it("says both when one comment put them on the map and voted", () => {
+    expect(voteReply("voted", 32, "gustavoguanabara", { login: "ianakiles", where: "em Manaus" })).toContain("ianakiles tá no mapa em Manaus e teu voto no 32 (gustavoguanabara)");
   });
 });
