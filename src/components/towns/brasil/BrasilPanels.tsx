@@ -266,7 +266,7 @@ function StatesTable({ ranked, points, yours, onPick }: { ranked: StateStats[]; 
 }
 
 /** Wider than a phone: the board in the middle. */
-function useWide(): boolean {
+export function useWide(): boolean {
   const [wide, setWide] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 640px)");
