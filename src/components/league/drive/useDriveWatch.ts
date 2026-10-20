@@ -15,7 +15,7 @@ const HIDDEN_GRACE_MS = 60_000;
 export function useDriveWatch(
   slug: string,
   enabled: boolean,
-  /** Smash: the room's floor changes (damage, damage_all); on the Brasil map, the State War's paint too (paint_*), and its city races (rally, with the welcome's). */
+  /** Smash: the room's floor changes (damage, damage_all); on the Brasil map, its city races (rally, with the welcome's). */
   onDamage?: (msg: { t: string } & Record<string, unknown>) => void,
 ) {
   const remotes = useRef(new Map<string, RemoteDriver>());
@@ -93,7 +93,7 @@ export function useDriveWatch(
       } else if (msg.t === "leave") {
         map.delete(msg.id);
         publish();
-      } else if (msg.t === "damage" || msg.t === "damage_all" || msg.t === "rally" || msg.t.startsWith("paint_")) {
+      } else if (msg.t === "damage" || msg.t === "damage_all" || msg.t === "rally") {
         onDamageRef.current?.(msg as unknown as { t: string } & Record<string, unknown>);
       }
     });

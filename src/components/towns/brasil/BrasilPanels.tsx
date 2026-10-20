@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronUp, Clock, Code2, Flag, Instagram, MapPin, MessageCircle, PaintRoller, Plus, Search, Trophy, UserPlus, Vote as VoteIcon, X, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, Code2, Flag, Instagram, MapPin, MessageCircle, Plus, Search, Trophy, UserPlus, Vote as VoteIcon, X, type LucideIcon } from "lucide-react";
 import type { CityBuilding } from "@/lib/github";
 import Panel from "@/components/league/hud/Panel";
 import { Avatar, HUD_BOX, fmt, useCountdown } from "@/components/league/hud/shared";
@@ -176,7 +176,6 @@ const EARN: { icon: LucideIcon; pts: number; word: string; hint: string; cap: st
   { icon: Flag, pts: 3, word: "Race", hint: "Finish a race with someone. More to win or set a route record.", cap: "30/day" },
   { icon: VoteIcon, pts: 10, word: "Vote", hint: "Vote for president.", cap: "1×" },
   { icon: MessageCircle, pts: 5, word: "Comment", hint: "Comment on a reel.", cap: "1/day" },
-  { icon: PaintRoller, pts: 1, word: "Paint", hint: "Drive a circle for your state. 1 per 20 lots of land.", cap: "20/day" },
 ];
 
 export function PointsRules({ compact = false }: { compact?: boolean }) {
