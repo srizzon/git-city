@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
 import posthog from "posthog-js";
-import Panel from "@/components/league/hud/Panel";
 import { CATEGORIES, LIMITS, type Category } from "@/lib/towns/brasil-projects";
 import type { MyProject } from "@/lib/towns/brasil-projects-server";
 import { Share, statusOf, type ProjectView } from "./ProjectSheet";
-import { api, postJson } from "./projects-ui";
+import { Overlay, api, postJson } from "./projects-ui";
 
 // Sharing a project (or editing one): the link first, and the form comes back
 // filled from the page and the repo (name, tagline, description), so the maker
@@ -72,7 +71,8 @@ export default function ShareProjectSheet({
   /** Something was posted or changed: the card reads again. */
   onDone: () => void;
 }) {
-  const [blocked, setBlocked] = useState<Blocked | "loading">(editing ? null : "loading");
+  // Whether they can post is read in the background: the form shows at once, and only a "no" replaces it.
+  const [blocked, setBlocked] = useState<Blocked>(null);
   const [step, setStep] = useState<"link" | "form" | "sending" | "result">(editing ? "form" : "link");
   const [form, setForm] = useState<Form>(editing ? { url: editing.url, name: editing.name, tagline: editing.tagline, description: editing.description, repo: editing.repo ?? "", category: editing.category } : empty);
   const [busy, setBusy] = useState(false);
@@ -130,26 +130,19 @@ export default function ShareProjectSheet({
 
   if (!signedIn)
     return (
-      <Panel title={title} onClose={onClose}>
+      <Overlay title={title} onClose={onClose}>
         <div className="flex flex-col gap-3">
           <p className="text-[11px] normal-case leading-relaxed text-warm">Post what you built. Everyone upvotes, and the week&apos;s top 3 show here on the map and win points.</p>
           <button type="button" onClick={onSignIn} className="btn-press min-h-10 bg-lime text-[10px] text-bg">
             Sign in with GitHub
           </button>
         </div>
-      </Panel>
-    );
-
-  if (blocked === "loading")
-    return (
-      <Panel title={title} onClose={onClose}>
-        <p className="text-[10px] text-muted">Loading</p>
-      </Panel>
+      </Overlay>
     );
 
   if (blocked)
     return (
-      <Panel title={title} onClose={onClose}>
+      <Overlay title={title} onClose={onClose}>
         <div className="flex flex-col gap-3">
           <p className="text-[11px] normal-case leading-relaxed text-warm">{blocked.error}</p>
           {blocked.code === "not_on_map" && (
@@ -158,13 +151,13 @@ export default function ShareProjectSheet({
             </button>
           )}
         </div>
-      </Panel>
+      </Overlay>
     );
 
   if (step === "result" && result) {
     const st = statusOf(result.status);
     return (
-      <Panel title={title} onClose={onClose}>
+      <Overlay title={title} onClose={onClose}>
         <div className="flex flex-col gap-4">
           {result.status === "live" ? (
             <>
@@ -192,24 +185,24 @@ export default function ShareProjectSheet({
             Close
           </button>
         </div>
-      </Panel>
+      </Overlay>
     );
   }
 
   if (step === "sending")
     return (
-      <Panel title={title} onClose={onClose}>
+      <Overlay title={title} onClose={onClose}>
         <div className="flex flex-col items-center gap-3 py-8 text-center">
           <Loader2 size={20} className="animate-spin text-lime" aria-hidden />
           <p className="text-[10px] text-cream">Checking your project</p>
           <p className="text-[10px] normal-case text-muted">We open the link and read the page. A few seconds.</p>
         </div>
-      </Panel>
+      </Overlay>
     );
 
   if (step === "link")
     return (
-      <Panel title={title} onClose={onClose}>
+      <Overlay title={title} onClose={onClose}>
         <form
           className="flex flex-col gap-3"
           onSubmit={(e) => {
@@ -227,11 +220,11 @@ export default function ShareProjectSheet({
           </button>
           <p className="text-[9px] normal-case text-muted">One project a week. Betting, casino and get-rich links are refused.</p>
         </form>
-      </Panel>
+      </Overlay>
     );
 
   return (
-    <Panel title={title} onClose={onClose}>
+    <Overlay title={title} onClose={onClose}>
       <form
         className="flex flex-col gap-3"
         onSubmit={(e) => {
@@ -282,6 +275,6 @@ export default function ShareProjectSheet({
           </button>
         )}
       </form>
-    </Panel>
+    </Overlay>
   );
 }

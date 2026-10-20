@@ -5,6 +5,7 @@ import { ArrowUpRight, Building2, Check, Copy, Flag, Github, Pencil, Trash2 } fr
 import posthog from "posthog-js";
 import Panel from "@/components/league/hud/Panel";
 import { Board, useWide } from "./BrasilPanels";
+import ProjectBoard from "./ProjectBoard";
 import {
   categoryLabel,
   timeLeft,
@@ -220,6 +221,14 @@ export default function ProjectSheet({
       </Shell>
     );
 
+  const remove = async () => {
+    const r = await postJson(`${api(slug)}/${p.id}`, {}, "DELETE");
+    posthog.capture("project_removed", { project_id: p.id, ok: r.ok });
+    if (r.ok) {
+      onChanged();
+      onClose();
+    }
+  };
   const st = statusOf(p.status);
   const live = p.status === "live";
   const status = p.mine && !live && (
@@ -400,23 +409,20 @@ export default function ProjectSheet({
   // A wide screen: a board in the middle like States, the project on the left and what you do with it on the right.
   if (wide)
     return (
-      <Board title="Project" onClose={onClose}>
-        <div className="grid grid-cols-[1fr_300px] gap-6">
-          <div className="flex min-w-0 flex-col gap-4">
-            {status}
-            {cover}
-            {header}
-            {description}
-            {maker}
-          </div>
-          <div className="flex flex-col gap-4">
-            {rank}
-            {actions}
-            {share}
-            {owner}
-          </div>
-        </div>
-      </Board>
+      <ProjectBoard
+        slug={slug}
+        p={p}
+        now={now}
+        signedIn={signedIn}
+        status={status}
+        onSignIn={onSignIn}
+        onClose={onClose}
+        onVisitBuilding={onVisitBuilding}
+        onEdit={onEdit}
+        onDelete={remove}
+        onChanged={onChanged}
+        from={from}
+      />
     );
   return (
     <Panel title="Project" onClose={onClose}>

@@ -285,7 +285,7 @@ export function useWide(): boolean {
  * card), which wait behind the dim until it closes: it renders on <body>,
  * since the map's page is a fixed layer whose children can't rise above them.
  */
-export function Board({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Board({ title, onClose, children, width = 820 }: { title: string; onClose: () => void; children: ReactNode; width?: number }) {
   const boxRef = useRef<HTMLElement>(null);
   useEffect(() => {
     // Focus moves into the board (not onto a button, which would show its ring before anyone touched a key).
@@ -297,7 +297,7 @@ export function Board({ title, onClose, children }: { title: string; onClose: ()
   return createPortal(
     <div className="pointer-events-auto fixed inset-0 z-[60] flex items-center justify-center p-6 font-pixel uppercase text-cream">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
-      <section ref={boxRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className={`${HUD_BOX} sheet-in relative outline-none flex max-h-[86vh] w-[min(820px,100%)] flex-col bg-bg/95 font-pixel uppercase text-warm`}>
+      <section ref={boxRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} style={{ width: `min(${width}px, 100%)` }} className={`${HUD_BOX} sheet-in relative outline-none flex max-h-[86vh] flex-col bg-bg/95 font-pixel uppercase text-warm`}>
         <header className="flex items-center justify-between border-b-2 border-border px-5 py-3">
           <h2 className="text-sm text-cream">{title}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="btn-press -mr-1.5 flex h-8 w-8 items-center justify-center text-muted transition-colors hover:text-cream">

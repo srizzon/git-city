@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import Panel from "@/components/league/hud/Panel";
+import { Board, useWide } from "./BrasilPanels";
 import { ChevronUp } from "lucide-react";
 import posthog from "posthog-js";
 import type { ProjectCard } from "@/lib/towns/brasil-projects";
@@ -40,7 +42,8 @@ export function ProjectIcon({ project, size = 22 }: { project: Pick<ProjectCard,
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => setSrc(src !== fallback ? fallback : null)}
-      className="shrink-0 bg-bg-raised object-cover"
+      // A site's icon is often dark on transparent: it sits on light, like a browser tab.
+      className={`shrink-0 object-cover ${src === project.icon ? "bg-[#eef0ea]" : "bg-bg-raised"}`}
       style={{ width: size, height: size, imageRendering: size <= 24 ? "pixelated" : undefined }}
     />
   ) : (
@@ -69,12 +72,14 @@ export function VoteButton({
   from: string;
   onSignIn: () => void;
   onChange?: (v: { votes: number; voted: boolean }) => void;
-  size?: "sm" | "lg";
+  /** sm: the card and lists; lg: a square count; hero: full width with the word. */
+  size?: "sm" | "lg" | "hero";
 }) {
   const [state, setState] = useState({ votes: project.votes, voted: project.voted });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const big = size === "lg";
+  const big = size !== "sm";
+  const hero = size === "hero";
   const click = async () => {
     if (mine || busy) return;
     if (!signedIn) {
@@ -99,7 +104,7 @@ export function VoteButton({
     posthog.capture(on ? "project_voted" : "project_unvoted", { project_id: project.id, from, counted: r.data.counted });
   };
   return (
-    <span className="flex shrink-0 flex-col items-end">
+    <span className={`flex shrink-0 flex-col items-end ${hero ? "w-full" : ""}`}>
       <button
         type="button"
         onClick={(e) => {
@@ -109,14 +114,39 @@ export function VoteButton({
         disabled={mine}
         aria-pressed={state.voted}
         aria-label={mine ? `${state.votes} upvotes` : state.voted ? `Upvoted, ${state.votes} upvotes. Take it back` : `Upvote, ${state.votes} upvotes`}
-        className={`btn-press flex items-center justify-center gap-1 border-2 tabular-nums transition-colors ${big ? "min-h-10 min-w-[84px] px-3 text-[11px]" : "min-h-7 min-w-[46px] px-1.5 text-[9px]"} ${
-          state.voted ? "border-lime bg-lime text-bg" : mine ? "border-border text-muted" : "border-border-light text-cream hover:border-lime hover:text-lime"
+        className={`btn-press flex items-center justify-center gap-1 border-2 tabular-nums transition-colors ${hero ? "min-h-12 w-full gap-2 px-4 text-[12px]" : big ? "min-h-10 min-w-[84px] px-3 text-[11px]" : "min-h-7 min-w-[46px] px-1.5 text-[9px]"} ${
+          hero
+            ? state.voted
+              ? "border-lime text-lime"
+              : mine
+                ? "border-border text-muted"
+                : "border-lime bg-lime text-bg"
+            : state.voted
+              ? "border-lime bg-lime text-bg"
+              : mine
+                ? "border-border text-muted"
+                : "border-border-light text-cream hover:border-lime hover:text-lime"
         }`}
       >
         <ChevronUp size={big ? 14 : 11} strokeWidth={3} aria-hidden />
-        {state.votes}
+        {hero && <span>{mine ? "Upvotes" : state.voted ? "Upvoted" : "Upvote"}</span>}
+        {!hero && state.votes}
       </button>
       {note && <span className="mt-1 max-w-[160px] text-right text-[8px] normal-case text-red-400">{note}</span>}
     </span>
+  );
+}
+
+/** A form or a list over the map: a board in the middle on a wide screen, the bottom sheet on a phone. */
+export function Overlay({ title, onClose, children, width = 560 }: { title: string; onClose: () => void; children: ReactNode; width?: number }) {
+  const wide = useWide();
+  return wide ? (
+    <Board title={title} onClose={onClose} width={width}>
+      {children}
+    </Board>
+  ) : (
+    <Panel title={title} onClose={onClose}>
+      {children}
+    </Panel>
   );
 }
