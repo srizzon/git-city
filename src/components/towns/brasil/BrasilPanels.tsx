@@ -287,13 +287,18 @@ export function useWide(): boolean {
  */
 export function Board({ title, onClose, children, width = 820 }: { title: string; onClose: () => void; children: ReactNode; width?: number }) {
   const boxRef = useRef<HTMLElement>(null);
+  const close = useRef(onClose);
   useEffect(() => {
-    // Focus moves into the board (not onto a button, which would show its ring before anyone touched a key).
-    boxRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    close.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    // Once, on open: focus moves into the board (not onto a button, which would show its ring before
+    // anyone touched a key), unless a field inside already took it (autoFocus).
+    if (!boxRef.current?.contains(document.activeElement)) boxRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close.current();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
   return createPortal(
     <div className="pointer-events-auto fixed inset-0 z-[60] flex items-center justify-center p-6 font-pixel uppercase text-cream">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />

@@ -91,7 +91,7 @@ export default function AdRequestSheet({ slug, onClose }: { slug: string; onClos
         <p className="text-[11px] normal-case leading-relaxed text-warm">Your project above the week&apos;s top 3, on the Brasil map, for a week. Tell us about it.</p>
         <label className="flex flex-col gap-1">
           <span className="text-[9px] text-muted">What you want to promote</span>
-          <input id="ad-what" className={input} value={what} onChange={(e) => setWhat(e.target.value)} maxLength={80} required />
+          <input id="ad-what" className={input} value={what} onChange={(e) => setWhat(e.target.value)} maxLength={80} required autoFocus />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[9px] text-muted">Link</span>
