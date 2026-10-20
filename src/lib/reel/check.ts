@@ -53,7 +53,7 @@ function onScreen(spec: ReelSpec): string[] {
                   ? []
                 : o.type === "comment"
                   ? [o.handle, ...o.parts.map((x) => x.text)]
-                : o.type === "pins"
+                : o.type === "pins" || o.type === "empties"
                   ? []
                 : o.type === "place"
                   ? [o.value]
@@ -150,9 +150,11 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   spec.lines.forEach((l, i) => {
     if (!l.say) return;
     const said = ` ${bare(l.say.replace(/[-–]/g, " ")).length ? l.say.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim() : ""} `;
+    // A count of something feminine is said in the feminine ("quatrocentas cidades"); read it as the plain number.
+    const counted = said.replace(/entas /g, "entos ").replace(/ uma /g, " um ").replace(/ duas /g, " dois ");
     for (const n of numbersIn(l.show.replace(/\*/g, ""))) {
       const words = spokenNumber(n);
-      if (words && !said.includes(` ${words} `)) fail("real data", `Line ${i + 1} shows ${n} but says "${l.say}" (${n} is "${words}").`);
+      if (words && !counted.includes(` ${words} `)) fail("real data", `Line ${i + 1} shows ${n} but says "${l.say}" (${n} is "${words}").`);
     }
   });
 

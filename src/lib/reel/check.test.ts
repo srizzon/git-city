@@ -40,6 +40,11 @@ describe("checkText", () => {
     expect(rules).toContain("voice");
   });
 
+  it("takes a feminine count as the shown number", () => {
+    const spec = { ...base, facts: { ...base.facts, empty: 5412 }, lines: [{ show: "*{facts.empty}* cidades", say: "Cinco mil quatrocentas e doze cidades." }, ...base.lines.slice(1)] };
+    expect(fails(checkText(spec, ctx))).toEqual([]);
+  });
+
   it("fails a reused hook, a scene twice in a row and a scene the world doesn't have", () => {
     const spec = { ...base, scenes: [base.scenes[0], base.scenes[0], { scene: "fly", at: "Comenta", params: {} }] };
     const rules = fails(checkText(spec, { ...ctx, priorHooks: ["11 devs"] }));
