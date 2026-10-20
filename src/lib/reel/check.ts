@@ -46,7 +46,7 @@ function onScreen(spec: ReelSpec): string[] {
           : o.type === "roster"
             ? [o.title ?? "", ...o.rows.map((r) => r.tag)]
             : o.type === "counter"
-              ? [String(o.value), o.label]
+              ? [String(o.value), o.prefix ?? "", o.label]
               : o.type === "poster"
                 ? [o.title, o.when, o.where]
                 : o.type === "profile" || o.type === "contrib"
@@ -85,6 +85,7 @@ function onScreen(spec: ReelSpec): string[] {
   ].map((t) => t.replace(/\*/g, ""));
 }
 
+const ORDINALS = ["", "primeiro", "segundo", "terceiro", "quarto", "quinto", "sexto", "sétimo", "oitavo", "nono", "décimo"];
 const UNITS = ["zero", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez", "onze", "doze", "treze", "catorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
 const TENS = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
 const HUNDREDS = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
@@ -154,8 +155,10 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
     const said = ` ${bare(l.say.replace(/[-–]/g, " ")).length ? l.say.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim() : ""} `;
     // A count of something feminine is said in the feminine ("quatrocentas cidades"); read it as the plain number.
     const counted = said.replace(/entas /g, "entos ").replace(/ uma /g, " um ").replace(/ duas /g, " dois ");
-    for (const n of numbersIn(l.show.replace(/\*/g, ""))) {
-      const words = spokenNumber(n);
+    const shown = l.show.replace(/\*/g, "");
+    for (const n of numbersIn(shown)) {
+      // "5º" is said as an ordinal ("quinto").
+      const words = shown.includes(`${n}º`) ? (ORDINALS[Number(n)] ?? null) : spokenNumber(n);
       if (words && !counted.includes(` ${words} `)) fail("real data", `Line ${i + 1} shows ${n} but says "${l.say}" (${n} is "${words}").`);
     }
   });
@@ -173,7 +176,8 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   for (const login of logins) if (!known.has(login.toLowerCase())) fail("real data", `${login} on screen isn't in the facts.`);
 
   const first = spec.lines[0].show.replace(/\*/g, "");
-  if (words(first).length > 3 && !/^\d/.test(first)) warn("hook", `The first line is ${words(first).length} words: open on a number alone or a provocation.`);
+  // P1: open on a real person with a stake; the ask or a greeting first lost the most viewers in our trials (76% skipped).
+  if (/^(comenta|segue|marca|oi|olá|fala|e aí)\b/i.test(first)) fail("hook", `The reel opens on the ask or a greeting ("${first}"): open on a real person with a stake (P1).`);
   // A variation that keeps the main's spoken hook shares it on purpose.
   const ownHook = !spec.variation || spec.variation.test === "voice";
   if (ownHook && ctx.priorHooks.map(bare).includes(hookOf(spec))) fail("hook", `The hook "${first}" was used before.`);
@@ -194,7 +198,7 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   const cta = [...ctaLines, ctaLines.join(" "), ...typed];
   if (spec.post.watch && !cta.some((t) => /\bseuuser (?:[A-Z]{2}\b|[A-ZÀ-Ú][a-zà-ú])/.test(t.replace(/\*/g, ""))))
     fail("cta", "A watched reel's call to action must show the parseable `seuuser UF` or `seuuser Cidade`.");
-  for (const h of spec.post.caption.match(/@[\w.]+/g) ?? []) {
+  for (const h of (spec.post.caption.match(/@[\w.]+/g) ?? []).map((x) => x.replace(/\.+$/, ""))) {
     if (!ctx.verifiedHandles.includes(h.slice(1).toLowerCase())) fail("caption", `${h} in the caption isn't a verified handle.`);
   }
 
