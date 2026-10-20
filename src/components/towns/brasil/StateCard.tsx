@@ -221,7 +221,7 @@ export function StateFlag({ uf, className = "" }: { uf: StateStats["uf"]; classN
   );
 }
 
-function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+export function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <div className="mx-4 mb-4">
       <p className="mb-1 flex items-baseline justify-between border-b border-border pb-1 text-[8px] text-muted">
@@ -234,7 +234,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 }
 
 /** One aligned line: the role, the dev's face and @, a number on the right. */
-function Row({
+export function Row({
   role,
   sub,
   hot = false,
