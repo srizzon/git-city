@@ -101,6 +101,10 @@ export function computeFacts({ layout, residents, devs, comments, week, count, s
   const president = count?.mode === "final" ? count.elected : null;
   const offices = brasilOffices(layout, new Map(Object.entries(week.totals)), president);
   const governors = Object.fromEntries(offices.governors);
+  // Each governor with the points that elected them (the office week's) and this week's so far: what a card shows.
+  const governorPoints = Object.fromEntries(
+    [...offices.governors].map(([uf, login]) => [uf, { login, points: week.totals[login] ?? 0, live: week.live.totals[login] ?? 0 }]),
+  );
 
   // This week's points so far: the leaders, and where their points came from.
   const leaders = Object.entries(week.live.totals)
@@ -132,6 +136,7 @@ export function computeFacts({ layout, residents, devs, comments, week, count, s
     newcomers: { biggest: sized[0] ?? null, smallest: sized[sized.length - 1] ?? null, count: sized.length },
     officesWeek: { weekStart: week.weekStart, provisional: week.provisional },
     governors,
+    governorPoints,
     president,
     points: { weekStart: week.live.weekStart, leaders },
     election: count ? { mode: count.mode, term: count.term, opens: new Date(count.opens).toISOString(), closes: new Date(count.closes).toISOString(), total: count.total, rows: count.rows } : null,
