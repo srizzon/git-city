@@ -53,7 +53,9 @@ function onScreen(spec: ReelSpec): string[] {
                   ? []
                 : o.type === "comment"
                   ? [o.handle, ...o.parts.map((x) => x.text)]
-                : o.type === "pins" || o.type === "empties"
+                : o.type === "pins"
+                  ? o.rows.map((r) => r.label ?? "")
+                : o.type === "empties"
                   ? []
                 : o.type === "place"
                   ? [o.value]
@@ -187,7 +189,9 @@ export function checkText(raw: ReelSpec, ctx: TextContext): Issue[] {
   // The call to action: the header's, else the last headline beat and the last comment typed (a card or the phone).
   const last = [...spec.overlays].reverse().find((o) => o.type === "comment" || o.type === "phone");
   const typed = !last ? [] : last.type === "comment" ? [last.parts.map((x) => x.text).join("")] : last.screens.flatMap((x) => [...x.posted, x.parts.map((y) => y.text).join("")]);
-  const cta = [...(spec.header?.cta ?? spec.headline?.[spec.headline.length - 1].lines ?? []).map((l) => l.text), ...typed];
+  const ctaLines = (spec.header?.cta ?? spec.headline?.[spec.headline.length - 1].lines ?? []).map((l) => l.text);
+  // A comment split over two big lines ("seuuser" / "Joinville") reads as one.
+  const cta = [...ctaLines, ctaLines.join(" "), ...typed];
   if (spec.post.watch && !cta.some((t) => /\bseuuser (?:[A-Z]{2}\b|[A-ZÀ-Ú][a-zà-ú])/.test(t.replace(/\*/g, ""))))
     fail("cta", "A watched reel's call to action must show the parseable `seuuser UF` or `seuuser Cidade`.");
   for (const h of spec.post.caption.match(/@[\w.]+/g) ?? []) {
@@ -248,7 +252,8 @@ export function checkTimed(raw: ReelSpec, voice: readonly Word[], mainLength?: n
         out.push({ level: "fail", rule: "typing", message: `"${x.what.replace(/\*/g, "")}" finishes typing at ${done.toFixed(1)}s, ${(x.to - done).toFixed(1)}s before its cut (${READ_HOLD}s to read).` });
     }
     const talk = voice[voice.length - 1][2] - voice[0][1];
-    if (talk < 15 || talk > 22) out.push({ level: "fail", rule: "length", message: `${talk.toFixed(1)}s of narration (15–22s).` });
+    // No target length (P4: length follows the content; our top reels ran 21–67s): only the extremes get a look.
+    if (talk < 8 || talk > 90) out.push({ level: "warn", rule: "length", message: `${talk.toFixed(1)}s of narration: is every beat earning its seconds (P4)?` });
     if (voice[0][1] > 2) out.push({ level: "fail", rule: "hook", message: `The first word comes at ${voice[0][1].toFixed(1)}s: the hook must land in the first 2s.` });
     if (spec.kind === "trial" && !spec.variation && mainLength !== undefined && Math.abs(reel.length - mainLength) < 3)
       out.push({ level: "fail", rule: "trial", message: `${reel.length.toFixed(1)}s vs the main's ${mainLength.toFixed(1)}s: a trial differs by 3s or more.` });
