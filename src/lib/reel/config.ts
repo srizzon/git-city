@@ -32,7 +32,7 @@ export const ReelsConfig = z.object({
     .object({
       /** Brasília time, "HH:MM", or "auto": the hour the followers are most online (12:00 until Instagram has the data). */
       main: z.string().regex(/^(\d{2}:\d{2}|auto)$/).default("auto"),
-      trialGapHours: z.number().positive().default(2),
+      trialGapHours: z.number().nonnegative().default(2),
     })
     .default({ main: "12:00", trialGapHours: 2 }),
 });

@@ -37,7 +37,7 @@ export function busiestHour(insight: { values?: { value?: Record<string, number>
 /**
  * Where a reel goes: the day's main at the main slot (the config's "HH:MM", or
  * "auto": the hour the followers are most online), each trial its gap after,
- * by slot name; never in the past, never within the hour of another reel.
+ * by slot name; never in the past, and (with a gap set) never closer to another reel than the gap or an hour.
  */
 export function slotFor(o: { spec: ReelSpec; trials: string[]; config: ReelsConfig; taken: number[]; busiest: number | null; now: number; at?: string }): Date {
   if (o.at) return new Date(`${o.at}${BRT}`);
@@ -46,7 +46,8 @@ export function slotFor(o: { spec: ReelSpec; trials: string[]; config: ReelsConf
   const base = new Date(`${date}T${main}:00${BRT}`).getTime();
   let t = o.spec.kind === "main" ? base : base + (o.trials.indexOf(slot) + 1) * o.config.slots.trialGapHours * HOUR;
   const soonest = o.now + 10 * 60_000;
-  while (t < soonest || o.taken.some((x) => Math.abs(x - t) < HOUR)) t += t < soonest ? Math.ceil((soonest - t) / (HOUR / 2)) * (HOUR / 2) : HOUR / 2;
+  const apart = Math.min(HOUR, o.config.slots.trialGapHours * HOUR);
+  while (t < soonest || o.taken.some((x) => Math.abs(x - t) < apart)) t += t < soonest ? Math.ceil((soonest - t) / (HOUR / 2)) * (HOUR / 2) : HOUR / 2;
   return new Date(t);
 }
 
