@@ -96,13 +96,15 @@ export function ReactionBar({
   );
 }
 
-/** Phone: a smile that opens the six. */
+/** Phone: a smile that opens the six (`up`: over it, for a button at the bottom, named). */
 export function ReactionButton({
   onEmote,
   className,
+  up = false,
 }: {
   onEmote: (e: number) => void;
   className: string;
+  up?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -114,11 +116,12 @@ export function ReactionButton({
         aria-expanded={open}
         className={`${className} ${open ? "text-lime" : ""}`}
       >
-        <Smile size={14} strokeWidth={2.5} aria-hidden />
+        <Smile size={up ? 18 : 14} strokeWidth={2.5} aria-hidden />
+        {up && "React"}
       </button>
       {open && (
         <div
-          className={`${HUD_BOX} absolute right-[-3px] top-full mt-2 grid animate-[fade-in_0.15s_ease-out_both] grid-cols-3 divide-border`}
+          className={`${HUD_BOX} absolute right-[-3px] ${up ? "bottom-full mb-2" : "top-full mt-2"} grid animate-[fade-in_0.15s_ease-out_both] grid-cols-[repeat(3,3rem)] divide-border`}
           role="menu"
         >
           {EMOTES.map((emoji, i) => (

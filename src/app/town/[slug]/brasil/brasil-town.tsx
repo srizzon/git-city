@@ -1160,6 +1160,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           startNote={startNote}
           onGames={racing ? undefined : () => setGames({ step: "modes" })}
           onResume={() => setPaused(false)}
+          onPause={() => setPaused(true)}
           onCamera={toggleCamera}
           onMute={toggleMute}
           onExit={exitDrive}

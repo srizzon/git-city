@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Gamepad2, LogIn, Plus, Users, Volume1, Volume2, VolumeX, X } from "lucide-react";
+import { Camera, Gamepad2, LogIn, Pause, Plus, Volume1, Volume2, VolumeX, X } from "lucide-react";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { HUD_BOX } from "../shared";
@@ -29,8 +29,9 @@ import type { EmoteLog } from "@/lib/league-city/drive/emote-log";
 // On the first drive, handed over by the town intro, there's no start screen
 // (the intro loaded the car): one prompt teaches the controls and the rest of
 // the HUD comes in piece by piece on your first move.
-// On a phone (touchRef) the HUD is only Exit, join and sound up top and the
-// touch controls (TouchControls) below; the prompts speak touch.
+// On a phone (touchRef) the HUD is only Pause (sound and exit are in its menu),
+// Games and join up top, others' reactions under Pause, and the touch controls
+// (TouchControls, with your reactions) below; the prompts speak touch.
 
 const SEG = "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
 const ICON_BTN = `${SEG} w-10 justify-center py-2 text-cream hover:text-lime`;
@@ -58,12 +59,12 @@ export default function DriveHud({
   onStartCrown,
   gameOn = false,
   onGames,
-  phoneLow = false,
   startNote = null,
   children,
   onVolume,
   onEmote,
   onResume,
+  onPause,
   onCamera,
   onMute,
   onExit,
@@ -98,8 +99,6 @@ export default function DriveHud({
   gameOn?: boolean;
   /** The Games menu (G): a button leads the top-right toolbar. Without it, Crown Rush keeps its own Start. */
   onGames?: () => void;
-  /** A phone: something sits under the top bar (a mission), so the minimap starts lower. */
-  phoneLow?: boolean;
   /** What's going on here, on the loading band ("4 driving · a race to Campinas is open"). */
   startNote?: string | null;
   /** A town's own HUD pieces (the Brasil map's races), over the rest. */
@@ -108,6 +107,8 @@ export default function DriveHud({
   /** A quick reaction (lib drive/emotes slot). */
   onEmote: (e: number) => void;
   onResume: () => void;
+  /** A phone's top-left button opens the pause menu (sound, exit); without it, it exits. */
+  onPause?: () => void;
   onCamera: () => void;
   onMute: () => void;
   onExit: () => void;
@@ -174,7 +175,7 @@ export default function DriveHud({
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
       {/* First, so every other piece of the HUD sits above the steering layer. */}
-      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} />}
+      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} onEmote={entered ? onEmote : undefined} />}
 
       {ready && entered && !touch && !gameOn && (
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`} style={enter(0)}>
@@ -201,16 +202,13 @@ export default function DriveHud({
         </div>
       )}
 
-      {/* Phone: Exit on the left, join and sound on the right, nothing else. */}
+      {/* Phone: Pause on the left, Games and join on the right, nothing else. */}
       {entered && touch && (
         <div className="absolute inset-x-4 top-[max(1rem,env(safe-area-inset-top))] flex items-start justify-between gap-3" style={enter(0)}>
-          <button type="button" onClick={onExit} aria-label="Exit" className={`${HUD_BOX} ${ICON_BTN} w-11 py-2.5`}>
-            <X {...ICON} aria-hidden />
+          <button type="button" onClick={onPause ?? onExit} aria-label={onPause ? "Pause" : "Exit"} className={`${HUD_BOX} ${ICON_BTN} w-11 py-2.5`}>
+            {onPause ? <Pause {...ICON} aria-hidden /> : <X {...ICON} aria-hidden />}
           </button>
-          <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border`}>
-            <span className="flex items-center gap-1.5 px-3 py-2.5 text-[10px] text-cream" aria-label={`${drivers.length + 1} driving here`}>
-              <Users {...ICON} aria-hidden /> {drivers.length + 1}
-            </span>
+          <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border empty:hidden`}>
             {onGames && (
               <button type="button" onClick={onGames} className="flex items-center gap-1.5 bg-lime px-3 py-2.5 text-[10px] text-bg active:translate-y-px">
                 <Gamepad2 {...ICON} aria-hidden /> Games
@@ -222,9 +220,6 @@ export default function DriveHud({
                 <span>{join.short}</span>
               </button>
             )}
-            <button type="button" onClick={onMute} aria-label={silent ? "Sound on" : "Mute"} aria-pressed={silent} className={`${ICON_BTN} w-11 py-2.5`}>
-              {silent ? <VolumeX {...ICON} aria-hidden /> : <Volume2 {...ICON} aria-hidden />}
-            </button>
           </div>
         </div>
       )}
@@ -312,16 +307,10 @@ export default function DriveHud({
 
       {ready && entered && !touch && <Dash telemetry={telemetry} style={enter(0.24)} />}
 
-      {/* Phone: the minimap under the top bar with others' reactions under it, and the six reactions over the controls. */}
+      {/* Phone: no minimap, others' reactions under Pause. */}
       {ready && loaded && entered && touch && (
-        <div className={`absolute left-4 flex flex-col items-start gap-2 ${phoneLow ? "top-[calc(max(1rem,env(safe-area-inset-top))+9.5rem)]" : "top-[calc(max(1rem,env(safe-area-inset-top))+8.75rem)]"}`}>
-          <Minimap telemetry={telemetry} buildings={map.buildings} objects={map.objects} home={map.home} size={104} layer={map.layer} />
+        <div className="absolute left-4 top-[calc(max(1rem,env(safe-area-inset-top))+3.5rem)]">
           <ReactionLog log={emoteLog} align="start" />
-        </div>
-      )}
-      {ready && loaded && entered && touch && (
-        <div className="absolute inset-x-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+162px)] flex justify-center">
-          <ReactionBar on={!paused} onEmote={onEmote} big />
         </div>
       )}
 

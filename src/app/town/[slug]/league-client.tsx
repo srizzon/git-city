@@ -1146,6 +1146,7 @@ export default function LeagueClient({
           onEmote={(e) => emoteApi.current?.send(e)}
           onStartCrown={() => crownApi.current?.start()}
           onResume={() => setPaused(false)}
+          onPause={() => setPaused(true)}
           onCamera={toggleCamera}
           onMute={toggleMute}
           onExit={exitDrive}

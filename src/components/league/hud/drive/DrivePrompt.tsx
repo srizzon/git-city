@@ -104,7 +104,7 @@ function TouchPrompt({ lesson, item }: { lesson: Lesson; item: string | null }) 
   switch (lesson) {
     case "drive":
     case "steer":
-      return line("Touch to drive", "Then drag left or right to steer");
+      return line("Drag to steer");
     case "boost":
       return line(
         <>
