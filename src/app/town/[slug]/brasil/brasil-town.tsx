@@ -57,6 +57,13 @@ import { brasilWorld, plainBuilding } from "@/lib/towns/brasil-world";
 import { brasilOffices, officeLabel, type Office } from "@/lib/towns/brasil-roles";
 import type { BrasilWeek } from "@/lib/towns/brasil-server";
 import type { Count, ElectionView } from "@/lib/towns/brasil-election-server";
+import type { CardData } from "@/lib/towns/brasil-projects-server";
+import type { ProjectCard } from "@/lib/towns/brasil-projects";
+import ProjectsCard from "@/components/towns/brasil/ProjectsCard";
+import ProjectSheet, { type ProjectView } from "@/components/towns/brasil/ProjectSheet";
+import ShareProjectSheet from "@/components/towns/brasil/ShareProjectSheet";
+import AdRequestSheet from "@/components/towns/brasil/AdRequestSheet";
+import MyProjects, { ProjectWin } from "@/components/towns/brasil/MyProjects";
 
 // The Brasil town's page: the map of Brazil with the town's residents, each
 // in their city, their buildings sized like everywhere in Git City. Over it:
@@ -92,7 +99,18 @@ export interface BrasilTownProps {
   count?: Count | null;
   /** ?vote=34 / ?run=34 (a shared vote or candidacy, the count, a sign-in coming back): the voting machine opens with that number typed; "open": just opens it. */
   startVote?: number | "open" | null;
+  /** This week's projects for the top-right card (null: couldn't be read). */
+  projects?: CardData | null;
+  /** Past weeks' winning projects by maker login (lowercase), for their building's card. */
+  projectWins?: Record<string, { week: string; name: string; slug: string }>;
+  /** ?project=slug (a shared project, a sign-in coming back): its sheet opens. */
+  startProject?: string | null;
+  /** ?share=1 / ?ad=1 (from the projects page): the share form or the ad request opens. */
+  startSheet?: "share" | "ad" | null;
 }
+
+/** The projects' sheets on the right: one project, the share form (or an edit), the ad request. */
+type ProjOverlay = { kind: "project"; slug: string; initial?: ProjectCard; from: string } | { kind: "share"; editing?: ProjectView } | { kind: "ad" } | null;
 
 type PanelId = "states" | "election" | null;
 const DriveHud = dynamic(() => import("@/components/league/hud/drive/DriveHud"), { ssr: false });
@@ -106,7 +124,7 @@ const HUD_BG = "bg-bg/90";
 const HUD_EDGE = "border-border";
 const HUD_SOFT = "text-muted";
 
-export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, grewAt = null, week: officeWeek, election, count = null, startVote = null, stateFounders = {} }: BrasilTownProps) {
+export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, grewAt = null, week: officeWeek, election, count = null, startVote = null, stateFounders = {}, projects = null, projectWins = {}, startProject = null, startSheet = null }: BrasilTownProps) {
   const router = useRouter();
   const camera = useRef<CameraApi | null>(null);
   const cameraStore = useMemo(() => createCameraStore(), []);
@@ -172,6 +190,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const [backTo, setBackTo] = useState<StateStats | null>(null);
   /** The city picker under the search, for a username typed there (null: yours), maybe opened on a city to found. */
   const [picker, setPicker] = useState<{ forLogin: string | null; query?: string } | null>(null);
+  const [proj, setProj] = useState<ProjOverlay>(null);
+  /** Bumped when a project was posted, edited, voted or taken down: the card and your list read again. */
+  const [projectsKey, setProjectsKey] = useState(0);
   const [joining, setJoining] = useState<{ pending: { ibge: number | null; name: string } | null; error: string | null }>({
     pending: null,
     error: null,
@@ -200,6 +221,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setFocused(null);
     setBackTo(null);
     setPicker(null);
+    setProj(null);
     setPanel(p);
   };
   /** The picker takes over: cards and panels close. */
@@ -208,6 +230,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setFocused(null);
     setBackTo(null);
     setPanel(null);
+    setProj(null);
     setJoining({ pending: null, error: null });
     setPicker({ forLogin, query });
     posthog.capture("brasil_picker_opened", { signed_in: !!viewerLogin, on_map: !!home });
@@ -406,6 +429,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       setBackTo(null);
       setPanel(null);
       setPicker(null);
+      setProj(null);
       setState(s);
       camera.current?.flyTo(s.capital.center, s.capital.radius);
     },
@@ -417,6 +441,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       posthog.capture("brasil_building_opened", { self: b.loginLower === viewerLogin?.toLowerCase() });
       setState(null);
       setPanel(null);
+      setProj(null);
       setFocused(b);
       mapNav.send({ type: "flyTo", x: b.position[0], z: b.position[2], distance: 700 });
     },
@@ -429,6 +454,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setBackTo(null);
     setPanel(null);
     setPicker(null);
+    setProj(null);
     camera.current?.flyTo(null);
   }, []);
   // Back (the phone's, or ‹ after a step this page took): show what the address says.
@@ -503,6 +529,18 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     }, 600);
     return () => clearTimeout(t);
   }, [startAt, world, openState, openCity, openBuilding, startPick, viewerLogin, home]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ?project=slug: the project's sheet, once the map is up.
+  useEffect(() => {
+    if (!startProject) return;
+    const t = setTimeout(() => setProj({ kind: "project", slug: startProject, from: "link" }), 600);
+    return () => clearTimeout(t);
+  }, [startProject]);
+  useEffect(() => {
+    if (!startSheet) return;
+    const t = setTimeout(() => setProj(startSheet === "ad" ? { kind: "ad" } : { kind: "share" }), 600);
+    return () => clearTimeout(t);
+  }, [startSheet]);
 
   useEffect(() => {
     if (state) askRecords();
@@ -801,6 +839,29 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     posthog.capture("brasil_signin_clicked", { from: "vote" });
     const next = `/town/${league.slug}?vote=${n ?? "open"}`;
     void signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`);
+  };
+  /** Sign in from a project (to upvote, report or post), and come back to it. */
+  const signInForProject = (slug: string | null) => {
+    posthog.capture("brasil_signin_clicked", { from: slug ? "project" : "share_project" });
+    const next = slug ? `/town/${league.slug}?project=${encodeURIComponent(slug)}` : `/town/${league.slug}?share=1`;
+    void signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`);
+  };
+  /** A project's sheet takes the right side: any card closes. */
+  const openProject = (slug: string, from: string, initial?: ProjectCard) => {
+    setState(null);
+    setFocused(null);
+    setBackTo(null);
+    setPanel(null);
+    setPicker(null);
+    setProj({ kind: "project", slug, from, initial });
+  };
+  const openShare = (editing?: ProjectView) => {
+    setState(null);
+    setFocused(null);
+    setBackTo(null);
+    setPanel(null);
+    setPicker(null);
+    setProj({ kind: "share", editing });
   };
   const signIn = () => {
     posthog.capture("brasil_signin_clicked", { for_login: picker?.forLogin ?? null });
@@ -1211,6 +1272,53 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
 
       {count && !inCar && !state && !focused && !panel && !picker && <ApuracaoWidget slug={league.slug} initial={count} myVote={electionNow?.viewer?.votedFor?.number ?? null} onVote={(n) => openVote(n)} />}
 
+      {!inCar && !state && !focused && !panel && !picker && !proj && (
+        <ProjectsCard
+          slug={league.slug}
+          initial={projects}
+          signedIn={!!viewerLogin}
+          viewerLogin={viewerLogin}
+          refreshKey={projectsKey}
+          onOpen={(p) => openProject(p.slug, "card", p)}
+          onShare={() => openShare()}
+          onOffer={() => {
+            setPanel(null);
+            setProj({ kind: "ad" });
+          }}
+          onSignIn={() => signInForProject(null)}
+        />
+      )}
+      {proj?.kind === "project" && !inCar && (
+        <ProjectSheet
+          key={proj.slug}
+          slug={league.slug}
+          projectSlug={proj.slug}
+          initial={proj.initial}
+          from={proj.from}
+          signedIn={!!viewerLogin}
+          onSignIn={() => signInForProject(proj.slug)}
+          onClose={() => setProj(null)}
+          onVisitBuilding={(login) => {
+            const b = world.placed.get(login.toLowerCase());
+            if (b) openBuilding(b);
+          }}
+          onEdit={(p) => openShare(p)}
+          onChanged={() => setProjectsKey((k) => k + 1)}
+        />
+      )}
+      {proj?.kind === "share" && !inCar && (
+        <ShareProjectSheet
+          slug={league.slug}
+          signedIn={!!viewerLogin}
+          editing={proj.editing}
+          onSignIn={() => signInForProject(null)}
+          onPutOnMap={() => openPicker(null)}
+          onClose={() => setProj(null)}
+          onDone={() => setProjectsKey((k) => k + 1)}
+        />
+      )}
+      {proj?.kind === "ad" && !inCar && <AdRequestSheet slug={league.slug} onClose={() => setProj(null)} />}
+
       {panel === "election" && election && (
         <ElectionPanel
           key={vote.key}
@@ -1282,6 +1390,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           viewerLogin={viewerLogin}
           lean
           section={
+            <>
             <PlaceRow
               login={focused.loginLower}
               city={world.cityOfLogin.get(focused.loginLower) ?? null}
@@ -1291,6 +1400,13 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               onState={openState}
               onMove={viewerLogin?.toLowerCase() === focused.loginLower ? () => openPicker(null) : undefined}
             />
+            {(projectWins[focused.loginLower] || viewerLogin?.toLowerCase() === focused.loginLower) && (
+              <div className="mx-4 mb-3 flex flex-col gap-2">
+                {projectWins[focused.loginLower] && <ProjectWin win={projectWins[focused.loginLower]} onOpen={(slug) => openProject(slug, "building")} />}
+                {viewerLogin?.toLowerCase() === focused.loginLower && <MyProjects slug={league.slug} refreshKey={projectsKey} onOpen={(slug) => openProject(slug, "my_building")} onShare={() => openShare()} />}
+              </div>
+            )}
+            </>
           }
           stats={[
             { label: "Pts this week", value: fmt(officeWeek.live.totals[focused.loginLower] ?? 0) },

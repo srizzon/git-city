@@ -10,6 +10,7 @@ import { BRASIL_SLUG, getBrasilLayout } from "@/lib/towns/brasil-server";
 import { weekCrown } from "@/components/towns/brasil/stats";
 import { candidateByNumber } from "@/lib/towns/brasil-election-server";
 import { PRESIDENCY_ON, ballot } from "@/lib/towns/brasil-election";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 // The Brasil map's share card: two short lines on the left, the map of Brazil
 // in pixels on the right with the real cities. Each link shares a moment:
@@ -21,6 +22,7 @@ import { PRESIDENCY_ON, ballot } from "@/lib/towns/brasil-election";
 //   ?vote=34   a vote ("seu voto para"), ?run=34 a candidacy ("vote 34"): the
 //              voting machine's screen with the number, the candidate's face
 //              and @, their state lit and their city glowing
+//   ?project=slug  a project: its name, "vota nele.", the maker's state lit and city glowing
 //   nothing    the whole map: every city lit, "326 devs / e você?"
 // In Portuguese: whoever shares it and whoever gets it is Brazilian.
 
@@ -77,7 +79,23 @@ export async function GET(req: Request) {
   const at = q.get("at")?.toLowerCase();
   const uf = parseUF(q.get("uf") ?? "");
   const cidade = q.get("cidade");
-  if (at && LOGIN_RE.test(at)) {
+  const projectSlug = q.get("project");
+  const project =
+    projectSlug && /^[a-z0-9-]{3,60}$/.test(projectSlug) && league
+      ? (
+          await getSupabaseAdmin()
+            .from("brasil_projects")
+            .select("name, developers(github_login)")
+            .eq("league_id", league.id)
+            .eq("slug", projectSlug)
+            .eq("status", "live")
+            .maybeSingle<{ name: string; developers: { github_login: string } | null }>()
+        ).data
+      : null;
+  if (project) {
+    const me = project.developers ? lotOf(project.developers.github_login.toLowerCase()) : null;
+    card = { top: project.name, bottom: "vota nele.", lit: me?.city.uf ?? null, hot: me ? [me.d.x, me.d.z] : null, litIsland: !!me && me.city.ibge === null };
+  } else if (at && LOGIN_RE.test(at)) {
     const me = lotOf(at);
     if (me) {
       const island = me.city.ibge === null;
