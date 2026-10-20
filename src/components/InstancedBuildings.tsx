@@ -246,6 +246,11 @@ const MAX_RISE_TOTAL = 4; // cap total stagger to 4s regardless of building coun
 // surviving component remounts caused by Next.js navigation.
 let hasPlayedRiseGlobal = false;
 
+/** A film (the reel studio) opens on the city already standing: no staggered rise on its first mount. */
+export function skipCityRise() {
+  hasPlayedRiseGlobal = true;
+}
+
 export default memo(function InstancedBuildings({
   buildings,
   colors,
