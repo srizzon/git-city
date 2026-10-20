@@ -92,7 +92,8 @@ export default function ApuracaoWidget({ slug, initial, onVote }: { slug: string
 
   const full = (
     <div className="flex flex-col gap-2">
-      <ol className="flex flex-col">
+      {/* Scrolls on its own, so Vote and Full count stay in view however many run. */}
+      <ol className="-mr-2 flex max-h-[min(50vh,360px)] flex-col overflow-y-auto overscroll-contain pr-2">
         {c.rows.map((r, i) => (
           <Row key={r.login} r={r} total={c.total} place={i + 1} onPick={onVote} />
         ))}
