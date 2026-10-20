@@ -20,7 +20,7 @@ const HeaderLine = z.object({
 });
 
 const Badge = z.object({
-  kind: z.enum(["governor", "senator", "mayor", "president", "founder", "resident"]),
+  kind: z.enum(["governor", "senator", "mayor", "president", "founder", "resident", "leader"]),
   at: Anchor,
   /** The small line under the title, e.g. "seuuser · SP · esta semana". */
   sub: z.string(),
@@ -199,7 +199,10 @@ const Pins = z.object({
   type: z.literal("pins"),
   from: Anchor,
   to: Anchor.optional(),
-  rows: z.array(z.object({ uf: z.string().length(2), login: z.string() })).min(1),
+  /** `label`: a plate under the photo (the state and its count, "PE 116"). */
+  rows: z.array(z.object({ uf: z.string().length(2), login: z.string(), label: z.string().optional() })).min(1),
+  /** The photos' size (share of the frame's width, cqw): small for 27 capitals, big for a duel's two. */
+  size: z.number().positive().max(30).default(5.6),
   /** Seconds between one pin and the next. */
   stagger: z.number().nonnegative().default(0.04),
 });

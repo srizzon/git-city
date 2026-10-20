@@ -92,7 +92,8 @@ export interface ReelPins {
   from: number;
   to: number;
   stagger: number;
-  rows: { uf: string; login: string }[];
+  size: number;
+  rows: { uf: string; login: string; label?: string }[];
 }
 
 export interface Reel {
@@ -260,7 +261,7 @@ export function reelOf(spec: ReelSpec, words: readonly Word[], song: string | nu
   const pins: ReelPins[] = spec.overlays.flatMap((o) => {
     if (o.type !== "pins") return [];
     const from = anchorAt(words, o.from);
-    return [{ from, to: o.to === undefined ? length : anchorAt(words, o.to, from), stagger: o.stagger, rows: o.rows }];
+    return [{ from, to: o.to === undefined ? length : anchorAt(words, o.to, from), stagger: o.stagger, size: o.size, rows: o.rows }];
   });
   const empties = spec.overlays.flatMap((o) => {
     if (o.type !== "empties") return [];

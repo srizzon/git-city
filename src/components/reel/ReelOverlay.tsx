@@ -29,7 +29,7 @@ const FADE = 0.15; // s
 /** How dark the scene goes behind a card. */
 const DIM = 0.55;
 
-type BadgeKind = "governor" | "senator" | "mayor" | "president" | "founder" | "resident";
+type BadgeKind = "governor" | "senator" | "mayor" | "president" | "founder" | "resident" | "leader";
 
 /** Each office's title and pixel icon ([x, y, w, h] on an 8×8 grid). */
 const BADGES: Record<BadgeKind, { title: string; color: string; pixels: number[][] }> = {
@@ -44,6 +44,8 @@ const BADGES: Record<BadgeKind, { title: string; color: string; pixels: number[]
   // A flag on its pole.
   founder: { title: "fundador", color: "var(--color-cream)", pixels: [[1, 0, 1, 8], [2, 1, 5, 1], [2, 2, 4, 1], [2, 3, 5, 1], [2, 4, 4, 1], [0, 7, 3, 1]] },
   // A building, for a dev with no office (a card in the same shape as an office's).
+  // An arrow up: whoever has the most points in the state this week.
+  leader: { title: "líder", color: "var(--color-lime)", pixels: [[3, 0, 2, 1], [2, 1, 4, 1], [1, 2, 6, 1], [3, 3, 2, 5]] },
   resident: { title: "morador", color: "var(--color-cream)", pixels: [[2, 0, 4, 8], [1, 7, 6, 1]] },
 };
 
@@ -1806,6 +1808,8 @@ function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf
                   gap: "2.2cqw",
                   border: `0.7cqw solid ${look.color}`,
                   padding: "2cqw 2.8cqw 2cqw 2.2cqw",
+                  // A person's card: one width for everyone in the reel, so two of them read as the same card.
+                  minWidth: b.photoOnBadge ? "60cqw" : undefined,
                   opacity: 0,
                   transformOrigin: "50% 100%",
                   whiteSpace: "nowrap",
@@ -1825,7 +1829,8 @@ function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf
                 )}
                 <div>
                   <p style={{ fontSize: "6.4cqw", lineHeight: 1, color: look.color }}>{look.title}</p>
-                  <p className="text-muted" style={{ fontSize: "3cqw", lineHeight: 1, marginTop: "1.6cqw", textTransform: "none" }}>
+                  {/* A line break in the sub starts a second line; lines never wrap (the safe-zone check catches one too long). */}
+                  <p className="text-muted" style={{ fontSize: "3cqw", lineHeight: 1.25, marginTop: "1.6cqw", textTransform: "none", whiteSpace: "pre" }}>
                     {badge.sub}
                   </p>
                 </div>
@@ -1909,7 +1914,8 @@ export default function ReelOverlay({
               : reel.lines[i].words.map((w) => {
                   const s = document.createElement("span");
                   s.textContent = w.text;
-                  if (w.lit) s.style.color = plates ? BRAND.green : "var(--color-lime)";
+                  // On plates the captions are yellow over the green map: the lit word goes white, lime would vanish into the ground.
+                  if (w.lit) s.style.color = plates ? BRAND.ink : "var(--color-lime)";
                   return s;
                 })),
           );
@@ -1993,15 +1999,15 @@ export default function ReelOverlay({
         {/* Photos the rig pins over capitals on the map (it moves and pops them each frame). */}
         {reel.pins.flatMap((g, i) =>
           g.rows.map((r, k) => (
-            // eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar, drawn as it is
-            <img
-              key={`${i}-${k}`}
-              data-pin={`${i}-${k}`}
-              alt=""
-              src={photoOf(r.login) ?? `https://avatars.githubusercontent.com/${r.login}?s=96`}
-              className="absolute"
-              style={{ width: "5.6cqw", height: "5.6cqw", border: "0.5cqw solid #000", outline: "0.35cqw solid var(--color-lime)", opacity: 0, transform: "translate(-50%, -100%)" }}
-            />
+            <div key={`${i}-${k}`} data-pin={`${i}-${k}`} className="absolute flex flex-col items-center font-pixel uppercase" style={{ opacity: 0, transform: "translate(-50%, -100%)", gap: `${g.size * 0.12}cqw` }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar, drawn as it is */}
+              <img
+                alt=""
+                src={photoOf(r.login) ?? `https://avatars.githubusercontent.com/${r.login}?s=96`}
+                style={{ width: `${g.size}cqw`, height: `${g.size}cqw`, border: `${g.size * 0.09}cqw solid #000`, outline: `${g.size * 0.06}cqw solid var(--color-lime)` }}
+              />
+              {r.label && <p style={{ ...PLATE, fontSize: `${g.size * 0.3}cqw`, whiteSpace: "nowrap" }}>{r.label}</p>}
+            </div>
           )),
         )}
       </div>
