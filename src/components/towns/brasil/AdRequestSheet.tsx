@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import posthog from "posthog-js";
-import Panel from "@/components/league/hud/Panel";
+import { Overlay } from "./projects-ui";
 import { ADVERTISER_KINDS, BUDGETS, advertiserLabel, budgetLabel, projectWeek, type AdvertiserKind, type Budget } from "@/lib/towns/brasil-projects";
 
 // The ad slot's request form: what to promote, the link, an email, who they
@@ -66,7 +66,7 @@ export default function AdRequestSheet({ slug, onClose }: { slug: string; onClos
 
   if (sent)
     return (
-      <Panel title="The #1 spot" onClose={onClose}>
+      <Overlay title="The #1 spot" onClose={onClose}>
         <div className="flex flex-col gap-3">
           <p className="flex items-center gap-2 text-[12px] text-lime">
             <Check size={16} strokeWidth={3} aria-hidden /> Got it
@@ -76,11 +76,11 @@ export default function AdRequestSheet({ slug, onClose }: { slug: string; onClos
             Close
           </button>
         </div>
-      </Panel>
+      </Overlay>
     );
 
   return (
-    <Panel title="The #1 spot" onClose={onClose}>
+    <Overlay title="The #1 spot" onClose={onClose}>
       <form
         className="flex flex-col gap-3"
         onSubmit={(e) => {
@@ -91,7 +91,7 @@ export default function AdRequestSheet({ slug, onClose }: { slug: string; onClos
         <p className="text-[11px] normal-case leading-relaxed text-warm">Your project above the week&apos;s top 3, on the Brasil map, for a week. Tell us about it.</p>
         <label className="flex flex-col gap-1">
           <span className="text-[9px] text-muted">What you want to promote</span>
-          <input id="ad-what" className={input} value={what} onChange={(e) => setWhat(e.target.value)} maxLength={80} required />
+          <input id="ad-what" className={input} value={what} onChange={(e) => setWhat(e.target.value)} maxLength={80} required autoFocus />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[9px] text-muted">Link</span>
@@ -156,6 +156,6 @@ export default function AdRequestSheet({ slug, onClose }: { slug: string; onClos
           {busy && <Loader2 size={13} className="animate-spin" aria-hidden />} Send
         </button>
       </form>
-    </Panel>
+    </Overlay>
   );
 }

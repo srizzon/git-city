@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { betHost, countedVoter, linkRules, normalizeRepo, normalizeUrl, podium, projectSlug, readProjectInput, textRules, timeLeft, weekClosesAt } from "./brasil-projects";
+import { betHost, countedVoter, launchWeekFor, opensText, slotWeekOf, linkRules, normalizeRepo, normalizeUrl, podium, projectSlug, readProjectInput, textRules, timeLeft, weekClosesAt } from "./brasil-projects";
 
 describe("normalizeUrl", () => {
   it("keeps https links, upgrades http and bare domains, drops the fragment and trailing slash", () => {
@@ -115,5 +115,22 @@ describe("weeks and slugs", () => {
   it("slugs are plain ascii", () => {
     expect(projectSlug("Cãozinho App!", "x7")).toBe("caozinho-app-x7");
     expect(projectSlug("🔥", "x7")).toBe("project-x7");
+  });
+});
+
+describe("launchWeekFor and slots", () => {
+  it("a project going live early in the week competes in it", () => {
+    expect(launchWeekFor(new Date("2026-10-21T12:00:00Z"))).toBe("2026-10-19");
+  });
+  it("in the last 24 hours it competes the next week", () => {
+    expect(launchWeekFor(new Date("2026-10-25T20:00:00Z"))).toBe("2026-10-26");
+    expect(launchWeekFor(new Date("2026-10-24T23:00:00Z"))).toBe("2026-10-19");
+  });
+  it("a project's slot is the week it competes in, or would have when posted", () => {
+    expect(slotWeekOf({ launch_week: "2026-10-19", created_at: "2026-10-25T23:00:00Z" })).toBe("2026-10-19");
+    expect(slotWeekOf({ launch_week: null, created_at: "2026-10-25T23:00:00Z" })).toBe("2026-10-26");
+  });
+  it("says when a week opens in Brasília", () => {
+    expect(opensText("2026-10-26", Date.parse("2026-10-23T00:00:00Z"))).toBe("Sun 21:00 (Brasília) · in 3d");
   });
 });

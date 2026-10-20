@@ -35,6 +35,10 @@ export const LIMITS = {
   votesPerHour: 30,
   /** Reports from counted accounts that hide a project until the admin looks. */
   reportsToHide: 3,
+  /** Refused tries in one week before posting closes until the next (no probing the checks). */
+  refusalsPerWeek: 3,
+  /** A project going live closer than this to the week's end competes the next week instead. */
+  lateHours: 24,
 } as const;
 
 /** What the week's top 3 win, in Brasil points. */
@@ -84,6 +88,27 @@ export interface AdCard {
 export const projectWeek = (at: Date): string => pointsWeek(at);
 /** When a week closes (the next Monday 00:00 UTC), in ms. */
 export const weekClosesAt = (week: string): number => Date.parse(`${week}T00:00:00Z`) + 7 * 86_400_000;
+
+/**
+ * The week a project going live now competes in: this one, or the next when
+ * fewer than LIMITS.lateHours are left (it would have minutes to gather votes).
+ */
+export function launchWeekFor(at: Date): string {
+  const week = projectWeek(at);
+  const closes = weekClosesAt(week);
+  return closes - at.getTime() < LIMITS.lateHours * 3_600_000 ? projectWeek(new Date(closes)) : week;
+}
+
+/** The week whose slot a project used: the week it competes in, or would have when it was posted. */
+export const slotWeekOf = (r: { launch_week: string | null; created_at: string }): string => r.launch_week ?? launchWeekFor(new Date(r.created_at));
+
+/** When a week opens, for a person: "Sun 21:00 (Brasília) · in 3d". */
+export function opensText(week: string, now = Date.now()): string {
+  const at = Date.parse(`${week}T00:00:00Z`);
+  const when = new Date(at).toLocaleString("en-GB", { timeZone: "America/Sao_Paulo", weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const h = Math.max(0, Math.ceil((at - now) / 3_600_000));
+  return `${when} (Brasília) · in ${h >= 24 ? `${Math.floor(h / 24)}d` : `${h}h`}`;
+}
 
 // ─── The fields ─────────────────────────────────────────────
 

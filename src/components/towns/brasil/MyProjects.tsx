@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Trophy } from "lucide-react";
-import type { MyProject } from "@/lib/towns/brasil-projects-server";
+import type { Blocked, MyProject } from "@/lib/towns/brasil-projects-server";
+import { opensText } from "@/lib/towns/brasil-projects";
 import { statusOf } from "./ProjectSheet";
 import { ProjectIcon, api } from "./projects-ui";
 
@@ -20,12 +21,16 @@ export function ProjectWin({ win, onOpen }: { win: { week: string; name: string;
   );
 }
 
-export default function MyProjects({ slug, refreshKey, onOpen, onShare }: { slug: string; refreshKey: number; onOpen: (slug: string) => void; onShare: () => void }) {
+export default function MyProjects({ slug, refreshKey, onOpen, onShare }: { slug: string; refreshKey: number; onOpen: (slug: string) => void; onShare: (blocked: Blocked | null) => void }) {
   const [rows, setRows] = useState<MyProject[] | null>(null);
+  const [blocked, setBlocked] = useState<Blocked | null>(null);
   useEffect(() => {
     fetch(`${api(slug)}?view=mine`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j: { projects: MyProject[] } | null) => setRows(j?.projects ?? []))
+      .then((j: { projects: MyProject[]; blocked: Blocked | null } | null) => {
+        setRows(j?.projects ?? []);
+        setBlocked(j?.blocked ?? null);
+      })
       .catch(() => setRows([]));
   }, [slug, refreshKey]);
   if (!rows) return null;
@@ -47,10 +52,14 @@ export default function MyProjects({ slug, refreshKey, onOpen, onShare }: { slug
           </button>
         );
       })}
-      {rows.filter((p) => ["live", "review", "checking"].includes(p.status)).length < 3 && (
-        <button type="button" onClick={onShare} className="btn-press flex min-h-8 items-center justify-center gap-1 border-2 border-border text-[9px] text-cream hover:border-lime/60">
-          <Plus size={11} strokeWidth={3} aria-hidden /> Share a project
-        </button>
+      {blocked?.opens ? (
+        <p className="text-[8px] text-muted">Next project from {opensText(blocked.opens)}</p>
+      ) : (
+        blocked?.code !== "live_limit" && (
+          <button type="button" onClick={() => onShare(blocked)} className="btn-press flex min-h-8 items-center justify-center gap-1 border-2 border-border text-[9px] text-cream hover:border-lime/60">
+            <Plus size={11} strokeWidth={3} aria-hidden /> Share a project
+          </button>
+        )
       )}
     </div>
   );

@@ -5,7 +5,7 @@ import { ArrowUpRight, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import posthog from "posthog-js";
 import Panel from "@/components/league/hud/Panel";
 import { timeLeft, type AdCard, type ProjectCard } from "@/lib/towns/brasil-projects";
-import type { CardData } from "@/lib/towns/brasil-projects-server";
+import type { Blocked, CardData } from "@/lib/towns/brasil-projects-server";
 import { ProjectIcon, VoteButton, adHref, api } from "./projects-ui";
 
 // The map's top-right corner: this week's projects. On a wide screen a card,
@@ -95,6 +95,7 @@ export default function ProjectsCard({
   refreshKey = 0,
   onOpen,
   onShare,
+  onOpenSlug,
   onOffer,
   onSignIn,
 }: {
@@ -105,7 +106,10 @@ export default function ProjectsCard({
   /** Bumped after something changed the card (a post, a vote in the sheet): read it again. */
   refreshKey?: number;
   onOpen: (p: ProjectCard) => void;
-  onShare: () => void;
+  /** Share yours, with whether they can post (null), why not, or undefined when the card doesn't know. */
+  onShare: (blocked: Blocked | null | undefined) => void;
+  /** Open a project by its slug (their own, from Your project). */
+  onOpenSlug: (slug: string) => void;
   onOffer: () => void;
   onSignIn: () => void;
 }) {
@@ -133,6 +137,7 @@ export default function ProjectsCard({
 
   if (!c) return null;
   const left = timeLeft(c.week);
+  const mine = c.me?.blocked?.code === "week_limit" ? c.me.blocked.project : null;
   const list = (
     <>
       <AdRow slug={slug} ad={c.ad} onOffer={onOffer} />
@@ -147,17 +152,31 @@ export default function ProjectsCard({
         <a href={`/town/${slug}/projects`} onClick={() => posthog.capture("projects_list_opened", { from: "card" })} className="btn-press flex min-h-9 items-center justify-center border-2 border-border text-[10px] text-cream hover:border-lime/60">
           See all{c.count > 3 ? ` · ${c.count}` : ""}
         </a>
-        <button
-          type="button"
-          onClick={() => {
-            posthog.capture("project_submit_started", { from: "card" });
-            setSheet(false);
-            onShare();
-          }}
-          className="btn-press flex min-h-9 items-center justify-center gap-1 bg-lime text-[10px] text-bg"
-        >
-          <Plus size={12} strokeWidth={3} aria-hidden /> Share yours
-        </button>
+        {mine && mine.status !== "removed" ? (
+          // This week's slot is used: the button is their project.
+          <button
+            type="button"
+            onClick={() => {
+              setSheet(false);
+              onOpenSlug(mine.slug);
+            }}
+            className="btn-press flex min-h-9 items-center justify-center gap-1 border-2 border-lime text-[10px] text-lime hover:bg-lime hover:text-bg"
+          >
+            Your project
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              posthog.capture("project_submit_started", { from: "card", blocked: c.me?.blocked?.code ?? null });
+              setSheet(false);
+              onShare(c.me ? c.me.blocked : undefined);
+            }}
+            className="btn-press flex min-h-9 items-center justify-center gap-1 bg-lime text-[10px] text-bg"
+          >
+            <Plus size={12} strokeWidth={3} aria-hidden /> Share yours
+          </button>
+        )}
       </div>
     </>
   );

@@ -108,7 +108,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
       PRESIDENCY_ON ? getElection(league.id, viewer) : Promise.resolve(null),
       PRESIDENCY_ON ? getCount(league.id) : Promise.resolve(null),
       getBrasilStateFounders(league.id),
-      getCardData(league.id, viewer?.id ?? null).catch(() => null),
+      getCardData(league.id, viewer).catch(() => null),
       winsByLogin(league.id).catch(() => ({})),
     ]);
     const home = viewer ? residents.find((r) => r.dev.id === viewer.id) : undefined;
