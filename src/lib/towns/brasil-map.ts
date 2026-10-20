@@ -111,8 +111,10 @@ export const CITY = {
   gapLots: 3,
   /** A city takes a block that's farther round (blocks) to keep off a neighbor, before it pushes the neighbor away. */
   detour: 1.5,
-  /** ...and one this much farther round to stay on land (a coastal city grows along the coast), before it moves inland. */
-  coastDetour: 6,
+  /** How far (lots) a city may stand from its real place, beyond its own reach, before Brazil grows instead. */
+  drift: 10,
+  /** A city of this many blocks or more never goes astray: Brazil grows first. */
+  anchored: 4,
   /** The island's smallest radius (lots), for its shore. */
   islandMin: 5,
   /** Open sea (lots) between the island's hub and the coast; its blocks keep islandShore of it. */
@@ -271,11 +273,12 @@ function buildLots(seed: number, block: [number, number], first: boolean): [numb
  *
  * A city grows a block at a time round its own middle, nearest first. Inside
  * it nothing ever moves. When it grows into a neighbor (or the coast), the
- * smaller of the two (the newer when they're even) moves away whole, the
- * least it can, keeping its real direction from the other; that can push a
- * third, and so on. When there's no room left, or the cities cover too much
- * of the land, Brazil grows by scaleStep and everyone follows their own real
- * place out. A stable, incremental Demers cartogram.
+ * smaller of the two (the newer when they're even) moves away whole, to the
+ * nearest clear place to its real place, keeping its real direction from the
+ * other; that can push a third, and so on. When there's no room left, a big
+ * city would stand far from its real place, or the cities cover too much of
+ * the land, Brazil grows by scaleStep and every city goes back to its real
+ * place. A stable, incremental Demers cartogram.
  */
 export class BrasilMap {
   scale: number;
@@ -413,6 +416,37 @@ export class BrasilMap {
     return !!c.info?.capital || c.residents.length > 0;
   }
 
+  /** Where a city belongs at this scale (lots): its real place. */
+  private home(c: City): [number, number] {
+    return [Math.round(c.anchor[0] * this.scale), Math.round(c.anchor[1] * this.scale)];
+  }
+
+  /** How far a city's ground reaches from its middle (lots). */
+  private reach(c: City): number {
+    return Math.max(...this.footprint(c).map(([bx, bz]) => Math.hypot(bx + 0.5, bz + 0.5) * P));
+  }
+
+  /**
+   * Whether a big city standing at `at` is too far from its real place: past
+   * its own reach and CITY.drift, or, when its real place is under a bigger
+   * city (Osasco and São Paulo), past that city's ground too. Small cities
+   * may go farther: they make room round the big ones.
+   */
+  private astray(c: City, at: [number, number]): boolean {
+    const n = this.footprint(c).length;
+    if (n < CITY.anchored) return false;
+    const [hx, hz] = this.home(c);
+    const own = this.reach(c);
+    let room = own + CITY.drift;
+    for (const o of this.others(c)) {
+      if (this.footprint(o).length <= n) continue;
+      const [ox, oz] = this.home(o);
+      const r = this.reach(o) + own + CITY.gapLots;
+      if (Math.hypot(hx - ox, hz - oz) < r) room = Math.max(room, r + CITY.drift);
+    }
+    return Math.hypot(at[0] - hx, at[1] - hz) > room;
+  }
+
   private others(c: City): City[] {
     return [...this.cities.values()].filter((o) => o !== c && this.present(o));
   }
@@ -458,6 +492,24 @@ export class BrasilMap {
       }
     }
     return best?.p ?? (strict ? null : landOnly);
+  }
+
+  /** The nearest place to `from` (lots) where the city stands on land, whoever is there (they're pushed after). */
+  private landNear(c: City, from: [number, number]): [number, number] | null {
+    let best: { p: [number, number]; d: number } | null = null;
+    for (let r = 0; r <= 80; r++) {
+      if (best && r > best.d) break;
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dz = -r; dz <= r; dz++) {
+          if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+          const d = Math.hypot(dx, dz);
+          if (best && d >= best.d) continue;
+          const p: [number, number] = [from[0] + dx, from[1] + dz];
+          if (this.onLandAt(c, p)) best = { p, d };
+        }
+      }
+    }
+    return best?.p ?? null;
   }
 
   /** Which way a city should go from `at`: away from the biggest city in the way (its real direction from it), else inland. */
@@ -511,10 +563,9 @@ export class BrasilMap {
         nearest = b;
         nearestD = d;
       }
-      if (d > nearestD + (landed ? CITY.detour : CITY.coastDetour)) break;
+      if (d > nearestD + CITY.detour) break;
       if (c.ibge === null ? this.islandBlock(c, b) : this.blockOnLand(c.center, b)) {
         landed ??= b;
-        if (d > nearestD + CITY.detour) break;
         const trial: City = { ...c, blocks: [...c.blocks, key(b[0], b[1])], fp: null, box: null };
         if (c.ibge === null || this.nearby(trial, c.center, 0).every((o) => !this.touches(trial, c.center, o))) {
           chosen = b;
@@ -554,7 +605,8 @@ export class BrasilMap {
     const r: Resident = { dev, city: ibge, lx, lz, at };
     this.record(c, r);
     if (c.ibge !== null && c.blocks.length > blocks) this.resolve([c]);
-    if (this.fill() > CITY.maxFill) this.grow();
+    // Too full, or a big city stands far from its real place (an older map pushed it): Brazil grows.
+    if (this.fill() > CITY.maxFill || [...this.cities.values()].some((o) => this.present(o) && this.astray(o, o.center))) this.grow();
     return r;
   }
 
@@ -604,24 +656,27 @@ export class BrasilMap {
   }
 
   /**
-   * Where `m` goes to clear `o`: straight out along x or z, the least lots,
-   * preferring its real direction from `o`, on land and touching nobody.
-   * Boxed in every way: the nearest clear place round it; none near enough
-   * means the region is full (null: Brazil grows).
+   * Where `m` goes to clear `o`: the nearest place to its real place that's
+   * on land and touches nobody, favoring its real direction from `o`. Boxed
+   * in further than that looks: straight out along x or z. None: the region
+   * is full (null: Brazil grows).
    */
   private shove(m: City, o: City): [number, number] | null {
+    const home = this.home(m);
     const S = this.scale;
     let vx = (m.anchor[0] - o.anchor[0]) * S;
     let vz = (m.anchor[1] - o.anchor[1]) * S;
     if (Math.hypot(vx, vz) < 0.5) [vx, vz] = [m.center[0] - o.center[0], m.center[1] - o.center[1]];
     if (Math.hypot(vx, vz) < 0.5) [vx, vz] = [1, 0];
+    const near = this.settle(m, home, [vx, vz], true);
+    if (near) return near;
     const vl = Math.hypot(vx, vz);
-    const others = this.nearby(m, m.center, 161);
+    const others = this.nearby(m, home, 161);
     let clear: { at: [number, number]; cost: number } | null = null;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
       const weight = 2 - (dx * vx + dz * vz) / vl;
-      for (let k = 1; k <= 160; k++) {
-        const at: [number, number] = [m.center[0] + dx * k, m.center[1] + dz * k];
+      for (let k = 81; k <= 160; k++) {
+        const at: [number, number] = [home[0] + dx * k, home[1] + dz * k];
         if (this.touches(m, at, o) || !this.onLandAt(m, at)) continue;
         const cost = k * weight;
         if (clear && cost >= clear.cost) break;
@@ -631,7 +686,7 @@ export class BrasilMap {
         }
       }
     }
-    return clear?.at ?? this.settle(m, m.center, [vx, vz], true);
+    return clear?.at ?? null;
   }
 
   /** Pushes cities apart until none touches another and all stand on land. False: no room left. */
@@ -641,8 +696,9 @@ export class BrasilMap {
       if (guard > 6000) return this.grow();
       const a = queue.shift()!;
       if (!this.onLandAt(a, a.center)) {
-        const at = this.settle(a, a.center, this.heading(a, a.center));
-        if (!at) return this.grow();
+        const home = this.home(a);
+        const at = this.landNear(a, home);
+        if (!at || this.astray(a, at)) return this.grow();
         a.center = at;
         this.moved.add(a.key);
       }
@@ -651,7 +707,7 @@ export class BrasilMap {
         const m = this.mover(a, b);
         const o = m === a ? b : a;
         const at = this.shove(m, o);
-        if (!at) return this.grow();
+        if (!at || this.astray(m, at)) return this.grow();
         m.center = at;
         this.moved.add(m.key);
         if (!queue.includes(m)) queue.push(m);
@@ -661,18 +717,16 @@ export class BrasilMap {
     return true;
   }
 
-  /** Brazil grows by scaleStep: every city keeps how far it was pushed from its real place, then they settle again. */
+  /** Brazil grows by scaleStep: every city goes back to its real place, then they settle again, the biggest first. */
   private grow(): boolean {
     if (this.scale > 50) throw new Error("brasil map: no room even at 50x");
     const S0 = this.scale;
     const S1 = Math.round(S0 * CITY.scaleStep * 1000) / 1000;
+    this.scale = S1;
     for (const c of this.cities.values()) {
-      const sx = c.center[0] - Math.round(c.anchor[0] * S0);
-      const sz = c.center[1] - Math.round(c.anchor[1] * S0);
-      c.center = [Math.round(c.anchor[0] * S1) + sx, Math.round(c.anchor[1] * S1) + sz];
+      c.center = this.home(c);
       this.moved.add(c.key);
     }
-    this.scale = S1;
     this.island.center = this.islandCenter();
     this.grew = true;
     // The biggest settle first, so the small ones move round them.

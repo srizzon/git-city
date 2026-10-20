@@ -158,6 +158,21 @@ describe("brasil cities", () => {
     for (const c of l.cities) for (const [x0, z0] of c.blocks) expect(landAt(g, x0, z0)).toBe(true);
   });
 
+  it("keeps every big city near its real place and compact, the coast's too, however big São Paulo gets", () => {
+    const spec: [UF, number, number][] = [["SP", 400, SP], ["RJ", 120, capitalIbge("RJ")], ["PR", 120, capitalIbge("PR")], ["PB", 80, capitalIbge("PB")], ["PE", 110, capitalIbge("PE")], ["CE", 130, capitalIbge("CE")]];
+    const l = layoutBrasil(devs(spec));
+    const geo = geoAt(l.scale);
+    for (const [uf, , ibge] of spec) {
+      const c = l.cities.find((x) => x.ibge === ibge)!;
+      const [hx, hz] = geo.project(CAPITAL_OF.get(uf)!.at).map((v) => v / LOT);
+      // Within its own reach (plus a little) of its real place, and in its own state.
+      expect(Math.hypot(c.hub[0] - hx, c.hub[1] - hz)).toBeLessThanOrEqual(c.radius + CITY.drift);
+      expect(geo.inState(uf, c.center[0] * LOT, c.center[1] * LOT)).toBe(true);
+      // Its blocks hold together: no wider than a round city of as many blocks, give or take.
+      expect(c.radius).toBeLessThan(Math.sqrt(c.blocks.length / Math.PI) * (CITY.block + 1) * 2 + 8);
+    }
+  }, 30_000);
+
   it("puts devs with no city on the island, out at sea, and Noronha's own devs with them", () => {
     const l = layoutBrasil(devs([[null, 40], ["PE", 3, NORONHA]]));
     const geo = geoAt(l.scale);

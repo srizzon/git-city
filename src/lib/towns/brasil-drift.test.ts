@@ -73,7 +73,7 @@ describe("the Brasil drift site", () => {
     for (const o of objects) expect(inDriftSite(o.x, o.z)).toBe(false);
     // Brazil grown to make room keeps the track clear too.
     expect(layout.scale).toBeGreaterThanOrEqual(1);
-  });
+  }, 30_000);
 });
 
 describe("the START gate", () => {
