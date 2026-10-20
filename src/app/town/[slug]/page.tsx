@@ -23,6 +23,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { getCount, getElection } from "@/lib/towns/brasil-election-server";
 import { PRESIDENCY_ON } from "@/lib/towns/brasil-election";
 import BrasilTownLoader from "./brasil/loader";
+import { getCardData, getProject, winsByLogin } from "@/lib/towns/brasil-projects-server";
 import { getCachedCity } from "@/lib/league-city/service";
 import { LOGIN_RE } from "@/lib/leagues/names";
 import { tokenMatches } from "@/lib/leagues/invite-token";
@@ -36,7 +37,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string; at?: string; join?: string; new?: string; uf?: string; cidade?: string; pick?: string; vote?: string; run?: string }>;
+  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string; at?: string; join?: string; new?: string; uf?: string; cidade?: string; pick?: string; vote?: string; run?: string; project?: string; share?: string; ad?: string }>;
 };
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
@@ -45,7 +46,15 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   if (!league) return { title: "Town not found - Git City" };
   // The Brasil map: its own card, naming the dev (?at=), the city (?cidade=) or the state (?uf=) the link points at.
   if (league.map === "brasil") {
-    const { at, uf, cidade, vote, run } = await searchParams;
+    const { at, uf, cidade, vote, run, project } = await searchParams;
+    // A shared project: its name and tagline, the card with the maker's city.
+    const shared = typeof project === "string" && /^[a-z0-9-]{3,60}$/.test(project) ? await getProject(league.id, project, null).catch(() => null) : null;
+    if (shared) {
+      const title = `${shared.name} · projetos dos devs do Brasil · Git City`;
+      const description = shared.tagline;
+      const image = { url: `/town/${league.slug}/brasil-og?project=${shared.slug}`, width: 1200, height: 630, alt: shared.name };
+      return { title, description, openGraph: { title, description, images: [image] }, twitter: { card: "summary_large_image", title, description, images: [image] } };
+    }
     const city = typeof cidade === "string" ? cityBySlug(cidade) : undefined;
     const voted = PRESIDENCY_ON && typeof vote === "string" && /^\d{2}$/.test(vote) ? vote : null;
     const running = PRESIDENCY_ON && typeof run === "string" && /^\d{2}$/.test(run) ? run : null;
@@ -92,13 +101,15 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   // The Brasil town is drawn as the map of Brazil: its own page.
   if (league.map === "brasil") {
     const { layout, residents, grewAt } = await getBrasilLayout(league.id);
-    const [cityDevs, cityNorms, week, election, count, stateFounders] = await Promise.all([
+    const [cityDevs, cityNorms, week, election, count, stateFounders, projects, projectWins] = await Promise.all([
       getCityDevsByIds(residents.map((r) => r.dev.id)),
       getCityNorms(),
       getBrasilWeek(league.id),
       PRESIDENCY_ON ? getElection(league.id, viewer) : Promise.resolve(null),
       PRESIDENCY_ON ? getCount(league.id) : Promise.resolve(null),
       getBrasilStateFounders(league.id),
+      getCardData(league.id, viewer?.id ?? null).catch(() => null),
+      winsByLogin(league.id).catch(() => ({})),
     ]);
     const home = viewer ? residents.find((r) => r.dev.id === viewer.id) : undefined;
     // Whether they named their city or only a state (then the map asks them once).
@@ -124,6 +135,10 @@ export default async function LeaguePage({ params, searchParams }: Props) {
         election={election}
         count={count}
         stateFounders={stateFounders}
+        projects={projects}
+        projectWins={projectWins}
+        startProject={typeof query.project === "string" && /^[a-z0-9-]{3,60}$/.test(query.project) ? query.project : null}
+        startSheet={query.share === "1" ? "share" : query.ad === "1" ? "ad" : null}
       />
     );
   }

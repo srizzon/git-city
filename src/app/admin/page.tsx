@@ -38,6 +38,11 @@ const SECTIONS: { heading: string; links: AdminLink[] }[] = [
         title: "Brasil town · comments",
         description: "Paste reel comments to put devs on the map",
       },
+      {
+        href: "/admin/projects",
+        title: "Brasil town · projects",
+        description: "Review queue, reports, the ad slot and moderation numbers",
+      },
     ],
   },
   {

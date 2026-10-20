@@ -15,6 +15,8 @@
     { "path": "/api/cron/league-close",                  "schedule": "5 0 * * 1" },
     { "path": "/api/cron/brasil-instagram",              "schedule": "*/10 * * * *" },
     { "path": "/api/cron/reel-publish",                  "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/reel-insights",                 "schedule": "20 * * * *" }
+    { "path": "/api/cron/reel-insights",                 "schedule": "20 * * * *" },
+    { "path": "/api/cron/brasil-projects-close",         "schedule": "10 0 * * 1" },
+    { "path": "/api/cron/brasil-projects-recheck",       "schedule": "0 7 * * *" }
   ]
 }
