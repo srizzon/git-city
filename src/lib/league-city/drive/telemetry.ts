@@ -37,6 +37,8 @@ export interface DriveRoute {
   z: number;
   /** Close enough to count as there, city units from the center. */
   reach: number;
+  /** A city race's next gate (cleared when the race is over, unlike Drive here's). */
+  race?: boolean;
 }
 
 export interface RadarCar {
@@ -54,6 +56,8 @@ export interface RadarFeed {
   cars: RadarCar[];
   /** Crown Rush: where the crown is while a match runs. */
   crown: { x: number; z: number } | null;
+  /** A city race you're in: its gates in order (city units), drawn as a line. */
+  raceLine?: [number, number][] | null;
 }
 
 export function createTelemetry(route: DriveRoute | null = null): DriveTelemetry {

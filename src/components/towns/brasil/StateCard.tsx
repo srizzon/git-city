@@ -7,6 +7,7 @@ import { Avatar, fmt } from "@/components/league/hud/shared";
 import { useSheet } from "@/components/league/hud/useSheet";
 import TrophyIcon from "@/components/towns/TrophyIcon";
 import { stateOf, type CityLayout } from "@/lib/towns/brasil-map";
+import { formatLap } from "@/lib/league-city/race/laps";
 import { type StateStats, type WeekStanding } from "./stats";
 
 // A state's card, opened from its tag or a search: its place in the week's
@@ -27,6 +28,7 @@ export default function StateCard({
   week,
   cabinet,
   race,
+  records,
 }: {
   state: StateStats;
   byLogin: ReadonlyMap<string, CityBuilding>;
@@ -43,6 +45,8 @@ export default function StateCard({
   cabinet?: { provisional: boolean; governor: string | null; senators: string[]; mayors: { city: string; login: string }[]; totals: Record<string, number> };
   /** Its place and points in this week's race (the States table's order). */
   race?: { place: number; points: number };
+  /** Race records on routes starting in this state: the route's name, its holder and time. */
+  records?: { route: string; login: string; ms: number }[];
 }) {
   const sheet = useSheet(onClose);
   const { close } = sheet;
@@ -163,6 +167,20 @@ export default function StateCard({
                   </li>
                 );
               })}
+          </Section>
+        )}
+
+        {records && records.length > 0 && (
+          <Section title="Race records" note="from here">
+            {records.slice(0, 5).map((r) => (
+              <li key={r.route} className="flex items-center gap-2.5 py-1">
+                <span className="min-w-0 flex-1 truncate text-[10px] normal-case text-cream">{r.route}</span>
+                <button type="button" onClick={() => onPickDev(r.login)} className="min-w-0 max-w-[40%] truncate text-[8px] normal-case text-muted hover:text-lime">
+                  @{r.login}
+                </button>
+                <span className="shrink-0 text-[9px] tabular-nums text-muted">{formatLap(r.ms)}</span>
+              </li>
+            ))}
           </Section>
         )}
 

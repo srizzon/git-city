@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, LogIn, Plus, Volume1, Volume2, VolumeX, X } from "lucide-react";
+import { Camera, Gamepad2, LogIn, Plus, Users, Volume1, Volume2, VolumeX, X } from "lucide-react";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { HUD_BOX } from "../shared";
@@ -56,6 +56,11 @@ export default function DriveHud({
   map,
   emoteLog,
   onStartCrown,
+  gameOn = false,
+  onGames,
+  phoneLow = false,
+  startNote = null,
+  children,
   onVolume,
   onEmote,
   onResume,
@@ -89,6 +94,16 @@ export default function DriveHud({
   /** The room's last reactions, oldest first. */
   emoteLog: EmoteLog;
   onStartCrown: () => void;
+  /** A car game has the screen (a city race you're in): the drivers list and Crown Rush step aside. */
+  gameOn?: boolean;
+  /** The Games menu (G): a button leads the top-right toolbar. Without it, Crown Rush keeps its own Start. */
+  onGames?: () => void;
+  /** A phone: something sits under the top bar (a mission), so the minimap starts lower. */
+  phoneLow?: boolean;
+  /** What's going on here, on the loading band ("4 driving · a race to Campinas is open"). */
+  startNote?: string | null;
+  /** A town's own HUD pieces (the Brasil map's races), over the rest. */
+  children?: React.ReactNode;
   onVolume: (v: number) => void;
   /** A quick reaction (lib drive/emotes slot). */
   onEmote: (e: number) => void;
@@ -102,6 +117,8 @@ export default function DriveHud({
   const [hints, setHints] = useState(true);
   // First drive: the HUD waits for your first move.
   const [entered, setEntered] = useState(!firstRun);
+  /** The loading band is gone (no band on the intro's first run): the controls take the bottom. */
+  const [loaded, setLoaded] = useState(firstRun);
   const enter = firstRun ? (delay: number) => ({ animation: `fade-in 0.45s ease-out ${delay}s both` }) : () => undefined;
 
   useEffect(() => {
@@ -130,6 +147,25 @@ export default function DriveHud({
   }, [telemetry]);
 
   const touch = !!touchRef;
+  // A phone in the car: a held thumb must never start selecting text (iOS
+  // picks words off hidden page text and the callout covers the controls).
+  // Off for the whole page while you drive, and any selection that slips
+  // through is dropped at once.
+  useEffect(() => {
+    if (!touch) return;
+    const el = document.documentElement;
+    const keep = ["user-select", "-webkit-user-select", "-webkit-touch-callout"].map((k) => [k, el.style.getPropertyValue(k)] as const);
+    for (const [k] of keep) el.style.setProperty(k, "none");
+    const drop = () => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) sel.removeAllRanges();
+    };
+    document.addEventListener("selectionchange", drop);
+    return () => {
+      document.removeEventListener("selectionchange", drop);
+      for (const [k, v] of keep) el.style.setProperty(k, v);
+    };
+  }, [touch]);
   const silent = muted || volume === 0;
   // The prompt on screen: on a phone its button pulses (and the camera's gets a callout).
   const [lesson, setLesson] = useState<Lesson | null>(null);
@@ -138,9 +174,9 @@ export default function DriveHud({
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
       {/* First, so every other piece of the HUD sits above the steering layer. */}
-      {ready && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} />}
+      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} />}
 
-      {ready && entered && !touch && (
+      {ready && entered && !touch && !gameOn && (
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`} style={enter(0)}>
           <p className="flex items-center gap-2 text-cream">
             <span className="h-1.5 w-1.5 animate-pulse bg-lime" aria-hidden />
@@ -172,6 +208,14 @@ export default function DriveHud({
             <X {...ICON} aria-hidden />
           </button>
           <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border`}>
+            <span className="flex items-center gap-1.5 px-3 py-2.5 text-[10px] text-cream" aria-label={`${drivers.length + 1} driving here`}>
+              <Users {...ICON} aria-hidden /> {drivers.length + 1}
+            </span>
+            {onGames && (
+              <button type="button" onClick={onGames} className="flex items-center gap-1.5 bg-lime px-3 py-2.5 text-[10px] text-bg active:translate-y-px">
+                <Gamepad2 {...ICON} aria-hidden /> Games
+              </button>
+            )}
             {join && (
               <button type="button" onClick={join.onClick} className={`${SEG} gap-2 px-3 py-2.5 text-[10px] text-lime`}>
                 {join.signIn ? <LogIn {...ICON} aria-hidden /> : <Plus {...ICON} aria-hidden />}
@@ -187,6 +231,13 @@ export default function DriveHud({
 
       {entered && !touch && (
         <div className={`${HUD_BOX} absolute right-4 top-4 flex items-stretch divide-x-2 divide-border`} style={enter(0.12)}>
+          {onGames && (
+            <button type="button" onClick={onGames} title="Games (G)" className={`${SEG} gap-2 px-3 py-2 text-[10px] text-lime hover:text-cream`}>
+              <Gamepad2 {...ICON} aria-hidden />
+              <span>Games</span>
+              <span className="bg-cream px-1 text-[8px] leading-[1.4] text-bg">G</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onCamera}
@@ -261,11 +312,24 @@ export default function DriveHud({
 
       {ready && entered && !touch && <Dash telemetry={telemetry} style={enter(0.24)} />}
 
+      {/* Phone: the minimap under the top bar with others' reactions under it, and the six reactions over the controls. */}
+      {ready && loaded && entered && touch && (
+        <div className={`absolute left-4 flex flex-col items-start gap-2 ${phoneLow ? "top-[calc(max(1rem,env(safe-area-inset-top))+9.5rem)]" : "top-[calc(max(1rem,env(safe-area-inset-top))+8.75rem)]"}`}>
+          <Minimap telemetry={telemetry} buildings={map.buildings} objects={map.objects} home={map.home} size={104} layer={map.layer} />
+          <ReactionLog log={emoteLog} align="start" />
+        </div>
+      )}
+      {ready && loaded && entered && touch && (
+        <div className="absolute inset-x-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+162px)] flex justify-center">
+          <ReactionBar on={!paused} onEmote={onEmote} big />
+        </div>
+      )}
+
       {ready && entered && !touch && (
         <div
           className={`absolute bottom-20 left-4 text-[9px] leading-loose text-muted transition-opacity duration-700 ${hints ? "opacity-100" : "opacity-0"}`}
         >
-          {CONTROLS.map(([k, v]) => (
+          {[...CONTROLS, ...(onGames ? ([["G", "games: race, crown rush"]] as [string, string][]) : [])].map(([k, v]) => (
             <div key={k}>
               <span className="text-cream">{k}</span> {v}
             </div>
@@ -280,10 +344,11 @@ export default function DriveHud({
         </div>
       )}
 
-      {ready && entered && <CrownPanel crown={crown?.crown ?? null} offset={crown?.offset ?? 0} you={crown?.you ?? null} drivers={drivers} touch={touch} onStart={onStartCrown} />}
+      {ready && entered && !gameOn && <CrownPanel crown={crown?.crown ?? null} offset={crown?.offset ?? 0} you={crown?.you ?? null} drivers={drivers} touch={touch} idle={!onGames} onStart={onStartCrown} />}
+      {ready && entered && children}
 
       {/* Last, so they blur and cover the rest of the HUD. */}
-      {!firstRun && <StartScreen ready={ready} touch={touch} />}
+      {!firstRun && <StartScreen ready={ready} touch={touch} note={startNote} onGone={() => setLoaded(true)} />}
       {paused && ready && (
         <PauseMenu camera={camera} muted={muted} onResume={onResume} onCamera={onCamera} onMute={onMute} onExit={onExit} />
       )}

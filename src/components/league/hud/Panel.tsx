@@ -10,7 +10,21 @@ import { useSheet } from "./useSheet";
  * Sheet over the city: a right-hand column on desktop, a bottom sheet on
  * phones. Slides in, slides out; Esc and the close button dismiss it.
  */
-export default function Panel({ title, onClose, children, above = false }: { title: string; onClose: () => void; children: ReactNode; /** Over the site's own notices (the email card), for a sheet you act in: the vote. */ above?: boolean }) {
+export default function Panel({
+  title,
+  onClose,
+  children,
+  above = false,
+  full = false,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  /** Over the site's own notices (the email card), for a sheet you act in: the vote. */
+  above?: boolean;
+  /** On a phone, the whole screen instead of a sheet (the voting machine needs the room). */
+  full?: boolean;
+}) {
   const sheet = useSheet(onClose);
   const { close } = sheet;
 
@@ -23,11 +37,11 @@ export default function Panel({ title, onClose, children, above = false }: { tit
   }, [close]);
 
   const sheetEl = (
-    <div className={`pointer-events-none fixed inset-x-0 bottom-0 ${above ? "z-[60]" : "z-40"} flex max-h-[78vh] sm:inset-y-4 sm:right-4 sm:left-auto sm:max-h-none sm:w-[400px]`}>
+    <div className={`pointer-events-none fixed inset-x-0 bottom-0 ${above ? "z-[60]" : "z-40"} flex ${full ? "max-sm:top-0" : "max-h-[78vh]"} sm:inset-y-4 sm:right-4 sm:left-auto sm:max-h-none sm:w-[400px]`}>
       <section
         role="dialog"
         aria-label={title}
-        className={`${HUD_BOX} ${sheet.className} flex w-full flex-col bg-bg/90 font-pixel uppercase text-warm`}
+        className={`${HUD_BOX} ${sheet.className} flex w-full flex-col font-pixel uppercase text-warm ${full ? "bg-bg max-sm:border-0 max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[env(safe-area-inset-bottom)] sm:bg-bg/90" : "bg-bg/90"}`}
       >
         <header className="flex items-center justify-between border-b-2 border-border px-4 py-3">
           <h2 className="text-sm text-cream">{title}</h2>

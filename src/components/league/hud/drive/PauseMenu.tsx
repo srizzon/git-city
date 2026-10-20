@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Backdrop, Band, Chip } from "@/components/games/ui";
+import { KEYS_ONLY, T } from "@/components/games/kit";
 import type { DriveCameraMode } from "@/lib/league-city/drive/telemetry";
 
-// Console-style pause: the city blurs behind a big PAUSED, a menu you walk
+// Console-style pause, in the car games' bands (drift's pause): the city blurs behind a lime PAUSED, a menu you walk
 // with ↑↓ / W S / the D-pad and pick with Enter, Space or A, and the controls
 // beside it. B / Start resume; Esc again (handled by the page) exits.
 
@@ -27,7 +29,7 @@ export const TOUCH_CONTROLS: [string, string][] = [
   ["Hold Brake", "brake, then reverse"],
   ["Hold Boost", "boost"],
   ["Tap the item", "attack (from ? boxes)"],
-  ["Tap the smile", "react"],
+  ["Tap a face", "react (the row over the buttons)"],
 ];
 
 type Item = { id: "resume" | "camera" | "sound" | "menu" | "exit"; label: string };
@@ -128,46 +130,49 @@ export default function PauseMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The car games' look (components/games), as drift's pause: the scene
+  // blurred behind, a lime PAUSED band, the items as bands (the one picked in
+  // cream), the keys beside them on a wide screen, the hints under (not on a phone).
   return (
-    <div
-      role="dialog"
-      aria-label="Paused"
-      className="pointer-events-auto absolute inset-0 flex animate-[fade-in_0.15s_ease-out] items-center justify-center bg-bg/60 backdrop-blur-md"
-    >
-      <div className="flex flex-col gap-10 px-6">
-        <h2 className="text-4xl tracking-[0.3em] text-cream sm:text-5xl">Paused</h2>
-
-        <div className="flex gap-16">
-          <ul className="flex min-w-[220px] flex-col gap-3" role="menu">
-            {items.map((it, i) => (
-              <li key={it.id} role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  onMouseEnter={() => setSel(i)}
-                  onClick={() => pick(it.id)}
-                  className={`flex items-center gap-3 text-sm transition-colors ${sel === i ? "text-lime" : "text-muted hover:text-cream"}`}
-                >
-                  <span aria-hidden className={`w-3 ${sel === i ? "animate-pulse" : "invisible"}`}>
-                    ▶
-                  </span>
-                  {it.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <dl className="hidden grid-cols-[auto_auto] gap-x-6 gap-y-2 self-start text-[10px] sm:grid">
-            {controls.map(([k, v]) => (
-              <div key={k} className="contents">
-                <dt className="text-cream">{k}</dt>
-                <dd className="text-muted">{v}</dd>
-              </div>
-            ))}
-          </dl>
+    <div role="dialog" aria-label="Paused" className="pointer-events-auto absolute inset-0 font-pixel uppercase">
+      <Backdrop side="left" />
+      <div className="absolute left-[6vw] top-1/2 flex w-[min(420px,calc(100vw-2rem))] -translate-y-1/2 flex-col items-stretch gap-5 max-sm:left-4">
+        <Band tone="lime" className="self-start px-6 pb-3 pt-4 leading-none tracking-[0.08em]" style={{ fontSize: "clamp(40px, min(9vh, 12vw), 104px)" }}>
+          Paused
+        </Band>
+        <div role="menu" className="flex flex-col items-stretch" style={{ fontSize: T.body }}>
+          {items.map((it, i) => {
+            const on = i === sel;
+            return (
+              <button
+                key={it.id}
+                type="button"
+                role="menuitem"
+                onMouseEnter={() => setSel(i)}
+                onClick={() => pick(it.id)}
+                className={`drift-band flex min-h-11 items-center gap-4 px-5 py-3 text-left shadow-[0_6px_0_rgba(0,0,0,0.35)] outline-none ${on ? "bg-cream text-bg" : "bg-[#141417] text-cream"}`}
+                style={{ animationDelay: `${60 + i * 50}ms` }}
+              >
+                <span className={`w-3 ${on ? "" : "opacity-0"}`} aria-hidden>
+                  ▶
+                </span>
+                <span className="flex-1">{it.label}</span>
+              </button>
+            );
+          })}
+          <Band delay={300} className={`justify-center gap-3 px-5 py-2 text-muted ${KEYS_ONLY}`} style={{ fontSize: T.small }}>
+            <Chip>↑</Chip>
+            <Chip>↓</Chip> choose <Chip>Enter</Chip> select <Chip>Esc</Chip> exit
+          </Band>
         </div>
-
-        <p className="text-[9px] text-dim">↑↓ choose · Enter select · Esc exit</p>
+      </div>
+      <div className="absolute right-[6vw] top-1/2 flex w-[min(320px,30vw)] -translate-y-1/2 flex-col items-stretch max-lg:hidden">
+        {controls.map(([k, v], i) => (
+          <Band key={k} delay={120 + i * 30} className="justify-between gap-4 px-4 py-2" style={{ fontSize: T.small }}>
+            <span className="text-cream">{k}</span>
+            <span className="normal-case text-muted">{v}</span>
+          </Band>
+        ))}
       </div>
     </div>
   );

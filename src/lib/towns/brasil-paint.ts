@@ -6,9 +6,10 @@
 // circle, the way people draw one), the trail and everything it closes in
 // become your state's. Someone driving over it, a trail longer than
 // PAINT.trailMax, a jump or a gap in the car's stream lose it (nothing
-// paints) and a new one starts where the car is. Building lots are
-// their state's for good: anyone can always start from home. Weeks run like the points' (Monday 00:00 UTC) and the board
-// starts over each week.
+// paints) and a new one starts where the car is. A building's lot shows its
+// state's color until someone paints over it, and beside it its state is
+// always home: anyone can always close a loop at their own building. Weeks
+// run like the points' (Monday 00:00 UTC) and the board starts over each week.
 //
 // The drive room (party/paint.ts) is the only one that paints: it builds the
 // trails from the cars' stream, never from what a client says it painted.
@@ -158,34 +159,31 @@ export class PaintGrid {
     return this.index(Math.floor((xm * M_TO_UNIT + LOT / 2) / CELL), Math.floor((zm * M_TO_UNIT + LOT / 2) / CELL));
   }
 
-  /** Marks the buildings' lots (each its state's for good); the old ones go back to nobody. */
+  /** Marks the buildings' lots (each shows its state until painted over); the old marks go. */
   setHomes(homes: readonly PaintHome[]) {
-    for (let c = 0; c < this.size; c++) {
-      if (this.home[c]) {
-        this.owner[c] = 0;
-        this.home[c] = 0;
-      }
-    }
+    this.home.fill(0);
     for (const h of homes) {
       if (!h.uf) continue;
-      for (const c of this.lotCells(h.x, h.z)) {
-        this.home[c] = stateIndex(h.uf);
-        this.owner[c] = this.home[c];
-      }
+      for (const c of this.lotCells(h.x, h.z)) this.home[c] = stateIndex(h.uf);
     }
   }
 
-  /** A new week: nobody holds anything but their buildings. */
-  clear() {
-    for (let c = 0; c < this.size; c++) this.owner[c] = this.home[c];
+  /** Who a cell shows as held: its painter, else its building's state, else 0. */
+  heldAt(c: number): number {
+    return this.owner[c] || this.home[c];
   }
 
-  /** Cells each state holds (buildings not counted: a big state doesn't start ahead). */
+  /** A new week: nobody has painted anything. */
+  clear() {
+    this.owner.fill(0);
+  }
+
+  /** Cells each state painted (an unpainted building counts for nobody: a big state doesn't start ahead). */
   shares(): Map<UF, number> {
     const out = new Map<UF, number>();
     for (let c = 0; c < this.size; c++) {
       const s = this.owner[c];
-      if (!s || this.home[c]) continue;
+      if (!s) continue;
       const uf = stateAt(s);
       if (uf) out.set(uf, (out.get(uf) ?? 0) + 1);
     }
@@ -205,10 +203,10 @@ export class PaintGrid {
     // A cell's middle in city units, scaled back to the old map, and the old cell there.
     const back = (v: number) => Math.floor((((v + 0.5) * CELL - LOT / 2) * k + LOT / 2) / CELL);
     for (let c = 0; c < this.size; c++) {
-      if (!this.open[c] || this.home[c]) continue;
+      if (!this.open[c]) continue;
       const [cx, cz] = this.xyOf(c);
       const o = old.index(back(cx), back(cz));
-      const s = o >= 0 && !old.home[o] ? old.owner[o] : 0;
+      const s = o >= 0 ? old.owner[o] : 0;
       if (s) this.owner[c] = s;
     }
   }
@@ -283,9 +281,9 @@ export const newRun = (s: number): Run => ({ s, cells: [], set: new Set(), cell:
 
 export type PaintEvent = { k: "add"; cells: number[] } | { k: "lost"; why: LostWhy } | { k: "close"; trail: number[] };
 
-/** Whether the car is home: on its state's land, or right next to one of its state's buildings. */
+/** Whether the car is home: on its state's land, or right next to one of its state's buildings (painted over or not). */
 export function atHome(g: PaintGrid, s: number, c: number): boolean {
-  if (g.owner[c] === s) return true;
+  if (g.heldAt(c) === s) return true;
   const w = g.geom.w;
   const x = c % w;
   return (x > 0 && g.home[c - 1] === s) || (x < w - 1 && g.home[c + 1] === s) || (c >= w && g.home[c - w] === s) || (c + w < g.size && g.home[c + w] === s);
@@ -339,7 +337,6 @@ export function step(g: PaintGrid, run: Run, xm: number, zm: number, now: number
           run.set = new Set();
           continue;
         }
-        if (g.home[p]) continue;
         run.cells.push(p);
         run.set.add(p);
         added.push(p);
@@ -358,7 +355,7 @@ export function step(g: PaintGrid, run: Run, xm: number, zm: number, now: number
   return { passed, events };
 }
 
-/** What a closed trail paints: the trail and every cell it closes in with the state's land (not buildings, not the sea). */
+/** What a closed trail paints: the trail and every cell it closes in with the state's land (not the sea). */
 export function enclosed(g: PaintGrid, s: number, trail: readonly number[]): number[] {
   if (trail.length === 0) return [];
   const { w, d } = g.geom;
@@ -412,7 +409,7 @@ export function enclosed(g: PaintGrid, s: number, trail: readonly number[]): num
   for (let j = minJ; j <= maxJ; j++) {
     for (let i = minI; i <= maxI; i++) {
       const c = j * w + i;
-      if (!seen[(j - minJ) * bw + (i - minI)] && !mine.has(c) && g.open[c] && !g.home[c] && g.owner[c] !== s) out.push(c);
+      if (!seen[(j - minJ) * bw + (i - minI)] && !mine.has(c) && g.open[c] && g.heldAt(c) !== s) out.push(c);
     }
   }
   return out;
@@ -425,8 +422,8 @@ export function capture(g: PaintGrid, s: number, cells: readonly number[]): { ch
   let taken = 0;
   let invaded = 0;
   for (const c of cells) {
-    const was = g.owner[c];
-    if (was === s || g.home[c] || !g.open[c]) continue;
+    const was = g.heldAt(c);
+    if (was === s || !g.open[c]) continue;
     if (was) {
       invaded++;
       const uf = stateAt(was);

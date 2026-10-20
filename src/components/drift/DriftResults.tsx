@@ -6,7 +6,7 @@ import { signInWithGitHub } from "@/lib/sign-in";
 import { medalFor, medalScores, type LiveSpot } from "@/lib/drift/spots/types";
 import { MEDAL_COLORS, fmt } from "./DriftHud";
 import type { BoardRowLite } from "./DriftTitle";
-import { Backdrop, Band, Chip } from "./ui";
+import { Backdrop, Band, Chip } from "@/components/games/ui";
 
 // Past the line, in Trackmania's order: FINISH on the scene, then the frame
 // blurs and a timing tower builds on the right, like motorsport TV: the run's

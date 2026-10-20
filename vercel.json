@@ -5,7 +5,7 @@
     { "path": "/api/cron/weekly-digest",   "schedule": "0 10 * * 1" },
     { "path": "/api/cron/campaign-runner",   "schedule": "*/5 * * * *" },
     { "path": "/api/cron/re-engagement",   "schedule": "0 14 * * *" },
-    { "path": "/api/cron/city-snapshot",   "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/city-snapshot",   "schedule": "*/30 * * * *" },
     { "path": "/api/cron/gitc-cleanup",                  "schedule": "0 4 * * *" },
     { "path": "/api/cron/event-lifecycle",               "schedule": "* * * * *" },
     { "path": "/api/cron/daily-snapshot",                "schedule": "5 0 * * *" },

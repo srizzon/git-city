@@ -30,7 +30,7 @@ import type { DriveInputRef } from "./useDriveInput";
 /** Battle news for the Battle component. */
 export type BattleEvent =
   | { t: "boxes"; boxes: BoxState[] }
-  | Extract<ServerMsg, { t: "box" } | { t: "got" } | { t: "fx" } | { t: "gone" } | { t: "crown" }>;
+  | Extract<ServerMsg, { t: "box" } | { t: "got" } | { t: "fx" } | { t: "gone" } | { t: "crown" } | { t: "rally" } | { t: "rally_receipt" }>;
 
 /** A car to draw: someone's snapshots, or a town bot's plan (bot: true). */
 export interface CarFeed {
@@ -141,7 +141,7 @@ export function useDrivePresence({
         if (r && s) r.buffer.push(performance.now(), s);
         return;
       }
-      if (msg.t === "box" || msg.t === "got" || msg.t === "fx" || msg.t === "gone" || msg.t === "crown") {
+      if (msg.t === "box" || msg.t === "got" || msg.t === "fx" || msg.t === "gone" || msg.t === "crown" || msg.t === "rally" || msg.t === "rally_receipt") {
         onBattleRef.current(msg);
         return;
       }
@@ -150,6 +150,7 @@ export function useDrivePresence({
         syncBotClock(msg.now);
         onBattleRef.current({ t: "boxes", boxes: msg.boxes ?? [] });
         if (msg.crown) onBattleRef.current({ t: "crown", crown: msg.crown, now: msg.now });
+        if (msg.rally) onBattleRef.current({ t: "rally", rally: msg.rally, now: msg.now });
         for (const d of msg.drivers) {
           if (d.id === msg.you) continue;
           add(d.id, d.name);
@@ -212,9 +213,12 @@ export function useDrivePresence({
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: "bump", to, x, z }));
   };
 
-  const send = (msg: ClientMsg) => {
+  /** False when the room isn't connected (nothing was sent). */
+  const send = (msg: ClientMsg): boolean => {
     const ws = socket.current;
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    ws.send(JSON.stringify(msg));
+    return true;
   };
 
   return { remotes, drivers, sendBump, send, selfId };
