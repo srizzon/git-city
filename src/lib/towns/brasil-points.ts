@@ -19,6 +19,8 @@ export const POINTS = {
   paint: 1,
   /** Finishing a race with another signed-in racer (more for winning and records: RACE_POINTS). */
   race: 3,
+  /** The week's #1 project (brasil-projects.ts POINTS_FOR_RANK pays 2nd and 3rd less). */
+  project: 100,
 } as const;
 
 /** Races (lib/towns/brasil-race): what each finish pays, and the day's cap. */
@@ -88,11 +90,12 @@ export interface PointsBreakdown {
   vote: number;
   paint: number;
   race: number;
+  project: number;
 }
 
-export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0, race: 0 });
+export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0, race: 0, project: 0 });
 
-export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote + b.paint + b.race;
+export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote + b.paint + b.race + b.project;
 
 /**
  * Each dev's week: the ledger's rows plus POINTS.coded for every day they
