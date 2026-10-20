@@ -34,8 +34,8 @@ function useWide(): boolean {
   return wide;
 }
 
-function Num({ n, small = false }: { n: number; small?: boolean }) {
-  return <span className={`flex ${small ? "h-5 w-6" : "h-6 w-7"} shrink-0 items-center justify-center border border-[#9a9a94] bg-[#eef0ea] text-[10px] tabular-nums text-[#1b1d22]`}>{ballot(n)}</span>;
+function Num({ n }: { n: number }) {
+  return <span className="flex h-6 w-7 shrink-0 items-center justify-center border border-[#9a9a94] bg-[#eef0ea] text-[10px] tabular-nums text-[#1b1d22]">{ballot(n)}</span>;
 }
 
 function Face({ src, size }: { src: string | null; size: number }) {
@@ -140,18 +140,24 @@ export default function ApuracaoWidget({
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Presidential count"
-          className="pointer-events-auto absolute left-3 top-[104px] z-20 flex h-9 w-[calc(50%-16px)] items-center gap-2 border-[3px] border-border bg-bg/90 px-2.5 font-pixel text-[9px] uppercase backdrop-blur-sm"
+          className="pointer-events-auto absolute left-3 top-[104px] z-20 flex h-12 w-[calc(50%-16px)] flex-col justify-center gap-1.5 border-[3px] border-border bg-bg/90 px-2.5 text-left font-pixel text-[9px] uppercase backdrop-blur-sm"
         >
-          <span className="shrink-0">{status}</span>
+          <span className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5">
+              <span className="text-lime">Election</span>
+              <span className="text-[8px]">{status}</span>
+            </span>
+            {voted && <Check size={12} strokeWidth={3} className="shrink-0 text-lime" aria-label="You voted" />}
+          </span>
           {lead && c.mode !== "soon" ? (
-            <>
-              <Num n={lead.number} small />
-              <span className="truncate tabular-nums text-cream">{pctText(lead.votes, c.total)}</span>
-            </>
+            <span className="flex items-center gap-1.5">
+              <Face src={lead.avatar_url} size={12} />
+              <span className="min-w-0 flex-1 truncate normal-case text-cream">@{lead.login}</span>
+              <span className="shrink-0 tabular-nums text-cream">{pctText(lead.votes, c.total)}</span>
+            </span>
           ) : (
-            <span className="truncate text-cream">President</span>
+            <span className="truncate text-cream">{c.rows.length ? `${c.rows.length} running` : "Run for president"}</span>
           )}
-          {voted && <Check size={12} strokeWidth={3} className="ml-auto shrink-0 text-lime" aria-label="You voted" />}
         </button>
         {open && (
           <Panel title="Apuração" onClose={() => setOpen(false)} above>

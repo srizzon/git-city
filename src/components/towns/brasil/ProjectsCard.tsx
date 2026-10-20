@@ -189,10 +189,20 @@ export default function ProjectsCard({
           type="button"
           onClick={() => setSheet(true)}
           aria-label="Projects this week"
-          className="pointer-events-auto absolute right-3 top-[104px] z-20 flex h-9 w-[calc(50%-16px)] items-center gap-2 border-[3px] border-border bg-bg/90 px-2.5 font-pixel text-[9px] uppercase backdrop-blur-sm"
+          className="pointer-events-auto absolute right-3 top-[104px] z-20 flex h-12 w-[calc(50%-16px)] flex-col justify-center gap-1.5 border-[3px] border-border bg-bg/90 px-2.5 text-left font-pixel text-[9px] uppercase backdrop-blur-sm"
         >
-          <span className="shrink-0 text-lime">Projects</span>
-          {lead ? <span className="truncate normal-case text-cream">{lead.name}</span> : <span className="text-muted">Share yours</span>}
+          <span className="flex items-center gap-1.5">
+            <span className="text-lime">Projects</span>
+            <span className="text-[8px] text-muted">This week</span>
+          </span>
+          {lead ? (
+            <span className="flex items-center gap-1.5">
+              {c.mode === "ranked" && lead.votes > 0 && <span className="shrink-0 tabular-nums text-muted">#1</span>}
+              <span className="min-w-0 truncate normal-case text-cream">{lead.name}</span>
+            </span>
+          ) : (
+            <span className="text-muted">Share yours</span>
+          )}
         </button>
         {sheet && (
           <Panel title="Projects this week" onClose={() => setSheet(false)}>
