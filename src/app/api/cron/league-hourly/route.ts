@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { fetchWeekContributionDays } from "@/lib/github-api";
 import { detectOvertakes, isoDay, weekDays, weekStart } from "@/lib/leagues/scoring";
 import { loadStandings } from "@/lib/leagues/standings";
-import { sendLeagueOvertakenNotification } from "@/lib/notification-senders/league-overtaken";
+import { OVERTAKEN_EVERY_MS, sendLeagueOvertakenNotification } from "@/lib/notification-senders/league-overtaken";
 import { mapWithConcurrency } from "@/lib/concurrency";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,34 @@ export const maxDuration = 300;
 const BATCH = 20;
 const RATE_LIMIT_FLOOR = 500;
 const TIME_BUDGET_MS = 240_000;
+
+/**
+ * Of these devs, the ones the overtaken email can reach (an email, or an
+ * account to read it from: getDeveloperEmail's rule) and not told in the last
+ * 3 days. Two queries for the whole run: checked one by one, the ~1,500 Brasil
+ * residents with no account went through every send check each hour, ~3k
+ * queries for a handful of emails (a dropped email logs nothing, so the 3-day
+ * gate never held them). The sender still checks each one itself.
+ */
+async function reachableNotYetTold(sb: ReturnType<typeof getSupabaseAdmin>, ids: number[]): Promise<Set<number>> {
+  const out = new Set<number>();
+  const since = new Date(Date.now() - OVERTAKEN_EVERY_MS).toISOString();
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = [...new Set(ids.slice(i, i + 200))];
+    const [{ data: devs, error }, { data: told, error: toldErr }] = await Promise.all([
+      sb.from("developers").select("id").in("id", chunk).or("email.not.is.null,claimed_by.not.is.null"),
+      sb.from("notification_log").select("developer_id").in("developer_id", chunk).eq("notification_type", "league_overtaken").neq("status", "failed").gte("created_at", since),
+    ]);
+    // A failed lookup filters nothing out: the sender's own checks still apply.
+    if (error || toldErr) {
+      for (const id of chunk) out.add(id);
+      continue;
+    }
+    const toldIds = new Set((told ?? []).map((r: { developer_id: number }) => r.developer_id));
+    for (const d of (devs ?? []) as { id: number }[]) if (!toldIds.has(d.id)) out.add(d.id);
+  }
+  return out;
+}
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -122,9 +150,10 @@ export async function GET(request: NextRequest) {
       }
     }
     overtakes = toNotify.length;
+    const sendable = await reachableNotYetTold(sb, toNotify.map((n) => n.developerId));
     // Awaited: a serverless function can be frozen once the response is sent.
     // Stops short of maxDuration; skipped ones are lost (max one per dev every 3 days anyway).
-    await mapWithConcurrency(toNotify, 4, async (n) => {
+    await mapWithConcurrency(toNotify.filter((n) => sendable.has(n.developerId)), 4, async (n) => {
       if (Date.now() - started > 285_000) return;
       await sendLeagueOvertakenNotification(n);
     });

@@ -8,7 +8,7 @@ import { contributions } from "./town-email";
 
 // At most one every 3 days per dev, across all towns: sent daily it filled the
 // shared weekly cap and pushed out the emails about your own building.
-const EVERY_MS = 3 * 86_400_000;
+export const OVERTAKEN_EVERY_MS = 3 * 86_400_000;
 
 export interface LeagueOvertakenEmailData {
   leagueSlug: string;
@@ -100,7 +100,7 @@ export async function sendLeagueOvertakenNotification(opts: {
     .eq("developer_id", opts.developerId)
     .eq("notification_type", "league_overtaken")
     .neq("status", "failed")
-    .gte("created_at", new Date(now.getTime() - EVERY_MS).toISOString())
+    .gte("created_at", new Date(now.getTime() - OVERTAKEN_EVERY_MS).toISOString())
     .limit(1)
     .maybeSingle();
   if (recent) return [];
@@ -119,7 +119,7 @@ export async function sendLeagueOvertakenNotification(opts: {
     type: "league_overtaken",
     category: "leagues",
     developerId: opts.developerId,
-    dedupKey: `league_overtaken:${opts.developerId}:${Math.floor(now.getTime() / EVERY_MS)}`,
+    dedupKey: `league_overtaken:${opts.developerId}:${Math.floor(now.getTime() / OVERTAKEN_EVERY_MS)}`,
     title: subject,
     body: preheader,
     render: (links) => renderLeagueOvertakenEmail(data, links),
