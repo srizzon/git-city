@@ -25,7 +25,8 @@ import { getSupabaseAdmin } from "../supabase";
 import { instagramComments, instagramMe, instagramThread, instagramUsernameOf, replyToComment } from "../instagram";
 import { getLeagueBySlug } from "../leagues/service";
 import { BRASIL_SLUG, importBrasilComment, type ReelKind } from "./brasil-server";
-import { parseComment, pickReading, replyFor } from "./brasil-comments";
+import { parseComment, parseVote, pickReading, replyFor, voteReply } from "./brasil-comments";
+import { candidateByNumber, castVote } from "./brasil-election-server";
 import type { UF } from "./brasil-map";
 import { answeredCity, confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
 import { captureServer } from "../posthog-server";
@@ -72,6 +73,17 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
     const id = `ig:${c.id}`;
     const credit = () => creditComment(league.id, { id, igUser: c.igUser, text: c.text }, own).catch((err) => console.error("[brasil] comment points", c.id, err));
     const w = watched.get(c.mediaId);
+    // A ballot number votes for president, on any of the account's posts.
+    const vote = parseVote(c.text);
+    if (vote !== null && c.igUser) {
+      try {
+        if (await voteByComment(league.id, { id, reel: w?.reel ?? c.mediaId, igUser: c.igUser, replyTo: c.parentId ?? c.id }, vote)) fresh++;
+        await credit();
+      } catch (err) {
+        console.error("[brasil] instagram vote", c.id, err);
+      }
+      continue;
+    }
     if (!w) {
       await credit();
       continue;
@@ -125,6 +137,40 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
     }
   }
   return fresh;
+}
+
+/**
+ * A comment's vote, cast as the Instagram account's dev on the map (the one its comments put there).
+ * An account not on the map yet doesn't vote: the reply says how to get on it. One vote a person, as
+ * on the site: a later one replaces it. False when the comment was already handled.
+ */
+async function voteByComment(leagueId: string, c: { id: string; reel: string; igUser: string; replyTo: string }, number: number): Promise<boolean> {
+  const sb = getSupabaseAdmin();
+  const { error: taken } = await sb.from("brasil_comments").insert({ id: c.id, reel: c.reel, ig_user: c.igUser, outcome: "vote_unlinked" });
+  if (taken) return false;
+  const dev = await residentOfInstagram(leagueId, c.igUser);
+  let reply: string;
+  if (!dev) reply = voteReply("unlinked", number);
+  else {
+    const why = await castVote(leagueId, { id: dev.id, github_login: dev.login }, number);
+    if (why) {
+      await sb.from("brasil_comments").update({ outcome: "vote_refused", developer_id: dev.id }).eq("id", c.id);
+      reply = voteReply(why.startsWith("Nobody") ? "number" : why.includes("days old") ? "young" : "closed", number);
+    } else {
+      await sb.from("brasil_comments").update({ outcome: "voted", developer_id: dev.id }).eq("id", c.id);
+      reply = voteReply("voted", number, (await candidateByNumber(number))?.login ?? null);
+    }
+  }
+  await captureServer(`ig:${c.igUser}`, "brasil_comment_vote", { linked: !!dev, number });
+  const { count } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", c.igUser).gte("replied_at", hourAgo());
+  if ((count ?? 0) >= LIMITS.repliesPerUserHour) return true;
+  if (process.env.VERCEL_ENV !== "production") {
+    console.info(`[brasil] would reply to ${c.replyTo}: ${reply}`);
+    return true;
+  }
+  await replyToComment(c.replyTo, reply);
+  await sb.from("brasil_comments").update({ replied_at: new Date().toISOString() }).eq("id", c.id);
+  return true;
 }
 
 /** Stories that tag the account (from the message webhook): each scores for whoever posted it, once a day, when they're on the map. */
