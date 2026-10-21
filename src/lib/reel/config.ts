@@ -1,11 +1,12 @@
 // ─── The reels' private config ──────────────────────────────
 // What only the account owner decides lives in REELS_HOME/reels.config.json,
-// not in the repo: the narrator's voice and its settings, the studio's URL,
-// the Instagram handles a caption may tag, and the posting slots.
+// not in the repo: the narrators' voices and their settings, and the posting
+// slots.
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import type { VoiceConfig } from "./voice";
 
 const Voice = z.object({
   id: z.string(),
@@ -19,20 +20,10 @@ const Voice = z.object({
 });
 
 export const ReelsConfig = z.object({
-  /** The narrator every reel uses unless its spec names another of `voices`. */
+  /** The fallback narrator, when `voices` has no "davi". */
   voice: Voice,
-  /** Other narrators by name (a spec's `voice`), like the account owner's own cloned voice. */
+  /** Narrators by name (`npm run reel -- voice --voice <name>`); "davi" is the default. */
   voices: z.record(z.string(), Voice).default({}),
-  /** The dev server the studio runs on (the export opens it). */
-  studioUrl: z.string().default("http://localhost:3002"),
-  /** Music beds, relative to REELS_HOME. */
-  beds: z.string().default("_assets"),
-  /**
-   * The beds reels take turns on when a spec doesn't name one (Sam, 2026-10-19: three bases,
-   * rotated): day by day, and the day's trials each one on from its main.
-   */
-  bedRotation: z.array(z.string()).default([]),
-  verifiedHandles: z.array(z.string()).default([]),
   slots: z
     .object({
       /** Brasília time, "HH:MM", or "auto": the hour the followers are most online (12:00 until Instagram has the data). */
@@ -46,7 +37,12 @@ export type ReelsConfig = z.infer<typeof ReelsConfig>;
 export function readConfig(home: string): ReelsConfig {
   const file = path.join(home, "reels.config.json");
   if (!existsSync(file)) throw new Error(`No ${file}: copy the voice and settings there first.`);
-  const config = ReelsConfig.parse(JSON.parse(readFileSync(file, "utf8")));
-  // A second worktree runs its own studio: REELS_STUDIO_URL points the exports at it.
-  return process.env.REELS_STUDIO_URL ? { ...config, studioUrl: process.env.REELS_STUDIO_URL } : config;
+  return ReelsConfig.parse(JSON.parse(readFileSync(file, "utf8")));
+}
+
+/** A narrator by name, or the default (Davi). */
+export function narratorOf(config: ReelsConfig, name?: string): VoiceConfig {
+  const v = name ? config.voices[name] : (config.voices.davi ?? config.voice);
+  if (!v) throw new Error(`No voice "${name}" in reels.config.json's voices.`);
+  return v;
 }
