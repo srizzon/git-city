@@ -10,7 +10,8 @@ import { type StateStats } from "./stats";
 
 // A state's card, opened from its tag or a search: its place and points in the
 // week's race, its founder, its top three devs by this week's points (the
-// governor tagged), and the two ways to grow it: drive there, or invite someone.
+// governor tagged), its biggest buildings like every city's card, and the two
+// ways to grow it: drive there, or invite someone.
 
 export default function StateCard({
   state: s,
@@ -94,6 +95,14 @@ export default function StateCard({
           <Section title="Top devs" note="pts this week">
             {topDevs.map((d, i) => (
               <Row key={d.login} role={`#${i + 1}`} sub={d.login.toLowerCase() === governor?.toLowerCase() ? "Governor" : undefined} login={d.login} avatar={avatar(d.login)} value={fmt(d.points)} onPick={onPickDev} />
+            ))}
+          </Section>
+        )}
+
+        {s.top.length > 0 && (
+          <Section title="Biggest buildings" note="commits, all time">
+            {s.top.map((login, i) => (
+              <Row key={login} role={`#${i + 1}`} login={login} avatar={avatar(login)} value={fmt(byLogin.get(login.toLowerCase())?.contributions ?? 0)} onPick={onPickDev} />
             ))}
           </Section>
         )}
