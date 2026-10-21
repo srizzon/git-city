@@ -252,10 +252,15 @@ export function voteIn(text: string): VoteInText | null {
   return { number: distinct[0], rest, worded: VOTE_WORDS.test(t) };
 }
 
+/** Whether the ballot number is the comment's last word (only emoji and punctuation after it). */
+const closesWith = (text: string, n: number) => new RegExp(`(?<![\\p{L}\\p{N}])0?${n}[^\\p{L}\\p{N}]*$`, "u").test(text.replace(/(\d)\uFE0F?\u20E3/g, "$1"));
+
 /**
  * Whether a comment votes, and with what: a bare number always does; a number among other words does
- * where comments aren't for joining (`watched` false: the vote post), with a voting word, or next to a
- * username (joining and voting at once). `join`: the words to join with, when they name a username. `loose` votes only count when
+ * with a voting word, or next to a username (joining and voting at once), on any post. Only the
+ * number closing a comment on a post that isn't for joining (`watched` false) votes without them
+ * ("Bora @amigo 34"): any of the account's posts gets comments like "Coloca 1 NPC", a count, not a
+ * vote. `join`: the words to join with, when they name a username. `loose` votes only count when
  * the number is a candidate's (the caller checks), so "a 32 do meu time" doesn't vote for a stranger.
  */
 export function voteRoute(text: string, watched: boolean): { number: number; join: string | null; loose: boolean } | null {
@@ -266,7 +271,7 @@ export function voteRoute(text: string, watched: boolean): { number: number; joi
   // An @ in a vote is a friend being called to vote ("Bora @amigo 34"), never the commenter's username.
   const rest = v.rest.replace(/@[a-z0-9._-]+/gi, " ").replace(/\s+/g, " ").trim();
   const join = rest && parseComment(rest).login ? rest : null;
-  if (v.worded || !watched || join) return { number: v.number, join, loose: true };
+  if (v.worded || join || (!watched && closesWith(text, v.number))) return { number: v.number, join, loose: true };
   return null;
 }
 

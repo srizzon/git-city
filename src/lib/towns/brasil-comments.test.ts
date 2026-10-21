@@ -230,6 +230,11 @@ describe("voteRoute", () => {
     expect(voteRoute("srizzon recife 32", true)).toMatchObject({ number: 32, join: "srizzon recife" });
     expect(voteRoute("top demais 10/10 kkk 32", true)).toBeNull();
   });
+  it("a count inside a sentence isn't a vote, on any post", () => {
+    expect(voteRoute("Coloca 1 NPC de cada usuário, que fica andando pelo mapa.", false)).toBeNull();
+    expect(voteRoute("Coloca 1 NPC de cada usuário, que fica andando pelo mapa.", true)).toBeNull();
+    expect(voteRoute("Bora 0️⃣1️⃣ 🔥", false)).toMatchObject({ number: 1 });
+  });
   it("a bare number is a vote anywhere, with nothing to join", () => {
     expect(voteRoute("53", true)).toEqual({ number: 53, join: null, loose: false });
   });
