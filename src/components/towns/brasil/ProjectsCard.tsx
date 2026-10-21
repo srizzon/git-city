@@ -97,6 +97,7 @@ export default function ProjectsCard({
   onShare,
   onOpenSlug,
   onOffer,
+  onSeeAll,
   onSignIn,
 }: {
   slug: string;
@@ -111,6 +112,8 @@ export default function ProjectsCard({
   /** Open a project by its slug (their own, from Your project). */
   onOpenSlug: (slug: string) => void;
   onOffer: () => void;
+  /** Every project: the board over the map. */
+  onSeeAll: () => void;
   onSignIn: () => void;
 }) {
   const wide = useWide();
@@ -149,9 +152,17 @@ export default function ProjectsCard({
       </ol>
       {c.mode === "new" && c.top.length > 0 && <p className="px-3 pb-1 text-[8px] text-muted">New this week · upvote to rank them</p>}
       <div className="grid grid-cols-2 gap-1.5 px-3 pb-3 pt-1">
-        <a href={`/town/${slug}/projects`} onClick={() => posthog.capture("projects_list_opened", { from: "card" })} className="btn-press flex min-h-9 items-center justify-center border-2 border-border text-[10px] text-cream hover:border-lime/60">
+        <button
+          type="button"
+          onClick={() => {
+            posthog.capture("projects_list_opened", { from: "card" });
+            setSheet(false);
+            onSeeAll();
+          }}
+          className="btn-press flex min-h-9 items-center justify-center border-2 border-border text-[10px] text-cream hover:border-lime/60"
+        >
           See all{c.count > 3 ? ` · ${c.count}` : ""}
-        </a>
+        </button>
         {mine && mine.status !== "removed" ? (
           // This week's slot is used: the button is their project.
           <button

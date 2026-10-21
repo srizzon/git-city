@@ -61,6 +61,7 @@ import type { Count, ElectionView } from "@/lib/towns/brasil-election-server";
 import type { Blocked, CardData } from "@/lib/towns/brasil-projects-server";
 import type { ProjectCard } from "@/lib/towns/brasil-projects";
 import ProjectsCard from "@/components/towns/brasil/ProjectsCard";
+import ProjectsBoard, { ALL_PROJECTS, type ProjectsView } from "@/components/towns/brasil/ProjectsBoard";
 import ProjectSheet, { type ProjectView } from "@/components/towns/brasil/ProjectSheet";
 import ShareProjectSheet from "@/components/towns/brasil/ShareProjectSheet";
 import AdRequestSheet from "@/components/towns/brasil/AdRequestSheet";
@@ -106,14 +107,14 @@ export interface BrasilTownProps {
   projectWins?: Record<string, { week: string; name: string; slug: string }>;
   /** ?project=slug (a shared project, a sign-in coming back): its sheet opens. */
   startProject?: string | null;
-  /** ?share=1 / ?ad=1 (from the projects page): the share form or the ad request opens. */
-  startSheet?: "share" | "ad" | null;
+  /** ?share=1 / ?ad=1 / ?projects=1 (a sign-in coming back, an old link to the projects page): the share form, the ad request or every project opens. */
+  startSheet?: "share" | "ad" | "projects" | null;
 }
 
 /** The projects' sheets on the right: one project, the share form (or an edit), the ad request. */
 type ProjOverlay = { kind: "project"; slug: string; initial?: ProjectCard; from: string } | { kind: "share"; editing?: ProjectView; blocked?: Blocked | null } | { kind: "ad" } | null;
 
-type PanelId = "states" | "election" | null;
+type PanelId = "states" | "election" | "projects" | null;
 const DriveHud = dynamic(() => import("@/components/league/hud/drive/DriveHud"), { ssr: false });
 /** The drive's mute switch, shared with every town. */
 const MUTE_KEY = "gc:drive-muted";
@@ -194,6 +195,15 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** The city picker under the search, for a username typed there (null: yours), maybe opened on a city to found. */
   const [picker, setPicker] = useState<{ forLogin: string | null; query?: string } | null>(null);
   const [proj, setProj] = useState<ProjOverlay>(null);
+  /** The projects board's tab and filters, and whether a sheet opened from it goes back to it on close. */
+  const [projectsView, setProjectsView] = useState<ProjectsView>(ALL_PROJECTS);
+  const [fromBoard, setFromBoard] = useState(false);
+  /** A project sheet closes: back to the board when it was opened from there. */
+  const closeProj = () => {
+    setProj(null);
+    if (fromBoard) setPanel("projects");
+    setFromBoard(false);
+  };
   /** Bumped when a project was posted, edited, voted or taken down: the card and your list read again. */
   const [projectsKey, setProjectsKey] = useState(0);
   const [joining, setJoining] = useState<{ pending: { ibge: number | null; name: string } | null; error: string | null }>({
@@ -549,7 +559,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   useEffect(() => {
     if (!startSheet) return;
     // The page read whether they can post with the card: the form opens on the right screen.
-    const t = setTimeout(() => setProj(startSheet === "ad" ? { kind: "ad" } : { kind: "share", blocked: projects?.me ? projects.me.blocked : undefined }), 600);
+    const t = setTimeout(() => (startSheet === "projects" ? setPanel("projects") : setProj(startSheet === "ad" ? { kind: "ad" } : { kind: "share", blocked: projects?.me ? projects.me.blocked : undefined })), 600);
     return () => clearTimeout(t);
   }, [startSheet, projects]);
 
@@ -1299,6 +1309,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             setPanel(null);
             setProj({ kind: "ad" });
           }}
+          onSeeAll={() => openPanel("projects")}
           onSignIn={() => signInForProject(null)}
         />
       )}
@@ -1311,7 +1322,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           from={proj.from}
           signedIn={!!viewerLogin}
           onSignIn={() => signInForProject(proj.slug)}
-          onClose={() => setProj(null)}
+          onClose={closeProj}
           onVisitBuilding={(login) => {
             const b = world.placed.get(login.toLowerCase());
             if (b) openBuilding(b);
@@ -1329,11 +1340,39 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onSignIn={() => signInForProject(null)}
           onPutOnMap={() => openPicker(null)}
           onOpenProject={(slug) => openProject(slug, "share_blocked")}
-          onClose={() => setProj(null)}
+          onClose={closeProj}
           onDone={() => setProjectsKey((k) => k + 1)}
         />
       )}
-      {proj?.kind === "ad" && !inCar && <AdRequestSheet slug={league.slug} onClose={() => setProj(null)} />}
+      {proj?.kind === "ad" && !inCar && <AdRequestSheet slug={league.slug} onClose={closeProj} />}
+
+      {panel === "projects" && !inCar && (
+        <ProjectsBoard
+          slug={league.slug}
+          ad={projects?.ad ?? null}
+          viewerLogin={viewerLogin}
+          view={projectsView}
+          onView={setProjectsView}
+          onOpen={(p) => {
+            openProject(p.slug, `list_${projectsView.tab}`, p);
+            setFromBoard(true);
+          }}
+          onShare={() => {
+            openShare(undefined, projects?.me ? projects.me.blocked : undefined);
+            setFromBoard(true);
+          }}
+          onOffer={() => {
+            setPanel(null);
+            setProj({ kind: "ad" });
+            setFromBoard(true);
+          }}
+          onSignIn={() => {
+            posthog.capture("brasil_signin_clicked", { from: "projects_list" });
+            void signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=${encodeURIComponent(`/town/${league.slug}?projects=1`)}`);
+          }}
+          onClose={() => setPanel(null)}
+        />
+      )}
 
       {panel === "election" && election && (
         <ElectionPanel

@@ -37,7 +37,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string; at?: string; join?: string; new?: string; uf?: string; cidade?: string; pick?: string; vote?: string; run?: string; project?: string; share?: string; ad?: string }>;
+  searchParams: Promise<{ invite?: string; ref?: string; t?: string; edit?: string; drive?: string; at?: string; join?: string; new?: string; uf?: string; cidade?: string; pick?: string; vote?: string; run?: string; project?: string; share?: string; ad?: string; projects?: string }>;
 };
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
@@ -138,7 +138,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
         projects={projects}
         projectWins={projectWins}
         startProject={typeof query.project === "string" && /^[a-z0-9-]{3,60}$/.test(query.project) ? query.project : null}
-        startSheet={query.share === "1" ? "share" : query.ad === "1" ? "ad" : null}
+        startSheet={query.share === "1" ? "share" : query.ad === "1" ? "ad" : query.projects === "1" ? "projects" : null}
       />
     );
   }
