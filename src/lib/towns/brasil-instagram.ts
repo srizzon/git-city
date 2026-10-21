@@ -1,6 +1,6 @@
 // ─── Brasil town: comments from Instagram ───────────────────
 // A comment on a watched reel (brasil_reels) puts its dev on the map (a city
-// reel: just gives them a building in the city) and gets a reply. Comments
+// reel: just gives them a building in the city), with a reply only when it needs one. Comments
 // arrive by webhook as they're written, and a sync reads the watched reels'
 // comments as a safety net for any the webhook missed; either way a comment
 // is imported once and answered once (importBrasilComment's `fresh`). The
@@ -20,6 +20,13 @@
 // Limits: per Instagram account, LIMITS.perUserHour comments read and
 // LIMITS.repliesPerUserHour replies an hour (the rest are logged, unread or
 // unanswered); LIMITS.modelPerDay model reads a day for everyone. Server only.
+//
+// Replies (speak): Instagram flagged the account for automated behavior after
+// ~3k replies a week (2026-10-21), so the account only answers comments that
+// need an answer back (a username GitHub doesn't have, "qual Santa Rita?", a
+// vote that can't count yet). Success is silent: the building is on the map.
+// At most LIMITS.repliesPerHour replies an hour for everyone, a random 3–8 min
+// apart; the rest are logged unanswered. BRASIL_IG_REPLIES=off stops them all.
 
 import { getSupabaseAdmin } from "../supabase";
 import { instagramCommentText, instagramComments, instagramMe, instagramThread, instagramUsernameOf, replyToComment } from "../instagram";
@@ -27,12 +34,12 @@ import { getLeagueBySlug } from "../leagues/service";
 import { BRASIL_SLUG, importBrasilComment, type ImportResult, type ReelKind } from "./brasil-server";
 import { parseComment, parseVote, pickReading, replyFor, voteIn, voteReply, voteRoute } from "./brasil-comments";
 import { candidateByNumber, castVote } from "./brasil-election-server";
-import { ptState, type UF } from "./brasil-map";
+import type { UF } from "./brasil-map";
 import { answeredCity, confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
 import { captureServer } from "../posthog-server";
 import { creditComment, creditStory, residentOfInstagram } from "./brasil-points-server";
 
-export const LIMITS = { perUserHour: 5, repliesPerUserHour: 3, modelPerDay: 2_000 } as const;
+export const LIMITS = { perUserHour: 5, repliesPerUserHour: 3, repliesPerHour: 10, modelPerDay: 2_000 } as const;
 
 export interface IncomingComment {
   id: string;
@@ -130,30 +137,21 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
       await captureServer(c.igUser ? `ig:${c.igUser}` : `ig-comment:${c.id}`, "brasil_comment_imported", { outcome: r.outcome, reader, kind: w.kind, reply: !!c.parentId });
       if (r.outcome === "added" && r.login) await captureServer(r.login, w.kind === "brasil" ? "brasil_resident_added" : "city_building_from_comment", { uf: r.uf, source: "instagram" });
       const suggestion = r.outcome === "unknown_user" && r.login ? await suggestLogin(r.login) : null;
-      let reply = replyFor(r.outcome, r.login, r.uf, w.kind, suggestion, { city: r.city, founded: r.founded, options: r.options });
+      const placed = r.outcome === "added" || r.outcome === "already";
       // On the map now: a vote they made from off it counts.
-      if ((r.outcome === "added" || r.outcome === "already") && c.igUser && w.kind === "brasil") {
+      if (placed && c.igUser && w.kind === "brasil") {
         const waiting = await waitingVote(c.igUser, id);
         const dev = waiting !== null ? await residentOfInstagram(league.id, c.igUser) : null;
         if (waiting !== null && dev && !(await castVote(league.id, { id: dev.id, github_login: dev.login }, waiting))) {
-          const where = r.city ? `em ${r.city}` : r.uf ? ptState(r.uf, "in") : "na ilha";
-          reply = voteReply("voted", waiting, (await candidateByNumber(waiting))?.login ?? null, { login: dev.login, where });
           await captureServer(`ig:${c.igUser}`, "brasil_comment_vote", { linked: true, joined: true, number: waiting, waited: true });
         }
       }
+      // Placed is silent (see speak); the rest asks them for something.
+      const reply = placed ? null : replyFor(r.outcome, r.login, r.uf, w.kind, suggestion, { city: r.city, founded: r.founded, options: r.options });
       if (!reply) continue;
-      if (c.igUser) {
-        const { count } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", c.igUser).gte("replied_at", hourAgo());
-        if ((count ?? 0) >= LIMITS.repliesPerUserHour) continue;
+      if (await speak(id, c, reply)) {
+        await captureServer(c.igUser ? `ig:${c.igUser}` : `ig-comment:${c.id}`, "brasil_reply_sent", { outcome: r.outcome, suggested: !!suggestion, kind: w.kind });
       }
-      // Only production speaks on Instagram: local and preview runs read real comments but just log the reply.
-      if (process.env.VERCEL_ENV !== "production") {
-        console.info(`[brasil] would reply to ${c.id}: ${reply}`);
-        continue;
-      }
-      await replyToComment(c.parentId ?? c.id, reply);
-      await sb.from("brasil_comments").update({ replied_at: new Date().toISOString() }).eq("id", id);
-      await captureServer(c.igUser ? `ig:${c.igUser}` : `ig-comment:${c.id}`, "brasil_reply_sent", { outcome: r.outcome, suggested: !!suggestion, kind: w.kind });
     } catch (err) {
       // Free the claim so the next sync tries again: kept, it read "no_login" for good (a username GitHub
       // has, put nowhere, because the map's write or GitHub failed that once).
@@ -256,20 +254,44 @@ async function voteByComment(
       reply = voteReply(why.startsWith("Nobody") ? "number" : why.includes("days old") ? "young" : why.startsWith("Put your building") ? "unlinked" : "closed", number);
     } else {
       await logVote("voted");
-      const where = joined?.city ? `em ${joined.city}` : joined?.uf ? ptState(joined.uf, "in") : "na ilha";
-      reply = voteReply("voted", number, (await candidateByNumber(number))?.login ?? null, joined ? { login: dev.login, where } : null);
+      // A counted vote is silent (see speak).
+      reply = null;
     }
   } else if (joined && joined.outcome !== "added" && joined.outcome !== "already") {
     // Couldn't join with it (a username GitHub doesn't have, "which Santa Rita?"): that reply; the vote keeps waiting.
     reply = replyFor(joined.outcome, joined.login, joined.uf, "brasil", suggestion, { city: joined.city, founded: joined.founded, options: joined.options });
   } else reply = voteReply("unlinked", number);
   await captureServer(`ig:${c.igUser}`, "brasil_comment_vote", { linked: !!dev, joined: !!joined, number });
-  if (!reply) return true;
-  const { count } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", c.igUser).gte("replied_at", hourAgo());
-  if ((count ?? 0) >= LIMITS.repliesPerUserHour) return true;
+  if (reply) await speak(id, c, reply);
+  return true;
+}
+
+/**
+ * Answers a comment on Instagram within the limits (see the header): off by BRASIL_IG_REPLIES=off, at most
+ * LIMITS.repliesPerUserHour to one person and LIMITS.repliesPerHour to everyone, a random 3–8 min after the
+ * last one. True when it was sent.
+ */
+async function speak(id: string, c: IncomingComment, reply: string): Promise<boolean> {
+  if (process.env.BRASIL_IG_REPLIES === "off") return false;
+  const sb = getSupabaseAdmin();
+  if (c.igUser) {
+    const { count } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", c.igUser).gte("replied_at", hourAgo());
+    if ((count ?? 0) >= LIMITS.repliesPerUserHour) return false;
+  }
+  const { data: recent } = await sb
+    .from("brasil_comments")
+    .select("replied_at")
+    .gte("replied_at", hourAgo())
+    .order("replied_at", { ascending: false })
+    .limit(LIMITS.repliesPerHour)
+    .returns<{ replied_at: string }[]>();
+  if ((recent ?? []).length >= LIMITS.repliesPerHour) return false;
+  const gap = (3 + Math.random() * 5) * 60_000;
+  if (recent?.[0] && Date.now() - new Date(recent[0].replied_at).getTime() < gap) return false;
+  // Only production speaks on Instagram: local and preview runs read real comments but just log the reply.
   if (process.env.VERCEL_ENV !== "production") {
     console.info(`[brasil] would reply to ${c.parentId ?? c.id}: ${reply}`);
-    return true;
+    return false;
   }
   await replyToComment(c.parentId ?? c.id, reply);
   await sb.from("brasil_comments").update({ replied_at: new Date().toISOString() }).eq("id", id);
