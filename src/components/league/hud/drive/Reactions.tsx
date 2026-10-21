@@ -255,3 +255,24 @@ export function ChatField({ onSend, onClose, className = "" }: { onSend: (text: 
     </form>
   );
 }
+
+/** Where the field opens, while it's closed: says chat exists and how to open it (Enter, or a tap). */
+export function ChatPrompt({ onOpen, touch = false }: { onOpen: () => void; touch?: boolean }) {
+  return (
+    <button
+      type="button"
+      // No focus on click: Space (the handbrake) would press it again.
+      onMouseDown={(ev) => ev.preventDefault()}
+      onClick={onOpen}
+      className={`${HUD_BOX} flex items-center gap-2 px-2.5 text-[10px] text-cream transition-colors hover:text-lime ${touch ? "h-10" : "h-[42px] w-[222px]"}`}
+    >
+      <MessageSquare size={14} strokeWidth={2.5} className="shrink-0 text-lime" aria-hidden />
+      <span className="flex-1 text-left">Chat</span>
+      {!touch && (
+        <span className="border-2 border-lime px-1.5 py-0.5 text-[8px] leading-none text-lime" aria-hidden>
+          Enter
+        </span>
+      )}
+    </button>
+  );
+}

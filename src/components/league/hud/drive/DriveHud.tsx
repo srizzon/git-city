@@ -18,7 +18,7 @@ import type { CrownState } from "@/lib/league-city/drive/crown";
 import type { CityBuilding } from "@/lib/github";
 import type { CityObject } from "@/lib/league-city/types";
 import Minimap from "./Minimap";
-import { ChatField, ReactionBar, ReactionLog, useChatKey } from "./Reactions";
+import { ChatField, ChatPrompt, ReactionBar, ReactionLog, useChatKey } from "./Reactions";
 import type { EmoteLog } from "@/lib/league-city/drive/emote-log";
 
 // Drive mode HUD: the dash (bottom: item, speed, boost), camera, mute and exit
@@ -32,7 +32,7 @@ import type { EmoteLog } from "@/lib/league-city/drive/emote-log";
 // On a phone (touchRef) the HUD is only Pause (sound and exit are in its menu),
 // Games and join up top, others' reactions under Pause, and the touch controls
 // (TouchControls, with your reactions) below; the prompts speak touch.
-// Signed in (`onChat`), Enter or the reactions menu's Chat opens a field to
+// Signed in (`onChat`), a Chat button (Enter on a keyboard) opens a field to
 // type to everyone driving here.
 
 const SEG = "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
@@ -156,7 +156,12 @@ export default function DriveHud({
   }, [telemetry]);
 
   const touch = !!touchRef;
-  const chatField = canChat && chatting ? <ChatField onSend={(t) => onChat?.(t)} onClose={() => setChatting(false)} className={touch ? "w-full" : "w-[222px]"} /> : null;
+  // Closed, the field's spot says chat is there (Enter, or a tap); open, it's the field.
+  const chatField = !canChat ? null : chatting ? (
+    <ChatField onSend={(t) => onChat?.(t)} onClose={() => setChatting(false)} className={touch ? "w-full" : "w-[222px]"} />
+  ) : (
+    <ChatPrompt touch={touch} onOpen={() => setChatting(true)} />
+  );
   // A phone in the car: a held thumb must never start selecting text (iOS
   // picks words off hidden page text and the callout covers the controls).
   // Off for the whole page while you drive, and any selection that slips
@@ -184,7 +189,7 @@ export default function DriveHud({
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
       {/* First, so every other piece of the HUD sits above the steering layer. */}
-      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} onEmote={entered ? onEmote : undefined} onChat={canChat ? () => setChatting(true) : undefined} />}
+      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} onEmote={entered ? onEmote : undefined} />}
 
       {ready && entered && !touch && !gameOn && (
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`} style={enter(0)}>
