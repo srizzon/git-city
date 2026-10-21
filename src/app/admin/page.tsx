@@ -43,6 +43,11 @@ const SECTIONS: { heading: string; links: AdminLink[] }[] = [
         title: "Brasil town · projects",
         description: "Review queue, reports, the ad slot and moderation numbers",
       },
+      {
+        href: "/admin/accounts",
+        title: "Account deletion",
+        description: "Delete an account someone asked to remove by email",
+      },
     ],
   },
   {
