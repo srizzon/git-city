@@ -1,5 +1,5 @@
 import { PartyRoom, type Connection, type ConnectionContext, type Env } from "./room";
-import { checkProfanity } from "glin-profanity";
+import { ChatGuard } from "../src/lib/chat-filter";
 
 // ─── Types (inline — party/ can't use @/ alias) ─────────────
 type Direction = "up" | "down" | "left" | "right";
@@ -282,16 +282,9 @@ function seatKey(x: number, y: number): string {
 // window) exceeds the burst buffer and gets dropped.
 const MOVE_INTERVAL_MS = 100;
 const MOVE_BURST_BUFFER_MS = 500;
-const CHAT_INTERVAL_MS = 1000;
 const SIT_INTERVAL_MS = 500;
 const AVATAR_INTERVAL_MS = 2000;
 const MAX_SPRITE_ID = 5;
-const CHAT_MAX_LENGTH = 100;
-const SPAM_WINDOW_MS = 10_000;
-const SPAM_MAX_DUPLICATES = 3;
-const MUTE_STRIKES_THRESHOLD = 5;
-const MUTE_STRIKES_WINDOW_MS = 60_000;
-const MUTE_DURATIONS_MS = [30_000, 120_000, 300_000];
 const CHAT_LOG_MAX = 30;
 
 // ─── Game constants ─────────────────────────────────────────
@@ -317,56 +310,7 @@ const MILESTONES: MilestoneDef[] = [
 ];
 
 // ─── Chat filter ─────────────────────────────────────────────
-const PROFANITY_CONFIG = {
-  allLanguages: true,
-  detectLeetspeak: true,
-  leetspeakLevel: "aggressive" as const,
-  normalizeUnicode: true,
-  cacheResults: true,
-  maxCacheSize: 500,
-};
-
-const URL_PATTERN = /(?:https?:\/\/|www\.)\S+|[\w-]+\.(?:com|net|org|io|gg|xyz|co|me|dev|app|link|click|info|biz|ru|cn|tk|ml|ga|cf|gq|top|pw|ws|tv|cc|ly|to|sh|be|gl)\b/i;
-
-const SCAM_PHRASES = [
-  "free nitro", "free robux", "steam gift", "claim reward", "click here",
-  "crypto airdrop", "send me", "dm me for", "double your",
-  "kys", "kill yourself", "neck yourself",
-];
-const SCAM_RE = new RegExp(
-  SCAM_PHRASES.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
-  "i",
-);
-
-const CHAR_FLOOD_RE = /(.)\1{6,}/;
-const MAX_CAPS_RATIO = 0.7;
-const MIN_CAPS_LENGTH = 8;
-
-function filterChat(text: string): { filtered: string; blocked: boolean } {
-  if (URL_PATTERN.test(text)) return { filtered: text, blocked: true };
-  if (SCAM_RE.test(text)) return { filtered: text, blocked: true };
-  const result = checkProfanity(text, PROFANITY_CONFIG);
-  if (result.containsProfanity) return { filtered: text, blocked: true };
-
-  let cleaned = text;
-  if (CHAR_FLOOD_RE.test(cleaned)) {
-    cleaned = cleaned.replace(/(.)\1{3,}/g, "$1$1$1");
-  }
-  if (cleaned.length >= MIN_CAPS_LENGTH) {
-    const upper = cleaned.replace(/[^A-Z]/g, "").length;
-    if (upper / cleaned.length > MAX_CAPS_RATIO) {
-      cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
-    }
-  }
-  return { filtered: cleaned, blocked: false };
-}
-
-// ─── Mute tracking ──────────────────────────────────────────
-interface MuteState {
-  strikes: number[];
-  muteCount: number;
-  mutedUntil: number;
-}
+// lib/chat-filter: links, scams, profanity, floods, strikes and mutes.
 
 // ─── Server ─────────────────────────────────────────────────
 export class ArcadeServer extends PartyRoom {
@@ -377,11 +321,9 @@ export class ArcadeServer extends PartyRoom {
 
   readonly players = new Map<string, PlayerState>();
   readonly lastMove = new Map<string, number>();
-  readonly lastChat = new Map<string, number>();
   readonly lastSit = new Map<string, number>();
   readonly lastAvatar = new Map<string, number>();
-  readonly chatHistory = new Map<string, { text: string; ts: number }[]>();
-  readonly muteStates = new Map<string, MuteState>();
+  readonly chat = new ChatGuard();
   readonly occupiedSeats = new Set<string>();
   readonly seatedAt = new Map<string, string>();
   readonly chatLog: ChatLogEntry[] = [];
@@ -815,36 +757,14 @@ export class ArcadeServer extends PartyRoom {
     }
 
     if (msg.type === "chat") {
-      const lastChatTime = this.lastChat.get(userId) ?? 0;
-      if (now - lastChatTime < CHAT_INTERVAL_MS) return;
-      this.lastChat.set(userId, now);
-
-      const mute = this.muteStates.get(userId);
-      if (mute && mute.mutedUntil > now) return;
-
-      const raw = typeof msg.text === "string" ? msg.text.trim().slice(0, CHAT_MAX_LENGTH) : "";
-      if (raw.length === 0) return;
-
-      const { filtered, blocked } = filterChat(raw);
-
-      if (blocked) {
-        this.addStrike(userId, now);
-        const silentMsg: ServerMsg = { type: "chat", id: userId, text: raw };
+      const verdict = this.chat.check(userId, msg.text, now);
+      if (verdict.kind === "drop") return;
+      if (verdict.kind === "shadow") {
+        const silentMsg: ServerMsg = { type: "chat", id: userId, text: verdict.text };
         sender.send(JSON.stringify(silentMsg));
         return;
       }
-
-      const history = this.chatHistory.get(userId) ?? [];
-      const recent = history.filter((h) => now - h.ts < SPAM_WINDOW_MS);
-      const dupes = recent.filter((h) => h.text.toLowerCase() === filtered.toLowerCase()).length;
-      if (dupes >= SPAM_MAX_DUPLICATES) {
-        this.addStrike(userId, now);
-        const silentMsg: ServerMsg = { type: "chat", id: userId, text: filtered };
-        sender.send(JSON.stringify(silentMsg));
-        return;
-      }
-      recent.push({ text: filtered, ts: now });
-      this.chatHistory.set(userId, recent);
+      const filtered = verdict.text;
 
       const chatMsg: ServerMsg = { type: "chat", id: userId, text: filtered };
       this.room.broadcast(JSON.stringify(chatMsg));
@@ -1092,21 +1012,6 @@ export class ArcadeServer extends PartyRoom {
     }
   }
 
-  private addStrike(userId: string, now: number) {
-    const state = this.muteStates.get(userId) ?? { strikes: [], muteCount: 0, mutedUntil: 0 };
-    state.strikes = state.strikes.filter((ts) => now - ts < MUTE_STRIKES_WINDOW_MS);
-    state.strikes.push(now);
-
-    if (state.strikes.length >= MUTE_STRIKES_THRESHOLD) {
-      const duration = MUTE_DURATIONS_MS[Math.min(state.muteCount, MUTE_DURATIONS_MS.length - 1)];
-      state.mutedUntil = now + duration;
-      state.muteCount++;
-      state.strikes = [];
-    }
-
-    this.muteStates.set(userId, state);
-  }
-
   // ── Disconnect ─────────────────────────────────────────────
   onClose(conn: Connection) {
     const state = conn.state as { userId?: string } | null;
@@ -1122,10 +1027,9 @@ export class ArcadeServer extends PartyRoom {
     this.players.delete(userId);
     this.room.storage.delete(`player:${userId}`);
     this.lastMove.delete(userId);
-    this.lastChat.delete(userId);
+    this.chat.forget(userId);
     this.lastSit.delete(userId);
     this.lastAvatar.delete(userId);
-    this.chatHistory.delete(userId);
     this.gameStartedAt.delete(userId);
     this.lastGameStop.delete(userId);
 
