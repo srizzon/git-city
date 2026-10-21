@@ -10,6 +10,7 @@ import { CATEGORIES, categoryLabel, timeLeft, type AdCard, type ProjectCard } fr
 import type { ListTab, ProjectList } from "@/lib/towns/brasil-projects-server";
 import { Board, useWide } from "./BrasilPanels";
 import { ProjectIcon, VoteButton, adHref, api } from "./projects-ui";
+import { useLang } from "@/lib/i18n/LangProvider";
 
 // Every project, as a big board over the map (the whole screen on a phone):
 // tabs for this week (ranked, the one that pays points), the newest, all time
@@ -18,18 +19,14 @@ import { ProjectIcon, VoteButton, adHref, api } from "./projects-ui";
 // top, like on the map's card. The map keeps the tab and filters (view), so
 // the board comes back as it was after a project's sheet closes.
 
-const TABS: { id: ListTab; label: string }[] = [
-  { id: "week", label: "This week" },
-  { id: "new", label: "New" },
-  { id: "all", label: "All time" },
-  { id: "winners", label: "Winners" },
+const TABS: { id: ListTab; label: string; pt: string }[] = [
+  { id: "week", label: "This week", pt: "Essa semana" },
+  { id: "new", label: "New", pt: "Novos" },
+  { id: "all", label: "All time", pt: "Todos" },
+  { id: "winners", label: "Winners", pt: "Vencedores" },
 ];
 
-const TAB_OPTIONS: PixelOption[] = TABS.map((t) => ({ value: t.id, label: t.label }));
-const CATEGORY_OPTIONS: PixelOption[] = [{ value: "", label: "Any type" }, ...CATEGORIES.map((c) => ({ value: c.id, label: c.label }))];
-const STATE_OPTIONS: PixelOption[] = [{ value: "", label: "Every state" }, ...STATES.map((s) => ({ value: s.uf, label: `${s.uf} · ${s.name}` }))];
-
-const PHONE_STATE_OPTIONS: PixelOption[] = [{ value: "", label: "Any state" }, ...STATE_OPTIONS.slice(1)];
+const STATE_ROWS: PixelOption[] = STATES.map((s) => ({ value: s.uf, label: `${s.uf} · ${s.name}` }));
 
 export interface ProjectsView {
   tab: ListTab;
@@ -66,6 +63,11 @@ export default function ProjectsBoard({
 }) {
   const { tab, category, uf } = view;
   const wide = useWide();
+  const { lang, t } = useLang();
+  const TAB_OPTIONS: PixelOption[] = TABS.map((x) => ({ value: x.id, label: t(x.label, x.pt) }));
+  const CATEGORY_OPTIONS: PixelOption[] = [{ value: "", label: t("Any type", "Qualquer tipo") }, ...CATEGORIES.map((c) => ({ value: c.id, label: t(c.label, c.pt) }))];
+  const STATE_OPTIONS: PixelOption[] = [{ value: "", label: t("Every state", "Todos os estados") }, ...STATE_ROWS];
+  const PHONE_STATE_OPTIONS: PixelOption[] = [{ value: "", label: t("Any state", "Qualquer estado") }, ...STATE_ROWS];
   const key = `${tab}:${category ?? ""}:${uf ?? ""}`;
   // The list and the filters it was read for: dimmed while it's another's.
   const [read, setRead] = useState<{ key: string; list: ProjectList } | null>(null);
@@ -92,7 +94,7 @@ export default function ProjectsBoard({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[9px] text-muted">
-          The week&apos;s top 3 win points{list ? ` · ${timeLeft(list.week, now)}` : ""}
+          {t("The week's top 3 win points", "Os 3 primeiros da semana ganham pontos")}{list ? ` · ${timeLeft(list.week, now, lang)}` : ""}
         </p>
         <button
           type="button"
@@ -102,7 +104,7 @@ export default function ProjectsBoard({
           }}
           className="btn-press flex min-h-9 items-center gap-1.5 bg-lime px-3 text-[10px] text-bg"
         >
-          <Plus size={13} strokeWidth={3} aria-hidden /> Share yours
+          <Plus size={13} strokeWidth={3} aria-hidden /> {t("Share yours", "Mostra o teu")}
         </button>
       </div>
 
@@ -127,44 +129,44 @@ export default function ProjectsBoard({
         >
           <span className="flex items-center gap-3">
             <span className="w-6 text-center text-[8px] text-[#f0b429]">AD</span>
-            <span className="text-cream">Advertise here</span>
-            <span className="normal-case text-muted max-sm:hidden">#1 on the map for a week</span>
+            <span className="text-cream">{t("Advertise here", "Anuncie aqui")}</span>
+            <span className="normal-case text-muted max-sm:hidden">{t("#1 on the map for a week", "#1 no mapa por uma semana")}</span>
           </span>
-          <span className="text-[#f0b429]">Get</span>
+          <span className="text-[#f0b429]">{t("Get", "Quero")}</span>
         </button>
       )}
 
       {wide ? (
         <>
-          <nav className="flex gap-1.5 overflow-x-auto" aria-label="Lists">
-            {TABS.map((t) => (
-              <button key={t.id} type="button" aria-pressed={tab === t.id} onClick={() => onView({ ...view, tab: t.id })} className={chip(tab === t.id)}>
-                {t.label}
+          <nav className="flex gap-1.5 overflow-x-auto" aria-label={t("Lists", "Listas")}>
+            {TABS.map((x) => (
+              <button key={x.id} type="button" aria-pressed={tab === x.id} onClick={() => onView({ ...view, tab: x.id })} className={chip(tab === x.id)}>
+                {t(x.label, x.pt)}
               </button>
             ))}
           </nav>
           {tab !== "winners" && (
             <div className="flex flex-wrap items-center gap-1.5">
               <button type="button" aria-pressed={!category} onClick={() => onView({ ...view, category: null })} className={chip(!category)}>
-                All
+                {t("All", "Todos")}
               </button>
               {CATEGORIES.map((c) => (
                 <button key={c.id} type="button" aria-pressed={category === c.id} onClick={() => onView({ ...view, category: category === c.id ? null : c.id })} className={chip(category === c.id)}>
-                  {c.label}
+                  {t(c.label, c.pt)}
                 </button>
               ))}
-              <PixelSelect value={uf ?? ""} onChange={(v) => onView({ ...view, uf: v || null })} options={STATE_OPTIONS} ariaLabel="State" searchable searchPlaceholder="State…" className="w-44" />
+              <PixelSelect value={uf ?? ""} onChange={(v) => onView({ ...view, uf: v || null })} options={STATE_OPTIONS} ariaLabel={t("State", "Estado")} searchable searchPlaceholder={t("State…", "Estado…")} className="w-44" />
             </div>
           )}
         </>
       ) : (
         // A phone: the list, the category and the state side by side, so the projects start higher.
         <div className="grid grid-cols-3 gap-1.5">
-          <PixelSelect value={tab} onChange={(v) => onView({ ...view, tab: v as ListTab })} options={TAB_OPTIONS} ariaLabel="List" />
+          <PixelSelect value={tab} onChange={(v) => onView({ ...view, tab: v as ListTab })} options={TAB_OPTIONS} ariaLabel={t("List", "Lista")} />
           {tab !== "winners" && (
             <>
-              <PixelSelect value={category ?? ""} onChange={(v) => onView({ ...view, category: v || null })} options={CATEGORY_OPTIONS} ariaLabel="Category" />
-              <PixelSelect value={uf ?? ""} onChange={(v) => onView({ ...view, uf: v || null })} options={PHONE_STATE_OPTIONS} ariaLabel="State" searchable searchPlaceholder="State…" />
+              <PixelSelect value={category ?? ""} onChange={(v) => onView({ ...view, category: v || null })} options={CATEGORY_OPTIONS} ariaLabel={t("Category", "Categoria")} />
+              <PixelSelect value={uf ?? ""} onChange={(v) => onView({ ...view, uf: v || null })} options={PHONE_STATE_OPTIONS} ariaLabel={t("State", "Estado")} searchable searchPlaceholder={t("State…", "Estado…")} />
             </>
           )}
         </div>
@@ -181,13 +183,13 @@ export default function ProjectsBoard({
                 <span className="block truncate text-[11px] normal-case text-warm">{p.tagline}</span>
                 <span className="block truncate text-[9px] text-muted">
                   <span className="normal-case">@{p.maker.login}</span>
-                  {p.uf ? ` · ${p.uf}` : ""} · {categoryLabel(p.category)}
-                  {list.tab === "winners" && p.week ? ` · week of ${p.week}` : ""}
+                  {p.uf ? ` · ${p.uf}` : ""} · {categoryLabel(p.category, lang)}
+                  {list.tab === "winners" && p.week ? t(` · week of ${p.week}`, ` · semana de ${p.week}`) : ""}
                 </span>
               </span>
             </button>
             {list.tab === "winners" ? (
-              <span className="shrink-0 text-[10px] tabular-nums text-muted">{p.votes} votes</span>
+              <span className="shrink-0 text-[10px] tabular-nums text-muted">{p.votes} {t("votes", "votos")}</span>
             ) : (
               <VoteButton key={`${p.id}:${p.votes}:${p.voted}`} slug={slug} project={p} signedIn={!!viewerLogin} mine={viewerLogin?.toLowerCase() === p.maker.login.toLowerCase()} from={`list_${tab}`} onSignIn={onSignIn} />
             )}
@@ -195,20 +197,20 @@ export default function ProjectsBoard({
         ))}
         {list && list.rows.length === 0 && (
           <li className="px-4 py-8 text-center text-[11px] normal-case text-muted">
-            {tab === "winners" ? "No week has closed yet. The first winner is crowned Sunday at 21h." : tab === "week" && !category && !uf ? "No projects this week yet. Be the first." : "Nothing here yet."}
+            {tab === "winners" ? t("No week has closed yet. The first winner is crowned Sunday at 21h.", "Nenhuma semana fechou ainda. O primeiro vencedor sai domingo às 21h.") : tab === "week" && !category && !uf ? t("No projects this week yet. Be the first.", "Nenhum projeto essa semana ainda. Seja o primeiro.") : t("Nothing here yet.", "Nada aqui ainda.")}
           </li>
         )}
-        {!list && <li className="px-4 py-8 text-center text-[11px] normal-case text-muted">Loading…</li>}
+        {!list && <li className="px-4 py-8 text-center text-[11px] normal-case text-muted">{t("Loading…", "Carregando…")}</li>}
       </ol>
     </div>
   );
 
   return wide ? (
-    <Board title="Projects" onClose={onClose} width={860}>
+    <Board title={t("Projects", "Projetos")} onClose={onClose} width={860}>
       {content}
     </Board>
   ) : (
-    <Panel title="Projects" onClose={onClose} full>
+    <Panel title={t("Projects", "Projetos")} onClose={onClose} full>
       {content}
     </Panel>
   );

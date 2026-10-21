@@ -6,6 +6,8 @@ import Panel from "@/components/league/hud/Panel";
 import { fmt } from "@/components/league/hud/shared";
 import type { Count, CountRow } from "@/lib/towns/brasil-election-server";
 import { ballot } from "@/lib/towns/brasil-election";
+import { useLang, useT } from "@/lib/i18n/LangProvider";
+import type { Lang } from "@/lib/i18n/lang";
 
 // The presidential count on the map, always in view while the presidency is
 // on: on a wide screen a card in the top-left corner (who leads, the top
@@ -17,7 +19,7 @@ import { ballot } from "@/lib/towns/brasil-election";
 
 const POLL_MS = 15_000;
 
-const when = (ms: number) => new Date(ms).toLocaleString("en-GB", { timeZone: "America/Sao_Paulo", weekday: "short", hour: "2-digit", minute: "2-digit" });
+const when = (ms: number, lang: Lang) => new Date(ms).toLocaleString(lang === "pt" ? "pt-BR" : "en-GB", { timeZone: "America/Sao_Paulo", weekday: "short", hour: "2-digit", minute: "2-digit" });
 const pct = (v: number, total: number) => (total ? (v / total) * 100 : 0);
 const pctText = (v: number, total: number) => `${pct(v, total).toFixed(1)}%`;
 
@@ -44,9 +46,10 @@ function Face({ src, size }: { src: string | null; size: number }) {
 }
 
 function Row({ r, total, place, mine, onPick }: { r: CountRow; total: number; place: number; mine: boolean; onPick: (n: number) => void }) {
+  const t = useT();
   return (
     <li>
-      <button type="button" onClick={() => onPick(r.number)} aria-label={`Vote ${ballot(r.number)}, @${r.login}${mine ? ", your vote" : ""}`} className="flex w-full items-center gap-2 py-1 text-left hover:text-lime">
+      <button type="button" onClick={() => onPick(r.number)} aria-label={t(`Vote ${ballot(r.number)}, @${r.login}${mine ? ", your vote" : ""}`, `Votar ${ballot(r.number)}, @${r.login}${mine ? ", seu voto" : ""}`)} className="flex w-full items-center gap-2 py-1 text-left hover:text-lime">
       <span className="flex w-4 justify-center text-[9px] tabular-nums text-muted">{mine ? <Check size={12} strokeWidth={3} className="text-lime" aria-hidden /> : place}</span>
       <Num n={r.number} />
       <Face src={r.avatar_url} size={20} />
@@ -75,6 +78,7 @@ export default function ApuracaoWidget({
   onVote: (number?: number) => void;
 }) {
   const wide = useWide();
+  const { lang, t } = useLang();
   const [c, setC] = useState(initial);
   const [open, setOpen] = useState(false);
 
@@ -95,22 +99,22 @@ export default function ApuracaoWidget({
   const voteButton = (extra: string) =>
     voted ? (
       <button type="button" onClick={() => onVote(myVote!)} className={`btn-press flex min-h-9 items-center justify-center gap-1.5 border-2 border-lime text-[10px] text-lime ${extra}`}>
-        <Check size={12} strokeWidth={3} aria-hidden /> You voted {ballot(myVote!)}
+        <Check size={12} strokeWidth={3} aria-hidden /> {t("You voted", "Você votou")} {ballot(myVote!)}
       </button>
     ) : (
       <button type="button" onClick={() => onVote()} className={`btn-press min-h-9 bg-lime text-[10px] text-bg ${extra}`}>
-        {c.mode === "live" ? "Vote" : c.mode === "final" ? "See the race" : "Run for president"}
+        {c.mode === "live" ? t("Vote", "Votar") : c.mode === "final" ? t("See the race", "Ver a eleição") : t("Run for president", "Me candidatar")}
       </button>
     );
   const status =
     c.mode === "live" ? (
       <span className="flex items-center gap-1.5 text-cream">
-        <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden /> Live
+        <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden /> {t("Live", "Ao vivo")}
       </span>
     ) : c.mode === "final" ? (
-      <span className="text-lime">Elected</span>
+      <span className="text-lime">{t("Elected", "Eleito")}</span>
     ) : (
-      <span className="text-muted">Vote {when(c.opens)}</span>
+      <span className="text-muted">{t("Vote", "Votação")} {when(c.opens, lang)}</span>
     );
 
   const full = (
@@ -120,13 +124,13 @@ export default function ApuracaoWidget({
         {c.rows.map((r, i) => (
           <Row key={r.login} r={r} total={c.total} place={i + 1} mine={voted && r.number === myVote} onPick={onVote} />
         ))}
-        {c.rows.length === 0 && <li className="py-2 text-[9px] normal-case text-muted">Nobody is running yet.</li>}
+        {c.rows.length === 0 && <li className="py-2 text-[9px] normal-case text-muted">{t("Nobody is running yet.", "Ninguém se candidatou ainda.")}</li>}
       </ol>
-      <p className="text-[9px] tabular-nums text-muted">{fmt(c.total)} votes</p>
+      <p className="text-[9px] tabular-nums text-muted">{fmt(c.total)} {t("votes", "votos")}</p>
       <div className="grid grid-cols-2 gap-1.5">
         {voteButton("")}
         <a href={`/town/${slug}/apuracao`} className="btn-press flex min-h-9 items-center justify-center gap-1.5 border-2 border-border text-[10px] text-cream hover:border-lime/60">
-          <Maximize2 size={12} aria-hidden /> Full count
+          <Maximize2 size={12} aria-hidden /> {t("Full count", "Apuração completa")}
         </a>
       </div>
     </div>
@@ -139,15 +143,15 @@ export default function ApuracaoWidget({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="Presidential count"
+          aria-label={t("Presidential count", "Apuração para presidente")}
           className="pointer-events-auto absolute left-3 top-[104px] z-20 flex h-12 w-[calc(50%-16px)] flex-col justify-center gap-1.5 border-[3px] border-border bg-bg/90 px-2.5 text-left font-pixel text-[9px] uppercase backdrop-blur-sm"
         >
           <span className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-1.5">
-              <span className="text-lime">Election</span>
+              <span className="text-lime">{t("Election", "Eleição")}</span>
               <span className="text-[8px]">{status}</span>
             </span>
-            {voted && <Check size={12} strokeWidth={3} className="shrink-0 text-lime" aria-label="You voted" />}
+            {voted && <Check size={12} strokeWidth={3} className="shrink-0 text-lime" aria-label={t("You voted", "Você votou")} />}
           </span>
           {lead && c.mode !== "soon" ? (
             <span className="flex items-center gap-1.5">
@@ -156,7 +160,7 @@ export default function ApuracaoWidget({
               <span className="shrink-0 tabular-nums text-cream">{pctText(lead.votes, c.total)}</span>
             </span>
           ) : (
-            <span className="truncate text-cream">{c.rows.length ? `${c.rows.length} running` : "Run for president"}</span>
+            <span className="truncate text-cream">{c.rows.length ? t(`${c.rows.length} running`, `${c.rows.length} candidatos`) : t("Run for president", "Me candidatar")}</span>
           )}
         </button>
         {open && (
@@ -171,7 +175,7 @@ export default function ApuracaoWidget({
 
   // A wide screen: the corner card, opening down.
   return (
-    <section aria-label="Presidential count" className="pointer-events-auto absolute left-4 top-4 z-20 w-[272px] border-[3px] border-border bg-bg/90 font-pixel uppercase backdrop-blur-sm">
+    <section aria-label={t("Presidential count", "Apuração para presidente")} className="pointer-events-auto absolute left-4 top-4 z-20 w-[272px] border-[3px] border-border bg-bg/90 font-pixel uppercase backdrop-blur-sm">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between gap-2 border-b-2 border-border px-3 py-2 text-[10px]">
         <span className="flex items-center gap-2">
           {status}
@@ -189,7 +193,7 @@ export default function ApuracaoWidget({
             ))}
           </ol>
         ) : (
-          <p className="py-1 text-[9px] normal-case text-muted">Nobody is running yet.</p>
+          <p className="py-1 text-[9px] normal-case text-muted">{t("Nobody is running yet.", "Ninguém se candidatou ainda.")}</p>
         )}
         {!open && voteButton("mt-2 w-full")}
       </div>

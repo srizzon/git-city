@@ -14,6 +14,7 @@ import type { PostResult, PostState } from "@/components/drift/DriftResults";
 import type { DriftFinish } from "@/components/drift/DriftWorld";
 import type { BoardRowLite } from "@/components/drift/DriftTitle";
 import { TrackCard, TrackResults } from "./DriftCards";
+import { useT } from "@/lib/i18n/LangProvider";
 import TouchControls from "@/components/league/hud/drive/TouchControls";
 import { lotToWorld } from "@/lib/league-city/grid";
 import type { DriveCameraMode } from "@/lib/league-city/drive/telemetry";
@@ -63,7 +64,9 @@ function signTexture(draw: (ctx: CanvasRenderingContext2D) => void): THREE.Canva
   return t;
 }
 
-function drawSign(ctx: CanvasRenderingContext2D) {
+type Tr = (en: string, pt: string) => string;
+
+function drawSign(ctx: CanvasRenderingContext2D, t: Tr) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = "56px Silkscreen, monospace";
@@ -71,10 +74,10 @@ function drawSign(ctx: CanvasRenderingContext2D) {
   ctx.fillText("DRIFT", 128, 52);
   ctx.font = "16px Silkscreen, monospace";
   ctx.fillStyle = "#8a93a6";
-  ctx.fillText("CROSS THE LINE", 128, 100);
+  ctx.fillText(t("CROSS THE LINE", "CRUZE A LINHA"), 128, 100);
 }
 
-function drawTop(ctx: CanvasRenderingContext2D, board: BoardRowLite[]) {
+function drawTop(ctx: CanvasRenderingContext2D, board: BoardRowLite[], t: Tr) {
   const top = board.slice(0, 5);
   ctx.textBaseline = "middle";
   ctx.font = "14px Silkscreen, monospace";
@@ -82,7 +85,7 @@ function drawTop(ctx: CanvasRenderingContext2D, board: BoardRowLite[]) {
   ctx.fillText("TOP 5 · BRASIL DRIFT", 12, 16);
   if (top.length === 0) {
     ctx.fillStyle = "#8a93a6";
-    ctx.fillText("NOBODY YET", 12, 60);
+    ctx.fillText(t("NOBODY YET", "NINGUÉM AINDA"), 12, 60);
   }
   top.forEach((r, i) => {
     const y = 38 + i * 20;
@@ -106,14 +109,15 @@ export function DriftSite({ board }: { board: BoardRowLite[] }) {
   });
   // fontReady: drawn again once Silkscreen is in.
   const fontReady = useFontReady();
+  const t = useT();
   const sign = useMemo(() => {
     void fontReady;
-    return signTexture(drawSign);
-  }, [fontReady]);
+    return signTexture((ctx) => drawSign(ctx, t));
+  }, [fontReady, t]);
   const tower = useMemo(() => {
     void fontReady;
-    return signTexture((ctx) => drawTop(ctx, board));
-  }, [fontReady, board]);
+    return signTexture((ctx) => drawTop(ctx, board, t));
+  }, [fontReady, board, t]);
   useEffect(() => () => sign.dispose(), [sign]);
   useEffect(() => () => tower.dispose(), [tower]);
   return (
@@ -172,6 +176,7 @@ export function useBrasilDrift({
   onReady?: () => void;
 }) {
   const spot = BRASIL_DRIFT;
+  const t = useT();
   const [telemetry] = useState(createDriftTelemetry);
   const [ready, setReady] = useState(false);
   const [paused, setPausedRaw] = useState(false);
@@ -383,7 +388,7 @@ export function useBrasilDrift({
         onRestart={retry}
         onRespawn={() => respawnRef.current?.()}
         onExit={back}
-        exitLabel="Back to the city"
+        exitLabel={t("Back to the city", "Voltar pra cidade")}
       />
       {ready && trial.stage === "menu" && <TrackCard spot={spot} board={board} best={best} you={viewerLogin} onStart={begin} onBack={back} />}
       {trial.stage === "finish" && finish && (

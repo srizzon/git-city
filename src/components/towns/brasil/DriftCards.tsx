@@ -6,7 +6,10 @@ import { signInWithGitHub } from "@/lib/sign-in";
 import { MEDAL_COLORS, fmt } from "@/components/drift/DriftHud";
 import { projected, type PostState } from "@/components/drift/DriftResults";
 import type { BoardRowLite } from "@/components/drift/DriftTitle";
-import { medalFor, type LiveSpot } from "@/lib/drift/spots/types";
+import { medalFor, type LiveSpot, type Medal } from "@/lib/drift/spots/types";
+import { useT } from "@/lib/i18n/LangProvider";
+
+const MEDAL_PT: Record<Medal, string> = { author: "autor", gold: "ouro", silver: "prata", bronze: "bronze" };
 
 // The drift track's two screens in the Brasil town, in the map's own HUD (one
 // boxed card at the bottom, the scene clear above it): before the run, the
@@ -25,7 +28,8 @@ function Card({ children }: { children: ReactNode }) {
 }
 
 function Rows({ rows, you }: { rows: BoardRowLite[]; you: string | null }) {
-  if (rows.length === 0) return <p className="px-4 py-3 text-[10px] text-muted">Nobody has driven it yet</p>;
+  const t = useT();
+  if (rows.length === 0) return <p className="px-4 py-3 text-[10px] text-muted">{t("Nobody has driven it yet", "Ninguém correu aqui ainda")}</p>;
   return (
     <ol className="py-1.5">
       {rows.map((r) => {
@@ -33,7 +37,7 @@ function Rows({ rows, you }: { rows: BoardRowLite[]; you: string | null }) {
         return (
           <li key={`${r.rank}-${r.login}`} className={`flex items-center gap-3 px-4 py-1 text-[11px] tabular-nums ${me ? "bg-lime text-bg" : ""}`}>
             <span className={`w-6 shrink-0 ${me ? "" : "text-muted"}`}>{r.rank}</span>
-            <span className="min-w-0 flex-1 truncate normal-case">{me && !you ? "You" : `@${r.login}`}</span>
+            <span className="min-w-0 flex-1 truncate normal-case">{me && !you ? t("You", "Você") : `@${r.login}`}</span>
             <span>{fmt(r.score)}</span>
           </li>
         );
@@ -59,20 +63,21 @@ function Actions({ back, go }: { back: { key: string; label: string; onClick: ()
 
 /** Before the run: the track, the top three, your best. */
 export function TrackCard({ spot, board, best, you, onStart, onBack }: { spot: LiveSpot; board: BoardRowLite[]; best: number | null; you: string | null; onStart: () => void; onBack: () => void }) {
+  const t = useT();
   return (
     <Card>
       <header className="flex items-baseline justify-between gap-3 px-4 pb-2 pt-3">
         <h2 className="text-base text-lime sm:text-lg">{spot.name}</h2>
         {best !== null && (
           <span className="text-[9px] text-muted">
-            Your best <span className="text-cream">{fmt(best)}</span>
+            {t("Your best", "Teu melhor")} <span className="text-cream">{fmt(best)}</span>
           </span>
         )}
       </header>
       <div className="border-t-[3px] border-border">
         <Rows rows={board.slice(0, 3)} you={you} />
       </div>
-      <Actions back={{ key: "Esc", label: "City", onClick: onBack }} go={{ key: "Enter", label: "Drift", onClick: onStart }} />
+      <Actions back={{ key: "Esc", label: t("City", "Cidade"), onClick: onBack }} go={{ key: "Enter", label: "Drift", onClick: onStart }} />
     </Card>
   );
 }
@@ -102,6 +107,7 @@ export function TrackResults({
   onRetryPost: () => void;
   onBack: () => void;
 }) {
+  const tr = useT();
   const [shown, setShown] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setShown(true), 1200);
@@ -130,12 +136,12 @@ export function TrackResults({
   const signIn = () => void signInWithGitHub(createBrowserSupabase(), `${window.location.origin}/auth/callback?next=${townPath}`);
   const verdict =
     before === null ? (
-      <span className="text-muted">First run</span>
+      <span className="text-muted">{tr("First run", "Primeira volta")}</span>
     ) : score > before ? (
-      <span className="text-lime">New best +{fmt(score - before)}</span>
+      <span className="text-lime">{tr("New best", "Novo recorde")} +{fmt(score - before)}</span>
     ) : (
       <span className="text-muted">
-        Best <span className="text-cream">{fmt(before)}</span>
+        {tr("Best", "Melhor")} <span className="text-cream">{fmt(before)}</span>
       </span>
     );
   return (
@@ -144,7 +150,7 @@ export function TrackResults({
         <h2 className="text-[10px] text-muted">{spot.name}</h2>
         {medal && (
           <span className="text-[10px]" style={{ color: MEDAL_COLORS[medal] }}>
-            {medal}
+            {tr(medal, MEDAL_PT[medal])}
           </span>
         )}
       </header>
@@ -157,16 +163,16 @@ export function TrackResults({
         {rows.length > 1 && <Rows rows={rows.slice(0, 5)} you={you} />}
         {post.status === "signed-out" && (
           <button type="button" onClick={signIn} className={`w-full px-4 py-2.5 text-left text-[10px] text-lime hover:text-cream ${rows.length > 1 ? "border-t-2 border-border" : ""}`}>
-            Sign in to post your run
+            {tr("Sign in to post your run", "Entra pra postar tua volta")}
           </button>
         )}
         {post.status === "failed" && (
           <button type="button" onClick={onRetryPost} className={`w-full px-4 py-2.5 text-left text-[10px] text-[#ff9a3c] hover:text-cream ${rows.length > 1 ? "border-t-2 border-border" : ""}`}>
-            Not posted · try again
+            {tr("Not posted · try again", "Não postou · tenta de novo")}
           </button>
         )}
       </div>
-      <Actions back={{ key: "Esc", label: "City", onClick: onBack }} go={{ key: "R", label: "Drive again", onClick: onRetry }} />
+      <Actions back={{ key: "Esc", label: tr("City", "Cidade"), onClick: onBack }} go={{ key: "R", label: tr("Drive again", "Correr de novo"), onClick: onRetry }} />
     </Card>
   );
 }

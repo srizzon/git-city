@@ -7,20 +7,24 @@
 // (brasil-projects-check.ts); this file holds the rules that need no network:
 // the fields, the link, the denylist, who counts as a voter, the ranking. Pure.
 
+import type { Lang } from "@/lib/i18n/lang";
 import { pointsWeek } from "./brasil-points";
 
 export const CATEGORIES = [
-  { id: "ai", label: "AI" },
-  { id: "devtool", label: "Dev tool" },
-  { id: "webapp", label: "Web app" },
-  { id: "mobile", label: "Mobile" },
-  { id: "game", label: "Game" },
-  { id: "library", label: "Library" },
-  { id: "other", label: "Other" },
+  { id: "ai", label: "AI", pt: "IA" },
+  { id: "devtool", label: "Dev tool", pt: "Dev tool" },
+  { id: "webapp", label: "Web app", pt: "Web app" },
+  { id: "mobile", label: "Mobile", pt: "Mobile" },
+  { id: "game", label: "Game", pt: "Jogo" },
+  { id: "library", label: "Library", pt: "Biblioteca" },
+  { id: "other", label: "Other", pt: "Outro" },
 ] as const;
 export type Category = (typeof CATEGORIES)[number]["id"];
 const CATEGORY_IDS = new Set<string>(CATEGORIES.map((c) => c.id));
-export const categoryLabel = (id: string): string => CATEGORIES.find((c) => c.id === id)?.label ?? "Other";
+export const categoryLabel = (id: string, lang: Lang = "en"): string => {
+  const c = CATEGORIES.find((x) => x.id === id);
+  return lang === "pt" ? (c?.pt ?? "Outro") : (c?.label ?? "Other");
+};
 
 export const LIMITS = {
   name: 40,
@@ -103,11 +107,11 @@ export function launchWeekFor(at: Date): string {
 export const slotWeekOf = (r: { launch_week: string | null; created_at: string }): string => r.launch_week ?? launchWeekFor(new Date(r.created_at));
 
 /** When a week opens, for a person: "Sun 21:00 (Brasília) · in 3d". */
-export function opensText(week: string, now = Date.now()): string {
+export function opensText(week: string, now = Date.now(), lang: Lang = "en"): string {
   const at = Date.parse(`${week}T00:00:00Z`);
-  const when = new Date(at).toLocaleString("en-GB", { timeZone: "America/Sao_Paulo", weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const when = new Date(at).toLocaleString(lang === "pt" ? "pt-BR" : "en-GB", { timeZone: "America/Sao_Paulo", weekday: "short", hour: "2-digit", minute: "2-digit" });
   const h = Math.max(0, Math.ceil((at - now) / 3_600_000));
-  return `${when} (Brasília) · in ${h >= 24 ? `${Math.floor(h / 24)}d` : `${h}h`}`;
+  return `${when} (Brasília) · ${lang === "pt" ? "em" : "in"} ${h >= 24 ? `${Math.floor(h / 24)}d` : `${h}h`}`;
 }
 
 // ─── The fields ─────────────────────────────────────────────
@@ -294,9 +298,10 @@ export function projectSlug(name: string, suffix: string): string {
 }
 
 /** Days and hours left in a week, for the card ("4d left", "6h left"). */
-export function timeLeft(week: string, now = Date.now()): string {
+export function timeLeft(week: string, now = Date.now(), lang: Lang = "en"): string {
   const ms = Math.max(0, weekClosesAt(week) - now);
   const h = Math.floor(ms / 3_600_000);
+  if (lang === "pt") return h >= 24 ? `faltam ${Math.floor(h / 24)}d` : h >= 1 ? `faltam ${h}h` : "fechando";
   return h >= 24 ? `${Math.floor(h / 24)}d left` : h >= 1 ? `${h}h left` : "closing";
 }
 

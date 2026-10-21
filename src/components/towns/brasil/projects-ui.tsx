@@ -6,6 +6,7 @@ import { Board, useWide } from "./BrasilPanels";
 import { ChevronUp } from "lucide-react";
 import posthog from "posthog-js";
 import type { ProjectCard } from "@/lib/towns/brasil-projects";
+import { useT } from "@/lib/i18n/LangProvider";
 
 // Pieces every projects surface shares (the map's card, the project sheet,
 // the list page): the icon, the upvote button and the calls behind them.
@@ -75,6 +76,7 @@ export function VoteButton({
   /** sm: the card and lists; lg: a square count; hero: full width with the word. */
   size?: "sm" | "lg" | "hero";
 }) {
+  const t = useT();
   const [state, setState] = useState({ votes: project.votes, voted: project.voted });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -113,7 +115,7 @@ export function VoteButton({
         }}
         disabled={mine}
         aria-pressed={state.voted}
-        aria-label={mine ? `${state.votes} upvotes` : state.voted ? `Upvoted, ${state.votes} upvotes. Take it back` : `Upvote, ${state.votes} upvotes`}
+        aria-label={mine ? t(`${state.votes} upvotes`, `${state.votes} votos`) : state.voted ? t(`Upvoted, ${state.votes} upvotes. Take it back`, `Votado, ${state.votes} votos. Desfazer`) : t(`Upvote, ${state.votes} upvotes`, `Votar, ${state.votes} votos`)}
         className={`btn-press flex items-center justify-center gap-1 border-2 tabular-nums transition-colors ${hero ? "min-h-12 w-full gap-2 px-4 text-[12px]" : big ? "min-h-10 min-w-[84px] px-3 text-[11px]" : "min-h-7 min-w-[46px] px-1.5 text-[9px]"} ${
           hero
             ? state.voted
@@ -129,7 +131,7 @@ export function VoteButton({
         }`}
       >
         <ChevronUp size={big ? 14 : 11} strokeWidth={3} aria-hidden />
-        {hero && <span>{mine ? "Upvotes" : state.voted ? "Upvoted" : "Upvote"}</span>}
+        {hero && <span>{mine ? t("Upvotes", "Votos") : state.voted ? t("Upvoted", "Votado") : t("Upvote", "Votar")}</span>}
         {!hero && state.votes}
       </button>
       {note && <span className="mt-1 max-w-[160px] text-right text-[8px] normal-case text-red-400">{note}</span>}
