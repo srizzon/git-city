@@ -304,6 +304,8 @@ export interface RecordedFall {
   victimId: number;
   attacker: string;
   attackerId: number;
+  /** When it fell (epoch ms). */
+  at: number;
 }
 
 /**
@@ -328,5 +330,5 @@ export async function recordFalls(leagueId: string, town: SmashTown, save: Smash
   const fresh = new Set((data ?? []).map((r) => `${r.victim_id}:${r.attacker_id}`));
   return falls
     .filter((f) => fresh.has(`${f.victimId}:${f.attackerId}`))
-    .map((f) => ({ victim: f.victim, victimId: f.victimId, attacker: f.attacker, attackerId: f.attackerId }));
+    .map((f) => ({ victim: f.victim, victimId: f.victimId, attacker: f.attacker, attackerId: f.attackerId, at: f.at }));
 }

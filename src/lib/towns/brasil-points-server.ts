@@ -15,6 +15,7 @@ import {
   INVITES_PER_WEEK,
   POINTS,
   POINTS_START,
+  SMASH_DAY_CAP,
   brasiliaDay,
   pointsWeek,
   taggedFriends,
@@ -35,6 +36,35 @@ export async function awardPoints(developerId: number, kind: LedgerKind, ref: st
   }
   await captureServer(`dev:${developerId}`, "brasil_points_awarded", { kind, points });
   return true;
+}
+
+/**
+ * Pays whoever knocked a building down on the map, under the day's cap
+ * (Brasília days). Each fall pays once: its ref is the victim and the moment
+ * it fell, the key town_demolitions is unique on.
+ */
+export async function awardSmashPoints(falls: readonly { victimId: number; attackerId: number; at: number }[]): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const paidToday = new Map<string, number>();
+  for (const f of falls) {
+    const at = new Date(f.at);
+    const day = brasiliaDay(at);
+    const key = `${f.attackerId}:${day}`;
+    let paid = paidToday.get(key);
+    if (paid === undefined) {
+      const { data } = await sb
+        .from("brasil_points")
+        .select("points")
+        .eq("developer_id", f.attackerId)
+        .eq("kind", "smash")
+        .gte("created_at", `${day}T03:00:00Z`)
+        .returns<{ points: number }[]>();
+      paid = (data ?? []).reduce((a, r) => a + r.points, 0);
+    }
+    const p = Math.min(POINTS.smash, SMASH_DAY_CAP - paid);
+    if (p > 0 && (await awardPoints(f.attackerId, "smash", `smash:${f.victimId}:${f.at}`, at, p))) paid += p;
+    paidToday.set(key, paid);
+  }
 }
 
 /** The resident an Instagram account plays as, or null (not on the map yet, or never linked). */

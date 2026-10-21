@@ -21,7 +21,12 @@ export const POINTS = {
   race: 3,
   /** The week's #1 project (brasil-projects.ts POINTS_FOR_RANK pays 2nd and 3rd less). */
   project: 100,
+  /** Knocking down someone's building on the map (SMASH_DAY_CAP a day). */
+  smash: 5,
 } as const;
+
+/** Most smash points per dev per (Brasília) day: ten buildings. */
+export const SMASH_DAY_CAP = 50;
 
 /** Races (lib/towns/brasil-race): what each finish pays, and the day's cap. */
 export const RACE_POINTS = {
@@ -91,11 +96,12 @@ export interface PointsBreakdown {
   paint: number;
   race: number;
   project: number;
+  smash: number;
 }
 
-export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0, race: 0, project: 0 });
+export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0, race: 0, project: 0, smash: 0 });
 
-export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote + b.paint + b.race + b.project;
+export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote + b.paint + b.race + b.project + b.smash;
 
 /**
  * Each dev's week: the ledger's rows plus POINTS.coded for every day they

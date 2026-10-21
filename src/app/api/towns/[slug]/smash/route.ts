@@ -3,6 +3,7 @@ import { getLeagueBySlug } from "@/lib/leagues/service";
 import { getDamage, getSmashTown, recordFalls, recordFloors, saveDamage, verifySmashSave, weekContribs } from "@/lib/league-city/smash-server";
 import { isRevenge, notifyDemolished } from "@/lib/notification-senders/town-demolished";
 import { captureServer } from "@/lib/posthog-server";
+import { awardSmashPoints } from "@/lib/towns/brasil-points-server";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +34,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
 }
 
 // POST: the drive room's save, signed (x-smash-signature). Writes the damaged
-// buildings, the floors players knocked down (play points) and the falls
-// before answering (a failure makes the room resend); the emails to whoever's
-// building just fell go out after.
+// buildings, the floors players knocked down (play points), the falls and,
+// on the Brasil map, the points each fall pays, before answering (a failure
+// makes the room resend); the emails to whoever's building just fell go out after.
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const body = await req.text();
@@ -50,6 +51,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     // logged, so the room's retry still gets the demolition emails out.
     await recordFloors(town, save);
     const falls = await recordFalls(league.id, town, save);
+    if (league.map === "brasil" && falls.length) await awardSmashPoints(falls).catch((err) => console.error("[smash:points]", err));
     if (falls.length) {
       after(async () => {
         for (const f of falls) {

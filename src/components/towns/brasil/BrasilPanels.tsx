@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronUp, Clock, Code2, Flag, Instagram, MapPin, MessageCircle, Plus, Search, Trophy, UserPlus, Vote as VoteIcon, X, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, Code2, Flag, Hammer, Instagram, MapPin, MessageCircle, Plus, Search, Trophy, UserPlus, Vote as VoteIcon, X, type LucideIcon } from "lucide-react";
 import type { CityBuilding } from "@/lib/github";
 import Panel from "@/components/league/hud/Panel";
 import { Avatar, HUD_BOX, fmt, useCountdown } from "@/components/league/hud/shared";
@@ -176,6 +176,7 @@ const EARN: { id: string; icon: LucideIcon; pts: number; word: Line; hint: Line;
   { id: "story", icon: Instagram, pts: 20, word: ["Story", "Story"], hint: ["Post a story tagging @samuelrizzondev.", "Posta um story marcando @samuelrizzondev."], cap: ["1/day", "1/dia"] },
   { id: "join", icon: MapPin, pts: 20, word: ["Join", "Entrar"], hint: ["Put your building on the map.", "Coloca seu prédio no mapa."], cap: ["1×", "1×"] },
   { id: "code", icon: Code2, pts: 10, word: ["Code", "Código"], hint: ["Commit on GitHub that day.", "Faz commit no GitHub no dia."], cap: ["1/day", "1/dia"] },
+  { id: "smash", icon: Hammer, pts: 5, word: ["Knock down", "Derrubar"], hint: ["Drive through someone's building until it falls.", "Passa de carro no prédio de alguém até ele cair."], cap: ["50/day", "50/dia"] },
   { id: "race", icon: Flag, pts: 3, word: ["Race", "Corrida"], hint: ["Finish a race with someone. More to win or set a route record.", "Termina uma corrida com alguém. Mais se ganhar ou bater o recorde da rota."], cap: ["30/day", "30/dia"] },
   { id: "vote", icon: VoteIcon, pts: 10, word: ["Vote", "Voto"], hint: ["Vote for president.", "Vota pra presidente."], cap: ["1×", "1×"] },
   { id: "comment", icon: MessageCircle, pts: 5, word: ["Comment", "Comentário"], hint: ["Comment on a reel.", "Comenta num reel."], cap: ["1/day", "1/dia"] },
