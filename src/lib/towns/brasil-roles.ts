@@ -7,6 +7,7 @@
 // is left for stays empty. Only devs who scored count. A city's founder (its
 // first resident) is not elected. Pure.
 
+import type { Lang } from "@/lib/i18n/lang";
 import { STATES, type BrasilLayout, type UF } from "./brasil-map";
 
 export type Office = { kind: "president" } | { kind: "governor"; uf: UF } | { kind: "senator"; uf: UF } | { kind: "mayor"; city: string; key: string; uf: UF };
@@ -62,10 +63,11 @@ export function brasilOffices(layout: BrasilLayout, totals: ReadonlyMap<string, 
   return { president: president?.toLowerCase() ?? null, governors, senators, mayors, byLogin };
 }
 
-/** An office as its badge says it. */
-export function officeLabel(o: Office): string {
-  if (o.kind === "president") return "President";
-  if (o.kind === "governor") return `Governor of ${o.uf}`;
-  if (o.kind === "senator") return `Senator for ${o.uf}`;
-  return `Mayor of ${o.city}`;
+/** An office as its badge says it, in English or Portuguese. */
+export function officeLabel(o: Office, lang: Lang = "en"): string {
+  const pt = lang === "pt";
+  if (o.kind === "president") return pt ? "Presidente" : "President";
+  if (o.kind === "governor") return pt ? `Governador de ${o.uf}` : `Governor of ${o.uf}`;
+  if (o.kind === "senator") return pt ? `Senador por ${o.uf}` : `Senator for ${o.uf}`;
+  return pt ? `Prefeito de ${o.city}` : `Mayor of ${o.city}`;
 }

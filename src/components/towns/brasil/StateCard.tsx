@@ -6,6 +6,7 @@ import type { CityBuilding } from "@/lib/github";
 import { Avatar, fmt } from "@/components/league/hud/shared";
 import { useSheet } from "@/components/league/hud/useSheet";
 import { stateOf } from "@/lib/towns/brasil-map";
+import { useT } from "@/lib/i18n/LangProvider";
 import { type StateStats } from "./stats";
 
 // A state's card, opened from its tag or a search: its place and points in the
@@ -38,6 +39,7 @@ export default function StateCard({
   /** The state's three devs with the most points this week. */
   topDevs?: { login: string; points: number }[];
 }) {
+  const t = useT();
   const sheet = useSheet(onClose);
   const { close } = sheet;
   const [copied, setCopied] = useState(false);
@@ -79,7 +81,7 @@ export default function StateCard({
             <p className="mt-1 truncate text-[9px] normal-case text-muted">
               {race && s.devs > 0 && (
                 <>
-                  <span className="text-lime">#{race.place}</span> this week · {fmt(race.points)} pts ·{" "}
+                  <span className="text-lime">#{race.place}</span> {t("this week", "na semana")} · {fmt(race.points)} pts ·{" "}
                 </>
               )}
               {fmt(s.devs)} {s.devs === 1 ? "dev" : "devs"}
@@ -88,19 +90,19 @@ export default function StateCard({
         </div>
 
         <ul className="mx-4 mb-4 flex flex-col">
-          <Row role="Founder" sub={s.capital.name} hot login={s.founder} avatar={avatar(s.founder)} empty={`Nobody yet. The first dev founds ${s.capital.name}.`} onPick={onPickDev} />
+          <Row role={t("Founder", "Fundador")} sub={s.capital.name} hot login={s.founder} avatar={avatar(s.founder)} empty={t(`Nobody yet. The first dev founds ${s.capital.name}.`, `Ninguém ainda. O primeiro dev funda ${s.capital.name}.`)} onPick={onPickDev} />
         </ul>
 
         {topDevs && topDevs.length > 0 && (
-          <Section title="Top devs" note="pts this week">
+          <Section title={t("Top devs", "Top devs")} note={t("pts this week", "pts na semana")}>
             {topDevs.map((d, i) => (
-              <Row key={d.login} role={`#${i + 1}`} sub={d.login.toLowerCase() === governor?.toLowerCase() ? "Governor" : undefined} login={d.login} avatar={avatar(d.login)} value={fmt(d.points)} onPick={onPickDev} />
+              <Row key={d.login} role={`#${i + 1}`} sub={d.login.toLowerCase() === governor?.toLowerCase() ? t("Governor", "Governador") : undefined} login={d.login} avatar={avatar(d.login)} value={fmt(d.points)} onPick={onPickDev} />
             ))}
           </Section>
         )}
 
         {s.top.length > 0 && (
-          <Section title="Biggest buildings" note="commits, all time">
+          <Section title={t("Biggest buildings", "Maiores prédios")} note={t("commits, all time", "commits, desde sempre")}>
             {s.top.map((login, i) => (
               <Row key={login} role={`#${i + 1}`} login={login} avatar={avatar(login)} value={fmt(byLogin.get(login.toLowerCase())?.contributions ?? 0)} onPick={onPickDev} />
             ))}
@@ -110,13 +112,13 @@ export default function StateCard({
         <div className="mx-4 mb-4 flex flex-col items-center gap-2">
           {onDriveHere && (
             <button type="button" onClick={onDriveHere} className="btn-press w-full border-2 border-lime bg-lime py-2 text-[10px] text-bg">
-              Drive to {(cities[0] ?? s.capital).name}
+              {t("Drive to", "Dirigir até")} {(cities[0] ?? s.capital).name}
             </button>
           )}
           <button type="button" onClick={invite} className="text-[9px] normal-case text-muted transition-colors hover:text-lime">
-            {copied ? "Invite copied" : `Invite to ${s.uf}`}
+            {copied ? t("Invite copied", "Convite copiado") : t(`Invite to ${s.uf}`, `Convidar pra ${s.uf}`)}
           </button>
-          <p className="text-center text-[8px] normal-case text-dim">Tag a friend in a reel comment: +50 pts when they join.</p>
+          <p className="text-center text-[8px] normal-case text-dim">{t("Tag a friend in a reel comment: +50 pts when they join.", "Marca um amigo num comentário do reel: +50 pts quando ele entrar.")}</p>
         </div>
       </div>
     </div>

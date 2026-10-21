@@ -19,6 +19,7 @@ import { GameMenu, type GameMode } from "@/components/games/kit";
 import { Crown as CrownIcon, Flag as FlagIcon, Map as DriftIcon } from "lucide-react";
 import type { RallyState } from "@/lib/league-city/drive/rally";
 import { Band } from "@/components/games/ui";
+import { useLang, useT } from "@/lib/i18n/LangProvider";
 import { T } from "@/components/games/kit";
 import { cityByKey, parseRouteKey, raceRoute, startLine } from "@/lib/towns/brasil-race";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
@@ -126,6 +127,7 @@ const HUD_EDGE = "border-border";
 const HUD_SOFT = "text-muted";
 
 export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, grewAt = null, week: officeWeek, election, count = null, startVote = null, stateFounders = {}, projects = null, projectWins = {}, startProject = null, startSheet = null }: BrasilTownProps) {
+  const { lang, setLang, t } = useLang();
   const router = useRouter();
   const camera = useRef<CameraApi | null>(null);
   const cameraStore = useMemo(() => createCameraStore(), []);
@@ -267,13 +269,15 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     // Each state's points this week: its residents' points added up.
     const statePoints: Partial<Record<UF, number>> = {};
     for (const c of allCities) for (const d of c.devs) if (d.dev.uf) statePoints[d.dev.uf] = (statePoints[d.dev.uf] ?? 0) + (officeWeek.live.totals[d.dev.login.toLowerCase()] ?? 0);
-    // Each holder's highest office, short, for the name plates.
-    const SHORT = { president: "Pres", governor: "Gov", senator: "Sen", mayor: "Mayor" } as const;
-    const plateOffice = new Map([...offices.byLogin].map(([l, os]) => [l, SHORT[os[0].kind]]));
     // Each state's place in the week's race: the States table's order.
     const racePlace = new Map([...states].sort((a, b) => (statePoints[b.uf] ?? 0) - (statePoints[a.uf] ?? 0) || b.devs - a.devs || a.name.localeCompare(b.name)).map((st, i) => [st.uf, i + 1]));
-    return { objects, buildings, placed, states, devs, founded, ufOf, allCities, cityByKey, cityBySlug, cityOfLogin, week, arrivals, fresh, offices, plateOffice, statePoints, racePlace, foundedState };
+    return { objects, buildings, placed, states, devs, founded, ufOf, allCities, cityByKey, cityBySlug, cityOfLogin, week, arrivals, fresh, offices, statePoints, racePlace, foundedState };
   }, [layout, cityDevs, cityNorms, now, officeWeek, election, stateFounders]);
+  // Each holder's highest office, short, for the name plates.
+  const plateOffice = useMemo(() => {
+    const short = lang === "pt" ? ({ president: "Pres", governor: "Gov", senator: "Sen", mayor: "Pref" } as const) : ({ president: "Pres", governor: "Gov", senator: "Sen", mayor: "Mayor" } as const);
+    return new Map([...world.offices.byLogin].map(([l, os]) => [l, short[os[0].kind]]));
+  }, [world.offices, lang]);
 
   const smash = useMemo(() => smashStoreFor(world.buildings), [world.buildings]);
 
@@ -803,12 +807,12 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         body: JSON.stringify({ city: city.ibge }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) return setJoining({ pending: null, error: body.error ?? "Couldn't put you on the map." });
+      if (!res.ok) return setJoining({ pending: null, error: body.error ?? t("Couldn't put you on the map.", "Não deu pra te colocar no mapa.") });
       // The picker stays (saying "finding your lot") until the refreshed map has the building.
       setArriving({ city: city.ibge });
       router.refresh();
     } catch {
-      setJoining({ pending: null, error: "Couldn't put you on the map." });
+      setJoining({ pending: null, error: t("Couldn't put you on the map.", "Não deu pra te colocar no mapa.") });
     }
   };
 
@@ -879,11 +883,29 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const raceBusy = !!rallyView && (rallyView.rally.phase === "invite" || rallyView.rally.phase === "countdown" || rallyView.rally.phase === "live");
   const crownBusy = !!crownView && (crownView.crown.phase === "countdown" || crownView.crown.phase === "live");
   // The loading band's live line: a race still taking racers, else how many drive here.
-  const startNote = liveRace?.route ? `${here} driving · race to ${cityByKey(layout, liveRace.route.to)?.name ?? "?"} open` : here > 1 ? `${here} driving here now` : null;
+  const startNote = liveRace?.route
+    ? t(`${here} driving · race to ${cityByKey(layout, liveRace.route.to)?.name ?? "?"} open`, `${here} dirigindo · corrida pra ${cityByKey(layout, liveRace.route.to)?.name ?? "?"} aberta`)
+    : here > 1
+      ? t(`${here} driving here now`, `${here} dirigindo aqui agora`)
+      : null;
   const gameModes: GameMode[] = [
-    { id: "race", icon: FlagIcon, name: "Race", line: "To another city. Everyone starts together.", need: "1+", blocked: raceBusy ? "A race is on. Join the next one." : crownBusy ? "Crown rush is on." : null },
-    { id: "crown", icon: CrownIcon, name: "Crown rush", line: "Hold the crown 30 s. Bump to steal it.", need: "2+", blocked: drivers.length === 0 ? "Needs someone else driving here." : raceBusy ? "A race is on." : crownBusy ? "One is on now." : null },
-    { id: "drift", icon: DriftIcon, name: "Drift track", line: "Off the coast between SP and RJ. The map shows the way.", need: "1" },
+    {
+      id: "race",
+      icon: FlagIcon,
+      name: t("Race", "Corrida"),
+      line: t("To another city. Everyone starts together.", "Até outra cidade. Todo mundo larga junto."),
+      need: "1+",
+      blocked: raceBusy ? t("A race is on. Join the next one.", "Tem corrida rolando. Entra na próxima.") : crownBusy ? t("Crown rush is on.", "Crown rush rolando.") : null,
+    },
+    {
+      id: "crown",
+      icon: CrownIcon,
+      name: "Crown rush",
+      line: t("Hold the crown 30 s. Bump to steal it.", "Segura a coroa 30 s. Bate pra roubar."),
+      need: "2+",
+      blocked: drivers.length === 0 ? t("Needs someone else driving here.", "Precisa de mais alguém dirigindo aqui.") : raceBusy ? t("A race is on.", "Tem corrida rolando.") : crownBusy ? t("One is on now.", "Já tem uma rolando.") : null,
+    },
+    { id: "drift", icon: DriftIcon, name: t("Drift track", "Pista de drift"), line: t("Off the coast between SP and RJ. The map shows the way.", "No mar entre SP e RJ. O mapa mostra o caminho."), need: "1" },
   ];
   /** Sends the race to the room; false (and the menu stays) when the room can't be reached. */
   const startRace = (route: Parameters<NonNullable<typeof rallyApi.current>["start"]>[0], how: string, solo = false): boolean => {
@@ -956,7 +978,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         driverAt={driverAt}
         crowned={world.week.crown?.uf ?? null}
         fresh={world.fresh}
-        offices={world.plateOffice}
+        offices={plateOffice}
         onCity={(key, looking) => {
           setViewKey(key);
           setLookKey(looking);
@@ -971,7 +993,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             <button
               type="button"
               onClick={goUp}
-              aria-label={focused ? "Close the building" : place ? "Back to Brazil" : "Back to towns"}
+              aria-label={focused ? t("Close the building", "Fechar o prédio") : place ? t("Back to Brazil", "Voltar pro Brasil") : t("Back to towns", "Voltar pras towns")}
               className={`flex w-9 shrink-0 items-center justify-center border-r-2 ${HUD_EDGE} ${HUD_SOFT} hover:text-cream`}
             >
               <ChevronLeft size={16} aria-hidden />
@@ -980,14 +1002,14 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               {place ? (
                 <>
                   <span className="h-2 w-2 shrink-0 border border-border-light" style={{ background: place.uf ? swatchOf(place.uf) : LIME }} aria-hidden />
-                  <span className="truncate text-cream">{place.ibge !== null ? place.name : "Island"}</span>
+                  <span className="truncate text-cream">{place.ibge !== null ? place.name : t("Island", "Ilha")}</span>
                   <span className={`shrink-0 ${HUD_SOFT}`}>· {fmt(place.devs.length)} {place.devs.length === 1 ? "dev" : "devs"}</span>
                 </>
               ) : (
                 <>
                   <span style={{ color: LIME }}>Brasil</span>
                   <span className="text-cream">· {fmt(world.devs)} devs</span>
-                  <span className={`truncate ${HUD_SOFT} max-sm:hidden`}>· {fmt(world.founded)} cities</span>
+                  <span className={`truncate ${HUD_SOFT} max-sm:hidden`}>· {fmt(world.founded)} {t("cities", "cidades")}</span>
                 </>
               )}
             </p>
@@ -996,9 +1018,20 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               {fmt(here)} online
               {drivingNow > 0 && !inCar && (
                 <button type="button" onClick={() => setDriversOpen((o) => !o)} className="underline decoration-lime/60 underline-offset-2 hover:text-lime">
-                  · {fmt(drivingNow)} driving
+                  · {fmt(drivingNow)} {t("driving", "dirigindo")}
                 </button>
               )}
+            </span>
+            {/* The map's language: Portuguese or English, kept in a cookie. */}
+            <span role="group" aria-label={t("Language", "Idioma")} className={`flex shrink-0 items-center border-l-2 ${HUD_EDGE} px-2 text-[9px] sm:text-[10px]`}>
+              {(["pt", "en"] as const).map((l, i) => (
+                <span key={l} className="flex items-center">
+                  {i > 0 && <span className={`px-1 ${HUD_SOFT}`} aria-hidden>·</span>}
+                  <button type="button" aria-pressed={lang === l} onClick={() => setLang(l)} className={lang === l ? "text-lime" : `${HUD_SOFT} hover:text-cream`}>
+                    {l}
+                  </button>
+                </span>
+              ))}
             </span>
           </div>
           {driversOpen && !inCar && (
@@ -1083,11 +1116,11 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       )}
       {!inCar && askCity && !picker && !state && !focused && !panel && (
         <div className="pointer-events-auto absolute bottom-[110px] left-1/2 z-20 flex w-[min(420px,calc(100vw-24px))] -translate-x-1/2 items-center gap-3 border-[3px] border-lime bg-bg/95 px-3 py-2 sm:bottom-[76px]">
-          <p className="min-w-0 flex-1 text-[11px] text-cream">Which city are you from?</p>
+          <p className="min-w-0 flex-1 text-[11px] text-cream">{t("Which city are you from?", "De qual cidade você é?")}</p>
           <button type="button" onClick={() => openPicker(null)} className="btn-press shrink-0 bg-lime px-2.5 py-1.5 text-[10px] text-bg">
-            Pick my city
+            {t("Pick my city", "Escolher cidade")}
           </button>
-          <button type="button" onClick={dismissAsk} aria-label="Not now" className="shrink-0 text-[10px] text-muted hover:text-cream">
+          <button type="button" onClick={dismissAsk} aria-label={t("Not now", "Agora não")} className="shrink-0 text-[10px] text-muted hover:text-cream">
             ✕
           </button>
         </div>
@@ -1095,7 +1128,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       {!inCar && <BrasilMinimap scale={layout.scale} cities={layout.cities} island={layout.island} camera={cameraStore} cars={carSpots} track={DRIFT_TAG} />}
       {!inCar && (
         <span className="pointer-events-none fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 max-sm:bottom-[calc(66px+env(safe-area-inset-bottom))] max-sm:max-w-[130px] max-sm:text-[8px] max-sm:leading-tight">
-          Map data: IBGE · Natural Earth
+          {t("Map data: IBGE · Natural Earth", "Dados do mapa: IBGE · Natural Earth")}
         </span>
       )}
 
@@ -1135,7 +1168,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         <nav className={`pointer-events-auto absolute inset-x-0 bottom-0 grid ${election ? "grid-cols-5" : "grid-cols-4"} items-end gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
           <button type="button" onClick={() => openPanel("states")} className={bar}>
             <Trophy size={18} className="sm:hidden" aria-hidden />
-            States
+            {t("States", "Estados")}
           </button>
           <button
             type="button"
@@ -1149,7 +1182,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             className={bar}
           >
             <MapIcon size={18} className="sm:hidden" aria-hidden />
-            Brazil
+            {t("Brazil", "Brasil")}
           </button>
           {/* Drive is the bar's middle, lime and raised over it: the one thing to do here. */}
           <button
@@ -1162,13 +1195,13 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             className="-mt-5 flex min-h-[80px] flex-col items-center justify-center gap-1.5 bg-lime text-[10px] text-bg shadow-[0_-6px_0_rgba(0,0,0,0.25)] transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40 sm:mt-0 sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-6 sm:text-[11px] sm:shadow-none"
           >
             <Car size={24} className="sm:size-4" aria-hidden />
-            Drive
+            {t("Drive", "Dirigir")}
           </button>
           {election && (
             <button type="button" onClick={() => openVote()} className={`${bar} relative`}>
               {election.phase === "voting" && <span className="absolute right-[30%] top-3 h-1.5 w-1.5 animate-pulse bg-red-500 sm:static sm:order-first" aria-hidden />}
               <Landmark size={18} className="sm:hidden" aria-hidden />
-              Vote
+              {t("Vote", "Votar")}
             </button>
           )}
           <button
@@ -1189,13 +1222,13 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             {yours && <span className="h-2.5 w-2.5 border border-border-light max-sm:hidden" style={{ background: swatchOf(yours) }} aria-hidden />}
             {home ? (
               <>
-                <span className="sm:hidden">Mine</span>
-                <span className="max-sm:hidden">My building</span>
+                <span className="sm:hidden">{t("Mine", "Meu")}</span>
+                <span className="max-sm:hidden">{t("My building", "Meu prédio")}</span>
               </>
             ) : (
               <span className="text-lime">
-                <span className="sm:hidden">Put mine</span>
-                <span className="max-sm:hidden">Put my building</span>
+                <span className="sm:hidden">{t("Put mine", "Pôr o meu")}</span>
+                <span className="max-sm:hidden">{t("Put my building", "Pôr meu prédio")}</span>
               </span>
             )}
           </button>
@@ -1218,7 +1251,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           paused={paused}
           gated={false}
           held={false}
-          join={!viewerLogin ? { label: "Sign in", short: "Sign in", signIn: true, onClick: signIn } : undefined}
+          join={!viewerLogin ? { label: t("Sign in", "Entrar"), short: t("Sign in", "Entrar"), signIn: true, onClick: signIn } : undefined}
           drivers={drivers}
           crown={crownView}
           map={driveMap}
@@ -1226,7 +1259,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onVolume={changeVolume}
           onEmote={(e) => emoteApi.current?.send(e)}
           // Signed in, and no menu that answers Enter itself is open.
-          onChat={viewerLogin && !games && !taste ? (t) => emoteApi.current?.say(t) : undefined}
+          onChat={viewerLogin && !games && !taste ? (text) => emoteApi.current?.say(text) : undefined}
           onStartCrown={() => crownApi.current?.start()}
           gameOn={racing || !!games}
           startNote={startNote}
@@ -1238,7 +1271,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onExit={exitDrive}
         >
           {games && (
-            <GameMenu title={`Games · ${drivers.length + 1} driving here`} modes={gameModes} onPick={pickGame} onClose={closeGames}>
+            <GameMenu title={t(`Games · ${drivers.length + 1} driving here`, `Jogos · ${drivers.length + 1} dirigindo aqui`)} modes={gameModes} onPick={pickGame} onClose={closeGames}>
               {games.step === "race" ? (
                 <RacePicker
                   slug={league.slug}
@@ -1458,12 +1491,12 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             </>
           }
           stats={[
-            { label: "Pts this week", value: fmt(officeWeek.live.totals[focused.loginLower] ?? 0) },
-            { label: "Rank", value: `#${fmt(focused.rank ?? 0)}` },
-            { label: "Contribs", value: fmt(focused.contributions ?? 0) },
-            { label: "Stars", value: fmt(focused.total_stars ?? 0) },
+            { label: t("Pts this week", "Pts na semana"), value: fmt(officeWeek.live.totals[focused.loginLower] ?? 0) },
+            { label: t("Rank", "Rank"), value: `#${fmt(focused.rank ?? 0)}` },
+            { label: t("Contribs", "Contribs"), value: fmt(focused.contributions ?? 0) },
+            { label: t("Stars", "Estrelas"), value: fmt(focused.total_stars ?? 0) },
             { label: "+1s", value: fmt(focused.kudos_count ?? 0) },
-            { label: "Visits", value: fmt(focused.visit_count ?? 0) },
+            { label: t("Visits", "Visitas"), value: fmt(focused.visit_count ?? 0) },
           ]}
           primary={<InviteButton login={focused.loginLower} city={world.cityOfLogin.get(focused.loginLower) ?? null} founder={!!world.ufOf.get(focused.loginLower)?.founder} townPath={`/town/${league.slug}`} onPickCity={() => openPicker(null)} />}
           onDriveTo={() => startDrive()}
@@ -1480,6 +1513,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
  * cities nothing shows; coming back into the same city doesn't repeat it.
  */
 function AreaTitle({ telemetry, cities }: { telemetry: { radar: { x: number; z: number } }; cities: CityLayout[] }) {
+  const t = useT();
   const [shown, setShown] = useState<{ city: CityLayout; at: number } | null>(null);
   const last = useRef<string | null>(null);
   useEffect(() => {
@@ -1499,16 +1533,16 @@ function AreaTitle({ telemetry, cities }: { telemetry: { radar: { x: number; z: 
   }, [telemetry, cities]);
   useEffect(() => {
     if (!shown) return;
-    const t = setTimeout(() => setShown(null), 3200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setShown(null), 3200);
+    return () => clearTimeout(timer);
   }, [shown]);
   if (!shown) return null;
   const c = shown.city;
   return (
     <div key={shown.at} className="area-title pointer-events-none fixed inset-x-0 top-[22%] z-30 flex flex-col items-center gap-1.5 text-center font-pixel uppercase">
       {c.uf && stateOf(c.uf).name !== c.name && <span className="text-[10px] tracking-[0.3em] text-muted">{stateOf(c.uf).name}</span>}
-      <span className="text-3xl text-cream [text-shadow:0_3px_0_rgba(0,0,0,0.6)] sm:text-5xl">{c.ibge !== null ? c.name : "The island"}</span>
-      <span className="text-[10px] text-lime">{fmt(c.devs.length)} devs live here</span>
+      <span className="text-3xl text-cream [text-shadow:0_3px_0_rgba(0,0,0,0.6)] sm:text-5xl">{c.ibge !== null ? c.name : t("The island", "A ilha")}</span>
+      <span className="text-[10px] text-lime">{t(`${fmt(c.devs.length)} devs live here`, `${fmt(c.devs.length)} devs moram aqui`)}</span>
     </div>
   );
 }
@@ -1527,6 +1561,7 @@ function DriversList({
   onJoin: (c: { x: number; z: number }) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const where = (x: number, z: number) => {
     let best: CityLayout | null = null;
     let bestD = Infinity;
@@ -1539,19 +1574,19 @@ function DriversList({
       }
     }
     if (!best) return "";
-    const name = best.ibge !== null ? best.name : "the island";
-    return bestD < (best.radius + 12) * LOT ? name : `near ${name}`;
+    const name = best.ibge !== null ? best.name : t("the island", "a ilha");
+    return bestD < (best.radius + 12) * LOT ? name : t(`near ${name}`, `perto de ${name}`);
   };
   return (
     <div className="pointer-events-auto border-[3px] border-b-0 border-border bg-bg/95 px-3 py-2 font-pixel uppercase text-cream backdrop-blur-sm">
       <div className="mb-1.5 flex items-baseline justify-between text-[9px] text-muted">
-        <span>Driving now</span>
+        <span>{t("Driving now", "Dirigindo agora")}</span>
         <button type="button" onClick={onClose} className="hover:text-cream">
           ESC
         </button>
       </div>
       {drivers.length === 0 ? (
-        <p className="py-1 text-[10px] normal-case text-muted">Finding them…</p>
+        <p className="py-1 text-[10px] normal-case text-muted">{t("Finding them…", "Procurando…")}</p>
       ) : (
         <ul className="flex flex-col">
           {drivers.map((d) => (
@@ -1561,10 +1596,10 @@ function DriversList({
                 @{d.name} <span className="text-muted">· {where(d.x, d.z)}</span>
               </span>
               <button type="button" onClick={() => onLook(d)} className="shrink-0 border border-border px-2 py-0.5 text-[9px] text-cream hover:border-lime hover:text-lime">
-                Look
+                {t("Look", "Ver")}
               </button>
               <button type="button" onClick={() => onJoin(d)} className="shrink-0 bg-lime px-2 py-0.5 text-[9px] text-bg">
-                Drive here
+                {t("Drive here", "Dirigir aqui")}
               </button>
             </li>
           ))}
@@ -1587,6 +1622,7 @@ function ago(at: number, now: number): string {
  * for its cities, that goes by first.
  */
 function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: string; where: string; at: number }[]; grew: { scale: number; at: number } | null; onPick: (login: string) => void; onBrazil: () => void }) {
+  const tr = useT();
   const [i, setI] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const n = Math.min(arrivals.length, 12) + (grew ? 1 : 0);
@@ -1608,7 +1644,7 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
         className="pointer-events-auto absolute bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream sm:bottom-[72px]"
       >
         <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
-        <span className="shrink-0 text-cream">Brazil grew</span>
+        <span className="shrink-0 text-cream">{tr("Brazil grew", "O Brasil cresceu")}</span>
         <span className="shrink-0 text-lime">{grew.scale}x</span>
         <span className="shrink-0">{ago(grew.at, now)}</span>
       </button>
@@ -1623,8 +1659,8 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
     >
       <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
       <span className="truncate normal-case text-cream">@{a.login}</span>
-      <span className="shrink-0">just arrived</span>
-      <span className="min-w-0 truncate text-lime">{a.where}</span>
+      <span className="shrink-0">{tr("just arrived", "acabou de chegar")}</span>
+      <span className="min-w-0 truncate text-lime">{a.where === "island" ? tr("island", "ilha") : a.where}</span>
       <span className="shrink-0">{ago(a.at, now)}</span>
     </button>
   );
@@ -1632,11 +1668,12 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
 
 /** The one filled button on your own building: invite people to your city (or pick one, on the island). */
 function InviteButton({ login, city, founder, townPath, onPickCity }: { login: string; city: CityLayout | null; founder: boolean; townPath: string; onPickCity: () => void }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   if (!city || city.ibge === null)
     return (
       <button type="button" onClick={onPickCity} className="btn-press w-full bg-lime py-2 text-[10px] text-bg">
-        Pick your city
+        {t("Pick your city", "Escolha sua cidade")}
       </button>
     );
   const invite = () => {
@@ -1652,24 +1689,25 @@ function InviteButton({ login, city, founder, townPath, onPickCity }: { login: s
   };
   return (
     <button type="button" onClick={invite} className="btn-press w-full bg-lime py-2 text-[10px] text-bg">
-      {copied ? "Invite copied" : `Invite to ${city.name}`}
+      {copied ? t("Invite copied", "Convite copiado") : t(`Invite to ${city.name}`, `Convidar pra ${city.name}`)}
     </button>
   );
 }
 
 /** Where a resident lives, said once: their city (a click flies there), its state, Move on yours, and what they are there as seals. */
 function PlaceRow({ login, city, offices, foundedState = null, onCity, onState, onMove }: { login: string; city: CityLayout | null; offices: Office[]; foundedState?: UF | null; onCity: (c: CityLayout) => void; onState: (uf: UF) => void; onMove?: () => void }) {
+  const { lang, t } = useLang();
   const island = !city || city.ibge === null;
   const at = city ? city.devs.findIndex((d) => d.dev.login.toLowerCase() === login) : -1;
   const founder = !island && at >= 0 && city!.devs[at].founder;
   // The city is on the line above: a mayor's seal needs no name.
   // The state they founded (forever, wherever they live now), then the city they founded.
-  const seals = [...(foundedState ? [`Founder ${foundedState}`] : []), ...(founder ? ["Founder"] : []), ...offices.map((o) => (o.kind === "mayor" ? "Mayor" : officeLabel(o)))];
+  const seals = [...(foundedState ? [t(`Founder ${foundedState}`, `Fundador ${foundedState}`)] : []), ...(founder ? [t("Founder", "Fundador")] : []), ...offices.map((o) => (o.kind === "mayor" ? t("Mayor", "Prefeito") : officeLabel(o, lang)))];
   return (
     <div className="mx-4 mb-3 border-2 border-border px-3 py-2.5">
       <div className="flex items-baseline justify-between gap-2">
         {island ? (
-          <span className="text-[11px] text-cream">The island</span>
+          <span className="text-[11px] text-cream">{t("The island", "A ilha")}</span>
         ) : (
           <button type="button" onClick={() => onCity(city!)} className="min-w-0 truncate text-left text-[11px] normal-case text-cream hover:text-lime">
             {city!.name}
@@ -1683,16 +1721,16 @@ function PlaceRow({ login, city, offices, foundedState = null, onCity, onState, 
           )}
           {onMove && (
             <button type="button" onClick={onMove} className="text-cream underline decoration-dotted underline-offset-2 hover:text-lime">
-              {island ? "Pick a city" : "Move"}
+              {island ? t("Pick a city", "Escolher cidade") : t("Move", "Mudar")}
             </button>
           )}
         </span>
       </div>
       {(seals.length > 0 || (!island && at >= 0)) && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {seals.map((t) => (
-            <span key={t} className="bg-lime px-1.5 py-0.5 text-[8px] text-bg">
-              {t}
+          {seals.map((seal) => (
+            <span key={seal} className="bg-lime px-1.5 py-0.5 text-[8px] text-bg">
+              {seal}
             </span>
           ))}
           {!founder && !island && at >= 0 && <span className="border border-border px-1.5 py-0.5 text-[8px] text-muted">Dev #{fmt(at + 1)}</span>}
@@ -1708,10 +1746,11 @@ function PlaceRow({ login, city, offices, foundedState = null, onCity, onState, 
  * your car and joins it. Its clock runs out with the invite.
  */
 function LiveRace({ race, offset, name, onJoin }: { race: RallyState; offset: number; name: (key: string) => string; onJoin: () => void }) {
+  const t = useT();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
   }, []);
   const left = Math.max(0, Math.ceil((race.inviteEnds - now - offset) / 1000));
   if (!race.route || left <= 0) return null;
@@ -1721,18 +1760,18 @@ function LiveRace({ race, offset, name, onJoin }: { race: RallyState; offset: nu
     <div className="pointer-events-auto flex w-[min(380px,100%)] flex-col gap-1">
       <Band className="flex-col items-start gap-1 px-4 py-3" style={{ fontSize: T.small }}>
         <span className="flex items-center gap-2 text-lime">
-          <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden /> Live · race
+          <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden /> {t("Live · race", "Ao vivo · corrida")}
         </span>
         <span className="normal-case text-cream" style={{ fontSize: T.body }}>
           {name(race.route.from)} → {name(race.route.to)}
         </span>
         <span className="normal-case text-muted">
-          {by && !by.startsWith("guest-") ? `@${by}` : "Someone"} · {n} in · starts in {left}s
+          {by && !by.startsWith("guest-") ? `@${by}` : t("Someone", "Alguém")} · {t(`${n} in · starts in ${left}s`, `${n} dentro · larga em ${left}s`)}
         </span>
       </Band>
       <button type="button" onClick={onJoin} className="flex min-h-11 items-center justify-between bg-lime px-4 text-bg shadow-[0_6px_0_rgba(0,0,0,0.35)] transition-[filter] hover:brightness-110 active:translate-y-px" style={{ fontSize: T.body }}>
         <span className="flex items-center gap-2">
-          <Car size={16} aria-hidden /> Drive and join
+          <Car size={16} aria-hidden /> {t("Drive and join", "Dirigir e entrar")}
         </span>
         <span className="tabular-nums">{left}s</span>
       </button>

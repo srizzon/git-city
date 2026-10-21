@@ -6,6 +6,7 @@ import type { CityBuilding } from "@/lib/github";
 import { fmt } from "@/components/league/hud/shared";
 import { useSheet } from "@/components/league/hud/useSheet";
 import { stateOf, type CityLayout, type UF } from "@/lib/towns/brasil-map";
+import { useT } from "@/lib/i18n/LangProvider";
 import { Row, Section, StateFlag } from "./StateCard";
 
 // A city's card, opened from its tag, a link (?cidade=) or a state's list,
@@ -46,6 +47,7 @@ export default function CityCard({
   onDriveHere?: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const sheet = useSheet(onClose);
   const { close } = sheet;
   const [copied, setCopied] = useState(false);
@@ -90,19 +92,19 @@ export default function CityCard({
         <div className="flex items-center gap-3 px-4 pb-3 pt-4 pr-12">
           {c.uf ? <StateFlag uf={c.uf} className="h-8 w-11" /> : <span className="h-8 w-11 shrink-0 border-2 border-border-light bg-lime/30" aria-hidden />}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm normal-case text-cream">{c.ibge === null ? "Island" : c.name}</p>
+            <p className="truncate text-sm normal-case text-cream">{c.ibge === null ? t("Island", "Ilha") : c.name}</p>
             {state && c.uf ? (
               <button type="button" onClick={() => onState(c.uf!)} className="truncate text-[9px] normal-case text-muted underline decoration-border-light underline-offset-2 hover:text-lime">
                 {state.name} · {c.uf}
               </button>
             ) : (
-              <p className="text-[9px] normal-case text-muted">For devs who didn&apos;t name a state</p>
+              <p className="text-[9px] normal-case text-muted">{t("For devs who didn't name a state", "Pra quem não disse o estado")}</p>
             )}
           </div>
           {place && c.devs.length > 0 && (
             <span className="shrink-0 text-right">
               <span className="block border-2 border-lime px-1.5 py-0.5 text-xs text-lime">#{place}</span>
-              <span className="mt-0.5 block text-[7px] text-muted">in {c.uf}</span>
+              <span className="mt-0.5 block text-[7px] text-muted">{t("in", "em")} {c.uf}</span>
             </span>
           )}
         </div>
@@ -110,7 +112,7 @@ export default function CityCard({
         <div className="mx-4 mb-4 grid grid-cols-3 gap-px border border-border/50 bg-border/30">
           {[
             { label: "Devs", value: fmt(c.devs.length) },
-            { label: "New this week", value: `+${fmt(newThisWeek)}` },
+            { label: t("New this week", "Novos na semana"), value: `+${fmt(newThisWeek)}` },
             { label: "Commits", value: fmt(commits) },
           ].map((x) => (
             <div key={x.label} className="bg-bg-card px-1 py-2 text-center">
@@ -121,14 +123,14 @@ export default function CityCard({
         </div>
 
         {c.ibge !== null && (
-          <Section title={`Who runs ${c.name}`} note="mayor changes Sunday 21h">
-            <Row role="Founder" hot login={founder} avatar={founder ? (byLogin.get(founder.toLowerCase())?.avatar_url ?? null) : null} value={founder ? "forever" : undefined} empty={`Nobody yet. The first dev founds ${c.name}.`} onPick={onPickDev} />
-            <Row role="Mayor" hot login={mayor} avatar={mayor ? (byLogin.get(mayor.toLowerCase())?.avatar_url ?? null) : null} value={mayor ? `${fmt(totals[mayor.toLowerCase()] ?? 0)} pts` : undefined} empty="Open: the most points here takes it." onPick={onPickDev} />
+          <Section title={t(`Who runs ${c.name}`, `Quem manda em ${c.name}`)} note={t("mayor changes Sunday 21h", "prefeito muda domingo 21h")}>
+            <Row role={t("Founder", "Fundador")} hot login={founder} avatar={founder ? (byLogin.get(founder.toLowerCase())?.avatar_url ?? null) : null} value={founder ? t("forever", "pra sempre") : undefined} empty={t(`Nobody yet. The first dev founds ${c.name}.`, `Ninguém ainda. O primeiro dev funda ${c.name}.`)} onPick={onPickDev} />
+            <Row role={t("Mayor", "Prefeito")} hot login={mayor} avatar={mayor ? (byLogin.get(mayor.toLowerCase())?.avatar_url ?? null) : null} value={mayor ? `${fmt(totals[mayor.toLowerCase()] ?? 0)} pts` : undefined} empty={t("Open: the most points here takes it.", "Vago: quem fizer mais pontos aqui leva.")} onPick={onPickDev} />
           </Section>
         )}
 
         {top.length > 0 && (
-          <Section title="Biggest buildings" note="commits, all time">
+          <Section title={t("Biggest buildings", "Maiores prédios")} note={t("commits, all time", "commits, desde sempre")}>
             {top.map((login, i) => {
               const b = byLogin.get(login.toLowerCase());
               return <Row key={login} role={`#${i + 1}`} login={login} avatar={b?.avatar_url ?? null} value={fmt(b?.contributions ?? 0)} onPick={onPickDev} />;
@@ -139,11 +141,11 @@ export default function CityCard({
         <div className="mx-4 mb-4 flex flex-col gap-1.5">
           {onDriveHere && c.devs.length > 0 && (
             <button type="button" onClick={onDriveHere} className="btn-press w-full border-2 border-lime bg-lime py-2 text-[10px] text-bg">
-              Drive in {c.ibge === null ? "the island" : c.name}
+              {t("Drive in", "Dirigir em")} {c.ibge === null ? t("the island", "a ilha") : c.name}
             </button>
           )}
           <button type="button" onClick={invite} className="btn-press w-full border-2 border-border py-2 text-[10px] text-cream hover:border-lime hover:text-lime">
-            {copied ? "Invite copied" : `Invite to ${c.ibge === null ? "the island" : c.name}`}
+            {copied ? t("Invite copied", "Convite copiado") : t(`Invite to ${c.ibge === null ? "the island" : c.name}`, `Convidar pra ${c.ibge === null ? "a ilha" : c.name}`)}
           </button>
         </div>
       </div>

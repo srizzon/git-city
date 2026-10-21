@@ -5,6 +5,7 @@ import { LOT } from "@/lib/league-city/grid";
 import { mapNav, type MapCameraStore } from "@/lib/map-nav";
 import { geoAt } from "@/lib/towns/brasil-geo";
 import type { CityLayout } from "@/lib/towns/brasil-map";
+import { useT } from "@/lib/i18n/LangProvider";
 import { swatchOf } from "./stats";
 
 // Brazil in a corner: the coast, a dot per city sized
@@ -30,6 +31,7 @@ export default function BrasilMinimap({
   /** The drift track's gate (world units): a checkered flag. */
   track?: { x: number; z: number };
 }) {
+  const t = useT();
   const cam = useSyncExternalStore(camera.subscribe, camera.get, camera.get);
   const { bounds, outline } = geoAt(scale);
   const pad = 600 * scale;
@@ -50,7 +52,7 @@ export default function BrasilMinimap({
   };
   return (
     <div className="pointer-events-auto fixed bottom-4 right-4 z-30 border-[3px] border-border bg-bg/80 p-1 backdrop-blur-sm max-sm:hidden">
-      <svg width={W} height={W} viewBox={`0 0 ${W} ${W}`} onClick={click} className="cursor-pointer" role="img" aria-label="Map of Brazil">
+      <svg width={W} height={W} viewBox={`0 0 ${W} ${W}`} onClick={click} className="cursor-pointer" role="img" aria-label={t("Map of Brazil", "Mapa do Brasil")}>
         <path d={path} fill="#1d2634" stroke="#4b5466" strokeWidth={1} />
         {[...cities, island].map((c) => {
           const d = dot(c);
