@@ -765,13 +765,6 @@ export default function LeagueClient({
   // HUD comes in piece by piece (hudEnter).
   const [outro, setOutro] = useState<number | null>(null);
   const outroTimer = useRef<number | undefined>(undefined);
-  // The lo-fi player stays out of the cutscene.
-  const cutscene = !!intro || outro !== null;
-  useEffect(() => {
-    const detail = { hidden: cutscene };
-    (window as unknown as Record<string, unknown>).__gcRadioMode = detail;
-    window.dispatchEvent(new CustomEvent("gc:radio-mode", { detail }));
-  }, [cutscene]);
   useEffect(() => () => window.clearTimeout(outroTimer.current), []);
   const endIntro = useCallback(() => {
     const cur = intro;
@@ -1235,13 +1228,6 @@ export default function LeagueClient({
               </div>
             )}
           </div>
-          {/* The lo-fi player's spot: above the bar on phones, bottom left on desktop. */}
-          <div
-            id="gc-radio-slot"
-            className={`pointer-events-auto fixed bottom-[68px] left-3 z-30 sm:bottom-4 sm:left-4 ${focused ? "max-sm:hidden" : ""}`}
-            style={hudEnter ? { animation: "slide-up 0.45s ease-out 0.3s both" } : undefined}
-          />
-
           <div
             className={`pointer-events-none fixed right-4 top-4 z-30 hidden transition-opacity duration-200 sm:block ${focused || panel ? "opacity-0" : ""}`}
             style={hudEnter ? { animation: "fade-in 0.45s ease-out 0.12s both" } : undefined}

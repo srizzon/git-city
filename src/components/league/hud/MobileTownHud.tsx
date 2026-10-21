@@ -12,8 +12,7 @@ import TrophyIcon from "@/components/towns/TrophyIcon";
 import { HUD_BOX, fmt } from "./shared";
 
 // The town HUD on phones (under 640px): one compact header row on top and one
-// full-width action bar at the bottom, with a spot above it for the lo-fi
-// player so nothing overlaps. Driving and editing need a computer, so they
+// full-width action bar at the bottom. Driving and editing need a computer, so they
 // aren't offered here.
 
 const ICON = { size: 16, strokeWidth: 2.5 } as const;
