@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 interface Account {
   id: number;
@@ -14,40 +15,74 @@ interface Account {
   last_active_at: string | null;
 }
 
+type Note = { kind: "ok" | "error"; text: string };
+
 const input = "w-full border border-border bg-bg px-3 py-2 text-[12px] text-cream outline-none placeholder:text-dim focus:border-lime/50";
 
 // Deletion requests sent by email. Delete only when the email on file is the
-// one that wrote in; the login goes with every building it claimed.
+// one that wrote in; the login goes with every building it claimed. The search
+// lives in ?q= so coming back from a profile shows the same result.
 export default function AccountsPage() {
-  const [q, setQ] = useState("");
+  const initial = useSearchParams().get("q") ?? "";
+  const [q, setQ] = useState(initial);
+  const [searching, setSearching] = useState(initial !== "");
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [confirm, setConfirm] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<number | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNote] = useState<Note | null>(null);
 
-  const search = async (e: React.FormEvent) => {
+  const load = useCallback(async (term: string): Promise<{ found: Account[]; note: Note | null }> => {
+    try {
+      const res = await fetch(`/api/admin/accounts?q=${encodeURIComponent(term)}`, { cache: "no-store" });
+      const json = (await res.json()) as { accounts?: Account[]; error?: string };
+      return { found: json.accounts ?? [], note: res.ok ? null : { kind: "error", text: json.error ?? "Search failed" } };
+    } catch {
+      return { found: [], note: { kind: "error", text: "Search failed" } };
+    }
+  }, []);
+
+  const show = useCallback((r: { found: Account[]; note: Note | null }) => {
+    setNote(r.note);
+    setAccounts(r.found);
+    setSearching(false);
+  }, []);
+
+  useEffect(() => {
+    if (initial) load(initial).then(show);
+  }, [initial, load, show]);
+
+  const search = (e: React.FormEvent) => {
     e.preventDefault();
+    const term = q.trim();
+    if (!term) return;
+    setSearching(true);
     setNote(null);
-    const res = await fetch(`/api/admin/accounts?q=${encodeURIComponent(q)}`, { cache: "no-store" });
-    const json = (await res.json()) as { accounts?: Account[] };
-    setAccounts(json.accounts ?? []);
+    const url = new URL(window.location.href);
+    url.searchParams.set("q", term);
+    window.history.replaceState(null, "", url);
+    load(term).then(show);
   };
 
   const erase = async (a: Account) => {
     setBusy(a.id);
-    const res = await fetch("/api/admin/accounts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ developer_id: a.id, confirm: confirm[a.id] ?? "" }),
-    });
-    const json = (await res.json()) as { error?: string; deleted?: string[] };
-    setBusy(null);
-    if (!res.ok) {
-      setNote(json.error ?? "Delete failed");
-      return;
+    setNote(null);
+    try {
+      const res = await fetch("/api/admin/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ developer_id: a.id, confirm: confirm[a.id] ?? "" }),
+      });
+      const json = (await res.json()) as { error?: string; deleted?: string[] };
+      if (!res.ok) {
+        setNote({ kind: "error", text: json.error ?? "Delete failed" });
+      } else {
+        setNote({ kind: "ok", text: `Deleted @${json.deleted?.join(", @")}` });
+        setAccounts((list) => list?.filter((x) => !json.deleted?.includes(x.github_login)) ?? null);
+      }
+    } catch {
+      setNote({ kind: "error", text: "Delete failed" });
     }
-    setNote(`Deleted ${json.deleted?.join(", ")}`);
-    setAccounts((list) => list?.filter((x) => !json.deleted?.includes(x.github_login)) ?? null);
+    setBusy(null);
   };
 
   return (
@@ -58,19 +93,24 @@ export default function AccountsPage() {
 
         <form onSubmit={search} className="mt-6 flex gap-2">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="github username or email" className={input} />
-          <button type="submit" className="shrink-0 border border-border px-4 py-2 text-[11px] text-cream">
-            Find
+          <button type="submit" disabled={searching} className="shrink-0 border border-border px-4 py-2 text-[11px] text-cream disabled:opacity-40">
+            {searching ? "Searching…" : "Find"}
           </button>
         </form>
 
-        {note && <p className="mt-4 text-[11px] text-lime">{note}</p>}
-        {accounts?.length === 0 && <p className="mt-8 text-[11px] text-muted">No account found.</p>}
+        {note && <p className={`mt-4 text-[11px] ${note.kind === "ok" ? "text-lime" : "text-red-400"}`}>{note.text}</p>}
+        {!searching && accounts?.length === 0 && note?.kind !== "ok" &&<p className="mt-8 text-[11px] text-muted">No account found.</p>}
 
         <div className="mt-6 space-y-3">
           {accounts?.map((a) => (
             <div key={a.id} className="border border-border bg-bg-raised p-4">
               <div className="flex items-baseline justify-between gap-2">
-                <a href={`/dev/${a.github_login}`} className="truncate text-xs text-cream hover:text-lime">
+                <a
+                  href={`/dev/${a.github_login}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="truncate text-xs text-cream hover:text-lime"
+                >
                   @{a.github_login}
                   {a.name ? <span className="text-muted"> · {a.name}</span> : null}
                 </a>
@@ -90,7 +130,7 @@ export default function AccountsPage() {
                 />
                 <button
                   type="button"
-                  disabled={busy === a.id || (confirm[a.id] ?? "").trim().toLowerCase() !== a.github_login.toLowerCase()}
+                  disabled={busy !== null || (confirm[a.id] ?? "").trim().toLowerCase() !== a.github_login.toLowerCase()}
                   onClick={() => erase(a)}
                   className="shrink-0 border border-red-400/60 px-4 py-2 text-[11px] text-red-300 disabled:opacity-40"
                 >

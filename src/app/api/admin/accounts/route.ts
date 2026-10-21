@@ -21,11 +21,13 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams.get("q")?.trim().replace(/^@/, "").toLowerCase() ?? "";
   if (!q) return NextResponse.json({ accounts: [] });
 
+  // Logins and emails are stored lowercase, so an exact match uses their
+  // indexes; ilike scanned the whole table and took ~25s.
   const column = q.includes("@") ? "email" : "github_login";
   const { data, error } = await getSupabaseAdmin()
     .from("developers")
     .select("id, github_login, name, email, claimed, claimed_by, created_at, xp_total, last_active_at")
-    .ilike(column, q.replace(/[%_\\]/g, "\\$&"))
+    .eq(column, q)
     .limit(10);
   if (error) return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
   return NextResponse.json({ accounts: data ?? [] });
