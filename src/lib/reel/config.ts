@@ -7,17 +7,22 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 
+const Voice = z.object({
+  id: z.string(),
+  model: z.string().default("eleven_multilingual_v2"),
+  speed: z.number().default(1),
+  seed: z.number().int().default(0),
+  stability: z.number().default(0.5),
+  similarity: z.number().default(0.75),
+  style: z.number().default(0),
+  speakerBoost: z.boolean().default(true),
+});
+
 export const ReelsConfig = z.object({
-  voice: z.object({
-    id: z.string(),
-    model: z.string().default("eleven_multilingual_v2"),
-    speed: z.number().default(1),
-    seed: z.number().int().default(0),
-    stability: z.number().default(0.5),
-    similarity: z.number().default(0.75),
-    style: z.number().default(0),
-    speakerBoost: z.boolean().default(true),
-  }),
+  /** The narrator every reel uses unless its spec names another of `voices`. */
+  voice: Voice,
+  /** Other narrators by name (a spec's `voice`), like the account owner's own cloned voice. */
+  voices: z.record(z.string(), Voice).default({}),
   /** The dev server the studio runs on (the export opens it). */
   studioUrl: z.string().default("http://localhost:3002"),
   /** Music beds, relative to REELS_HOME. */

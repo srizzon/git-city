@@ -436,6 +436,8 @@ export const ReelSpec = z.object({
   /** A trial written as a variation of another reel of the day: what it changes (set when the spec is read). */
   variation: Variation.optional(),
   world: World,
+  /** One of the config's `voices` to narrate with; left out, its default `voice`. */
+  voice: z.string().optional(),
   /** Seconds of picture before the narrator's first word (single-take voice). */
   voiceAt: z.number().nonnegative().default(0.4),
   /** Seconds after the last word. */
