@@ -21,7 +21,6 @@ import type { RallyState } from "@/lib/league-city/drive/rally";
 import { Band } from "@/components/games/ui";
 import { T } from "@/components/games/kit";
 import { cityByKey, parseRouteKey, raceRoute, startLine } from "@/lib/towns/brasil-race";
-import type { RouteRecord } from "@/lib/towns/brasil-race-server";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
 import { useTouch } from "@/components/towns/useDesktop";
 import { createEmoteLog } from "@/lib/league-city/drive/emote-log";
@@ -160,17 +159,6 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     setWasRacing(racing);
     if (racing && games) setGames(null);
   }
-  // Every route's record, for the state cards: fetched the first time one opens.
-  const [raceRecords, setRaceRecords] = useState<RouteRecord[] | null>(null);
-  const recordsAsked = useRef(false);
-  const askRecords = useCallback(() => {
-    if (recordsAsked.current) return;
-    recordsAsked.current = true;
-    fetch(`/api/towns/${encodeURIComponent(league.slug)}/brasil/race?view=week`)
-      .then((r) => r.json())
-      .then((b: { records?: RouteRecord[] }) => setRaceRecords(b.records ?? []))
-      .catch(() => {});
-  }, [league.slug]);
   const [driving, setDriving] = useState(false);
   /** On the drift track: the town's car is parked, a drift run is on. */
   const [drifting, setDrifting] = useState(false);
@@ -562,10 +550,6 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const t = setTimeout(() => (startSheet === "projects" ? setPanel("projects") : setProj(startSheet === "ad" ? { kind: "ad" } : { kind: "share", blocked: projects?.me ? projects.me.blocked : undefined })), 600);
     return () => clearTimeout(t);
   }, [startSheet, projects]);
-
-  useEffect(() => {
-    if (state) askRecords();
-  }, [state, askRecords]);
 
   // ?race=<route>: straight into the car at the route's start city; the race card opens once it's ready.
   const raceStarted = useRef(false);
@@ -1414,24 +1398,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             openCity(c);
           }}
           onDriveHere={state.devs > 0 ? () => startDrive() : undefined}
-          week={world.week}
           race={{ place: world.racePlace.get(state.uf) ?? 27, points: world.statePoints[state.uf] ?? 0 }}
-          records={raceRecords
-            ?.filter((r) => cityByKey(layout, r.from)?.uf === state.uf)
-            .sort((a, b) => a.ms - b.ms)
-            .map((r) => ({ route: `${cityByKey(layout, r.from)?.name ?? "?"} → ${cityByKey(layout, r.to)?.name ?? "?"}`, login: r.login, ms: r.ms }))}
-          cabinet={{
-            provisional: officeWeek.provisional,
-            governor: world.offices.governors.get(state.uf) ?? null,
-            senators: world.offices.senators.get(state.uf) ?? [],
-            mayors: state.cities
-              .flatMap((c) => {
-                const m = world.offices.mayors.get(c.key);
-                return m ? [{ city: m.city, login: m.login }] : [];
-              })
-              .slice(0, 3),
-            totals: officeWeek.totals,
-          }}
+          governor={world.offices.governors.get(state.uf) ?? null}
+          governorPoints={officeWeek.totals}
           onClose={() => {
             setState(null);
             replaceUrl("");
