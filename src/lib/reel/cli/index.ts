@@ -3,6 +3,7 @@
 //
 //   facts [date]        the day's numbers from prod → days/<date>/facts.json
 //   check <id>          the text rules (before any voice is spent)
+//   timing <id>         the text rules, then the voice (cached) and the timing rules: no studio, no export
 //   draft <id>          voice (cached) → mix → 360x640 4 fps export → contact sheet → checks
 //   final <id>          1080x1920 30 fps export → sheet → caption.txt → archive folder → log.md row
 //   cover <id>          the main reel's grid cover (Codex image, ~1.5 min of quota) → cover.png
@@ -188,6 +189,14 @@ async function voice(id: string, config: ReelsConfig) {
   console.log(`  voice ${reel.length.toFixed(1)}s, ${w.length} words → vo.mp3, mix.wav`);
 }
 
+/** Everything a draft checks before the picture: iterate on this, export once the timing passes. */
+async function timing(id: string) {
+  const config = readConfig(home());
+  if (!report(textIssues(loadSpec(id), config))) throw new Error("The text rules failed.");
+  await voice(id, config);
+  if (!(await check(id))) throw new Error("The timing rules failed.");
+}
+
 async function draft(id: string) {
   const config = readConfig(home());
   const dir = dirOf(id);
@@ -365,6 +374,7 @@ const [cmd, arg] = process.argv.slice(2);
 const commands: Record<string, () => Promise<unknown> | unknown> = {
   facts: () => facts(arg),
   check: () => check(arg),
+  timing: () => timing(arg),
   draft: () => draft(arg),
   final: () => final(arg),
   cover: () => cover(arg),
