@@ -177,7 +177,7 @@ async function check(id: string) {
 async function voice(id: string, config: ReelsConfig) {
   const spec = filled(loadSpec(id));
   const dir = dirOf(id);
-  const lines = spec.lines.map((l) => ({ say: l.say ?? l.show.replace(/\*/g, ""), at: l.at }));
+  const lines = spec.lines.map((l) => ({ say: l.say ?? l.show.replace(/\*/g, ""), at: l.at, tone: l.tone }));
   const narrator = spec.voice ? config.voices[spec.voice] : config.voice;
   if (!narrator) throw new Error(`No voice "${spec.voice}" in reels.config.json's voices.`);
   const w = await narrate(lines, spec.voiceAt, narrator, path.join(home(), ".cache", "tts"), path.join(dir, "vo.mp3"));

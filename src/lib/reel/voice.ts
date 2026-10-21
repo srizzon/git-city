@@ -71,8 +71,12 @@ function wordsOf(a: Take["alignment"], shift: number): Word[] {
     e = a.character_end_times_seconds[i];
   });
   if (cur) out.push([cur, s + shift, e + shift]);
-  return out.map(([w, a0, b0]) => [w, Math.round(a0 * 1000) / 1000, Math.round(b0 * 1000) / 1000]);
+  // A tone's audio tag ("[confident]") directs the voice: it isn't a spoken word.
+  return out.filter(([w]) => !/^\[[^\]]*\]$/.test(w)).map(([w, a0, b0]) => [w, Math.round(a0 * 1000) / 1000, Math.round(b0 * 1000) / 1000]);
 }
+
+/** A line as the voice gets it: its tone's audio tag first. */
+const toned = (l: { say: string; tone?: string }) => (l.tone ? `[${l.tone}] ${l.say}` : l.say);
 
 const ffmpeg = (args: string[]) => execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", ...args], { stdio: ["ignore", "ignore", "inherit"] });
 
@@ -83,7 +87,7 @@ const ffmpeg = (args: string[]) => execFileSync("ffmpeg", ["-hide_banner", "-log
  * with the previous line as context, so the voice keeps its tone).
  */
 export async function narrate(
-  lines: { say: string; at?: number }[],
+  lines: { say: string; at?: number; tone?: string }[],
   voiceAt: number,
   voice: VoiceConfig,
   cacheDir: string,
@@ -92,7 +96,7 @@ export async function narrate(
   const tmp = mkdtempSync(path.join(tmpdir(), "reel-voice-"));
   try {
     if (lines.every((l) => l.at === undefined)) {
-      const take = await speak(lines.map((l) => l.say).join(" "), null, voice, cacheDir);
+      const take = await speak(lines.map(toned).join(" "), null, voice, cacheDir);
       const raw = path.join(tmp, "vo.mp3");
       writeFileSync(raw, Buffer.from(take.audio, "base64"));
       // The film's clock: silence before the first word.
@@ -104,7 +108,7 @@ export async function narrate(
     const clips: [number, string][] = [];
     let previous: string | null = null;
     for (const [n, l] of lines.entries()) {
-      const take = await speak(l.say, previous, voice, cacheDir);
+      const take = await speak(toned(l), previous, voice, cacheDir);
       const clip = path.join(tmp, `l${n}.mp3`);
       writeFileSync(clip, Buffer.from(take.audio, "base64"));
       clips.push([l.at!, clip]);

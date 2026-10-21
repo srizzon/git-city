@@ -24,6 +24,8 @@ const Badge = z.object({
   at: Anchor,
   /** The small line under the title, e.g. "seuuser · SP · esta semana". */
   sub: z.string(),
+  /** Replaces the office's title, to carry the card's number at title size ("MORADOR *+50*", the starred word lime). */
+  title: z.string().optional(),
 });
 
 const Balloon = z.object({
@@ -404,6 +406,8 @@ export const Line = z.object({
   at: z.number().nonnegative().optional(),
   /** Said but not captioned (e.g. while a poster says it). */
   hidden: z.boolean().optional(),
+  /** How it's said: a voice model's audio tag ("confident", "teasing"), sent before the line and never shown or counted as a word. */
+  tone: z.string().regex(/^[a-z ]+$/).optional(),
 });
 
 /**
