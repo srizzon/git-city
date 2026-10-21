@@ -86,6 +86,8 @@ export type ClientMsg =
   | { t: "rally_take"; box: number; gen: number }
   /** A quick reaction over your car (lib drive/emotes: the slot). */
   | { t: "emote"; e: number }
+  /** A typed message over your car (signed in only; lib/chat-filter's rules). */
+  | { t: "chat"; text: string }
   /** Rivalry smash (lib/league-city/smash-net): who you are, for the room to ask the site. */
   | { t: "auth"; token: string }
   /** Rivalry smash: your car (k "car") or your blast (k "blast", fx id) took floors off columns `c` of building `b`. */
@@ -115,6 +117,8 @@ export type ServerMsg =
   | { t: "bump"; from: string; x: number; z: number }
   /** Someone's quick reaction (not echoed to the sender). */
   | { t: "emote"; from: string; e: number }
+  /** Someone's typed message, under the login the room checked (not echoed to the sender). */
+  | { t: "chat"; from: string; login: string; text: string }
   /** Smash: whether your `auth` lets you break this town's buildings (signed in with one), and whether you live here. */
   | { t: "smash_me"; can: boolean; home: boolean; login: string | null; floors?: number }
   /** Smash: floors you just took off `b` that score (`n`), and your floors today (UTC), capped. */

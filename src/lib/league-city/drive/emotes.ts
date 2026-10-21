@@ -8,6 +8,9 @@ export const EMOTES = ["😂", "🔥", "👋", "😡", "👑", "💀"] as const;
 export const EMOTE_MS = 2200;
 /** One reaction per driver this often, at most (ms); the server drops the rest. */
 export const EMOTE_MIN_MS = 600;
+/** Typed chat (Enter): its longest message, as the room's rules cut it (lib/chat-filter), and how long its bubble stays (ms). */
+export const CHAT_MAX = 100;
+export const CHAT_MS = 5000;
 /** Lines in the HUD's reaction log. */
 export const LOG_LINES = 5;
 

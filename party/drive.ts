@@ -40,6 +40,7 @@ import {
   tickCrown,
 } from "../src/lib/league-city/drive/crown";
 import { EMOTE_MIN_MS, validEmote } from "../src/lib/league-city/drive/emotes";
+import { ChatGuard } from "../src/lib/chat-filter";
 import {
   RALLY_RECEIPT_TTL_MS,
   idleRally,
@@ -89,6 +90,10 @@ import { LIVE_SECRET_HEADER, createReporter, type TownLive } from "../src/lib/to
 // crowd watching costs a few messages a second, not drivers × watchers × 15.
 // They never count toward MAX_DRIVERS and nothing they send is read.
 //
+// Chat: a driver signed in (their login checked by the site, the smash auth)
+// types a message; lib/chat-filter's rules (the arcade's) decide whether the
+// others get it, under that checked login, never the hello's name.
+//
 // Live count: how many drive and watch here goes to the town tally
 // (party/townlive) on every change, batched, for the /towns cards.
 
@@ -113,6 +118,7 @@ interface Box {
 
 export class DriveServer extends PartyRoom {
   private drivers = new Map<string, Driver>();
+  private chat = new ChatGuard();
   /** One per box slot; how many depends on the room (boxCountFor), set in the constructor. */
   private boxes: Box[] = [];
   private fxSeq = 0;
@@ -340,6 +346,16 @@ export class DriveServer extends PartyRoom {
       if (!d || !validEmote(e) || now - d.lastEmote < EMOTE_MIN_MS) return;
       d.lastEmote = now;
       this.room.broadcast(JSON.stringify({ t: "emote", from: sender.id, e } satisfies ServerMsg), [sender.id, ...this.watchers]);
+      return;
+    }
+
+    // A typed message: signed in only, by the login the site checked; blocked ones reach nobody.
+    if (t === "chat") {
+      const login = this.drivers.has(sender.id) ? this.smash.drivers.get(sender.id)?.login : null;
+      if (!login) return;
+      const verdict = this.chat.check(login, (msg as { text?: unknown }).text, Date.now());
+      if (verdict.kind !== "send") return;
+      this.room.broadcast(JSON.stringify({ t: "chat", from: sender.id, login, text: verdict.text } satisfies ServerMsg), [sender.id, ...this.watchers]);
       return;
     }
 
