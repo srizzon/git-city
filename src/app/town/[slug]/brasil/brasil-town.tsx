@@ -1241,6 +1241,8 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           emoteLog={emoteLog}
           onVolume={changeVolume}
           onEmote={(e) => emoteApi.current?.send(e)}
+          // Signed in, and no menu that answers Enter itself is open.
+          onChat={viewerLogin && !games && !taste ? (t) => emoteApi.current?.say(t) : undefined}
           onStartCrown={() => crownApi.current?.start()}
           gameOn={racing || !!games}
           startNote={startNote}

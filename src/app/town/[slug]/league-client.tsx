@@ -1144,6 +1144,8 @@ export default function LeagueClient({
           emoteLog={emoteLog}
           onVolume={changeVolume}
           onEmote={(e) => emoteApi.current?.send(e)}
+          // Signed in, and no gate, arrival choice or card that answers Enter itself is up.
+          onChat={viewer && !gate && !arriving && !focused ? (t) => emoteApi.current?.say(t) : undefined}
           onStartCrown={() => crownApi.current?.start()}
           onResume={() => setPaused(false)}
           onPause={() => setPaused(true)}

@@ -56,6 +56,7 @@ export default function TouchControls({
   lesson = null,
   mode = "town",
   onEmote,
+  onChat,
 }: {
   touchRef: React.MutableRefObject<TouchDrive>;
   telemetry: DriveTelemetry;
@@ -64,6 +65,8 @@ export default function TouchControls({
   mode?: "town" | "drift";
   /** Your reactions: a React button in the row. */
   onEmote?: (e: number) => void;
+  /** Signed in: the reactions menu's Chat opens the field. */
+  onChat?: () => void;
 }) {
   const driftMode = mode === "drift";
   const drag = useRef<{ id: number; origin: number; x: number; y: number } | null>(null);
@@ -268,7 +271,7 @@ export default function TouchControls({
               </span>
               <span className="text-[8px] text-cream/70">km/h</span>
             </div>
-            {onEmote && <ReactionButton onEmote={onEmote} up className={`${ROW_SMALL} border-cream/40 text-cream/80`} />}
+            {onEmote && <ReactionButton onEmote={onEmote} onChat={onChat} up className={`${ROW_SMALL} border-cream/40 text-cream/80`} />}
             <div className="relative shrink-0">
               {/* Parked at a teammate's building: whose, over the horn that opens it. */}
               {near && (

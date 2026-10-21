@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Smile } from "lucide-react";
-import { EMOTES, emoteForKey } from "@/lib/league-city/drive/emotes";
+import { MessageSquare, Smile } from "lucide-react";
+import { CHAT_MAX, EMOTES, emoteForKey } from "@/lib/league-city/drive/emotes";
 import { HUD_BOX } from "../shared";
 import { carColor } from "@/lib/league-city/drive/net";
 import type { EmoteLog } from "@/lib/league-city/drive/emote-log";
@@ -10,7 +10,8 @@ import type { EmoteLog } from "@/lib/league-city/drive/emote-log";
 // Quick reactions in the HUD (lib drive/emotes). On a keyboard: the six slots
 // in a row with their keys, 1–6 fires one and its slot flashes. On a phone:
 // a smile button that opens the six, a tap sends and closes it. Over the
-// row on a keyboard, a small log of the room's last reactions.
+// row on a keyboard, a small log of the room's last reactions and messages.
+// Signed in, Enter (or Chat in the phone's menu) opens a field to type one.
 
 function typing(): boolean {
   const el = document.activeElement as HTMLElement | null;
@@ -99,10 +100,13 @@ export function ReactionBar({
 /** Phone: a smile that opens the six (`up`: over it, for a button at the bottom, named). */
 export function ReactionButton({
   onEmote,
+  onChat,
   className,
   up = false,
 }: {
   onEmote: (e: number) => void;
+  /** Signed in: a Chat row under the six opens the field. */
+  onChat?: () => void;
   className: string;
   up?: boolean;
 }) {
@@ -139,6 +143,20 @@ export function ReactionButton({
               {emoji}
             </button>
           ))}
+          {onChat && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onChat();
+                setOpen(false);
+              }}
+              className="col-span-3 flex h-11 items-center justify-center gap-2 border-t-2 border-border text-[10px] text-cream active:bg-white/10"
+            >
+              <MessageSquare size={14} strokeWidth={2.5} aria-hidden />
+              Chat
+            </button>
+          )}
         </div>
       )}
     </span>
@@ -162,10 +180,78 @@ export function ReactionLog({ log, align = "end" }: { log: EmoteLog; align?: "st
             <span className={l.mine ? "text-lime" : "text-muted"}>
               {l.name.startsWith("guest-") ? "guest" : `@${l.name}`}
             </span>
-            <span className="text-[11px] leading-none">{EMOTES[l.e]}</span>
+            {l.text ? (
+              <span className="max-w-[16rem] break-words text-[9px] leading-snug text-cream">{l.text}</span>
+            ) : (
+              <span className="text-[11px] leading-none">{EMOTES[l.e]}</span>
+            )}
           </span>
         </li>
       ))}
     </ol>
+  );
+}
+
+/** Enter opens it while driving (`on`), unless something else has the keys. */
+export function useChatKey(on: boolean, open: () => void) {
+  const cb = useRef(open);
+  useEffect(() => {
+    cb.current = open;
+  });
+  useEffect(() => {
+    if (!on) return;
+    const down = (ev: KeyboardEvent) => {
+      if (ev.code !== "Enter" && ev.code !== "NumpadEnter") return;
+      if (ev.repeat || typing() || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      ev.preventDefault();
+      cb.current();
+    };
+    window.addEventListener("keydown", down);
+    return () => window.removeEventListener("keydown", down);
+  }, [on]);
+}
+
+/** The field to type a message: Enter sends, Esc or leaving it closes it (and the car has the keys again). */
+export function ChatField({ onSend, onClose, className = "" }: { onSend: (text: string) => void; onClose: () => void; className?: string }) {
+  const [text, setText] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    input.current?.focus();
+  }, []);
+  return (
+    <form
+      className={`${HUD_BOX} flex items-center gap-2 px-2 ${className}`}
+      onSubmit={(ev) => {
+        ev.preventDefault();
+        if (text.trim()) onSend(text);
+        onClose();
+      }}
+    >
+      <input
+        ref={input}
+        value={text}
+        onChange={(ev) => setText(ev.target.value)}
+        onKeyDown={(ev) => {
+          // Esc closes the field, not the drive (the page's Esc pauses).
+          if (ev.key === "Escape") {
+            ev.preventDefault();
+            ev.stopPropagation();
+            onClose();
+          }
+        }}
+        onBlur={onClose}
+        maxLength={CHAT_MAX}
+        enterKeyHint="send"
+        autoComplete="off"
+        aria-label="Message everyone driving here"
+        placeholder="Say something"
+        // Driving on a phone turns text selection off for the page (DriveHud); iOS won't type into a field without it.
+        style={{ userSelect: "text", WebkitUserSelect: "text" }}
+        className="h-9 min-w-0 flex-1 bg-transparent text-[16px] normal-case text-cream outline-none placeholder:text-dim sm:text-[11px]"
+      />
+      <span className="shrink-0 text-[8px] text-dim tabular-nums" aria-hidden>
+        {CHAT_MAX - text.length}
+      </span>
+    </form>
   );
 }

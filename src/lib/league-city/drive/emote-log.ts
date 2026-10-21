@@ -8,6 +8,8 @@ export interface EmoteLogEntry {
   key: number;
   name: string;
   e: number;
+  /** A typed message instead of the reaction slot. */
+  text?: string;
   mine: boolean;
 }
 

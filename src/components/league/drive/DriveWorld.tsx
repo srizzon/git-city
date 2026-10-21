@@ -400,6 +400,7 @@ export default function DriveWorld({
   const crownHit = useRef<(id: string) => void>(() => {});
   const crownKnock = useRef<() => void>(() => {});
   const emoteSink = useRef<(from: string, e: number) => void>(() => {});
+  const chatSink = useRef<(from: string, login: string, text: string) => void>(() => {});
   const ownEmoteApi = useRef<EmoteApi | null>(null);
   const telemetryRef = useRef(telemetry);
   // The car for the tree bubble: where the minimap feed last put it (units).
@@ -420,6 +421,7 @@ export default function DriveWorld({
       impact.current = { strength: Math.min(1, Math.hypot(x, z) / 12), at: performance.now() };
     },
     onEmote: (from, e) => emoteSink.current(from, e),
+    onChat: (from, login, text) => chatSink.current(from, login, text),
     onBattle: (e) => (e.t === "crown" ? crownSink.current(e) : e.t === "rally" || e.t === "rally_receipt" ? rallySink.current(e) : battleSink.current(e)),
     // Smash: the room asks the site who you are, and has the last word on the floors.
     auth: smash ? smashToken : undefined,
@@ -586,7 +588,7 @@ export default function DriveWorld({
           <BoostTrail sources={fx} />
           <EngineSmoke car={car} stallAt={stallRef} impact={impact} />
           <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} volume={volume} />
-          <EmoteBubbles carRef={car} remotes={remotes} send={send} apiRef={emoteApi ?? ownEmoteApi} sinkRef={emoteSink} name={name} onLog={onEmoteLog} />
+          <EmoteBubbles carRef={car} remotes={remotes} send={send} apiRef={emoteApi ?? ownEmoteApi} sinkRef={emoteSink} chatSinkRef={chatSink} name={name} onLog={onEmoteLog} />
           <RadarFeed car={car} cars={cars} telemetryRef={telemetryRef} />
           <RouteArrow
             car={car}

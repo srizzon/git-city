@@ -67,6 +67,7 @@ export function useDrivePresence({
   onOther,
   auth,
   onEmote,
+  onChat,
   offline = false,
   seat,
 }: {
@@ -88,6 +89,8 @@ export function useDrivePresence({
   /** Rivalry smash: your access token, sent after hello so the room can ask the site who you are. */
   /** Someone else's quick reaction (lib drive/emotes slot). */
   onEmote?: (from: string, e: number) => void;
+  /** Someone else's typed message, under the login the room checked. */
+  onChat?: (from: string, login: string, text: string) => void;
   auth?: () => Promise<string | null>;
 }) {
   const onBumpRef = useRef(onBump);
@@ -95,6 +98,7 @@ export function useDrivePresence({
   const onOtherRef = useRef(onOther);
   const authRef = useRef(auth);
   const onEmoteRef = useRef(onEmote);
+  const onChatRef = useRef(onChat);
   const selfId = useRef<string | null>(null);
   useEffect(() => {
     onBumpRef.current = onBump;
@@ -102,6 +106,7 @@ export function useDrivePresence({
     onOtherRef.current = onOther;
     authRef.current = auth;
     onEmoteRef.current = onEmote;
+    onChatRef.current = onChat;
   });
   const remotes = useRef(new Map<string, RemoteDriver>());
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
@@ -167,6 +172,8 @@ export function useDrivePresence({
         if (v && map.has(msg.from)) onBumpRef.current(msg.from, v.x, v.z);
       } else if (msg.t === "emote") {
         if (map.has(msg.from)) onEmoteRef.current?.(msg.from, msg.e);
+      } else if (msg.t === "chat") {
+        if (map.has(msg.from) && typeof msg.text === "string") onChatRef.current?.(msg.from, msg.login, msg.text);
       } else if (msg.t === "leave") {
         map.delete(msg.id);
         publish();

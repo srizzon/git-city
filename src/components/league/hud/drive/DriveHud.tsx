@@ -18,7 +18,7 @@ import type { CrownState } from "@/lib/league-city/drive/crown";
 import type { CityBuilding } from "@/lib/github";
 import type { CityObject } from "@/lib/league-city/types";
 import Minimap from "./Minimap";
-import { ReactionBar, ReactionLog } from "./Reactions";
+import { ChatField, ReactionBar, ReactionLog, useChatKey } from "./Reactions";
 import type { EmoteLog } from "@/lib/league-city/drive/emote-log";
 
 // Drive mode HUD: the dash (bottom: item, speed, boost), camera, mute and exit
@@ -32,6 +32,8 @@ import type { EmoteLog } from "@/lib/league-city/drive/emote-log";
 // On a phone (touchRef) the HUD is only Pause (sound and exit are in its menu),
 // Games and join up top, others' reactions under Pause, and the touch controls
 // (TouchControls, with your reactions) below; the prompts speak touch.
+// Signed in (`onChat`), Enter or the reactions menu's Chat opens a field to
+// type to everyone driving here.
 
 const SEG = "flex items-center transition-colors hover:bg-white/5 [&>*]:transition-transform active:[&>*]:translate-y-px";
 const ICON_BTN = `${SEG} w-10 justify-center py-2 text-cream hover:text-lime`;
@@ -63,6 +65,7 @@ export default function DriveHud({
   children,
   onVolume,
   onEmote,
+  onChat,
   onResume,
   onPause,
   onCamera,
@@ -106,6 +109,8 @@ export default function DriveHud({
   onVolume: (v: number) => void;
   /** A quick reaction (lib drive/emotes slot). */
   onEmote: (e: number) => void;
+  /** Signed in: send a typed message to the room. */
+  onChat?: (text: string) => void;
   onResume: () => void;
   /** A phone's top-left button opens the pause menu (sound, exit); without it, it exits. */
   onPause?: () => void;
@@ -120,6 +125,9 @@ export default function DriveHud({
   const [entered, setEntered] = useState(!firstRun);
   /** The loading band is gone (no band on the intro's first run): the controls take the bottom. */
   const [loaded, setLoaded] = useState(firstRun);
+  const [chatting, setChatting] = useState(false);
+  const canChat = !!onChat && ready && entered && !paused && !held;
+  useChatKey(canChat && !chatting, () => setChatting(true));
   const enter = firstRun ? (delay: number) => ({ animation: `fade-in 0.45s ease-out ${delay}s both` }) : () => undefined;
 
   useEffect(() => {
@@ -148,6 +156,7 @@ export default function DriveHud({
   }, [telemetry]);
 
   const touch = !!touchRef;
+  const chatField = canChat && chatting ? <ChatField onSend={(t) => onChat?.(t)} onClose={() => setChatting(false)} className={touch ? "w-full" : "w-[222px]"} /> : null;
   // A phone in the car: a held thumb must never start selecting text (iOS
   // picks words off hidden page text and the callout covers the controls).
   // Off for the whole page while you drive, and any selection that slips
@@ -175,7 +184,7 @@ export default function DriveHud({
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
       {/* First, so every other piece of the HUD sits above the steering layer. */}
-      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} onEmote={entered ? onEmote : undefined} />}
+      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} onEmote={entered ? onEmote : undefined} onChat={canChat ? () => setChatting(true) : undefined} />}
 
       {ready && entered && !touch && !gameOn && (
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`} style={enter(0)}>
@@ -298,6 +307,7 @@ export default function DriveHud({
       {ready && entered && !touch && (
         <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2" style={enter(0.2)}>
           <ReactionLog log={emoteLog} />
+          {chatField}
           <ReactionBar on={!paused} onEmote={onEmote} />
           <Minimap telemetry={telemetry} buildings={map.buildings} objects={map.objects} home={map.home} size={150} layer={map.layer} />
         </div>
@@ -309,7 +319,8 @@ export default function DriveHud({
 
       {/* Phone: no minimap, others' reactions under Pause. */}
       {ready && loaded && entered && touch && (
-        <div className="absolute left-4 top-[calc(max(1rem,env(safe-area-inset-top))+3.5rem)]">
+        <div className="absolute inset-x-4 top-[calc(max(1rem,env(safe-area-inset-top))+3.5rem)] flex flex-col items-start gap-2">
+          {chatField}
           <ReactionLog log={emoteLog} align="start" />
         </div>
       )}
@@ -318,7 +329,7 @@ export default function DriveHud({
         <div
           className={`absolute bottom-20 left-4 text-[9px] leading-loose text-muted transition-opacity duration-700 ${hints ? "opacity-100" : "opacity-0"}`}
         >
-          {[...CONTROLS, ...(onGames ? ([["G", "games: race, crown rush"]] as [string, string][]) : [])].map(([k, v]) => (
+          {[...CONTROLS, ...(onGames ? ([["G", "games: race, crown rush"]] as [string, string][]) : []), ...(onChat ? ([["Enter", "chat"]] as [string, string][]) : [])].map(([k, v]) => (
             <div key={k}>
               <span className="text-cream">{k}</span> {v}
             </div>
