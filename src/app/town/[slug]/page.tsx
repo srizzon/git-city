@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { STATES } from "@/lib/towns/brasil-map";
 import { cityBySlug, citySlug } from "@/lib/towns/br-cities";
 import { notFound, permanentRedirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { LANG_COOKIE, pickLang } from "@/lib/i18n/lang";
 import {
   countJoinRequests,
   currentSlugFor,
@@ -119,8 +120,11 @@ export default async function LeaguePage({ params, searchParams }: Props) {
     const uf = typeof query.uf === "string" && /^[A-Za-z]{2}$/.test(query.uf) ? query.uf.toUpperCase() : null;
     const cidade = typeof query.cidade === "string" && /^[a-z0-9-]{3,80}$/.test(query.cidade) ? query.cidade : null;
     const atLogin = typeof at === "string" && LOGIN_RE.test(at.toLowerCase()) ? at.toLowerCase() : null;
+    const [h, jar] = await Promise.all([headers(), cookies()]);
+    const lang = pickLang({ cookie: jar.get(LANG_COOKIE)?.value, acceptLanguage: h.get("accept-language"), country: h.get("x-vercel-ip-country") });
     return (
       <BrasilTownLoader
+        lang={lang}
         league={{ slug: league.slug, name: league.name }}
         layout={layout}
         cityDevs={cityDevs}
