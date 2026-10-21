@@ -5,40 +5,37 @@ import posthog from "posthog-js";
 import type { CityBuilding } from "@/lib/github";
 import { Avatar, fmt } from "@/components/league/hud/shared";
 import { useSheet } from "@/components/league/hud/useSheet";
-import { stateOf, type CityLayout } from "@/lib/towns/brasil-map";
+import { stateOf } from "@/lib/towns/brasil-map";
 import { type StateStats } from "./stats";
 
 // A state's card, opened from its tag or a search: its place and points in the
-// week's race, who runs it (this week's governor and its founder), its three
-// biggest cities, and the two ways to grow it: drive there, or invite someone.
+// week's race, its founder, its top three devs by this week's points (the
+// governor tagged), and the two ways to grow it: drive there, or invite someone.
 
 export default function StateCard({
   state: s,
   byLogin,
   townPath,
   onPickDev,
-  onPickCity,
   onDriveHere,
   onClose,
   race,
   governor,
-  governorPoints,
+  topDevs,
 }: {
   state: StateStats;
   byLogin: ReadonlyMap<string, CityBuilding>;
   /** The town's path, for the invite link. */
   townPath: string;
   onPickDev: (login: string) => void;
-  /** Fly to one of its cities. */
-  onPickCity: (c: CityLayout) => void;
   onDriveHere?: () => void;
   onClose: () => void;
   /** Its place and points in this week's race (the States table's order). */
   race?: { place: number; points: number };
-  /** This week's governor (the most points in the state), if any. */
+  /** This week's governor, tagged in the top devs. */
   governor?: string | null;
-  /** This week's points by login. */
-  governorPoints?: Record<string, number>;
+  /** The state's three devs with the most points this week. */
+  topDevs?: { login: string; points: number }[];
 }) {
   const sheet = useSheet(onClose);
   const { close } = sheet;
@@ -89,22 +86,14 @@ export default function StateCard({
           </div>
         </div>
 
-        <Section title={`Who runs ${s.uf}`}>
-          {governor !== undefined && (
-            <Row role="Governor" hot login={governor} avatar={avatar(governor)} value={governor ? `${fmt(governorPoints?.[governor] ?? 0)} pts` : undefined} empty="Open: the most points takes it." onPick={onPickDev} />
-          )}
-          <Row role="Founder" login={s.founder} avatar={avatar(s.founder)} value={s.founder ? s.capital.name : undefined} empty={`Nobody yet. The first dev founds ${s.capital.name}.`} onPick={onPickDev} />
-        </Section>
+        <ul className="mx-4 mb-4 flex flex-col">
+          <Row role="Founder" sub={s.capital.name} hot login={s.founder} avatar={avatar(s.founder)} empty={`Nobody yet. The first dev founds ${s.capital.name}.`} onPick={onPickDev} />
+        </ul>
 
-        {cities.length > 0 && (
-          <Section title="Cities" note="devs">
-            {cities.slice(0, 3).map((c) => (
-              <li key={c.key}>
-                <button type="button" onClick={() => onPickCity(c)} className="flex w-full items-center gap-2.5 py-1 text-left hover:text-lime">
-                  <span className="min-w-0 flex-1 truncate text-[10px] normal-case text-cream">{c.name}</span>
-                  <span className="w-8 shrink-0 text-right text-[9px] tabular-nums text-muted">{fmt(c.devs.length)}</span>
-                </button>
-              </li>
+        {topDevs && topDevs.length > 0 && (
+          <Section title="Top devs" note="pts this week">
+            {topDevs.map((d, i) => (
+              <Row key={d.login} role={`#${i + 1}`} sub={d.login.toLowerCase() === governor?.toLowerCase() ? "Governor" : undefined} login={d.login} avatar={avatar(d.login)} value={fmt(d.points)} onPick={onPickDev} />
             ))}
           </Section>
         )}

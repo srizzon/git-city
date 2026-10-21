@@ -1393,14 +1393,14 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             openBuilding(b);
             setBackTo(state);
           }}
-          onPickCity={(c) => {
-            posthog.capture("brasil_city_opened", { city: c.ibge, from: "state_card" });
-            openCity(c);
-          }}
           onDriveHere={state.devs > 0 ? () => startDrive() : undefined}
           race={{ place: world.racePlace.get(state.uf) ?? 27, points: world.statePoints[state.uf] ?? 0 }}
           governor={world.offices.governors.get(state.uf) ?? null}
-          governorPoints={officeWeek.totals}
+          topDevs={world.allCities
+            .flatMap((c) => c.devs.filter((d) => d.dev.uf === state.uf).map((d) => ({ login: d.dev.login, points: officeWeek.totals[d.dev.login.toLowerCase()] ?? 0 })))
+            .filter((d) => d.points > 0)
+            .sort((a, b) => b.points - a.points || a.login.localeCompare(b.login))
+            .slice(0, 3)}
           onClose={() => {
             setState(null);
             replaceUrl("");
