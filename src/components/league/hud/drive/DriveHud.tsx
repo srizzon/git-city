@@ -5,7 +5,8 @@ import { Camera, Gamepad2, LogIn, Pause, Plus, Volume1, Volume2, VolumeX, X } fr
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { carColor, type DriverInfo } from "@/lib/league-city/drive/net";
 import { HUD_BOX } from "../shared";
-import PauseMenu, { CONTROLS } from "./PauseMenu";
+import PauseMenu, { CONTROLS, CONTROLS_PT } from "./PauseMenu";
+import { useLang } from "@/lib/i18n/LangProvider";
 import StartScreen from "./StartScreen";
 import DrivePrompt, { type Lesson } from "./DrivePrompt";
 import Dash from "./Dash";
@@ -118,6 +119,7 @@ export default function DriveHud({
   onMute: () => void;
   onExit: () => void;
 }) {
+  const { lang, t } = useLang();
   const honk = useRef<HTMLDivElement>(null);
   const honkName = useRef<HTMLSpanElement>(null);
   const [hints, setHints] = useState(true);
@@ -158,7 +160,7 @@ export default function DriveHud({
   const touch = !!touchRef;
   // Closed, the field's spot says chat is there (Enter, or a tap); open, it's the field.
   const chatField = !canChat ? null : chatting ? (
-    <ChatField onSend={(t) => onChat?.(t)} onClose={() => setChatting(false)} className={touch ? "w-full" : "w-[222px]"} />
+    <ChatField onSend={(m) => onChat?.(m)} onClose={() => setChatting(false)} className={touch ? "w-full" : "w-[222px]"} />
   ) : (
     <ChatPrompt touch={touch} onOpen={() => setChatting(true)} />
   );
@@ -195,11 +197,11 @@ export default function DriveHud({
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`} style={enter(0)}>
           <p className="flex items-center gap-2 text-cream">
             <span className="h-1.5 w-1.5 animate-pulse bg-lime" aria-hidden />
-            {drivers.length + 1} driving now
+            {drivers.length + 1} {t("driving now", "dirigindo agora")}
           </p>
           {drivers.length === 0 ? (
             <div className="flex max-w-[180px] flex-col items-start gap-1.5">
-              <p className="text-dim normal-case">Share the link to race your team here.</p>
+              <p className="text-dim normal-case">{t("Share the link to race your team here.", "Manda o link pra correr com a galera aqui.")}</p>
               <CopyLink />
             </div>
           ) : (
@@ -207,10 +209,10 @@ export default function DriveHud({
               {drivers.slice(0, 6).map((d) => (
                 <li key={d.id} className="flex items-center gap-1.5 text-muted">
                   <span className="h-2 w-2" style={{ background: carColor(d.name) }} aria-hidden />
-                  {d.name.startsWith("guest-") ? "guest" : `@${d.name}`}
+                  {d.name.startsWith("guest-") ? t("guest", "visitante") : `@${d.name}`}
                 </li>
               ))}
-              {drivers.length > 6 && <li className="text-dim">+{drivers.length - 6} more</li>}
+              {drivers.length > 6 && <li className="text-dim">+{drivers.length - 6} {t("more", "mais")}</li>}
             </ul>
           )}
         </div>
@@ -219,13 +221,13 @@ export default function DriveHud({
       {/* Phone: Pause on the left, Games and join on the right, nothing else. */}
       {entered && touch && (
         <div className="absolute inset-x-4 top-[max(1rem,env(safe-area-inset-top))] flex items-start justify-between gap-3" style={enter(0)}>
-          <button type="button" onClick={onPause ?? onExit} aria-label={onPause ? "Pause" : "Exit"} className={`${HUD_BOX} ${ICON_BTN} w-11 py-2.5`}>
+          <button type="button" onClick={onPause ?? onExit} aria-label={onPause ? t("Pause", "Pausar") : t("Exit", "Sair")} className={`${HUD_BOX} ${ICON_BTN} w-11 py-2.5`}>
             {onPause ? <Pause {...ICON} aria-hidden /> : <X {...ICON} aria-hidden />}
           </button>
           <div className={`${HUD_BOX} flex items-stretch divide-x-2 divide-border empty:hidden`}>
             {onGames && (
               <button type="button" onClick={onGames} className="flex items-center gap-1.5 bg-lime px-3 py-2.5 text-[10px] text-bg active:translate-y-px">
-                <Gamepad2 {...ICON} aria-hidden /> Games
+                <Gamepad2 {...ICON} aria-hidden /> {t("Games", "Jogos")}
               </button>
             )}
             {join && (
@@ -241,17 +243,17 @@ export default function DriveHud({
       {entered && !touch && (
         <div className={`${HUD_BOX} absolute right-4 top-4 flex items-stretch divide-x-2 divide-border`} style={enter(0.12)}>
           {onGames && (
-            <button type="button" onClick={onGames} title="Games (G)" className={`${SEG} gap-2 px-3 py-2 text-[10px] text-lime hover:text-cream`}>
+            <button type="button" onClick={onGames} title={t("Games (G)", "Jogos (G)")} className={`${SEG} gap-2 px-3 py-2 text-[10px] text-lime hover:text-cream`}>
               <Gamepad2 {...ICON} aria-hidden />
-              <span>Games</span>
+              <span>{t("Games", "Jogos")}</span>
               <span className="bg-cream px-1 text-[8px] leading-[1.4] text-bg">G</span>
             </button>
           )}
           <button
             type="button"
             onClick={onCamera}
-            aria-label={camera === "chase" ? "Top-down camera (C)" : "Chase camera (C)"}
-            title={camera === "chase" ? "Top-down camera (C)" : "Chase camera (C)"}
+            aria-label={camera === "chase" ? t("Top-down camera (C)", "Câmera de cima (C)") : t("Chase camera (C)", "Câmera atrás (C)")}
+            title={camera === "chase" ? t("Top-down camera (C)", "Câmera de cima (C)") : t("Chase camera (C)", "Câmera atrás (C)")}
             className={ICON_BTN}
           >
             <Camera {...ICON} aria-hidden />
@@ -261,9 +263,9 @@ export default function DriveHud({
             <button
               type="button"
               onClick={onMute}
-              aria-label={silent ? "Sound on" : "Mute"}
+              aria-label={silent ? t("Sound on", "Ligar som") : t("Mute", "Mudo")}
               aria-pressed={silent}
-              title={silent ? "Sound on" : "Mute"}
+              title={silent ? t("Sound on", "Ligar som") : t("Mute", "Mudo")}
               className={ICON_BTN}
             >
               {silent ? <VolumeX {...ICON} aria-hidden /> : volume < 0.5 ? <Volume1 {...ICON} aria-hidden /> : <Volume2 {...ICON} aria-hidden />}
@@ -271,7 +273,7 @@ export default function DriveHud({
             {/* pt-2, not mt-2: the pointer crosses the gap without closing it. */}
             <span className="absolute right-[-3px] top-full hidden pt-2 group-focus-within:block group-hover:block">
               <label className={`${HUD_BOX} flex items-center gap-3 px-3 py-2.5 text-[9px] text-muted`}>
-                <span className="sr-only">Volume</span>
+                <span className="sr-only">{t("Volume", "Volume")}</span>
                 <input
                   type="range"
                   min={0}
@@ -293,7 +295,7 @@ export default function DriveHud({
           )}
           <button type="button" onClick={onExit} className={`${SEG} gap-2 px-3 py-2 text-[10px] text-cream hover:text-lime`}>
             <X {...ICON} aria-hidden />
-            <span>Exit</span>
+            <span>{t("Exit", "Sair")}</span>
           </button>
         </div>
       )}
@@ -305,7 +307,7 @@ export default function DriveHud({
           className={`${HUD_BOX} absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-2 px-3 py-1.5 text-[10px] text-cream opacity-0 transition-opacity data-[on=true]:opacity-100`}
         >
           <span className="border-2 border-lime px-1.5 text-lime">H</span>
-          Honk at <span ref={honkName} className="text-lime" />
+          {t("Honk at", "Buzinar pra")} <span ref={honkName} className="text-lime" />
         </div>
       )}
 
@@ -336,10 +338,10 @@ export default function DriveHud({
         >
           {[...CONTROLS, ...(onGames ? ([["G", "games: race, crown rush"]] as [string, string][]) : []), ...(onChat ? ([["Enter", "chat"]] as [string, string][]) : [])].map(([k, v]) => (
             <div key={k}>
-              <span className="text-cream">{k}</span> {v}
+              <span className="text-cream">{lang === "pt" ? (CONTROLS_PT[k] ?? k) : k}</span> {lang === "pt" ? (CONTROLS_PT[v] ?? v) : v}
             </div>
           ))}
-          <div className="normal-case">Gamepad works too</div>
+          <div className="normal-case">{t("Gamepad works too", "Controle também funciona")}</div>
         </div>
       )}
 

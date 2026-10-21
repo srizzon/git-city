@@ -9,13 +9,15 @@ import type { ElectionView } from "@/lib/towns/brasil-election-server";
 import type { UF } from "@/lib/towns/brasil-map";
 import { Board } from "./BrasilPanels";
 import { ballot } from "@/lib/towns/brasil-election";
+import { useLang } from "@/lib/i18n/LangProvider";
+import type { Lang } from "@/lib/i18n/lang";
 
 // The presidential race as Brazil's voting machine: every candidate has a
 // two-digit number, you type it on the keypad (or the keyboard, or tap the
 // candidate), the screen shows their face, and CONFIRMA casts it (BRANCO
 // takes your vote back, CORRIGE clears what you typed); the machine says FIM.
 // The machine's buttons and screen keep its Portuguese, laid out like the
-// real one; the rest is English.
+// real one; the rest speaks the map's language.
 //
 // Anyone can type and see a candidate. Only CONFIRMA asks for more, and the
 // screen says what's missing right where you'd confirm: the vote not open
@@ -25,9 +27,9 @@ import { ballot } from "@/lib/towns/brasil-election";
 // live count, and running. A board on a wide screen, the sheet on a phone.
 // Times are Brasília's.
 
-const when = (ms: number) =>
-  new Date(ms).toLocaleString("en-GB", { timeZone: "America/Sao_Paulo", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const day = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { timeZone: "America/Sao_Paulo", day: "numeric", month: "short" });
+const when = (ms: number, lang: Lang) =>
+  new Date(ms).toLocaleString(lang === "pt" ? "pt-BR" : "en-GB", { timeZone: "America/Sao_Paulo", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const day = (ms: number, lang: Lang) => new Date(ms).toLocaleDateString(lang === "pt" ? "pt-BR" : "en-GB", { timeZone: "America/Sao_Paulo", day: "numeric", month: "short" });
 
 function left(to: number): string {
   const ms = Math.max(0, to - Date.now());
@@ -90,6 +92,7 @@ export default function ElectionPanel({
   onClose: () => void;
 }) {
   const wide = useWide();
+  const { lang, t } = useLang();
   const [e, setE] = useState(initial);
   const [typed, setTyped] = useState(startNumber ? ballot(startNumber) : "");
   const [fim, setFim] = useState(false);
@@ -126,18 +129,18 @@ export default function ElectionPanel({
       try {
         const res = await fetch(`/api/towns/${slug}/brasil/election`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Try again.");
+        if (!res.ok) throw new Error(json.error ?? t("Try again.", "Tenta de novo."));
         setE(json as ElectionView);
         posthog.capture(body.action === "vote" ? "brasil_vote_clicked" : "brasil_run_clicked", { action: body.action, blank: body.number === null });
         return true;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Try again.");
+        setError(err instanceof Error ? err.message : t("Try again.", "Tenta de novo."));
         return false;
       } finally {
         setBusy(false);
       }
     },
-    [slug],
+    [slug, t],
   );
 
   const voting = e.phase === "voting";
@@ -151,11 +154,11 @@ export default function ElectionPanel({
   // Whether CONFIRMA can go through, and (for the screen) what stands in the way when it can't.
   const blocked = !voting || !signedIn || !me?.onMap || !!me?.cantVote;
   const why: { text: string; action?: { label: string; run: () => void } } | null = !voting
-    ? { text: `Vote opens ${when(e.next.opens)} (Brasília).` }
+    ? { text: t(`Vote opens ${when(e.next.opens, lang)} (Brasília).`, `A votação abre ${when(e.next.opens, lang)} (Brasília).`) }
     : !signedIn
-      ? { text: "Sign in to confirm your vote.", action: { label: "Sign in with GitHub", run: () => onSignIn(typedNumber) } }
+      ? { text: t("Sign in to confirm your vote.", "Entra pra confirmar seu voto."), action: { label: t("Sign in with GitHub", "Entrar com GitHub"), run: () => onSignIn(typedNumber) } }
       : !me?.onMap
-        ? { text: "Only devs on the map vote.", action: { label: "Put my building on the map", run: () => onPutOnMap(typedNumber) } }
+        ? { text: t("Only devs on the map vote.", "Só devs no mapa votam."), action: { label: t("Put my building on the map", "Botar meu prédio no mapa"), run: () => onPutOnMap(typedNumber) } }
         : me.cantVote
           ? { text: me.cantVote }
           : null;
@@ -269,11 +272,11 @@ export default function ElectionPanel({
               </span>
             </span>
           ) : (
-            <span className="text-[9px] normal-case">Voto em branco · no vote</span>
+            <span className="text-[9px] normal-case">{t("Voto em branco · no vote", "Voto em branco")}</span>
           )}
           {mine && (
             <button type="button" onClick={() => share("vote")} className="btn-press bg-[#1b1d22] px-4 py-2 text-[10px] uppercase text-lime">
-              {copied === "vote" ? "Link copied" : "Share my vote"}
+              {copied === "vote" ? t("Link copied", "Link copiado") : t("Share my vote", "Compartilhar meu voto")}
             </button>
           )}
           {!fim && <span className="text-[8px] normal-case">Digite outro número para trocar.</span>}
@@ -320,7 +323,7 @@ export default function ElectionPanel({
       type="button"
       disabled={busy}
       onClick={() => press(label)}
-      aria-label={`Digit ${label}`}
+      aria-label={t(`Digit ${label}`, `Dígito ${label}`)}
       className="btn-press flex h-10 items-center justify-center rounded-[3px] bg-[#25272c] text-base tabular-nums text-white shadow-[0_3px_0_#0b0c0e] disabled:opacity-50"
     >
       {label}
@@ -365,13 +368,13 @@ export default function ElectionPanel({
   const roster = (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between px-1 text-[9px] text-muted">
-        <span>Candidates · tap one to type their number</span>
+        <span>{t("Candidates · tap one to type their number", "Candidatos · toca num pra digitar o número")}</span>
         <a href={`/town/${slug}/apuracao`} className="text-cream underline hover:text-lime">
-          {voting ? `Live count · ${fmt(total)} votes` : "Live count"}
+          {voting ? t(`Live count · ${fmt(total)} votes`, `Apuração · ${fmt(total)} votos`) : t("Live count", "Apuração")}
         </a>
       </div>
       {e.candidates.length === 0 ? (
-        <p className="border-2 border-border px-3 py-3 text-[10px] normal-case text-muted">Nobody is running yet. Be the first.</p>
+        <p className="border-2 border-border px-3 py-3 text-[10px] normal-case text-muted">{t("Nobody is running yet. Be the first.", "Ninguém se candidatou ainda. Seja o primeiro.")}</p>
       ) : (
         <ol className="flex flex-col gap-1">
           {e.candidates.map((c) => {
@@ -383,7 +386,7 @@ export default function ElectionPanel({
                 <button
                   type="button"
                   onClick={() => type(ballot(c.number))}
-                  aria-label={`Type ${ballot(c.number)}, @${c.login}`}
+                  aria-label={t(`Type ${ballot(c.number)}, @${c.login}`, `Digitar ${ballot(c.number)}, @${c.login}`)}
                   className={`flex w-full items-center gap-2.5 border-2 px-2 py-1.5 text-left ${onScreen ? "border-cream" : mine ? "border-lime" : "border-border hover:border-lime/50"}`}
                 >
                   <span className="flex h-8 w-9 shrink-0 items-center justify-center bg-[#eef0ea] text-sm tabular-nums" style={{ color: ink }}>
@@ -393,8 +396,8 @@ export default function ElectionPanel({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[10px] normal-case text-cream">@{c.login}</span>
                     <span className="block text-[8px] text-muted">
-                      {[ufOf(c.login) === undefined ? null : (ufOf(c.login) ?? "Island"), c.addedBy === "admin" ? "Nominated" : null].filter(Boolean).join(" · ")}
-                      {mine && <span className="text-lime"> · your vote</span>}
+                      {[ufOf(c.login) === undefined ? null : (ufOf(c.login) ?? t("Island", "Ilha")), c.addedBy === "admin" ? t("Nominated", "Indicado") : null].filter(Boolean).join(" · ")}
+                      {mine && <span className="text-lime"> · {t("your vote", "seu voto")}</span>}
                     </span>
                   </span>
                   {voting && (
@@ -415,14 +418,14 @@ export default function ElectionPanel({
         <div className="flex flex-col gap-1.5 border-2 border-lime p-2.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[9px] text-cream">
-              You&apos;re running · <span className="text-lime">#{ballot(me.running)}</span>
+              {t("You're running", "Você é candidato")} · <span className="text-lime">#{ballot(me.running)}</span>
             </span>
             <button type="button" disabled={busy} onClick={() => act({ action: "withdraw" })} className="text-[9px] text-muted underline hover:text-cream disabled:opacity-40">
-              Stop running
+              {t("Stop running", "Desistir")}
             </button>
           </div>
           <button type="button" onClick={() => share("run")} className="btn-press bg-lime py-2 text-[10px] text-bg">
-            {copied === "run" ? "Link copied" : `Share "vote ${ballot(me.running)}"`}
+            {copied === "run" ? t("Link copied", "Link copiado") : t(`Share "vote ${ballot(me.running)}"`, `Compartilhar "vote ${ballot(me.running)}"`)}
           </button>
         </div>
       ) : (
@@ -432,7 +435,7 @@ export default function ElectionPanel({
           onClick={() => (!signedIn ? onSignIn(null) : !me?.onMap ? onPutOnMap(null) : act({ action: "run" }))}
           className="btn-press border-2 border-border py-2 text-[10px] text-cream hover:border-lime/60 disabled:opacity-40"
         >
-          {!signedIn ? "Sign in to run for president" : !me?.onMap ? "Put my building on the map to run" : "Run for president"}
+          {!signedIn ? t("Sign in to run for president", "Entra pra se candidatar") : !me?.onMap ? t("Put my building on the map to run", "Bota teu prédio no mapa pra se candidatar") : t("Run for president", "Me candidatar a presidente")}
         </button>
       )}
     </div>
@@ -445,22 +448,22 @@ export default function ElectionPanel({
         <Crown size={12} className={e.president ? "text-lime" : ""} aria-hidden />
         {e.president ? (
           <>
-            President <span className="normal-case text-cream">@{e.president.login}</span>
-            {e.current && <span>· until {day(e.current.end)}</span>}
+            {t("President", "Presidente")} <span className="normal-case text-cream">@{e.president.login}</span>
+            {e.current && <span>· {t("until", "até")} {day(e.current.end, lang)}</span>}
           </>
         ) : (
-          "No president yet"
+          t("No president yet", "Sem presidente ainda")
         )}
       </span>
       <span className="flex items-center gap-1.5">
         <Clock size={12} aria-hidden />
         {voting ? (
           <>
-            Vote ends in <span className="tabular-nums text-cream">{left(e.next.closes)}</span>
+            {t("Vote ends in", "Votação fecha em")} <span className="tabular-nums text-cream">{left(e.next.closes)}</span>
           </>
         ) : (
           <>
-            Vote opens in <span className="tabular-nums text-cream">{left(e.next.opens)}</span>
+            {t("Vote opens in", "Votação abre em")} <span className="tabular-nums text-cream">{left(e.next.opens)}</span>
           </>
         )}
       </span>
@@ -476,11 +479,11 @@ export default function ElectionPanel({
   );
 
   return wide ? (
-    <Board title="President" onClose={onClose}>
+    <Board title={t("President", "Presidente")} onClose={onClose}>
       {body}
     </Board>
   ) : (
-    <Panel title="President" onClose={onClose} above full>
+    <Panel title={t("President", "Presidente")} onClose={onClose} above full>
       {body}
     </Panel>
   );

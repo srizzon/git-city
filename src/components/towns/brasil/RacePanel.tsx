@@ -13,6 +13,8 @@ import type { RallyView } from "@/components/league/drive/RallyMode";
 import { Band } from "@/components/games/ui";
 import { GameClock, GameInvite, GameOnBand, GameResults, GameStandings, KEYS_ONLY, Keys, LIGHTS, T, type ResultRow, type StandingRow } from "@/components/games/kit";
 import { Chip } from "@/components/games/ui";
+import { useLang, useT } from "@/lib/i18n/LangProvider";
+import type { Lang } from "@/lib/i18n/lang";
 
 // The Brasil map's city race in the car games' kit (components/games): the
 // race's step in the Games menu (how long, the route it drew, its record and
@@ -21,12 +23,12 @@ import { Chip } from "@/components/games/ui";
 // route again.
 
 const PLACE = ["1st", "2nd", "3rd"];
-const place = (n: number) => PLACE[n - 1] ?? `${n}th`;
+const place = (n: number, lang: Lang) => (lang === "pt" ? `${n}º` : (PLACE[n - 1] ?? `${n}th`));
 const km = (m: number) => `${(m / 1000).toFixed(1)} km`;
-const LENGTH_LABEL: Record<RaceLength, [string, string]> = {
-  short: ["Short", "~1 min"],
-  medium: ["Medium", "~2 min"],
-  long: ["Long", "~4 min"],
+const LENGTH_LABEL: Record<RaceLength, [string, string, string]> = {
+  short: ["Short", "Curta", "~1 min"],
+  medium: ["Medium", "Média", "~2 min"],
+  long: ["Long", "Longa", "~4 min"],
 };
 const ORDER: RaceLength[] = ["short", "medium", "long"];
 /** A split shows this long after each gate (ms). */
@@ -91,20 +93,21 @@ export function RacePicker({
   onStart: (route: RallyRoute, how: string, solo?: boolean) => boolean;
   onBack: () => void;
 }) {
+  const t = useT();
   const [length, setLength] = useState<RaceLength>("medium");
   const [draft, setDraft] = useState<{ route: RaceRoute | null; problem: string | null; how: string }>(() => {
     const k = initial ? parseRouteKey(initial) : null;
     const r = k ? raceRoute(layout, k.from, k.to) : null;
-    if (r) return { route: r, problem: r.key !== initial ? "The road between these cities changed: this is a fresh board." : null, how: "link" };
+    if (r) return { route: r, problem: r.key !== initial ? t("The road between these cities changed: this is a fresh board.", "A estrada entre essas cidades mudou: o placar é novo.") : null, how: "link" };
     return draw(layout, telemetry, "medium");
   });
   const board = useBoard(slug, draft.route?.key ?? null);
   const go = (route: RaceRoute, solo = false) => {
-    if (!onStart(toRallyRoute(route), draft.how, solo)) setDraft((d) => ({ ...d, problem: "Can't reach the race room right now. Try again in a moment." }));
+    if (!onStart(toRallyRoute(route), draft.how, solo)) setDraft((d) => ({ ...d, problem: t("Can't reach the race room right now. Try again in a moment.", "Não deu pra conectar na sala da corrida. Tenta de novo daqui a pouco.") }));
   };
   const record = board?.[0] ?? null;
   const name = (key: string) => cityByKey(layout, key)?.name ?? "?";
-  const from = draft.route ? name(draft.route.from) : (nearestCity(layout, telemetry.radar.x * UNIT_TO_M, telemetry.radar.z * UNIT_TO_M)?.name ?? "here");
+  const from = draft.route ? name(draft.route.from) : (nearestCity(layout, telemetry.radar.x * UNIT_TO_M, telemetry.radar.z * UNIT_TO_M)?.name ?? t("here", "aqui"));
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
@@ -135,8 +138,8 @@ export function RacePicker({
     <>
       <button type="button" onClick={onBack} className="text-left outline-none active:translate-y-px">
         <Band className="w-full justify-between px-4 py-2 text-lime" style={{ fontSize: T.small }}>
-          <span>‹ Race · from {from}</span>
-          <span className="text-muted">Back</span>
+          <span>‹ {t("Race", "Corrida")} · {t("from", "de")} {from}</span>
+          <span className="text-muted">{t("Back", "Voltar")}</span>
         </Band>
       </button>
       <div className="grid grid-cols-3 gap-1.5">
@@ -153,9 +156,9 @@ export function RacePicker({
           >
             <Band tone={l === length ? "cream" : "dark"} delay={40 + i * 30} className="min-h-11 w-full flex-col gap-1 px-3 py-2" style={{ fontSize: T.small }}>
               <span>
-                {i + 1} · {LENGTH_LABEL[l][0]}
+                {i + 1} · {t(LENGTH_LABEL[l][0], LENGTH_LABEL[l][1])}
               </span>
-              <span className="normal-case opacity-70">{LENGTH_LABEL[l][1]}</span>
+              <span className="normal-case opacity-70">{LENGTH_LABEL[l][2]}</span>
             </Band>
           </button>
         ))}
@@ -168,15 +171,15 @@ export function RacePicker({
           </Band>
           <Band delay={140} className="flex-wrap gap-x-3 gap-y-1 px-4 py-2.5 normal-case text-muted" style={{ fontSize: T.small }}>
             <span>
-              {km(draft.route.length)} · {draft.route.gates.length} gates
+              {km(draft.route.length)} · {draft.route.gates.length} {t("gates", "portões")}
             </span>
             <span>
               {board === null ? "…" : record ? (
                 <>
-                  record <span className="text-cream">{formatLap(record.ms)}</span> @{record.login}
+                  {t("record", "recorde")} <span className="text-cream">{formatLap(record.ms)}</span> @{record.login}
                 </>
               ) : (
-                "no record yet"
+                t("no record yet", "sem recorde ainda")
               )}
             </span>
           </Band>
@@ -192,11 +195,11 @@ export function RacePicker({
       ) : null}
       {(draft.problem || !draft.route) && (
         <Band delay={140} className="px-4 py-2.5 normal-case text-muted" style={{ fontSize: T.small }}>
-          {draft.problem ?? "No road from this city reaches another one. Drive to a bigger city."}
+          {draft.problem ?? t("No road from this city reaches another one. Drive to a bigger city.", "Nenhuma estrada daqui chega em outra cidade. Dirige até uma cidade maior.")}
         </Band>
       )}
       <Band delay={320} className="px-4 py-2 normal-case text-dim" style={{ fontSize: T.small }}>
-        {others > 0 ? `Everyone driving here gets ${RALLY.invite / 1000} s to join. Nobody does: no race.` : "Nobody else is driving here: you race the record's ghost."}
+        {others > 0 ? t(`Everyone driving here gets ${RALLY.invite / 1000} s to join. Nobody does: no race.`, `Quem tá dirigindo aqui tem ${RALLY.invite / 1000} s pra entrar. Ninguém entra: sem corrida.`) : t("Nobody else is driving here: you race the record's ghost.", "Ninguém mais tá dirigindo aqui: você corre contra o fantasma do recorde.")}
       </Band>
       <div className="grid grid-cols-2 gap-1.5">
         <button type="button" onClick={() => setDraft(draw(layout, telemetry, length))} className="outline-none active:translate-y-px">
@@ -204,13 +207,13 @@ export function RacePicker({
             <span className={KEYS_ONLY}>
               <Chip>R</Chip>
             </span>{" "}
-            Other city
+            {t("Other city", "Outra cidade")}
           </Band>
         </button>
         {draft.route && (
           <button type="button" onClick={() => draft.route && go(draft.route)} className="outline-none active:translate-y-px">
             <Band tone="lime" delay={360} className="min-h-11 w-full justify-center gap-3 px-4 py-2.5" style={{ fontSize: T.body }}>
-              {others > 0 ? "Challenge" : "Race"}
+              {others > 0 ? t("Challenge", "Desafiar") : t("Race", "Correr")}
             </Band>
           </button>
         )}
@@ -218,16 +221,16 @@ export function RacePicker({
       {draft.route && others > 0 && (
         <button type="button" onClick={() => draft.route && go(draft.route, true)} className="outline-none active:translate-y-px">
           <Band delay={380} className="min-h-11 w-full justify-center px-4 py-2 normal-case text-muted" style={{ fontSize: T.small }}>
-            Or race it alone, against the record&apos;s ghost
+            {t("Or race it alone, against the record's ghost", "Ou corre sozinho, contra o fantasma do recorde")}
           </Band>
         </button>
       )}
       <Keys
         delay={400}
         keys={[
-          ["Enter", others > 0 ? "challenge" : "race"],
-          ["← →", "length"],
-          ["Esc", "back"],
+          ["Enter", others > 0 ? t("challenge", "desafiar") : t("race", "correr")],
+          ["← →", t("length", "distância")],
+          ["Esc", t("back", "voltar")],
         ]}
       />
     </>
@@ -266,6 +269,7 @@ export default function RacePanel({
   /** Race the same route again. */
   onRematch: (route: RallyRoute) => void;
 }) {
+  const { lang, t: tr } = useLang();
   const rally = view?.rally ?? null;
   const you = view?.you ?? null;
   const counting = !!rally && rally.phase !== "idle";
@@ -304,23 +308,23 @@ export default function RacePanel({
     const news: [string, string][] = [];
     const pts = saved?.state === "saved" ? saved.points : 0;
     const uf = yourUf ? ` · ${yourUf}` : "";
-    if (saved?.state === "saved" && saved.newRecord) news.push(["New route record", pts > 0 ? `+${pts} pts${uf}` : ""]);
-    else if (pts > 0) news.push(["Points for your state", `+${pts}${uf}`]);
+    if (saved?.state === "saved" && saved.newRecord) news.push([tr("New route record", "Novo recorde da rota"), pts > 0 ? `+${pts} pts${uf}` : ""]);
+    else if (pts > 0) news.push([tr("Points for your state", "Pontos pro teu estado"), `+${pts}${uf}`]);
     const live = r.phase === "live";
     const guest = mine.name.startsWith("guest-");
     const status =
       guest && mine.ms !== null && mine.ms > 0
-        ? "Sign in to save your time and score points."
+        ? tr("Sign in to save your time and score points.", "Entra pra salvar teu tempo e marcar pontos.")
         : saved?.state === "saving"
-        ? "Saving your time…"
+        ? tr("Saving your time…", "Salvando teu tempo…")
         : saved?.state === "guest"
-          ? "Sign in to save your time and score points."
+          ? tr("Sign in to save your time and score points.", "Entra pra salvar teu tempo e marcar pontos.")
           : saved?.state === "error"
             ? saved.message
             : live
-              ? `The others have ${Math.max(0, Math.ceil((r.endsAt - serverNow) / 1000))}s`
+              ? tr(`The others have ${Math.max(0, Math.ceil((r.endsAt - serverNow) / 1000))}s`, `Os outros têm ${Math.max(0, Math.ceil((r.endsAt - serverNow) / 1000))}s`)
               : saved?.state === "saved"
-                ? `Your best ${formatLap(saved.best)} · #${saved.rank} on this route`
+                ? tr(`Your best ${formatLap(saved.best)} · #${saved.rank} on this route`, `Teu melhor ${formatLap(saved.best)} · #${saved.rank} nessa rota`)
                 : null;
     const rows: ResultRow[] = order.map((id) => {
       const x = r.racers[id];
@@ -336,9 +340,9 @@ export default function RacePanel({
               ? formatLap(x.ms)
               : `+${((x.ms - winner) / 1000).toFixed(3)}`
             : x.ms === -1
-              ? "untimed"
+              ? tr("untimed", "sem tempo")
               : x.gone
-                ? "left"
+                ? tr("left", "saiu")
                 : live
                   ? `${x.next}/${route.gates.length}`
                   : "DNF",
@@ -348,12 +352,12 @@ export default function RacePanel({
     return (
       <GameResults
         title={routeName(route)}
-        place={myPlace > 0 ? (order.length === 1 ? "Your time" : `${place(myPlace)} of ${order.length}`) : mine.ms === -1 ? "Finished, untimed" : "Didn't finish"}
+        place={myPlace > 0 ? (order.length === 1 ? tr("Your time", "Teu tempo") : tr(`${place(myPlace, lang)} of ${order.length}`, `${place(myPlace, lang)} de ${order.length}`)) : mine.ms === -1 ? tr("Finished, untimed", "Terminou, sem tempo") : tr("Didn't finish", "Não terminou")}
         time={mine.ms !== null && mine.ms > 0 ? formatLap(mine.ms) : null}
         news={news}
         status={status}
         rows={rows}
-        again="Rematch"
+        again={tr("Rematch", "Revanche")}
         onAgain={busy || live ? null : () => onRematch(route)}
         onClose={() => setClosed(results.id)}
       />
@@ -370,14 +374,14 @@ export default function RacePanel({
     if (!mine || you !== rally.by) return null;
     return (
       <GameInvite
-        kind="Race"
+        kind={tr("Race", "Corrida")}
         icon={Flag}
         title={routeName(route)}
-        lines={["Nobody joined, so no race."]}
+        lines={[tr("Nobody joined, so no race.", "Ninguém entrou, sem corrida.")]}
         endsAt={rally.endsAt + RALLY.over}
         serverNow={serverNow}
         total={RALLY.over}
-        action="Race it alone"
+        action={tr("Race it alone", "Correr sozinho")}
         onJoin={() => onAlone(route)}
       />
     );
@@ -388,14 +392,14 @@ export default function RacePanel({
     const by = rally.by ? rally.racers[rally.by]?.name : null;
     return (
       <GameInvite
-        kind="Race"
+        kind={tr("Race", "Corrida")}
         icon={Flag}
         title={routeName(route)}
-        lines={[`${by && !by.startsWith("guest-") ? `@${by}` : "Someone"} · ${km(route.length)} · ${n} in`]}
+        lines={[`${by && !by.startsWith("guest-") ? `@${by}` : tr("Someone", "Alguém")} · ${km(route.length)} · ${n} ${tr("in", "dentro")}`]}
         endsAt={rally.inviteEnds}
         serverNow={serverNow}
         total={RALLY.invite}
-        action={mine ? `Waiting for racers · ${n} in` : "Join race"}
+        action={mine ? tr(`Waiting for racers · ${n} in`, `Esperando pilotos · ${n} dentro`) : tr("Join race", "Entrar na corrida")}
         onJoin={
           mine
             ? null
@@ -413,7 +417,7 @@ export default function RacePanel({
     if (rally.phase !== "countdown" && rally.phase !== "live") return null;
     return (
       <GameOnBand icon={Flag}>
-        Race on: {routeName(route)} · {Object.values(rally.racers).filter((r) => !r.gone).length} racing
+        {tr("Race on", "Corrida rolando")}: {routeName(route)} · {Object.values(rally.racers).filter((r) => !r.gone).length} {tr("racing", "correndo")}
       </GameOnBand>
     );
   }
@@ -426,7 +430,7 @@ export default function RacePanel({
   const grid = rally.phase === "countdown";
   const rows: StandingRow[] = (grid ? Object.entries(rally.racers).sort((a, b) => a[1].slot - b[1].slot).map(([id]) => id) : order).map((id) => {
     const x = rally.racers[id];
-    return { id, name: x.name, you: id === you, value: grid ? "" : x.ms !== null ? "in" : `${x.next}/${gates}` };
+    return { id, name: x.name, you: id === you, value: grid ? "" : x.ms !== null ? tr("in", "chegou") : `${x.next}/${gates}` };
   });
   const lit = grid ? Math.max(0, Math.min(LIGHTS, Math.floor((serverNow - rally.lightsAt) / RALLY.lightMs) + 1)) : null;
   const t = Math.max(0, serverNow - rally.startsAt);
@@ -439,12 +443,12 @@ export default function RacePanel({
   return (
     <>
       <GameClock
-        label={grid ? `Grid · P${mine.slot + 1} of ${n}` : `Gate ${Math.min(mine.next + 1, gates)}/${gates}${n > 1 ? ` · P${pos}/${n}` : ""}`}
+        label={grid ? tr(`Grid · P${mine.slot + 1} of ${n}`, `Grid · P${mine.slot + 1} de ${n}`) : `${tr("Gate", "Portão")} ${Math.min(mine.next + 1, gates)}/${gates}${n > 1 ? ` · P${pos}/${n}` : ""}`}
         lit={lit}
         ms={t}
         split={grid ? null : split}
         go={!grid && t < 1200}
-        note={mine.void ? <Band className="px-3 py-1 normal-case text-[#ff7e7e]" style={{ fontSize: T.small }}>Too fast somewhere: this run isn&apos;t timed.</Band> : null}
+        note={mine.void ? <Band className="px-3 py-1 normal-case text-[#ff7e7e]" style={{ fontSize: T.small }}>{tr("Too fast somewhere: this run isn't timed.", "Rápido demais em algum ponto: essa volta não conta tempo.")}</Band> : null}
       />
       {n > 1 && <GameStandings rows={rows} />}
     </>

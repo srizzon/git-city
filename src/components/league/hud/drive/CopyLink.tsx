@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { Check, Link2 } from "lucide-react";
+import { useT } from "@/lib/i18n/LangProvider";
 
 // Copies this league's link, so teammates can come drive (and race for the
 // crown) here. Blurs after the click so Space keeps drifting instead of
 // pressing the button again.
 
 export default function CopyLink({ className = "" }: { className?: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const copy = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.blur();
@@ -29,7 +31,7 @@ export default function CopyLink({ className = "" }: { className?: string }) {
       } ${className}`}
     >
       {copied ? <Check size={11} strokeWidth={3} aria-hidden /> : <Link2 size={11} strokeWidth={3} aria-hidden />}
-      {copied ? "Copied" : "Copy link"}
+      {copied ? t("Copied", "Copiado") : t("Copy link", "Copiar link")}
     </button>
   );
 }

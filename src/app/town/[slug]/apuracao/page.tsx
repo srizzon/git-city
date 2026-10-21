@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cookies, headers } from "next/headers";
+import { LANG_COOKIE, pickLang } from "@/lib/i18n/lang";
+import { LangProvider } from "@/lib/i18n/LangProvider";
 import { getLeagueBySlug } from "@/lib/leagues/service";
 import { getCount } from "@/lib/towns/brasil-election-server";
 import { PRESIDENCY_ON } from "@/lib/towns/brasil-election";
@@ -25,5 +28,11 @@ export default async function ApuracaoPage({ params }: Props) {
   const { slug } = await params;
   const league = await getLeagueBySlug(slug);
   if (league?.map !== "brasil") notFound();
-  return <ApuracaoLive slug={league.slug} initial={await getCount(league.id)} />;
+  const [h, jar] = await Promise.all([headers(), cookies()]);
+  const lang = pickLang({ cookie: jar.get(LANG_COOKIE)?.value, acceptLanguage: h.get("accept-language"), country: h.get("x-vercel-ip-country") });
+  return (
+    <LangProvider initial={lang}>
+      <ApuracaoLive slug={league.slug} initial={await getCount(league.id)} />
+    </LangProvider>
+  );
 }

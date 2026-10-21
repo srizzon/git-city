@@ -51,6 +51,7 @@ export const BRASIL_DRIFT: LiveSpot = {
   status: "live",
   name: "Brasil Drift",
   tagline: "Interlagos cut down to a drift course, on an island off the coast between São Paulo and Rio.",
+  taglinePt: "Interlagos virou pista de drift, numa ilha no litoral entre São Paulo e Rio.",
   track: {
     ...SPRINT,
     id: "brasil",

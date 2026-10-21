@@ -561,12 +561,6 @@ function HomeContent({ serverIsAdmin, townOfWeek }: HomeContentProps) {
       window.history.replaceState(null, "", loginSetup.redirect);
     }
   }, [loginSetup.status, loginSetup.redirect]);
-  // The lo-fi radio portals into #gc-radio-slot. Rendered only after this page
-  // hydrates, so the server HTML never has the slot: when the radio filled it
-  // mid-hydration (a heavy page outlasts GlobalRadio's two-frame wait), React
-  // found an unexpected node there and threw #418.
-  const [radioSlotReady, setRadioSlotReady] = useState(false);
-  useEffect(() => { setRadioSlotReady(true); }, []);
   const bench = benchCount(searchParams.get("bench"));
 
   // Real live event fetched from the server (the production path).
@@ -988,20 +982,6 @@ function HomeContent({ serverIsAdmin, townOfWeek }: HomeContentProps) {
   const theme = THEMES[themeIndex];
   const didInit = useRef(false);
   const savedFocusRef = useRef<string | null>(null);
-
-  // Broadcast mode/theme to global LofiRadio (lives in layout)
-  useEffect(() => {
-    const detail = {
-      flyMode,
-      raidMode: raidState.phase !== "idle" && raidState.phase !== "preview",
-      accent: theme.accent,
-      shadow: theme.shadow,
-      hidden: flyMode && isMobile,
-    };
-    // Store for late-mounting components (e.g. portal)
-    (window as unknown as Record<string, unknown>).__gcRadioMode = detail;
-    window.dispatchEvent(new CustomEvent("gc:radio-mode", { detail }));
-  }, [flyMode, raidState.phase, theme.accent, theme.shadow, isMobile]);
 
   // Detect mobile/touch device
   useEffect(() => {
@@ -3375,7 +3355,7 @@ function HomeContent({ serverIsAdmin, townOfWeek }: HomeContentProps) {
             </button>
           </div>
 
-          {/* Theme switcher + Radio (bottom-left) — above ticker */}
+          {/* Theme switcher (bottom-left) — above ticker */}
           <div className="pointer-events-auto fixed bottom-10 left-3 z-31 flex flex-col-reverse items-start gap-2 sm:left-4 sm:flex-row sm:items-center">
             <button
               onClick={cycleTheme}
@@ -3385,7 +3365,6 @@ function HomeContent({ serverIsAdmin, townOfWeek }: HomeContentProps) {
               <span className="text-cream">{theme.name}</span>
               <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
             </button>
-            {radioSlotReady && <div id="gc-radio-slot" />}
             <GraphicsControl
               mode={perfMode}
               preference={perfPreference}
@@ -5776,7 +5755,7 @@ function HomeContent({ serverIsAdmin, townOfWeek }: HomeContentProps) {
         </div>
       )}
 
-      {/* ─── Bottom-left controls: Theme + Radio (portal slot) + Intro ─── */}
+      {/* ─── Bottom-left controls: Theme + Intro ─── */}
       {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (
         <div className="pointer-events-auto fixed bottom-8 left-3 z-25 flex flex-col-reverse items-start gap-2 sm:bottom-10 sm:left-4 sm:flex-row sm:items-center">
           <button
@@ -5787,7 +5766,6 @@ function HomeContent({ serverIsAdmin, townOfWeek }: HomeContentProps) {
             <span className="text-cream">{theme.name}</span>
             <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
           </button>
-          {radioSlotReady && <div id="gc-radio-slot" />}
           <button
             onClick={replayIntro}
             className="btn-press flex items-center gap-1 border-[3px] border-border bg-bg/70 px-2 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"

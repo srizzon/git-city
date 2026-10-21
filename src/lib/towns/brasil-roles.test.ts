@@ -16,7 +16,7 @@ describe("brasilOffices", () => {
   const o = brasilOffices(layout, totals, "Gus");
   it("the president comes from the vote and holds nothing else", () => {
     expect(o.president).toBe("gus");
-    expect(o.byLogin.get("gus")?.map(officeLabel)).toEqual(["President"]);
+    expect(o.byLogin.get("gus")?.map((o) => officeLabel(o))).toEqual(["President"]);
     expect(brasilOffices(layout, totals).president).toBeNull();
   });
   it("one office each, from the top down: governor, then the next one to the Senate", () => {
@@ -28,7 +28,7 @@ describe("brasilOffices", () => {
   it("a mayor is whoever is left; nobody who didn't code holds anything", () => {
     expect(o.mayors.get("3550308")?.login).toBe("ana");
     expect(o.byLogin.has("duda")).toBe(false);
-    expect(o.byLogin.get("bia")?.map(officeLabel)).toEqual(["Governor of SP"]);
+    expect(o.byLogin.get("bia")?.map((o) => officeLabel(o))).toEqual(["Governor of SP"]);
     expect([...o.byLogin.values()].every((os) => os.length === 1)).toBe(true);
   });
 });

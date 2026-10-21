@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import GlobalRadio from "@/components/GlobalRadio";
 import EmailNotice from "@/components/EmailNotice";
 import CaptureMode from "@/components/CaptureMode";
 import PostHogIdentify from "@/components/PostHogIdentify";
@@ -99,7 +98,6 @@ export default function RootLayout({
       </head>
       <body className="bg-bg font-pixel text-warm" suppressHydrationWarning>
         {children}
-        <GlobalRadio />
         <EmailNotice />
         <CaptureMode />
         <PostHogIdentify />

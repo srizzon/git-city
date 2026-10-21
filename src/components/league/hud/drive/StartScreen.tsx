@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Car } from "lucide-react";
 import { Band } from "@/components/games/ui";
 import { T } from "@/components/games/kit";
+import { useT } from "@/lib/i18n/LangProvider";
 
 // Shown from the Drive click until the car is ready (picked in the
 // 2026-10-19 phone prototype, "Live"): the scene stays sharp, and a lime
@@ -28,6 +29,7 @@ export default function StartScreen({
   /** The band has faded out: the controls can come up where it was. */
   onGone?: () => void;
 }) {
+  const t = useT();
   const [progress, setProgress] = useState(0);
   const [gone, setGone] = useState(false);
   const [minPassed, setMinPassed] = useState(false);
@@ -35,8 +37,8 @@ export default function StartScreen({
   const done = ready && minPassed;
 
   useEffect(() => {
-    const t = setTimeout(() => setMinPassed(true), MIN_MS);
-    return () => clearTimeout(t);
+    const id = setTimeout(() => setMinPassed(true), MIN_MS);
+    return () => clearTimeout(id);
   }, []);
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export default function StartScreen({
         <Band tone="lime" delay={60} className="flex-col items-stretch gap-2 px-4 py-3" style={{ fontSize: T.body }}>
           <span className="flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <Car size={16} aria-hidden /> {ready ? "Ready" : "Starting your car"}
+              <Car size={16} aria-hidden /> {ready ? t("Ready", "Pronto") : t("Starting your car", "Ligando seu carro")}
             </span>
             <span className="tabular-nums">{Math.round(shown * 100)}%</span>
           </span>

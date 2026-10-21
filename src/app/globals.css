@@ -203,69 +203,6 @@ button:not(:disabled) {
   animation: kudos-float 1.2s ease-out forwards;
 }
 
-/* ─── Lo-fi Radio ─── */
-@keyframes radio-pulse {
-  0%, 100% { border-color: var(--radio-accent, #c8e64a); }
-  50% { border-color: var(--color-border); }
-}
-.radio-pulse {
-  animation: radio-pulse 2s ease-in-out infinite;
-}
-@keyframes eq-bar-1 {
-  0%, 100% { height: 3px; }
-  50% { height: 10px; }
-}
-@keyframes eq-bar-2 {
-  0%, 100% { height: 8px; }
-  50% { height: 3px; }
-}
-@keyframes eq-bar-3 {
-  0%, 100% { height: 5px; }
-  50% { height: 12px; }
-}
-.eq-bar {
-  width: 3px;
-  background: var(--radio-accent, #c8e64a);
-  display: inline-block;
-}
-.eq-bar-1 { animation: eq-bar-1 0.8s ease-in-out infinite; }
-.eq-bar-2 { animation: eq-bar-2 0.6s ease-in-out infinite 0.15s; }
-.eq-bar-3 { animation: eq-bar-3 0.7s ease-in-out infinite 0.3s; }
-.radio-volume {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  background: var(--color-border);
-  border-radius: 0;
-  cursor: pointer;
-}
-.radio-volume::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 10px;
-  height: 10px;
-  background: var(--radio-accent, #c8e64a);
-  border: none;
-  border-radius: 0;
-  cursor: pointer;
-}
-.radio-volume::-moz-range-thumb {
-  width: 10px;
-  height: 10px;
-  background: var(--radio-accent, #c8e64a);
-  border: none;
-  border-radius: 0;
-  cursor: pointer;
-}
-.radio-volume::-webkit-slider-runnable-track {
-  height: 4px;
-  background: var(--color-border);
-}
-.radio-volume::-moz-range-track {
-  height: 4px;
-  background: var(--color-border);
-}
-
 /* ─── Intro Confetti ─── */
 @keyframes introConfettiFall {
   0% { opacity: 1; transform: translateY(0) rotate(0deg); }

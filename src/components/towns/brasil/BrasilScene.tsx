@@ -34,6 +34,10 @@ import { stateOf, type CityLayout, type UF } from "@/lib/towns/brasil-map";
 import type { BoardRowLite } from "@/components/drift/DriftTitle";
 import { DriftSite, DriftTag } from "./BrasilDrift";
 import { DRIFT_SITE } from "@/lib/towns/brasil-drift";
+import { useLang } from "@/lib/i18n/LangProvider";
+
+/** The UI's t(en, pt), handed into the canvas (React context stops at <Canvas>). */
+type T = (en: string, pt: string) => string;
 
 // The Brasil town: the country on its real outline under the towns' night
 // sky, a pale coast, the states' borders dashed in lime, every city someone
@@ -294,7 +298,7 @@ function Squares({ cities }: { cities: CityLayout[] }) {
 }
 
 /** The city's name on a board by its square (the towns' billboard), lime on the night panel. */
-function CitySign({ city }: { city: CityLayout }) {
+function CitySign({ city, island }: { city: CityLayout; island: string }) {
   const fontReady = useFontReady();
   const tex = useMemo(() => {
     const c = document.createElement("canvas");
@@ -314,13 +318,13 @@ function CitySign({ city }: { city: CityLayout }) {
     ctx.fillText(name, 128, 54);
     ctx.font = "18px Silkscreen, monospace";
     ctx.fillStyle = "#8a93a6";
-    ctx.fillText(city.uf ?? "ISLAND", 128, 96);
+    ctx.fillText(city.uf ?? island.toUpperCase(), 128, 96);
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     t.magFilter = THREE.NearestFilter;
     return t;
     // fontReady: redraw once Silkscreen is in.
-  }, [city.name, city.uf, fontReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [city.name, city.uf, island, fontReady]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => tex.dispose(), [tex]);
   const [x, z] = lotToWorld(...city.center);
   return <Billboard position={[x, z - LOT * 0.42]} rot={0} map={tex} />;
@@ -335,7 +339,7 @@ const SIGN_MAX = 16;
  * from higher): mounted as they come near, so a country of cities never
  * holds a texture for each.
  */
-function NearSigns({ cities }: { cities: CityLayout[] }) {
+function NearSigns({ cities, island }: { cities: CityLayout[]; island: string }) {
   const [shown, setShown] = useState<CityLayout[]>([]);
   const last = useRef(0);
   const key = useRef("");
@@ -358,14 +362,14 @@ function NearSigns({ cities }: { cities: CityLayout[] }) {
   return (
     <>
       {shown.map((c) => (
-        <CitySign key={c.key} city={c} />
+        <CitySign key={c.key} city={c} island={island} />
       ))}
     </>
   );
 }
 
 /** Up close: the @login over the buildings nearest the middle of the view (the towns' name tags). */
-function NearPlates({ buildings, fresh, offices }: { buildings: CityBuilding[]; fresh?: ReadonlySet<string>; offices?: ReadonlyMap<string, string> }) {
+function NearPlates({ buildings, fresh, offices, t }: { buildings: CityBuilding[]; fresh?: ReadonlySet<string>; offices?: ReadonlyMap<string, string>; t: T }) {
   const [shown, setShown] = useState<CityBuilding[]>([]);
   const last = useRef(0);
   const key = useRef("");
@@ -395,7 +399,7 @@ function NearPlates({ buildings, fresh, offices }: { buildings: CityBuilding[]; 
         <Html key={b.login} position={[b.position[0], b.height + 10, b.position[2]]} center zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
           <div className={`flex items-center gap-1 whitespace-nowrap border-2 bg-bg/80 px-1.5 py-0.5 font-pixel text-[9px] normal-case text-cream ${fresh?.has(b.loginLower) ? "border-lime" : "border-border"}`}>
             {offices?.get(b.loginLower) && <span className="bg-cream px-1 text-[8px] uppercase text-bg">{offices.get(b.loginLower)}</span>}
-            {fresh?.has(b.loginLower) && <span className="bg-lime px-1 text-[8px] uppercase text-bg">new</span>}@{b.login}
+            {fresh?.has(b.loginLower) && <span className="bg-lime px-1 text-[8px] uppercase text-bg">{t("new", "novo")}</span>}@{b.login}
           </div>
         </Html>
       ))}
@@ -405,7 +409,7 @@ function NearPlates({ buildings, fresh, offices }: { buildings: CityBuilding[]; 
 
 // ─── Tags ────────────────────────────────────────────────────
 
-function Tag({ city, near, far, crowned, onClick }: { city: CityLayout; near: boolean; far: boolean; crowned: boolean; onClick: () => void }) {
+function Tag({ city, near, far, crowned, onClick, t }: { city: CityLayout; near: boolean; far: boolean; crowned: boolean; onClick: () => void; t: T }) {
   const [x, z] = lotToWorld(...city.center);
   const founder = city.devs.find((d) => d.founder)?.dev.login ?? null;
   const st = city.uf ? stateOf(city.uf) : null;
@@ -414,19 +418,19 @@ function Tag({ city, near, far, crowned, onClick }: { city: CityLayout; near: bo
     <Html position={[x, 60, z]} center zIndexRange={[20, 0]} style={{ pointerEvents: "auto" }}>
       <button type="button" onClick={onClick} className="flex cursor-pointer flex-col items-center whitespace-nowrap font-pixel uppercase">
         <span className="flex items-center gap-1 border-2 border-border bg-bg/85 px-1 py-px text-[9px] text-cream hover:border-lime sm:gap-1.5 sm:px-1.5 sm:py-0.5 sm:text-[11px]">
-          {crowned ? <TrophyIcon size={11} className="text-lime" label="State of the week" /> : <span className="h-1.5 w-1.5 sm:h-2 sm:w-2" style={{ background: swatch }} aria-hidden />}
+          {crowned ? <TrophyIcon size={11} className="text-lime" label={t("State of the week", "Estado da semana")} /> : <span className="h-1.5 w-1.5 sm:h-2 sm:w-2" style={{ background: swatch }} aria-hidden />}
           {/* From the whole country a capital stands for its state. */}
-          {city.ibge === null ? "Island" : far && city.capital ? city.uf : city.name}
+          {city.ibge === null ? t("Island", "Ilha") : far && city.capital ? city.uf : city.name}
           {city.devs.length > 0 && <span className="text-lime">{city.devs.length}</span>}
         </span>
         {near && (
           <span className="border-2 border-t-0 border-border bg-bg/85 px-1.5 py-0.5 text-[8px] normal-case text-muted">
             {founder ? (
               <>
-                <span className="uppercase text-lime">founder</span> @{founder}
+                <span className="uppercase text-lime">{t("founder", "fundador")}</span> @{founder}
               </>
             ) : (
-              <span className="uppercase">{city.uf ? "no founder yet" : "no city"}</span>
+              <span className="uppercase">{city.uf ? t("no founder yet", "sem fundador ainda") : t("no city", "sem cidade")}</span>
             )}
           </span>
         )}
@@ -464,7 +468,7 @@ const _v = new THREE.Vector3();
  * first (a crowned or capital city, then more devs), each kept only if it
  * doesn't overlap one already placed; from far, only the capitals.
  */
-function Tags({ cities, near, crowned, onTag, overview }: { cities: CityLayout[]; near: boolean; crowned: UF | null; onTag?: (c: CityLayout) => void; overview: number }) {
+function Tags({ cities, near, crowned, onTag, overview, t }: { cities: CityLayout[]; near: boolean; crowned: UF | null; onTag?: (c: CityLayout) => void; overview: number; t: T }) {
   const [shown, setShown] = useState<{ list: CityLayout[]; far: boolean }>({ list: [], far: true });
   const last = useRef(0);
   const key = useRef("");
@@ -511,7 +515,7 @@ function Tags({ cities, near, crowned, onTag, overview }: { cities: CityLayout[]
   return (
     <>
       {shown.list.map((c) => (
-        <Tag key={c.key} city={c} near={near} far={shown.far} crowned={!!crowned && c.uf === crowned && c.capital} onClick={() => onTag?.(c)} />
+        <Tag key={c.key} city={c} near={near} far={shown.far} crowned={!!crowned && c.uf === crowned && c.capital} onClick={() => onTag?.(c)} t={t} />
       ))}
     </>
   );
@@ -876,6 +880,7 @@ function Pulse({ x, z }: { x: number; z: number }) {
 }
 
 export default function BrasilScene({ scale = 1, cities, island, objects, buildings, cameraApi, cameraStore, onTag, onBuildingClick, focused = null, drive, smash, pulse = null, watching, onCity, cameraStart = null, stats = false, crowned = null, fresh, offices, drivers, driverAt, drift, driftBoard = NO_BOARD, onDriftTag, rig, embedded, children, filmLight = 1 }: BrasilSceneProps) {
+  const { t } = useLang();
   const allCities = useMemo(() => [...cities, island], [cities, island]);
   // Phones and weak GPUs draw at a lower resolution, as in the main city (?perf=low|high overrides).
   const { mode: perf } = usePerfMode();
@@ -958,7 +963,7 @@ export default function BrasilScene({ scale = 1, cities, island, objects, buildi
       )}
       {!off("paving") && <Paving cities={[...cities, island]} />}
       {!off("squares") && <Squares cities={[...cities, island]} />}
-      {!off("signs") && <NearSigns cities={allCities} />}
+      {!off("signs") && <NearSigns cities={allCities} island={t("Island", "Ilha")} />}
       {!off("decor") && <InstancedDecorations items={decorations} roadMarkingColor={NIGHT.roadMarkingColor} sidewalkColor={NIGHT.sidewalkColor} />}
       {!off("roads") && <LeagueRoads objects={objects} markingColor={NIGHT.roadMarkingColor} />}
       <LeagueToys objects={objects} driving={driving} />
@@ -975,8 +980,8 @@ export default function BrasilScene({ scale = 1, cities, island, objects, buildi
         onBuildingClick={driving ? undefined : onBuildingClick}
       />}
       {smash && !off("buildings") && <RubbleFlags store={smash} />}
-      {!driving && !film && <NearPlates buildings={buildings} fresh={fresh} offices={offices} />}
-      {!driving && !film && <Tags cities={allCities} near={near} crowned={crowned} onTag={onTag} overview={overview} />}
+      {!driving && !film && <NearPlates buildings={buildings} fresh={fresh} offices={offices} t={t} />}
+      {!driving && !film && <Tags cities={allCities} near={near} crowned={crowned} onTag={onTag} overview={overview} t={t} />}
       {!drifting && <DriftSite board={driftBoard} />}
       {!driving && !film && onDriftTag && <DriftTag record={driftBoard[0] ?? null} onClick={onDriftTag} />}
       {drift}

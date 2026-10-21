@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { DRIFT } from "@/lib/league-city/drive/tuning";
-import { ITEM_NAMES, isItem } from "@/lib/league-city/drive/battle";
+import { ITEM_NAMES, ITEM_NAMES_PT, isItem } from "@/lib/league-city/drive/battle";
+import { useLang, useT } from "@/lib/i18n/LangProvider";
 import type { DriveCameraMode } from "@/lib/league-city/drive/telemetry";
 import type { TouchDrive } from "@/lib/league-city/drive/touch";
 import { Band } from "@/components/games/ui";
@@ -88,6 +89,7 @@ const HOLD = "text-[10px] tracking-[0.2em] text-cream/70 [text-shadow:2px_2px_0_
 const TOUCH_TURN = 0.5;
 
 function TouchPrompt({ lesson, item }: { lesson: Lesson; item: string | null }) {
+  const t = useT();
   // The car games' bands (components/games): the move on one, how under it.
   const line = (lead: React.ReactNode, sub?: string) => (
     <span className="flex flex-col items-center gap-1 text-center">
@@ -104,19 +106,19 @@ function TouchPrompt({ lesson, item }: { lesson: Lesson; item: string | null }) 
   switch (lesson) {
     case "drive":
     case "steer":
-      return line("Drag to steer");
+      return line(t("Drag to steer", "Arraste pra virar"));
     case "boost":
       return line(
         <>
-          Hold <span className="text-[#7ee8ff]">Boost</span> ↘
+          {t("Hold", "Segure")} <span className="text-[#7ee8ff]">{t("Boost", "Turbo")}</span> ↘
         </>,
       );
     case "drift":
       return line(
         <>
-          Hold <span className="text-lime">Drift</span>
+          {t("Hold", "Segure")} <span className="text-lime">Drift</span>
         </>,
-        "while you steer, or just steer hard",
+        t("while you steer, or just steer hard", "enquanto vira, ou só vire forte"),
       );
     case "camera":
       // Shown on the camera button itself (DriveHud).
@@ -124,21 +126,22 @@ function TouchPrompt({ lesson, item }: { lesson: Lesson; item: string | null }) 
     case "attack":
       return line(
         <>
-          Tap <span className="text-[#ff9a3c]">{item ?? "the item"}</span>
+          {t("Tap", "Toque em")} <span className="text-[#ff9a3c]">{item ?? t("the item", "o item")}</span>
         </>,
-        "to throw it",
+        t("to throw it", "pra jogar"),
       );
   }
 }
 
 function Prompt({ lesson, item }: { lesson: Lesson; item: string | null }) {
+  const t = useT();
   switch (lesson) {
     case "drive":
       return (
         <>
           <Key>W</Key>
           <Key>↑</Key>
-          <span className={`${TEXT} text-cream`}>Drive</span>
+          <span className={`${TEXT} text-cream`}>{t("Drive", "Acelerar")}</span>
         </>
       );
     case "steer":
@@ -146,23 +149,23 @@ function Prompt({ lesson, item }: { lesson: Lesson; item: string | null }) {
         <>
           <Key>A</Key>
           <Key>D</Key>
-          <span className={`${TEXT} text-cream`}>Steer</span>
+          <span className={`${TEXT} text-cream`}>{t("Steer", "Virar")}</span>
         </>
       );
     case "boost":
       return (
         <>
-          <span className={HOLD}>Hold</span>
+          <span className={HOLD}>{t("Hold", "Segure")}</span>
           <Key wide>Shift</Key>
-          <span className={`${TEXT} text-[#7ee8ff]`}>Boost</span>
+          <span className={`${TEXT} text-[#7ee8ff]`}>{t("Boost", "Turbo")}</span>
         </>
       );
     case "drift":
       return (
         <>
-          <span className={HOLD}>Hold</span>
-          <Key wide>Space</Key>
-          <span className={HOLD}>+ steer</span>
+          <span className={HOLD}>{t("Hold", "Segure")}</span>
+          <Key wide>{t("Space", "Espaço")}</Key>
+          <span className={HOLD}>{t("+ steer", "+ vire")}</span>
           <span className={`${TEXT} text-lime`}>Drift</span>
         </>
       );
@@ -170,14 +173,14 @@ function Prompt({ lesson, item }: { lesson: Lesson; item: string | null }) {
       return (
         <>
           <Key>C</Key>
-          <span className={`${TEXT} text-cream`}>Change camera</span>
+          <span className={`${TEXT} text-cream`}>{t("Change camera", "Trocar câmera")}</span>
         </>
       );
     case "attack":
       return (
         <>
           <Key>F</Key>
-          <span className={`${TEXT} text-[#ff9a3c]`}>Throw {item ?? "it"}</span>
+          <span className={`${TEXT} text-[#ff9a3c]`}>{item ? t(`Throw ${item}`, `Jogar ${item}`) : t("Throw it", "Jogar")}</span>
         </>
       );
   }
@@ -205,6 +208,11 @@ export default function DrivePrompt({
 }) {
   // On a phone the car waits for a first touch every time: always say so.
   const opens = firstRun || !!touchRef;
+  const { lang } = useLang();
+  const langRef = useRef(lang);
+  useEffect(() => {
+    langRef.current = lang;
+  }, [lang]);
   const [lesson, setLesson] = useState<Lesson | null>(opens ? "drive" : null);
   const [idle, setIdle] = useState(false);
   const [item, setItem] = useState<string | null>(null);
@@ -296,7 +304,7 @@ export default function DrivePrompt({
       const steering = [...STEER].some((k) => held.has(k)) || Math.abs(t?.steer ?? 0) > TOUCH_TURN;
       st.fastSince = speed > BOOST_SPEED && !steering ? st.fastSince || now : 0;
       st.turnSince = speed > DRIFT_SPEED && steering ? st.turnSince || now : 0;
-      const holding = isItem(telemetry.held) ? ITEM_NAMES[telemetry.held] : null;
+      const holding = isItem(telemetry.held) ? (langRef.current === "pt" ? ITEM_NAMES_PT : ITEM_NAMES)[telemetry.held] : null;
 
       // The prompt on screen: done, or ignored long enough.
       const l = st.lesson;

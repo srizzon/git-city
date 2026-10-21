@@ -7,6 +7,7 @@ import { categoryLabel, timeLeft, weekClosesAt } from "@/lib/towns/brasil-projec
 import { Board } from "./BrasilPanels";
 import { ProjectIcon, VoteButton, api, postJson, shareUrl, visitHref } from "./projects-ui";
 import type { ProjectView } from "./ProjectSheet";
+import { useLang, useT } from "@/lib/i18n/LangProvider";
 
 // A project on a wide screen: a board in the middle of the map. The name,
 // its line and its place in the week sit on the profile's pixel grid; under
@@ -21,11 +22,11 @@ const GRID = {
 };
 
 const REASONS = [
-  { id: "scam", label: "Scam" },
-  { id: "gambling", label: "Gambling" },
-  { id: "broken", label: "Broken" },
-  { id: "not_theirs", label: "Not theirs" },
-  { id: "other", label: "Other" },
+  { id: "scam", label: "Scam", pt: "Golpe" },
+  { id: "gambling", label: "Gambling", pt: "Aposta" },
+  { id: "broken", label: "Broken", pt: "Quebrado" },
+  { id: "not_theirs", label: "Not theirs", pt: "Não é dele" },
+  { id: "other", label: "Other", pt: "Outro" },
 ];
 
 /** A square button with an icon, like the profile's social links. */
@@ -43,13 +44,14 @@ function Square({ label, href, onClick, children, active = false }: { label: str
 }
 
 function Report({ slug, id, signedIn, onSignIn }: { slug: string; id: number; signedIn: boolean; onSignIn: () => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   if (done) return <span className="text-[9px] normal-case text-muted">{done}</span>;
   if (!open)
     return (
       <button type="button" onClick={() => (signedIn ? setOpen(true) : onSignIn())} className="flex items-center gap-1.5 text-[9px] text-dim hover:text-cream">
-        <Flag size={11} aria-hidden /> Report
+        <Flag size={11} aria-hidden /> {t("Report", "Denunciar")}
       </button>
     );
   return (
@@ -61,11 +63,11 @@ function Report({ slug, id, signedIn, onSignIn }: { slug: string; id: number; si
           onClick={async () => {
             const res = await postJson(`${api(slug)}/${id}`, { action: "report", reason: r.id, note: "" });
             posthog.capture("project_reported", { project_id: id, reason: r.id, ok: res.ok });
-            setDone(res.ok ? "Thanks. We'll take a look." : res.error);
+            setDone(res.ok ? t("Thanks. We'll take a look.", "Valeu. A gente vai dar uma olhada.") : res.error);
           }}
           className="btn-press border-2 border-border px-2 py-1 text-[9px] text-cream hover:border-red-400/70"
         >
-          {r.label}
+          {t(r.label, r.pt)}
         </button>
       ))}
     </span>
@@ -100,6 +102,7 @@ export default function ProjectBoard({
   onChanged: () => void;
   from: string;
 }) {
+  const { lang, t } = useLang();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [copied, setCopied] = useState(false);
   const live = p.status === "live";
@@ -113,14 +116,14 @@ export default function ProjectBoard({
     <p className="text-[10px] text-muted">
       {p.rank ? (
         <>
-          <span className="text-lime">#{p.rank}</span> {open ? "this week" : "of its week"}
+          <span className="text-lime">#{p.rank}</span> {open ? t("this week", "da semana") : t("of its week", "da semana dele")}
         </>
       ) : (
-        "New this week"
+        t("New this week", "Novo na semana")
       )}
       {" · "}
-      <span className="tabular-nums text-cream">{p.votes}</span> {p.votes === 1 ? "upvote" : "upvotes"}
-      {open && p.week ? ` · ${timeLeft(p.week, now)}` : ""}
+      <span className="tabular-nums text-cream">{p.votes}</span> {p.votes === 1 ? t("upvote", "voto") : t("upvotes", "votos")}
+      {open && p.week ? ` · ${timeLeft(p.week, now, lang)}` : ""}
     </p>
   );
   const vote = live && <VoteButton key={`${p.id}:${p.votes}:${p.voted}`} slug={slug} project={p} signedIn={signedIn} mine={p.mine} size="hero" from={`board_${from}`} onSignIn={onSignIn} onChange={onChanged} />;
@@ -132,11 +135,11 @@ export default function ProjectBoard({
       onClick={() => posthog.capture("project_visit_clicked", { project_id: p.id, from })}
       className="btn-press flex min-h-12 flex-1 items-center justify-center gap-2 border-2 border-border-light px-4 text-[12px] text-cream hover:border-lime hover:text-lime"
     >
-      Visit <ArrowUpRight size={14} aria-hidden />
+      {t("Visit", "Visitar")} <ArrowUpRight size={14} aria-hidden />
     </a>
   );
   const repo = p.repo && (
-    <a href={p.repo} target="_blank" rel="noopener noreferrer nofollow ugc" aria-label="GitHub repo" title="GitHub repo" onClick={() => posthog.capture("project_repo_clicked", { project_id: p.id })} className="btn-press flex h-12 w-12 shrink-0 items-center justify-center border-2 border-border-light text-cream hover:border-lime hover:text-lime">
+    <a href={p.repo} target="_blank" rel="noopener noreferrer nofollow ugc" aria-label={t("GitHub repo", "Repo no GitHub")} title={t("GitHub repo", "Repo no GitHub")} onClick={() => posthog.capture("project_repo_clicked", { project_id: p.id })} className="btn-press flex h-12 w-12 shrink-0 items-center justify-center border-2 border-border-light text-cream hover:border-lime hover:text-lime">
       <Github size={16} aria-hidden />
     </a>
   );
@@ -144,7 +147,7 @@ export default function ProjectBoard({
   const shareRow = live && (
     <div className="flex items-center gap-1.5">
       <Square
-        label={copied ? "Copied" : "Copy link"}
+        label={copied ? t("Copied", "Copiado") : t("Copy link", "Copiar link")}
         active={copied}
         onClick={() => {
           void navigator.clipboard?.writeText(url).then(() => setCopied(true), () => {});
@@ -153,13 +156,13 @@ export default function ProjectBoard({
       >
         {copied ? <Check size={15} aria-hidden /> : <Link2 size={15} aria-hidden />}
       </Square>
-      <Square label="Share on X" href={`https://x.com/intent/post?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`} onClick={() => shared("x")}>
+      <Square label={t("Share on X", "Compartilhar no X")} href={`https://x.com/intent/post?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`} onClick={() => shared("x")}>
         <span className="text-[12px]">X</span>
       </Square>
-      <Square label="Share on LinkedIn" href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`} onClick={() => shared("linkedin")}>
+      <Square label={t("Share on LinkedIn", "Compartilhar no LinkedIn")} href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`} onClick={() => shared("linkedin")}>
         <Linkedin size={15} aria-hidden />
       </Square>
-      <Square label="Share on WhatsApp" href={`https://wa.me/?text=${encodeURIComponent(`${shareText}: ${url}`)}`} onClick={() => shared("whatsapp")}>
+      <Square label={t("Share on WhatsApp", "Compartilhar no WhatsApp")} href={`https://wa.me/?text=${encodeURIComponent(`${shareText}: ${url}`)}`} onClick={() => shared("whatsapp")}>
         <MessageCircle size={15} aria-hidden />
       </Square>
     </div>
@@ -170,11 +173,11 @@ export default function ProjectBoard({
         {/* eslint-disable-next-line @next/next/no-img-element -- a GitHub avatar */}
         {p.maker.avatar ? <img src={p.maker.avatar} alt="" width={32} height={32} className="h-8 w-8 shrink-0" /> : <span className="h-8 w-8 shrink-0 bg-bg-raised" />}
         <p className="min-w-0 text-[10px] text-muted">
-          Made by <span className="normal-case text-cream">@{p.maker.login}</span>
+          {t("Made by", "Feito por")} <span className="normal-case text-cream">@{p.maker.login}</span>
         </p>
         {onVisitBuilding && (
           <button type="button" onClick={() => onVisitBuilding(p.maker.login)} className="btn-press flex h-8 items-center gap-1.5 border-2 border-border px-2.5 text-[9px] text-cream hover:border-lime/60">
-            <Building2 size={12} aria-hidden /> Their building
+            <Building2 size={12} aria-hidden /> {t("Their building", "Prédio dele")}
           </button>
         )}
       </div>
@@ -185,16 +188,16 @@ export default function ProjectBoard({
     <div className="flex items-center justify-end gap-1.5">
       {p.status !== "hidden" && (
         <button type="button" onClick={() => onEdit(p)} className="btn-press flex h-8 items-center gap-1.5 border-2 border-border px-2.5 text-[9px] text-cream hover:border-lime/60">
-          <Pencil size={12} aria-hidden /> Edit
+          <Pencil size={12} aria-hidden /> {t("Edit", "Editar")}
         </button>
       )}
       {confirmDelete ? (
         <button type="button" onClick={onDelete} className="btn-press flex h-8 items-center gap-1.5 border-2 border-red-400 px-2.5 text-[9px] text-red-400">
-          Delete? This week&apos;s slot doesn&apos;t come back
+          {t("Delete? This week's slot doesn't come back", "Apagar? A vaga da semana não volta")}
         </button>
       ) : (
         <button type="button" onClick={() => setConfirmDelete(true)} className="btn-press flex h-8 items-center gap-1.5 border-2 border-border px-2.5 text-[9px] text-muted hover:text-cream">
-          <Trash2 size={12} aria-hidden /> Delete
+          <Trash2 size={12} aria-hidden /> {t("Delete", "Apagar")}
         </button>
       )}
     </div>
@@ -207,7 +210,7 @@ export default function ProjectBoard({
   );
 
   return (
-    <Board title="Project" onClose={onClose} width={680}>
+    <Board title={t("Project", "Projeto")} onClose={onClose} width={680}>
       <div className="flex flex-col gap-5">
         {status}
         <section className="flex flex-col items-center gap-3 border-[3px] border-border bg-bg-raised px-6 pb-6 pt-7 text-center" style={GRID}>
@@ -217,7 +220,7 @@ export default function ProjectBoard({
           </div>
           <p className="max-w-[44ch] text-balance font-sans text-[17px] normal-case leading-snug text-cream">{p.tagline}</p>
           <p className="text-[9px] text-muted">
-            {categoryLabel(p.category)} · <span className="normal-case">{p.host}</span>
+            {categoryLabel(p.category, lang)} · <span className="normal-case">{p.host}</span>
             {p.uf ? ` · ${p.uf}` : ""}
           </p>
           {place}

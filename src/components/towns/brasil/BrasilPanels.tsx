@@ -10,6 +10,7 @@ import TrophyIcon from "@/components/towns/TrophyIcon";
 import { PRESIDENCY_ON } from "@/lib/towns/brasil-election";
 import { STATES, type CityLayout, type UF } from "@/lib/towns/brasil-map";
 import type { BrCity } from "@/lib/towns/br-cities";
+import { useT } from "@/lib/i18n/LangProvider";
 import { swatchOf, type StateStats } from "./stats";
 import { useBrCities } from "./useBrCities";
 import RaceBoard from "./RaceBoard";
@@ -46,6 +47,7 @@ export function BrasilSearchBar({
   /** A city nobody lives in yet: found it. */
   onFound: (city: BrCity) => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const q = fold(query.trim().replace(/^@/, ""));
@@ -106,8 +108,8 @@ export function BrasilSearchBar({
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={(e) => e.key === "Escape" && (e.currentTarget.blur(), setOpen(false))}
-          placeholder="@username, city or state"
-          aria-label="Find your building: GitHub username, city or state"
+          placeholder={t("@username, city or state", "@usuário, cidade ou estado")}
+          aria-label={t("Find your building: GitHub username, city or state", "Ache seu prédio: usuário do GitHub, cidade ou estado")}
           // A search, not a login: password managers (Bitwarden, 1Password, LastPass) keep their icon off it.
           type="search"
           name="brasil-find"
@@ -120,9 +122,9 @@ export function BrasilSearchBar({
           data-form-type="other"
           className="h-10 min-w-0 flex-1 border-[3px] border-border bg-bg/90 px-3 [&::-webkit-search-cancel-button]:hidden text-base normal-case text-cream outline-none backdrop-blur-sm placeholder:text-dim focus:border-lime/70 sm:text-[12px]"
         />
-        <button type="submit" aria-label="Find" className="flex items-center bg-lime px-3 text-[11px] uppercase text-bg sm:px-4">
+        <button type="submit" aria-label={t("Find", "Buscar")} className="flex items-center bg-lime px-3 text-[11px] uppercase text-bg sm:px-4">
           <Search size={16} className="sm:hidden" aria-hidden />
-          <span className="max-sm:hidden">Find</span>
+          <span className="max-sm:hidden">{t("Find", "Buscar")}</span>
         </button>
       </form>
       {open && q && (
@@ -132,7 +134,7 @@ export function BrasilSearchBar({
               <span className="h-2.5 w-2.5 shrink-0" style={{ background: c.uf ? swatchOf(c.uf) : "#c8e64a" }} aria-hidden />
               <span className="min-w-0 flex-1 truncate text-[11px] normal-case text-cream">{c.name}</span>
               <span className="text-[9px] text-muted">
-                {c.uf ?? "Island"} · {fmt(c.devs.length)}
+                {c.uf ?? t("Island", "Ilha")} · {fmt(c.devs.length)}
               </span>
             </button>
           ))}
@@ -141,7 +143,7 @@ export function BrasilSearchBar({
               <span className="h-2.5 w-2.5 shrink-0 border border-border-light" aria-hidden />
               <span className="min-w-0 flex-1 truncate text-[11px] normal-case text-cream">{c.name}</span>
               <span className="text-[9px] text-muted">
-                {c.uf} · <span className="text-lime">Found it</span>
+                {c.uf} · <span className="text-lime">{t("Found it", "Fundar")}</span>
               </span>
             </button>
           ))}
@@ -154,13 +156,13 @@ export function BrasilSearchBar({
           ))}
           {missing && (
             <div className="flex items-center justify-between gap-3 border-t-2 border-border px-3 py-2">
-              <span className="min-w-0 truncate text-[10px] normal-case text-muted">@{missing} isn&apos;t on the map yet</span>
+              <span className="min-w-0 truncate text-[10px] normal-case text-muted">{t(`@${missing} isn't on the map yet`, `@${missing} ainda não tá no mapa`)}</span>
               <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(() => onPutOnMap(missing))} className="shrink-0 bg-lime px-2.5 py-1 text-[10px] text-bg">
-                Put it on the map
+                {t("Put it on the map", "Colocar no mapa")}
               </button>
             </div>
           )}
-          {places.length === 0 && unfounded.length === 0 && devs.length === 0 && !missing && <p className="px-3 py-2 text-[10px] normal-case text-muted">Nothing on the map called “{query.trim()}”.</p>}
+          {places.length === 0 && unfounded.length === 0 && devs.length === 0 && !missing && <p className="px-3 py-2 text-[10px] normal-case text-muted">{t(`Nothing on the map called “${query.trim()}”.`, `Nada no mapa chamado “${query.trim()}”.`)}</p>}
         </div>
       )}
     </div>
@@ -168,33 +170,35 @@ export function BrasilSearchBar({
 }
 
 /** How points are made, the same table the reels show: icon, one word, one plain line, the points and how often. */
-const EARN: { icon: LucideIcon; pts: number; word: string; hint: string; cap: string }[] = [
-  { icon: UserPlus, pts: 50, word: "Friend", hint: "Tag a friend in a comment. They join, you score.", cap: "10/week" },
-  { icon: Instagram, pts: 20, word: "Story", hint: "Post a story tagging @samuelrizzondev.", cap: "1/day" },
-  { icon: MapPin, pts: 20, word: "Join", hint: "Put your building on the map.", cap: "1×" },
-  { icon: Code2, pts: 10, word: "Code", hint: "Commit on GitHub that day.", cap: "1/day" },
-  { icon: Flag, pts: 3, word: "Race", hint: "Finish a race with someone. More to win or set a route record.", cap: "30/day" },
-  { icon: VoteIcon, pts: 10, word: "Vote", hint: "Vote for president.", cap: "1×" },
-  { icon: MessageCircle, pts: 5, word: "Comment", hint: "Comment on a reel.", cap: "1/day" },
+type Line = [en: string, pt: string];
+const EARN: { id: string; icon: LucideIcon; pts: number; word: Line; hint: Line; cap: Line }[] = [
+  { id: "friend", icon: UserPlus, pts: 50, word: ["Friend", "Amigo"], hint: ["Tag a friend in a comment. They join, you score.", "Marca um amigo num comentário. Ele entra, você pontua."], cap: ["10/week", "10/semana"] },
+  { id: "story", icon: Instagram, pts: 20, word: ["Story", "Story"], hint: ["Post a story tagging @samuelrizzondev.", "Posta um story marcando @samuelrizzondev."], cap: ["1/day", "1/dia"] },
+  { id: "join", icon: MapPin, pts: 20, word: ["Join", "Entrar"], hint: ["Put your building on the map.", "Coloca seu prédio no mapa."], cap: ["1×", "1×"] },
+  { id: "code", icon: Code2, pts: 10, word: ["Code", "Código"], hint: ["Commit on GitHub that day.", "Faz commit no GitHub no dia."], cap: ["1/day", "1/dia"] },
+  { id: "race", icon: Flag, pts: 3, word: ["Race", "Corrida"], hint: ["Finish a race with someone. More to win or set a route record.", "Termina uma corrida com alguém. Mais se ganhar ou bater o recorde da rota."], cap: ["30/day", "30/dia"] },
+  { id: "vote", icon: VoteIcon, pts: 10, word: ["Vote", "Voto"], hint: ["Vote for president.", "Vota pra presidente."], cap: ["1×", "1×"] },
+  { id: "comment", icon: MessageCircle, pts: 5, word: ["Comment", "Comentário"], hint: ["Comment on a reel.", "Comenta num reel."], cap: ["1/day", "1/dia"] },
 ];
 
 export function PointsRules({ compact = false }: { compact?: boolean }) {
+  const t = useT();
   return (
     <ul className="flex flex-col gap-1">
-      {EARN.filter((e) => PRESIDENCY_ON || e.word !== "Vote").map((e) => (
-        <li key={e.word} className={`flex items-center gap-3 border-2 border-border px-3 ${compact ? "py-2" : "py-2.5"}`}>
+      {EARN.filter((e) => PRESIDENCY_ON || e.id !== "vote").map((e) => (
+        <li key={e.id} className={`flex items-center gap-3 border-2 border-border px-3 ${compact ? "py-2" : "py-2.5"}`}>
           <e.icon size={18} className="shrink-0 text-cream" aria-hidden />
           <span className="min-w-0 flex-1">
-            <span className="block text-[10px] text-cream">{e.word}</span>
-            <span className="block text-[9px] normal-case text-muted">{e.hint}</span>
+            <span className="block text-[10px] text-cream">{t(...e.word)}</span>
+            <span className="block text-[9px] normal-case text-muted">{t(...e.hint)}</span>
           </span>
           <span className="text-right">
             <span className="block text-sm tabular-nums text-lime">+{e.pts}</span>
-            <span className="block text-[8px] text-dim">{e.cap}</span>
+            <span className="block text-[8px] text-dim">{t(...e.cap)}</span>
           </span>
         </li>
       ))}
-      <li className="mt-2 px-1 text-[9px] normal-case text-muted">Your points → your state. #1 in each state = governor.</li>
+      <li className="mt-2 px-1 text-[9px] normal-case text-muted">{t("Your points → your state. #1 in each state = governor.", "Seus pontos → seu estado. #1 de cada estado = governador.")}</li>
     </ul>
   );
 }
@@ -203,16 +207,18 @@ const STEP = 10;
 
 /** When the week's points close (Monday 00:00 UTC, Sunday 21h in Brasília), in plain words. */
 function WeekEnds() {
+  const t = useT();
   const left = useCountdown();
   return (
     <p className="flex items-center gap-1.5 px-1 text-[9px] text-muted">
-      <Clock size={12} aria-hidden /> Week ends in <span className="tabular-nums text-cream">{left}</span>
+      <Clock size={12} aria-hidden /> {t("Week ends in", "Semana acaba em")} <span className="tabular-nums text-cream">{left}</span>
     </p>
   );
 }
 
 /** The table: 10 at a time and back, your state pinned under it while it's further down. */
 function StatesTable({ ranked, points, yours, onPick }: { ranked: StateStats[]; points: Partial<Record<UF, number>>; yours: UF | null; onPick: (s: StateStats) => void }) {
+  const t = useT();
   const [shown, setShown] = useState(STEP);
   const yourIndex = yours ? ranked.findIndex((s) => s.uf === yours) : -1;
   const left = ranked.length - shown;
@@ -226,11 +232,11 @@ function StatesTable({ ranked, points, yours, onPick }: { ranked: StateStats[]; 
           className={`flex w-full items-center gap-2 px-2 py-1.5 text-left ${mine ? "bg-lime text-bg" : `${i % 2 ? "" : "bg-white/[0.02]"} text-cream hover:text-lime`}`}
         >
           <span className={`flex w-5 justify-center text-[9px] tabular-nums ${mine ? "" : "text-muted"}`}>
-            {i === 0 && (points[s.uf] ?? 0) > 0 ? <TrophyIcon size={11} className={mine ? "" : "text-lime"} label="First place" /> : i + 1}
+            {i === 0 && (points[s.uf] ?? 0) > 0 ? <TrophyIcon size={11} className={mine ? "" : "text-lime"} label={t("First place", "Primeiro lugar")} /> : i + 1}
           </span>
           <span className="w-6 text-[10px]">{s.uf}</span>
           <span className={`min-w-0 flex-1 truncate text-[9px] normal-case ${mine ? "" : "text-muted"}`}>{s.name}</span>
-          {mine && <span className="bg-bg px-1.5 py-0.5 text-[8px] text-lime">You</span>}
+          {mine && <span className="bg-bg px-1.5 py-0.5 text-[8px] text-lime">{t("You", "Você")}</span>}
           <span className={`w-10 text-right text-[9px] tabular-nums ${mine ? "" : "text-muted"}`}>{fmt(s.devs)}</span>
           <span className="w-14 text-right text-[11px] tabular-nums">{fmt(points[s.uf] ?? 0)}</span>
         </button>
@@ -241,9 +247,9 @@ function StatesTable({ ranked, points, yours, onPick }: { ranked: StateStats[]; 
     <div className="flex flex-col">
       <div className="flex items-center gap-2 border-b-2 border-border px-2 pb-1.5 text-[8px] text-dim">
         <span className="w-5 text-center">#</span>
-        <span className="flex-1">State</span>
+        <span className="flex-1">{t("State", "Estado")}</span>
         <span className="w-10 text-right">Devs</span>
-        <span className="w-14 text-right">Points</span>
+        <span className="w-14 text-right">{t("Points", "Pontos")}</span>
       </div>
       <ol className="flex flex-col">{ranked.slice(0, shown).map(row)}</ol>
       {yourIndex >= shown && <ol className="mt-1 border-t-2 border-dashed border-border pt-1">{row(ranked[yourIndex], yourIndex)}</ol>}
@@ -251,12 +257,12 @@ function StatesTable({ ranked, points, yours, onPick }: { ranked: StateStats[]; 
         <div className="mt-2 flex gap-1">
           {left > 0 && (
             <button type="button" onClick={() => setShown((n) => n + STEP)} className="btn-press flex min-h-10 flex-1 items-center justify-center gap-2 border-2 border-border text-[10px] text-cream hover:border-lime/60">
-              <ChevronDown size={13} aria-hidden /> Show more <span className="text-dim">({left})</span>
+              <ChevronDown size={13} aria-hidden /> {t("Show more", "Ver mais")} <span className="text-dim">({left})</span>
             </button>
           )}
           {shown > STEP && (
             <button type="button" onClick={() => setShown(STEP)} className="btn-press flex min-h-10 flex-1 items-center justify-center gap-2 border-2 border-border text-[10px] text-muted hover:text-cream">
-              <ChevronUp size={13} aria-hidden /> Show less
+              <ChevronUp size={13} aria-hidden /> {t("Show less", "Ver menos")}
             </button>
           )}
         </div>
@@ -286,6 +292,7 @@ export function useWide(): boolean {
  * since the map's page is a fixed layer whose children can't rise above them.
  */
 export function Board({ title, onClose, children, width = 820 }: { title: string; onClose: () => void; children: ReactNode; width?: number }) {
+  const t = useT();
   const boxRef = useRef<HTMLElement>(null);
   const close = useRef(onClose);
   useEffect(() => {
@@ -305,7 +312,7 @@ export function Board({ title, onClose, children, width = 820 }: { title: string
       <section ref={boxRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} style={{ width: `min(${width}px, 100%)` }} className={`${HUD_BOX} sheet-in relative outline-none flex max-h-[86vh] flex-col bg-bg/95 font-pixel uppercase text-warm`}>
         <header className="flex items-center justify-between border-b-2 border-border px-5 py-3">
           <h2 className="text-sm text-cream">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="btn-press -mr-1.5 flex h-8 w-8 items-center justify-center text-muted transition-colors hover:text-cream">
+          <button type="button" onClick={onClose} aria-label={t("Close", "Fechar")} className="btn-press -mr-1.5 flex h-8 w-8 items-center justify-center text-muted transition-colors hover:text-cream">
             <X size={16} strokeWidth={2.5} />
           </button>
         </header>
@@ -338,6 +345,7 @@ export function BrasilRanking({
   onPick: (s: StateStats) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const wide = useWide();
   const [tab, setTab] = useState<"table" | "races" | "points">("table");
   const raceBoard = <RaceBoard {...races} />;
@@ -346,14 +354,14 @@ export function BrasilRanking({
 
   if (wide) {
     return (
-      <Board title="States" onClose={onClose}>
+      <Board title={t("States", "Estados")} onClose={onClose}>
         <div className="grid grid-cols-[1fr_300px] gap-5">
           <div className="flex min-w-0 flex-col gap-2">
             <div role="tablist" className="grid grid-cols-2 border-2 border-border">
               {(
                 [
-                  ["table", Trophy, "States"],
-                  ["races", Flag, "Racers"],
+                  ["table", Trophy, t("States", "Estados")],
+                  ["races", Flag, t("Racers", "Pilotos")],
                 ] as const
               ).map(([id, Icon, label]) => (
                 <button key={id} role="tab" aria-selected={(tab === "races") === (id === "races")} type="button" onClick={() => setTab(id)} className={`flex min-h-9 items-center justify-center gap-2 text-[10px] ${(tab === "races") === (id === "races") ? "bg-lime text-bg" : "text-muted hover:text-cream"}`}>
@@ -365,7 +373,7 @@ export function BrasilRanking({
             {tab === "races" ? raceBoard : table}
           </div>
           <div className="flex flex-col gap-2">
-            <p className="px-1 text-[9px] text-muted">How to score</p>
+            <p className="px-1 text-[9px] text-muted">{t("How to score", "Como pontuar")}</p>
             <PointsRules compact />
           </div>
         </div>
@@ -373,14 +381,14 @@ export function BrasilRanking({
     );
   }
   return (
-    <Panel title="States" onClose={onClose}>
+    <Panel title={t("States", "Estados")} onClose={onClose}>
       <div className="flex flex-col gap-2">
         <div role="tablist" className="grid grid-cols-3 border-2 border-border">
           {(
             [
-              ["table", Trophy, "Ranking"],
-              ["races", Flag, "Racers"],
-              ["points", Plus, "Points"],
+              ["table", Trophy, t("Ranking", "Ranking")],
+              ["races", Flag, t("Racers", "Pilotos")],
+              ["points", Plus, t("Points", "Pontos")],
             ] as const
           ).map(([id, Icon, label]) => (
             <button key={id} role="tab" aria-selected={tab === id} type="button" onClick={() => setTab(id)} className={`flex min-h-10 items-center justify-center gap-2 text-[10px] ${tab === id ? "bg-lime text-bg" : "text-muted hover:text-cream"}`}>
@@ -439,6 +447,7 @@ export function BrasilPicker({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, pending]);
+  const t = useT();
   const [query, setQuery] = useState(initialQuery);
   const [state, setState] = useState<UF | null>(null);
   const br = useBrCities(signedIn);
@@ -478,7 +487,7 @@ export function BrasilPicker({
           <span className="min-w-0 flex-1 truncate text-[11px] normal-case">
             {c.name} <span className={now ? "" : "text-muted"}>{c.uf}</span>
           </span>
-          <span className={`shrink-0 text-[9px] normal-case ${now ? "" : n ? "text-muted" : "text-lime"}`}>{mine ? "You live here" : n ? `${fmt(n)} dev${n === 1 ? "" : "s"}${founder ? ` · @${founder}` : ""}` : "Nobody yet · found it"}</span>
+          <span className={`shrink-0 text-[9px] normal-case ${now ? "" : n ? "text-muted" : "text-lime"}`}>{mine ? t("You live here", "Você mora aqui") : n ? `${fmt(n)} dev${n === 1 ? "" : "s"}${founder ? ` · @${founder}` : ""}` : t("Nobody yet · found it", "Ninguém ainda · fundar")}</span>
         </button>
       </li>
     );
@@ -488,7 +497,7 @@ export function BrasilPicker({
     <div className="pointer-events-auto mt-1 w-full border-[3px] sm:w-[min(420px,calc(100vw-32px))] border-border bg-bg/95 p-3 font-pixel uppercase text-cream shadow-[0_6px_0_rgba(0,0,0,0.35)] backdrop-blur-sm">
       <div className="mb-2.5 flex items-baseline justify-between gap-3">
         <p className="min-w-0 truncate text-[11px]">
-          {current && !someoneElse ? (firstPick ? "Pick your city" : "Move to another city") : who ? <>Put <span className="normal-case text-lime">@{who}</span> on the map</> : "Put your building on the map"}
+          {current && !someoneElse ? (firstPick ? t("Pick your city", "Escolha sua cidade") : t("Move to another city", "Mudar de cidade")) : who ? <>{t("Put", "Colocar")} <span className="normal-case text-lime">@{who}</span> {t("on the map", "no mapa")}</> : t("Put your building on the map", "Coloque seu prédio no mapa")}
         </p>
         <button type="button" disabled={busy} onClick={onClose} className="shrink-0 text-[10px] text-muted hover:text-cream disabled:opacity-40">
           ESC
@@ -497,27 +506,30 @@ export function BrasilPicker({
 
       {someoneElse ? (
         <p className="text-[10px] normal-case text-muted">
-          Only @{forLogin} can put their building here: they sign in with GitHub on this page, or comment their @ and city on the reel. You&apos;re signed in as @{viewerLogin}.
+          {t(
+            `Only @${forLogin} can put their building here: they sign in with GitHub on this page, or comment their @ and city on the reel. You're signed in as @${viewerLogin}.`,
+            `Só @${forLogin} pode colocar o prédio aqui: entrando com o GitHub nesta página, ou comentando o @ e a cidade no reel. Você entrou como @${viewerLogin}.`,
+          )}
         </p>
       ) : !signedIn ? (
         <div className="flex flex-col gap-2.5">
-          <p className="text-[10px] normal-case text-muted">{forLogin ? `Is @${forLogin} you? ` : ""}Sign in with GitHub, pick your city, and your building goes up there.</p>
+          <p className="text-[10px] normal-case text-muted">{forLogin ? t(`Is @${forLogin} you? `, `@${forLogin} é você? `) : ""}{t("Sign in with GitHub, pick your city, and your building goes up there.", "Entra com o GitHub, escolhe sua cidade e seu prédio sobe lá.")}</p>
           <button type="button" onClick={onSignIn} className="btn-press border-2 border-lime bg-lime py-2 text-[11px] text-bg">
-            Sign in with GitHub
+            {t("Sign in with GitHub", "Entrar com GitHub")}
           </button>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           <p className="text-[10px] normal-case text-muted">
-            {current && !firstPick ? "Your building moves to a new lot there. You can move once a week." : "Your building goes up in your city. Nobody from there yet? You found it."}
+            {current && !firstPick ? t("Your building moves to a new lot there. You can move once a week.", "Seu prédio vai pra um lote novo lá. Dá pra mudar uma vez por semana.") : t("Your building goes up in your city. Nobody from there yet? You found it.", "Seu prédio sobe na sua cidade. Ninguém de lá ainda? Você funda.")}
           </p>
           <div className="flex items-stretch">
             <input
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={state ? `A city in ${state}` : "Your city"}
-              aria-label="Your city"
+              placeholder={state ? t(`A city in ${state}`, `Uma cidade em ${state}`) : t("Your city", "Sua cidade")}
+              aria-label={t("Your city", "Sua cidade")}
               type="search"
               name="brasil-city"
               autoComplete="off"
@@ -528,7 +540,7 @@ export function BrasilPicker({
               className="h-10 min-w-0 flex-1 border-2 border-border bg-bg px-3 text-base normal-case text-cream outline-none placeholder:text-dim focus:border-lime/70 sm:text-[12px] [&::-webkit-search-cancel-button]:hidden"
             />
             {state && (
-              <button type="button" onClick={() => setState(null)} className="flex items-center gap-1.5 border-2 border-l-0 border-border px-2 text-[10px] text-cream" aria-label={`Any state (now ${state})`}>
+              <button type="button" onClick={() => setState(null)} className="flex items-center gap-1.5 border-2 border-l-0 border-border px-2 text-[10px] text-cream" aria-label={t(`Any state (now ${state})`, `Qualquer estado (agora ${state})`)}>
                 {state} <X size={12} aria-hidden />
               </button>
             )}
@@ -536,10 +548,10 @@ export function BrasilPicker({
           {results.length > 0 ? (
             <ul className="flex flex-col gap-1">{results.map(row)}</ul>
           ) : q.length >= 2 ? (
-            <p className="px-1 text-[10px] normal-case text-muted">{br ? `No city called “${q}”.` : "Loading the cities…"}</p>
+            <p className="px-1 text-[10px] normal-case text-muted">{br ? t(`No city called “${q}”.`, `Nenhuma cidade chamada “${q}”.`) : t("Loading the cities…", "Carregando as cidades…")}</p>
           ) : (
             <>
-              <p className="px-1 text-[9px] text-dim">Or pick your state</p>
+              <p className="px-1 text-[9px] text-dim">{t("Or pick your state", "Ou escolha seu estado")}</p>
               <div className="grid grid-cols-7 gap-1">
                 {STATES.map((s) => (
                   <button
@@ -565,11 +577,11 @@ export function BrasilPicker({
               pending && pending.ibge === null ? "border-lime bg-lime text-bg" : current === "island" ? "border-lime text-lime" : "border-border text-muted hover:text-cream"
             } ${busy && pending?.ibge !== null ? "opacity-30" : ""}`}
           >
-            No city · live on the island
+            {t("No city · live on the island", "Sem cidade · morar na ilha")}
           </button>
           {busy && (
             <div className="flex flex-col gap-1.5 pt-1">
-              <p className="text-[10px] normal-case text-lime">Finding your lot in {pending!.name}…</p>
+              <p className="text-[10px] normal-case text-lime">{t(`Finding your lot in ${pending!.name}…`, `Achando seu lote em ${pending!.name === "the island" ? "a ilha" : pending!.name}…`)}</p>
               <div className="h-1 animate-pulse bg-lime" />
             </div>
           )}

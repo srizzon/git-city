@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { HUD_BOX } from "./shared";
 import { useSheet } from "./useSheet";
+import { useT } from "@/lib/i18n/LangProvider";
 
 /**
  * Sheet over the city: a right-hand column on desktop, a bottom sheet on
@@ -25,6 +26,7 @@ export default function Panel({
   /** On a phone, the whole screen instead of a sheet (the voting machine needs the room). */
   full?: boolean;
 }) {
+  const t = useT();
   const sheet = useSheet(onClose);
   const { close } = sheet;
 
@@ -48,7 +50,7 @@ export default function Panel({
           <button
             type="button"
             onClick={close}
-            aria-label="Close"
+            aria-label={t("Close", "Fechar")}
             className="btn-press -mr-1.5 flex h-7 w-7 items-center justify-center text-muted transition-colors hover:text-cream"
           >
             <X size={16} strokeWidth={2.5} />

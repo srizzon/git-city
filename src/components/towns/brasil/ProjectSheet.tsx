@@ -14,6 +14,7 @@ import {
   type ProjectStatus,
 } from "@/lib/towns/brasil-projects";
 import { ProjectIcon, VoteButton, api, postJson, shareUrl, visitHref } from "./projects-ui";
+import { useLang, useT } from "@/lib/i18n/LangProvider";
 
 // A project, opened from the card, the list or a shared link: what it is, a
 // Visit through the click-through, its repo, the upvote and its place in the
@@ -26,18 +27,19 @@ export type ProjectView = ProjectCard & {
   mine: boolean;
 };
 
-const STATUS: Record<ProjectStatus, { label: string; tone: string }> = {
-  checking: { label: "Checking", tone: "text-muted" },
-  live: { label: "Live", tone: "text-lime" },
-  review: { label: "In review", tone: "text-[#f0b429]" },
-  rejected: { label: "Rejected", tone: "text-red-400" },
-  hidden: { label: "Hidden", tone: "text-red-400" },
-  removed: { label: "Removed", tone: "text-muted" },
+const STATUS: Record<ProjectStatus, { label: string; pt: string; tone: string }> = {
+  checking: { label: "Checking", pt: "Checando", tone: "text-muted" },
+  live: { label: "Live", pt: "No ar", tone: "text-lime" },
+  review: { label: "In review", pt: "Em análise", tone: "text-[#f0b429]" },
+  rejected: { label: "Rejected", pt: "Recusado", tone: "text-red-400" },
+  hidden: { label: "Hidden", pt: "Oculto", tone: "text-red-400" },
+  removed: { label: "Removed", pt: "Removido", tone: "text-muted" },
 };
 
 export const statusOf = (s: ProjectStatus) => STATUS[s];
 
 export function Share({ slug, p }: { slug: string; p: ProjectCard }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const url = shareUrl(slug, p.slug);
   const text = `Vota no ${p.name} no mapa dos devs do Brasil`;
@@ -75,7 +77,7 @@ export function Share({ slug, p }: { slug: string; p: ProjectCard }) {
         <span className="truncate text-muted">{url.replace(/^https?:\/\//, "")}</span>
         <span className="flex shrink-0 items-center gap-1 uppercase text-lime">
           {copied ? <Check size={12} aria-hidden /> : <Copy size={12} aria-hidden />}{" "}
-          {copied ? "Copied" : "Copy"}
+          {copied ? t("Copied", "Copiado") : t("Copy", "Copiar")}
         </span>
       </button>
       <div className="grid grid-cols-3 gap-1.5">
@@ -97,11 +99,11 @@ export function Share({ slug, p }: { slug: string; p: ProjectCard }) {
 }
 
 const REASONS = [
-  { id: "scam", label: "Scam" },
-  { id: "gambling", label: "Gambling" },
-  { id: "broken", label: "Broken" },
-  { id: "not_theirs", label: "Not theirs" },
-  { id: "other", label: "Other" },
+  { id: "scam", label: "Scam", pt: "Golpe" },
+  { id: "gambling", label: "Gambling", pt: "Aposta" },
+  { id: "broken", label: "Broken", pt: "Quebrado" },
+  { id: "not_theirs", label: "Not theirs", pt: "Não é dele" },
+  { id: "other", label: "Other", pt: "Outro" },
 ];
 
 function Report({
@@ -115,6 +117,7 @@ function Report({
   signedIn: boolean;
   onSignIn: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   if (done) return <p className="text-[9px] normal-case text-muted">{done}</p>;
@@ -125,12 +128,12 @@ function Report({
         onClick={() => (signedIn ? setOpen(true) : onSignIn())}
         className="flex items-center gap-1.5 self-start text-[9px] text-muted hover:text-cream"
       >
-        <Flag size={11} aria-hidden /> Report
+        <Flag size={11} aria-hidden /> {t("Report", "Denunciar")}
       </button>
     );
   return (
     <div className="flex flex-col gap-1.5">
-      <p className="text-[9px] text-muted">What&apos;s wrong with it?</p>
+      <p className="text-[9px] text-muted">{t("What's wrong with it?", "Qual o problema?")}</p>
       <div className="flex flex-wrap gap-1.5">
         {REASONS.map((r) => (
           <button
@@ -143,11 +146,11 @@ function Report({
                 note: "",
               });
               posthog.capture("project_reported", { project_id: id, reason: r.id, ok: res.ok });
-              setDone(res.ok ? "Thanks. We'll take a look." : res.error);
+              setDone(res.ok ? t("Thanks. We'll take a look.", "Valeu. A gente vai dar uma olhada.") : res.error);
             }}
             className="btn-press border-2 border-border px-2 py-1 text-[9px] text-cream hover:border-red-400/70"
           >
-            {r.label}
+            {t(r.label, r.pt)}
           </button>
         ))}
       </div>
@@ -187,6 +190,7 @@ export default function ProjectSheet({
   const [appeal, setAppeal] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
   const wide = useWide();
+  const { lang, t } = useLang();
 
   useEffect(() => {
     let live = true;
@@ -210,14 +214,14 @@ export default function ProjectSheet({
   const Shell = wide ? Board : Panel;
   if (missing && !p)
     return (
-      <Shell title="Project" onClose={onClose}>
-        <p className="text-[10px] normal-case text-muted">This project isn&apos;t up anymore.</p>
+      <Shell title={t("Project", "Projeto")} onClose={onClose}>
+        <p className="text-[10px] normal-case text-muted">{t("This project isn't up anymore.", "Esse projeto não tá mais no ar.")}</p>
       </Shell>
     );
   if (!p)
     return (
-      <Shell title="Project" onClose={onClose}>
-        <p className="text-[10px] text-muted">Loading</p>
+      <Shell title={t("Project", "Projeto")} onClose={onClose}>
+        <p className="text-[10px] text-muted">{t("Loading", "Carregando")}</p>
       </Shell>
     );
 
@@ -233,11 +237,11 @@ export default function ProjectSheet({
   const live = p.status === "live";
   const status = p.mine && !live && (
     <div className="border-2 border-border bg-bg-raised px-3 py-2 text-[9px]">
-      <span className={st.tone}>{st.label}</span>
+      <span className={st.tone}>{t(st.label, st.pt)}</span>
       {p.reason && <p className="mt-1 text-[10px] normal-case text-muted">{p.reason}</p>}
       {p.status === "review" && (
         <p className="mt-1 text-[10px] normal-case text-muted">
-          A person looks at it soon. You get an email either way.
+          {t("A person looks at it soon. You get an email either way.", "Uma pessoa vai olhar em breve. Você recebe um email de qualquer jeito.")}
         </p>
       )}
     </div>
@@ -259,7 +263,7 @@ export default function ProjectSheet({
         <h3 className="break-words text-[13px] normal-case leading-tight text-cream">{p.name}</h3>
         <p className="mt-1 font-sans text-[13px] normal-case leading-snug text-warm">{p.tagline}</p>
         <p className="mt-1.5 text-[9px] text-muted">
-          {categoryLabel(p.category)} · <span className="normal-case">{p.host}</span>
+          {categoryLabel(p.category, lang)} · <span className="normal-case">{p.host}</span>
         </p>
       </div>
     </div>
@@ -271,11 +275,11 @@ export default function ProjectSheet({
           <span>
             <span className="text-[13px] tabular-nums text-cream">#{p.rank}</span>{" "}
             {p.week && weekClosesAt(p.week) > now
-              ? `this week · ${timeLeft(p.week, now)}`
-              : "of its week"}
+              ? t(`this week · ${timeLeft(p.week, now, lang)}`, `da semana · ${timeLeft(p.week, now, lang)}`)
+              : t("of its week", "da semana dele")}
           </span>
         ) : (
-          <span>Upvote to push it up</span>
+          <span>{t("Upvote to push it up", "Vota pra subir ele")}</span>
         )}
       </div>
       <VoteButton
@@ -300,7 +304,7 @@ export default function ProjectSheet({
         onClick={() => posthog.capture("project_visit_clicked", { project_id: p.id, from })}
         className={`btn-press flex min-h-10 items-center justify-center gap-1.5 bg-lime text-[10px] text-bg ${p.repo ? "" : "col-span-2"}`}
       >
-        Visit <ArrowUpRight size={13} aria-hidden />
+        {t("Visit", "Visitar")} <ArrowUpRight size={13} aria-hidden />
       </a>
       {p.repo && (
         <a
@@ -338,14 +342,14 @@ export default function ProjectSheet({
           onClick={() => onVisitBuilding(p.maker.login)}
           className="btn-press flex min-h-8 items-center gap-1.5 border-2 border-border px-2.5 text-[9px] text-cream hover:border-lime/60"
         >
-          <Building2 size={12} aria-hidden /> Their building
+          <Building2 size={12} aria-hidden /> {t("Their building", "Prédio dele")}
         </button>
       )}
     </div>
   );
   const share = live && (
     <div className="flex flex-col gap-1.5">
-      <p className="text-[9px] text-muted">{p.mine ? "Bring votes" : "Share"}</p>
+      <p className="text-[9px] text-muted">{p.mine ? t("Bring votes", "Traz votos") : t("Share", "Compartilhar")}</p>
       <Share slug={slug} p={p} />
     </div>
   );
@@ -358,7 +362,7 @@ export default function ProjectSheet({
             onClick={() => onEdit(p)}
             className="btn-press flex min-h-9 items-center justify-center gap-1.5 border-2 border-border text-[10px] text-cream hover:border-lime/60"
           >
-            <Pencil size={12} aria-hidden /> Edit
+            <Pencil size={12} aria-hidden /> {t("Edit", "Editar")}
           </button>
         )}
         {confirmDelete ? (
@@ -374,7 +378,7 @@ export default function ProjectSheet({
             }}
             className="btn-press flex min-h-9 items-center justify-center gap-1.5 border-2 border-red-400 text-[10px] text-red-400"
           >
-            Delete? This week&apos;s slot doesn&apos;t come back
+            {t("Delete? This week's slot doesn't come back", "Apagar? A vaga da semana não volta")}
           </button>
         ) : (
           <button
@@ -382,13 +386,13 @@ export default function ProjectSheet({
             onClick={() => setConfirmDelete(true)}
             className="btn-press flex min-h-9 items-center justify-center gap-1.5 border-2 border-border text-[10px] text-muted hover:text-cream"
           >
-            <Trash2 size={12} aria-hidden /> Delete
+            <Trash2 size={12} aria-hidden /> {t("Delete", "Apagar")}
           </button>
         )}
       </div>
       {p.status === "rejected" &&
         (appeal === "sent" ? (
-          <p className="text-[9px] normal-case text-muted">Sent. A person will look at it.</p>
+          <p className="text-[9px] normal-case text-muted">{t("Sent. A person will look at it.", "Enviado. Uma pessoa vai olhar.")}</p>
         ) : (
           <button
             type="button"
@@ -398,7 +402,7 @@ export default function ProjectSheet({
             }}
             className="self-start text-[9px] text-muted underline underline-offset-2 hover:text-cream"
           >
-            {appeal ?? "Think it's a mistake? Ask for a look"}
+            {appeal ?? t("Think it's a mistake? Ask for a look", "Acha que foi engano? Pede uma revisão")}
           </button>
         ))}
     </div>
@@ -425,7 +429,7 @@ export default function ProjectSheet({
       />
     );
   return (
-    <Panel title="Project" onClose={onClose}>
+    <Panel title={t("Project", "Projeto")} onClose={onClose}>
       <div className="flex flex-col gap-4">
         {status}
         {cover}

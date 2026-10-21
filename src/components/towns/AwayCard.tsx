@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import posthog from "posthog-js";
 import { HUD_BOX } from "@/components/league/hud/shared";
+import { useLang } from "@/lib/i18n/LangProvider";
+import type { Lang } from "@/lib/i18n/lang";
 import type { AwayFall, AwayResponse } from "@/app/api/towns/away/route";
 
 // While you were away: who knocked your buildings down since you last looked,
@@ -32,14 +34,15 @@ function saveSeen() {
   }
 }
 
-function ago(ms: number): string {
+function ago(ms: number, lang: Lang): string {
   const m = Math.max(1, Math.round(ms / 60_000));
-  if (m < 60) return `${m}m ago`;
   const h = Math.round(m / 60);
-  return h < 48 ? `${h}h ago` : `${Math.round(h / 24)}d ago`;
+  const span = m < 60 ? `${m}m` : h < 48 ? `${h}h` : `${Math.round(h / 24)}d`;
+  return lang === "pt" ? `há ${span}` : `${span} ago`;
 }
 
 export default function AwayCard({ signedIn }: { signedIn: boolean }) {
+  const { lang, t } = useLang();
   const [news, setNews] = useState<{ falls: AwayFall[]; hitBack: AwayResponse["hitBack"]; at: number } | null>(null);
 
   useEffect(() => {
@@ -74,16 +77,18 @@ export default function AwayCard({ signedIn }: { signedIn: boolean }) {
   return (
     <section className={`${HUD_BOX} w-full px-4 py-3 font-pixel uppercase sm:w-[300px]`} style={{ animation: "slide-up 0.4s ease-out both" }}>
       <div className="flex items-center justify-between text-[10px]">
-        <span className="text-cream">While you were away</span>
-        <button type="button" onClick={close} aria-label="Hide" className="px-1 text-muted transition-colors hover:text-cream">
+        <span className="text-cream">{t("While you were away", "Enquanto você tava fora")}</span>
+        <button type="button" onClick={close} aria-label={t("Hide", "Esconder")} className="px-1 text-muted transition-colors hover:text-cream">
           ✕
         </button>
       </div>
       <p className="mt-2.5 text-[11px] normal-case leading-relaxed text-cream">
         <span className="text-lime">@{last.attacker}</span>
-        {others > 0 ? ` and ${others} other${others === 1 ? "" : "s"}` : ""} knocked your building down in {last.town} · {ago(since)}
+        {lang === "pt"
+          ? `${others > 0 ? ` e mais ${others}` : ""} ${others > 0 ? "derrubaram" : "derrubou"} seu prédio em ${last.town} · ${ago(since, lang)}`
+          : `${others > 0 ? ` and ${others} other${others === 1 ? "" : "s"}` : ""} knocked your building down in ${last.town} · ${ago(since, lang)}`}
       </p>
-      {shieldH > 0 && <p className="mt-1 text-[10px] normal-case text-muted">Shielded for {shieldH}h</p>}
+      {shieldH > 0 && <p className="mt-1 text-[10px] normal-case text-muted">{t(`Shielded for ${shieldH}h`, `Protegido por ${shieldH}h`)}</p>}
       {news.hitBack && (
         <a
           href={`/town/${news.hitBack.slug}?drive=1&at=${encodeURIComponent(news.hitBack.login)}`}
@@ -93,7 +98,7 @@ export default function AwayCard({ signedIn }: { signedIn: boolean }) {
           }}
           className="btn-press mt-3 inline-block bg-lime px-2.5 py-1 text-[10px] uppercase tracking-wider text-bg"
         >
-          Smash back
+          {t("Smash back", "Revidar")}
         </a>
       )}
     </section>

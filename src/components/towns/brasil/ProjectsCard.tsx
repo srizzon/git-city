@@ -7,6 +7,7 @@ import Panel from "@/components/league/hud/Panel";
 import { timeLeft, type AdCard, type ProjectCard } from "@/lib/towns/brasil-projects";
 import type { Blocked, CardData } from "@/lib/towns/brasil-projects-server";
 import { ProjectIcon, VoteButton, adHref, api } from "./projects-ui";
+import { useLang, useT } from "@/lib/i18n/LangProvider";
 
 // The map's top-right corner: this week's projects. On a wide screen a card,
 // the mirror of the apuração card on the left (same border, rows, fold): the
@@ -31,6 +32,7 @@ function useWide(): boolean {
 }
 
 function AdRow({ slug, ad, onOffer }: { slug: string; ad: AdCard | null; onOffer: () => void }) {
+  const t = useT();
   const seen = useRef(false);
   useEffect(() => {
     if (seen.current) return;
@@ -43,10 +45,10 @@ function AdRow({ slug, ad, onOffer }: { slug: string; ad: AdCard | null; onOffer
       <span className="w-4 shrink-0 text-center text-[7px] text-[#f0b429]">AD</span>
       {ad ? <ProjectIcon project={{ icon: ad.icon, maker: { login: "", avatar: null } }} size={22} /> : <span className="h-[22px] w-[22px] shrink-0 border border-dashed border-[#f0b429]/60" aria-hidden />}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[9px] text-cream">{ad ? ad.name : "Your project here"}</span>
-        <span className="block truncate text-[10px] normal-case text-muted">{ad ? ad.tagline : "#1 here for a week"}</span>
+        <span className="block truncate text-[9px] text-cream">{ad ? ad.name : t("Your project here", "Teu projeto aqui")}</span>
+        <span className="block truncate text-[10px] normal-case text-muted">{ad ? ad.tagline : t("#1 here for a week", "#1 aqui por uma semana")}</span>
       </span>
-      <span className="flex min-h-7 min-w-[46px] shrink-0 items-center justify-center border-2 border-[#f0b429]/70 text-[9px] text-[#f0b429]">{ad ? <ArrowUpRight size={12} aria-label="Visit" /> : "Get"}</span>
+      <span className="flex min-h-7 min-w-[46px] shrink-0 items-center justify-center border-2 border-[#f0b429]/70 text-[9px] text-[#f0b429]">{ad ? <ArrowUpRight size={12} aria-label={t("Visit", "Visitar")} /> : t("Get", "Quero")}</span>
     </>
   );
   const cls = "flex w-full items-center gap-2 bg-[#f0b429]/[0.06] px-3 py-1.5 text-left hover:bg-[#f0b429]/[0.12]";
@@ -69,9 +71,10 @@ function AdRow({ slug, ad, onOffer }: { slug: string; ad: AdCard | null; onOffer
 }
 
 function Row({ slug, p, place, signedIn, viewerLogin, onOpen, onSignIn }: { slug: string; p: ProjectCard; place: number | null; signedIn: boolean; viewerLogin: string | null; onOpen: (p: ProjectCard) => void; onSignIn: () => void }) {
+  const t = useT();
   return (
     <li className="flex items-center gap-2 px-3 py-1.5">
-      <button type="button" onClick={() => onOpen(p)} className="flex min-w-0 flex-1 items-center gap-2 text-left hover:text-lime" aria-label={`Open ${p.name}`}>
+      <button type="button" onClick={() => onOpen(p)} className="flex min-w-0 flex-1 items-center gap-2 text-left hover:text-lime" aria-label={t(`Open ${p.name}`, `Abrir ${p.name}`)}>
         <span className="w-4 shrink-0 text-center text-[9px] tabular-nums text-muted">{place ?? "·"}</span>
         <ProjectIcon project={p} size={22} />
         <span className="min-w-0 flex-1">
@@ -117,6 +120,7 @@ export default function ProjectsCard({
   onSignIn: () => void;
 }) {
   const wide = useWide();
+  const { lang, t } = useLang();
   const [c, setC] = useState(initial);
   const [open, setOpen] = useState(true);
   const [sheet, setSheet] = useState(false);
@@ -139,7 +143,7 @@ export default function ProjectsCard({
   }, []);
 
   if (!c) return null;
-  const left = timeLeft(c.week);
+  const left = timeLeft(c.week, undefined, lang);
   const mine = c.me?.blocked?.code === "week_limit" ? c.me.blocked.project : null;
   const list = (
     <>
@@ -148,9 +152,9 @@ export default function ProjectsCard({
         {c.top.map((p, i) => (
           <Row key={p.id} slug={slug} p={p} place={c.mode === "ranked" && p.votes > 0 ? i + 1 : null} signedIn={signedIn} viewerLogin={viewerLogin} onOpen={onOpen} onSignIn={onSignIn} />
         ))}
-        {c.top.length === 0 && <li className="px-3 py-2 text-[10px] normal-case text-muted">No projects this week yet. Be the first.</li>}
+        {c.top.length === 0 && <li className="px-3 py-2 text-[10px] normal-case text-muted">{t("No projects this week yet. Be the first.", "Nenhum projeto essa semana ainda. Seja o primeiro.")}</li>}
       </ol>
-      {c.mode === "new" && c.top.length > 0 && <p className="px-3 pb-1 text-[8px] text-muted">New this week · upvote to rank them</p>}
+      {c.mode === "new" && c.top.length > 0 && <p className="px-3 pb-1 text-[8px] text-muted">{t("New this week · upvote to rank them", "Novos da semana · vota pra ranquear")}</p>}
       <div className="grid grid-cols-2 gap-1.5 px-3 pb-3 pt-1">
         <button
           type="button"
@@ -161,7 +165,7 @@ export default function ProjectsCard({
           }}
           className="btn-press flex min-h-9 items-center justify-center border-2 border-border text-[10px] text-cream hover:border-lime/60"
         >
-          See all{c.count > 3 ? ` · ${c.count}` : ""}
+          {t("See all", "Ver todos")}{c.count > 3 ? ` · ${c.count}` : ""}
         </button>
         {mine && mine.status !== "removed" ? (
           // This week's slot is used: the button is their project.
@@ -173,7 +177,7 @@ export default function ProjectsCard({
             }}
             className="btn-press flex min-h-9 items-center justify-center gap-1 border-2 border-lime text-[10px] text-lime hover:bg-lime hover:text-bg"
           >
-            Your project
+            {t("Your project", "Teu projeto")}
           </button>
         ) : (
           <button
@@ -185,7 +189,7 @@ export default function ProjectsCard({
             }}
             className="btn-press flex min-h-9 items-center justify-center gap-1 bg-lime text-[10px] text-bg"
           >
-            <Plus size={12} strokeWidth={3} aria-hidden /> Share yours
+            <Plus size={12} strokeWidth={3} aria-hidden /> {t("Share yours", "Mostra o teu")}
           </button>
         )}
       </div>
@@ -199,12 +203,12 @@ export default function ProjectsCard({
         <button
           type="button"
           onClick={() => setSheet(true)}
-          aria-label="Projects this week"
+          aria-label={t("Projects this week", "Projetos da semana")}
           className="pointer-events-auto absolute right-3 top-[104px] z-20 flex h-12 w-[calc(50%-16px)] flex-col justify-center gap-1.5 border-[3px] border-border bg-bg/90 px-2.5 text-left font-pixel text-[9px] uppercase backdrop-blur-sm"
         >
           <span className="flex items-center gap-1.5">
-            <span className="text-lime">Projects</span>
-            <span className="text-[8px] text-muted">This week</span>
+            <span className="text-lime">{t("Projects", "Projetos")}</span>
+            <span className="text-[8px] text-muted">{t("This week", "Da semana")}</span>
           </span>
           {lead ? (
             <span className="flex items-center gap-1.5">
@@ -212,11 +216,11 @@ export default function ProjectsCard({
               <span className="min-w-0 truncate normal-case text-cream">{lead.name}</span>
             </span>
           ) : (
-            <span className="text-muted">Share yours</span>
+            <span className="text-muted">{t("Share yours", "Mostra o teu")}</span>
           )}
         </button>
         {sheet && (
-          <Panel title="Projects this week" onClose={() => setSheet(false)}>
+          <Panel title={t("Projects this week", "Projetos da semana")} onClose={() => setSheet(false)}>
             <p className="-mt-1 mb-2 text-[9px] text-muted">{left}</p>
             <div className="-mx-4">{list}</div>
           </Panel>
@@ -226,9 +230,9 @@ export default function ProjectsCard({
   }
 
   return (
-    <section aria-label="Projects this week" className="pointer-events-auto absolute right-4 top-4 z-20 w-[272px] border-[3px] border-border bg-bg/90 font-pixel uppercase backdrop-blur-sm">
+    <section aria-label={t("Projects this week", "Projetos da semana")} className="pointer-events-auto absolute right-4 top-4 z-20 w-[272px] border-[3px] border-border bg-bg/90 font-pixel uppercase backdrop-blur-sm">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between gap-2 border-b-2 border-border px-3 py-2 text-[10px]">
-        <span className="text-cream">Projects · this week</span>
+        <span className="text-cream">{t("Projects · this week", "Projetos · da semana")}</span>
         <span className="flex items-center gap-1.5 text-muted">
           {left}
           {open ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
