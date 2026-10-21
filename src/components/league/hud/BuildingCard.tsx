@@ -9,6 +9,7 @@ import { Avatar, fmt } from "./shared";
 import { SocialLinkChip } from "@/components/SocialIcons";
 import { SOCIAL_PLATFORMS, type SocialLinks } from "@/lib/social-links";
 import { useSheet } from "./useSheet";
+import { useT } from "@/lib/i18n/LangProvider";
 
 // Same card as the home city's building profile (header, level, stats,
 // actions), plus the dev's place in this league and a kudos button. A town
@@ -46,12 +47,13 @@ export default function BuildingCard({
   onDriveTo?: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [kudos, setKudos] = useState<{ state: "idle" | "sending" | "sent" | "error"; message?: string }>({ state: "idle" });
   const viewer = data ? (data.viewer?.login ?? null) : (viewerLogin ?? null);
   const isSelf = viewer?.toLowerCase() === b.loginLower;
   const giveKudos = async () => {
     if (!viewer) {
-      setKudos({ state: "error", message: "Sign in to give kudos" });
+      setKudos({ state: "error", message: t("Sign in to give kudos", "Entre pra dar kudos") });
       return;
     }
     setKudos({ state: "sending" });
@@ -67,10 +69,10 @@ export default function BuildingCard({
       }
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       const message =
-        res.status === 403 ? "Claim your building to give kudos" : res.status === 429 ? (body.error?.includes("Daily") ? "No kudos left today (5/day)" : "Too fast, try again") : "Couldn't send kudos";
+        res.status === 403 ? t("Claim your building to give kudos", "Reivindique seu prédio pra dar kudos") : res.status === 429 ? (body.error?.includes("Daily") ? t("No kudos left today (5/day)", "Acabaram seus kudos de hoje (5/dia)") : t("Too fast, try again", "Calma, tenta de novo")) : t("Couldn't send kudos", "Não deu pra mandar o kudos");
       setKudos({ state: "error", message });
     } catch {
-      setKudos({ state: "error", message: "Couldn't send kudos" });
+      setKudos({ state: "error", message: t("Couldn't send kudos", "Não deu pra mandar o kudos") });
     }
   };
   // Lean: the links they put on their profile, fetched when the card opens.
@@ -148,7 +150,7 @@ export default function BuildingCard({
                   {b.claimed && (
                     <span className="inline-flex shrink-0 items-center gap-1 border border-border-light bg-bg/40 px-1.5 py-0.5 text-[7px] text-muted">
                       <span className="h-1 w-1 bg-lime" />
-                      Claimed
+                      {t("Claimed", "Reivindicado")}
                     </span>
                   )}
                 </div>
@@ -234,7 +236,7 @@ export default function BuildingCard({
                     disabled={kudos.state === "sending" || kudos.state === "sent"}
                     className={`btn-press w-full py-2 text-[10px] ${kudos.state === "sent" ? "border-2 border-lime text-lime" : "bg-lime text-bg"} disabled:cursor-default`}
                   >
-                    {kudos.state === "sending" ? "Sending…" : kudos.state === "sent" ? "Kudos sent" : "Give kudos"}
+                    {kudos.state === "sending" ? t("Sending…", "Enviando…") : kudos.state === "sent" ? t("Kudos sent", "Kudos enviado") : t("Give kudos", "Dar kudos")}
                   </button>
                   {kudos.state === "error" && <p className="text-[9px] text-red-400 normal-case">{kudos.message}</p>}
                 </>
@@ -242,11 +244,11 @@ export default function BuildingCard({
               <div className="flex gap-2">
                 {onDriveTo && (
                   <button type="button" onClick={onDriveTo} className="btn-press flex-1 border-2 border-border py-2 text-[10px] text-cream transition-colors hover:border-lime/60">
-                    Drive here
+                    {t("Drive here", "Dirigir até aqui")}
                   </button>
                 )}
                 <Link href={`/dev/${b.login}`} className="btn-press flex-1 border-2 border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-lime/60">
-                  Profile
+                  {t("Profile", "Perfil")}
                 </Link>
               </div>
             </div>

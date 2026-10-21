@@ -15,6 +15,8 @@ export interface LiveSpot {
   name: string;
   /** One line under the name. */
   tagline: string;
+  /** The same in Portuguese, for a spot on the Brasil map. */
+  taglinePt?: string;
   track: TrackSpec;
   surface: Surface;
   clips: Clip[];

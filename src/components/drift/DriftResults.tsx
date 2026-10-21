@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createBrowserSupabase } from "@/lib/supabase";
 import { signInWithGitHub } from "@/lib/sign-in";
 import { medalFor, medalScores, type LiveSpot } from "@/lib/drift/spots/types";
-import { MEDAL_COLORS, fmt } from "./DriftHud";
+import { DRIFT_PT, MEDAL_COLORS, fmt } from "./DriftHud";
+import { useLang } from "@/lib/i18n/LangProvider";
 import type { BoardRowLite } from "./DriftTitle";
 import { Backdrop, Band, Chip } from "@/components/games/ui";
 
@@ -54,6 +55,7 @@ export interface DriftResultsProps {
 }
 
 const COUNTRY = new Intl.DisplayNames(["en"], { type: "region" });
+const COUNTRY_PT = new Intl.DisplayNames(["pt-BR"], { type: "region" });
 const T = { hero: "clamp(40px, min(11vh, 14vw), 128px)", big: "clamp(16px, min(3vh, 4.4vw), 34px)", body: "clamp(11px, min(1.8vh, 3.2vw), 19px)", small: "clamp(10px, min(1.4vh, 2.6vw), 15px)" };
 
 /** Rows around a score that isn't on the board yet: two above, you, two below. */
@@ -67,6 +69,8 @@ export function projected(board: BoardRowLite[], score: number, you: string): Bo
 }
 
 export default function DriftResults(p: DriftResultsProps) {
+  const { lang, t } = useLang();
+  const medalName = (m: string) => (lang === "pt" ? (DRIFT_PT[m] ?? m) : m);
   const [beat, setBeat] = useState(0);
   const [shown, setShown] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -134,7 +138,7 @@ export default function DriftResults(p: DriftResultsProps) {
       {beat === 0 && (
         <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2">
           <span className="block animate-[drift-pop_0.3s_ease-out_both] bg-lime px-8 pb-4 pt-5 leading-none tracking-[0.12em] text-bg shadow-[0_10px_0_rgba(0,0,0,0.35)]" style={{ fontSize: T.hero }}>
-            Finish
+            {t("Finish", "Chegada")}
           </span>
         </div>
       )}
@@ -148,7 +152,7 @@ export default function DriftResults(p: DriftResultsProps) {
               <span className="text-lime">{p.spot.name} · finish</span>
               {beat >= 2 && medal && (
                 <span className="animate-[drift-pop_0.3s_ease-out_both]" style={{ color: MEDAL_COLORS[medal] }}>
-                  {medal} medal
+                  {t(`${medal} medal`, `medalha de ${medalName(medal)}`)}
                 </span>
               )}
             </Band>
@@ -165,17 +169,17 @@ export default function DriftResults(p: DriftResultsProps) {
               >
                 {better && p.before !== null && (
                   <>
-                    <span>New best</span>
+                    <span>{t("New best", "Novo recorde")}</span>
                     <span>+{fmt(p.score - p.before)}</span>
                   </>
                 )}
                 {!better && p.before !== null && (
                   <>
-                    <span className="text-muted">Your best {fmt(p.before)}</span>
+                    <span className="text-muted">{t("Your best", "Seu recorde")} {fmt(p.before)}</span>
                     <span className="text-[#ff5a52]">−{fmt(p.before - p.score)}</span>
                   </>
                 )}
-                {p.before === null && <span>First run</span>}
+                {p.before === null && <span>{t("First run", "Primeira volta")}</span>}
               </Band>
             )}
 
@@ -195,7 +199,7 @@ export default function DriftResults(p: DriftResultsProps) {
                         <span className="flex gap-5">
                           <span className={mine ? "" : "text-muted"}>{row.rank}</span>
                           <span className="normal-case">{mine && !p.you ? "You" : `@${row.login}`}</span>
-                          {passed.has(row.login.toLowerCase()) && <span className="text-lime">passed</span>}
+                          {passed.has(row.login.toLowerCase()) && <span className="text-lime">{t("passed", "passou")}</span>}
                         </span>
                         <span>{fmt(row.score)}</span>
                       </Band>
@@ -205,31 +209,31 @@ export default function DriftResults(p: DriftResultsProps) {
                 <Band delay={420} className="mt-5 flex-wrap gap-x-5 gap-y-1 px-5 py-2.5 text-muted" style={{ fontSize: T.small }}>
                   {r?.country && (
                     <span>
-                      {COUNTRY.of(r.country) ?? r.country} <span className="text-cream">#{r.rankCountry}</span>
+                      {(lang === "pt" ? COUNTRY_PT : COUNTRY).of(r.country) ?? r.country} <span className="text-cream">#{r.rankCountry}</span>
                     </span>
                   )}
                   {r && (
                     <span>
-                      World <span className="text-cream">#{r.rankWorld}</span> of {fmt(r.totalWorld)}
+                      {t("World", "Mundo")} <span className="text-cream">#{r.rankWorld}</span> {t("of", "de")} {fmt(r.totalWorld)}
                     </span>
                   )}
                   <span>
-                    <span className="text-cream">{p.stats.banks}</span> banked
+                    <span className="text-cream">{p.stats.banks}</span> {t("banked", "garantidos")}
                   </span>
                   <span>
-                    <span className={p.stats.lost ? "text-[#ff5a52]" : "text-cream"}>{p.stats.lost}</span> lost
+                    <span className={p.stats.lost ? "text-[#ff5a52]" : "text-cream"}>{p.stats.lost}</span> {t("lost", "perdidos")}
                   </span>
                   <span>
-                    <span className="text-cream">{p.stats.clips}</span> clips
+                    <span className="text-cream">{p.stats.clips}</span> {t("clips", "clips")}
                   </span>
                   <span>
-                    Best chain <span className="text-cream">{fmt(p.stats.bestChain)}</span>
+                    {t("Best chain", "Melhor sequência")} <span className="text-cream">{fmt(p.stats.bestChain)}</span>
                   </span>
                 </Band>
                 {!r?.next && nextMedal && (
                   <Band delay={480} className="gap-3 px-5 py-2.5" style={{ fontSize: T.small }}>
-                    <span className="text-muted">Next</span>
-                    <span style={{ color: MEDAL_COLORS[nextMedal[0]] }}>{nextMedal[0]}</span>
+                    <span className="text-muted">{t("Next", "Próxima")}</span>
+                    <span style={{ color: MEDAL_COLORS[nextMedal[0]] }}>{medalName(nextMedal[0])}</span>
                     <span className="tabular-nums">{fmt(nextMedal[1])}</span>
                   </Band>
                 )}
@@ -241,35 +245,35 @@ export default function DriftResults(p: DriftResultsProps) {
           {beat >= 3 && (
             <div className="pointer-events-auto absolute bottom-[4vh] left-4 right-4 grid grid-cols-2 items-stretch md:bottom-[6vh] md:left-auto md:right-[6vw] md:flex md:flex-wrap md:justify-end" style={{ fontSize: T.body }}>
               <button type="button" onClick={p.onSpots} className={`${act} bg-[#141417] px-4 text-cream hover:text-lime`} style={{ animationDelay: "560ms" }}>
-                <Chip>Esc</Chip> {p.town?.exit ?? "Spots"}
+                <Chip>Esc</Chip> {p.town?.exit ?? t("Spots", "Spots")}
               </button>
               {p.post.status === "signed-out" && (
                 <button type="button" onClick={signIn} className={`${act} bg-[#141417] px-4 text-lime`} style={{ animationDelay: "520ms" }}>
-                  Sign in to post
+                  {t("Sign in to post", "Entre pra postar")}
                 </button>
               )}
               {p.post.status === "failed" && (
                 <button type="button" onClick={p.onRetryPost} className={`${act} bg-[#ff9a3c] px-4 text-bg`} style={{ animationDelay: "520ms" }}>
-                  Not posted · try again
+                  {t("Not posted · try again", "Não postou · tenta de novo")}
                 </button>
               )}
               {p.post.status === "posting" && (
                 <span className={`${act} bg-[#141417] px-4 text-muted`} style={{ animationDelay: "520ms" }}>
-                  Posting…
+                  {t("Posting…", "Postando…")}
                 </span>
               )}
               {p.you && p.post.status === "posted" && (
                 <button type="button" onClick={challenge} className={`${act} bg-[#141417] px-4 text-cream hover:text-lime`} style={{ animationDelay: "500ms" }}>
-                  <Chip>C</Chip> {copied ? "Link copied" : "Challenge"}
+                  <Chip>C</Chip> {copied ? t("Link copied", "Link copiado") : t("Challenge", "Desafiar")}
                 </button>
               )}
               {r?.next && (
                 <button type="button" onClick={() => p.onRaceGhost(r.next!.login)} className={`${act} bg-[#141417] px-4 normal-case text-cream hover:text-lime`} style={{ animationDelay: "460ms" }}>
-                  <Chip>G</Chip> Race @{r.next.login}
+                  <Chip>G</Chip> {t("Race", "Correr contra")} @{r.next.login}
                 </button>
               )}
               <button type="button" onClick={p.onRetry} autoFocus className={`${act} col-span-2 justify-center bg-cream px-7 py-4 text-bg outline-none hover:bg-lime focus-visible:bg-lime`} style={{ fontSize: T.big, animationDelay: "420ms" }}>
-                <Chip tone="dark">R</Chip> {p.town?.again ?? "Again"}
+                <Chip tone="dark">R</Chip> {p.town?.again ?? t("Again", "De novo")}
               </button>
             </div>
           )}

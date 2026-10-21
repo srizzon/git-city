@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { useT } from "@/lib/i18n/LangProvider";
 
 // Reusable pixel-art dropdown matching the Git City design system
 // (3px borders, hard pixel shadow, lime accent). Replaces native <select> in
@@ -34,6 +35,7 @@ export function PixelSelect({
   searchable?: boolean;
   searchPlaceholder?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hi, setHi] = useState(-1);
@@ -122,7 +124,7 @@ export function PixelSelect({
             />
           )}
           <ul role="listbox" id={listId} className="scrollbar-thin max-h-60 list-none overflow-auto">
-          {searchable && shown.length === 0 && <li className="px-3 py-2 text-[11px] text-dim normal-case">No match.</li>}
+          {searchable && shown.length === 0 && <li className="px-3 py-2 text-[11px] text-dim normal-case">{t("No match.", "Nada encontrado.")}</li>}
           {shown.map((o, i) => {
             const sel = o.value === value;
             return (

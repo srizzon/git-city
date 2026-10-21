@@ -5,6 +5,7 @@ import { CROWN, type CrownState } from "@/lib/league-city/drive/crown";
 import type { DriverInfo } from "@/lib/league-city/drive/net";
 import { HUD_BOX } from "../shared";
 import CopyLink from "./CopyLink";
+import { useT } from "@/lib/i18n/LangProvider";
 
 // Crown Rush HUD: a Start button when 2+ people drive here, the 3-2-1, then
 // everyone's time left (the holder's counting down live), who holds the
@@ -47,14 +48,15 @@ export default function CrownPanel({
   idle?: boolean;
   onStart: () => void;
 }) {
+  const t = useT();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 100);
-    return () => clearInterval(t);
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
   }, []);
   const serverNow = now + offset;
-  const name = (id: string) => (id === you ? "You" : (drivers.find((d) => d.id === id)?.name.replace(/^guest-.*/, "guest") ?? "someone"));
-  const at = (id: string) => (id === you ? "you" : `@${name(id)}`);
+  const name = (id: string) => (id === you ? t("You", "Você") : (drivers.find((d) => d.id === id)?.name.replace(/^guest-.*/, t("guest", "visitante")) ?? t("someone", "alguém")));
+  const at = (id: string) => (id === you ? t("you", "você") : `@${name(id)}`);
 
   const phase = crown?.phase ?? "idle";
   const canStart = drivers.length >= 1 && (phase === "idle" || (phase === "over" && serverNow >= (crown?.endsAt ?? 0) + CROWN.over));
@@ -65,7 +67,7 @@ export default function CrownPanel({
       <div className="absolute inset-x-0 top-[28%] flex flex-col items-center gap-3 text-cream">
         <Crown className="h-8 w-[72px]" />
         <p className="text-6xl tabular-nums">{n}</p>
-        <p className="text-[10px] text-muted">Hold the crown {CROWN.goal / 1000} s to win</p>
+        <p className="text-[10px] text-muted">{t(`Hold the crown ${CROWN.goal / 1000} s to win`, `Segure a coroa por ${CROWN.goal / 1000} s pra ganhar`)}</p>
       </div>
     );
   }
@@ -90,7 +92,7 @@ export default function CrownPanel({
         <div className={`${HUD_BOX} absolute left-1/2 top-4 max-sm:left-auto max-sm:right-4 max-sm:top-[4.25rem] max-sm:translate-x-0 flex -translate-x-1/2 flex-col gap-1.5 px-3 py-2 text-[9px]`}>
           <p className="flex items-center justify-between gap-4 text-cream">
             <span className="flex items-center gap-1.5">
-              <Crown className="h-2.5 w-[22px]" /> Crown rush
+              <Crown className="h-2.5 w-[22px]" /> {t("Crown rush", "Corrida da coroa")}
             </span>
             <span className="tabular-nums text-muted">{clock(crown.endsAt - serverNow)}</span>
           </p>
@@ -104,7 +106,7 @@ export default function CrownPanel({
                 <span className="tabular-nums">{secs(left(id))}s</span>
               </li>
             ))}
-            {rest > 0 && <li className="pl-[24px] text-dim">+{rest} racing</li>}
+            {rest > 0 && <li className="pl-[24px] text-dim">+{rest} {t("racing", "correndo")}</li>}
           </ul>
         </div>
         <p
@@ -113,12 +115,12 @@ export default function CrownPanel({
           }`}
         >
           {mine
-            ? "You have the crown! Don't get hit"
+            ? t("You have the crown! Don't get hit", "A coroa é sua! Não deixa te pegarem")
             : crown.holder
-              ? `${at(crown.holder)} has the crown. Bump them (boost to steal)`
+              ? t(`${at(crown.holder)} has the crown. Bump them (boost to steal)`, `${at(crown.holder)} tá com a coroa. Bate nele (turbo pra roubar)`)
               : crown.lockId === you && serverNow < crown.lockUntil
-                ? `You lost the crown! Back in ${secs(crown.lockUntil - serverNow)}s`
-                : "The crown is loose! Grab it"}
+                ? t(`You lost the crown! Back in ${secs(crown.lockUntil - serverNow)}s`, `Você perdeu a coroa! Volta em ${secs(crown.lockUntil - serverNow)}s`)
+                : t("The crown is loose! Grab it", "A coroa tá solta! Pega ela")}
         </p>
       </>
     );
@@ -130,7 +132,7 @@ export default function CrownPanel({
       <div className="absolute inset-x-0 top-[20%] flex flex-col items-center gap-4 text-cream">
         <Crown className="h-10 w-[90px]" />
         <p className="text-2xl tracking-[0.15em]">
-          {crown.winner ? (crown.winner === you ? "You win!" : `${at(crown.winner)} wins!`) : "Nobody wins"}
+          {crown.winner ? (crown.winner === you ? t("You win!", "Você ganhou!") : t(`${at(crown.winner)} wins!`, `${at(crown.winner)} ganhou!`)) : t("Nobody wins", "Ninguém ganhou")}
         </p>
         <ul className={`${HUD_BOX} flex flex-col gap-1 px-4 py-2 text-[10px]`}>
           {ranked.slice(0, 6).map(([id, ms], i) => (
@@ -138,7 +140,7 @@ export default function CrownPanel({
               <span className={id === crown.winner ? "text-[#ffcf33]" : "text-muted"}>
                 {i + 1}. {name(id)}
               </span>
-              <span className="tabular-nums text-muted">{((CROWN.goal - ms) / 1000).toFixed(1)}s held</span>
+              <span className="tabular-nums text-muted">{((CROWN.goal - ms) / 1000).toFixed(1)}s {t("held", "com a coroa")}</span>
             </li>
           ))}
         </ul>
@@ -152,12 +154,12 @@ export default function CrownPanel({
       {canStart ? (
         <button type="button" onClick={onStart} className={`${HUD_BOX} btn-press flex items-center gap-2 px-3 py-2 text-[10px] text-[#ffcf33] hover:text-cream`}>
           <Crown className="h-2.5 w-[22px]" />
-          Start crown rush
+          {t("Start crown rush", "Começar corrida da coroa")}
         </button>
       ) : (
         <div className={`${HUD_BOX} flex items-center gap-3 px-3 py-2 text-[9px] text-dim normal-case`}>
           <Crown className="h-2.5 w-[22px] opacity-50" />
-          Crown rush needs 2 drivers.
+          {t("Crown rush needs 2 drivers.", "A corrida da coroa precisa de 2 pilotos.")}
           <CopyLink />
         </div>
       )}

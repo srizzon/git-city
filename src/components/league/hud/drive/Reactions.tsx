@@ -6,6 +6,7 @@ import { CHAT_MAX, EMOTES, emoteForKey } from "@/lib/league-city/drive/emotes";
 import { HUD_BOX } from "../shared";
 import { carColor } from "@/lib/league-city/drive/net";
 import type { EmoteLog } from "@/lib/league-city/drive/emote-log";
+import { useT } from "@/lib/i18n/LangProvider";
 
 // Quick reactions in the HUD (lib drive/emotes). On a keyboard: the six slots
 // in a row with their keys, 1–6 fires one and its slot flashes. On a phone:
@@ -60,13 +61,14 @@ export function ReactionBar({
   /** A phone: thumb-sized keys, no key numbers. */
   big?: boolean;
 }) {
+  const t = useT();
   const flash = useEmoteKeys(on, onEmote);
   return (
     <div
       className={`${HUD_BOX} flex divide-x-2 divide-border`}
       style={style}
       role="toolbar"
-      aria-label="Reactions"
+      aria-label={t("Reactions", "Reações")}
     >
       {EMOTES.map((emoji, i) => (
         <button
@@ -75,8 +77,8 @@ export function ReactionBar({
           // No focus on click: Space (the handbrake) would press it again.
           onMouseDown={(ev) => ev.preventDefault()}
           onClick={() => onEmote(i)}
-          aria-label={`React ${emoji} (${i + 1})`}
-          title={`React (${i + 1})`}
+          aria-label={t(`React ${emoji} (${i + 1})`, `Reagir ${emoji} (${i + 1})`)}
+          title={t(`React (${i + 1})`, `Reagir (${i + 1})`)}
           className={`relative flex items-center justify-center leading-none transition-colors hover:bg-white/5 active:translate-y-px ${big ? "h-11 w-12 text-xl" : "h-9 w-9 text-[16px]"}`}
         >
           <span
@@ -110,18 +112,19 @@ export function ReactionButton({
   className: string;
   up?: boolean;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <span className="relative flex">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="React"
+        aria-label={t("React", "Reagir")}
         aria-expanded={open}
         className={`${className} ${open ? "text-lime" : ""}`}
       >
         <Smile size={up ? 18 : 14} strokeWidth={2.5} aria-hidden />
-        {up && "React"}
+        {up && t("React", "Reagir")}
       </button>
       {open && (
         <div
@@ -133,7 +136,7 @@ export function ReactionButton({
               key={i}
               type="button"
               role="menuitem"
-              aria-label={`React ${emoji}`}
+              aria-label={t(`React ${emoji}`, `Reagir ${emoji}`)}
               onClick={() => {
                 onEmote(i);
                 setOpen(false);
@@ -165,12 +168,13 @@ export function ReactionButton({
 
 /** Keyboard: the last few reactions in the room, newest at the bottom, older ones fading. */
 export function ReactionLog({ log, align = "end" }: { log: EmoteLog; align?: "start" | "end" }) {
+  const t = useT();
   const entries = useSyncExternalStore(log.subscribe, log.get, log.get);
   if (entries.length === 0) return null;
   return (
     <ol
       className={`flex flex-col gap-0.5 text-[8px] normal-case ${align === "start" ? "items-start" : "items-end"}`}
-      aria-label="Recent reactions"
+      aria-label={t("Recent reactions", "Reações recentes")}
       aria-live="polite"
     >
       {entries.map((l, i) => (
@@ -213,6 +217,7 @@ export function useChatKey(on: boolean, open: () => void) {
 
 /** The field to type a message: Enter sends, Esc or leaving it closes it (and the car has the keys again). */
 export function ChatField({ onSend, onClose, className = "" }: { onSend: (text: string) => void; onClose: () => void; className?: string }) {
+  const t = useT();
   const [text, setText] = useState("");
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -243,8 +248,8 @@ export function ChatField({ onSend, onClose, className = "" }: { onSend: (text: 
         maxLength={CHAT_MAX}
         enterKeyHint="send"
         autoComplete="off"
-        aria-label="Message everyone driving here"
-        placeholder="Say something"
+        aria-label={t("Message everyone driving here", "Mensagem pra todo mundo dirigindo aqui")}
+        placeholder={t("Say something", "Fala alguma coisa")}
         // Driving on a phone turns text selection off for the page (DriveHud); iOS won't type into a field without it.
         style={{ userSelect: "text", WebkitUserSelect: "text" }}
         className="h-9 min-w-0 flex-1 bg-transparent text-[16px] normal-case text-cream outline-none placeholder:text-dim sm:text-[11px]"
@@ -258,6 +263,7 @@ export function ChatField({ onSend, onClose, className = "" }: { onSend: (text: 
 
 /** Where the field opens, while it's closed: says chat exists and how to open it (Enter, or a tap). */
 export function ChatPrompt({ onOpen, touch = false }: { onOpen: () => void; touch?: boolean }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -267,7 +273,7 @@ export function ChatPrompt({ onOpen, touch = false }: { onOpen: () => void; touc
       className={`${HUD_BOX} flex items-center gap-2 px-2.5 text-[10px] text-cream transition-colors hover:text-lime ${touch ? "h-10" : "h-[42px] w-[222px]"}`}
     >
       <MessageSquare size={14} strokeWidth={2.5} className="shrink-0 text-lime" aria-hidden />
-      <span className="flex-1 text-left">Chat</span>
+      <span className="flex-1 text-left">{t("Chat", "Chat")}</span>
       {!touch && (
         <span className="border-2 border-lime px-1.5 py-0.5 text-[8px] leading-none text-lime" aria-hidden>
           Enter

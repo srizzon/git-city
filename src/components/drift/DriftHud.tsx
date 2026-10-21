@@ -8,6 +8,7 @@ import { medalScores, type LiveSpot, type Medal } from "@/lib/drift/spots/types"
 import type { DriftTelemetry } from "@/lib/drift/telemetry";
 import { markSeen, seen } from "@/lib/drift/local";
 import { Backdrop, Band, Chip } from "@/components/games/ui";
+import { useLang } from "@/lib/i18n/LangProvider";
 
 // The driving HUD in broadcast bands, on the scene as is (no blur while you
 // drive). The center is the road: only the countdown, the live combo and a
@@ -34,6 +35,48 @@ export const DRIFT_CONTROLS: [string, string][] = [
   ["C", "Camera"],
   ["Esc", "Pause"],
 ];
+
+/** The drift's words in Portuguese (the Brasil map), looked up at render: controls, hints, medals, grades. */
+export const DRIFT_PT: Record<string, string> = {
+  Drive: "Acelerar",
+  Drift: "Drift",
+  "Space + steer": "Espaço + vire",
+  "Steer in / out": "Vire pra dentro / fora",
+  "Open / close the angle": "Abre / fecha o ângulo",
+  "Start over": "Recomeçar",
+  "Last checkpoint": "Último checkpoint",
+  "Ghosts / HUD": "Fantasmas / HUD",
+  Camera: "Câmera",
+  Pause: "Pausar",
+  "Too shallow": "Pouco ângulo",
+  "Steer in to open the angle": "Vire pra dentro pra abrir o ângulo",
+  "Too much angle": "Ângulo demais",
+  "Countersteer to close it": "Contraesterce pra fechar",
+  "Too slow": "Devagar demais",
+  "Carry more speed in": "Entre com mais velocidade",
+  "Off the asphalt": "Fora do asfalto",
+  "Back on the road": "Volta pra pista",
+  "Wrong way": "Contramão",
+  "Turn around": "Dá meia-volta",
+  "Already driven": "Já passou aqui",
+  "Only new track scores": "Só trecho novo pontua",
+  "Hold to drift": "Segure pra fazer drift",
+  "Straighten out to bank it": "Endireite pra garantir",
+  "Hold and drag to drift": "Segure e arraste pro drift",
+  "Drag in to open the angle": "Arraste pra dentro pra abrir o ângulo",
+  "Let go to bank it": "Solte pra garantir",
+  Space: "Espaço",
+  author: "autor",
+  gold: "ouro",
+  silver: "prata",
+  bronze: "bronze",
+  Next: "Próxima",
+  "Author beaten": "Autor batido",
+  "Link the next one": "Emende o próximo",
+  Good: "Bom",
+  Great: "Ótimo",
+  Insane: "Insano",
+};
 
 const HINT_TEXT: Record<Exclude<SlideHint, null>, [string, string]> = {
   shallow: ["Too shallow", "Steer in to open the angle"],
@@ -128,6 +171,12 @@ export default function DriftHud(p: DriftHudProps) {
   const [hidden, setHidden] = useState(false);
   const [hint, setHint] = useState<number | null>(null);
 
+  const { lang, t } = useLang();
+  const tr = (x: string) => (lang === "pt" ? (DRIFT_PT[x] ?? x) : x);
+  const trRef = useRef(tr);
+  useEffect(() => {
+    trRef.current = tr;
+  });
   const medals = medalScores(p.spot);
   const live = p.ready && (p.stage === "countdown" || p.stage === "run");
 
@@ -172,7 +221,7 @@ export default function DriftHud(p: DriftHudProps) {
         rank.current.textContent = n === 0 ? "" : above >= n ? `#${n}+` : `#${above + 1}`;
       }
       const next = [...medals].reverse().find(([, at]) => at > banked) ?? null;
-      if (goal.current) goal.current.textContent = next ? `Next · ${next[0]} ${fmt(next[1])}` : "Author beaten";
+      if (goal.current) goal.current.textContent = next ? `${trRef.current("Next")} · ${trRef.current(next[0])} ${fmt(next[1])}` : trRef.current("Author beaten");
       if (goalBar.current) {
         goalBar.current.style.transform = `scaleX(${next ? Math.min(1, banked / next[1]) : 1})`;
         goalBar.current.style.background = next ? MEDAL_COLORS[next[0]] : MEDAL_COLORS.author;
@@ -202,7 +251,7 @@ export default function DriftHud(p: DriftHudProps) {
       if (d && d.risk > 0) {
         if (risk.current) risk.current.textContent = fmt(d.risk);
         if (mult.current) mult.current.textContent = `×${d.mult.toFixed(1)}`;
-        if (grade.current) grade.current.textContent = d.drifting ? `${driftGrade(d.angle, d.kmh)} drift` : "Link the next one";
+        if (grade.current) grade.current.textContent = d.drifting ? `${trRef.current(driftGrade(d.angle, d.kmh))} drift` : trRef.current("Link the next one");
         const left = d.gap / DRIFT_SCORE.chainMax;
         if (chain.current) chain.current.style.transform = `scaleX(${d.drifting ? 1 : Math.max(0, 1 - left)})`;
         if (comboBox.current) {
@@ -248,7 +297,7 @@ export default function DriftHud(p: DriftHudProps) {
             className={`flex animate-[drift-pop_0.32s_ease-out_both] items-center justify-center px-[0.3em] leading-none shadow-[0_10px_0_rgba(0,0,0,0.35)] ${cue === "Go" ? "bg-lime text-bg" : "bg-cream text-bg"}`}
             style={{ fontSize: T.count, minWidth: "1.5em", height: "1.4em" }}
           >
-            {cue}
+            {cue === "Go" ? t("Go", "Vai") : cue}
           </span>
         </div>
       )}
@@ -302,7 +351,7 @@ export default function DriftHud(p: DriftHudProps) {
             {center.kind === "bank" && (
               <div key={center.at} className="flex animate-[drift-pop_0.3s_ease-out_both] flex-col items-stretch">
                 <Band animate={false} className="justify-center px-4 py-1.5 text-lime" style={{ fontSize: T.mid }}>
-                  Banked
+                  {t("Banked", "Garantido")}
                 </Band>
                 <Band animate={false} tone="cream" className="px-6 py-2 leading-none tabular-nums" style={{ fontSize: T.combo }}>
                   +{fmt(center.points)}
@@ -312,7 +361,7 @@ export default function DriftHud(p: DriftHudProps) {
             {center.kind === "lost" && (
               <div key={center.at} className="flex animate-[drift-drop_1s_ease-in_both] flex-col items-stretch">
                 <Band animate={false} className="justify-center px-4 py-1.5 text-[#ff5a52]" style={{ fontSize: T.mid }}>
-                  Lost
+                  {t("Lost", "Perdeu")}
                 </Band>
                 <Band animate={false} tone="red" className="px-6 py-2 leading-none tabular-nums line-through decoration-[6px]" style={{ fontSize: T.combo }}>
                   {fmt(center.points)}
@@ -322,10 +371,10 @@ export default function DriftHud(p: DriftHudProps) {
             {center.kind === "hint" && (
               <div className="flex flex-col items-center">
                 <Band animate={false} tone="orange" className="px-5 py-2" style={{ fontSize: T.mid }}>
-                  {HINT_TEXT[center.hint][0]}
+                  {tr(HINT_TEXT[center.hint][0])}
                 </Band>
                 <Band animate={false} className="px-4 py-1.5 normal-case" style={{ fontSize: T.small }}>
-                  {HINT_TEXT[center.hint][1]}
+                  {tr(HINT_TEXT[center.hint][1])}
                 </Band>
               </div>
             )}
@@ -348,9 +397,9 @@ export default function DriftHud(p: DriftHudProps) {
             <div className={`absolute left-1/2 -translate-x-1/2 ${p.touch ? "bottom-[150px]" : "bottom-[8vh]"}`}>
               <Band className="gap-3 whitespace-nowrap px-4 py-3" style={{ fontSize: T.mid }}>
                 {(p.touch ? FIRST_HINTS_TOUCH : FIRST_HINTS)[hint].keys.map((k) => (
-                  <Chip key={k}>{k}</Chip>
+                  <Chip key={k}>{tr(k)}</Chip>
                 ))}
-                <span>{(p.touch ? FIRST_HINTS_TOUCH : FIRST_HINTS)[hint].text}</span>
+                <span>{tr((p.touch ? FIRST_HINTS_TOUCH : FIRST_HINTS)[hint].text)}</span>
               </Band>
             </div>
           )}
@@ -360,24 +409,24 @@ export default function DriftHud(p: DriftHudProps) {
       {/* Buttons */}
       {live && !hidden && p.touch && (
         <div className="pointer-events-auto absolute right-[3vw] top-[4vh]">
-          <button type="button" onClick={() => p.onPause(true)} title="Pause" className={`${btn} text-[11px]`}>
-            <Pause size={14} /> Pause
+          <button type="button" onClick={() => p.onPause(true)} title={t("Pause", "Pausar")} className={`${btn} text-[11px]`}>
+            <Pause size={14} /> {t("Pause", "Pausar")}
           </button>
         </div>
       )}
       {live && !hidden && !p.touch && (
         <div className="pointer-events-auto absolute right-[3vw] top-[4vh] flex gap-1">
-          <button type="button" onClick={p.onToggleGhosts} title="Ghosts (G)" className={`${btn} ${p.showGhosts ? "" : "text-muted"}`}>
+          <button type="button" onClick={p.onToggleGhosts} title={t("Ghosts (G)", "Fantasmas (G)")} className={`${btn} ${p.showGhosts ? "" : "text-muted"}`}>
             <GhostIcon size={16} />
           </button>
-          <button type="button" onClick={p.onToggleCamera} title="Camera (C)" className={btn}>
+          <button type="button" onClick={p.onToggleCamera} title={t("Camera (C)", "Câmera (C)")} className={btn}>
             <Camera size={16} />
           </button>
-          <button type="button" onClick={p.onToggleMute} title="Sound" className={btn}>
+          <button type="button" onClick={p.onToggleMute} title={t("Sound", "Som")} className={btn}>
             {p.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>
-          <button type="button" onClick={() => p.onPause(true)} title="Pause (Esc)" className={`${btn} text-[11px]`}>
-            <X size={14} /> Exit
+          <button type="button" onClick={() => p.onPause(true)} title={t("Pause (Esc)", "Pausar (Esc)")} className={`${btn} text-[11px]`}>
+            <X size={14} /> {t("Exit", "Sair")}
           </button>
         </div>
       )}
@@ -388,12 +437,13 @@ export default function DriftHud(p: DriftHudProps) {
 }
 
 function PauseMenu(p: DriftHudProps & { medals: [Medal, number][] }) {
+  const { lang, t } = useLang();
   const next = [...p.medals].reverse().find(([, at]) => p.best === null || at > p.best) ?? null;
   const items: { id: string; chip?: string; label: string; act: () => void }[] = [
-    { id: "resume", chip: "Esc", label: "Resume", act: () => p.onPause(false) },
-    ...(p.room ? [] : [{ id: "restart", chip: "R", label: "Start over", act: () => { p.onPause(false); p.onRestart(); } }]),
-    ...(p.stage === "run" ? [{ id: "checkpoint", label: "Last checkpoint", act: () => { p.onPause(false); p.onRespawn(); } }] : []),
-    { id: "spots", chip: "Q", label: p.room ? "Leave the room" : (p.exitLabel ?? "Back to spots"), act: p.onExit },
+    { id: "resume", chip: "Esc", label: t("Resume", "Continuar"), act: () => p.onPause(false) },
+    ...(p.room ? [] : [{ id: "restart", chip: "R", label: t("Start over", "Recomeçar"), act: () => { p.onPause(false); p.onRestart(); } }]),
+    ...(p.stage === "run" ? [{ id: "checkpoint", label: t("Last checkpoint", "Último checkpoint"), act: () => { p.onPause(false); p.onRespawn(); } }] : []),
+    { id: "spots", chip: "Q", label: p.room ? t("Leave the room", "Sair da sala") : (p.exitLabel ?? t("Back to spots", "Voltar aos spots")), act: p.onExit },
   ];
   const [sel, setSel] = useState(0);
   // A game menu: ↑↓ (or W S) choose, Enter or Space picks, the letters jump straight there. Esc lives on the page.
@@ -430,7 +480,7 @@ function PauseMenu(p: DriftHudProps & { medals: [Medal, number][] }) {
       <Backdrop side="left" />
       <div className="absolute left-[6vw] top-1/2 flex -translate-y-1/2 flex-col items-start gap-5">
         <Band tone="lime" className="px-6 pb-3 pt-4 leading-none tracking-[0.08em]" style={{ fontSize: "clamp(44px, 9vh, 104px)" }}>
-          Paused
+          {t("Paused", "Pausado")}
         </Band>
         <div role="menu" className="flex w-[min(420px,80vw)] flex-col items-stretch" style={{ fontSize: T.mid }}>
           {items.map((it, i) => {
@@ -453,7 +503,7 @@ function PauseMenu(p: DriftHudProps & { medals: [Medal, number][] }) {
           })}
           <Band delay={300} className="justify-center gap-3 px-5 py-2 text-muted" style={{ fontSize: T.small }}>
             <Chip>↑</Chip>
-            <Chip>↓</Chip> choose <Chip>Enter</Chip> select
+            <Chip>↓</Chip> {t("choose", "escolher")} <Chip>Enter</Chip> {t("select", "confirmar")}
           </Band>
         </div>
       </div>
@@ -462,12 +512,12 @@ function PauseMenu(p: DriftHudProps & { medals: [Medal, number][] }) {
           {p.spot.name}
         </Band>
         <Band delay={170} className="justify-between gap-3 px-4 py-2" style={{ fontSize: T.mid }}>
-          <span className="text-muted">Your best</span>
+          <span className="text-muted">{t("Your best", "Seu recorde")}</span>
           <span className="tabular-nums">{p.best !== null ? fmt(p.best) : "-"}</span>
         </Band>
         {next && (
           <Band delay={220} className="justify-between gap-3 px-4 py-2" style={{ fontSize: T.mid }}>
-            <span style={{ color: MEDAL_COLORS[next[0]] }}>{next[0]}</span>
+            <span style={{ color: MEDAL_COLORS[next[0]] }}>{lang === "pt" ? (DRIFT_PT[next[0]] ?? next[0]) : next[0]}</span>
             <span className="tabular-nums">{fmt(next[1])}</span>
           </Band>
         )}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Backdrop, Band, Chip } from "@/components/games/ui";
 import { KEYS_ONLY, T } from "@/components/games/kit";
 import type { DriveCameraMode } from "@/lib/league-city/drive/telemetry";
+import { useLang } from "@/lib/i18n/LangProvider";
 
 // Console-style pause, in the car games' bands (drift's pause): the city blurs behind a lime PAUSED, a menu you walk
 // with ↑↓ / W S / the D-pad and pick with Enter, Space or A, and the controls
@@ -20,6 +21,35 @@ export const CONTROLS: [string, string][] = [
   ["1 – 6", "react"],
   ["Esc", "pause"],
 ];
+
+/** The keys' and controls' words in Portuguese (the Brasil map), looked up at render. */
+export const CONTROLS_PT: Record<string, string> = {
+  "Hold Space + steer": "Segure Espaço + vire",
+  "Hold Shift": "Segure Shift",
+  drive: "dirigir",
+  drift: "drift",
+  boost: "turbo",
+  horn: "buzina",
+  camera: "câmera",
+  reset: "resetar",
+  "attack (from ? boxes)": "atacar (das caixas ?)",
+  react: "reagir",
+  pause: "pausar",
+  "games: race, crown rush": "jogos: corrida, coroa",
+  chat: "chat",
+  Touch: "Toque",
+  go: "acelerar",
+  "Drag left / right": "Arraste esq. / dir.",
+  steer: "virar",
+  "Hold Drift": "Segure Drift",
+  "drift (or steer hard)": "drift (ou vire forte)",
+  "Hold Brake": "Segure Freio",
+  "brake, then reverse": "freia, depois ré",
+  "Hold Boost": "Segure Turbo",
+  "Tap the item": "Toque no item",
+  "Tap a face": "Toque numa cara",
+  "react (the row over the buttons)": "reagir (a fileira sobre os botões)",
+};
 
 /** The same, on a phone (TouchControls). */
 export const TOUCH_CONTROLS: [string, string][] = [
@@ -62,12 +92,14 @@ export default function PauseMenu({
   /** A "Race menu" item (the race track). */
   onMenu?: () => void;
 }) {
+  const { lang, t } = useLang();
+  const tr = (s: string) => (lang === "pt" ? (CONTROLS_PT[s] ?? s) : s);
   const items: Item[] = [
-    { id: "resume", label: "Resume" },
-    { id: "camera", label: `Camera: ${camera === "chase" ? "Chase" : "Top-down"}` },
-    { id: "sound", label: `Sound: ${muted ? "Off" : "On"}` },
-    ...(onMenu ? [{ id: "menu" as const, label: "Race menu" }] : []),
-    { id: "exit", label: "Exit" },
+    { id: "resume", label: t("Resume", "Continuar") },
+    { id: "camera", label: `${t("Camera", "Câmera")}: ${camera === "chase" ? t("Chase", "Atrás") : t("Top-down", "De cima")}` },
+    { id: "sound", label: `${t("Sound", "Som")}: ${muted ? t("Off", "Desligado") : t("On", "Ligado")}` },
+    ...(onMenu ? [{ id: "menu" as const, label: t("Race menu", "Menu da corrida") }] : []),
+    { id: "exit", label: t("Exit", "Sair") },
   ];
   const [sel, setSel] = useState(0);
 
@@ -134,11 +166,11 @@ export default function PauseMenu({
   // blurred behind, a lime PAUSED band, the items as bands (the one picked in
   // cream), the keys beside them on a wide screen, the hints under (not on a phone).
   return (
-    <div role="dialog" aria-label="Paused" className="pointer-events-auto absolute inset-0 font-pixel uppercase">
+    <div role="dialog" aria-label={t("Paused", "Pausado")} className="pointer-events-auto absolute inset-0 font-pixel uppercase">
       <Backdrop side="left" />
       <div className="absolute left-[6vw] top-1/2 flex w-[min(420px,calc(100vw-2rem))] -translate-y-1/2 flex-col items-stretch gap-5 max-sm:left-4">
         <Band tone="lime" className="self-start px-6 pb-3 pt-4 leading-none tracking-[0.08em]" style={{ fontSize: "clamp(40px, min(9vh, 12vw), 104px)" }}>
-          Paused
+          {t("Paused", "Pausado")}
         </Band>
         <div role="menu" className="flex flex-col items-stretch" style={{ fontSize: T.body }}>
           {items.map((it, i) => {
@@ -162,15 +194,15 @@ export default function PauseMenu({
           })}
           <Band delay={300} className={`justify-center gap-3 px-5 py-2 text-muted ${KEYS_ONLY}`} style={{ fontSize: T.small }}>
             <Chip>↑</Chip>
-            <Chip>↓</Chip> choose <Chip>Enter</Chip> select <Chip>Esc</Chip> exit
+            <Chip>↓</Chip> {t("choose", "escolher")} <Chip>Enter</Chip> {t("select", "confirmar")} <Chip>Esc</Chip> {t("exit", "sair")}
           </Band>
         </div>
       </div>
       <div className="absolute right-[6vw] top-1/2 flex w-[min(320px,30vw)] -translate-y-1/2 flex-col items-stretch max-lg:hidden">
         {controls.map(([k, v], i) => (
           <Band key={k} delay={120 + i * 30} className="justify-between gap-4 px-4 py-2" style={{ fontSize: T.small }}>
-            <span className="text-cream">{k}</span>
-            <span className="normal-case text-muted">{v}</span>
+            <span className="text-cream">{tr(k)}</span>
+            <span className="normal-case text-muted">{tr(v)}</span>
           </Band>
         ))}
       </div>

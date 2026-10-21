@@ -6,6 +6,7 @@ import { HUD_BOX } from "@/components/league/hud/shared";
 import { carColor } from "@/lib/league-city/drive/net";
 import { formatLap } from "@/lib/league-city/race/laps";
 import { Backdrop, Band, Chip, type Tone } from "./ui";
+import { useT } from "@/lib/i18n/LangProvider";
 
 // The screens every car game shares, picked one by one in the 2026-10-19
 // prototype: the Games menu (drift's column of bands on the left, over the
@@ -24,6 +25,12 @@ export const T = {
 };
 
 export const who = (name: string) => (name.startsWith("guest-") ? "guest" : `@${name}`);
+
+/** who() in the subtree's language (a guest is "visitante" on the Brasil map). */
+function useWho() {
+  const t = useT();
+  return (name: string) => (name.startsWith("guest-") ? t("guest", "visitante") : `@${name}`);
+}
 
 /** Hidden on a touch screen (no keyboard): key hints and key chips. */
 export const KEYS_ONLY = "[@media(hover:none)]:hidden";
@@ -73,6 +80,7 @@ export function GameMenu({
   /** A mode's own step (the race's route), instead of the list. */
   children?: ReactNode;
 }) {
+  const t = useT();
   const [sel, setSel] = useState(0);
   const step = !!children;
   useEffect(() => {
@@ -103,7 +111,7 @@ export function GameMenu({
             <button type="button" onClick={onClose} className="text-left outline-none active:translate-y-px">
               <Band className="w-full justify-between px-4 py-2 text-lime" style={{ fontSize: T.small }}>
                 <span>{title}</span>
-                <span className="text-muted">Close ✕</span>
+                <span className="text-muted">{t("Close", "Fechar")} ✕</span>
               </Band>
             </button>
             {modes.map((m, i) => {
@@ -135,9 +143,9 @@ export function GameMenu({
             <Keys
               delay={60 + modes.length * 50}
               keys={[
-                ["↑↓", "choose"],
-                ["Enter", "pick"],
-                ["Esc", "back to driving"],
+                ["↑↓", t("choose", "escolher")],
+                ["Enter", t("pick", "confirmar")],
+                ["Esc", t("back to driving", "voltar a dirigir")],
               ]}
             />
           </>
@@ -261,12 +269,13 @@ export function GameClock({
   /** A line under it (a run that isn't timed). */
   note?: ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-1.5 max-sm:left-auto max-sm:right-4 max-sm:top-[4.25rem] max-sm:translate-x-0 max-sm:items-end">
       <div className={`${HUD_BOX} flex min-w-[240px] flex-col items-center px-5 py-2 max-sm:min-w-[200px]`}>
         <span className="text-[9px] text-muted">{label}</span>
         {lit !== null ? (
-          <span className="flex h-9 items-center gap-1.5" role="img" aria-label={`${lit} of ${LIGHTS} lights on`}>
+          <span className="flex h-9 items-center gap-1.5" role="img" aria-label={t(`${lit} of ${LIGHTS} lights on`, `${lit} de ${LIGHTS} luzes acesas`)}>
             {Array.from({ length: LIGHTS }, (_, i) => (
               <span key={i} className={`size-7 border-[3px] border-bg ${i < lit ? "bg-[#ff2a2a] shadow-[0_0_18px_#ff2a2a]" : "bg-[#2a1416]"}`} />
             ))}
@@ -281,7 +290,7 @@ export function GameClock({
           {(Math.abs(split) / 1000).toFixed(3)}
         </span>
       )}
-      {go && <span className="text-4xl text-lime drop-shadow-[0_2px_0_#000]">Go</span>}
+      {go && <span className="text-4xl text-lime drop-shadow-[0_2px_0_#000]">{t("Go", "Vai")}</span>}
       {note}
     </div>
   );
@@ -297,6 +306,7 @@ export interface StandingRow {
 
 /** The order on the left, the race track's list: place, car color, name, a value. */
 export function GameStandings({ rows }: { rows: StandingRow[] }) {
+  const who = useWho();
   return (
     <ol className={`${HUD_BOX} absolute left-4 top-4 w-[220px] space-y-1 px-3 py-2.5 max-sm:hidden`}>
       {rows.map((r, i) => (
@@ -350,6 +360,8 @@ export function GameResults({
   onAgain: (() => void) | null;
   onClose: () => void;
 }) {
+  const t = useT();
+  const who = useWho();
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (e.repeat) return;
@@ -416,7 +428,7 @@ export function GameResults({
                 <span className={KEYS_ONLY}>
                   <Chip>Esc</Chip>
                 </span>{" "}
-                Drive on
+                {t("Drive on", "Seguir dirigindo")}
               </Band>
             </button>
           </div>

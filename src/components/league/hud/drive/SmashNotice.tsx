@@ -6,6 +6,7 @@ import posthog from "posthog-js";
 import type { DriveTelemetry } from "@/lib/league-city/drive/telemetry";
 import { floorScoring } from "@/lib/towns/play-board";
 import { HUD_BOX } from "../shared";
+import { useT } from "@/lib/i18n/LangProvider";
 
 // Smash, above the honk prompt: "sign in" for a while after you run into a
 // building signed out, how long a shielded one has left when you run into
@@ -18,6 +19,7 @@ import { HUD_BOX } from "../shared";
 const HINT_MS = 4500;
 
 export default function SmashNotice({ telemetry, touch = false }: { telemetry: DriveTelemetry; touch?: boolean }) {
+  const t = useT();
   const pathname = usePathname();
   const hint = useRef<HTMLDivElement>(null);
   const shield = useRef<HTMLDivElement>(null);
@@ -72,33 +74,33 @@ export default function SmashNotice({ telemetry, touch = false }: { telemetry: D
   return (
     <>
       <div ref={hint} data-on="false" className={`${chip} pointer-events-none data-[on=true]:pointer-events-auto`}>
-        Sign in to knock buildings down
+        {t("Sign in to knock buildings down", "Entre pra derrubar prédios")}
         <a
           href={`/api/auth/github?redirect=${encodeURIComponent(`${pathname}?drive=1`)}`}
           onClick={() => posthog.capture("signin_clicked", { where: "smash_hint", path: pathname })}
           className="border-2 border-lime px-1.5 text-lime hover:bg-lime/10"
         >
-          Sign in
+          {t("Sign in", "Entrar")}
         </a>
       </div>
       <div ref={shield} data-on="false" className={`${chip} pointer-events-none`}>
-        Just fell. Shielded for <span ref={hours} className="text-lime" />
+        {t("Just fell. Shielded for", "Acabou de cair. Protegido por")} <span ref={hours} className="text-lime" />
       </div>
       <div ref={rebuild} data-on="false" className={`${chip} pointer-events-none`}>
         <span className="h-1.5 w-1.5 animate-pulse bg-lime" aria-hidden />
-        Rebuilding <span ref={floors} className="text-lime" /> floors
+        {t("Rebuilding", "Reconstruindo")} <span ref={floors} className="text-lime" /> {t("floors", "andares")}
       </div>
       <div ref={maxed} data-on="false" className={`${chip} pointer-events-none`}>
-        Floors maxed for today
+        {t("Floors maxed for today", "Limite de andares de hoje")}
       </div>
       {!touch && (
         <div
           ref={today}
           data-on="false"
           className={`${chip.replace("bottom-32", "bottom-[5.5rem]")} pointer-events-none`}
-          aria-label="Floor points today"
+          aria-label={t("Floor points today", "Pontos de andares hoje")}
         >
-          <span className="text-muted">Floors today</span>
+          <span className="text-muted">{t("Floors today", "Andares hoje")}</span>
           <span ref={todayPts} className="text-lime tabular-nums" />
           <span className="text-muted">pts</span>
         </div>

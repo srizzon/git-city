@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Bomb, Rocket, Zap, type LucideIcon } from "lucide-react";
 import type { DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import { ITEM_NAMES, isItem, type BattleItem } from "@/lib/league-city/drive/battle";
+import { ITEM_NAMES, ITEM_NAMES_PT, isItem, type BattleItem } from "@/lib/league-city/drive/battle";
+import { useLang } from "@/lib/i18n/LangProvider";
 import { BOOST } from "@/lib/league-city/drive/tuning";
 import { HUD_BOX } from "../shared";
 
@@ -22,6 +23,7 @@ const NEW_MS = 900;
 const ATTACK = "#ff9a3c";
 
 export default function Dash({ telemetry, style }: { telemetry: DriveTelemetry; style?: React.CSSProperties }) {
+  const { lang, t } = useLang();
   const speed = useRef<HTMLSpanElement>(null);
   const bar = useRef<HTMLDivElement>(null);
   const boost = useRef<HTMLDivElement>(null);
@@ -77,14 +79,14 @@ export default function Dash({ telemetry, style }: { telemetry: DriveTelemetry; 
             {item ? (
               <>
                 <span className="text-[11px]" style={{ color: "#ff9a3c" }}>
-                  {ITEM_NAMES[item]}
+                  {(lang === "pt" ? ITEM_NAMES_PT : ITEM_NAMES)[item]}
                 </span>
-                <span className="text-muted">Ready</span>
+                <span className="text-muted">{t("Ready", "Pronto")}</span>
               </>
             ) : (
               <>
-                <span className="text-muted">No attack</span>
-                <span className="text-dim normal-case">Drive through a ? box</span>
+                <span className="text-muted">{t("No attack", "Sem ataque")}</span>
+                <span className="text-dim normal-case">{t("Drive through a ? box", "Passe por uma caixa ?")}</span>
               </>
             )}
           </div>
@@ -120,7 +122,7 @@ export default function Dash({ telemetry, style }: { telemetry: DriveTelemetry; 
           >
             Shift
           </span>
-          <span className="text-[9px] text-muted group-data-[on=true]:text-[#7ee8ff]">Boost</span>
+          <span className="text-[9px] text-muted group-data-[on=true]:text-[#7ee8ff]">{t("Boost", "Turbo")}</span>
         </div>
       </div>
     </div>

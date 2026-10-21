@@ -23,6 +23,13 @@ export const ITEM_NAMES: Record<BattleItem, string> = {
   missile: "Missile",
 };
 
+/** The same in Portuguese (the Brasil map). */
+export const ITEM_NAMES_PT: Record<BattleItem, string> = {
+  shock: "Onda de choque",
+  bomb: "Bomba",
+  missile: "Míssil",
+};
+
 export const BOX_COUNT = 12;
 /** The Brasil map is a country, not a town: boxes enough for every city (they appear on city streets only). */
 const BRASIL_BOX_COUNT = 120;

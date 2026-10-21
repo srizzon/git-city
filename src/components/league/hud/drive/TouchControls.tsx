@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowBigDown, Bomb, ChevronsDown, Megaphone, Rocket, Wind, Zap, type LucideIcon } from "lucide-react";
 import type { DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import { ITEM_NAMES, isItem, type BattleItem } from "@/lib/league-city/drive/battle";
+import { ITEM_NAMES, ITEM_NAMES_PT, isItem, type BattleItem } from "@/lib/league-city/drive/battle";
+import { useLang } from "@/lib/i18n/LangProvider";
 import { autoDrift, dragSteer, type TouchDrive } from "@/lib/league-city/drive/touch";
 import { ReactionButton } from "./Reactions";
 
@@ -73,6 +74,8 @@ export default function TouchControls({
   const ring = useRef<HTMLDivElement>(null);
   const dot = useRef<HTMLDivElement>(null);
   const speed = useRef<HTMLSpanElement>(null);
+  const { lang, t } = useLang();
+  const names = lang === "pt" ? ITEM_NAMES_PT : ITEM_NAMES;
   const [brake, setBrake] = useState(false);
   const [drift, setDrift] = useState(false);
   const [boost, setBoost] = useState(false);
@@ -217,12 +220,12 @@ export default function TouchControls({
           <div className="mx-auto grid max-w-md grid-cols-[5rem_minmax(0,1fr)_5rem] items-center gap-x-3">
             <button
               type="button"
-              aria-label="Brake, hold"
+              aria-label={t("Brake, hold", "Freio, segure")}
               {...hold("brake", setBrake)}
               className={`${BIG} ${brake ? "border-cream bg-cream text-bg" : "border-cream/70 text-cream"}`}
             >
               <ChevronsDown size={24} strokeWidth={2.5} aria-hidden />
-              Brake
+              {t("Brake", "Freio")}
             </button>
             <div className="flex items-baseline justify-center gap-1 tabular-nums [text-shadow:2px_2px_0_rgba(0,0,0,0.6)]">
               <span ref={speed} className="text-2xl leading-none text-cream">
@@ -232,7 +235,7 @@ export default function TouchControls({
             </div>
             <button
               type="button"
-              aria-label="Drift, hold while steering"
+              aria-label={t("Drift, hold while steering", "Drift, segure enquanto vira")}
               {...hold("driftButton", setDrift)}
               className={`${BIG} ${drift ? "border-lime bg-lime text-bg" : "border-lime text-lime"}`}
             >
@@ -248,16 +251,16 @@ export default function TouchControls({
           <div className="relative mx-auto flex max-w-md items-end justify-between gap-1.5">
             <button
               type="button"
-              aria-label={reverse ? "Reverse, hold" : "Brake, hold"}
+              aria-label={reverse ? t("Reverse, hold", "Ré, segure") : t("Brake, hold", "Freio, segure")}
               {...hold("brake", setBrake)}
               className={`${ROW_BIG} ${brake ? "border-cream bg-cream text-bg" : "border-cream/70 text-cream"}`}
             >
               {reverse ? <ArrowBigDown size={22} strokeWidth={2.5} aria-hidden /> : <ChevronsDown size={22} strokeWidth={2.5} aria-hidden />}
-              {reverse ? "Reverse" : "Brake"}
+              {reverse ? t("Reverse", "Ré") : t("Brake", "Freio")}
             </button>
             <button
               type="button"
-              aria-label="Drift, hold while steering"
+              aria-label={t("Drift, hold while steering", "Drift, segure enquanto vira")}
               {...hold("driftButton", setDrift)}
               className={`${ROW_SMALL} ${drift ? "border-lime bg-lime text-bg" : "border-lime/80 text-lime"}`}
             >
@@ -282,35 +285,35 @@ export default function TouchControls({
               <button
                 type="button"
                 onClick={tap("horn")}
-                aria-label={near ? `Honk at @${near}` : "Horn"}
+                aria-label={near ? t(`Honk at @${near}`, `Buzinar pra @${near}`) : t("Horn", "Buzina")}
                 className={`${ROW_SMALL} ${near ? "border-lime text-lime" : "border-cream/40 text-cream/80"} active:bg-cream active:text-bg`}
               >
                 <Megaphone size={16} strokeWidth={2.5} aria-hidden />
-                Horn
+                {t("Horn", "Buzina")}
               </button>
             </div>
             <button
               type="button"
-              aria-label="Boost, hold"
+              aria-label={t("Boost, hold", "Turbo, segure")}
               {...hold("boost", setBoost)}
               className={`${ROW_BIG} ${boost ? "border-[#7ee8ff] bg-[#7ee8ff] text-bg" : "border-[#7ee8ff] text-[#7ee8ff]"}`}
             >
               <Pulse on={lesson === "boost"} />
               <Zap size={22} strokeWidth={2.5} aria-hidden />
-              Boost
+              {t("Boost", "Turbo")}
             </button>
             {item && Icon && (
               <div className="absolute bottom-full left-1/2 mb-3 -translate-x-1/2">
                 <button
                   type="button"
                   onClick={tap("fire")}
-                  aria-label={`Throw the ${ITEM_NAMES[item].toLowerCase()}`}
+                  aria-label={t(`Throw the ${ITEM_NAMES[item].toLowerCase()}`, `Jogar ${names[item].toLowerCase()}`)}
                   className={`${CHIP} text-cream active:bg-[#ff9a3c] active:text-bg`}
                   style={{ borderColor: ATTACK }}
                 >
                   <Pulse on={lesson === "attack"} />
                   <Icon size={18} strokeWidth={2.5} color={ATTACK} className="shrink-0" aria-hidden />
-                  {ITEM_NAMES[item]}
+                  {names[item]}
                 </button>
               </div>
             )}
