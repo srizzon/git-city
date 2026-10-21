@@ -270,7 +270,7 @@ export function checkTimed(raw: ReelSpec, voice: readonly Word[], mainLength?: n
 /** What the export reports per frame: boxes in stage fractions (0–1). */
 export interface FrameReport {
   t: number;
-  boxes: { name: string; x: number; y: number; w: number; h: number }[];
+  boxes: { name: string; x: number; y: number; w: number; h: number; overflow?: string }[];
 }
 
 /** Instagram's safe zone (Meta's Reels spec): 14–65% down, centred, at most 72% wide (the captions' own box is 76%, their text stays inside 72%). */
@@ -283,6 +283,7 @@ export function checkPicture(frames: readonly FrameReport[]): Issue[] {
     for (const b of f.boxes) {
       if (b.w <= 0 || b.h <= 0) continue;
       const at = `${b.name} at ${f.t.toFixed(1)}s`;
+      if (b.overflow && !out.has(`${b.name}-overflow`)) out.set(`${b.name}-overflow`, { level: "fail", rule: "overflow", message: `Text runs past its border in the ${at} (${b.overflow}).` });
       if (b.y < 0.14 - 0.005) fail(`${b.name}-top`, `${at} reaches ${(b.y * 100).toFixed(0)}% from the top (14% minimum).`);
       if (b.y + b.h > 0.65 + 0.005) fail(`${b.name}-bottom`, `${at} reaches ${((b.y + b.h) * 100).toFixed(0)}% down (65% maximum).`);
       if (b.name !== "balloon" && Math.abs(b.x + b.w / 2 - 0.5) > 0.01) fail(`${b.name}-centre`, `${at} is off-centre by ${((b.x + b.w / 2 - 0.5) * 100).toFixed(1)}%.`);

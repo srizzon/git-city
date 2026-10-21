@@ -88,6 +88,11 @@ describe("checkPicture", () => {
     ]);
     expect(issues.map((i) => i.rule)).toEqual(["safe zone", "subject"]);
   });
+
+  it("fails type running past its card", () => {
+    const issues = checkPicture([{ t: 2, boxes: [{ name: "balloon", x: 0.14, y: 0.3, w: 0.72, h: 0.1, overflow: 'p "@someone" 300>260' }] }]);
+    expect(issues.map((i) => i.rule)).toEqual(["overflow"]);
+  });
 });
 
 describe("extenso", () => {

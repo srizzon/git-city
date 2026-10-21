@@ -56,6 +56,27 @@ function back(x: number) {
 }
 
 /**
+ * A card's lines (a long @ or city) shrink to its text column instead of
+ * running past its border. Run every frame, not once: the column only has
+ * its final width once the stage is full size and the photo beside it has
+ * loaded, and the export's frozen clock holds back observers.
+ */
+function fitCard(el: HTMLElement) {
+  el.querySelectorAll<HTMLElement>("[data-fit-box]").forEach((box) => {
+    const w = box.clientWidth;
+    // Fitted again when the width changes or the pixel font arrives.
+    const key = `${w}:${document.fonts?.status}`;
+    if (!w || box.dataset.fitKey === key) return;
+    box.dataset.fitKey = key;
+    box.querySelectorAll<HTMLElement>("[data-fit]").forEach((p) => {
+      p.style.fontSize = p.dataset.fs!;
+      // A pixel font's width doesn't scale exactly with its size: 3% to spare.
+      if (p.scrollWidth > w) p.style.fontSize = `${(parseFloat(p.dataset.fs!) * w * 0.97) / p.scrollWidth}cqw`;
+    });
+  });
+}
+
+/**
  * Moves balloon `index` of the overlay's balloons (stage percent) and shows its plate until the first
  * badge's moment, then each badge as its moment comes (popping in over
  * 0.4s), the next one replacing it. null hides it.
@@ -72,6 +93,7 @@ export function placeBalloon(
   });
   const el = container.querySelector<HTMLElement>(`[data-balloon="${index}"]`);
   if (!el || !at) return;
+  fitCard(el);
   el.style.opacity = String(at.opacity);
   // Where its building's roof is on screen (0–1), for the export's report.
   if (at.roof) {
@@ -100,7 +122,7 @@ export function placeBalloon(
  * spoken words and the balloon. The export records it per frame for the
  * safe-zone check (lib/reel/check), so nobody screenshots the 3D city.
  */
-export function overlayBoxes(stage: HTMLElement): { name: string; x: number; y: number; w: number; h: number }[] {
+export function overlayBoxes(stage: HTMLElement): { name: string; x: number; y: number; w: number; h: number; overflow?: string }[] {
   const s = stage.getBoundingClientRect();
   return [...stage.querySelectorAll<HTMLElement>("[data-reel-box]")].flatMap((el) => {
     if (Number(el.style.opacity || 1) < 0.5 || getComputedStyle(el).visibility === "hidden") return [];
@@ -116,7 +138,12 @@ export function overlayBoxes(stage: HTMLElement): { name: string; x: number; y: 
       r = range.getBoundingClientRect();
     }
     if (!r.width || !r.height) return [];
-    const box = { name: el.dataset.reelBox!, x: (r.left - s.left) / s.width, y: (r.top - s.top) / s.height, w: r.width / s.width, h: r.height / s.height };
+    // Type running past its own plate or card: any element inside it wider than it lets show (2px for sub-pixel rounding).
+    // Only elements that hold type themselves: a wrapper's scroll width also counts a child mid pop-in (scaled past it).
+    const holdsText = (d: HTMLElement) => [...d.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
+    const over = [el, ...el.querySelectorAll<HTMLElement>("*")].find((d) => holdsText(d) && d.clientWidth > 0 && d.scrollWidth > d.clientWidth + 2);
+    const overflow = over ? `${over.tagName.toLowerCase()} "${(over.textContent ?? "").trim().slice(0, 24)}" ${over.scrollWidth}>${over.clientWidth}` : undefined;
+    const box = { name: el.dataset.reelBox!, x: (r.left - s.left) / s.width, y: (r.top - s.top) / s.height, w: r.width / s.width, h: r.height / s.height, ...(overflow ? { overflow } : {}) };
     // A balloon's building: where its roof is (a point).
     const roof = el.dataset.roofY ? [{ name: "roof", x: Number(el.dataset.roofX), y: Number(el.dataset.roofY), w: 0, h: 0 }] : [];
     return [box, ...roof];
@@ -1834,22 +1861,26 @@ function Balloon({ b, index, photoOf }: { b: ReelBalloon; index: number; photoOf
                   whiteSpace: "nowrap",
                 }}
               >
-                {b.photoOnBadge && photo && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photo} alt="" style={{ width: "13cqw", height: "13cqw", objectFit: "cover", display: "block", flexShrink: 0, imageRendering: "pixelated", border: `0.5cqw solid ${look.color}` }} />
-                )}
-                {/* With the photo on it, the photo is the badge's picture: no office icon beside it. */}
-                {!(b.photoOnBadge && photo) && (
+                {b.photoOnBadge &&
+                  (photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photo} alt="" style={{ width: "13cqw", height: "13cqw", objectFit: "cover", display: "block", flexShrink: 0, imageRendering: "pixelated", border: `0.5cqw solid ${look.color}` }} />
+                  ) : (
+                    // The photo's place, kept while it loads: the text beside it never changes width.
+                    <span style={{ width: "13cqw", height: "13cqw", display: "block", flexShrink: 0, border: `0.5cqw solid ${look.color}` }} />
+                  ))}
+                {/* A person's card has the photo as its picture: no office icon beside it. */}
+                {!b.photoOnBadge && (
                   <svg viewBox="0 0 8 8" shapeRendering="crispEdges" style={{ width: "9cqw", height: "9cqw", flexShrink: 0 }}>
                     {look.pixels.map(([x, y, w, h]) => (
                       <rect key={`${x}-${y}`} x={x} y={y} width={w} height={h} fill={look.color} />
                     ))}
                   </svg>
                 )}
-                <div>
-                  <p style={{ fontSize: "6.4cqw", lineHeight: 1, color: look.color }}>{look.title}</p>
-                  {/* A line break in the sub starts a second line; lines never wrap (the safe-zone check catches one too long). */}
-                  <p className="text-muted" style={{ fontSize: b.photoOnBadge ? "3.1cqw" : "3cqw", lineHeight: 1.25, marginTop: "1.6cqw", textTransform: "none", whiteSpace: "pre" }}>
+                <div data-fit-box style={{ minWidth: 0, flex: b.photoOnBadge ? 1 : undefined }}>
+                  <p data-fit data-fs="6.4cqw" style={{ fontSize: "6.4cqw", lineHeight: 1, color: look.color }}>{look.title}</p>
+                  {/* A line break in the sub starts a second line; lines never wrap: a line wider than the card shrinks to fit it. */}
+                  <p data-fit data-fs={b.photoOnBadge ? "3.1cqw" : "3cqw"} className="text-muted" style={{ fontSize: b.photoOnBadge ? "3.1cqw" : "3cqw", lineHeight: 1.25, marginTop: "1.6cqw", textTransform: "none", whiteSpace: "pre" }}>
                     {/* A person's first line is their @: in ink, the line that makes them findable. */}
                     {b.photoOnBadge && badge.sub.includes("\n") ? (
                       <>
