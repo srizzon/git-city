@@ -33,6 +33,7 @@ supabase/
 
 - Migrations in `supabase/migrations/`, numbered sequentially
 - Never modify existing migrations, always create new ones
+- Every foreign key to `developers` (or `auth.users`) is `ON DELETE CASCADE`, or `SET NULL` when the row belongs to someone else, so `delete_developer_account()` (migration 183) can erase an account in one go
 - Run locally with `npx supabase db push`
 - **NEVER run UPDATE or DELETE on production data without explicit user approval**
 - **NEVER NULL out, drop, or modify columns that contain user data (emails, API keys, etc)**
