@@ -52,6 +52,8 @@ export interface BotTarget {
   hit: (vx: number, vz: number, power: number) => void;
   /** Where it is (m), or null while it's out of town or wrecked. */
   pos: () => { x: number; z: number } | null;
+  /** Blow it up in cubes right now (the city of the day's takedowns). */
+  wreck?: () => void;
 }
 export type BotTargets = React.MutableRefObject<Map<string, BotTarget>>;
 
@@ -162,6 +164,7 @@ function RemoteCar({
         const p = b.translation();
         return { x: p.x, z: p.z };
       },
+      wreck,
     });
     return () => {
       map.delete(remote.id);

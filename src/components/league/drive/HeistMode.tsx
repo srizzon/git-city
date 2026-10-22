@@ -66,7 +66,6 @@ const SIDE_COLOR: Record<HeistSide, string> = { robber: "#ff5a52", cop: "#5aa0ff
 const COP_COLOR = "#f2f4ff";
 const GANG_COLOR = "#3a1c1c";
 /** Game cars' pace (m/s): cops a bit slower than your top speed, so you can get away. */
-const COP_SPEED = 23;
 const COP_TURN = 2.2;
 const GANG_SPEED = 17;
 /** How close (m) a game car has to be to hit you, and how often one can. */
@@ -77,6 +76,19 @@ const STUN_MS = 1500;
 const BLAST_STUN_MS = 2500;
 /** How long the HUD says what just hit you (ms). */
 const HIT_SHOWN_MS = 1300;
+// Takedowns (Burnout, Smashy Road): wreck a cop and it blows up in cubes.
+/** You hit a cop going this fast (m/s): it's wrecked, not you. */
+const TAKEDOWN_SPEED = 14;
+/** Within this share of a blast's reach a cop is wrecked; further out, stunned. */
+const BLAST_WRECK = 0.6;
+/** A wrecked cop's place stays empty this long (ms). */
+const COP_BACK_MS = 8000;
+// The cops change with the stars (GTA): 1 follows, 2 rams, 3 sends one ahead to block the street, 4–5 drive faster.
+const COP_SPEED_BY_STARS = [0, 17, 23, 24, 27, 30];
+/** At one star a cop keeps this far behind (m), never hitting you. */
+const FOLLOW_GAP = 25;
+/** From this many stars, the third cop goes ahead to block. */
+const BLOCK_STARS = 3;
 const SHOT_SPEED = 42;
 const SHOT_LIFE = 3;
 const SHOT_HIT = 2.6;
@@ -101,6 +113,8 @@ interface Npc {
   lot?: Lot | null;
   prev?: Lot | null;
   next?: Lot | null;
+  /** A cop sent ahead to block your street (from BLOCK_STARS). */
+  block?: boolean;
   /** Slowed (blue screen), or stopped (a crash or a blast) until (ms). */
   slowUntil?: number;
   stunUntil?: number;
@@ -333,6 +347,19 @@ export default function HeistMode({
   /** A hit on a robber: one heart; `cop` names a real cop for the bust. */
   /** What hit you last and when, for the HUD. */
   const lastHurt = useRef<{ why: NonNullable<HeistView["robber"]>["hit"]; at: number } | null>(null);
+  /** When the next cop may take a wrecked one's place, and when you last wrecked one (the HUD's "Takedown!"). */
+  const copBackAt = useRef(0);
+  const lastTakedown = useRef(0);
+
+  /** A cop wrecked: it blows up in cubes and its place stays empty a while. */
+  const takedown = (n: Npc) => {
+    const now = performance.now();
+    botTargets.current.get(n.id)?.wreck?.();
+    npcs.current = npcs.current.filter((x) => x !== n);
+    copBackAt.current = now + COP_BACK_MS;
+    lastTakedown.current = now;
+    pushFeeds();
+  };
 
   const hurt = (why: NonNullable<NonNullable<HeistView["robber"]>["hit"]>, cop?: string) => {
     if (props.current.side !== "robber" || bustAt.current !== null) return;
@@ -422,10 +449,13 @@ export default function HeistMode({
       const now = performance.now();
       const n = npcs.current.find((x) => x.id === id);
       if (n?.id.startsWith("bot:heist-cop")) {
+        // You came in fast: takedown.
+        const me = car.current?.body.linvel();
+        if (me && Math.hypot(me.x, me.z) > TAKEDOWN_SPEED) return takedown(n);
         if (now - n.lastRam < RAM_EVERY_MS) return;
         n.lastRam = now;
-        // Coming at you at speed it costs a heart; either way it backs off and stalls a moment.
-        const hit = (n.stunUntil ?? 0) < now && n.v > RAM_SPEED;
+        // Coming at you at speed it costs a heart (from 2 stars: at 1 a cop only follows); either way it backs off and stalls a moment.
+        const hit = (n.stunUntil ?? 0) < now && n.v > RAM_SPEED && starsFor(held.current) >= 2;
         n.stunUntil = now + STUN_MS;
         n.v = -4;
         if (hit) hurt("cop");
@@ -444,7 +474,11 @@ export default function HeistMode({
     use,
     blast: (x, z, reach) => {
       const now = performance.now();
-      for (const n of npcs.current) if (Math.hypot(n.x - x, n.z - z) < reach) n.stunUntil = now + BLAST_STUN_MS;
+      for (const n of [...npcs.current]) {
+        const d = Math.hypot(n.x - x, n.z - z);
+        if (d < reach * BLAST_WRECK && n.id.startsWith("bot:heist-cop")) takedown(n);
+        else if (d < reach) n.stunUntil = now + BLAST_STUN_MS;
+      }
     },
   };
 
@@ -579,15 +613,19 @@ export default function HeistMode({
     // Game cops after a robber with stars.
     const copsWanted = P.side === "robber" ? gameCops(stars, realCops.length) : 0;
     const cops = npcs.current.filter((n) => n.id.startsWith("bot:heist-cop"));
-    if (cops.length < copsWanted) {
+    if (cops.length < copsWanted && now >= copBackAt.current) {
       const h = carHeading(c.body);
-      const i = cops.length;
-      const back = 70 + i * 12;
+      const used = new Set(cops.map((n) => n.id));
+      const i = [0, 1, 2, 3].find((k) => !used.has(`bot:heist-cop-${k}`)) ?? 0;
+      // The blocker comes in ahead of you; the others from behind.
+      const block = i === 2 && stars >= BLOCK_STARS;
+      const dist = block ? -90 : 70 + i * 12;
       const side = (i % 2 ? 1 : -1) * 18;
-      const sx = p.x - Math.sin(h) * back + Math.cos(h) * side;
-      const sz = p.z - Math.cos(h) * back - Math.sin(h) * side;
+      const sx = p.x - Math.sin(h) * dist + Math.cos(h) * side;
+      const sz = p.z - Math.cos(h) * dist - Math.sin(h) * side;
       const lot = nearestRoad(roads, sx, sz, LOT_M);
-      const n = npcAt(`bot:heist-cop-${i}`, lot ? lot[0] * LOT_M : sx, lot ? lot[1] * LOT_M : sz, h);
+      const n = npcAt(`bot:heist-cop-${i}`, lot ? lot[0] * LOT_M : sx, lot ? lot[1] * LOT_M : sz, h + (block ? Math.PI : 0));
+      n.block = block;
       npcs.current.push(n);
       feedsChanged = true;
     } else if (cops.length > copsWanted) {
@@ -630,11 +668,34 @@ export default function HeistMode({
         continue;
       }
       if (n.id.startsWith("bot:heist-cop")) {
-        // Pursuit: where you'll be in a moment, or the duck.
-        const tx = activeDuck ? activeDuck.x : p.x + v.x * 0.6;
-        const tz = activeDuck ? activeDuck.z : p.z + v.z * 0.6;
-        const go = navTo(n, roads, tx, tz);
-        steer(n, go.x, go.z, COP_SPEED * slow, dt);
+        const speed = COP_SPEED_BY_STARS[Math.min(5, stars)] * slow;
+        const mySpeed = Math.hypot(v.x, v.z);
+        const dirX = mySpeed > 2 ? v.x / mySpeed : 0;
+        const dirZ = mySpeed > 2 ? v.z / mySpeed : 0;
+        if (activeDuck) {
+          const go = navTo(n, roads, activeDuck.x, activeDuck.z);
+          steer(n, go.x, go.z, speed, dt);
+        } else if (stars <= 1) {
+          // One star: it follows, a gap behind, as fast as you and no faster.
+          const go = navTo(n, roads, p.x - dirX * FOLLOW_GAP, p.z - dirZ * FOLLOW_GAP);
+          steer(n, go.x, go.z, Math.min(speed, mySpeed + 3), dt);
+        } else if (n.block) {
+          // The blocker: to the street ahead of you, then it stops across it.
+          const ax = p.x + dirX * 55;
+          const az = p.z + dirZ * 55;
+          const ahead = (n.x - p.x) * dirX + (n.z - p.z) * dirZ;
+          if (ahead > 12 && Math.hypot(n.x - p.x, n.z - p.z) < 70) {
+            n.v *= Math.max(0, 1 - dt * 4);
+            n.h += dt * 1.5 * Math.sign(Math.sin(n.h - Math.atan2(dirX, dirZ)) || 1);
+          } else {
+            const go = navTo(n, roads, ax, az);
+            steer(n, go.x, go.z, speed + 4, dt);
+          }
+        } else {
+          // Pursuit: where you'll be in a moment.
+          const go = navTo(n, roads, p.x + v.x * 0.6, p.z + v.z * 0.6);
+          steer(n, go.x, go.z, speed, dt);
+        }
       } else {
         // The gang roams the city and runs from you.
         const dx = n.x - p.x;
@@ -657,6 +718,17 @@ export default function HeistMode({
       }
       record(n, now);
     }
+    // Two cops crashing into each other: both wrecked.
+    const live = npcs.current.filter((n) => n.id.startsWith("bot:heist-cop") && (n.stunUntil ?? 0) < now);
+    for (let i = 0; i < live.length; i++)
+      for (let j = i + 1; j < live.length; j++) {
+        const a = live[i];
+        const b = live[j];
+        if (Math.hypot(a.x - b.x, a.z - b.z) < 3 && Math.abs(a.v) + Math.abs(b.v) > 22) {
+          takedown(a);
+          takedown(b);
+        }
+      }
     if (feedsChanged) pushFeeds();
 
     // Turrets: the tallest standing buildings near a wanted robber shoot where you're going.
@@ -729,6 +801,7 @@ export default function HeistMode({
               hearts: hearts.current,
               inside,
               hit: lastHurt.current && now - lastHurt.current.at < HIT_SHOWN_MS ? lastHurt.current.why : null,
+              takedown: now - lastTakedown.current < HIT_SHOWN_MS,
               push: pushing ? { secsLeft: Math.max(0, Math.ceil(HEIST.pushSecs - push.current.held / 1000)), done: push.current.held / (HEIST.pushSecs * 1000), paused: copClose } : null,
             }
           : null,

@@ -89,7 +89,14 @@ export default function HeistHud({ view }: { view: HeistView }) {
             </div>
           )}
 
-          {/* What just cost you a heart. */}
+          {/* You just wrecked a cop. */}
+        {robber?.takedown && (
+          <Band tone="lime" animate={false} className={`w-full justify-center ${touch ? "px-2.5 py-1.5" : "px-3 py-2"}`} style={{ fontSize: T.body }}>
+            {t("Takedown!", "Takedown!")}
+          </Band>
+        )}
+
+        {/* What just cost you a heart. */}
         {hit && (
           <Band tone="red" animate={false} className={`w-full justify-center gap-2 ${touch ? "px-2.5 py-1.5" : "px-3 py-2"}`} style={{ fontSize: T.small }}>
             {t(hitLine[hit][0], hitLine[hit][1])} · −1 {t("heart", "vida")}
