@@ -27,6 +27,21 @@ export async function instagramToken(): Promise<string | null> {
   return data?.access_token ?? process.env.INSTAGRAM_ACCESS_TOKEN ?? null;
 }
 
+/** A refusal from Meta's API, with its error code and subcode (368: blocked, 4/17/32/613/80002: rate limits). */
+export class InstagramError extends Error {
+  constructor(
+    message: string,
+    readonly code: number | null,
+    readonly subcode: number | null,
+  ) {
+    super(message);
+  }
+}
+
+type GraphError = { error?: { message?: string; code?: number; error_subcode?: number } };
+const refusal = (path: string, status: number, e: GraphError["error"]) =>
+  new InstagramError(`Instagram ${path}: ${e?.message ?? status}${e?.code ? ` (code ${e.code}${e.error_subcode ? `/${e.error_subcode}` : ""})` : ""}`, e?.code ?? null, e?.error_subcode ?? null);
+
 async function graph<T>(path: string, params: Record<string, string> = {}, method: "GET" | "POST" = "GET"): Promise<T> {
   const token = await instagramToken();
   if (!token) throw new Error("Instagram isn't connected (no token).");
@@ -34,8 +49,8 @@ async function graph<T>(path: string, params: Record<string, string> = {}, metho
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   url.searchParams.set("access_token", token);
   const res = await fetch(url, { method, cache: "no-store" });
-  const json = (await res.json().catch(() => ({}))) as T & { error?: { message?: string } };
-  if (!res.ok || json.error) throw new Error(`Instagram ${path}: ${json.error?.message ?? res.status}`);
+  const json = (await res.json().catch(() => ({}))) as T & GraphError;
+  if (!res.ok || json.error) throw refusal(path, res.status, json.error);
   return json;
 }
 
@@ -62,8 +77,8 @@ async function graphJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
     cache: "no-store",
   });
-  const json = (await res.json().catch(() => ({}))) as T & { error?: { message?: string } };
-  if (!res.ok || json.error) throw new Error(`Instagram ${path}: ${json.error?.message ?? res.status}`);
+  const json = (await res.json().catch(() => ({}))) as T & GraphError;
+  if (!res.ok || json.error) throw refusal(path, res.status, json.error);
   return json;
 }
 
