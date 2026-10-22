@@ -1,7 +1,7 @@
 // ─── Brasil town: the DM after a comment ────────────────────
 // Someone a comment put on the map gets no public reply (Instagram flagged the
 // account for automated behavior after ~3k of them, 2026-10-21): a cron sends
-// them a private reply instead, "teu prédio subiu" with a "Ver meu prédio"
+// them a private reply instead, "seu prédio subiu" with a "Ver meu prédio"
 // button and no link (a link in a first DM gets hidden as spam). Their tap
 // comes back as a message (the webhook), which opens Meta's 24h window, and
 // the link goes then.
@@ -47,13 +47,13 @@ function speaking(): boolean {
 function opening(login: string, where: string | null): string {
   const lines = where
     ? [
-        `Pronto, ${login}! Teu prédio subiu ${where} 🏙️ Toca no botão aqui embaixo que eu te mando o link`,
-        `${login}, teu prédio já tá no mapa ${where} 🇧🇷 Quer o link pra ver? Toca no botão`,
-        `Feito! ${login} agora mora ${where} 🏙️ Toca aqui embaixo pra receber o link do teu prédio`,
+        `Pronto, ${login}! Seu prédio subiu ${where} 🏙️ Toca no botão aqui embaixo que eu te mando o link`,
+        `${login}, seu prédio já tá no mapa ${where} 🇧🇷 Quer o link pra ver? Toca no botão`,
+        `Feito! ${login} agora mora ${where} 🏙️ Toca aqui embaixo pra receber o link do seu prédio`,
       ]
     : [
-        `Pronto, ${login}! Teu prédio subiu na Git City 🏙️ Toca no botão aqui embaixo que eu te mando o link`,
-        `${login}, teu prédio já tá na cidade 🏙️ Quer o link pra ver? Toca no botão`,
+        `Pronto, ${login}! Seu prédio subiu na Git City 🏙️ Toca no botão aqui embaixo que eu te mando o link`,
+        `${login}, seu prédio já tá na cidade 🏙️ Quer o link pra ver? Toca no botão`,
         `Feito! Prédio do ${login} na Git City 🏙️ Toca aqui embaixo pra receber o link`,
       ];
   const hash = [...login].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
@@ -137,7 +137,7 @@ export async function handleBrasilTaps(taps: { sender: string; payload: string }
       const { data: reel } = await sb.from("brasil_reels").select("kind").or(`media_id.eq."${row.reel}",permalink.eq."${row.reel}"`).maybeSingle<{ kind: string }>();
       const login = encodeURIComponent(row.github_login);
       const url = reel?.kind === "city" ? `${SITE}/dev/${login}` : `${SITE}/town/${BRASIL_SLUG}?at=${login}`;
-      await sendMessage(t.sender, `Aqui teu prédio 👇\n${url}`);
+      await sendMessage(t.sender, `Aqui seu prédio 👇\n${url}`);
       await sb.from("brasil_comments").update({ link_sent_at: new Date().toISOString() }).eq("id", id);
       await captureServer(`ig:${row.ig_user}`, "brasil_dm_tapped", { kind: reel?.kind ?? "brasil" });
     } catch (err) {

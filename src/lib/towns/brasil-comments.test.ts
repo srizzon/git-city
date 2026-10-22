@@ -252,6 +252,6 @@ describe("voteReply", () => {
     expect(voteReply("unlinked", 53)).toContain("53");
   });
   it("says both when one comment put them on the map and voted", () => {
-    expect(voteReply("voted", 32, "gustavoguanabara", { login: "ianakiles", where: "em Manaus" })).toContain("ianakiles tá no mapa em Manaus e teu voto no 32 (gustavoguanabara)");
+    expect(voteReply("voted", 32, "gustavoguanabara", { login: "ianakiles", where: "em Manaus" })).toContain("ianakiles tá no mapa em Manaus e seu voto no 32 (gustavoguanabara)");
   });
 });

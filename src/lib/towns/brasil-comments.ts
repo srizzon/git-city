@@ -196,12 +196,12 @@ export function replyFor(outcome: string, login: string | null, uf: UF | null, k
   if (outcome === "which_city" && place?.city && place.options?.length) return `${login}, qual ${place.city}? Tem em ${list(place.options)}. Responde com o estado que eu coloco 😉`;
   if (kind === "city") {
     if (outcome === "added") return pick([`Pronto! O prédio do ${login} já tá na Git City 🏙️ Link na bio pra ver`, `Feito! ${login} já tem prédio na cidade 🏙️ Corre no link da bio`, `Tá na mão! Prédio do ${login} subiu na Git City 🏙️ Link na bio`]);
-    if (outcome === "already") return pick([`O ${login} já tinha prédio na cidade! Link na bio pra achar 🏙️`, `${login} já tá na Git City faz tempo 😎 Link na bio pra ver teu prédio`, `Esse já tava lá! Prédio do ${login} no link da bio 🏙️`]);
+    if (outcome === "already") return pick([`O ${login} já tinha prédio na cidade! Link na bio pra achar 🏙️`, `${login} já tá na Git City faz tempo 😎 Link na bio pra ver seu prédio`, `Esse já tava lá! Prédio do ${login} no link da bio 🏙️`]);
     return null;
   }
   if (outcome === "added" && place?.founded && place.city) return pick([`${login} fundou ${place.city} no mapa 🏙️ Primeiro dev de lá! Link na bio`, `Pronto! ${place.city} agora existe no mapa, fundada pelo ${login} 🇧🇷 Link na bio`, `Feito! ${login} é o fundador de ${place.city} 🏙️ Chama a galera de lá. Link na bio`]);
-  if (outcome === "added") return pick([`Pronto! ${login} tá no mapa ${where} 🏙️ Link na bio pra ver teu prédio`, `Feito! Prédio do ${login} subiu ${where} 🇧🇷 Corre no link da bio`, `Tá no mapa! ${login} agora mora ${where} 🏙️ Link na bio`]);
-  if (outcome === "already") return pick([`O ${login} já tava no mapa! Link na bio pra achar teu prédio 🏙️`, `${login} já mora no mapa 😎 Link na bio pra ver`, `Esse já tava lá! Prédio do ${login} no link da bio 🇧🇷`]);
+  if (outcome === "added") return pick([`Pronto! ${login} tá no mapa ${where} 🏙️ Link na bio pra ver seu prédio`, `Feito! Prédio do ${login} subiu ${where} 🇧🇷 Corre no link da bio`, `Tá no mapa! ${login} agora mora ${where} 🏙️ Link na bio`]);
+  if (outcome === "already") return pick([`O ${login} já tava no mapa! Link na bio pra achar seu prédio 🏙️`, `${login} já mora no mapa 😎 Link na bio pra ver`, `Esse já tava lá! Prédio do ${login} no link da bio 🇧🇷`]);
   return null;
 }
 
@@ -282,9 +282,9 @@ export function voteRoute(text: string, watched: boolean): { number: number; joi
  */
 export function voteReply(outcome: "voted" | "unlinked" | "number" | "young" | "closed", number: number, login: string | null = null, joined: { login: string; where: string } | null = null): string {
   const nn = String(number).padStart(2, "0");
-  if (outcome === "voted" && joined) return `Pronto! ${joined.login} tá no mapa ${joined.where} e teu voto no ${nn}${login ? ` (${login})` : ""} tá registrado 🗳️ Dá pra trocar até domingo, 21h`;
+  if (outcome === "voted" && joined) return `Pronto! ${joined.login} tá no mapa ${joined.where} e seu voto no ${nn}${login ? ` (${login})` : ""} tá registrado 🗳️ Dá pra trocar até domingo, 21h`;
   if (outcome === "voted") return `Voto no ${nn}${login ? ` (${login})` : ""} registrado 🗳️ Dá pra trocar até domingo, 21h`;
-  if (outcome === "unlinked") return `Seu Instagram ainda não tá no mapa 😕 Responde aqui com seu user do GitHub e sua cidade (ex: seuuser Recife) que eu te coloco e conto teu voto no ${nn}`;
+  if (outcome === "unlinked") return `Seu Instagram ainda não tá no mapa 😕 Responde aqui com seu user do GitHub e sua cidade (ex: seuuser Recife) que eu te coloco e conto seu voto no ${nn}`;
   if (outcome === "number") return `Não tem candidato ${nn} 🤔 Os números tão na urna, no link da bio`;
   if (outcome === "young") return `Sua conta do GitHub precisa ter 30 dias pra votar 😕`;
   return `A votação não tá aberta agora`;
