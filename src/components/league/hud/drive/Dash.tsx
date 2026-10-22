@@ -26,7 +26,7 @@ const ITEM_ICON: Record<BattleItem, LucideIcon> = { shock: Zap, bomb: Bomb, miss
 const NEW_MS = 900;
 const ATTACK = "#ff9a3c";
 
-export default function Dash({ telemetry, style, kit = null }: { telemetry: DriveTelemetry; style?: React.CSSProperties; kit?: { slots: KitSlot[]; side: HeistSide } | null }) {
+export default function Dash({ telemetry, style, kit = null }: { telemetry: DriveTelemetry; style?: React.CSSProperties; kit?: { slots: KitSlot[]; side: HeistSide; onUse?: (key: KitSlot["key"]) => void } | null }) {
   const { lang, t } = useLang();
   const speed = useRef<HTMLSpanElement>(null);
   const bar = useRef<HTMLDivElement>(null);

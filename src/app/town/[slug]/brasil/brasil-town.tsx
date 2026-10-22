@@ -70,6 +70,9 @@ import MyProjects, { ProjectWin } from "@/components/towns/brasil/MyProjects";
 import HeistHud from "@/components/towns/brasil/heist/HeistHud";
 import { HeistResultTower, HeistStrip, SideChoice } from "@/components/towns/brasil/heist/HeistMap";
 import { HeistPreviewStrip, IN_CAR, heistMock, useHeistPreview } from "@/components/towns/brasil/heist/HeistPreview";
+import { useHeist } from "@/components/towns/brasil/heist/useHeist";
+import type { HeistApi } from "@/components/league/drive/HeistMode";
+import type { HeistSide, HeistView, KitSlot } from "@/lib/towns/heist";
 
 // The Brasil town's page: the map of Brazil with the town's residents, each
 // in their city, their buildings sized like everywhere in Git City. Over it:
@@ -171,6 +174,26 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const [heistStep, setHeistStep] = useHeistPreview();
   const heist = useMemo(() => (heistStep ? heistMock(heistStep) : null), [heistStep]);
   const heistInCar = !!heistStep && IN_CAR.includes(heistStep);
+  // The city of the day for real: today's city, your side, what the car's mode tells the HUD.
+  const today = useHeist(league.slug, !!viewerLogin);
+  const [heistView, setHeistView] = useState<HeistView | null>(null);
+  const [needSide, setNeedSide] = useState(false);
+  const heistApi = useRef<HeistApi | null>(null);
+  const [resultSeen, setResultSeen] = useState(() => {
+    try {
+      return typeof window !== "undefined" && localStorage.getItem("gc:heist-result") === new Date().toISOString().slice(0, 10);
+    } catch {
+      return false;
+    }
+  });
+  const closeResult = () => {
+    setResultSeen(true);
+    try {
+      localStorage.setItem("gc:heist-result", new Date().toISOString().slice(0, 10));
+    } catch {
+      // shown again next visit
+    }
+  };
   /** Where the next drive starts instead of a building (to or back from the drift track: the highway by its gate). */
   const [driveSpawn, setDriveSpawn] = useState<Spawn | null>(null);
   /** Dark between the town's car and the drift run, both ways, while the next world loads. */
@@ -649,8 +672,24 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       onCrown: setCrownView,
       onTaste: viewerLogin ? undefined : onTaste,
       rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef, startLine: raceStartLine, routeLine: raceLine },
+      heist:
+        today.day?.ring && !heistStep
+          ? {
+              ring: today.day.ring,
+              side: today.me?.side ?? null,
+              resident: today.me?.resident ?? false,
+              signedIn: !!viewerLogin,
+              busts: today.me?.busts ?? 0,
+              standing: today.day.standing,
+              cityName: today.day.name,
+              token: today.token,
+              apiRef: heistApi,
+              onView: setHeistView,
+              onNeedSide: setNeedSide,
+            }
+          : undefined,
     }),
-    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, games, raceStartLine, raceResults, raceLine],
+    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, games, raceStartLine, raceResults, raceLine, today.day, today.me, today.token, heistStep],
   );
   /** Your state, from your city. */
   const homeCity = viewerLogin ? world.cityOfLogin.get(viewerLogin.toLowerCase()) : undefined;
@@ -954,7 +993,22 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   // The map with nothing open over it: what the bar's slot shows (a live race, the city of the day, who arrived).
   const mapClear = !inCar && !state && !focused && !panel && !picker;
   // The city of the day's card takes the slot unless a race is open or we're asking for your city.
-  const heistCard = mapClear && !askCity && !liveRace && !!heist?.view && !!heistStep?.startsWith("card");
+  // The block on the bar: the preview's made-up state, or today's real city.
+  const strip = heistStep
+    ? heistStep.startsWith("card") && heist?.view
+      ? { city: heist.view.city, side: heist.view.side, resident: heist.view.resident }
+      : null
+    : today.day
+      ? { city: { name: today.day.name, uf: today.day.uf ?? "", buildings: today.day.buildings, standing: today.day.standing }, side: today.me?.side ?? null, resident: today.me?.resident ?? false }
+      : null;
+  const heistCard = mapClear && !askCity && !liveRace && !!strip;
+  /** A side from the map's block or the ring: kept by the site; from the map, the car goes to the city. */
+  const pickSide = async (side: HeistSide) => {
+    if (!viewerLogin) return signIn();
+    const me = await today.pick(side);
+    const ring = today.day?.ring;
+    if (me?.side && ring && !inCar) startDrive({ x: ring.x * M_TO_UNIT, z: ring.z * M_TO_UNIT });
+  };
   const pickHeist = (step: NonNullable<typeof heistStep>) => {
     setHeistStep(step);
     if (IN_CAR.includes(step) && !inCar) startDrive();
@@ -1167,17 +1221,18 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
 
       {/* The city of the day takes the live race's spot over the bar when no race is open. */}
       {!inCar && heist?.result && <HeistResultTower result={heist.result} onClose={() => setHeistStep("card")} />}
+      {!inCar && !heistStep && today.result && !resultSeen && <HeistResultTower result={today.result} onClose={closeResult} />}
       {heistStep && <HeistPreviewStrip step={heistStep} onStep={pickHeist} />}
 
       {/* The bar: a row of words on a desktop, a tab bar of icons on a phone; Drive raised in the middle. */}
       {/* The city of the day rides on the bar: as wide as it on a desktop, edge to edge over the tab bar on a phone. */}
       {!inCar && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2">
-        {heistCard && heist?.view && (
+        {heistCard && strip && (
           <div className="flex w-0 min-w-full flex-col gap-px">
             {/* On a phone the map's credit moves up here, off the bar's gap the strip now fills. */}
             <span className="mb-1 ml-1.5 text-[8px] normal-case leading-tight text-muted/60 sm:hidden">{t("Map data: IBGE · Natural Earth", "Dados do mapa: IBGE · Natural Earth")}</span>
-            <HeistStrip city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onPick={(side) => pickHeist(side)} className="max-sm:border-x-0 max-sm:border-b-0" />
+            <HeistStrip city={strip.city} side={strip.side} resident={strip.resident} onPick={(side) => (heistStep ? pickHeist(side) : void pickSide(side))} className="max-sm:border-x-0 max-sm:border-b-0" />
           </div>
         )}
         <nav className={`pointer-events-auto relative grid ${election ? "grid-cols-5" : "grid-cols-4"} items-stretch gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:flex sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
@@ -1289,9 +1344,19 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onCamera={toggleCamera}
           onMute={toggleMute}
           onExit={exitDrive}
-          kit={heistInCar && heist?.view?.kit && heist.view.side ? { slots: heist.view.kit, side: heist.view.side } : null}
+          kit={
+            heistInCar && heist?.view?.kit && heist.view.side
+              ? { slots: heist.view.kit, side: heist.view.side }
+              : !heistStep && heistView?.kit && heistView.side
+                ? { slots: heistView.kit, side: heistView.side, onUse: (key: KitSlot["key"]) => heistApi.current?.use(key) }
+                : null
+          }
         >
           {heistInCar && heist?.view && (heistStep === "pick" ? <SideChoice city={heist.view.city} onPick={(side) => setHeistStep(side === "cop" ? "cop" : "robber")} /> : <HeistHud view={heist.view} />)}
+          {!heistStep && heistView?.side && <HeistHud view={heistView} />}
+          {!heistStep && needSide && today.day && (
+            <SideChoice city={{ name: today.day.name, uf: today.day.uf ?? "", buildings: today.day.buildings, standing: today.day.standing }} onPick={(side) => void pickSide(side)} />
+          )}
           {games && (
             <GameMenu title={t(`Games · ${drivers.length + 1} driving here`, `Jogos · ${drivers.length + 1} dirigindo aqui`)} modes={gameModes} onPick={pickGame} onClose={closeGames}>
               {games.step === "race" ? (

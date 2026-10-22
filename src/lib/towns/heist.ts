@@ -58,7 +58,7 @@ export interface HeistCity {
   standing: number;
 }
 
-export type HeistFlash = { kind: "pushed"; pts: number } | { kind: "busted"; pts: number; by: string | null } | { kind: "bluescreen"; by: string | null };
+export type HeistFlash = { kind: "pushed"; pts: number } | { kind: "bust"; pts: number } | { kind: "busted"; pts: number; by: string | null } | { kind: "bluescreen"; by: string | null };
 
 export interface HeistView {
   city: HeistCity;

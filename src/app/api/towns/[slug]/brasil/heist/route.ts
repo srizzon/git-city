@@ -3,7 +3,7 @@ import { getLeagueBySlug, getViewer } from "@/lib/leagues/service";
 import { assertSameOrigin } from "@/lib/leagues/http";
 import { rateLimit } from "@/lib/rate-limit";
 import { getBrasilLayout } from "@/lib/towns/brasil-server";
-import { heistDay, heistResult, heistSideOf, pickHeistSide } from "@/lib/towns/heist-server";
+import { heistBustsOn, heistDay, heistResult, heistSideOf, pickHeistSide } from "@/lib/towns/heist-server";
 import { SIDE_TOKEN_TTL_MS, signSideToken } from "@/lib/towns/heist-side-token";
 import { isSide } from "@/lib/towns/heist";
 import { captureServer } from "@/lib/posthog-server";
@@ -21,8 +21,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const [{ layout }, viewer] = await Promise.all([getBrasilLayout(league.id), getViewer()]);
   const day = await heistDay(league.id, Date.now(), layout);
   if (!day) return NextResponse.json({ day: null, me: null, result: null }, { headers: { "Cache-Control": "private, no-store" } });
-  const [me, result] = await Promise.all([viewer ? heistSideOf(viewer.id, day, layout) : null, heistResult(viewer?.id ?? null)]);
-  return NextResponse.json({ day, me, result }, { headers: { "Cache-Control": "private, no-store" } });
+  const [me, result, busts] = await Promise.all([
+    viewer ? heistSideOf(viewer.id, day, layout) : null,
+    heistResult(viewer?.id ?? null),
+    viewer ? heistBustsOn(viewer.id, day.day) : 0,
+  ]);
+  return NextResponse.json({ day, me: me ? { ...me, busts } : null, result }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {

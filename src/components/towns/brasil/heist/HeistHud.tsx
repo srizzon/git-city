@@ -112,7 +112,16 @@ export default function HeistHud({ view }: { view: HeistView }) {
         <div className="absolute inset-0">
           <Backdrop />
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4">
-            {flash.kind === "pushed" ? (
+            {flash.kind === "bust" ? (
+              <>
+                <Band className="px-6 py-3 leading-none text-bg" style={{ fontSize: T.hero, background: COP }}>
+                  {t("Busted!", "Prendeu!")}
+                </Band>
+                <Band delay={90} className="px-5 py-2" style={{ fontSize: T.big }}>
+                  <span className="text-lime">+{flash.pts}</span>&nbsp;pts
+                </Band>
+              </>
+            ) : flash.kind === "pushed" ? (
               <>
                 <Band tone="lime" className="px-6 py-3 leading-none" style={{ fontSize: T.hero }}>
                   {t("Pushed", "Push feito")}

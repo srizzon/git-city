@@ -51,7 +51,7 @@ export function KitDash({ kit, side }: { kit: KitSlot[]; side: HeistSide }) {
 }
 
 /** The phone's column of three, over Boost. */
-export function KitTouch({ kit, side }: { kit: KitSlot[]; side: HeistSide }) {
+export function KitTouch({ kit, side, onUse }: { kit: KitSlot[]; side: HeistSide; onUse?: (key: KitSlot["key"]) => void }) {
   const { lang } = useLang();
   const color = SIDE_COLOR[side];
   return (
@@ -64,6 +64,7 @@ export function KitTouch({ kit, side }: { kit: KitSlot[]; side: HeistSide }) {
             key={s.key}
             type="button"
             disabled={!ready}
+            onClick={() => onUse?.(s.key)}
             aria-label={KIT_NAMES[s.item][lang === "pt" ? 1 : 0]}
             className="pointer-events-auto relative flex h-11 w-11 touch-none select-none items-center justify-center border-[3px] bg-bg/80 backdrop-blur-sm"
             style={{ borderColor: ready ? color : "#3a3a44", color }}

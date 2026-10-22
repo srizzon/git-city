@@ -131,6 +131,18 @@ async function paidOn(devId: number, kind: "heist" | "bust", day: string): Promi
   return (data ?? []).reduce((a, r) => a + r.points, 0);
 }
 
+/** How many busts a cop has on a Brasília day. */
+export async function heistBustsOn(devId: number, day: string): Promise<number> {
+  const { count } = await getSupabaseAdmin()
+    .from("brasil_points")
+    .select("id", { count: "exact", head: true })
+    .eq("developer_id", devId)
+    .eq("kind", "bust")
+    .gte("created_at", dayStart(day))
+    .lt("created_at", dayEnd(day));
+  return count ?? 0;
+}
+
 /** Pays each push (the room's save): double points a building, under the robber's day cap. Once per (robber, moment). */
 export async function payPushes(pushes: readonly HeistPush[]): Promise<void> {
   for (const p of pushes) {

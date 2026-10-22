@@ -110,7 +110,7 @@ export default function DriveHud({
   /** A town's own HUD pieces (the Brasil map's races), over the rest. */
   children?: React.ReactNode;
   /** The Brasil map's city of the day: your side's weapons in place of the ? box slot. */
-  kit?: { slots: KitSlot[]; side: HeistSide } | null;
+  kit?: { slots: KitSlot[]; side: HeistSide; onUse?: (key: KitSlot["key"]) => void } | null;
   onVolume: (v: number) => void;
   /** A quick reaction (lib drive/emotes slot). */
   onEmote: (e: number) => void;

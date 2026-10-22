@@ -101,6 +101,9 @@ export interface PointsBreakdown {
   race: number;
   project: number;
   smash: number;
+  heist: number;
+  bust: number;
+  heist_bonus: number;
 }
 
 export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0, race: 0, project: 0, smash: 0, heist: 0, bust: 0, heist_bonus: 0 });

@@ -74,7 +74,7 @@ export default function TouchControls({
   /** Signed in: the reactions menu's Chat opens the field. */
   onChat?: () => void;
   /** The city of the day: your side's weapons over the row. */
-  kit?: { slots: KitSlot[]; side: HeistSide } | null;
+  kit?: { slots: KitSlot[]; side: HeistSide; onUse?: (key: KitSlot["key"]) => void } | null;
 }) {
   const driftMode = mode === "drift";
   const drag = useRef<{ id: number; origin: number; x: number; y: number } | null>(null);
@@ -311,7 +311,7 @@ export default function TouchControls({
             </button>
             {kit && (
               <div className="absolute bottom-full right-0 mb-3 flex w-16 justify-center">
-                <KitTouch kit={kit.slots} side={kit.side} />
+                <KitTouch kit={kit.slots} side={kit.side} onUse={kit.onUse} />
               </div>
             )}
             {!kit && item && Icon && (
