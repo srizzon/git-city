@@ -25,7 +25,7 @@
 // ~3k replies a week (2026-10-21), so the account only answers comments that
 // need an answer back (a username GitHub doesn't have, "qual Santa Rita?", a
 // vote that can't count yet). Success is silent: the building is on the map.
-// At most LIMITS.repliesPerHour replies an hour for everyone, a random 3–8 min
+// At most LIMITS.repliesPerHour replies an hour for everyone, a random 2–5 min
 // apart; the rest are logged unanswered. Someone placed gets a DM instead
 // (brasil-dm.ts), and a public "te mandei na DM" when the hour has room left.
 // BRASIL_IG_REPLIES=off stops them all.
@@ -42,7 +42,7 @@ import { captureServer } from "../posthog-server";
 import { creditComment, creditStory, residentOfInstagram } from "./brasil-points-server";
 import { dmComment } from "./brasil-dm";
 
-export const LIMITS = { perUserHour: 5, repliesPerUserHour: 3, repliesPerHour: 10, modelPerDay: 2_000 } as const;
+export const LIMITS = { perUserHour: 5, repliesPerUserHour: 3, repliesPerHour: 12, modelPerDay: 2_000 } as const;
 
 export interface IncomingComment {
   id: string;
@@ -150,7 +150,7 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
         }
       }
       // Placed gets a DM (brasil-dm.ts), not a public reply; the rest asks them for something.
-      if (r.outcome === "added") await dmComment(id, w.kind === "city").catch((err) => console.error("[brasil] dm", c.id, err));
+      if (placed) await dmComment(id, w.kind === "city").catch((err) => console.error("[brasil] dm", c.id, err));
       // The rest asks them for something in public.
       const reply = placed ? null : replyFor(r.outcome, r.login, r.uf, w.kind, suggestion, { city: r.city, founded: r.founded, options: r.options });
       if (!reply) continue;
@@ -273,7 +273,7 @@ async function voteByComment(
 
 /**
  * Answers a comment on Instagram within the limits (see the header): off by BRASIL_IG_REPLIES=off, at most
- * LIMITS.repliesPerUserHour to one person and LIMITS.repliesPerHour to everyone, a random 3–8 min after the
+ * LIMITS.repliesPerUserHour to one person and LIMITS.repliesPerHour to everyone, a random 2–5 min after the
  * last one. `reserve` leaves that many of the hour's replies to others (the DM nudge leaves room for the
  * replies that ask for something). True when it was sent.
  */
@@ -292,7 +292,7 @@ export async function speak(id: string, c: IncomingComment, reply: string, reser
     .limit(LIMITS.repliesPerHour)
     .returns<{ replied_at: string }[]>();
   if ((recent ?? []).length >= LIMITS.repliesPerHour - reserve) return false;
-  const gap = (3 + Math.random() * 5) * 60_000;
+  const gap = (2 + Math.random() * 3) * 60_000;
   if (recent?.[0] && Date.now() - new Date(recent[0].replied_at).getTime() < gap) return false;
   // Only production speaks on Instagram: local and preview runs read real comments but just log the reply.
   if (process.env.VERCEL_ENV !== "production") {

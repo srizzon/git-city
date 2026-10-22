@@ -1,22 +1,23 @@
 // ─── Brasil town: the DM after a comment ────────────────────
-// Someone a comment put on the map gets no public reply (Instagram flagged the
-// account for automated behavior after ~3k of them, 2026-10-21): they get a
-// private reply instead, sent as the comment is read: "seu prédio subiu"
-// with a "Ver meu prédio" button in the bubble (a button template) and no link (a link in a first DM
-// gets hidden as spam). Their tap comes back as a postback (the webhook),
-// which opens Meta's 24h window, and the link goes then. A DM from an account they don't follow lands in their
-// requests, so the comment also gets a public "te mandei na DM" while the
-// hour's public replies have room (speak, brasil-instagram.ts).
+// Someone on the map after a comment (just placed, or already there) gets no
+// public reply about it (Instagram flagged the account for automated behavior
+// after ~3k of them, 2026-10-21): they get a private reply instead, sent as
+// the comment is read, with a "Ver meu prédio" button in the bubble (a button
+// template) and no link (a link in a first DM gets hidden as spam). Their tap
+// comes back as a postback (the webhook), which opens Meta's 24h window, and
+// the link goes then. A DM from an account they don't follow lands in their
+// requests, so the comment also gets a public "@them, te mandei o link no
+// direct" while the hour's public replies have room (speak,
+// brasil-instagram.ts), the newly placed first. Wordings are Sam's.
 //
 // Pace: one DM an account, ever; at most DM.perHour an hour. Over that, the
 // comment waits in the queue a cron empties every 5 minutes (DM.perRun a run):
-// a private reply may go up to 7 days after its comment. BRASIL_IG_REPLIES=off stops these too. Server only.
+// a private reply may go up to 7 days after its comment. BRASIL_IG_REPLIES=off
+// stops these too. Server only.
 
 import { getSupabaseAdmin } from "../supabase";
 import { instagramUsernameOf, privateReply, sendMessage } from "../instagram";
 import { captureServer } from "../posthog-server";
-import { cityOf } from "./br-cities";
-import { ptState, type UF } from "./brasil-map";
 import { BRASIL_SLUG } from "./brasil-server";
 import { speak } from "./brasil-instagram";
 
@@ -29,6 +30,7 @@ const PAYLOAD = "predio:";
 
 interface Queued {
   id: string;
+  outcome: Placed;
   reel: string;
   ig_user: string;
   github_login: string;
@@ -45,26 +47,43 @@ function speaking(): boolean {
   return process.env.VERCEL_ENV === "production";
 }
 
+type Placed = "added" | "already";
+
 /** The first DM: no link, a button. Wordings picked by the login, so they vary. */
-function opening(login: string, where: string | null): string {
-  const lines = where
-    ? [
-        `Pronto, ${login}! Seu prédio subiu ${where} 🏙️\n\nToca no botão aqui embaixo que eu te mando o link`,
-        `${login}, seu prédio já tá no mapa ${where} 🇧🇷\n\nQuer o link pra ver? Toca no botão`,
-        `Feito! ${login} agora mora ${where} 🏙️\n\nToca aqui embaixo pra receber o link do seu prédio`,
-      ]
-    : [
-        `Pronto, ${login}! Seu prédio subiu na Git City 🏙️\n\nToca no botão aqui embaixo que eu te mando o link`,
-        `${login}, seu prédio já tá na cidade 🏙️\n\nQuer o link pra ver? Toca no botão`,
-        `Feito! Prédio do ${login} na Git City 🏙️\n\nToca aqui embaixo pra receber o link`,
-      ];
+function opening(login: string, outcome: Placed, city: boolean): string {
+  const lines =
+    outcome === "already"
+      ? [
+          `Fala ${login}! Você já tem lote na Git City 😎\n\nClica no botão que eu te mando o link 👇`,
+          `Opa ${login}, seu prédio já tava lá na Git City 🇧🇷\n\nQuer o link pra ver como ele tá? Clica aqui 👇`,
+          `Fala ${login}, você já é de casa na Git City 🏙️\n\nToca aqui embaixo pra receber o link e ir derrubar uns prédios 👇`,
+        ]
+      : city
+        ? [
+            `Fala ${login}! Seu prédio subiu na Git City 🏙️\n\nClica no botão aqui embaixo que eu te mando o link 👇`,
+            `Opa ${login}, você agora é morador da Git City 🏙️\n\nQuer ver seu prédio? Clica no botão aqui 👇`,
+            `Fala ${login}, levantei seu prédio na Git City 🏙️\n\nToca aqui embaixo pra receber o link e ver quem tá do seu lado 👇`,
+          ]
+        : [
+            `Fala ${login}! Agora você tem um lote na Git City.\n\nClica no botão aqui embaixo que eu te mando o link 👇`,
+            `Opa ${login}, coloquei seu prédio na Git City 🇧🇷\n\nQuer o link pra ver? Clica no botão aqui 👇`,
+            `Fala ${login}, agora você tem um barraco na Git City 🇧🇷\n\nToca aqui embaixo pra receber o link e ir derrubar outros prédios 👇`,
+          ];
   const hash = [...login].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
   return lines[hash % lines.length];
 }
 
-const NUDGES = ["Te mandei na DM 📩", "Olha a DM 👀", "Mandei o link no direct 📩", "Corre na DM que tá lá 📩", "Te chamei no direct 👀"];
-/** Public replies the nudge leaves to the ones that ask for something (a wrong username, "qual Santa Rita?"). */
-const NUDGE_RESERVE = 3;
+/** The public "it's in your DM", by their @ (one-word or emoji-only replies read as spam). */
+const NUDGES = [
+  (at: string) => `@${at} te mandei o link no direct 📩`,
+  (at: string) => `Fala @${at}! Coloquei seu prédio, o link tá na sua DM 👇`,
+  (at: string) => `@${at} pronto, seu lote tá garantido. Olha o direct 📩`,
+  (at: string) => `Opa @${at}, te chamei no direct com o link 👀`,
+  (at: string) => `@${at} feito! Corre na DM que o link tá lá 📩`,
+  (at: string) => `Fala @${at}, seu prédio subiu. Te mandei o link no direct 🏙️`,
+];
+/** Public replies the nudge leaves to others: the ones that ask for something (a wrong username, "qual Santa Rita?"), and the newly placed before who was already there. */
+const NUDGE_RESERVE: Record<Placed, number> = { added: 3, already: 6 };
 
 /** DMs sent in the last hour, against DM.perHour. */
 async function sentLastHour(): Promise<number> {
@@ -86,18 +105,17 @@ async function dmOne(q: Queued, city: boolean): Promise<"sent" | "skipped" | "fa
   // One DM an account, ever.
   const { count: had } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", q.ig_user).eq("dm_status", "sent");
   if (had) return "skipped";
-  const where = city ? null : q.ibge !== null && cityOf(q.ibge) ? `em ${cityOf(q.ibge)!.name}` : q.uf ? ptState(q.uf as UF, "in") : "no mapa";
   try {
-    await privateReply(q.id.replace(/^ig:/, ""), opening(q.github_login, where), { title: "Ver meu prédio 🏙️", payload: `${PAYLOAD}${q.id}` });
+    await privateReply(q.id.replace(/^ig:/, ""), opening(q.github_login, q.outcome, city), { title: "Ver meu prédio 🏙️", payload: `${PAYLOAD}${q.id}` });
   } catch (err) {
     console.error("[brasil] dm", q.id, err);
     await mark("failed");
     return "failed";
   }
   await mark("sent");
-  await captureServer(`ig:${q.ig_user}`, "brasil_dm_sent", { kind: city ? "city" : "brasil" });
-  const nudge = NUDGES[Math.floor(Math.random() * NUDGES.length)];
-  if (await speak(q.id, { id: q.id.replace(/^ig:/, ""), mediaId: "", text: "", igUser: q.ig_user }, nudge, NUDGE_RESERVE).catch(() => false)) {
+  await captureServer(`ig:${q.ig_user}`, "brasil_dm_sent", { kind: city ? "city" : "brasil", outcome: q.outcome });
+  const nudge = NUDGES[Math.floor(Math.random() * NUDGES.length)](q.ig_user);
+  if (await speak(q.id, { id: q.id.replace(/^ig:/, ""), mediaId: "", text: "", igUser: q.ig_user }, nudge, NUDGE_RESERVE[q.outcome]).catch(() => false)) {
     await captureServer(`ig:${q.ig_user}`, "brasil_dm_nudged", {});
   }
   return "sent";
@@ -108,9 +126,9 @@ export async function dmComment(id: string, city: boolean): Promise<void> {
   if (!speaking() || (await sentLastHour()) >= DM.perHour) return;
   const { data: q } = await getSupabaseAdmin()
     .from("brasil_comments")
-    .select("id, reel, ig_user, github_login, uf, ibge, created_at")
+    .select("id, outcome, reel, ig_user, github_login, uf, ibge, created_at")
     .eq("id", id)
-    .eq("outcome", "added")
+    .in("outcome", ["added", "already"])
     .is("dm_status", null)
     .maybeSingle<Queued>();
   if (q?.ig_user && q.github_login) await dmOne(q, city);
@@ -126,8 +144,8 @@ export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; 
 
   const { data: queue } = await sb
     .from("brasil_comments")
-    .select("id, reel, ig_user, github_login, uf, ibge, created_at")
-    .eq("outcome", "added")
+    .select("id, outcome, reel, ig_user, github_login, uf, ibge, created_at")
+    .in("outcome", ["added", "already"])
     .is("dm_status", null)
     .is("replied_at", null)
     .not("ig_user", "is", null)
@@ -172,7 +190,7 @@ export async function handleBrasilTaps(taps: { sender: string; payload: string }
       const { data: reel } = await sb.from("brasil_reels").select("kind").or(`media_id.eq."${row.reel}",permalink.eq."${row.reel}"`).maybeSingle<{ kind: string }>();
       const login = encodeURIComponent(row.github_login);
       const url = reel?.kind === "city" ? `${SITE}/dev/${login}` : `${SITE}/town/${BRASIL_SLUG}?at=${login}`;
-      await sendMessage(t.sender, `Aqui seu prédio 👇\n${url}`);
+      await sendMessage(t.sender, `Tá aqui 👇\n${url}\n\nManda esse reel pros devs da sua cidade, quanto mais gente, maior fica o seu bairro 🏙️`);
       await sb.from("brasil_comments").update({ link_sent_at: new Date().toISOString() }).eq("id", id);
       await captureServer(`ig:${row.ig_user}`, "brasil_dm_tapped", { kind: reel?.kind ?? "brasil" });
     } catch (err) {
