@@ -11,10 +11,9 @@ import type { SmashStore } from "@/lib/league-city/smash";
 import { CHASSIS, M_TO_UNIT, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
 import { INTERP_MS, SnapshotBuffer, emptySnapshot, type CarSnapshot, type ClientMsg } from "@/lib/league-city/drive/net";
 import { carHeading } from "@/lib/league-city/drive/vehicle";
-import { nearestRoad, nextRoad, roadAround, roadSet, type Lot } from "@/lib/league-city/drive/heist-nav";
+import { COPS, COPS_BY_STARS, FlowField, newCar, roleOf, spawnSpot, stepCop, stepGang, type Car as SimCar, type CopWorld, type Quarry } from "@/lib/league-city/drive/heist-cops";
 import { LOT } from "@/lib/league-city/grid";
-import type { CityObject } from "@/lib/league-city/types";
-import { HEIST, KIT, RULES, gameCops, inRing, starsFor, stepPush, type HeistFlash, type HeistSide, type HeistView, type KitItem, type KitSlot, type Ring } from "@/lib/towns/heist";
+import { HEIST, KIT, RULES, inRing, starsFor, stepPush, type HeistFlash, type HeistSide, type HeistView, type KitItem, type KitSlot, type Ring } from "@/lib/towns/heist";
 
 // ─── City of the day, in the car ────────────────────────────
 // Everything the Brasil map's cops and robbers need on your screen; the
@@ -30,8 +29,11 @@ import { HEIST, KIT, RULES, gameCops, inRing, starsFor, stepPush, type HeistFlas
 //   kit       Q E F (1–6 are reactions): bomb and missile go through the
 //             battle's own fx; duck, magnet and blue screen are drawn here
 // Game-run cars are town-bot feeds (RemoteCars draws them, with bodies you
-// can hit and blasts that wreck them), driven by a small sim here that keeps
-// them on the streets (lib drive/heist-nav) until they're close enough to ram.
+// can hit), driven by lib drive/heist-cops: a flow field round you over the
+// lots no standing building blocks, a role each (chase, the two sides, the
+// blocker), kept apart, spawned out of view, handed back when stuck or left
+// far behind. Only you wreck them (a fast hit, a blast): a takedown.
+// ?heist=debug (dev) draws a line from each to where it's aiming.
 
 export interface HeistApi {
   /** Your car touched a remote car or bot. */
@@ -65,8 +67,6 @@ export interface HeistDriveProps {
 const SIDE_COLOR: Record<HeistSide, string> = { robber: "#ff5a52", cop: "#5aa0ff" };
 const COP_COLOR = "#f2f4ff";
 const GANG_COLOR = "#3a1c1c";
-/** Game cars' pace (m/s): cops a bit slower than your top speed, so you can get away. */
-const COP_TURN = 2.2;
 const GANG_SPEED = 17;
 /** How close (m) a game car has to be to hit you, and how often one can. */
 const RAM_EVERY_MS = 1400;
@@ -83,41 +83,22 @@ const TAKEDOWN_SPEED = 14;
 const BLAST_WRECK = 0.6;
 /** A wrecked cop's place stays empty this long (ms). */
 const COP_BACK_MS = 8000;
-// The cops change with the stars (GTA): 1 follows, 2 rams, 3 sends one ahead to block the street, 4–5 drive faster.
-const COP_SPEED_BY_STARS = [0, 17, 23, 24, 27, 30];
-/** At one star a cop keeps this far behind (m), never hitting you. */
-const FOLLOW_GAP = 25;
-/** From this many stars, the third cop goes ahead to block. */
-const BLOCK_STARS = 3;
 const SHOT_SPEED = 42;
 const SHOT_LIFE = 3;
 const SHOT_HIT = 2.6;
 const TETHER_PULL = 14;
 /** A lot in meters. */
 const LOT_M = LOT * UNIT_TO_M;
-/** Closer than this (m), a game car leaves the street and goes straight for its target. */
-const DIRECT = 22;
 /** How long a bust holds your car before it starts again outside the city (ms). */
 const BUST_HOLD_MS = 2600;
 
-interface Npc {
-  id: string;
-  x: number;
-  z: number;
-  h: number;
-  v: number;
+/** A game-run car: the sim's car (lib drive/heist-cops) plus what this screen keeps for it. */
+interface Npc extends SimCar {
+  /** A cop's slot (0–3: its role by the stars). */
+  slot: number;
   /** Gang: where it's headed and its hearts. */
   goal?: { x: number; z: number };
   hearts?: number;
-  /** On the streets: the lot it's on, the one it came from, the one it's heading to. */
-  lot?: Lot | null;
-  prev?: Lot | null;
-  next?: Lot | null;
-  /** A cop sent ahead to block your street (from BLOCK_STARS). */
-  block?: boolean;
-  /** Slowed (blue screen), or stopped (a crash or a blast) until (ms). */
-  slowUntil?: number;
-  stunUntil?: number;
   pulledUntil?: number;
   lastRam: number;
   buffer: SnapshotBuffer;
@@ -146,22 +127,8 @@ function feedOf(n: Npc, color: string, badge: "cop" | "robber"): CarFeed {
   return { id: n.id, name: n.id, color, bot: true, badge, buffer: n.buffer };
 }
 
-function npcAt(id: string, x: number, z: number, h: number): Npc {
-  return { id, x, z, h, v: 0, lastRam: 0, buffer: new SnapshotBuffer() };
-}
-
-/** Turn toward (tx, tz) and drive at `speed`, as a car would (no strafing). */
-function steer(n: Npc, tx: number, tz: number, speed: number, dt: number) {
-  const want = Math.atan2(tx - n.x, tz - n.z);
-  let d = want - n.h;
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  n.h += Math.max(-COP_TURN * dt, Math.min(COP_TURN * dt, d));
-  // Slow down in a hard turn.
-  const target = speed * (Math.abs(d) > 1.2 ? 0.55 : 1);
-  n.v += Math.max(-14 * dt, Math.min(9 * dt, target - n.v));
-  n.x += Math.sin(n.h) * n.v * dt;
-  n.z += Math.cos(n.h) * n.v * dt;
+function npcAt(id: string, slot: number, x: number, z: number, h: number, now: number): Npc {
+  return { ...newCar(id, "chase", x, z, h, now), slot, lastRam: 0, buffer: new SnapshotBuffer() };
 }
 
 function record(n: Npc, now: number) {
@@ -174,30 +141,8 @@ function record(n: Npc, now: number) {
   n.buffer.push(now, s);
 }
 
-/**
- * Where a game car drives next: straight at (tx, tz) once it's close, otherwise
- * the middle of the next street lot toward it (`away`: away from it).
- */
-function navTo(n: Npc, roads: ReadonlySet<string>, tx: number, tz: number, away = false): { x: number; z: number } {
-  if (!away && Math.hypot(tx - n.x, tz - n.z) < DIRECT) return { x: tx, z: tz };
-  if (roads.size === 0) return away ? { x: n.x + (n.x - tx), z: n.z + (n.z - tz) } : { x: tx, z: tz };
-  if (!n.next) {
-    n.lot = nearestRoad(roads, n.x, n.z, LOT_M);
-    n.next = n.lot;
-    n.prev = null;
-  }
-  if (!n.next) return { x: tx, z: tz };
-  if (Math.hypot(n.next[0] * LOT_M - n.x, n.next[1] * LOT_M - n.z) < 4) {
-    n.prev = n.lot ?? null;
-    n.lot = n.next;
-    n.next = nextRoad(roads, n.lot, n.prev, tx, tz, LOT_M, away) ?? n.lot;
-  }
-  return { x: n.next[0] * LOT_M, z: n.next[1] * LOT_M };
-}
-
 export default function HeistMode({
   heist,
-  objects,
   car,
   remotes,
   sides,
@@ -211,8 +156,6 @@ export default function HeistMode({
   muted,
 }: {
   heist: HeistDriveProps;
-  /** The map's objects: its road lots are where the game cars drive. */
-  objects: readonly CityObject[];
   car: React.MutableRefObject<CarApi | null>;
   remotes: React.MutableRefObject<Map<string, RemoteDriver>>;
   /** Every driver's side, from the room. */
@@ -555,7 +498,25 @@ export default function HeistMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [side]);
 
-  const roads = useMemo(() => roadSet(objects), [objects]);
+  // The cars' map: a lot is blocked while a building stands on it (a fallen one frees it).
+  const lotIndex = useMemo(() => {
+    const m = new Map<string, number>();
+    store?.targets.forEach((t, i) => m.set(`${Math.round(t.x / LOT)},${Math.round(t.z / LOT)}`, i));
+    return m;
+  }, [store]);
+  const world = useMemo<CopWorld>(
+    () => ({
+      lotM: LOT_M,
+      blocked: (lx, lz) => {
+        const i = lotIndex.get(`${lx},${lz}`);
+        return i !== undefined && !!store && !store.isRubble(i, Date.now());
+      },
+    }),
+    [lotIndex, store],
+  );
+  const field = useRef(new FlowField());
+  const aims = useRef<{ x: number; z: number; ax: number; az: number; role: string }[]>([]);
+  const [debug] = useState(() => process.env.NODE_ENV !== "production" && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("heist") === "debug");
   // Turret candidates: buildings with their height (m), from the smash store.
   const towers = useMemo(() => (store ? store.targets.map((t, i) => ({ i, x: t.x * UNIT_TO_M, z: t.z * UNIT_TO_M, h: t.floors * t.floorH * UNIT_TO_M })) : []), [store]);
 
@@ -610,128 +571,85 @@ export default function HeistMode({
     const realRobbers = realOn("robber");
     let feedsChanged = false;
 
-    // Game cops after a robber with stars.
-    const copsWanted = P.side === "robber" ? gameCops(stars, realCops.length) : 0;
+    // The cars' way to you: the flow field from where you are, rebuilt a few times a second.
+    const q: Quarry = { x: p.x, z: p.z, vx: v.x, vz: v.z, h: carHeading(c.body) };
+    const sim = P.side === "robber" ? stars > 0 : P.side === "cop" && realRobbers.length === 0;
+    if (sim && now - field.current.builtAt >= COPS.fieldEveryMs) field.current.build(world, q.x, q.z, now);
+
+    // Game cops after a robber with stars: fewer for each real cop in the room.
+    const copsWanted = P.side === "robber" ? Math.max(0, (COPS_BY_STARS[Math.min(5, stars)]?.cars ?? 0) - realCops.length) : 0;
     const cops = npcs.current.filter((n) => n.id.startsWith("bot:heist-cop"));
     if (cops.length < copsWanted && now >= copBackAt.current) {
-      const h = carHeading(c.body);
-      const used = new Set(cops.map((n) => n.id));
-      const i = [0, 1, 2, 3].find((k) => !used.has(`bot:heist-cop-${k}`)) ?? 0;
-      // The blocker comes in ahead of you; the others from behind.
-      const block = i === 2 && stars >= BLOCK_STARS;
-      const dist = block ? -60 : 55 + i * 8;
-      const side = (i % 2 ? 1 : -1) * 18;
-      const sx = p.x - Math.sin(h) * dist + Math.cos(h) * side;
-      const sz = p.z - Math.cos(h) * dist - Math.sin(h) * side;
-      // On a street 40–80 m from you, as close as can be to that spot.
-      const lot = roadAround(roads, p.x, p.z, 40, 80, sx, sz, LOT_M) ?? nearestRoad(roads, p.x, p.z, LOT_M);
-      const n = npcAt(`bot:heist-cop-${i}`, lot ? lot[0] * LOT_M : sx, lot ? lot[1] * LOT_M : sz, h + (block ? Math.PI : 0));
-      n.block = block;
-      npcs.current.push(n);
-      feedsChanged = true;
+      const used = new Set(cops.map((n) => n.slot));
+      const slot = [0, 1, 2, 3].find((k) => !used.has(k)) ?? 0;
+      const role = roleOf(slot, stars);
+      // Out of the camera's view (it looks where the car does), or ahead of you for the blocker.
+      const spot = spawnSpot(world, field.current, q, q.h, role === "block");
+      if (spot) {
+        const n = npcAt(`bot:heist-cop-${slot}-${Math.floor(now)}`, slot, spot.x, spot.z, Math.atan2(q.x - spot.x, q.z - spot.z), now);
+        n.role = role;
+        npcs.current.push(n);
+        feedsChanged = true;
+      }
     } else if (cops.length > copsWanted) {
-      npcs.current = npcs.current.filter((n) => !n.id.startsWith("bot:heist-cop") || Number(n.id.slice(-1)) < copsWanted);
+      const keep = new Set(cops.sort((a, b) => a.slot - b.slot).slice(0, copsWanted));
+      npcs.current = npcs.current.filter((n) => !n.id.startsWith("bot:heist-cop") || keep.has(n));
       feedsChanged = true;
     }
 
-    // A gang for a lone cop.
+    // A gang for a lone cop, somewhere in the city.
     const gangWanted = P.side === "cop" && realRobbers.length === 0 ? RULES.gangCars : 0;
     const gang = npcs.current.filter((n) => n.id.startsWith("bot:heist-gang"));
+    const cityLot = () => {
+      for (let k = 0; k < 30; k++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = Math.sqrt(Math.random()) * P.ring.r * 0.8;
+        const lx = Math.round((P.ring.x + Math.sin(a) * r) / LOT_M);
+        const lz = Math.round((P.ring.z + Math.cos(a) * r) / LOT_M);
+        if (!world.blocked(lx, lz)) return { x: lx * LOT_M, z: lz * LOT_M };
+      }
+      return null;
+    };
     if (gang.length < gangWanted) {
-      const a = Math.random() * Math.PI * 2;
-      const gx = P.ring.x + Math.sin(a) * P.ring.r * 0.6;
-      const gz = P.ring.z + Math.cos(a) * P.ring.r * 0.6;
-      const lot = nearestRoad(roads, gx, gz, LOT_M);
-      const n = npcAt(`bot:heist-gang-${Math.floor(Math.random() * 1e6)}`, lot ? lot[0] * LOT_M : gx, lot ? lot[1] * LOT_M : gz, a + Math.PI);
-      n.hearts = RULES.gangHearts;
-      npcs.current.push(n);
-      feedsChanged = true;
+      const at = cityLot();
+      if (at) {
+        const n = npcAt(`bot:heist-gang-${Math.floor(Math.random() * 1e6)}`, 0, at.x, at.z, Math.random() * Math.PI * 2, now);
+        n.hearts = RULES.gangHearts;
+        npcs.current.push(n);
+        feedsChanged = true;
+      }
     } else if (gang.length > gangWanted) {
       npcs.current = npcs.current.filter((n) => !n.id.startsWith("bot:heist-gang"));
       feedsChanged = true;
     }
 
-    const activeDuck = duck.current.find((d) => d.mine && d.until > now);
+    const activeDuck = duck.current.find((d) => d.mine && d.until > now) ?? null;
+    const copCars = npcs.current.filter((n) => n.id.startsWith("bot:heist-cop"));
+    const gangCars = npcs.current.filter((n) => n.id.startsWith("bot:heist-gang"));
+    const retired: Npc[] = [];
     for (const n of npcs.current) {
       const body = botTargets.current.get(n.id)?.pos();
-      // Knocked loose or wrecked: the sim waits where the body is.
+      // Pushed by a crash: the sim follows where the body ended up.
       if (body) {
         n.x += (body.x - n.x) * Math.min(1, dt * 2);
         n.z += (body.z - n.z) * Math.min(1, dt * 2);
       }
-      const slow = (n.slowUntil ?? 0) > now ? 0.35 : 1;
-      // Stunned: it rolls to a stop where it is.
-      if ((n.stunUntil ?? 0) > now) {
-        n.v *= Math.max(0, 1 - dt * 3);
-        n.x += Math.sin(n.h) * n.v * dt;
-        n.z += Math.cos(n.h) * n.v * dt;
-        record(n, now);
-        continue;
-      }
       if (n.id.startsWith("bot:heist-cop")) {
-        const speed = COP_SPEED_BY_STARS[Math.min(5, stars)] * slow;
-        const mySpeed = Math.hypot(v.x, v.z);
-        const dirX = mySpeed > 2 ? v.x / mySpeed : 0;
-        const dirZ = mySpeed > 2 ? v.z / mySpeed : 0;
-        if (activeDuck) {
-          const go = navTo(n, roads, activeDuck.x, activeDuck.z);
-          steer(n, go.x, go.z, speed, dt);
-        } else if (stars <= 1) {
-          // One star: it comes at full speed, then keeps a gap behind you, no faster than you.
-          const close = Math.hypot(n.x - p.x, n.z - p.z) < FOLLOW_GAP + 15;
-          const go = navTo(n, roads, p.x - dirX * FOLLOW_GAP, p.z - dirZ * FOLLOW_GAP);
-          steer(n, go.x, go.z, close ? Math.min(speed, mySpeed + 3) : speed, dt);
-        } else if (n.block) {
-          // The blocker: to the street ahead of you, then it stops across it.
-          const ax = p.x + dirX * 55;
-          const az = p.z + dirZ * 55;
-          const ahead = (n.x - p.x) * dirX + (n.z - p.z) * dirZ;
-          if (ahead > 12 && Math.hypot(n.x - p.x, n.z - p.z) < 70) {
-            n.v *= Math.max(0, 1 - dt * 4);
-            n.h += dt * 1.5 * Math.sign(Math.sin(n.h - Math.atan2(dirX, dirZ)) || 1);
-          } else {
-            const go = navTo(n, roads, ax, az);
-            steer(n, go.x, go.z, speed + 4, dt);
-          }
-        } else {
-          // Pursuit: where you'll be in a moment.
-          const go = navTo(n, roads, p.x + v.x * 0.6, p.z + v.z * 0.6);
-          steer(n, go.x, go.z, speed, dt);
-        }
+        n.role = roleOf(n.slot, stars);
+        if (stepCop(n, q, stars, world, field.current, copCars, now, dt, activeDuck)) retired.push(n);
       } else {
-        // The gang roams the city and runs from you.
-        const dx = n.x - p.x;
-        const dz = n.z - p.z;
-        const d = Math.hypot(dx, dz);
-        if ((n.pulledUntil ?? 0) > now) {
-          steer(n, p.x, p.z, 10, dt);
-        } else if (d < 45) {
-          const go = navTo(n, roads, p.x, p.z, true);
-          steer(n, go.x, go.z, GANG_SPEED * slow, dt);
-        } else {
-          if (!n.goal || Math.hypot(n.goal.x - n.x, n.goal.z - n.z) < 8) {
-            const a = Math.random() * Math.PI * 2;
-            const r = Math.sqrt(Math.random()) * P.ring.r * 0.8;
-            n.goal = { x: P.ring.x + Math.sin(a) * r, z: P.ring.z + Math.cos(a) * r };
-          }
-          const go = navTo(n, roads, n.goal.x, n.goal.z);
-          steer(n, go.x, go.z, GANG_SPEED * 0.7 * slow, dt);
-        }
+        if (!n.goal) n.goal = cityLot() ?? { x: P.ring.x, z: P.ring.z };
+        if (stepGang(n, q, n.goal, world, field.current, gangCars, GANG_SPEED, now, dt, (n.pulledUntil ?? 0) > now)) n.goal = cityLot() ?? n.goal;
       }
       record(n, now);
     }
-    // Two cops crashing into each other: both wrecked.
-    const live = npcs.current.filter((n) => n.id.startsWith("bot:heist-cop") && (n.stunUntil ?? 0) < now);
-    for (let i = 0; i < live.length; i++)
-      for (let j = i + 1; j < live.length; j++) {
-        const a = live[i];
-        const b = live[j];
-        if (Math.hypot(a.x - b.x, a.z - b.z) < 3 && Math.abs(a.v) + Math.abs(b.v) > 22) {
-          takedown(a);
-          takedown(b);
-        }
-      }
+    // Stuck or left far behind: out quietly; the spawn brings a fresh one closer.
+    if (retired.length) {
+      npcs.current = npcs.current.filter((n) => !retired.includes(n));
+      feedsChanged = true;
+    }
     if (feedsChanged) pushFeeds();
+    if (debug) aims.current = npcs.current.map((n) => ({ x: n.x, z: n.z, ax: n.aim?.x ?? n.x, az: n.aim?.z ?? n.z, role: n.role }));
 
     // Turrets: the tallest standing buildings near a wanted robber shoot where you're going.
     if (P.side === "robber" && stars >= RULES.turretStars && store) {
@@ -829,6 +747,7 @@ export default function HeistMode({
         <Duck key={d.key} x={d.x} z={d.z} />
       ))}
       <Tether from={myTether} car={car} remotes={remotes} npcs={npcs} />
+      {debug && <DebugAims aims={aims} />}
     </>
   );
 }
@@ -934,6 +853,46 @@ function Tether({
       <boxGeometry args={[0.5, 0.5, 1]} />
       <meshStandardMaterial color="#5aa0ff" emissive="#5aa0ff" emissiveIntensity={2} toneMapped={false} />
     </mesh>
+  );
+}
+
+const ROLE_COLOR: Record<string, string> = { chase: "#ff5a52", left: "#ffcf33", right: "#ffcf33", block: "#5aa0ff" };
+
+/** ?heist=debug: a line from each game car to where it's aiming, colored by role. */
+function DebugAims({ aims }: { aims: React.MutableRefObject<{ x: number; z: number; ax: number; az: number; role: string }[]> }) {
+  const meshes = useRef<(THREE.Mesh | null)[]>([]);
+  const _a = useMemo(() => new THREE.Vector3(), []);
+  const _b = useMemo(() => new THREE.Vector3(), []);
+  useFrame(() => {
+    meshes.current.forEach((m, i) => {
+      if (!m) return;
+      const a = aims.current[i];
+      m.visible = !!a;
+      if (!a) return;
+      _a.set(a.x * M_TO_UNIT, 6, a.z * M_TO_UNIT);
+      _b.set(a.ax * M_TO_UNIT, 6, a.az * M_TO_UNIT);
+      const len = Math.max(0.1, _a.distanceTo(_b));
+      m.position.copy(_a).lerp(_b, 0.5);
+      m.lookAt(_b);
+      m.scale.set(1, 1, len);
+      (m.material as THREE.MeshBasicMaterial).color.set(ROLE_COLOR[a.role] ?? "#ffffff");
+    });
+  });
+  return (
+    <>
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <mesh
+          key={i}
+          visible={false}
+          ref={(el) => {
+            meshes.current[i] = el;
+          }}
+        >
+          <boxGeometry args={[0.6, 0.6, 1]} />
+          <meshBasicMaterial color="#ffffff" toneMapped={false} />
+        </mesh>
+      ))}
+    </>
   );
 }
 

@@ -644,7 +644,6 @@ export default function DriveWorld({
           )}
           {heist && (
             <HeistMode
-              objects={objects}
               heist={{
                 ...heist,
                 onView: (v) => {
