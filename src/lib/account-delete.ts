@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { captureServer } from "@/lib/posthog-server";
+import { invalidateLeague } from "@/lib/leagues/cache";
 
 export interface AccountToDelete {
   /** The login (auth user), or null for a building nobody claimed. */
@@ -27,6 +28,10 @@ export async function findAccount(developerId: number): Promise<AccountToDelete 
 // building whole; the login goes last, once no building points at it.
 export async function deleteAccount(account: AccountToDelete, via: "self" | "admin"): Promise<boolean> {
   const admin = getSupabaseAdmin();
+  // The towns they live in, read before the rows go: their cached maps must forget them now.
+  const ids = account.developers.map((d) => d.id);
+  const { data: memberships } = await admin.from("league_members").select("league_id").in("developer_id", ids);
+  const leagueIds = new Set((memberships ?? []).map((m) => m.league_id as string));
 
   for (const dev of account.developers) {
     const { error } = await admin.rpc("delete_developer_account", { p_developer_id: dev.id });
@@ -35,6 +40,7 @@ export async function deleteAccount(account: AccountToDelete, via: "self" | "adm
       return false;
     }
   }
+  leagueIds.forEach(invalidateLeague);
 
   if (account.authUserId) {
     const { error } = await admin.auth.admin.deleteUser(account.authUserId);
