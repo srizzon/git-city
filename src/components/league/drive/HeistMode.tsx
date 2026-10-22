@@ -70,8 +70,6 @@ const GANG_COLOR = "#3a1c1c";
 const GANG_SPEED = 17;
 /** How close (m) a game car has to be to hit you, and how often one can. */
 const RAM_EVERY_MS = 1400;
-/** A game cop only hurts you coming in at this speed (m/s); slower, or rammed by you, it's just stunned. */
-const RAM_SPEED = 8;
 const STUN_MS = 1500;
 const BLAST_STUN_MS = 2500;
 /** How long the HUD says what just hit you (ms). */
@@ -392,13 +390,13 @@ export default function HeistMode({
       const now = performance.now();
       const n = npcs.current.find((x) => x.id === id);
       if (n?.id.startsWith("bot:heist-cop")) {
-        // You came in fast: takedown.
-        const me = car.current?.body.linvel();
-        if (me && Math.hypot(me.x, me.z) > TAKEDOWN_SPEED) return takedown(n);
+        // One rule: on boost you wreck it (takedown); off boost it gets you.
+        const me = car.current;
+        if (me?.state.boosting && Math.hypot(me.body.linvel().x, me.body.linvel().z) > TAKEDOWN_SPEED) return takedown(n);
         if (now - n.lastRam < RAM_EVERY_MS) return;
         n.lastRam = now;
-        // Coming at you at speed it costs a heart (from 2 stars: at 1 a cop only follows); either way it backs off and stalls a moment.
-        const hit = (n.stunUntil ?? 0) < now && n.v > RAM_SPEED && starsFor(held.current) >= 2;
+        // It costs a heart from 2 stars (at 1 a cop only follows); either way it backs off and stalls a moment.
+        const hit = (n.stunUntil ?? 0) < now && starsFor(held.current) >= 2;
         n.stunUntil = now + STUN_MS;
         n.v = -4;
         if (hit) hurt("cop");
@@ -722,6 +720,8 @@ export default function HeistMode({
               inside,
               hit: lastHurt.current && now - lastHurt.current.at < HIT_SHOWN_MS ? lastHurt.current.why : null,
               takedown: now - lastTakedown.current < HIT_SHOWN_MS,
+              // A cop close by: how to fight back.
+              copNear: npcs.current.some((n) => n.id.startsWith("bot:heist-cop") && Math.hypot(n.x - p.x, n.z - p.z) < 45),
               push: pushing ? { secsLeft: Math.max(0, Math.ceil(HEIST.pushSecs - push.current.held / 1000)), done: push.current.held / (HEIST.pushSecs * 1000), paused: copClose } : null,
             }
           : null,

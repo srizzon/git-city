@@ -61,6 +61,13 @@ export const COPS = {
   /** The field reaches this many lots round the player. */
   fieldRadius: 25,
   fieldEveryMs: 250,
+  /**
+   * Within this many lots of the player a building can be driven through, at
+   * `throughCost` steps a lot (a street is 1): only when it's the only way
+   * in, since you smash inside blocks and the cars must get to you.
+   */
+  escape: 3,
+  throughCost: 8,
   /** Closer than this (m) with a clear line, a car leaves the field and goes straight for its spot. */
   direct: 80,
   /** How far down the field a car looks for a point it can see (lots). */
@@ -145,7 +152,16 @@ export class FlowField {
     return i < 0 || j < 0 || i >= this.size || j >= this.size ? -1 : j * this.size + i;
   }
 
-  /** Breadth-first from (x, z) meters over free lots (the start lot counts as free even with a building on it). */
+  /** Lots within COPS.escape of the start that hold a building (drivable at a cost). */
+  private through = new Uint8Array(0);
+
+  /**
+   * Cheapest steps from every lot to the player's, from (x, z) meters: a
+   * street or square costs 1, a building within COPS.escape of the player
+   * COPS.throughCost (the start lot is free), any other building can't be
+   * crossed. So the cars keep to the streets and cut through a building only
+   * when the player is shut inside a block. Dial's algorithm (small costs).
+   */
   build(world: CopWorld, x: number, z: number, now: number) {
     const sx = lotOf(x, world.lotM);
     const sz = lotOf(z, world.lotM);
@@ -155,33 +171,56 @@ export class FlowField {
     this.fromZ = sz;
     this.builtAt = now;
     this.dist.fill(-1);
-    const q = new Int32Array(this.size * this.size);
-    let head = 0;
-    let tail = 0;
-    const start = this.index(sx, sz);
-    this.dist[start] = 0;
-    q[tail++] = start;
-    while (head < tail) {
-      const k = q[head++];
-      const i = k % this.size;
-      const j = (k - i) / this.size;
-      const d = this.dist[k];
-      for (const [di, dj] of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ] as const) {
-        const ni = i + di;
-        const nj = j + dj;
-        if (ni < 0 || nj < 0 || ni >= this.size || nj >= this.size) continue;
-        const n = nj * this.size + ni;
-        if (this.dist[n] !== -1) continue;
-        if (world.blocked(ni - this.radius + this.cx, nj - this.radius + this.cz)) continue;
-        this.dist[n] = d + 1;
-        q[tail++] = n;
+    if (this.through.length !== this.dist.length) this.through = new Uint8Array(this.dist.length);
+    this.through.fill(0);
+    const R = this.radius;
+    const cost = (ni: number, nj: number): number => {
+      const lx = ni - R + this.cx;
+      const lz = nj - R + this.cz;
+      if (!world.blocked(lx, lz)) return 1;
+      return Math.max(Math.abs(lx - sx), Math.abs(lz - sz)) <= COPS.escape ? COPS.throughCost : 0;
+    };
+    const buckets: number[][] = [[this.index(sx, sz)]];
+    this.dist[this.index(sx, sz)] = 0;
+    for (let d = 0; d < buckets.length; d++) {
+      const b = buckets[d];
+      if (!b) continue;
+      for (const k of b) {
+        if (this.dist[k] !== d) continue;
+        const i = k % this.size;
+        const j = (k - i) / this.size;
+        for (const [di, dj] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
+          const ni = i + di;
+          const nj = j + dj;
+          if (ni < 0 || nj < 0 || ni >= this.size || nj >= this.size) continue;
+          const c = cost(ni, nj);
+          if (c === 0) continue;
+          const n = nj * this.size + ni;
+          const nd = d + c;
+          if (this.dist[n] !== -1 && this.dist[n] <= nd) continue;
+          this.dist[n] = nd;
+          if (c > 1) this.through[n] = 1;
+          (buckets[nd] ??= []).push(n);
+        }
       }
     }
+  }
+
+  /** A lot a car may drive on: free, or a building near the player that the field crosses. */
+  open(world: CopWorld, lx: number, lz: number): boolean {
+    if (!world.blocked(lx, lz)) return true;
+    const k = this.index(lx, lz);
+    return k >= 0 && this.through[k] === 1 && this.dist[k] !== -1;
+  }
+
+  /** The world as the cars see it now: buildings near the player don't block. */
+  near(world: CopWorld): CopWorld {
+    return { lotM: world.lotM, blocked: (lx, lz) => !this.open(world, lx, lz) };
   }
 
   /** Steps from this lot to the player, or -1 (blocked, out of reach, off the field). */
@@ -190,7 +229,7 @@ export class FlowField {
     return k < 0 ? -1 : this.dist[k];
   }
 
-  /** The neighbouring lot one step closer (or, `away`, further), or null when there's none. */
+  /** The neighbouring lot one step closer (or, `away`, further, never into a building), or null when there's none. */
   step(lx: number, lz: number, away = false): [number, number] | null {
     const here = this.at(lx, lz);
     let best: [number, number] | null = null;
@@ -203,6 +242,7 @@ export class FlowField {
     ] as const) {
       const d = this.at(lx + dx, lz + dz);
       if (d === -1) continue;
+      if (away && this.through[this.index(lx + dx, lz + dz)] === 1) continue;
       if (away ? d > bestD : d < bestD) {
         bestD = d;
         best = [lx + dx, lz + dz];
@@ -370,7 +410,8 @@ export function stepCop(c: Car, q: Quarry, stars: number, world: CopWorld, field
   }
   const spot = decoy ?? spotFor(c.role, q, stars);
   const quarryLot: [number, number] = [lotOf(q.x, world.lotM), lotOf(q.z, world.lotM)];
-  const out = avoid(c, world, field, quarryLot, false);
+  // Sight is strict (every building blocks); the feeler lets the car into a building only where the field crosses one.
+  const out = avoid(c, field.near(world), field, quarryLot, false);
   const aim = out ?? separate(c, aimFor(c, spot, world, field), others);
   c.aim = aim;
   // Following (one star): full speed to catch up, then no faster than you.

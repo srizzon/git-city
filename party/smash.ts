@@ -53,6 +53,9 @@ interface Blast {
   buildings: Set<string>;
 }
 
+/** Blocks a minute per account on the Brasil map (towns: FLOORS_PER_MINUTE). */
+const BRASIL_FLOORS_PER_MINUTE = 600;
+
 /** A failed ask to the site (not a bad token) is tried again this many times, 2 s, 4 s, 6 s apart. */
 const AUTH_RETRIES = 3;
 
@@ -260,7 +263,8 @@ export class SmashRoom {
       n = BLAST_ROWS;
     }
     let budget = this.budgets.get(d.login);
-    if (!budget) this.budgets.set(d.login, (budget = new FloorBudget()));
+    // The Brasil map scores no floors (its smash pays per push or fall, under day caps): a robber smashes freely.
+    if (!budget) this.budgets.set(d.login, (budget = new FloorBudget(this.room.id === "brasil-town" ? BRASIL_FLOORS_PER_MINUTE : undefined)));
     const allowed = Math.floor(budget.take(columns.length * n, now) / n);
     columns = columns.slice(0, allowed);
     if (columns.length === 0) return;

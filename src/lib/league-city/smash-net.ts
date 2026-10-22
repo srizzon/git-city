@@ -77,6 +77,8 @@ export function blastReaches(store: SmashStore, target: number, columns: readonl
 export class FloorBudget {
   private start = 0;
   private used = 0;
+  /** `perMinute`: the cap (the Brasil map's robbers smash more: party/smash.ts). */
+  constructor(private perMinute = FLOORS_PER_MINUTE) {}
   /** Its minute is over: nothing booked would still count. */
   idle(now: number): boolean {
     return now - this.start >= 60_000;
@@ -87,7 +89,7 @@ export class FloorBudget {
       this.start = now;
       this.used = 0;
     }
-    const n = Math.max(0, Math.min(want, FLOORS_PER_MINUTE - this.used));
+    const n = Math.max(0, Math.min(want, this.perMinute - this.used));
     this.used += n;
     return n;
   }

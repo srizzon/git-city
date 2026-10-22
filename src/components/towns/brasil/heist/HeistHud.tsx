@@ -96,6 +96,13 @@ export default function HeistHud({ view }: { view: HeistView }) {
           </Band>
         )}
 
+        {/* A cop close: the one rule of the fight. */}
+        {robber?.copNear && !robber.takedown && !hit && !push && (
+          <Band animate={false} className={`w-full justify-center gap-2 normal-case text-cream ${touch ? "px-2.5 py-1.5" : "px-3 py-2"}`} style={{ fontSize: T.small }}>
+            {touch ? t("Boost into the cop car = takedown", "Turbo na viatura = takedown") : t("Shift into the cop car = takedown", "Shift na viatura = takedown")}
+          </Band>
+        )}
+
         {/* What just cost you a heart. */}
         {hit && (
           <Band tone="red" animate={false} className={`w-full justify-center gap-2 ${touch ? "px-2.5 py-1.5" : "px-3 py-2"}`} style={{ fontSize: T.small }}>

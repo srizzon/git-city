@@ -65,7 +65,7 @@ export interface HeistView {
   side: HeistSide | null;
   /** You live in the city: a cop without choosing. */
   resident: boolean;
-  robber: { unpushed: number; stars: number; hearts: number; push: { secsLeft: number; done: number; paused: boolean } | null; inside?: boolean; hit?: "cop" | "shot" | "blast" | "magnet" | null; takedown?: boolean } | null;
+  robber: { unpushed: number; stars: number; hearts: number; push: { secsLeft: number; done: number; paused: boolean } | null; inside?: boolean; hit?: "cop" | "shot" | "blast" | "magnet" | null; takedown?: boolean; copNear?: boolean } | null;
   cop: { busts: number; target: string | null } | null;
   kit: KitSlot[] | null;
   flash: HeistFlash | null;

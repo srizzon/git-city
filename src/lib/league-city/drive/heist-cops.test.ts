@@ -40,10 +40,13 @@ describe("flow field", () => {
     const f = new FlowField(10);
     f.build(w, 1 * LOT, 1 * LOT, 0); // the player on a building lot
     expect(f.at(1, 1)).toBe(0);
-    expect(f.at(2, 2)).toBe(-1); // a building
+    expect(f.at(8, 8)).toBe(-1); // a building far from the player
+    expect(f.at(2, 2)).toBeGreaterThan(f.at(0, 2)); // one near: crossable, at a cost
     expect(f.at(0, 1)).toBe(1);
     expect(f.at(6, 0)).toBeGreaterThan(5);
     expect(f.step(6, 0)).toEqual([5, 0]);
+    // The streets win whenever there's a way along them.
+    expect(f.at(3, 0)).toBe(3);
   });
 
   it("sees down a street, not through a block", () => {
@@ -63,6 +66,27 @@ describe("cops", () => {
     expect(log.closest).toBeLessThan(8);
     expect(log.inBuilding).toBe(0);
     expect(log.retired).toBe(0);
+  });
+
+  it("reach a player smashing deep inside a big block, cut off from every street", () => {
+    // A 3×3 block of buildings round lots (4..6, 4..6); the player in its middle (5, 5).
+    const open = new Set<string>();
+    const w: CopWorld = {
+      lotM: LOT,
+      blocked: (x, z) => {
+        if (x >= 4 && x <= 6 && z >= 4 && z <= 6) return true;
+        return !(street(x) || street(z)) && !open.has(`${x},${z}`);
+      },
+    };
+    const q: Quarry = { x: 5 * LOT, z: 5 * LOT, vx: 0, vz: 0, h: 0 };
+    const f = new FlowField();
+    f.build(w, q.x, q.z, 0);
+    expect(f.at(0, 0)).toBeGreaterThan(0);
+    const spot = spawnSpot(w, f, q, 0, false, () => 0.5);
+    expect(spot).not.toBeNull();
+    const cars = [newCar("a", "chase", spot!.x, spot!.z, 0, 0)];
+    const log = chase(w, q, 2, cars, 12);
+    expect(log.closest).toBeLessThan(10);
   });
 
   it("keep apart instead of stacking up", () => {
