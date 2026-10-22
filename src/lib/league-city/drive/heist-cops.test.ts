@@ -120,6 +120,14 @@ describe("cops", () => {
     expect(Math.abs(b[0].v)).toBeLessThan(3);
   });
 
+  it("a car chasing a player it can't catch is never taken for stuck", () => {
+    const w = city();
+    const q: Quarry = { x: 0, z: 0, vx: 0, vz: 24, h: 0 };
+    const cop = [newCar("a", "chase", 0, -40, 0, 0)];
+    const log = chase(w, q, 2, cop, 6, (qq, dt) => (qq.z += qq.vz * dt));
+    expect(log.retired).toBe(0);
+  });
+
   it("a car left far behind is handed back", () => {
     const w = city();
     const q: Quarry = { x: 0, z: 0, vx: 0, vz: 0, h: 0 };

@@ -641,9 +641,16 @@ export default function HeistMode({
       }
       record(n, now);
     }
-    // Stuck or left far behind: out quietly; the spawn brings a fresh one closer.
-    if (retired.length) {
-      npcs.current = npcs.current.filter((n) => !retired.includes(n));
+    // Stuck or left far behind: out quietly, but never in front of you (the camera looks where the car does); the spawn brings a fresh one closer.
+    const inView = (n: Npc) => {
+      const dx = n.x - p.x;
+      const dz = n.z - p.z;
+      const d = Math.hypot(dx, dz) || 1;
+      return d < 180 && (dx * Math.sin(q.h) + dz * Math.cos(q.h)) / d > 0.2;
+    };
+    const gone = retired.filter((n) => !inView(n));
+    if (gone.length) {
+      npcs.current = npcs.current.filter((n) => !gone.includes(n));
       feedsChanged = true;
     }
     if (feedsChanged) pushFeeds();

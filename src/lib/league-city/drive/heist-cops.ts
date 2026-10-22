@@ -50,9 +50,8 @@ export interface Car {
   /** Stopped (a crash or a blast) or slowed (the blue screen) until (ms). */
   stunUntil: number;
   slowUntil: number;
-  /** Closest it got to its quarry lately, and when: no progress for a while is stuck. */
-  best: number;
-  bestAt: number;
+  /** When it last moved (or was meant to stand): standing still for a while is stuck. */
+  movedAt: number;
   /** Where it aimed last frame (for a debug view). */
   aim?: { x: number; z: number };
 }
@@ -95,9 +94,9 @@ export const COPS = {
   spawnMax: 90,
   /** Further than this (m) a car is taken out and brought back closer. */
   leash: 150,
-  /** No closer by this much (m) in this long (ms), and not already close: stuck. */
-  stuckGain: 3,
-  stuckMs: 3500,
+  /** Under this speed (m/s) for this long (ms), not stunned nor blocking nor already close: stuck. A car chasing you that isn't gaining is not stuck. */
+  stuckSpeed: 2,
+  stuckMs: 3000,
   stuckNear: 25,
   /** At one star a car keeps this far behind (m), never faster than you up close. */
   followGap: 25,
@@ -389,16 +388,16 @@ export function stepCop(c: Car, q: Quarry, stars: number, world: CopWorld, field
   }
   const dist = Math.hypot(q.x - c.x, q.z - c.z);
   if (dist > COPS.leash) return true;
-  if (dist < c.best - COPS.stuckGain || dist < COPS.stuckNear) {
-    c.best = dist;
-    c.bestAt = now;
-  } else if (now - c.bestAt > COPS.stuckMs) return true;
+  if (Math.abs(c.v) > COPS.stuckSpeed || dist < COPS.stuckNear) c.movedAt = now;
+  else if (now - c.movedAt > COPS.stuckMs) return true;
 
   const [fx, fz] = forwardOf(q);
   // The blocker, once it's ahead of you and close: it stops across your street.
   if (c.role === "block" && stars >= 3 && !decoy) {
     const ahead = (c.x - q.x) * fx + (c.z - q.z) * fz;
     if (ahead > 10 && dist < 70) {
+      // Standing across your street on purpose: not stuck.
+      c.movedAt = now;
       const across = Math.atan2(fz, -fx);
       const err = wrap(across - c.h);
       c.h = wrap(c.h + Math.max(-2 * dt, Math.min(2 * dt, err)));
@@ -487,5 +486,5 @@ export function spawnSpot(world: CopWorld, field: FlowField, q: Quarry, camH: nu
 }
 
 export function newCar(id: string, role: CopRole, x: number, z: number, h: number, now: number): Car {
-  return { id, role, x, z, h, v: 0, stunUntil: 0, slowUntil: 0, best: Infinity, bestAt: now };
+  return { id, role, x, z, h, v: 0, stunUntil: 0, slowUntil: 0, movedAt: now };
 }
