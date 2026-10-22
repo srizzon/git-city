@@ -20,7 +20,7 @@ interface AgendaReel {
   attempts: number;
   error: string | null;
   permalink: string | null;
-  meta: { preset?: string; hook?: string; length_s?: number };
+  meta: { preset?: string; hook?: string; length_s?: number; readout?: { at: string; verdict: string; winner?: boolean } };
   stats: AgendaStats | null;
   graduated: boolean;
 }
@@ -81,6 +81,13 @@ function Row({ r, act, busy }: { r: AgendaReel; act: (body: Record<string, strin
             </div>
           ))}
         </div>
+      )}
+      {r.meta.readout && (
+        // the cloud readout's verdict on this reel (api/reels/readout), written once it had its numbers
+        <p className={`border-l-2 pl-2 text-[11px] normal-case ${r.meta.readout.winner ? "border-lime text-lime" : "border-border text-cream"}`}>
+          {r.meta.readout.winner ? "Winner · " : ""}
+          {r.meta.readout.verdict}
+        </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
         {r.permalink && (
