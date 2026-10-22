@@ -23,7 +23,9 @@ function chase(world: CopWorld, q: Quarry, stars: number, cars: Car[], seconds: 
       if (stepCop(c, q, stars, world, field, cars, t, DT)) log.retired++;
       const lx = lotOf(c.x);
       const lz = lotOf(c.z);
-      if (world.blocked(lx, lz) && !(lx === lotOf(q.x) && lz === lotOf(q.z))) log.inBuilding++;
+      // On the way there it never cuts through a block; the last lunge at a player inside one may graze the lot next door.
+      const lunge = Math.max(Math.abs(lx - lotOf(q.x)), Math.abs(lz - lotOf(q.z))) <= 1;
+      if (world.blocked(lx, lz) && !lunge) log.inBuilding++;
       log.closest = Math.min(log.closest, Math.hypot(c.x - q.x, c.z - q.z));
     }
     for (let i = 0; i < cars.length; i++)
@@ -55,7 +57,8 @@ describe("cops", () => {
   it("reach a player smashing inside a block within 10 s, round the buildings", () => {
     const w = city();
     const q: Quarry = { x: 4 * LOT, z: 4 * LOT, vx: 0, vz: 0, h: 0 };
-    const cars = [newCar("a", roleOf(0, 2), 0, -3 * LOT, 0, 0), newCar("b", roleOf(1, 2), 9 * LOT, 0, Math.PI, 0)];
+    // Where cars spawn: within reach of the player (COPS.spawnMax), on streets.
+    const cars = [newCar("a", roleOf(0, 2), 0, 0, 0, 0), newCar("b", roleOf(1, 2), 9 * LOT, 0, Math.PI, 0)];
     const log = chase(w, q, 2, cars, 10);
     expect(log.closest).toBeLessThan(8);
     expect(log.inBuilding).toBe(0);

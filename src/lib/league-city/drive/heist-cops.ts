@@ -70,8 +70,14 @@ export const COPS = {
   turnRefSpeed: 14,
   accel: 9,
   brake: 16,
-  /** Cars keep this far apart (m). */
+  /** Cars keep this far apart (m), and brake for one this close ahead. */
   separation: 9,
+  tailgate: 8,
+  /** A car's half width plus a margin (m): a line of sight is this wide. */
+  halfWidth: 2.5,
+  /** The feeler (Reynolds' obstacle avoidance): how far ahead (m, plus a share of the speed in s) a car checks for a building. */
+  feeler: 3,
+  feelerTime: 0.45,
   /** Where the side cars ride (m to your side) and how far ahead the blocker stops (m). */
   flank: 9,
   blockAhead: 55,
@@ -128,7 +134,7 @@ export class FlowField {
   fromX = NaN;
   fromZ = NaN;
 
-  constructor(readonly radius = COPS.fieldRadius) {
+  constructor(readonly radius: number = COPS.fieldRadius) {
     this.size = radius * 2 + 1;
     this.dist = new Int16Array(this.size * this.size).fill(-1);
   }
@@ -206,18 +212,28 @@ export class FlowField {
   }
 }
 
-/** Nothing standing between two points (m), sampled every quarter lot; the end lots don't count. */
+/**
+ * Nothing standing between two points (m): a band a car wide (COPS.halfWidth
+ * each side), sampled every eighth of a lot; the end lots don't count.
+ */
 export function lineOfSight(world: CopWorld, ax: number, az: number, bx: number, bz: number): boolean {
   const len = Math.hypot(bx - ax, bz - az);
-  const n = Math.ceil(len / (world.lotM / 4));
+  if (len < 0.01) return true;
+  const n = Math.ceil(len / (world.lotM / 8));
+  const px = (-(bz - az) / len) * COPS.halfWidth;
+  const pz = ((bx - ax) / len) * COPS.halfWidth;
   const al = [lotOf(ax, world.lotM), lotOf(az, world.lotM)];
   const bl = [lotOf(bx, world.lotM), lotOf(bz, world.lotM)];
   for (let s = 1; s < n; s++) {
     const t = s / n;
-    const lx = lotOf(ax + (bx - ax) * t, world.lotM);
-    const lz = lotOf(az + (bz - az) * t, world.lotM);
-    if ((lx === al[0] && lz === al[1]) || (lx === bl[0] && lz === bl[1])) continue;
-    if (world.blocked(lx, lz)) return false;
+    const x = ax + (bx - ax) * t;
+    const z = az + (bz - az) * t;
+    for (const k of [-1, 0, 1]) {
+      const lx = lotOf(x + px * k, world.lotM);
+      const lz = lotOf(z + pz * k, world.lotM);
+      if ((lx === al[0] && lz === al[1]) || (lx === bl[0] && lz === bl[1])) continue;
+      if (world.blocked(lx, lz)) return false;
+    }
   }
   return true;
 }
@@ -275,7 +291,7 @@ export function aimFor(c: Car, spot: { x: number; z: number }, world: CopWorld, 
   return aim ?? spot;
 }
 
-/** Pushes the aim away from other cars within COPS.separation. */
+/** Pushes the aim away from other cars within COPS.separation (the aim is at least that far out, so the push turns the car). */
 export function separate(c: Car, aim: { x: number; z: number }, others: readonly Car[]): { x: number; z: number } {
   let x = aim.x;
   let z = aim.z;
@@ -285,11 +301,41 @@ export function separate(c: Car, aim: { x: number; z: number }, others: readonly
     const dz = c.z - o.z;
     const d = Math.hypot(dx, dz);
     if (d < 0.01 || d >= COPS.separation) continue;
-    const k = ((COPS.separation - d) / d) * 2;
+    const k = ((COPS.separation - d) / d) * 5;
     x += dx * k;
     z += dz * k;
   }
   return { x, z };
+}
+
+/** The slowest speed of a car right ahead of this one (within COPS.tailgate, in front), or Infinity. */
+function aheadSpeed(c: Car, others: readonly Car[]): number {
+  const fx = Math.sin(c.h);
+  const fz = Math.cos(c.h);
+  let v = Infinity;
+  for (const o of others) {
+    if (o === c) continue;
+    const dx = o.x - c.x;
+    const dz = o.z - c.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.01 || d > COPS.tailgate || (dx * fx + dz * fz) / d < 0.6) continue;
+    v = Math.min(v, Math.max(0, o.v) * 0.8);
+  }
+  return v;
+}
+
+/**
+ * The feeler: when the point a little ahead of the car is a building (not
+ * the quarry's own lot), the way out is the next free lot down the field, and
+ * the car brakes. Null when the way ahead is clear.
+ */
+function avoid(c: Car, world: CopWorld, field: FlowField, quarryLot: [number, number], away: boolean): { x: number; z: number } | null {
+  const reach = COPS.feeler + Math.abs(c.v) * COPS.feelerTime;
+  const lx = lotOf(c.x + Math.sin(c.h) * reach, world.lotM);
+  const lz = lotOf(c.z + Math.cos(c.h) * reach, world.lotM);
+  if ((lx === quarryLot[0] && lz === quarryLot[1]) || !world.blocked(lx, lz)) return null;
+  const s = field.step(lotOf(c.x, world.lotM), lotOf(c.z, world.lotM), away);
+  return s ? { x: s[0] * world.lotM, z: s[1] * world.lotM } : null;
 }
 
 /** One cop, one frame. Returns true when it's stuck or left too far behind (take it out and bring it back). */
@@ -323,11 +369,15 @@ export function stepCop(c: Car, q: Quarry, stars: number, world: CopWorld, field
     }
   }
   const spot = decoy ?? spotFor(c.role, q, stars);
-  const aim = separate(c, aimFor(c, spot, world, field), others);
+  const quarryLot: [number, number] = [lotOf(q.x, world.lotM), lotOf(q.z, world.lotM)];
+  const out = avoid(c, world, field, quarryLot, false);
+  const aim = out ?? separate(c, aimFor(c, spot, world, field), others);
   c.aim = aim;
   // Following (one star): full speed to catch up, then no faster than you.
   const qs = Math.hypot(q.vx, q.vz);
-  const speed = stars <= 1 && dist < COPS.followGap + 15 ? Math.min(top, qs + 3) : top;
+  let speed = stars <= 1 && dist < COPS.followGap + 15 ? Math.min(top, qs + 3) : top;
+  if (out) speed *= 0.4;
+  speed = Math.min(speed, aheadSpeed(c, others));
   drive(c, aim.x, aim.z, speed, dt);
   return false;
 }
@@ -350,6 +400,11 @@ export function stepGang(c: Car, cop: Quarry, goal: { x: number; z: number }, wo
     return false;
   }
   const near = Math.hypot(cop.x - c.x, cop.z - c.z) < 45;
+  const out = avoid(c, world, field, [lotOf(cop.x, world.lotM), lotOf(cop.z, world.lotM)], near);
+  if (out) {
+    drive(c, out.x, out.z, top * 0.4, dt);
+    return false;
+  }
   if (near) {
     const aim = separate(c, aimFor(c, cop, world, field, true), others);
     drive(c, aim.x, aim.z, top, dt);
