@@ -7,6 +7,8 @@ import { ITEM_NAMES, ITEM_NAMES_PT, isItem, type BattleItem } from "@/lib/league
 import { useLang } from "@/lib/i18n/LangProvider";
 import { BOOST } from "@/lib/league-city/drive/tuning";
 import { HUD_BOX } from "../shared";
+import { KitDash } from "@/components/towns/brasil/heist/kit";
+import type { HeistSide, KitSlot } from "@/lib/towns/heist";
 
 // The dash, bottom center: what you hold, how fast you go, the boost.
 //   item    a slot like Mario Kart's item box: empty it asks for a ? box;
@@ -14,7 +16,9 @@ import { HUD_BOX } from "../shared";
 //   speed   big digits and a block bar that fills toward boost top speed,
 //           turning cyan while you boost
 //   boost   the key itself, lit while held
-// Updated from telemetry every animation frame; only the item re-renders.
+// Playing the Brasil map's city of the day, your side's kit (`kit`) takes the
+// item slot's place. Updated from telemetry every animation frame; only the
+// item re-renders.
 
 const BLOCKS = 14;
 const ITEM_ICON: Record<BattleItem, LucideIcon> = { shock: Zap, bomb: Bomb, missile: Rocket };
@@ -22,7 +26,7 @@ const ITEM_ICON: Record<BattleItem, LucideIcon> = { shock: Zap, bomb: Bomb, miss
 const NEW_MS = 900;
 const ATTACK = "#ff9a3c";
 
-export default function Dash({ telemetry, style }: { telemetry: DriveTelemetry; style?: React.CSSProperties }) {
+export default function Dash({ telemetry, style, kit = null }: { telemetry: DriveTelemetry; style?: React.CSSProperties; kit?: { slots: KitSlot[]; side: HeistSide } | null }) {
   const { lang, t } = useLang();
   const speed = useRef<HTMLSpanElement>(null);
   const bar = useRef<HTMLDivElement>(null);
@@ -61,8 +65,9 @@ export default function Dash({ telemetry, style }: { telemetry: DriveTelemetry; 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center" style={style}>
       <div className={`${HUD_BOX} flex items-stretch divide-x-[3px] divide-border`}>
+        {kit && <KitDash kit={kit.slots} side={kit.side} />}
         {/* Item slot */}
-        <div className="flex items-center gap-2.5 px-3 py-2">
+        <div className={`flex items-center gap-2.5 px-3 py-2 ${kit ? "hidden" : ""}`}>
           <div
             ref={slot}
             data-new="false"
