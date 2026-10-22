@@ -145,7 +145,10 @@ export default function HeistHud({ view }: { view: HeistView }) {
                 <Band delay={90} className="px-5 py-2" style={{ fontSize: T.big }}>
                   <span style={{ color: RED }}>−{flash.pts}</span>&nbsp;pts
                 </Band>
-                <Band delay={150} className="gap-2 px-4 py-1.5" style={{ fontSize: T.small }}>
+                <Band delay={150} className="gap-2 px-4 py-1.5 normal-case" style={{ fontSize: T.small }}>
+                  {t("Back to the edge of the city", "Você volta pra fora da cidade")}
+                </Band>
+                <Band delay={190} className="gap-2 px-4 py-1.5" style={{ fontSize: T.small }}>
                   <span className="text-muted">{t("Busted by", "Preso por")}</span>
                   {flash.by ? <span className="normal-case" style={{ color: COP }}>@{flash.by}</span> : <span style={{ color: COP }}>{t("the police", "pela polícia")}</span>}
                 </Band>

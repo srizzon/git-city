@@ -11,6 +11,9 @@ import type { SmashStore } from "@/lib/league-city/smash";
 import { CHASSIS, M_TO_UNIT, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
 import { INTERP_MS, SnapshotBuffer, emptySnapshot, type CarSnapshot, type ClientMsg } from "@/lib/league-city/drive/net";
 import { carHeading } from "@/lib/league-city/drive/vehicle";
+import { nearestRoad, nextRoad, roadSet, type Lot } from "@/lib/league-city/drive/heist-nav";
+import { LOT } from "@/lib/league-city/grid";
+import type { CityObject } from "@/lib/league-city/types";
 import { HEIST, KIT, RULES, gameCops, inRing, starsFor, stepPush, type HeistFlash, type HeistSide, type HeistView, type KitItem, type KitSlot, type Ring } from "@/lib/towns/heist";
 
 // ─── City of the day, in the car ────────────────────────────
@@ -27,7 +30,8 @@ import { HEIST, KIT, RULES, gameCops, inRing, starsFor, stepPush, type HeistFlas
 //   kit       Q E F (1–6 are reactions): bomb and missile go through the
 //             battle's own fx; duck, magnet and blue screen are drawn here
 // Game-run cars are town-bot feeds (RemoteCars draws them, with bodies you
-// can hit and blasts that wreck them), driven by a small pursuit sim here.
+// can hit and blasts that wreck them), driven by a small sim here that keeps
+// them on the streets (lib drive/heist-nav) until they're close enough to ram.
 
 export interface HeistApi {
   /** Your car touched a remote car or bot. */
@@ -70,6 +74,12 @@ const SHOT_SPEED = 42;
 const SHOT_LIFE = 3;
 const SHOT_HIT = 2.6;
 const TETHER_PULL = 14;
+/** A lot in meters. */
+const LOT_M = LOT * UNIT_TO_M;
+/** Closer than this (m), a game car leaves the street and goes straight for its target. */
+const DIRECT = 22;
+/** How long a bust holds your car before it starts again outside the city (ms). */
+const BUST_HOLD_MS = 2600;
 
 interface Npc {
   id: string;
@@ -80,6 +90,10 @@ interface Npc {
   /** Gang: where it's headed and its hearts. */
   goal?: { x: number; z: number };
   hearts?: number;
+  /** On the streets: the lot it's on, the one it came from, the one it's heading to. */
+  lot?: Lot | null;
+  prev?: Lot | null;
+  next?: Lot | null;
   /** Slowed (blue screen) or held (magnet) until (ms). */
   slowUntil?: number;
   pulledUntil?: number;
@@ -131,15 +145,37 @@ function steer(n: Npc, tx: number, tz: number, speed: number, dt: number) {
 function record(n: Npc, now: number) {
   const s = emptySnapshot();
   s.x = n.x;
-  s.y = 0.6;
+  s.y = 0;
   s.z = n.z;
   quatY(n.h, s);
   s.speed = n.v;
   n.buffer.push(now, s);
 }
 
+/**
+ * Where a game car drives next: straight at (tx, tz) once it's close, otherwise
+ * the middle of the next street lot toward it (`away`: away from it).
+ */
+function navTo(n: Npc, roads: ReadonlySet<string>, tx: number, tz: number, away = false): { x: number; z: number } {
+  if (!away && Math.hypot(tx - n.x, tz - n.z) < DIRECT) return { x: tx, z: tz };
+  if (roads.size === 0) return away ? { x: n.x + (n.x - tx), z: n.z + (n.z - tz) } : { x: tx, z: tz };
+  if (!n.next) {
+    n.lot = nearestRoad(roads, n.x, n.z, LOT_M);
+    n.next = n.lot;
+    n.prev = null;
+  }
+  if (!n.next) return { x: tx, z: tz };
+  if (Math.hypot(n.next[0] * LOT_M - n.x, n.next[1] * LOT_M - n.z) < 4) {
+    n.prev = n.lot ?? null;
+    n.lot = n.next;
+    n.next = nextRoad(roads, n.lot, n.prev, tx, tz, LOT_M, away) ?? n.lot;
+  }
+  return { x: n.next[0] * LOT_M, z: n.next[1] * LOT_M };
+}
+
 export default function HeistMode({
   heist,
+  objects,
   car,
   remotes,
   sides,
@@ -153,6 +189,8 @@ export default function HeistMode({
   muted,
 }: {
   heist: HeistDriveProps;
+  /** The map's objects: its road lots are where the game cars drive. */
+  objects: readonly CityObject[];
   car: React.MutableRefObject<CarApi | null>;
   remotes: React.MutableRefObject<Map<string, RemoteDriver>>;
   /** Every driver's side, from the room. */
@@ -248,19 +286,28 @@ export default function HeistMode({
     lastCop.current = null;
   };
 
-  /** Out of hearts: the room drops what you held, and you start again outside the city. */
+  /** Busted at (performance.now): the car holds still for BUST_HOLD_MS, then starts again outside the city. */
+  const bustAt = useRef<number | null>(null);
+
+  /** Out of hearts: the room drops what you held; the screen says so while the car stands, then it's moved out. */
   const busted = () => {
-    const c = car.current;
-    const ring = props.current.ring;
     const now = performance.now();
     const by = lastCop.current && now - lastCop.current.at < RULES.bustCreditMs ? lastCop.current.id : undefined;
     const turret = !by && lastTurret.current && now - lastTurret.current.at < 500 ? lastTurret.current.login : undefined;
     send({ t: "heist_bust", ...(by ? { by } : turret ? { turret } : {}) });
     const lost = held.current;
-    setFlash({ kind: "busted", pts: lost, by: by ? (remotes.current.get(by)?.name ?? null) : null }, 2600);
+    setFlash({ kind: "busted", pts: lost, by: by ? (remotes.current.get(by)?.name ?? null) : null }, BUST_HOLD_MS);
     resetRun();
     npcs.current = npcs.current.filter((n) => !n.id.startsWith("bot:heist-cop"));
     shots.current = [];
+    bustAt.current = now;
+    pushFeeds();
+  };
+
+  /** After the hold: outside the ring, facing away from the city. */
+  const outside = () => {
+    const c = car.current;
+    const ring = props.current.ring;
     if (c) {
       const p = c.body.translation();
       const d = Math.hypot(p.x - ring.x, p.z - ring.z) || 1;
@@ -277,7 +324,7 @@ export default function HeistMode({
 
   /** A hit on a robber: one heart; `cop` names a real cop for the bust. */
   const hurt = (cop?: string) => {
-    if (props.current.side !== "robber") return;
+    if (props.current.side !== "robber" || bustAt.current !== null) return;
     const now = performance.now();
     if (cop) lastCop.current = { id: cop, at: now };
     if (now - lastHit.current < 700) return;
@@ -454,6 +501,7 @@ export default function HeistMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [side]);
 
+  const roads = useMemo(() => roadSet(objects), [objects]);
   // Turret candidates: buildings with their height (m), from the smash store.
   const towers = useMemo(() => (store ? store.targets.map((t, i) => ({ i, x: t.x * UNIT_TO_M, z: t.z * UNIT_TO_M, h: t.floors * t.floorH * UNIT_TO_M })) : []), [store]);
 
@@ -466,6 +514,16 @@ export default function HeistMode({
     const P = props.current;
     const now = performance.now();
     if (!c) return;
+    // Busted: the car stands while the screen says so, then it's moved out of the city.
+    if (bustAt.current !== null) {
+      if (now - bustAt.current < BUST_HOLD_MS) {
+        const lv = c.body.linvel();
+        c.body.setLinvel({ x: lv.x * 0.85, y: lv.y, z: lv.z * 0.85 }, true);
+      } else {
+        bustAt.current = null;
+        outside();
+      }
+    }
     const p = c.body.translation();
     const v = c.body.linvel();
     const inside = inRing(P.ring, p.x, p.z);
@@ -506,7 +564,10 @@ export default function HeistMode({
       const i = cops.length;
       const back = 70 + i * 12;
       const side = (i % 2 ? 1 : -1) * 18;
-      const n = npcAt(`bot:heist-cop-${i}`, p.x - Math.sin(h) * back + Math.cos(h) * side, p.z - Math.cos(h) * back - Math.sin(h) * side, h);
+      const sx = p.x - Math.sin(h) * back + Math.cos(h) * side;
+      const sz = p.z - Math.cos(h) * back - Math.sin(h) * side;
+      const lot = nearestRoad(roads, sx, sz, LOT_M);
+      const n = npcAt(`bot:heist-cop-${i}`, lot ? lot[0] * LOT_M : sx, lot ? lot[1] * LOT_M : sz, h);
       npcs.current.push(n);
       feedsChanged = true;
     } else if (cops.length > copsWanted) {
@@ -519,7 +580,10 @@ export default function HeistMode({
     const gang = npcs.current.filter((n) => n.id.startsWith("bot:heist-gang"));
     if (gang.length < gangWanted) {
       const a = Math.random() * Math.PI * 2;
-      const n = npcAt(`bot:heist-gang-${Math.floor(Math.random() * 1e6)}`, P.ring.x + Math.sin(a) * P.ring.r * 0.6, P.ring.z + Math.cos(a) * P.ring.r * 0.6, a + Math.PI);
+      const gx = P.ring.x + Math.sin(a) * P.ring.r * 0.6;
+      const gz = P.ring.z + Math.cos(a) * P.ring.r * 0.6;
+      const lot = nearestRoad(roads, gx, gz, LOT_M);
+      const n = npcAt(`bot:heist-gang-${Math.floor(Math.random() * 1e6)}`, lot ? lot[0] * LOT_M : gx, lot ? lot[1] * LOT_M : gz, a + Math.PI);
       n.hearts = RULES.gangHearts;
       npcs.current.push(n);
       feedsChanged = true;
@@ -541,7 +605,8 @@ export default function HeistMode({
         // Pursuit: where you'll be in a moment, or the duck.
         const tx = activeDuck ? activeDuck.x : p.x + v.x * 0.6;
         const tz = activeDuck ? activeDuck.z : p.z + v.z * 0.6;
-        steer(n, tx, tz, COP_SPEED * slow, dt);
+        const go = navTo(n, roads, tx, tz);
+        steer(n, go.x, go.z, COP_SPEED * slow, dt);
       } else {
         // The gang roams the city and runs from you.
         const dx = n.x - p.x;
@@ -549,14 +614,17 @@ export default function HeistMode({
         const d = Math.hypot(dx, dz);
         if ((n.pulledUntil ?? 0) > now) {
           steer(n, p.x, p.z, 10, dt);
-        } else if (d < 45) steer(n, n.x + (dx / (d || 1)) * 30, n.z + (dz / (d || 1)) * 30, GANG_SPEED * slow, dt);
-        else {
+        } else if (d < 45) {
+          const go = navTo(n, roads, p.x, p.z, true);
+          steer(n, go.x, go.z, GANG_SPEED * slow, dt);
+        } else {
           if (!n.goal || Math.hypot(n.goal.x - n.x, n.goal.z - n.z) < 8) {
             const a = Math.random() * Math.PI * 2;
             const r = Math.sqrt(Math.random()) * P.ring.r * 0.8;
             n.goal = { x: P.ring.x + Math.sin(a) * r, z: P.ring.z + Math.cos(a) * r };
           }
-          steer(n, n.goal.x, n.goal.z, GANG_SPEED * 0.7 * slow, dt);
+          const go = navTo(n, roads, n.goal.x, n.goal.z);
+          steer(n, go.x, go.z, GANG_SPEED * 0.7 * slow, dt);
         }
       }
       record(n, now);
