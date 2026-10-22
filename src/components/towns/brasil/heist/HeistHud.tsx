@@ -19,97 +19,93 @@ const STAR = "#ffcf33";
 const RED = "#ff5a52";
 const COP = SIDE_COLOR.cop;
 const EMPTY = "#2a2a30";
-/** On a phone the top row is Pause and Games: the panel goes under it. */
-const TOP_TOUCH = "top-[calc(max(1rem,env(safe-area-inset-top))+3.5rem)]";
+/** On a phone the top row is Pause and Games, and chat sits under Pause: the block goes right, under Games. */
+const TOP_TOUCH = "right-4 top-[calc(max(1rem,env(safe-area-inset-top))+3.5rem)]";
 
 export default function HeistHud({ view }: { view: HeistView }) {
   const t = useT();
   const touch = useTouch();
   const { robber, cop, flash } = view;
-  const bars = touch ? 12 : 20;
+  const push = robber?.push ?? null;
 
   if (flash?.kind === "bluescreen") return <BlueScreen by={flash.by} />;
 
+  // One block, every row as wide as the panel.
   return (
     <>
-      <div className={`absolute inset-x-0 flex flex-col items-center gap-2 px-4 ${touch ? TOP_TOUCH : "top-4"}`}>
-        {robber && (
-          <div className={`${HUD_BOX} flex items-stretch divide-x-[3px] divide-border ${touch ? "max-w-full" : ""}`}>
-            <div className="flex items-baseline gap-2 px-4 py-2">
-              <span className="text-2xl leading-none tabular-nums text-lime">{robber.unpushed}</span>
-              <span className="text-[9px] text-muted">{t("pts not pushed", "pts sem push")}</span>
+      <div className={touch ? `absolute ${TOP_TOUCH}` : "absolute inset-x-0 top-4 flex justify-center"}>
+        <div className="inline-flex flex-col items-stretch gap-1">
+          {robber && (
+            <div className={`${HUD_BOX} flex items-stretch divide-x-[3px] divide-border`}>
+              <div className={`flex flex-1 items-baseline gap-2 ${touch ? "px-2.5 py-1.5" : "px-4 py-2"}`}>
+                <span className={`${touch ? "text-lg" : "text-2xl"} leading-none tabular-nums text-lime`}>{robber.unpushed}</span>
+                <span className={`${touch ? "text-[8px]" : "text-[9px]"} text-muted`}>{touch ? t("unpushed", "sem push") : t("pts not pushed", "pts sem push")}</span>
+              </div>
+              <div className={`flex items-center gap-0.5 ${touch ? "px-2" : "px-3"}`} aria-label={t(`${robber.stars} stars`, `${robber.stars} estrelas`)}>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <span key={i} className={`${touch ? "text-xs" : "text-lg"} leading-none`} style={{ color: i < robber.stars ? STAR : "#3a3a44" }} aria-hidden>
+                    ★
+                  </span>
+                ))}
+              </div>
+              <div className={`flex items-center gap-1 ${touch ? "px-2" : "px-3"}`} aria-label={t(`${robber.hearts} of ${HEIST.hearts} hearts`, `${robber.hearts} de ${HEIST.hearts} vidas`)}>
+                {Array.from({ length: HEIST.hearts }, (_, i) => (
+                  <span key={i} className={touch ? "h-2 w-2" : "h-3 w-3"} style={{ background: i < robber.hearts ? RED : EMPTY }} aria-hidden />
+                ))}
+              </div>
             </div>
-            <div className="flex items-center gap-0.5 px-3" aria-label={t(`${robber.stars} stars`, `${robber.stars} estrelas`)}>
-              {Array.from({ length: 5 }, (_, i) => (
-                <span key={i} className={touch ? "text-sm leading-none" : "text-lg leading-none"} style={{ color: i < robber.stars ? STAR : "#3a3a44" }} aria-hidden>
-                  ★
+          )}
+
+          {cop && (
+            <div className={`${HUD_BOX} flex items-stretch divide-x-[3px] divide-border`} style={{ borderColor: COP }}>
+              {!touch && (
+                <div className="flex flex-col justify-center gap-1 px-4 py-2">
+                  <span className="text-[8px]" style={{ color: COP }}>
+                    {t("Defending", "Defendendo")}
+                  </span>
+                  <span className="text-sm leading-none">{view.city.name}</span>
+                </div>
+              )}
+              <div className={`flex flex-1 flex-col justify-center gap-1.5 ${touch ? "px-2.5 py-1.5" : "px-3 py-2"}`}>
+                <span className="text-[8px] text-muted">
+                  {t("Standing", "De pé")} <span className="text-cream">{Math.round(view.city.standing * 100)}%</span> · {t("goal", "meta")} {Math.round(HEIST.standGoal * 100)}%
                 </span>
-              ))}
+                <span className="relative flex h-2 w-full min-w-[100px] bg-border" aria-hidden>
+                  <span className="h-full" style={{ width: `${view.city.standing * 100}%`, background: COP }} />
+                  <span className="absolute -top-[3px] h-[14px] w-[2px] bg-cream" style={{ left: `calc(${HEIST.standGoal * 100}% - 1px)` }} />
+                </span>
+              </div>
+              <div className={`flex items-baseline gap-1.5 ${touch ? "px-2.5 py-1.5" : "px-4 py-2"}`}>
+                <span className={`${touch ? "text-lg" : "text-2xl"} leading-none tabular-nums`}>{cop.busts}</span>
+                <span className={`${touch ? "text-[8px]" : "text-[9px]"} text-muted`}>{t("busts", "prisões")}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1 px-3" aria-label={t(`${robber.hearts} of ${HEIST.hearts} hearts`, `${robber.hearts} de ${HEIST.hearts} vidas`)}>
-              {Array.from({ length: HEIST.hearts }, (_, i) => (
-                <span key={i} className={touch ? "h-2 w-2" : "h-3 w-3"} style={{ background: i < robber.hearts ? RED : EMPTY }} aria-hidden />
-              ))}
-            </div>
-          </div>
-        )}
+          )}
 
-        {cop && (
-          <div className={`${HUD_BOX} flex items-stretch divide-x-[3px] divide-border`} style={{ borderColor: COP }}>
-            <div className="flex flex-col justify-center gap-1 px-4 py-2">
-              <span className="text-[8px]" style={{ color: COP }}>
-                {t("Defending", "Defendendo")}
-              </span>
-              <span className={touch ? "text-[11px] leading-none" : "text-sm leading-none"}>{view.city.name}</span>
-            </div>
-            <div className="flex flex-col justify-center gap-1.5 px-3 py-2">
-              <span className="text-[8px] text-muted">
-                {t("Standing", "De pé")} <span className="text-cream">{Math.round(view.city.standing * 100)}%</span> · {t("goal", "meta")} {Math.round(HEIST.standGoal * 100)}%
-              </span>
-              <span className="relative flex gap-[3px]" aria-hidden>
-                {Array.from({ length: bars }, (_, i) => (
-                  <span key={i} className="h-2 w-[6px]" style={{ background: i < Math.round(view.city.standing * bars) ? COP : EMPTY }} />
-                ))}
-                <span className="absolute -top-[3px] h-[14px] w-[2px] bg-cream" style={{ left: `calc(${HEIST.standGoal * 100}% - 1px)` }} />
-              </span>
-            </div>
-            <div className="flex items-baseline gap-1.5 px-4 py-2">
-              <span className="text-2xl leading-none tabular-nums">{cop.busts}</span>
-              <span className="text-[9px] text-muted">{t("busts", "prisões")}</span>
-            </div>
-          </div>
-        )}
-
-        {robber?.push && (
-          <div className="flex flex-col items-center gap-1">
-            <Band tone={robber.push.paused ? "red" : "dark"} tab={robber.push.paused ? undefined : "#c8e64a"} className="gap-3 px-4 py-2.5" style={{ fontSize: T.body }}>
-              {robber.push.paused ? t("Cop nearby", "Viatura perto") : <span className="text-lime">{t("Pushing…", "Fazendo push…")}</span>}
-              <span className="flex gap-[3px]" aria-hidden>
+          {push && (
+            <Band tone={push.paused ? "red" : "dark"} tab={push.paused ? undefined : "#c8e64a"} animate={false} className={`w-full justify-between gap-3 ${touch ? "px-2.5 py-1.5" : "px-4 py-2"}`} style={{ fontSize: touch ? T.small : T.body }}>
+              {push.paused ? t("Cop nearby", "Viatura perto") : <span className="text-lime">{t("Pushing", "Fazendo push")}</span>}
+              <span className="flex flex-1 gap-[3px]" aria-hidden>
                 {Array.from({ length: 10 }, (_, i) => (
-                  <span
-                    key={i}
-                    className="h-3 w-2.5"
-                    style={{ background: i < robber.push!.done * 10 ? (robber.push!.paused ? "#0d0d0f" : "#c8e64a") : robber.push!.paused ? "rgba(13,13,15,0.25)" : EMPTY }}
-                  />
+                  <span key={i} className="h-3 flex-1" style={{ background: i < push.done * 10 ? (push.paused ? "#0d0d0f" : "#c8e64a") : push.paused ? "rgba(13,13,15,0.25)" : EMPTY }} />
                 ))}
               </span>
-              <span className="w-[2.5ch] text-right tabular-nums">{robber.push.secsLeft}s</span>
+              <span className="tabular-nums">{push.secsLeft}s</span>
             </Band>
-            {robber.push.paused && (
-              <Band delay={60} className="px-3 py-1.5 normal-case text-muted" style={{ fontSize: T.small }}>
-                {t("Lose it to keep going", "Despista ela pra continuar")}
-              </Band>
-            )}
-          </div>
-        )}
+          )}
+          {push?.paused && !touch && (
+            <Band animate={false} className="w-full justify-center px-3 py-1.5 normal-case text-muted" style={{ fontSize: T.small }}>
+              {t("Lose it to keep going", "Despista ela pra continuar")}
+            </Band>
+          )}
 
-        {cop?.target && (
-          <Band tone="dark" tab={COP} className="gap-2 px-3 py-1.5" style={{ fontSize: T.small }}>
-            <span style={{ color: COP }}>{t("Magnet", "Ímã")}</span>
-            <span className="normal-case">@{cop.target}</span>
-            <span className="text-muted">{t("in range", "na mira")}</span>
-          </Band>
-        )}
+          {cop?.target && (
+            <Band tone="dark" tab={COP} animate={false} className={`w-full gap-2 ${touch ? "px-2.5 py-1.5" : "px-3 py-1.5"}`} style={{ fontSize: T.small }}>
+              <span style={{ color: COP }}>{t("Magnet", "Ímã")}</span>
+              <span className="truncate normal-case">@{cop.target}</span>
+            </Band>
+          )}
+        </div>
       </div>
 
       {flash && (
