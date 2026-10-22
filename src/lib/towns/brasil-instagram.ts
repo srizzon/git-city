@@ -40,6 +40,7 @@ import type { UF } from "./brasil-map";
 import { answeredCity, confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
 import { captureServer } from "../posthog-server";
 import { creditComment, creditStory, residentOfInstagram } from "./brasil-points-server";
+import { dmComment } from "./brasil-dm";
 
 export const LIMITS = { perUserHour: 5, repliesPerUserHour: 3, repliesPerHour: 10, modelPerDay: 2_000 } as const;
 
@@ -148,7 +149,9 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
           await captureServer(`ig:${c.igUser}`, "brasil_comment_vote", { linked: true, joined: true, number: waiting, waited: true });
         }
       }
-      // Placed is silent (see speak); the rest asks them for something.
+      // Placed gets a DM (brasil-dm.ts), not a public reply; the rest asks them for something.
+      if (r.outcome === "added") await dmComment(id, w.kind === "city").catch((err) => console.error("[brasil] dm", c.id, err));
+      // The rest asks them for something in public.
       const reply = placed ? null : replyFor(r.outcome, r.login, r.uf, w.kind, suggestion, { city: r.city, founded: r.founded, options: r.options });
       if (!reply) continue;
       if (await speak(id, c, reply)) {

@@ -1,17 +1,16 @@
 // ─── Brasil town: the DM after a comment ────────────────────
 // Someone a comment put on the map gets no public reply (Instagram flagged the
-// account for automated behavior after ~3k of them, 2026-10-21): a cron sends
-// them a private reply instead, "seu prédio subiu" with a "Ver meu prédio"
+// account for automated behavior after ~3k of them, 2026-10-21): they get a
+// private reply instead, sent as the comment is read, "seu prédio subiu" with a "Ver meu prédio"
 // button and no link (a link in a first DM gets hidden as spam). Their tap
 // comes back as a message (the webhook), which opens Meta's 24h window, and
 // the link goes then. A DM from an account they don't follow lands in their
 // requests, so the comment also gets a public "te mandei na DM" while the
 // hour's public replies have room (speak, brasil-instagram.ts).
 //
-// Pace: one DM an account, ever; at most DM.perHour an hour, DM.perRun a run
-// (the cron's every 5 minutes) a random 20–40 s apart. A private reply has to
-// go within 7 days of its comment, so the queue keeps whatever the cap holds
-// back. BRASIL_IG_REPLIES=off stops these too. Server only.
+// Pace: one DM an account, ever; at most DM.perHour an hour. Over that, the
+// comment waits in the queue a cron empties every 5 minutes (DM.perRun a run):
+// a private reply may go up to 7 days after its comment. BRASIL_IG_REPLIES=off stops these too. Server only.
 
 import { getSupabaseAdmin } from "../supabase";
 import { instagramUsernameOf, privateReply, sendMessage } from "../instagram";
@@ -67,17 +66,62 @@ const NUDGES = ["Te mandei na DM 📩", "Olha a DM 👀", "Mandei o link no dire
 /** Public replies the nudge leaves to the ones that ask for something (a wrong username, "qual Santa Rita?"). */
 const NUDGE_RESERVE = 3;
 
-/** Sends the queue's next DMs within the pace. */
-export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; failed: number }> {
-  const out = { sent: 0, skipped: 0, failed: 0 };
-  if (!speaking()) return out;
-  const sb = getSupabaseAdmin();
-  const { count } = await sb
+/** DMs sent in the last hour, against DM.perHour. */
+async function sentLastHour(): Promise<number> {
+  const { count } = await getSupabaseAdmin()
     .from("brasil_comments")
     .select("id", { count: "exact", head: true })
     .eq("dm_status", "sent")
     .gte("dm_sent_at", new Date(Date.now() - 3_600_000).toISOString());
-  let budget = Math.min(DM.perRun, DM.perHour - (count ?? 0));
+  return count ?? 0;
+}
+
+/** One comment's DM (and its public nudge): skipped when that account already got one. */
+async function dmOne(q: Queued, city: boolean): Promise<"sent" | "skipped" | "failed"> {
+  const sb = getSupabaseAdmin();
+  // Claim it first: the webhook and the cron may reach the same comment at once.
+  const { data: claimed } = await sb.from("brasil_comments").update({ dm_status: "skipped" }).eq("id", q.id).is("dm_status", null).select("id");
+  if (!claimed?.length) return "skipped";
+  const mark = (dm_status: "sent" | "failed") => sb.from("brasil_comments").update({ dm_status, dm_sent_at: dm_status === "sent" ? new Date().toISOString() : null }).eq("id", q.id);
+  // One DM an account, ever.
+  const { count: had } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", q.ig_user).eq("dm_status", "sent");
+  if (had) return "skipped";
+  const where = city ? null : q.ibge !== null && cityOf(q.ibge) ? `em ${cityOf(q.ibge)!.name}` : q.uf ? ptState(q.uf as UF, "in") : "no mapa";
+  try {
+    await privateReply(q.id.replace(/^ig:/, ""), opening(q.github_login, where), [{ title: "Ver meu prédio 🏙️", payload: `${PAYLOAD}${q.id}` }]);
+  } catch (err) {
+    console.error("[brasil] dm", q.id, err);
+    await mark("failed");
+    return "failed";
+  }
+  await mark("sent");
+  await captureServer(`ig:${q.ig_user}`, "brasil_dm_sent", { kind: city ? "city" : "brasil" });
+  const nudge = NUDGES[Math.floor(Math.random() * NUDGES.length)];
+  if (await speak(q.id, { id: q.id.replace(/^ig:/, ""), mediaId: "", text: "", igUser: q.ig_user }, nudge, NUDGE_RESERVE).catch(() => false)) {
+    await captureServer(`ig:${q.ig_user}`, "brasil_dm_nudged", {});
+  }
+  return "sent";
+}
+
+/** The DM right after a comment put someone on the map (brasil-instagram.ts); over the hour's cap, the cron's queue keeps it. */
+export async function dmComment(id: string, city: boolean): Promise<void> {
+  if (!speaking() || (await sentLastHour()) >= DM.perHour) return;
+  const { data: q } = await getSupabaseAdmin()
+    .from("brasil_comments")
+    .select("id, reel, ig_user, github_login, uf, ibge, created_at")
+    .eq("id", id)
+    .eq("outcome", "added")
+    .is("dm_status", null)
+    .maybeSingle<Queued>();
+  if (q?.ig_user && q.github_login) await dmOne(q, city);
+}
+
+/** The queue's next DMs (the ones the hour's cap held back), within the pace. */
+export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; failed: number }> {
+  const out = { sent: 0, skipped: 0, failed: 0 };
+  if (!speaking()) return out;
+  const sb = getSupabaseAdmin();
+  let budget = Math.min(DM.perRun, DM.perHour - (await sentLastHour()));
   if (budget <= 0) return out;
 
   const { data: queue } = await sb
@@ -90,6 +134,8 @@ export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; 
     .not("github_login", "is", null)
     // A private reply must go within 7 days of the comment; leave an hour's room.
     .gte("created_at", new Date(Math.max(Date.parse(DM_SINCE), Date.now() - 7 * 86_400_000 + 3_600_000)).toISOString())
+    // Younger than a minute: the webhook is still on it.
+    .lte("created_at", new Date(Date.now() - 60_000).toISOString())
     .order("created_at", { ascending: true })
     .limit(budget * 3)
     .returns<Queued[]>();
@@ -100,32 +146,10 @@ export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; 
 
   for (const q of queue) {
     if (budget <= 0) break;
-    const mark = (dm_status: "sent" | "skipped" | "failed") =>
-      sb.from("brasil_comments").update({ dm_status, dm_sent_at: dm_status === "sent" ? new Date().toISOString() : null }).eq("id", q.id);
-    // One DM an account, ever.
-    const { count: had } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", q.ig_user).eq("dm_status", "sent");
-    if (had) {
-      await mark("skipped");
-      out.skipped++;
-      continue;
-    }
-    const where = cityReels.has(q.reel) ? null : q.ibge !== null && cityOf(q.ibge) ? `em ${cityOf(q.ibge)!.name}` : q.uf ? ptState(q.uf as UF, "in") : "no mapa";
-    if (out.sent) await sleep(20_000 + Math.random() * 20_000);
-    try {
-      await privateReply(q.id.replace(/^ig:/, ""), opening(q.github_login, where), [{ title: "Ver meu prédio 🏙️", payload: `${PAYLOAD}${q.id}` }]);
-      await mark("sent");
-      out.sent++;
-      budget--;
-      await captureServer(`ig:${q.ig_user}`, "brasil_dm_sent", { kind: where ? "brasil" : "city" });
-      const nudge = NUDGES[Math.floor(Math.random() * NUDGES.length)];
-      if (await speak(q.id, { id: q.id.replace(/^ig:/, ""), mediaId: "", text: "", igUser: q.ig_user }, nudge, NUDGE_RESERVE).catch(() => false)) {
-        await captureServer(`ig:${q.ig_user}`, "brasil_dm_nudged", {});
-      }
-    } catch (err) {
-      console.error("[brasil] dm", q.id, err);
-      await mark("failed");
-      out.failed++;
-    }
+    if (out.sent) await sleep(5_000 + Math.random() * 10_000);
+    const r = await dmOne(q, cityReels.has(q.reel));
+    out[r]++;
+    if (r === "sent") budget--;
   }
   return out;
 }
