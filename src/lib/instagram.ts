@@ -52,6 +52,35 @@ export function replyToComment(commentId: string, message: string) {
   return graph<{ id: string }>(`/${commentId}/replies`, { message }, "POST");
 }
 
+/** POSTs a JSON body: the messaging endpoints take one instead of query params. */
+async function graphJson<T>(path: string, body: unknown): Promise<T> {
+  const token = await instagramToken();
+  if (!token) throw new Error("Instagram isn't connected (no token).");
+  const res = await fetch(`${GRAPH}${path}?access_token=${encodeURIComponent(token)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  const json = (await res.json().catch(() => ({}))) as T & { error?: { message?: string } };
+  if (!res.ok || json.error) throw new Error(`Instagram ${path}: ${json.error?.message ?? res.status}`);
+  return json;
+}
+
+/**
+ * A private reply: one DM to whoever wrote the comment, within 7 days of it (Meta allows one a comment).
+ * Quick replies are buttons whose tap comes back as a message with their payload (the webhook's).
+ */
+export function privateReply(commentId: string, text: string, quickReplies: { title: string; payload: string }[] = []) {
+  const message = quickReplies.length ? { text, quick_replies: quickReplies.map((q) => ({ content_type: "text", ...q })) } : { text };
+  return graphJson<{ message_id?: string }>("/me/messages", { recipient: { comment_id: commentId }, message });
+}
+
+/** A DM to someone who wrote to the account in the last 24h (their Instagram-scoped id). */
+export function sendMessage(igsid: string, text: string) {
+  return graphJson<{ message_id?: string }>("/me/messages", { recipient: { id: igsid }, message: { text } });
+}
+
 /**
  * Turns on the account's webhooks (the dashboard's webhook setup alone
  * doesn't): comments, and messages when the token has the messaging
