@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { narratorOf, readConfig } from "../config";
-import { brt, busiestHour, scheduleReel, type ReelKind } from "../schedule";
+import { busiestHour, scheduleReel, type ReelKind } from "../schedule";
 import { fillLog, weeklyReport, type PostRow, type StatRow } from "../report";
 import { onlineFollowers } from "@/lib/instagram";
 import { mix, narrate } from "../voice";
@@ -76,7 +76,8 @@ async function schedule(mp4: string, flags: Record<string, string>) {
     sb: admin(),
     config: readConfig(home()),
     busiest: busiestHour(await onlineFollowers()),
-    id: flags.id ?? `${flags.at?.slice(0, 10) ?? brt()}-${path.basename(mp4, ".mp4")}`,
+    // A video's folder (videos/<date>-<slug>/) names it: every folder's file is reel.mp4.
+    id: flags.id ?? path.basename(path.dirname(path.resolve(mp4))),
     kind,
     caption: readFileSync(flags.caption, "utf8").trim(),
     video: mp4,

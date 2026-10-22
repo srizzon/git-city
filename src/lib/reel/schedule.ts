@@ -69,6 +69,9 @@ export async function scheduleReel(o: {
   at?: string;
 }): Promise<Date> {
   if (o.kind === "main" && !o.cover) throw new Error("A main reel needs a cover.");
+  // Scheduling a posted id again would overwrite its row (media, permalink) and post another video under it.
+  const { data: posted } = await o.sb.from("reel_schedule").select("permalink").eq("spec_id", o.id).eq("status", "posted").maybeSingle<{ permalink: string | null }>();
+  if (posted) throw new Error(`"${o.id}" is already posted (${posted.permalink}): pass another --id.`);
   const date = o.at ? o.at.slice(0, 10) : brt();
   const { data: rows } = await o.sb.from("reel_schedule").select("spec_id, kind, scheduled_at").in("status", ["scheduled", "publishing"]);
   const others = (rows ?? []).filter((r) => r.spec_id !== o.id);
