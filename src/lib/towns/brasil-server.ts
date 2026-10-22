@@ -194,8 +194,8 @@ export async function placeBrasilResident(
       if (grew) console.info(`[brasil] the map grew to ${map.scale}`);
       return { status: there ? "moved" : "added", city, founded: !island && before === 0 };
     }
-    // 40001: someone placed a moment ago (the map changed); 23505: the lot was taken. Read again and retry.
-    if (error.code !== "40001" && error.code !== "23505") throw new Error(`brasil place: ${error.message}`);
+    // GC409 (40001 before 189): someone placed a moment ago (the map changed); 23505: the lot was taken. Read again and retry.
+    if (error.code !== "GC409" && error.code !== "40001" && error.code !== "23505") throw new Error(`brasil place: ${error.message}`);
   }
   throw new Error("brasil place: too many retries");
 }
