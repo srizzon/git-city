@@ -1,13 +1,14 @@
 import type { Room } from "./room";
 import { UNIT_TO_M } from "../src/lib/league-city/drive/tuning";
-import { HEIST, KIT, RULES, inRing, isSide, type HeistSide, type KitItem, type Ring } from "../src/lib/towns/heist";
+import { HEIST, KIT, RULES, heldPoints, inRing, isSide, type HeistSide, type KitItem, type Ring } from "../src/lib/towns/heist";
 
 // ─── City of the day (drive room side) ──────────────────────
 // The Brasil map's cops and robbers, decided here, never by a client:
 //   sides     each driver's side for the day (the site's /smash/me, or a
 //             token the site signed when they picked mid-drive)
-//   holding   a building a robber knocks down inside the ring pays nothing
-//             yet: it waits, per login, until they push
+//   holding   what a robber knocks off buildings inside the ring pays nothing
+//             yet: the blocks wait, per login, until they push (RULES.blocksPerPoint
+//             a point)
 //   push      the room keeps when each car left the ring; a push lands only
 //             after HEIST.pushSecs out of it with no real cop near (game
 //             cops live on the robber's screen, which pauses its own bar)
@@ -25,7 +26,7 @@ export interface HeistDayInfo {
 
 export interface HeistPushOut {
   attackerId: number;
-  buildings: number;
+  pts: number;
   at: number;
 }
 
@@ -47,7 +48,7 @@ type Who = (id: string) => { login: string; devId: number | null } | null;
 export class HeistRoom {
   info: HeistDayInfo | null = null;
   private sides = new Map<string, HeistSide>();
-  /** Buildings each robber (login) knocked down in the ring and hasn't pushed. */
+  /** Blocks each robber (login) knocked off in the ring and hasn't pushed. */
   private holding = new Map<string, number>();
   /** When each car last went out of the ring (ms), null inside. */
   private outSince = new Map<string, number | null>();
@@ -107,18 +108,23 @@ export class HeistRoom {
     else if (was === null) this.outSince.set(id, now);
   }
 
-  /**
-   * A building fell (`x`, `z`: its middle in city units). True when it stood
-   * in the city of the day: it never pays as a plain smash, and a robber holds it.
-   */
-  fell(id: string, login: string, x: number, z: number): boolean {
-    if (!this.info || !inRing(this.info.ring, x * UNIT_TO_M, z * UNIT_TO_M)) return false;
-    if (this.sides.get(id) === "robber") {
-      const n = (this.holding.get(login) ?? 0) + 1;
-      this.holding.set(login, n);
-      this.room.getConnection(id)?.send(JSON.stringify({ t: "heist_held", n }));
-    }
-    return true;
+  /** Whether a building (`x`, `z`: its middle in city units) stands in the city of the day: its fall never pays as a plain smash. */
+  inCity(x: number, z: number): boolean {
+    return !!this.info && inRing(this.info.ring, x * UNIT_TO_M, z * UNIT_TO_M);
+  }
+
+  /** A robber knocked `blocks` off a building in the city: they hold them (the HUD hears the points when they change). */
+  took(id: string, login: string, blocks: number, x: number, z: number) {
+    if (blocks <= 0 || this.sides.get(id) !== "robber" || !this.inCity(x, z)) return;
+    const was = this.holding.get(login) ?? 0;
+    this.holding.set(login, was + blocks);
+    const n = heldPoints(was + blocks);
+    if (n !== heldPoints(was)) this.room.getConnection(id)?.send(JSON.stringify({ t: "heist_held", n }));
+  }
+
+  /** Points a robber (login) holds now. */
+  private held(login: string): number {
+    return heldPoints(this.holding.get(login) ?? 0);
   }
 
   private copNear(x: number, z: number): boolean {
@@ -135,7 +141,7 @@ export class HeistRoom {
     const me = this.who(id);
     const at = this.where(id);
     const since = this.outSince.get(id) ?? null;
-    const n = me ? (this.holding.get(me.login) ?? 0) : 0;
+    const n = me ? this.held(me.login) : 0;
     const ok =
       !!me && me.devId !== null && !!at && !!this.info && this.sides.get(id) === "robber" && n > 0 &&
       since !== null && now - since >= HEIST.pushSecs * 1000 - RULES.pushSlackMs && !this.copNear(at.x, at.z);
@@ -144,15 +150,15 @@ export class HeistRoom {
       return;
     }
     this.holding.delete(me.login);
-    this.pushes.push({ attackerId: me.devId, buildings: n, at: now });
-    this.room.getConnection(id)?.send(JSON.stringify({ t: "heist_pushed", n, pts: n * HEIST.building }));
+    this.pushes.push({ attackerId: me.devId, pts: n, at: now });
+    this.room.getConnection(id)?.send(JSON.stringify({ t: "heist_pushed", n, pts: n }));
   }
 
   /** The robber's car ran out of hearts: what it held is gone; the real cop it names, if close, gets the bust, or the building whose shot did it. */
   bust(id: string, by: unknown, now: number, turret?: unknown) {
     const me = this.who(id);
     if (!me || this.sides.get(id) !== "robber") return;
-    const lost = this.holding.get(me.login) ?? 0;
+    const lost = this.held(me.login);
     this.holding.delete(me.login);
     this.room.getConnection(id)?.send(JSON.stringify({ t: "heist_busted", lost }));
     // A bust counts only for a robber holding something: nobody hands a friend points by getting caught empty.

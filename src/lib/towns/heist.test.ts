@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HEIST, RULES, gameCops, inRing, pickDayCity, pushPoints, ringOf, standingOf, starsFor, stepPush } from "./heist";
+import { HEIST, RULES, gameCops, heldPoints, inRing, pickDayCity, pushPoints, ringOf, standingOf, starsFor, stepPush } from "./heist";
 
 const city = (key: string, buildings: number) => ({ key, name: key, uf: "SP", buildings });
 
@@ -34,12 +34,14 @@ describe("pickDayCity", () => {
 });
 
 describe("rules", () => {
-  it("stars climb with buildings knocked down", () => {
+  it("stars climb with points held", () => {
     expect(starsFor(0)).toBe(0);
     expect(starsFor(1)).toBe(1);
-    expect(starsFor(3)).toBe(2);
-    expect(starsFor(14)).toBe(4);
+    expect(starsFor(10)).toBe(2);
+    expect(starsFor(79)).toBe(4);
     expect(starsFor(99)).toBe(5);
+    expect(heldPoints(9)).toBe(0);
+    expect(heldPoints(125)).toBe(12);
   });
 
   it("real cops take game cops' places, at most 4", () => {
@@ -69,10 +71,10 @@ describe("rules", () => {
     expect(stepPush(p, 9000, true, false, 0)).toBe(false);
   });
 
-  it("pushes pay double, under the day's cap", () => {
-    expect(pushPoints(3, 0)).toBe(3 * HEIST.building);
-    expect(pushPoints(5, 80)).toBe(20);
-    expect(pushPoints(5, 100)).toBe(0);
+  it("pushes pay what's held, under the day's cap", () => {
+    expect(pushPoints(30, 0)).toBe(30);
+    expect(pushPoints(50, 80)).toBe(20);
+    expect(pushPoints(5, HEIST.dayCap)).toBe(0);
   });
 
   it("standing is what didn't fall", () => {

@@ -189,10 +189,10 @@ export interface SmashFall {
   day?: boolean;
 }
 
-/** A robber's push in the city of the day: this many buildings banked at once. */
+/** A robber's push in the city of the day: the points they held, banked at once. */
 export interface HeistPush {
   attackerId: number;
-  buildings: number;
+  pts: number;
   at: number;
 }
 
@@ -248,7 +248,7 @@ export function verifySmashSave(slug: string, body: string, signature: string | 
     floors: cleanFloors(save.floors, now),
     floorsBatch: isUuid(save.floorsBatch) ? save.floorsBatch : undefined,
     heist: (Array.isArray(save.heist) ? save.heist : []).filter(
-      (h) => isId(h?.attackerId) && Number.isInteger(h.buildings) && h.buildings > 0 && h.buildings <= 50 && typeof h.at === "number" && Math.abs(now - h.at) < 86_400_000,
+      (h) => isId(h?.attackerId) && Number.isInteger(h.pts) && h.pts > 0 && h.pts <= 500 && typeof h.at === "number" && Math.abs(now - h.at) < 86_400_000,
     ),
     turrets: (Array.isArray(save.turrets) ? save.turrets : []).filter((t) => isLogin(t?.login) && typeof t.at === "number" && Math.abs(now - t.at) < 86_400_000),
     busts: (Array.isArray(save.busts) ? save.busts : []).filter(

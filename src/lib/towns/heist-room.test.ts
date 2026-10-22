@@ -25,20 +25,25 @@ function setup() {
 const at = (m: number) => m / UNIT_TO_M;
 
 describe("HeistRoom", () => {
-  it("holds a robber's falls in the ring, not outside it or anyone else's", () => {
-    const { h } = setup();
+  it("holds what a robber knocks off in the ring, a point per RULES.blocksPerPoint blocks", () => {
+    const { h, last } = setup();
     h.setSide("r", "robber");
-    expect(h.fell("r", "robber", at(50), 0)).toBe(true);
-    expect(h.fell("r", "robber", at(150), 0)).toBe(false);
-    expect(h.fell("x", "nobody", at(10), 0)).toBe(true);
+    expect(h.inCity(at(50), 0)).toBe(true);
+    expect(h.inCity(at(150), 0)).toBe(false);
+    h.took("r", "robber", RULES.blocksPerPoint - 1, at(50), 0);
+    expect(last("r")).toBeNull();
+    h.took("r", "robber", 1, at(50), 0);
+    expect(last("r")).toEqual({ t: "heist_held", n: 1 });
+    h.took("r", "robber", 50, at(150), 0);
+    expect(last("r")).toEqual({ t: "heist_held", n: 1 });
   });
 
   it("banks a push only after the time out of the ring, with no real cop near", () => {
     const { h, pos, last } = setup();
     h.setSide("r", "robber");
     h.setSide("c", "cop");
-    h.fell("r", "robber", 0, 0);
-    h.fell("r", "robber", 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
     pos.set("r", { x: 150, z: 0 });
     pos.set("c", { x: 500, z: 0 });
     h.state("r", 50, 0, 0);
@@ -50,8 +55,8 @@ describe("HeistRoom", () => {
     expect(last("r")?.t).toBe("heist_push_no");
     pos.set("c", { x: 500, z: 0 });
     h.push("r", 1000 + HEIST.pushSecs * 1000);
-    expect(last("r")).toEqual({ t: "heist_pushed", n: 2, pts: 2 * HEIST.building });
-    expect(h.take().heist).toEqual([{ attackerId: 1, buildings: 2, at: 1000 + HEIST.pushSecs * 1000 }]);
+    expect(last("r")).toEqual({ t: "heist_pushed", n: 2, pts: 2 });
+    expect(h.take().heist).toEqual([{ attackerId: 1, pts: 2, at: 1000 + HEIST.pushSecs * 1000 }]);
   });
 
   it("a bust drops what the robber held and pays the close cop it names", () => {
@@ -59,14 +64,14 @@ describe("HeistRoom", () => {
     h.setSide("r", "robber");
     h.setSide("c", "cop");
     h.setSide("c2", "cop");
-    h.fell("r", "robber", 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
     pos.set("r", { x: 0, z: 0 });
     pos.set("c", { x: 10, z: 0 });
     pos.set("c2", { x: 900, z: 0 });
     h.bust("r", "c2", 5);
     expect(last("r")).toEqual({ t: "heist_busted", lost: 1 });
     expect(h.take().busts).toEqual([]);
-    h.fell("r", "robber", 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
     h.bust("r", "c", 6);
     expect(last("c")?.t).toBe("heist_bust_credit");
     expect(h.take().busts).toEqual([{ copId: 2, robberId: 1, at: 6 }]);
@@ -80,7 +85,7 @@ describe("HeistRoom", () => {
     h.setSide("r", "robber");
     h.bust("r", undefined, 1, "dev-a");
     expect(h.take().turrets).toEqual([]);
-    h.fell("r", "robber", 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
     h.bust("r", undefined, 2, "dev-a");
     expect(h.take().turrets).toEqual([{ login: "dev-a", at: 2 }]);
   });
@@ -113,7 +118,7 @@ describe("HeistRoom", () => {
   it("a new day forgets yesterday's sides and holdings", () => {
     const { h, pos, last } = setup();
     h.setSide("r", "robber");
-    h.fell("r", "robber", 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
     h.setDay({ day: "2026-10-23", key: "1", ring: { x: 0, z: 0, r: 100 } });
     expect(h.side("r")).toBeNull();
     h.setSide("r", "robber");

@@ -85,7 +85,7 @@ export default function HeistHud({ view }: { view: HeistView }) {
           {/* In the city with nothing knocked down yet: what to do. */}
         {robber?.inside && robber.unpushed === 0 && !push && (
           <Band animate={false} className={`w-full justify-center gap-2 normal-case text-cream ${touch ? "px-2.5 py-1.5" : "px-3 py-2"}`} style={{ fontSize: T.small }}>
-            {t(`Ram buildings to knock them down · ${HEIST.building} each`, `Bata nos prédios pra derrubar · cada um vale ${HEIST.building}`)}
+            {t("Ram the buildings: every floor you knock off is points", "Bata nos prédios: cada andar derrubado vira ponto")}
           </Band>
         )}
 

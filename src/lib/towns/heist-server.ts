@@ -144,11 +144,11 @@ export async function heistBustsOn(devId: number, day: string): Promise<number> 
   return count ?? 0;
 }
 
-/** Pays each push (the room's save): double points a building, under the robber's day cap. Once per (robber, moment). */
+/** Pays each push (the room's save): the points held, under the robber's day cap. Once per (robber, moment). */
 export async function payPushes(pushes: readonly HeistPush[]): Promise<void> {
   for (const p of pushes) {
     const at = new Date(p.at);
-    const pts = pushPoints(p.buildings, await paidOn(p.attackerId, "heist", brasiliaToday(p.at)));
+    const pts = pushPoints(p.pts, await paidOn(p.attackerId, "heist", brasiliaToday(p.at)));
     if (pts > 0) await awardPoints(p.attackerId, "heist", `heist:${p.attackerId}:${p.at}`, at, pts);
   }
 }

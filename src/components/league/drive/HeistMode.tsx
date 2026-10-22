@@ -257,7 +257,7 @@ export default function HeistMode({
     const turret = !by && lastTurret.current && now - lastTurret.current.at < 500 ? lastTurret.current.login : undefined;
     send({ t: "heist_bust", ...(by ? { by } : turret ? { turret } : {}) });
     const lost = held.current;
-    setFlash({ kind: "busted", pts: lost * HEIST.building, by: by ? (remotes.current.get(by)?.name ?? null) : null }, 2600);
+    setFlash({ kind: "busted", pts: lost, by: by ? (remotes.current.get(by)?.name ?? null) : null }, 2600);
     resetRun();
     npcs.current = npcs.current.filter((n) => !n.id.startsWith("bot:heist-cop"));
     shots.current = [];
@@ -633,7 +633,7 @@ export default function HeistMode({
       robber:
         P.side === "robber"
           ? {
-              unpushed: held.current * HEIST.building,
+              unpushed: held.current,
               stars,
               hearts: hearts.current,
               inside,

@@ -255,6 +255,8 @@ export class SmashRoom {
     columns = columns.slice(0, allowed);
     if (columns.length === 0) return;
     const { took, down } = store.hitColumns(target, columns, n, now, d.login);
+    // The city of the day: a robber holds every block they knock off there until they push.
+    this.heist.took(id, d.login, took, store.targets[target].x, store.targets[target].z);
     const attackerId = this.ids.get(d.login);
     // Play points: floors off a building outside your own town (shielded ones give took = 0).
     // took is blocks (one floor of one column); a floor scores once every column of it is down.
@@ -269,7 +271,7 @@ export class SmashRoom {
     if (down && attackerId !== undefined) {
       const t = store.targets[target];
       // In the city of the day it pays only once its robber pushes.
-      const day = this.heist.fell(id, d.login, t.x, t.z);
+      const day = this.heist.inCity(t.x, t.z);
       this.fallen.push({ victim: m.b, attacker: d.login, attackerId, at: now, ...(day ? { day: true } : {}) });
       this.lastSave = 0; // save (and email) now
     }

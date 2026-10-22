@@ -109,8 +109,10 @@ export const RULES = {
   gangBustGapMs: 20_000,
   /** Busts pay up to this a day per cop. */
   bustDayCap: 100,
-  /** Stars by buildings knocked down since you came in (1 at the first). */
-  starsAt: [1, 3, 6, 10, 15],
+  /** Blocks (one floor of one column) knocked off in the ring per point held: a typical building (12 columns × 10 floors) is ~12. */
+  blocksPerPoint: 10,
+  /** Stars by points held (1 at the first). */
+  starsAt: [1, 10, 25, 50, 80],
   /** Most game cop cars after one robber. */
   maxGameCops: 4,
   /** Turrets: from this many stars, the tallest this many buildings within reach (m) shoot every `turretEveryMs`. */
@@ -144,7 +146,10 @@ export function isSide(v: unknown): v is HeistSide {
   return v === "robber" || v === "cop";
 }
 
-/** Stars for this many buildings knocked down since you came into the city (0…5). */
+/** Points held for this many blocks knocked off in the ring. */
+export const heldPoints = (blocks: number) => Math.floor(blocks / RULES.blocksPerPoint);
+
+/** Stars for this many points held (0…5). */
 export function starsFor(down: number): number {
   let s = 0;
   for (const at of RULES.starsAt) if (down >= at) s++;
@@ -223,9 +228,9 @@ export function stepPush(p: PushState, dtMs: number, outside: boolean, copNear: 
   return was < HEIST.pushSecs * 1000 && p.held >= HEIST.pushSecs * 1000;
 }
 
-/** Points a push of this many buildings pays, under what's left of the day's cap. */
-export function pushPoints(buildings: number, paidToday: number): number {
-  return Math.max(0, Math.min(buildings * HEIST.building, HEIST.dayCap - paidToday));
+/** What a push of `pts` points held pays, under what's left of the day's cap. */
+export function pushPoints(pts: number, paidToday: number): number {
+  return Math.max(0, Math.min(pts, HEIST.dayCap - paidToday));
 }
 
 /** Share of the city standing, from its buildings and how many fell today. */
