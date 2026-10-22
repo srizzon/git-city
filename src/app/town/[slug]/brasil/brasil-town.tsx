@@ -67,6 +67,9 @@ import ProjectSheet, { type ProjectView } from "@/components/towns/brasil/Projec
 import ShareProjectSheet from "@/components/towns/brasil/ShareProjectSheet";
 import AdRequestSheet from "@/components/towns/brasil/AdRequestSheet";
 import MyProjects, { ProjectWin } from "@/components/towns/brasil/MyProjects";
+import HeistHud from "@/components/towns/brasil/heist/HeistHud";
+import { HeistCard, HeistResultTower, SideChoice } from "@/components/towns/brasil/heist/HeistMap";
+import { HeistPreviewStrip, IN_CAR, heistMock, useHeistPreview } from "@/components/towns/brasil/heist/HeistPreview";
 
 // The Brasil town's page: the map of Brazil with the town's residents, each
 // in their city, their buildings sized like everywhere in Git City. Over it:
@@ -166,6 +169,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** On the drift track: the town's car is parked, a drift run is on. */
   const [drifting, setDrifting] = useState(false);
   const inCar = driving || drifting;
+  // Local only (?heist=1): made-up city-of-the-day states over the real page.
+  const [heistStep, setHeistStep] = useHeistPreview();
+  const heist = useMemo(() => (heistStep ? heistMock(heistStep) : null), [heistStep]);
+  const heistInCar = !!heistStep && IN_CAR.includes(heistStep);
   /** Where the next drive starts instead of a building (to or back from the drift track: the highway by its gate). */
   const [driveSpawn, setDriveSpawn] = useState<Spawn | null>(null);
   /** Dark between the town's car and the drift run, both ways, while the next world loads. */
@@ -946,6 +953,11 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   };
   const bar = "flex min-h-[60px] flex-col items-center justify-center gap-1.5 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
 
+  const pickHeist = (step: NonNullable<typeof heistStep>) => {
+    setHeistStep(step);
+    if (IN_CAR.includes(step) && !inCar) startDrive();
+  };
+
   return (
     <main className="fixed inset-0 bg-bg font-pixel uppercase text-cream">
       <BrasilScene
@@ -1163,6 +1175,15 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         </div>
       )}
 
+      {/* The city of the day takes the live race's spot over the bar when no race is open. */}
+      {!inCar && !state && !focused && !panel && !picker && !liveRace && heist?.view && heistStep?.startsWith("card") && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[112px]">
+          <HeistCard city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onPick={() => setHeistStep(heist.view?.side === "cop" || heist.view?.resident ? "cop" : "robber")} />
+        </div>
+      )}
+      {!inCar && heist?.result && <HeistResultTower result={heist.result} onClose={() => setHeistStep("card")} />}
+      {heistStep && <HeistPreviewStrip step={heistStep} onStep={pickHeist} />}
+
       {/* The bar: a row of words on a desktop, a tab bar of icons on a phone; Drive raised in the middle. */}
       {!inCar && (
         <nav className={`pointer-events-auto absolute inset-x-0 bottom-0 grid ${election ? "grid-cols-5" : "grid-cols-4"} items-end gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
@@ -1269,7 +1290,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onCamera={toggleCamera}
           onMute={toggleMute}
           onExit={exitDrive}
+          kit={heistInCar && heist?.view?.kit && heist.view.side ? { slots: heist.view.kit, side: heist.view.side } : null}
         >
+          {heistInCar && heist?.view && (heistStep === "pick" ? <SideChoice city={heist.view.city} onPick={(side) => setHeistStep(side === "cop" ? "cop" : "robber")} /> : <HeistHud view={heist.view} />)}
           {games && (
             <GameMenu title={t(`Games · ${drivers.length + 1} driving here`, `Jogos · ${drivers.length + 1} dirigindo aqui`)} modes={gameModes} onPick={pickGame} onClose={closeGames}>
               {games.step === "race" ? (
