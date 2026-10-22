@@ -1,64 +1,47 @@
 "use client";
 
-import { Car, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { Backdrop, Band } from "@/components/games/ui";
 import { T } from "@/components/games/kit";
 import { HEIST, defended, type HeistCity, type HeistResult, type HeistSide } from "@/lib/towns/heist";
 import { useT } from "@/lib/i18n/LangProvider";
 import { SIDE_COLOR } from "./kit";
 
-// The city of the day off the car. On the map, the card over the bar where a
-// live race's invite sits (a race takes the spot while one is open): the
-// city, what it pays, how much is standing, and the two sides; a resident is
-// a cop already and gets one button that drives there. At the ring, a driver
+// The city of the day off the car. On the map, a row riding on the bar (a
+// live race's invite takes over while one is open): the city, what it pays or
+// your side for the day; a tap drives there. At the ring, a driver
 // who never picked gets the two sides as equal cards (neither is the
 // default). The morning after, yesterday's result once, as a timing tower.
 
 const ROBBER = "#ff5a52";
 const COP = SIDE_COLOR.cop;
-const BTN = "flex min-h-11 items-center gap-2 max-sm:min-h-10 px-4 text-bg shadow-[0_6px_0_rgba(0,0,0,0.35)] transition-[filter] hover:brightness-110 active:translate-y-px";
 
-export function HeistCard({ city, side, resident, onPick }: { city: HeistCity; side: HeistSide | null; resident: boolean; onPick: (side: HeistSide) => void }) {
+/** On the map: one row on top of the bar. A tap drives there; the side is picked at the ring. */
+export function HeistStrip({ city, side, resident, onGo }: { city: HeistCity; side: HeistSide | null; resident: boolean; onGo: () => void }) {
   const t = useT();
   const mine = resident ? "cop" : side;
   return (
-    <div className="pointer-events-auto flex w-[min(380px,100%)] flex-col gap-1">
-      <Band className="w-full flex-col items-start gap-1 px-4 py-2.5 max-sm:px-3 max-sm:py-2" style={{ fontSize: T.small }}>
-        <span className="flex w-full items-center justify-between gap-2">
-          <span className="flex items-center gap-2 text-lime">
-            <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden /> {t("City of the day", "Cidade do dia")}
-          </span>
-          {resident ? (
-            <span style={{ color: COP }}>{t("You live here", "Você mora aqui")}</span>
-          ) : (
-            <span className="text-muted max-sm:hidden">{t("until midnight", "até meia-noite")}</span>
-          )}
-        </span>
-        <span className="flex w-full items-baseline justify-between gap-2">
-          <span className="normal-case text-cream" style={{ fontSize: T.body }}>
-            {city.name}
-          </span>
-          <span className="shrink-0 normal-case text-muted">
-            {HEIST.building} {t("a building", "por prédio")} · {Math.round(city.standing * 100)}% {t("standing", "de pé")}
-          </span>
-        </span>
-      </Band>
-      {mine ? (
-        <button type="button" onClick={() => onPick(mine)} className={`${BTN} justify-center`} style={{ fontSize: T.body, background: mine === "cop" ? COP : ROBBER }}>
-          <Car size={16} aria-hidden />
-          {mine === "cop" ? t("Defend", "Defender") : t("Smash", "Derrubar")}
-        </button>
-      ) : (
-        <div className="grid grid-cols-2 gap-1">
-          <button type="button" onClick={() => onPick("robber")} className={`${BTN} justify-center`} style={{ fontSize: T.body, background: ROBBER }}>
-            {t("Smash", "Derrubar")}
-          </button>
-          <button type="button" onClick={() => onPick("cop")} className={`${BTN} justify-center`} style={{ fontSize: T.body, background: COP }}>
-            {t("Defend", "Defender")}
-          </button>
-        </div>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onGo}
+      className="pointer-events-auto flex h-10 w-full items-center gap-2 bg-[#141417] px-3 text-left font-pixel text-[10px] uppercase shadow-[0_6px_0_rgba(0,0,0,0.35)] transition-colors hover:bg-[#1c1c20] sm:text-[11px]"
+    >
+      <span className="h-1.5 w-1.5 shrink-0 animate-pulse bg-red-500" aria-hidden />
+      <span className="shrink-0 text-lime">{t("City of the day", "Cidade do dia")}</span>
+      <span className="truncate normal-case text-cream">{city.name}</span>
+      <span className="ml-auto shrink-0" style={{ color: mine === "cop" ? COP : mine === "robber" ? ROBBER : undefined }}>
+        {resident ? (
+          t("You defend it", "Você defende")
+        ) : mine === "cop" ? (
+          t("Cop today", "Polícia hoje")
+        ) : mine === "robber" ? (
+          t("Robber today", "Ladrão hoje")
+        ) : (
+          <span className="text-muted">{t(`${HEIST.building} a building`, `${HEIST.building} por prédio`)}</span>
+        )}
+      </span>
+      <ChevronRight size={14} className="shrink-0 text-lime" aria-hidden />
+    </button>
   );
 }
 

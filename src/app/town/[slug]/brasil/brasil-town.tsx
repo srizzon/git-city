@@ -68,7 +68,7 @@ import ShareProjectSheet from "@/components/towns/brasil/ShareProjectSheet";
 import AdRequestSheet from "@/components/towns/brasil/AdRequestSheet";
 import MyProjects, { ProjectWin } from "@/components/towns/brasil/MyProjects";
 import HeistHud from "@/components/towns/brasil/heist/HeistHud";
-import { HeistCard, HeistResultTower, SideChoice } from "@/components/towns/brasil/heist/HeistMap";
+import { HeistResultTower, HeistStrip, SideChoice } from "@/components/towns/brasil/heist/HeistMap";
 import { HeistPreviewStrip, IN_CAR, heistMock, useHeistPreview } from "@/components/towns/brasil/heist/HeistPreview";
 
 // The Brasil town's page: the map of Brazil with the town's residents, each
@@ -953,6 +953,24 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   };
   const bar = "flex min-h-[60px] flex-col items-center justify-center gap-1.5 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
 
+  // The map with nothing open over it: what the bar's slot shows (a live race, the city of the day, who arrived).
+  const mapClear = !inCar && !state && !focused && !panel && !picker;
+  const grew = grewAt !== null && now - grewAt < 86_400_000 ? { scale: layout.scale, at: grewAt } : null;
+  const arrivals = heistStep && world.arrivals.length === 0 ? [{ login: "lu_codes", where: "Campinas", at: now - 180_000 }] : world.arrivals;
+  const hasArrivals = arrivals.length > 0 || grew !== null;
+  const arrivalsProps = {
+    arrivals,
+    grew,
+    onBrazil: () => camera.current?.flyTo(null),
+    onPick: (login: string) => {
+      const b = world.placed.get(login.toLowerCase());
+      if (!b) return;
+      posthog.capture("brasil_arrival_clicked");
+      openBuilding(b);
+    },
+  };
+  // The city of the day's card takes the slot unless a race is open or we're asking for your city.
+  const heistCard = mapClear && !askCity && !liveRace && !!heist?.view && !!heistStep?.startsWith("card");
   const pickHeist = (step: NonNullable<typeof heistStep>) => {
     setHeistStep(step);
     if (IN_CAR.includes(step) && !inCar) startDrive();
@@ -1144,19 +1162,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         </span>
       )}
 
-      {!inCar && !state && !focused && !panel && !picker && !askCity && !liveRace && (world.arrivals.length > 0 || (grewAt !== null && now - grewAt < 86_400_000)) && (
-        <Arrivals
-          arrivals={world.arrivals}
-          grew={grewAt !== null && now - grewAt < 86_400_000 ? { scale: layout.scale, at: grewAt } : null}
-          onBrazil={() => camera.current?.flyTo(null)}
-          onPick={(login) => {
-            const b = world.placed.get(login.toLowerCase());
-            if (!b) return;
-            posthog.capture("brasil_arrival_clicked");
-            openBuilding(b);
-          }}
-        />
-      )}
+      {mapClear && !askCity && !liveRace && !heistCard && hasArrivals && <Arrivals {...arrivalsProps} />}
 
       {/* Over the bar: a race anyone can still join. */}
       {!inCar && !state && !focused && !panel && !picker && liveRace && (
@@ -1176,17 +1182,20 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       )}
 
       {/* The city of the day takes the live race's spot over the bar when no race is open. */}
-      {!inCar && !state && !focused && !panel && !picker && !liveRace && heist?.view && heistStep?.startsWith("card") && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[76px]">
-          <HeistCard city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onPick={() => setHeistStep(heist.view?.side === "cop" || heist.view?.resident ? "cop" : "robber")} />
-        </div>
-      )}
       {!inCar && heist?.result && <HeistResultTower result={heist.result} onClose={() => setHeistStep("card")} />}
       {heistStep && <HeistPreviewStrip step={heistStep} onStep={pickHeist} />}
 
       {/* The bar: a row of words on a desktop, a tab bar of icons on a phone; Drive raised in the middle. */}
+      {/* The city of the day rides on the bar: as wide as it on a desktop, resting on the raised Drive on a phone; who just arrived goes by on top. */}
       {!inCar && (
-        <nav className={`pointer-events-auto absolute inset-x-0 bottom-0 grid ${election ? "grid-cols-5" : "grid-cols-4"} items-end gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2">
+        {heistCard && heist?.view && (
+          <div className="flex w-0 min-w-full flex-col gap-px max-sm:mb-[18px]">
+            {hasArrivals && <Arrivals {...arrivalsProps} docked />}
+            <HeistStrip city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onGo={() => pickHeist(heist.view?.resident || heist.view?.side === "cop" ? "cop" : heist.view?.side === "robber" ? "robber" : "pick")} />
+          </div>
+        )}
+        <nav className={`pointer-events-auto relative grid ${election ? "grid-cols-5" : "grid-cols-4"} items-end gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:flex sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
           <button type="button" onClick={() => openPanel("states")} className={bar}>
             <Trophy size={18} className="sm:hidden" aria-hidden />
             {t("States", "Estados")}
@@ -1254,6 +1263,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             )}
           </button>
         </nav>
+        </div>
       )}
 
       {drift.overlay}
@@ -1647,10 +1657,14 @@ function ago(at: number, now: number): string {
  * Who just arrived, one at a time over the bar: "@login just arrived · Campinas · 3m",
  * a tap away from their building. Whoever commented on the reel opens the map
  * and sees their name go by. When Brazil grew in the last day to make room
- * for its cities, that goes by first.
+ * for its cities, that goes by first. `docked`: a row on top of the city of
+ * the day's card, as wide as it, instead of on its own over the bar.
  */
-function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: string; where: string; at: number }[]; grew: { scale: number; at: number } | null; onPick: (login: string) => void; onBrazil: () => void }) {
+function Arrivals({ arrivals, grew, onPick, onBrazil, docked = false }: { arrivals: { login: string; where: string; at: number }[]; grew: { scale: number; at: number } | null; onPick: (login: string) => void; onBrazil: () => void; docked?: boolean }) {
   const tr = useT();
+  const at = docked
+    ? "w-full bg-bg/90 shadow-[0_6px_0_rgba(0,0,0,0.35)]"
+    : "absolute bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-20 max-w-[calc(100vw-24px)] -translate-x-1/2 bg-bg/90 sm:bottom-[72px]";
   const [i, setI] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const n = Math.min(arrivals.length, 12) + (grew ? 1 : 0);
@@ -1669,7 +1683,7 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
         key="grew"
         type="button"
         onClick={onBrazil}
-        className="pointer-events-auto absolute bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream sm:bottom-[72px]"
+        className={`pointer-events-auto ${at} flex animate-[fade-in_0.4s_ease-out] items-center gap-2 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream`}
       >
         <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
         <span className="shrink-0 text-cream">{tr("Brazil grew", "O Brasil cresceu")}</span>
@@ -1683,7 +1697,7 @@ function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: str
       key={a.login}
       type="button"
       onClick={() => onPick(a.login)}
-      className="pointer-events-auto absolute bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream sm:bottom-[72px]"
+      className={`pointer-events-auto ${at} flex animate-[fade-in_0.4s_ease-out] items-center gap-2 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream`}
     >
       <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
       <span className="truncate normal-case text-cream">@{a.login}</span>
