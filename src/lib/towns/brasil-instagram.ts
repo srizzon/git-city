@@ -41,6 +41,7 @@ import { answeredCity, confirmedLogin, readComment, suggestLogin, type ThreadLin
 import { captureServer } from "../posthog-server";
 import { creditComment, creditStory, residentOfInstagram } from "./brasil-points-server";
 import { dmComment } from "./brasil-dm";
+import { guarded, mayTalk } from "./brasil-breaker";
 
 export const LIMITS = { perUserHour: 5, repliesPerUserHour: 3, repliesPerHour: 12, modelPerDay: 2_000 } as const;
 
@@ -131,7 +132,8 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
       }
 
       // Someone already on the map who comments a lone @ is tagging a friend; someone new may be giving their own.
-      const onMap = c.igUser ? !!(await residentOfInstagram(league.id, c.igUser)) : false;
+      const resident = c.igUser ? await residentOfInstagram(league.id, c.igUser) : null;
+      const onMap = !!resident;
       const { reader, ...parsed } = await read(c, own, !onMap);
       const r = await importBrasilComment(league, { id, reel: w.reel, kind: w.kind, igUser: c.igUser, text: c.text, parsed, claimed: true });
       if (!r.fresh) continue;
@@ -150,7 +152,9 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
         }
       }
       // Placed gets a DM (brasil-dm.ts), not a public reply; the rest asks them for something.
-      if (placed) await dmComment(id, w.kind === "city").catch((err) => console.error("[brasil] dm", c.id, err));
+      // Someone on the map who wrote no username ("Presidente Venceslau - SP"): the DM of who was already there.
+      if (r.outcome === "no_login" && resident) await sb.from("brasil_comments").update({ github_login: resident.login }).eq("id", id);
+      if (placed || (r.outcome === "no_login" && resident)) await dmComment(id, w.kind === "city").catch((err) => console.error("[brasil] dm", c.id, err));
       // The rest asks them for something in public.
       const reply = placed ? null : replyFor(r.outcome, r.login, r.uf, w.kind, suggestion, { city: r.city, founded: r.founded, options: r.options });
       if (!reply) continue;
@@ -272,13 +276,14 @@ async function voteByComment(
 }
 
 /**
- * Answers a comment on Instagram within the limits (see the header): off by BRASIL_IG_REPLIES=off, at most
+ * Answers a comment on Instagram within the limits (see the header): off by BRASIL_IG_REPLIES=off or the
+ * breaker (brasil-breaker.ts), at most
  * LIMITS.repliesPerUserHour to one person and LIMITS.repliesPerHour to everyone, a random 2–5 min after the
  * last one. `reserve` leaves that many of the hour's replies to others (the DM nudge leaves room for the
  * replies that ask for something). True when it was sent.
  */
 export async function speak(id: string, c: IncomingComment, reply: string, reserve = 0): Promise<boolean> {
-  if (process.env.BRASIL_IG_REPLIES === "off") return false;
+  if (!(await mayTalk())) return false;
   const sb = getSupabaseAdmin();
   if (c.igUser) {
     const { count } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", c.igUser).gte("replied_at", hourAgo());
@@ -299,7 +304,7 @@ export async function speak(id: string, c: IncomingComment, reply: string, reser
     console.info(`[brasil] would reply to ${c.parentId ?? c.id}: ${reply}`);
     return false;
   }
-  await replyToComment(c.parentId ?? c.id, reply);
+  await guarded(() => replyToComment(c.parentId ?? c.id, reply));
   await sb.from("brasil_comments").update({ replied_at: new Date().toISOString() }).eq("id", id);
   return true;
 }

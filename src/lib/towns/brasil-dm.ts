@@ -20,6 +20,7 @@ import { instagramUsernameOf, privateReply, sendMessage } from "../instagram";
 import { captureServer } from "../posthog-server";
 import { BRASIL_SLUG } from "./brasil-server";
 import { speak } from "./brasil-instagram";
+import { guarded, mayTalk } from "./brasil-breaker";
 
 export const DM = { perHour: 60, perRun: 5 } as const;
 
@@ -41,18 +42,19 @@ interface Queued {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function speaking(): boolean {
-  if (process.env.BRASIL_IG_REPLIES === "off") return false;
+async function speaking(): Promise<boolean> {
   // Local and preview runs read the same database: only production speaks on Instagram.
-  return process.env.VERCEL_ENV === "production";
+  if (process.env.VERCEL_ENV !== "production") return false;
+  return mayTalk();
 }
 
-type Placed = "added" | "already";
+/** "no_login": someone already on the map who wrote no username (their login set from the map, brasil-instagram.ts). */
+type Placed = "added" | "already" | "no_login";
 
 /** The first DM: no link, a button. Wordings picked by the login, so they vary. */
 function opening(login: string, outcome: Placed, city: boolean): string {
   const lines =
-    outcome === "already"
+    outcome !== "added"
       ? [
           `Fala ${login}! Você já tem lote na Git City 😎\n\nClica no botão que eu te mando o link 👇`,
           `Opa ${login}, seu prédio já tava lá na Git City 🇧🇷\n\nQuer o link pra ver como ele tá? Clica aqui 👇`,
@@ -83,7 +85,7 @@ const NUDGES = [
   (at: string) => `Fala @${at}, seu prédio subiu. Te mandei o link no direct 🏙️`,
 ];
 /** Public replies the nudge leaves to others: the ones that ask for something (a wrong username, "qual Santa Rita?"), and the newly placed before who was already there. */
-const NUDGE_RESERVE: Record<Placed, number> = { added: 3, already: 6 };
+const NUDGE_RESERVE: Record<Placed, number> = { added: 3, already: 6, no_login: 6 };
 
 /** DMs sent in the last hour, against DM.perHour. */
 async function sentLastHour(): Promise<number> {
@@ -106,7 +108,7 @@ async function dmOne(q: Queued, city: boolean): Promise<"sent" | "skipped" | "fa
   const { count: had } = await sb.from("brasil_comments").select("id", { count: "exact", head: true }).eq("ig_user", q.ig_user).eq("dm_status", "sent");
   if (had) return "skipped";
   try {
-    await privateReply(q.id.replace(/^ig:/, ""), opening(q.github_login, q.outcome, city), { title: "Ver meu prédio 🏙️", payload: `${PAYLOAD}${q.id}` });
+    await guarded(() => privateReply(q.id.replace(/^ig:/, ""), opening(q.github_login, q.outcome, city), { title: "Ver meu prédio 🏙️", payload: `${PAYLOAD}${q.id}` }));
   } catch (err) {
     console.error("[brasil] dm", q.id, err);
     await mark("failed");
@@ -123,12 +125,12 @@ async function dmOne(q: Queued, city: boolean): Promise<"sent" | "skipped" | "fa
 
 /** The DM right after a comment put someone on the map (brasil-instagram.ts); over the hour's cap, the cron's queue keeps it. */
 export async function dmComment(id: string, city: boolean): Promise<void> {
-  if (!speaking() || (await sentLastHour()) >= DM.perHour) return;
+  if (!(await speaking()) || (await sentLastHour()) >= DM.perHour) return;
   const { data: q } = await getSupabaseAdmin()
     .from("brasil_comments")
     .select("id, outcome, reel, ig_user, github_login, uf, ibge, created_at")
     .eq("id", id)
-    .in("outcome", ["added", "already"])
+    .in("outcome", ["added", "already", "no_login"])
     .is("dm_status", null)
     .maybeSingle<Queued>();
   if (q?.ig_user && q.github_login) await dmOne(q, city);
@@ -137,7 +139,7 @@ export async function dmComment(id: string, city: boolean): Promise<void> {
 /** The queue's next DMs (the ones the hour's cap held back), within the pace. */
 export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; failed: number }> {
   const out = { sent: 0, skipped: 0, failed: 0 };
-  if (!speaking()) return out;
+  if (!(await speaking())) return out;
   const sb = getSupabaseAdmin();
   let budget = Math.min(DM.perRun, DM.perHour - (await sentLastHour()));
   if (budget <= 0) return out;
@@ -145,7 +147,7 @@ export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; 
   const { data: queue } = await sb
     .from("brasil_comments")
     .select("id, outcome, reel, ig_user, github_login, uf, ibge, created_at")
-    .in("outcome", ["added", "already"])
+    .in("outcome", ["added", "already", "no_login"])
     .is("dm_status", null)
     .is("replied_at", null)
     .not("ig_user", "is", null)
@@ -174,7 +176,7 @@ export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; 
 
 /** A tap on "Ver meu prédio": the link to their building, once, to the account whose comment it was. */
 export async function handleBrasilTaps(taps: { sender: string; payload: string }[]): Promise<void> {
-  if (!speaking()) return;
+  if (!(await speaking())) return;
   const sb = getSupabaseAdmin();
   for (const t of taps) {
     if (!t.payload.startsWith(PAYLOAD)) continue;
@@ -190,7 +192,7 @@ export async function handleBrasilTaps(taps: { sender: string; payload: string }
       const { data: reel } = await sb.from("brasil_reels").select("kind").or(`media_id.eq."${row.reel}",permalink.eq."${row.reel}"`).maybeSingle<{ kind: string }>();
       const login = encodeURIComponent(row.github_login);
       const url = reel?.kind === "city" ? `${SITE}/dev/${login}` : `${SITE}/town/${BRASIL_SLUG}?at=${login}`;
-      await sendMessage(t.sender, `Tá aqui 👇\n${url}\n\nManda esse reel pros devs da sua cidade, quanto mais gente, maior fica o seu bairro 🏙️`);
+      await guarded(() => sendMessage(t.sender, `Tá aqui 👇\n${url}\n\nManda esse reel pros devs da sua cidade, quanto mais gente, maior fica o seu bairro 🏙️`));
       await sb.from("brasil_comments").update({ link_sent_at: new Date().toISOString() }).eq("id", id);
       await captureServer(`ig:${row.ig_user}`, "brasil_dm_tapped", { kind: reel?.kind ?? "brasil" });
     } catch (err) {
