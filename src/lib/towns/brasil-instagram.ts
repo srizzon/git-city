@@ -309,6 +309,11 @@ export async function speak(id: string, c: IncomingComment, reply: string, reser
   return true;
 }
 
+/** A comment read again with today's reader (brasil-recheck.ts): its text alone, as a top-level comment. */
+export async function rereadComment(c: { id: string; text: string; igUser: string | null }): Promise<Reading> {
+  return read({ ...c, mediaId: "" }, await ownUsername(), false);
+}
+
 /** Stories that tag the account (from the message webhook): each scores for whoever posted it, once a day, when they're on the map. */
 export async function handleStoryMentions(stories: { sender: string; mid: string | null }[]): Promise<void> {
   const league = await getLeagueBySlug(BRASIL_SLUG);
