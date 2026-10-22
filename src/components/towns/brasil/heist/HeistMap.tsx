@@ -19,26 +19,25 @@ const COP = SIDE_COLOR.cop;
 /** On the map: one row on top of the bar. A tap drives there; the side is picked at the ring. */
 /**
  * On the map: a VS block on top of the bar, read at a glance. Robbers on the
- * left, cops on the right, each half the button for its side; the city in the
- * middle; under it the fight itself, a bar of what's down (red) against what's
- * standing (blue), like the towns' score bar. Once you have a side (or live
- * there, a cop already) your half is filled and goes, the other dims.
+ * left, cops on the right, each a solid button in its side's color (with the
+ * game's pressable bottom edge); the city in the middle. Once you have a side
+ * (or live there, a cop already) only yours stays a button and goes there;
+ * the other turns into a faded outline.
  */
 export function HeistStrip({ city, side, resident, onPick }: { city: HeistCity; side: HeistSide | null; resident: boolean; onPick: (side: HeistSide) => void }) {
   const t = useT();
   const mine: HeistSide | null = resident ? "cop" : side;
-  const half = (s: HeistSide) => {
+  const pick = (s: HeistSide) => {
     const color = s === "cop" ? COP : ROBBER;
     const Icon = s === "cop" ? Siren : Bomb;
-    const on = mine === s;
-    const off = mine !== null && !on;
+    const off = mine !== null && mine !== s;
     return (
       <button
         type="button"
         disabled={off}
         onClick={() => onPick(s)}
-        className={`flex h-12 w-full items-center gap-2 px-3 text-[11px] transition-[filter,background-color] active:translate-y-px disabled:opacity-30 sm:px-4 sm:text-[12px] ${s === "cop" ? "flex-row-reverse" : ""} ${on ? "text-bg hover:brightness-110" : "hover:bg-white/5"}`}
-        style={on ? { background: color } : { color }}
+        className={`flex h-11 w-full items-center justify-center gap-2 px-3 text-[11px] sm:text-[12px] ${off ? "border-2 opacity-30" : "text-bg shadow-[inset_0_-4px_0_rgba(0,0,0,0.3)] transition-[filter] hover:brightness-110 active:translate-y-px active:shadow-none"}`}
+        style={off ? { borderColor: color, color } : { background: color }}
       >
         <Icon size={18} strokeWidth={2.5} aria-hidden />
         {s === "cop" ? t("Cop", "Polícia") : t("Robber", "Ladrão")}
@@ -46,22 +45,16 @@ export function HeistStrip({ city, side, resident, onPick }: { city: HeistCity; 
     );
   };
   return (
-    <div className="pointer-events-auto flex w-full flex-col border-[3px] border-border bg-bg-raised font-pixel uppercase">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-stretch">
-        {half("robber")}
-        <div className="flex flex-col items-center justify-center gap-1 px-2">
-          <span className="flex items-center gap-1.5 text-[11px] leading-none text-cream sm:text-[12px]">
-            <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden />
-            {city.name}
-          </span>
-          <span className="text-[8px] leading-none text-lime">{t("double pts", "pts em dobro")}</span>
-        </div>
-        {half("cop")}
+    <div className="pointer-events-auto grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 border-[3px] border-border bg-bg-raised p-1.5 font-pixel uppercase">
+      {pick("robber")}
+      <div className="flex flex-col items-center gap-1 px-1">
+        <span className="flex items-center gap-1.5 text-[11px] leading-none text-cream sm:text-[12px]">
+          <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden />
+          {city.name}
+        </span>
+        <span className="text-[8px] leading-none text-lime">{t("double pts", "pts em dobro")}</span>
       </div>
-      <div className="flex h-1.5" role="img" aria-label={t(`${Math.round(city.standing * 100)}% standing`, `${Math.round(city.standing * 100)}% de pé`)}>
-        <span style={{ width: `${(1 - city.standing) * 100}%`, background: ROBBER }} />
-        <span className="flex-1" style={{ background: COP }} />
-      </div>
+      {pick("cop")}
     </div>
   );
 }
