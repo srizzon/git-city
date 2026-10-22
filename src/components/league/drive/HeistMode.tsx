@@ -636,6 +636,7 @@ export default function HeistMode({
               unpushed: held.current * HEIST.building,
               stars,
               hearts: hearts.current,
+              inside,
               push: pushing ? { secsLeft: Math.max(0, Math.ceil(HEIST.pushSecs - push.current.held / 1000)), done: push.current.held / (HEIST.pushSecs * 1000), paused: copClose } : null,
             }
           : null,

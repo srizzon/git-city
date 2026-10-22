@@ -82,7 +82,14 @@ export default function HeistHud({ view }: { view: HeistView }) {
             </div>
           )}
 
-          {push && (
+          {/* In the city with nothing knocked down yet: what to do. */}
+        {robber?.inside && robber.unpushed === 0 && !push && (
+          <Band animate={false} className={`w-full justify-center gap-2 normal-case text-cream ${touch ? "px-2.5 py-1.5" : "px-3 py-2"}`} style={{ fontSize: T.small }}>
+            {t(`Ram buildings to knock them down · ${HEIST.building} each`, `Bata nos prédios pra derrubar · cada um vale ${HEIST.building}`)}
+          </Band>
+        )}
+
+        {push && (
             <Band tone={push.paused ? "red" : "dark"} tab={push.paused ? undefined : "#c8e64a"} animate={false} className={`w-full justify-between gap-3 ${touch ? "px-2.5 py-1.5" : "px-4 py-2"}`} style={{ fontSize: touch ? T.small : T.body }}>
               {push.paused ? t("Cop nearby", "Viatura perto") : <span className="text-lime">{t("Pushing", "Fazendo push")}</span>}
               <span className="flex flex-1 gap-[3px]" aria-hidden>
