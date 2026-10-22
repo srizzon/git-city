@@ -4,18 +4,26 @@ import { getDamage, getSmashTown, recordFalls, recordFloors, saveDamage, verifyS
 import { isRevenge, notifyDemolished } from "@/lib/notification-senders/town-demolished";
 import { captureServer } from "@/lib/posthog-server";
 import { awardSmashPoints } from "@/lib/towns/brasil-points-server";
+import { heistDay, payBusts, payPushes } from "@/lib/towns/heist-server";
 
 export const dynamic = "force-dynamic";
 
 // GET: a town's smash state: its buildings as targets (for the drive
 // room) and their saved damage (for everyone). ?contrib=1 only returns the
 // damaged owners' contributions this week (the room grows floors back from
-// them). Public: it's what anyone sees in the town.
+// them). On the Brasil map, `heist`: the city of the day's ring (meters), for
+// the room to hold that city's falls until a push. Public: it's what anyone
+// sees in the town.
 export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const league = await getLeagueBySlug(slug);
   if (!league) return NextResponse.json({ error: "Town not found." }, { status: 404 });
   try {
+    // ?heist=1: only the city of the day (the room checks it again through the day).
+    if (new URL(req.url).searchParams.get("heist") === "1") {
+      const day = league.map === "brasil" ? await heistDay(league.id).catch(() => null) : null;
+      return NextResponse.json({ heist: day?.ring ? { day: day.day, key: day.key, ring: day.ring } : null }, { headers: { "Cache-Control": "private, no-store" } });
+    }
     const town = await getSmashTown(league.id);
     const damage = await getDamage(league.id, town);
     if (new URL(req.url).searchParams.get("contrib") === "1") {
@@ -23,8 +31,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
       const contrib = Object.fromEntries(damage.map((d) => [d.login, byId.get(town.devIds[d.login]) ?? 0]));
       return NextResponse.json({ contrib }, { headers: { "Cache-Control": "private, no-store" } });
     }
+    const day = league.map === "brasil" ? await heistDay(league.id).catch(() => null) : null;
+    const heist = day?.ring ? { day: day.day, key: day.key, ring: day.ring } : null;
     return NextResponse.json(
-      { targets: town.targets, damage, now: Date.now() },
+      { targets: town.targets, damage, heist, now: Date.now() },
       { headers: { "Cache-Control": "public, s-maxage=5, stale-while-revalidate=10" } },
     );
   } catch (err) {
@@ -51,7 +61,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     // logged, so the room's retry still gets the demolition emails out.
     await recordFloors(town, save);
     const falls = await recordFalls(league.id, town, save);
-    if (league.map === "brasil" && falls.length) await awardSmashPoints(falls).catch((err) => console.error("[smash:points]", err));
+    if (league.map === "brasil") {
+      // A fall in the city of the day pays only when its robber pushes.
+      const plain = falls.filter((f) => !f.day);
+      if (plain.length) await awardSmashPoints(plain).catch((err) => console.error("[smash:points]", err));
+      if (save.heist?.length) await payPushes(save.heist).catch((err) => console.error("[smash:heist]", err));
+      if (save.busts?.length) await payBusts(save.busts).catch((err) => console.error("[smash:busts]", err));
+    }
     if (falls.length) {
       after(async () => {
         for (const f of falls) {

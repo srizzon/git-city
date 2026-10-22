@@ -18,6 +18,7 @@
     { "path": "/api/cron/reel-publish",                  "schedule": "*/5 * * * *" },
     { "path": "/api/cron/reel-insights",                 "schedule": "20 * * * *" },
     { "path": "/api/cron/brasil-projects-close",         "schedule": "10 0 * * 1" },
-    { "path": "/api/cron/brasil-projects-recheck",       "schedule": "0 7 * * *" }
+    { "path": "/api/cron/brasil-projects-recheck",       "schedule": "0 7 * * *" },
+    { "path": "/api/cron/brasil-heist",                  "schedule": "5 3 * * *" }
   ]
 }
