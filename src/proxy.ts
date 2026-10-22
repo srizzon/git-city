@@ -8,6 +8,7 @@ import { timedFetch } from "@/lib/supabase-fetch";
 // ---------------------------------------------------------------------------
 const ROUTE_LIMITS: [string, number, number][] = [
   // Exact-prefix match – order from most-specific to least-specific
+  ["/api/reels/readout", 10, 60_000],
   ["/api/customizations/upload", 5, 60_000],
   ["/api/customizations", 10, 60_000],
   ["/api/sky-ads/track", 30, 60_000],
