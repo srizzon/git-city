@@ -1170,14 +1170,14 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       {heistStep && <HeistPreviewStrip step={heistStep} onStep={pickHeist} />}
 
       {/* The bar: a row of words on a desktop, a tab bar of icons on a phone; Drive raised in the middle. */}
-      {/* The city of the day rides on the bar: as wide as it on a desktop, resting on the raised Drive on a phone. */}
+      {/* The city of the day rides on the bar: as wide as it on a desktop; on a phone it runs into the tab bar, the raised Drive standing in its bottom padding. */}
       {!inCar && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2">
         {heistCard && heist?.view && (
-          <div className="flex w-0 min-w-full flex-col gap-px max-sm:mb-[18px]">
+          <div className="flex w-0 min-w-full flex-col gap-px">
             {/* On a phone the map's credit moves up here, off the bar's gap the strip now fills. */}
             <span className="mb-1 ml-1.5 text-[8px] normal-case leading-tight text-muted/60 sm:hidden">{t("Map data: IBGE · Natural Earth", "Dados do mapa: IBGE · Natural Earth")}</span>
-            <HeistStrip city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onPick={(side) => pickHeist(side)} />
+            <HeistStrip city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onPick={(side) => pickHeist(side)} className="max-sm:border-b-0 max-sm:pb-[26px]" />
           </div>
         )}
         <nav className={`pointer-events-auto relative grid ${election ? "grid-cols-5" : "grid-cols-4"} items-end gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:flex sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>

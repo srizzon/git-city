@@ -24,7 +24,7 @@ const COP = SIDE_COLOR.cop;
  * (or live there, a cop already) only yours stays a button and goes there;
  * the other turns into a faded outline.
  */
-export function HeistStrip({ city, side, resident, onPick }: { city: HeistCity; side: HeistSide | null; resident: boolean; onPick: (side: HeistSide) => void }) {
+export function HeistStrip({ city, side, resident, onPick, className = "" }: { city: HeistCity; side: HeistSide | null; resident: boolean; onPick: (side: HeistSide) => void; className?: string }) {
   const t = useT();
   const mine: HeistSide | null = resident ? "cop" : side;
   const pick = (s: HeistSide) => {
@@ -45,7 +45,7 @@ export function HeistStrip({ city, side, resident, onPick }: { city: HeistCity; 
     );
   };
   return (
-    <div className="pointer-events-auto grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 border-[3px] border-border bg-bg-raised p-1.5 font-pixel uppercase">
+    <div className={`pointer-events-auto grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 border-[3px] border-border bg-bg-raised p-1.5 font-pixel uppercase ${className}`}>
       {pick("robber")}
       <div className="flex flex-col items-center gap-1 px-1">
         <span className="flex items-center gap-1.5 text-[11px] leading-none text-cream sm:text-[12px]">
