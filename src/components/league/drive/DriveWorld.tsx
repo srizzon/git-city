@@ -513,7 +513,10 @@ export default function DriveWorld({
   /** A blast at (x, z) meters throws every bot in reach, harder the closer. */
   const blastBots = (x: number, z: number, reach: number, power: number, fx?: { id: number; mine: boolean }) => {
     smashApi.current?.blast(x, z, reach, fx);
-    for (const t of botTargets.current.values()) {
+    // The city of the day's game cars are stunned, never thrown (they'd fly off the streets).
+    heistApi.current?.blast(x, z, reach);
+    for (const [id, t] of botTargets.current) {
+      if (id.startsWith("bot:heist")) continue;
       const p = t.pos();
       if (!p) continue;
       const d = Math.hypot(p.x - x, p.z - z);
@@ -525,7 +528,10 @@ export default function DriveWorld({
     }
   };
   const onRemoteHit = (id: string, other: RapierRigidBody) => {
-    if (id.startsWith("bot:heist")) heistApi.current?.contact(id);
+    if (id.startsWith("bot:heist")) {
+      heistApi.current?.contact(id);
+      return;
+    }
     if (id.startsWith("bot:")) {
       // Nobody to tell: the bot takes the hit here, as hard as you came in.
       const c = car.current;

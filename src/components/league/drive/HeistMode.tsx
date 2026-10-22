@@ -42,6 +42,8 @@ export interface HeistApi {
   knocked: () => void;
   /** A kit key, from the keyboard or the phone's buttons. */
   use: (key: KitSlot["key"]) => void;
+  /** A blast went off (m): game cars in reach are stunned (they never fly). */
+  blast: (x: number, z: number, reach: number) => void;
 }
 
 export interface HeistDriveProps {
@@ -68,8 +70,13 @@ const COP_SPEED = 23;
 const COP_TURN = 2.2;
 const GANG_SPEED = 17;
 /** How close (m) a game car has to be to hit you, and how often one can. */
-const RAM_REACH = 4.2;
 const RAM_EVERY_MS = 1400;
+/** A game cop only hurts you coming in at this speed (m/s); slower, or rammed by you, it's just stunned. */
+const RAM_SPEED = 8;
+const STUN_MS = 1500;
+const BLAST_STUN_MS = 2500;
+/** How long the HUD says what just hit you (ms). */
+const HIT_SHOWN_MS = 1300;
 const SHOT_SPEED = 42;
 const SHOT_LIFE = 3;
 const SHOT_HIT = 2.6;
@@ -94,8 +101,9 @@ interface Npc {
   lot?: Lot | null;
   prev?: Lot | null;
   next?: Lot | null;
-  /** Slowed (blue screen) or held (magnet) until (ms). */
+  /** Slowed (blue screen), or stopped (a crash or a blast) until (ms). */
   slowUntil?: number;
+  stunUntil?: number;
   pulledUntil?: number;
   lastRam: number;
   buffer: SnapshotBuffer;
@@ -323,12 +331,16 @@ export default function HeistMode({
   };
 
   /** A hit on a robber: one heart; `cop` names a real cop for the bust. */
-  const hurt = (cop?: string) => {
+  /** What hit you last and when, for the HUD. */
+  const lastHurt = useRef<{ why: NonNullable<HeistView["robber"]>["hit"]; at: number } | null>(null);
+
+  const hurt = (why: NonNullable<NonNullable<HeistView["robber"]>["hit"]>, cop?: string) => {
     if (props.current.side !== "robber" || bustAt.current !== null) return;
     const now = performance.now();
     if (cop) lastCop.current = { id: cop, at: now };
     if (now - lastHit.current < 700) return;
     lastHit.current = now;
+    lastHurt.current = { why, at: now };
     hearts.current = Math.max(0, hearts.current - 1);
     if (!silent.current) ding.current?.play();
     if (hearts.current === 0) busted();
@@ -412,7 +424,11 @@ export default function HeistMode({
       if (n?.id.startsWith("bot:heist-cop")) {
         if (now - n.lastRam < RAM_EVERY_MS) return;
         n.lastRam = now;
-        hurt();
+        // Coming at you at speed it costs a heart; either way it backs off and stalls a moment.
+        const hit = (n.stunUntil ?? 0) < now && n.v > RAM_SPEED;
+        n.stunUntil = now + STUN_MS;
+        n.v = -4;
+        if (hit) hurt("cop");
       } else if (n?.id.startsWith("bot:heist-gang") && props.current.side === "cop") {
         const me = car.current?.body.linvel();
         if (!me || Math.hypot(me.x, me.z) < 6 || now - n.lastRam < 800) return;
@@ -422,10 +438,14 @@ export default function HeistMode({
       }
     },
     bumped: (from) => {
-      if (sides.current.get(from) === "cop") hurt(from);
+      if (sides.current.get(from) === "cop") hurt("cop", from);
     },
-    knocked: () => hurt(lastCop.current?.id),
+    knocked: () => hurt("blast", lastCop.current?.id),
     use,
+    blast: (x, z, reach) => {
+      const now = performance.now();
+      for (const n of npcs.current) if (Math.hypot(n.x - x, n.z - z) < reach) n.stunUntil = now + BLAST_STUN_MS;
+    },
   };
 
   const gangBusted = (n: Npc) => {
@@ -469,7 +489,7 @@ export default function HeistMode({
         } else if (target && target === me && typeof m.from === "string") {
           if (m.item === "magnet") {
             tether.current = { from: m.from, until: now + RULES.magnetMs };
-            hurt(m.from);
+            hurt("magnet", m.from);
           } else if (m.item === "bluescreen") {
             lastCop.current = { id: m.from, at: now };
             setFlash({ kind: "bluescreen", by: remotes.current.get(m.from)?.name ?? null }, RULES.bluescreenMs);
@@ -601,6 +621,14 @@ export default function HeistMode({
         n.z += (body.z - n.z) * Math.min(1, dt * 2);
       }
       const slow = (n.slowUntil ?? 0) > now ? 0.35 : 1;
+      // Stunned: it rolls to a stop where it is.
+      if ((n.stunUntil ?? 0) > now) {
+        n.v *= Math.max(0, 1 - dt * 3);
+        n.x += Math.sin(n.h) * n.v * dt;
+        n.z += Math.cos(n.h) * n.v * dt;
+        record(n, now);
+        continue;
+      }
       if (n.id.startsWith("bot:heist-cop")) {
         // Pursuit: where you'll be in a moment, or the duck.
         const tx = activeDuck ? activeDuck.x : p.x + v.x * 0.6;
@@ -628,11 +656,6 @@ export default function HeistMode({
         }
       }
       record(n, now);
-      // A cop car that reaches you rams (Rapier's contact tells `contact`; this catches a near miss at speed).
-      if (n.id.startsWith("bot:heist-cop") && Math.hypot(n.x - p.x, n.z - p.z) < RAM_REACH && now - n.lastRam > RAM_EVERY_MS) {
-        n.lastRam = now;
-        hurt();
-      }
     }
     if (feedsChanged) pushFeeds();
 
@@ -660,7 +683,7 @@ export default function HeistMode({
       if (Math.hypot(s.x - p.x, s.y - p.y, s.z - p.z) < SHOT_HIT) {
         c.body.applyImpulse({ x: s.vx * 0.08 * CHASSIS.mass, y: 2 * CHASSIS.mass, z: s.vz * 0.08 * CHASSIS.mass }, true);
         lastTurret.current = { login: s.from, at: now };
-        hurt();
+        hurt("shot");
         return false;
       }
       return true;
@@ -705,6 +728,7 @@ export default function HeistMode({
               stars,
               hearts: hearts.current,
               inside,
+              hit: lastHurt.current && now - lastHurt.current.at < HIT_SHOWN_MS ? lastHurt.current.why : null,
               push: pushing ? { secsLeft: Math.max(0, Math.ceil(HEIST.pushSecs - push.current.held / 1000)), done: push.current.held / (HEIST.pushSecs * 1000), paused: copClose } : null,
             }
           : null,

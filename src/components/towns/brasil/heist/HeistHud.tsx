@@ -29,6 +29,13 @@ export default function HeistHud({ view }: { view: HeistView }) {
   const push = robber?.push ?? null;
 
   if (flash?.kind === "bluescreen") return <BlueScreen by={flash.by} />;
+  const hit = robber?.hit ?? null;
+  const hitLine: Record<NonNullable<typeof hit>, [string, string]> = {
+    cop: ["A cop car got you", "Viatura te pegou"],
+    shot: ["A building shot you", "Tiro de prédio"],
+    blast: ["Blast", "Explosão"],
+    magnet: ["Magnet", "Ímã da polícia"],
+  };
 
   // One block, every row as wide as the panel.
   return (
@@ -82,7 +89,14 @@ export default function HeistHud({ view }: { view: HeistView }) {
             </div>
           )}
 
-          {/* In the city with nothing knocked down yet: what to do. */}
+          {/* What just cost you a heart. */}
+        {hit && (
+          <Band tone="red" animate={false} className={`w-full justify-center gap-2 ${touch ? "px-2.5 py-1.5" : "px-3 py-2"}`} style={{ fontSize: T.small }}>
+            {t(hitLine[hit][0], hitLine[hit][1])} · −1 {t("heart", "vida")}
+          </Band>
+        )}
+
+        {/* In the city with nothing knocked down yet: what to do. */}
         {robber?.inside && robber.unpushed === 0 && !push && (
           <Band animate={false} className={`w-full justify-center gap-2 normal-case text-cream ${touch ? "px-2.5 py-1.5" : "px-3 py-2"}`} style={{ fontSize: T.small }}>
             {t("Ram the buildings: every floor you knock off is points", "Bata nos prédios: cada andar derrubado vira ponto")}
@@ -114,6 +128,9 @@ export default function HeistHud({ view }: { view: HeistView }) {
           )}
         </div>
       </div>
+
+      {/* A hit: the screen's edge goes red for a moment. */}
+      {hit && <div className="pointer-events-none fixed inset-0 animate-[fade-in_0.12s_ease-out] shadow-[inset_0_0_90px_24px_rgba(255,90,82,0.55)]" aria-hidden />}
 
       {flash && (
         <div className="absolute inset-0">
