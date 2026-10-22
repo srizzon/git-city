@@ -92,9 +92,26 @@ export function getBrasilState(leagueId: string): Promise<MapState & { version: 
 /** The last layout drawn on this server, by map version: drawing thousands of cities isn't free, and most views share a version. */
 let drawn: { key: string; layout: BrasilLayout } | null = null;
 
-/** The whole map from what's stored. */
-export async function getBrasilLayout(leagueId: string): Promise<{ layout: BrasilLayout; residents: Resident[]; grewAt: number | null }> {
-  const state = await getBrasilState(leagueId);
+/** Whether this login (lowercase) moved onto the map in the last 2 minutes. */
+async function placedJustNow(leagueId: string, login: string): Promise<boolean> {
+  const { data } = await getSupabaseAdmin()
+    .from("brasil_residents")
+    .select("developer_id, developers!inner(github_login)")
+    .eq("league_id", leagueId)
+    .ilike("developers.github_login", login)
+    .gte("placed_at", new Date(Date.now() - 120_000).toISOString())
+    .limit(1);
+  return !!data?.length;
+}
+
+/**
+ * The whole map from what's stored. `at`: the login a link opens (?at=, lowercase). Someone the DM just
+ * put on the map taps its link within seconds, before the cached map (up to a minute old) has them: then,
+ * and only for a login placed in the last 2 minutes, the map is read fresh.
+ */
+export async function getBrasilLayout(leagueId: string, at: string | null = null): Promise<{ layout: BrasilLayout; residents: Resident[]; grewAt: number | null }> {
+  let state = await getBrasilState(leagueId);
+  if (at && !state.residents.some((r) => r.dev.login.toLowerCase() === at) && (await placedJustNow(leagueId, at))) state = await readMapState(leagueId);
   const key = `${leagueId}:${state.version}:${state.residents.length}`;
   if (drawn?.key !== key) drawn = { key, layout: layoutFromState(state) };
   return { layout: drawn.layout, residents: state.residents, grewAt: state.grewAt };

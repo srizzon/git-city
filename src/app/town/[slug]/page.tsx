@@ -101,7 +101,8 @@ export default async function LeaguePage({ params, searchParams }: Props) {
 
   // The Brasil town is drawn as the map of Brazil: its own page.
   if (league.map === "brasil") {
-    const { layout, residents, grewAt } = await getBrasilLayout(league.id);
+    const atQuery = typeof query.at === "string" && LOGIN_RE.test(query.at.toLowerCase()) ? query.at.toLowerCase() : null;
+    const { layout, residents, grewAt } = await getBrasilLayout(league.id, atQuery);
     const [cityDevs, cityNorms, week, election, count, stateFounders, projects, projectWins] = await Promise.all([
       getCityDevsByIds(residents.map((r) => r.dev.id)),
       getCityNorms(),
