@@ -69,10 +69,13 @@ async function graphJson<T>(path: string, body: unknown): Promise<T> {
 
 /**
  * A private reply: one DM to whoever wrote the comment, within 7 days of it (Meta allows one a comment).
- * Quick replies are buttons whose tap comes back as a message with their payload (the webhook's).
+ * It's a card (a generic template: title and subtitle up to 80 characters each, a button up to 20) whose
+ * tap comes back to the webhook as a postback with the button's payload. Unlike quick replies, the card
+ * and its button show in the requests folder and on both sides of the chat.
  */
-export function privateReply(commentId: string, text: string, quickReplies: { title: string; payload: string }[] = []) {
-  const message = quickReplies.length ? { text, quick_replies: quickReplies.map((q) => ({ content_type: "text", ...q })) } : { text };
+export function privateReply(commentId: string, card: { title: string; subtitle: string; button: { title: string; payload: string } }) {
+  const element = { title: card.title, subtitle: card.subtitle, buttons: [{ type: "postback", ...card.button }] };
+  const message = { attachment: { type: "template", payload: { template_type: "generic", elements: [element] } } };
   return graphJson<{ message_id?: string }>("/me/messages", { recipient: { comment_id: commentId }, message });
 }
 
@@ -83,10 +86,17 @@ export function sendMessage(igsid: string, text: string) {
 
 /**
  * Turns on the account's webhooks (the dashboard's webhook setup alone
- * doesn't): comments, and messages when the token has the messaging
- * permission (stories that tag the account). Without it, comments alone.
+ * doesn't): comments, and messages and postbacks when the token has the
+ * messaging permission (stories that tag the account, taps on a DM's
+ * button). Without it, comments alone.
  */
 export async function subscribeToComments(): Promise<{ fields: string }> {
+  try {
+    await graph<{ success: boolean }>("/me/subscribed_apps", { subscribed_fields: "comments,messages,messaging_postbacks" }, "POST");
+    return { fields: "comments,messages,messaging_postbacks" };
+  } catch {
+    // no postbacks: try without them
+  }
   try {
     await graph<{ success: boolean }>("/me/subscribed_apps", { subscribed_fields: "comments,messages" }, "POST");
     return { fields: "comments,messages" };

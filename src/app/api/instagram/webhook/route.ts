@@ -22,6 +22,7 @@ interface WebhookBody {
     messaging?: {
       sender?: { id: string };
       message?: { mid?: string; is_echo?: boolean; attachments?: { type: string }[]; quick_reply?: { payload?: string } };
+      postback?: { payload?: string };
     }[];
   }[];
 }
@@ -56,11 +57,12 @@ export async function POST(req: Request) {
       .filter((m) => m.sender?.id && m.sender.id !== e.id && !m.message?.is_echo && m.message?.attachments?.some((a) => a.type === "story_mention"))
       .map((m) => ({ sender: m.sender!.id, mid: m.message?.mid ?? null })),
   );
-  // A tap on a DM's button (brasil-dm.ts): a message carrying its payload.
+  // A tap on a DM's button (brasil-dm.ts): a postback (a card's button) or a message carrying a quick reply's payload.
   const taps = (body.entry ?? []).flatMap((e) =>
-    (e.messaging ?? [])
-      .filter((m) => m.sender?.id && m.sender.id !== e.id && !m.message?.is_echo && m.message?.quick_reply?.payload)
-      .map((m) => ({ sender: m.sender!.id, payload: m.message!.quick_reply!.payload! })),
+    (e.messaging ?? []).flatMap((m) => {
+      const payload = m.postback?.payload ?? (m.message?.is_echo ? undefined : m.message?.quick_reply?.payload);
+      return m.sender?.id && m.sender.id !== e.id && payload ? [{ sender: m.sender.id, payload }] : [];
+    }),
   );
   if (comments.length) after(() => handleBrasilComments(comments));
   if (taps.length) after(() => handleBrasilTaps(taps));

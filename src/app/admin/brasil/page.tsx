@@ -203,7 +203,7 @@ export default function BrasilAdminPage() {
             <h2 className="text-[11px] uppercase tracking-wider text-dim">Instagram</h2>
             <div className="flex items-center gap-3 text-[11px]">
               <span className={ig?.account ? "text-lime" : "text-muted"}>{!ig ? "Loading…" : ig.account ? `@${ig.account.username}` : "Not connected"}</span>
-              <button type="button" disabled={igBusy || !ig?.account} onClick={() => igAction({ action: "sync" }, (j) => (j.fresh ? `${j.fresh} new comment${j.fresh === 1 ? "" : "s"} answered.` : "No new comments."))} className="border border-border px-3 py-1.5 text-cream hover:border-lime hover:text-lime disabled:opacity-40">
+              <button type="button" disabled={igBusy || !ig?.account} onClick={() => igAction({ action: "sync" }, (j) => `${j.fresh ? `${j.fresh} new comment${j.fresh === 1 ? "" : "s"} answered.` : "No new comments."} Webhooks: ${String(j.fields)}.`)} className="border border-border px-3 py-1.5 text-cream hover:border-lime hover:text-lime disabled:opacity-40">
                 {igBusy ? "Working…" : "Sync now"}
               </button>
             </div>

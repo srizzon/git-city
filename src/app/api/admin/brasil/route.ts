@@ -221,7 +221,9 @@ export async function POST(req: Request) {
   if (body.action === "sync") {
     try {
       const { data: account } = await getSupabaseAdmin().from("instagram_account").select("ig_user_id").eq("id", 1).maybeSingle<{ ig_user_id: string | null }>();
-      return NextResponse.json(await syncBrasilReels(account?.ig_user_id ?? null));
+      // Webhook fields turned on in Meta's dashboard since (messaging_postbacks) reach the account here.
+      const { fields } = await subscribeToComments();
+      return NextResponse.json({ ...(await syncBrasilReels(account?.ig_user_id ?? null)), fields });
     } catch (err) {
       return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 502 });
     }
