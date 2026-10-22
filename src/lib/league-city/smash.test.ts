@@ -126,6 +126,30 @@ describe("standingHeight", () => {
     expect(s.hitColumns(0, [0], 1, 1000 + SMASH.shieldMs).took).toBe(1);
   });
 
+  it("a fallen building lies in rubble with its flag for rubbleMs: time, contributions and the owner can't grow it back", () => {
+    const s = smashStoreFor([tower], 1000);
+    // First hit long before the fall: the regen clock must not count from it.
+    s.hitColumns(0, [0], 1, 0, "x");
+    const fell = 5000;
+    expect(s.hitColumns(0, Array.from({ length: 16 }, (_, c) => c), 10, fell, "killer").down).toBe(true);
+    const end = fell + SMASH.rubbleMs;
+    s.regrow(0, 3, fell + 1);
+    s.frame(end - 1, 0.016);
+    expect(s.standing(0)).toBe(0);
+    expect(s.demolishedBy.get(0)).toBe("killer");
+    s.frame(end, 0.016);
+    expect(s.rows[0]).toBe(1);
+    expect(s.demolishedBy.size).toBe(0);
+  });
+
+  it("loads rubble without the contributions made since, and keeps its flag", () => {
+    const s = smashStoreFor([tower], 1000);
+    const shieldUntil = 1000 + SMASH.shieldMs;
+    s.load([{ login: "a", rows: Array(16).fill(0), regenFrom: 1000, contribBase: 10, contribNow: 15, demolishedBy: "killer", shieldUntil }], 2000);
+    expect(s.standing(0)).toBe(0);
+    expect(s.demolishedBy.get(0)).toBe("killer");
+  });
+
   it("keeps a shielded building in the snapshot even once it's whole again", () => {
     const s = smashStoreFor([{ ...tower, floors: 1, windowsPerFloor: 1, sideWindowsPerFloor: 1 }]);
     s.hitColumns(0, [0], 1, 1000, "b");

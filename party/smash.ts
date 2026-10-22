@@ -124,7 +124,11 @@ export class SmashRoom {
     const store = new SmashStore(body.targets);
     store.load(body.damage, Date.now());
     store.takeChanged();
-    for (const d of body.damage) this.contrib.set(d.login, d.contribNow);
+    // A building in rubble keeps its saved base: the contributions since grow it back once the rubble ends.
+    for (const d of body.damage) {
+      const i = store.index.get(d.login);
+      this.contrib.set(d.login, i !== undefined && store.isRubble(i, Date.now()) ? d.contribBase : d.contribNow);
+    }
     this.store = store;
     this.lastContrib = Date.now();
     this.room.broadcast(JSON.stringify(this.all()));
@@ -284,7 +288,7 @@ export class SmashRoom {
         const i = store.index.get(d.login);
         const car = this.where(id);
         if (i === undefined || !car || !store.isDamaged(i) || Math.abs(car.speed) > REBUILD_SPEED) continue;
-        if (toFootprint(store, i, car.x * M_TO_UNIT, car.z * M_TO_UNIT) <= REBUILD_REACH) store.regrow(i, 1);
+        if (toFootprint(store, i, car.x * M_TO_UNIT, car.z * M_TO_UNIT) <= REBUILD_REACH) store.regrow(i, 1, now);
       }
       this.flush();
       if (now - this.lastContrib >= CONTRIB_MS) {
@@ -316,11 +320,14 @@ export class SmashRoom {
       const res = await fetch(`${site}/api/towns/${encodeURIComponent(this.room.id)}/smash?contrib=1`, { headers: { "cache-control": "no-cache" } });
       if (!res.ok) return;
       const { contrib } = (await res.json()) as { contrib: Record<string, number> };
+      const now = Date.now();
       for (const [login, n] of Object.entries(contrib)) {
+        const i = store.index.get(login);
+        // In rubble: the base stays, so these contributions count once it ends.
+        if (i !== undefined && store.isRubble(i, now)) continue;
         const prev = this.contrib.get(login);
         this.contrib.set(login, n);
-        const i = store.index.get(login);
-        if (prev !== undefined && i !== undefined && n > prev) store.regrow(i, n - prev);
+        if (prev !== undefined && i !== undefined && n > prev) store.regrow(i, n - prev, now);
       }
       this.flush();
     } catch (err) {

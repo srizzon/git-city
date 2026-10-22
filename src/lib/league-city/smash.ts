@@ -6,7 +6,8 @@
 // falls in a few passes, a tall one in many. Knocked-out floors grow back on
 // their own, one row every `regenMs`. A building that fell is shielded for
 // `shieldMs` (Clash of Clans' shield): it grows back before anyone can hit it
-// again, so nobody keeps a small town flat.
+// again, so nobody keeps a small town flat. It first lies in rubble for
+// `rubbleMs`, the attacker's flag planted in it: nothing grows it back sooner.
 //
 // Everything is in city units, times are epoch ms. The store is shared by the
 // drive world (which hits it) and the building renderer (which draws it), so
@@ -30,6 +31,8 @@ export const SMASH = {
   regenMs: 3_600_000,
   /** A fallen building can't be hit for this long (ms). */
   shieldMs: 12 * 3_600_000,
+  /** A fallen building stays flat, flying its attacker's flag, this long (ms). */
+  rubbleMs: 3 * 3_600_000,
   /** A column falls into the gap its lost floors leave (floors/s²), bounces a little, and grows back (floors/s). */
   gravity: 30,
   bounce: 0.22,
@@ -172,6 +175,17 @@ export class SmashStore {
     return this.shieldUntil[target] > now;
   }
 
+  /** Fell less than `rubbleMs` ago: it stays flat (time, contributions and the owner can't grow it back). */
+  isRubble(target: number, now: number): boolean {
+    return now < this.rubbleUntil(target);
+  }
+
+  /** Epoch ms the rubble may start growing back (the fall is the shield's start; 0: never fell). */
+  private rubbleUntil(target: number): number {
+    const shield = this.shieldUntil[target];
+    return shield > 0 ? shield - SMASH.shieldMs + SMASH.rubbleMs : 0;
+  }
+
   /** The room's word on a shield (epoch ms it ends, 0 for none). */
   setShield(target: number, until: number) {
     this.shieldUntil[target] = Number.isFinite(until) && until > 0 ? until : 0;
@@ -214,10 +228,11 @@ export class SmashStore {
     for (const e of entries) {
       const i = this.index.get(e.login);
       if (i === undefined) continue;
-      const back = Math.max(0, e.contribNow - e.contribBase);
+      this.setShield(i, e.shieldUntil);
+      // Contributions made while it lies in rubble wait for the rubble to end (the room keeps the old base).
+      const back = this.isRubble(i, now) ? 0 : Math.max(0, e.contribNow - e.contribBase);
       this.setRows(i, e.rows.map((r) => r + back), now, e.regenFrom, false);
       this.setBy(i, e.demolishedBy);
-      this.setShield(i, e.shieldUntil);
       if (this.damaged[i]) this.regen(i, now);
       for (let c = 0; c < cols(this.targets[i]); c++) this.shown[i * SMASH_SLOTS + c] = this.rows[i * SMASH_SLOTS + c];
     }
@@ -281,9 +296,9 @@ export class SmashStore {
     } else if (this.demolishedBy.delete(target)) this.version++;
   }
 
-  /** `n` floors back on every short column (a contribution, the owner parked by it). */
-  regrow(target: number, n: number) {
-    if (!this.damaged[target] || n <= 0) return;
+  /** `n` floors back on every short column (a contribution, the owner parked by it). Not while in rubble. */
+  regrow(target: number, n: number, now = Date.now()) {
+    if (!this.damaged[target] || n <= 0 || this.isRubble(target, now)) return;
     const t = this.targets[target];
     let full = true;
     for (let c = 0; c < cols(t); c++) {
@@ -293,10 +308,9 @@ export class SmashStore {
     }
     this.moving.add(target);
     this.changed.add(target);
-    if (full) {
-      this.damaged[target] = 0;
-      this.setBy(target, null);
-    }
+    // Off the ground again: the flag comes down.
+    this.setBy(target, null);
+    if (full) this.damaged[target] = 0;
   }
 
   /** Book-keeping after a building's floors changed. */
@@ -470,6 +484,10 @@ export class SmashStore {
 
   /** One row back on every short column per `regenMs` since the last one. */
   private regen(i: number, now: number) {
+    const hold = this.rubbleUntil(i);
+    if (now < hold) return;
+    // The first floor comes back as the rubble ends, not an hour after the first hit.
+    if (this.since[i] < hold - this.regenMs) this.since[i] = hold - this.regenMs;
     const k = Math.floor((now - this.since[i]) / this.regenMs);
     if (k <= 0) return;
     this.since[i] += k * this.regenMs;
@@ -482,10 +500,8 @@ export class SmashStore {
     }
     this.moving.add(i);
     this.changed.add(i);
-    if (full) {
-      this.damaged[i] = 0;
-      this.setBy(i, null);
-    }
+    this.setBy(i, null);
+    if (full) this.damaged[i] = 0;
   }
 }
 
