@@ -66,9 +66,23 @@ describe("HeistRoom", () => {
     h.bust("r", "c2", 5);
     expect(last("r")).toEqual({ t: "heist_busted", lost: 1 });
     expect(h.take().busts).toEqual([]);
+    h.fell("r", "robber", 0, 0);
     h.bust("r", "c", 6);
     expect(last("c")?.t).toBe("heist_bust_credit");
     expect(h.take().busts).toEqual([{ copId: 2, robberId: 1, at: 6 }]);
+    // Caught empty-handed: nothing to pay.
+    h.bust("r", "c", 7);
+    expect(h.take().busts).toEqual([]);
+  });
+
+  it("credits the building whose shot ended a run, only when the robber held something", () => {
+    const { h } = setup();
+    h.setSide("r", "robber");
+    h.bust("r", undefined, 1, "dev-a");
+    expect(h.take().turrets).toEqual([]);
+    h.fell("r", "robber", 0, 0);
+    h.bust("r", undefined, 2, "dev-a");
+    expect(h.take().turrets).toEqual([{ login: "dev-a", at: 2 }]);
   });
 
   it("pays a game-run bust only with no real robber in the room, spaced out", () => {

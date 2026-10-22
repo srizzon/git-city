@@ -88,6 +88,8 @@ interface Npc {
 }
 
 interface Shot {
+  /** The building that fired it (its owner's login). */
+  from: string;
   x: number;
   y: number;
   z: number;
@@ -182,6 +184,8 @@ export default function HeistMode({
   const push = useRef({ held: 0 });
   const pushAsked = useRef(0);
   const lastCop = useRef<{ id: string; at: number } | null>(null);
+  /** The building whose shot hit you last (its owner's login), for the bust. */
+  const lastTurret = useRef<{ login: string; at: number } | null>(null);
   const lastHit = useRef(0);
   // Cop
   const busts = useRef(heist.busts);
@@ -250,7 +254,8 @@ export default function HeistMode({
     const ring = props.current.ring;
     const now = performance.now();
     const by = lastCop.current && now - lastCop.current.at < RULES.bustCreditMs ? lastCop.current.id : undefined;
-    send({ t: "heist_bust", ...(by ? { by } : {}) });
+    const turret = !by && lastTurret.current && now - lastTurret.current.at < 500 ? lastTurret.current.login : undefined;
+    send({ t: "heist_bust", ...(by ? { by } : turret ? { turret } : {}) });
     const lost = held.current;
     setFlash({ kind: "busted", pts: lost * HEIST.building, by: by ? (remotes.current.get(by)?.name ?? null) : null }, 2600);
     resetRun();
@@ -333,7 +338,11 @@ export default function HeistMode({
     const h = carHeading(c.body);
     const fx = Math.sin(h);
     const fz = Math.cos(h);
-    if (item === "bomb" || item === "duck") send({ t: "use", kit: true, item, x: p.x - fx * 4, z: p.z - fz * 4, dx: fx, dz: fz });
+    // The bomb right behind you; the duck further back, past the camera, between you and whoever's after you.
+    if (item === "bomb" || item === "duck") {
+      const back = item === "duck" ? 14 : 4;
+      send({ t: "use", kit: true, item, x: p.x - fx * back, z: p.z - fz * back, dx: fx, dz: fz });
+    }
     else {
       const tgt = aim(item === "missile" ? 140 : 60);
       const real = tgt && !tgt.id.startsWith("bot:") ? tgt.id : undefined;
@@ -572,7 +581,7 @@ export default function HeistMode({
         const dz = aimZ - t.z;
         const dy = 1 - t.h;
         const d = Math.hypot(dx, dy, dz) || 1;
-        shots.current.push({ x: t.x, y: t.h, z: t.z, vx: (dx / d) * SHOT_SPEED, vy: (dy / d) * SHOT_SPEED, vz: (dz / d) * SHOT_SPEED, born: now });
+        shots.current.push({ from: store.targets[t.i].login, x: t.x, y: t.h, z: t.z, vx: (dx / d) * SHOT_SPEED, vy: (dy / d) * SHOT_SPEED, vz: (dz / d) * SHOT_SPEED, born: now });
       }
     }
     shots.current = shots.current.filter((s) => {
@@ -582,6 +591,7 @@ export default function HeistMode({
       if (now - s.born > SHOT_LIFE * 1000 || s.y < -1) return false;
       if (Math.hypot(s.x - p.x, s.y - p.y, s.z - p.z) < SHOT_HIT) {
         c.body.applyImpulse({ x: s.vx * 0.08 * CHASSIS.mass, y: 2 * CHASSIS.mass, z: s.vz * 0.08 * CHASSIS.mass }, true);
+        lastTurret.current = { login: s.from, at: now };
         hurt();
         return false;
       }

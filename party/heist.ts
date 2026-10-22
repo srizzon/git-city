@@ -12,7 +12,8 @@ import { HEIST, KIT, RULES, inRing, isSide, type HeistSide, type KitItem, type R
 //             after HEIST.pushSecs out of it with no real cop near (game
 //             cops live on the robber's screen, which pauses its own bar)
 //   bust      the robber's car says it's out of hearts; what it held is gone,
-//             and the real cop it names gets the bust if they're close
+//             and the real cop it names gets the bust if they're close (only
+//             when there was something to lose)
 //   kit       each side's weapons, once per RULES.kitMs each, near the city
 // Pushes and busts ride the smash save to the site, which pays them.
 
@@ -25,6 +26,12 @@ export interface HeistDayInfo {
 export interface HeistPushOut {
   attackerId: number;
   buildings: number;
+  at: number;
+}
+
+/** A building's shot ended a robber's run (its owner's login). */
+export interface HeistTurretOut {
+  login: string;
   at: number;
 }
 
@@ -48,6 +55,7 @@ export class HeistRoom {
   private lastGang = new Map<string, number>();
   private pushes: HeistPushOut[] = [];
   private busts: HeistBustOut[] = [];
+  private turrets: HeistTurretOut[] = [];
 
   constructor(
     private room: Room,
@@ -140,13 +148,19 @@ export class HeistRoom {
     this.room.getConnection(id)?.send(JSON.stringify({ t: "heist_pushed", n, pts: n * HEIST.building }));
   }
 
-  /** The robber's car ran out of hearts: what it held is gone; the real cop it names, if close, gets the bust. */
-  bust(id: string, by: unknown, now: number) {
+  /** The robber's car ran out of hearts: what it held is gone; the real cop it names, if close, gets the bust, or the building whose shot did it. */
+  bust(id: string, by: unknown, now: number, turret?: unknown) {
     const me = this.who(id);
     if (!me || this.sides.get(id) !== "robber") return;
     const lost = this.holding.get(me.login) ?? 0;
     this.holding.delete(me.login);
     this.room.getConnection(id)?.send(JSON.stringify({ t: "heist_busted", lost }));
+    // A bust counts only for a robber holding something: nobody hands a friend points by getting caught empty.
+    if (lost === 0) return;
+    if (typeof turret === "string" && /^[a-z0-9-]{1,39}$/.test(turret) && turret !== me.login && typeof by !== "string") {
+      this.turrets.push({ login: turret, at: now });
+      return;
+    }
     if (typeof by !== "string" || this.sides.get(by) !== "cop" || me.devId === null) return;
     const cop = this.who(by);
     const a = this.where(id);
@@ -184,19 +198,22 @@ export class HeistRoom {
   }
 
   hasWork(): boolean {
-    return this.pushes.length > 0 || this.busts.length > 0;
+    return this.pushes.length > 0 || this.busts.length > 0 || this.turrets.length > 0;
   }
 
   /** What the next save carries; `undo` puts it back when the save fails. */
-  take(): { heist: HeistPushOut[]; busts: HeistBustOut[]; undo: () => void } {
+  take(): { heist: HeistPushOut[]; busts: HeistBustOut[]; turrets: HeistTurretOut[]; undo: () => void } {
     const heist = this.pushes.splice(0);
     const busts = this.busts.splice(0);
+    const turrets = this.turrets.splice(0);
     return {
       heist,
       busts,
+      turrets,
       undo: () => {
         this.pushes.unshift(...heist);
         this.busts.unshift(...busts);
+        this.turrets.unshift(...turrets);
       },
     };
   }

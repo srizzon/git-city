@@ -95,7 +95,7 @@ export type ClientMsg =
   /** The city of the day (party/heist.ts): a side the site signed, the push bar filled, out of hearts (`by`: the real cop who last hit), a game-run robber busted. */
   | { t: "heist_side"; token: string }
   | { t: "heist_push" }
-  | { t: "heist_bust"; by?: string }
+  | { t: "heist_bust"; by?: string; turret?: string }
   | { t: "heist_gang_bust" }
   /** Race track only (party/race.ts): in or out for the next race. */
   | { t: "ready"; on: boolean }

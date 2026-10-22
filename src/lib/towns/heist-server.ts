@@ -11,6 +11,7 @@ import { LOT } from "../league-city/grid";
 import { UNIT_TO_M } from "../league-city/drive/tuning";
 import type { HeistBust, HeistPush } from "../league-city/smash-server";
 import { awardPoints } from "./brasil-points-server";
+import { sendHeistTurretEmail } from "../notification-senders/brasil-heist";
 import { brasiliaToday } from "./brasil-day";
 import { getBrasilLayout } from "./brasil-server";
 import type { BrasilLayout, CityLayout } from "./brasil-map";
@@ -162,6 +163,24 @@ export async function payBusts(busts: readonly HeistBust[]): Promise<void> {
   }
 }
 
+/** Counts the robbers each building stopped (its owner's row for the day). */
+export async function recordTurretBusts(devIds: Record<string, number>, turrets: readonly { login: string; at: number }[]): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const n = new Map<string, number>();
+  for (const t of turrets) {
+    const id = devIds[t.login];
+    if (id === undefined) continue;
+    const key = `${brasiliaToday(t.at)}:${id}`;
+    n.set(key, (n.get(key) ?? 0) + 1);
+  }
+  for (const [key, add] of n) {
+    const [day, id] = key.split(":");
+    const { data } = await sb.from("brasil_heist_turrets").select("busts").eq("day", day).eq("developer_id", Number(id)).maybeSingle<{ busts: number }>();
+    const { error } = await sb.from("brasil_heist_turrets").upsert({ day, developer_id: Number(id), busts: (data?.busts ?? 0) + add, updated_at: new Date().toISOString() }, { onConflict: "day,developer_id" });
+    if (error) throw error;
+  }
+}
+
 /**
  * Settles a finished day once: how much of the city stood at midnight and,
  * when it held (HEIST.standGoal), HEIST.standBonus to every cop who busted
@@ -184,6 +203,9 @@ export async function settleHeistDay(leagueId: string, day: string): Promise<boo
     for (const id of new Set((cops ?? []).map((c) => c.developer_id))) await awardPoints(id, "heist_bonus", `heist_bonus:${day}`, new Date(dayEnd(day)), HEIST.standBonus);
   }
   await sb.from("brasil_heist_days").update({ standing, settled_at: new Date().toISOString() }).eq("day", day);
+  // Owners whose building stopped robbers hear how many.
+  const { data: turrets } = await sb.from("brasil_heist_turrets").select("developer_id, busts").eq("day", day).gt("busts", 0).returns<{ developer_id: number; busts: number }[]>();
+  for (const t of turrets ?? []) await sendHeistTurretEmail({ developerId: t.developer_id, busts: t.busts, cityName: row.name, day }).catch((err) => console.error("[heist] turret email", err));
   return true;
 }
 

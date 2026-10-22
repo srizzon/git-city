@@ -388,7 +388,7 @@ export class DriveServer extends PartyRoom {
           if (v && v.dln === login && v.day === heist.info?.day && this.drivers.has(sender.id)) heist.setSide(sender.id, v.side);
         });
       } else if (t === "heist_push") heist.push(sender.id, now);
-      else if (t === "heist_bust") heist.bust(sender.id, (msg as { by?: unknown }).by, now);
+      else if (t === "heist_bust") heist.bust(sender.id, (msg as { by?: unknown }).by, now, (msg as { turret?: unknown }).turret);
       else heist.gangBust(sender.id, now);
       return;
     }

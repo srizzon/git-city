@@ -393,6 +393,7 @@ export class SmashRoom {
       ...(pending ? { floors: pending.entries, floorsBatch: pending.batch } : {}),
       ...(heist.heist.length ? { heist: heist.heist } : {}),
       ...(heist.busts.length ? { busts: heist.busts } : {}),
+      ...(heist.turrets.length ? { turrets: heist.turrets } : {}),
     });
     try {
       const res = await fetch(`${site}/api/towns/${encodeURIComponent(this.room.id)}/smash`, {

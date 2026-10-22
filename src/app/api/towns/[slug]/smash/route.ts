@@ -4,7 +4,7 @@ import { getDamage, getSmashTown, recordFalls, recordFloors, saveDamage, verifyS
 import { isRevenge, notifyDemolished } from "@/lib/notification-senders/town-demolished";
 import { captureServer } from "@/lib/posthog-server";
 import { awardSmashPoints } from "@/lib/towns/brasil-points-server";
-import { heistDay, payBusts, payPushes } from "@/lib/towns/heist-server";
+import { heistDay, payBusts, payPushes, recordTurretBusts } from "@/lib/towns/heist-server";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +67,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       if (plain.length) await awardSmashPoints(plain).catch((err) => console.error("[smash:points]", err));
       if (save.heist?.length) await payPushes(save.heist).catch((err) => console.error("[smash:heist]", err));
       if (save.busts?.length) await payBusts(save.busts).catch((err) => console.error("[smash:busts]", err));
+      if (save.turrets?.length) await recordTurretBusts(town.devIds, save.turrets).catch((err) => console.error("[smash:turrets]", err));
     }
     if (falls.length) {
       after(async () => {

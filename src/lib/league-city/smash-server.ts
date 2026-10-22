@@ -214,6 +214,8 @@ export interface SmashSave {
   /** The city of the day's pushes and busts (the Brasil map). */
   heist?: HeistPush[];
   busts?: HeistBust[];
+  /** Buildings whose shot ended a robber's run (owner's login). */
+  turrets?: { login: string; at: number }[];
 }
 
 const isId = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n > 0;
@@ -248,6 +250,7 @@ export function verifySmashSave(slug: string, body: string, signature: string | 
     heist: (Array.isArray(save.heist) ? save.heist : []).filter(
       (h) => isId(h?.attackerId) && Number.isInteger(h.buildings) && h.buildings > 0 && h.buildings <= 50 && typeof h.at === "number" && Math.abs(now - h.at) < 86_400_000,
     ),
+    turrets: (Array.isArray(save.turrets) ? save.turrets : []).filter((t) => isLogin(t?.login) && typeof t.at === "number" && Math.abs(now - t.at) < 86_400_000),
     busts: (Array.isArray(save.busts) ? save.busts : []).filter(
       (b) => isId(b?.copId) && (b.robberId === null || (isId(b.robberId) && b.robberId !== b.copId)) && typeof b.at === "number" && Math.abs(now - b.at) < 86_400_000,
     ),
