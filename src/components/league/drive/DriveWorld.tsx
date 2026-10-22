@@ -263,10 +263,22 @@ function DynamicProp({ spec }: { spec: ColliderSpec }) {
 const _fwd = new THREE.Vector3();
 
 /** Writes where you, the other cars and the bots are for the HUD's minimap. */
-function RadarFeed({ car, cars, telemetryRef }: { car: React.MutableRefObject<CarApi | null>; cars: CarFeed[]; telemetryRef: React.MutableRefObject<DriveTelemetry> }) {
+function RadarFeed({
+  car,
+  cars,
+  telemetryRef,
+  ring,
+}: {
+  car: React.MutableRefObject<CarApi | null>;
+  cars: CarFeed[];
+  telemetryRef: React.MutableRefObject<DriveTelemetry>;
+  /** The city of the day's ring (m), for the minimap. */
+  ring?: { x: number; z: number; r: number } | null;
+}) {
   const snaps = useRef<ReturnType<typeof emptySnapshot>[]>([]);
   useFrame(() => {
     const r = telemetryRef.current.radar;
+    r.heist = ring ? { x: ring.x * M_TO_UNIT, z: ring.z * M_TO_UNIT, r: ring.r * M_TO_UNIT } : null;
     const c = car.current;
     if (c) {
       r.x = c.group.position.x;
@@ -279,7 +291,7 @@ function RadarFeed({ car, cars, telemetryRef }: { car: React.MutableRefObject<Ca
     r.cars.length = 0;
     cars.forEach((f, i) => {
       const s = f.buffer.sample(t, (snaps.current[i] ??= emptySnapshot()));
-      if (s) r.cars.push({ x: s.x * M_TO_UNIT, z: s.z * M_TO_UNIT, color: f.color, bot: !!f.bot });
+      if (s) r.cars.push({ x: s.x * M_TO_UNIT, z: s.z * M_TO_UNIT, color: f.color, bot: !!f.bot, ...(f.badge ? { badge: f.badge } : {}) });
     });
   });
   return null;
@@ -668,7 +680,7 @@ export default function DriveWorld({
           <EngineSmoke car={car} stallAt={stallRef} impact={impact} />
           <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} volume={volume} />
           <EmoteBubbles carRef={car} remotes={remotes} send={send} apiRef={emoteApi ?? ownEmoteApi} sinkRef={emoteSink} chatSinkRef={chatSink} name={name} onLog={onEmoteLog} />
-          <RadarFeed car={car} cars={cars} telemetryRef={telemetryRef} />
+          <RadarFeed car={car} cars={cars} telemetryRef={telemetryRef} ring={heist?.ring ?? null} />
           <RouteArrow
             car={car}
             telemetryRef={telemetryRef}

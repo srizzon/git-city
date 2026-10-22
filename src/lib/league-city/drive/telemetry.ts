@@ -46,6 +46,8 @@ export interface RadarCar {
   z: number;
   color: string;
   bot: boolean;
+  /** The city of the day: a cop or a robber (real or game-run). */
+  badge?: "cop" | "robber";
 }
 
 export interface RadarFeed {
@@ -56,6 +58,8 @@ export interface RadarFeed {
   cars: RadarCar[];
   /** Crown Rush: where the crown is while a match runs. */
   crown: { x: number; z: number } | null;
+  /** The Brasil map's city of the day: its ring (city units), while you play it. */
+  heist?: { x: number; z: number; r: number } | null;
   /** A city race you're in: its gates in order (city units), drawn as a line. */
   raceLine?: [number, number][] | null;
 }
