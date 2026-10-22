@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, X } from "lucide-react";
+import { Bomb, Siren, X } from "lucide-react";
 import { Backdrop, Band } from "@/components/games/ui";
 import { T } from "@/components/games/kit";
 import { HEIST, defended, type HeistCity, type HeistResult, type HeistSide } from "@/lib/towns/heist";
@@ -18,54 +18,50 @@ const COP = SIDE_COLOR.cop;
 
 /** On the map: one row on top of the bar. A tap drives there; the side is picked at the ring. */
 /**
- * On the map: one block on top of the bar, in the HUD's dark with a 3px edge.
- * It says what's going on in words a first-timer gets (a fight over a city,
- * double points for knocking buildings down there) and asks for a side right
- * there; once you have one (or live there, a cop already), one button goes.
+ * On the map: a VS block on top of the bar, read at a glance. Robbers on the
+ * left, cops on the right, each half the button for its side; the city in the
+ * middle; under it the fight itself, a bar of what's down (red) against what's
+ * standing (blue), like the towns' score bar. Once you have a side (or live
+ * there, a cop already) your half is filled and goes, the other dims.
  */
 export function HeistStrip({ city, side, resident, onPick }: { city: HeistCity; side: HeistSide | null; resident: boolean; onPick: (side: HeistSide) => void }) {
   const t = useT();
   const mine: HeistSide | null = resident ? "cop" : side;
-  const title = resident
-    ? t(`${city.name} is yours: defend it`, `${city.name} é sua: defenda`)
-    : mine === "robber"
-      ? t(`${city.name}: you're a robber today`, `${city.name}: você é ladrão hoje`)
-      : mine === "cop"
-        ? t(`${city.name}: you're a cop today`, `${city.name}: você é polícia hoje`)
-        : t(`${city.name}: smash or defend`, `${city.name}: derrube ou defenda`);
-  const line =
-    mine === "robber"
-      ? t("Smash, then leave the city to keep the points", "Derrube e saia da cidade pra garantir")
-      : mine === "cop"
-        ? t("Bust whoever smashes here, points each", "Prenda quem derruba aqui, pontos por prisão")
-        : t("A building knocked down here pays double points", "Prédio derrubado aqui vale pontos em dobro");
-  const btn = "flex h-9 items-center justify-center gap-1.5 border-[3px] px-3 text-[10px] transition-colors active:translate-y-px sm:text-[11px]";
+  const half = (s: HeistSide) => {
+    const color = s === "cop" ? COP : ROBBER;
+    const Icon = s === "cop" ? Siren : Bomb;
+    const on = mine === s;
+    const off = mine !== null && !on;
+    return (
+      <button
+        type="button"
+        disabled={off}
+        onClick={() => onPick(s)}
+        className={`flex h-12 w-full items-center gap-2 px-3 text-[11px] transition-[filter,background-color] active:translate-y-px disabled:opacity-30 sm:px-4 sm:text-[12px] ${s === "cop" ? "flex-row-reverse" : ""} ${on ? "text-bg hover:brightness-110" : "hover:bg-white/5"}`}
+        style={on ? { background: color } : { color }}
+      >
+        <Icon size={18} strokeWidth={2.5} aria-hidden />
+        {s === "cop" ? t("Cop", "Polícia") : t("Robber", "Ladrão")}
+      </button>
+    );
+  };
   return (
-    // No side yet: the two sides under the words, full width. A side: one button on the right.
-    <div className={`pointer-events-auto flex w-full gap-3 border-[3px] border-border bg-bg-raised px-3 py-2.5 font-pixel uppercase sm:px-4 ${mine ? "items-center" : "flex-col items-stretch gap-2.5"}`}>
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <span className="flex items-center gap-1.5 text-[8px] tracking-widest text-muted sm:text-[9px]">
-          <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden />
-          {t("City of the day · until midnight", "Cidade do dia · até meia-noite")}
-        </span>
-        <span className="text-[12px] leading-tight text-cream sm:text-sm">{title}</span>
-        <span className="text-[9px] normal-case leading-snug text-muted sm:text-[10px]">{line}</span>
-      </div>
-      {mine ? (
-        <button type="button" onClick={() => onPick(mine)} className={`${btn} shrink-0 text-bg hover:brightness-110`} style={{ background: mine === "cop" ? COP : ROBBER, borderColor: mine === "cop" ? COP : ROBBER }}>
-          {mine === "cop" && resident ? t("Defend", "Defender") : t("Go", "Ir")}
-          <ChevronRight size={14} strokeWidth={3} aria-hidden />
-        </button>
-      ) : (
-        <div className="grid shrink-0 grid-cols-2 gap-1.5">
-          <button type="button" onClick={() => onPick("robber")} className={`${btn} hover:bg-[#ff5a52]/15`} style={{ borderColor: ROBBER, color: ROBBER }}>
-            {t("Smash", "Derrubar")}
-          </button>
-          <button type="button" onClick={() => onPick("cop")} className={`${btn} hover:bg-[#5aa0ff]/15`} style={{ borderColor: COP, color: COP }}>
-            {t("Defend", "Defender")}
-          </button>
+    <div className="pointer-events-auto flex w-full flex-col border-[3px] border-border bg-bg-raised font-pixel uppercase">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-stretch">
+        {half("robber")}
+        <div className="flex flex-col items-center justify-center gap-1 px-2">
+          <span className="flex items-center gap-1.5 text-[11px] leading-none text-cream sm:text-[12px]">
+            <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden />
+            {city.name}
+          </span>
+          <span className="text-[8px] leading-none text-lime">{t("double pts", "pts em dobro")}</span>
         </div>
-      )}
+        {half("cop")}
+      </div>
+      <div className="flex h-1.5" role="img" aria-label={t(`${Math.round(city.standing * 100)}% standing`, `${Math.round(city.standing * 100)}% de pé`)}>
+        <span style={{ width: `${(1 - city.standing) * 100}%`, background: ROBBER }} />
+        <span className="flex-1" style={{ background: COP }} />
+      </div>
     </div>
   );
 }
