@@ -12,6 +12,7 @@ import { CHASSIS, M_TO_UNIT, STEER, WHEEL } from "@/lib/league-city/drive/tuning
 import { WHEELS } from "@/lib/league-city/drive/vehicle";
 import type { CarApi } from "./Car";
 import CarModel from "./CarModel";
+import { LightBar, RobberMark } from "./HeistMode";
 import Lights from "./Lights";
 import { Bursts, FIRE, type VoxelBursts } from "./Voxels";
 import type { FxSource, FxSources } from "./fx";
@@ -318,7 +319,9 @@ function RemoteCar({
       <group ref={group} visible={false}>
         <CarModel color={remote.color} wheelRefs={wheelRefs}>
           <Lights spots={false} braking={() => (flags.current & FLAG_BRAKE) !== 0} />
+          {remote.badge === "cop" && <LightBar />}
         </CarModel>
+        {remote.badge === "robber" && <RobberMark />}
         {!remote.bot && (
           <Html position={[0, 7.5, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
             <div className="flex items-center gap-1.5 whitespace-nowrap border-2 border-border bg-bg/80 px-1.5 py-0.5 font-pixel text-[9px] uppercase text-cream">

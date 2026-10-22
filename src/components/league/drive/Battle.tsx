@@ -110,6 +110,7 @@ export default function Battle({
   muted,
   room,
   spots: spotsOverride,
+  kitOn,
 }: {
   objects: CityObject[];
   car: React.MutableRefObject<CarApi | null>;
@@ -130,6 +131,8 @@ export default function Battle({
   room: string;
   /** Where boxes may appear, when not every road and plaza (the Brasil map: city streets only). */
   spots?: [number, number][];
+  /** The city of the day's kit is in your hands (HeistMode): no boxes to take, and F is the kit's. */
+  kitOn?: () => boolean;
 }) {
   const spots = useMemo(() => spotsOverride ?? boxSpots(objects), [objects, spotsOverride]);
   const boxes = useRef(Array.from({ length: boxCountFor(room) }, () => ({ gen: 0, at: 0 })));
@@ -289,8 +292,9 @@ export default function Battle({
     const fz = Math.cos(h);
     const me = selfId.current;
 
+    const kit = kitOn?.() ?? false;
     // Drive through a box to take it (one ask per box generation).
-    if (!held.current) {
+    if (!held.current && !kit) {
       boxes.current.forEach((b, i) => {
         if (now < b.at) return;
         const pos = boxPosition(spots, i, b.gen, UNIT_TO_M);
@@ -323,7 +327,7 @@ export default function Battle({
 
     // F: use what you hold.
     const item = held.current;
-    if (input.current.pressed.fire && item) {
+    if (input.current.pressed.fire && item && !kit) {
       held.current = null;
       telemetryRef.current.held = null;
       setHolding(false);
