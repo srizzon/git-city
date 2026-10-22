@@ -82,3 +82,154 @@ export interface HeistResult {
 
 /** The cops kept the city. */
 export const defended = (standing: number) => standing >= HEIST.standGoal;
+
+// ─── The rules in numbers ────────────────────────────────────
+// Shared by the site, the drive room (party/drive.ts: relative imports only)
+// and the client.
+
+export const RULES = {
+  /** A city needs this many buildings to be picked… */
+  minBuildings: 30,
+  /** …unless fewer than this many cities have them: then the biggest few. */
+  minCandidates: 3,
+  fallbackCandidates: 5,
+  /** The ring reaches this many lots past the city's own radius. */
+  ringPad: 1.5,
+  /** A cop this close (m) pauses the push bar. */
+  copNear: 35,
+  /** The room allows a push this much early (ms), for the clock skew between car and room. */
+  pushSlackMs: 800,
+  /** A bust names the last real cop that hit you within this long (ms)… */
+  bustCreditMs: 3000,
+  /** …and only if that cop is this close (m) when the bust lands. */
+  bustReach: 60,
+  /** Points a bust pays the cop (`bust`), and a game-run robber's. */
+  gangBust: 5,
+  /** Fewest seconds between two game-run busts paid to one cop. */
+  gangBustGapMs: 20_000,
+  /** Busts pay up to this a day per cop. */
+  bustDayCap: 100,
+  /** Stars by buildings knocked down since you came in (1 at the first). */
+  starsAt: [1, 3, 6, 10, 15],
+  /** Most game cop cars after one robber. */
+  maxGameCops: 4,
+  /** Turrets: from this many stars, the tallest this many buildings within reach (m) shoot every `turretEveryMs`. */
+  turretStars: 2,
+  turrets: 3,
+  turretReach: 120,
+  turretEveryMs: 2500,
+  /** A game-run gang for a lone cop: this many cars, each with this many hearts. */
+  gangCars: 2,
+  gangHearts: 3,
+  /** Kit recharge (ms). */
+  kitMs: { duck: 25_000, bomb: 15_000, missile: 20_000, magnet: 18_000, bluescreen: 25_000 } as Record<KitItem, number>,
+  /** The kit works this far from the city's middle (× the ring's radius): in the city and on the way out. */
+  kitReach: 2.2,
+  /** Effects (ms). */
+  duckMs: 4000,
+  magnetMs: 3000,
+  bluescreenMs: 1500,
+} as const;
+
+export const KIT_ITEMS: readonly KitItem[] = ["missile", "duck", "bomb", "magnet", "bluescreen"];
+export function isKitItem(v: unknown): v is KitItem {
+  return typeof v === "string" && (KIT_ITEMS as readonly string[]).includes(v);
+}
+/** Items only the kit has (bomb and missile are the boxes' too). */
+export function kitOnly(v: unknown): v is "duck" | "magnet" | "bluescreen" {
+  return v === "duck" || v === "magnet" || v === "bluescreen";
+}
+
+export function isSide(v: unknown): v is HeistSide {
+  return v === "robber" || v === "cop";
+}
+
+/** Stars for this many buildings knocked down since you came into the city (0…5). */
+export function starsFor(down: number): number {
+  let s = 0;
+  for (const at of RULES.starsAt) if (down >= at) s++;
+  return s;
+}
+
+/** Game cop cars after a robber with this many stars, with this many real cops in the room. */
+export function gameCops(stars: number, realCops: number): number {
+  return Math.max(0, Math.min(RULES.maxGameCops, stars) - realCops);
+}
+
+export interface Ring {
+  /** Middle and reach, meters (the drive's units). */
+  x: number;
+  z: number;
+  r: number;
+}
+
+/** A city's ring, in meters, from its square (lots) and radius (lots). */
+export function ringOf(center: readonly [number, number], radius: number, lot: number, unitToM: number): Ring {
+  return { x: center[0] * lot * unitToM, z: center[1] * lot * unitToM, r: (radius + RULES.ringPad) * lot * unitToM };
+}
+
+export const inRing = (ring: Ring, x: number, z: number) => Math.hypot(x - ring.x, z - ring.z) <= ring.r;
+
+/** 32-bit FNV-1a, for a seed from the date. */
+function hash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+export interface CityPick {
+  key: string;
+  name: string;
+  uf: string | null;
+  buildings: number;
+}
+
+/**
+ * The day's city: one of the cities with RULES.minBuildings buildings (or,
+ * while fewer than RULES.minCandidates have that many, one of the biggest
+ * RULES.fallbackCandidates), seeded by the date, never yesterday's when
+ * there's another. The island never plays.
+ */
+export function pickDayCity(cities: readonly CityPick[], day: string, yesterday: string | null = null): CityPick | null {
+  const real = cities.filter((c) => c.key !== "island" && c.buildings > 0);
+  let pool = real.filter((c) => c.buildings >= RULES.minBuildings);
+  if (pool.length < RULES.minCandidates) pool = [...real].sort((a, b) => b.buildings - a.buildings || a.key.localeCompare(b.key)).slice(0, RULES.fallbackCandidates);
+  if (pool.length === 0) return null;
+  pool = [...pool].sort((a, b) => a.key.localeCompare(b.key));
+  const fresh = pool.length > 1 && yesterday ? pool.filter((c) => c.key !== yesterday) : pool;
+  return fresh[hash(`heist:${day}`) % fresh.length];
+}
+
+// ─── Push ────────────────────────────────────────────────────
+
+export interface PushState {
+  /** Held out this long so far (ms). */
+  held: number;
+}
+
+/**
+ * One step of the push bar: it fills while you're out of the ring with points
+ * to bank and no cop near, stops while one is, and empties when you go back in.
+ * Returns true the step it fills.
+ */
+export function stepPush(p: PushState, dtMs: number, outside: boolean, copNear: boolean, unpushed: number): boolean {
+  if (!outside || unpushed <= 0) {
+    p.held = 0;
+    return false;
+  }
+  if (copNear) return false;
+  const was = p.held;
+  p.held = Math.min(HEIST.pushSecs * 1000, p.held + dtMs);
+  return was < HEIST.pushSecs * 1000 && p.held >= HEIST.pushSecs * 1000;
+}
+
+/** Points a push of this many buildings pays, under what's left of the day's cap. */
+export function pushPoints(buildings: number, paidToday: number): number {
+  return Math.max(0, Math.min(buildings * HEIST.building, HEIST.dayCap - paidToday));
+}
+
+/** Share of the city standing, from its buildings and how many fell today. */
+export function standingOf(buildings: number, fell: number): number {
+  if (buildings <= 0) return 1;
+  return Math.max(0, Math.min(1, 1 - fell / buildings));
+}
