@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { validInstagramSignature } from "@/lib/instagram";
 import { handleBrasilComments, handleStoryMentions, type IncomingComment } from "@/lib/towns/brasil-instagram";
+import { handleBrasilTaps } from "@/lib/towns/brasil-dm";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -8,8 +9,8 @@ export const maxDuration = 300;
 // ─── Instagram webhook ───────────────────────────────────────
 // Meta calls this for every comment on the connected account's posts and
 // every message it gets (a story tagging the account arrives as one), signed
-// with the app secret. Meta wants a 200 fast and retries otherwise, so both
-// are handled after the response (brasil-instagram.ts).
+// with the app secret. Meta wants a 200 fast and retries otherwise, so all
+// are handled after the response (brasil-instagram.ts, brasil-dm.ts).
 
 interface WebhookBody {
   entry?: {
@@ -20,7 +21,7 @@ interface WebhookBody {
     }[];
     messaging?: {
       sender?: { id: string };
-      message?: { mid?: string; is_echo?: boolean; attachments?: { type: string }[] };
+      message?: { mid?: string; is_echo?: boolean; attachments?: { type: string }[]; quick_reply?: { payload?: string } };
     }[];
   }[];
 }
@@ -55,7 +56,14 @@ export async function POST(req: Request) {
       .filter((m) => m.sender?.id && m.sender.id !== e.id && !m.message?.is_echo && m.message?.attachments?.some((a) => a.type === "story_mention"))
       .map((m) => ({ sender: m.sender!.id, mid: m.message?.mid ?? null })),
   );
+  // A tap on a DM's button (brasil-dm.ts): a message carrying its payload.
+  const taps = (body.entry ?? []).flatMap((e) =>
+    (e.messaging ?? [])
+      .filter((m) => m.sender?.id && m.sender.id !== e.id && !m.message?.is_echo && m.message?.quick_reply?.payload)
+      .map((m) => ({ sender: m.sender!.id, payload: m.message!.quick_reply!.payload! })),
+  );
   if (comments.length) after(() => handleBrasilComments(comments));
+  if (taps.length) after(() => handleBrasilTaps(taps));
   if (stories.length) after(() => handleStoryMentions(stories));
   return NextResponse.json({ ok: true });
 }
