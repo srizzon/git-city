@@ -326,7 +326,8 @@ export default function DriveHud({
 
       {ready && entered && <SmashNotice telemetry={telemetry} touch={touch} />}
 
-      {ready && entered && !touch && <Dash telemetry={telemetry} style={enter(0.24)} kit={kit} />}
+      {/* After the loading band has gone: it sits where the dash comes up. */}
+      {ready && loaded && entered && !touch && <Dash telemetry={telemetry} style={enter(0.24)} kit={kit} />}
 
       {/* Phone: no minimap, others' reactions under Pause. */}
       {ready && loaded && entered && touch && (
