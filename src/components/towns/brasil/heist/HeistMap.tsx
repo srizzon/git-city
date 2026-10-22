@@ -127,7 +127,7 @@ export function HeistResultTower({ result, onClose }: { result: HeistResult; onC
           <Band key={c.login} delay={80 + i * 40} className={row} style={{ fontSize: T.body }}>
             <span className="normal-case">@{c.login}</span>
             <span style={{ color: COP }}>
-              {c.busts} {t("busts", "prisões")}
+              {c.busts} {c.busts === 1 ? t("bust", "prisão") : t("busts", "prisões")}
             </span>
           </Band>
         ))}
@@ -143,7 +143,7 @@ export function HeistResultTower({ result, onClose }: { result: HeistResult; onC
           <Band tone="lime" delay={200} className={row} style={{ fontSize: T.body }}>
             <span>
               {t("You", "Você")}:{" "}
-              {result.you.side === "cop" ? `${result.you.busts ?? 0} ${t("busts", "prisões")}` : `${result.you.pts ?? 0} ${t("pts pushed", "pts com push")}`}
+              {result.you.side === "cop" ? `${result.you.busts ?? 0} ${result.you.busts === 1 ? t("bust", "prisão") : t("busts", "prisões")}` : `${result.you.pts ?? 0} ${t("pts pushed", "pts com push")}`}
             </span>
             {result.you.bonus ? <span>+{result.you.bonus} {t("bonus", "bônus")}</span> : null}
           </Band>

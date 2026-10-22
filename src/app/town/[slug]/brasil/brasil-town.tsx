@@ -186,6 +186,17 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       return false;
     }
   });
+  // Yesterday's tower only greets you: once you've clicked or pressed anything, a late answer stays away.
+  const [touchedMap, setTouchedMap] = useState(false);
+  useEffect(() => {
+    const on = () => setTouchedMap(true);
+    window.addEventListener("pointerdown", on, { once: true });
+    window.addEventListener("keydown", on, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", on);
+      window.removeEventListener("keydown", on);
+    };
+  }, []);
   const closeResult = () => {
     setResultSeen(true);
     try {
@@ -1221,7 +1232,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
 
       {/* The city of the day takes the live race's spot over the bar when no race is open. */}
       {!inCar && heist?.result && <HeistResultTower result={heist.result} onClose={() => setHeistStep("card")} />}
-      {!inCar && !heistStep && today.result && !resultSeen && <HeistResultTower result={today.result} onClose={closeResult} />}
+      {!inCar && !heistStep && today.result?.you && !resultSeen && !touchedMap && <HeistResultTower result={today.result} onClose={closeResult} />}
       {heistStep && <HeistPreviewStrip step={heistStep} onStep={pickHeist} />}
 
       {/* The bar: a row of words on a desktop, a tab bar of icons on a phone; Drive raised in the middle. */}

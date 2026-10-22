@@ -77,7 +77,7 @@ export default function HeistHud({ view }: { view: HeistView }) {
               </div>
               <div className={`flex items-baseline gap-1.5 ${touch ? "px-2.5 py-1.5" : "px-4 py-2"}`}>
                 <span className={`${touch ? "text-lg" : "text-2xl"} leading-none tabular-nums`}>{cop.busts}</span>
-                <span className={`${touch ? "text-[8px]" : "text-[9px]"} text-muted`}>{t("busts", "prisões")}</span>
+                <span className={`${touch ? "text-[8px]" : "text-[9px]"} text-muted`}>{cop.busts === 1 ? t("bust", "prisão") : t("busts", "prisões")}</span>
               </div>
             </div>
           )}
