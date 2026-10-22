@@ -45,6 +45,32 @@ export function nearestRoad(roads: ReadonlySet<string>, xm: number, zm: number, 
 }
 
 /**
+ * A road lot between `min` and `max` meters from (xm, zm), the one closest to
+ * (px, pz) (where you'd like it: behind a car, say); null with none in that band.
+ */
+export function roadAround(roads: ReadonlySet<string>, xm: number, zm: number, min: number, max: number, px: number, pz: number, lotM: number): Lot | null {
+  const r = Math.ceil(max / lotM);
+  const cx = Math.round(xm / lotM);
+  const cz = Math.round(zm / lotM);
+  let best: Lot | null = null;
+  let bestD = Infinity;
+  for (let dx = -r; dx <= r; dx++)
+    for (let dz = -r; dz <= r; dz++) {
+      const x = cx + dx;
+      const z = cz + dz;
+      if (!roads.has(lotKey(x, z))) continue;
+      const d = Math.hypot(x * lotM - xm, z * lotM - zm);
+      if (d < min || d > max) continue;
+      const want = Math.hypot(x * lotM - px, z * lotM - pz);
+      if (want < bestD) {
+        bestD = want;
+        best = [x, z];
+      }
+    }
+  return best;
+}
+
+/**
  * The next road lot from `cur` toward (tx, tz) meters (`away`: from it), not
  * back to `prev` unless it's the only way; null when `cur` has no road around.
  */

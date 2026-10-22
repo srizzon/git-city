@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lotKey } from "../placement";
-import { nearestRoad, nextRoad } from "./heist-nav";
+import { nearestRoad, nextRoad, roadAround } from "./heist-nav";
 
 // A plus-shaped crossing: roads along x = 0 and z = 0, 3 lots each way.
 const roads = new Set<string>();
@@ -20,6 +20,11 @@ describe("heist nav", () => {
     expect(nextRoad(roads, [0, 0], [-1, 0], 0, 30, L)).toEqual([0, 1]);
     expect(nextRoad(roads, [0, 0], [0, 1], 0, 30, L)).not.toEqual([0, 1]);
     expect(nextRoad(roads, [3, 0], [2, 0], 0, 0, L)).toEqual([2, 0]);
+  });
+
+  it("finds a road in a distance band, nearest where it's wanted", () => {
+    expect(roadAround(roads, 0, 0, 15, 35, -30, 0, L)).toEqual([-3, 0]);
+    expect(roadAround(roads, 0, 0, 100, 200, 0, 0, L)).toBeNull();
   });
 
   it("runs away when asked", () => {

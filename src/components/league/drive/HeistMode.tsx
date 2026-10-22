@@ -11,7 +11,7 @@ import type { SmashStore } from "@/lib/league-city/smash";
 import { CHASSIS, M_TO_UNIT, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
 import { INTERP_MS, SnapshotBuffer, emptySnapshot, type CarSnapshot, type ClientMsg } from "@/lib/league-city/drive/net";
 import { carHeading } from "@/lib/league-city/drive/vehicle";
-import { nearestRoad, nextRoad, roadSet, type Lot } from "@/lib/league-city/drive/heist-nav";
+import { nearestRoad, nextRoad, roadAround, roadSet, type Lot } from "@/lib/league-city/drive/heist-nav";
 import { LOT } from "@/lib/league-city/grid";
 import type { CityObject } from "@/lib/league-city/types";
 import { HEIST, KIT, RULES, gameCops, inRing, starsFor, stepPush, type HeistFlash, type HeistSide, type HeistView, type KitItem, type KitSlot, type Ring } from "@/lib/towns/heist";
@@ -619,11 +619,12 @@ export default function HeistMode({
       const i = [0, 1, 2, 3].find((k) => !used.has(`bot:heist-cop-${k}`)) ?? 0;
       // The blocker comes in ahead of you; the others from behind.
       const block = i === 2 && stars >= BLOCK_STARS;
-      const dist = block ? -90 : 70 + i * 12;
+      const dist = block ? -60 : 55 + i * 8;
       const side = (i % 2 ? 1 : -1) * 18;
       const sx = p.x - Math.sin(h) * dist + Math.cos(h) * side;
       const sz = p.z - Math.cos(h) * dist - Math.sin(h) * side;
-      const lot = nearestRoad(roads, sx, sz, LOT_M);
+      // On a street 40–80 m from you, as close as can be to that spot.
+      const lot = roadAround(roads, p.x, p.z, 40, 80, sx, sz, LOT_M) ?? nearestRoad(roads, p.x, p.z, LOT_M);
       const n = npcAt(`bot:heist-cop-${i}`, lot ? lot[0] * LOT_M : sx, lot ? lot[1] * LOT_M : sz, h + (block ? Math.PI : 0));
       n.block = block;
       npcs.current.push(n);
@@ -676,9 +677,10 @@ export default function HeistMode({
           const go = navTo(n, roads, activeDuck.x, activeDuck.z);
           steer(n, go.x, go.z, speed, dt);
         } else if (stars <= 1) {
-          // One star: it follows, a gap behind, as fast as you and no faster.
+          // One star: it comes at full speed, then keeps a gap behind you, no faster than you.
+          const close = Math.hypot(n.x - p.x, n.z - p.z) < FOLLOW_GAP + 15;
           const go = navTo(n, roads, p.x - dirX * FOLLOW_GAP, p.z - dirZ * FOLLOW_GAP);
-          steer(n, go.x, go.z, Math.min(speed, mySpeed + 3), dt);
+          steer(n, go.x, go.z, close ? Math.min(speed, mySpeed + 3) : speed, dt);
         } else if (n.block) {
           // The blocker: to the street ahead of you, then it stops across it.
           const ax = p.x + dirX * 55;
