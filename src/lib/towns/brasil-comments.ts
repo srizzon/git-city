@@ -12,7 +12,7 @@
 // checks GitHub before placing anyone. Pure.
 
 import { STATES, parseUF, ptState, type UF } from "./brasil-map";
-import { resolveCity } from "./br-cities";
+import { citiesNamed, resolveCity } from "./br-cities";
 
 export interface ParsedComment {
   login: string | null;
@@ -65,6 +65,33 @@ export function pickReading<T extends ParsedComment>(text: string, model: T | nu
   // segurar Pernambuco") the word beside the state is just a word.
   if (!model.login && rules.login && (rules.uf || rules.place) && leftover(text, rules) <= 1) return rules;
   return model;
+}
+
+/**
+ * A reading's last word on the place. A username that is a city of the state named, or a city beside
+ * another place, is that place, not a stranger's GitHub ("Vacaria RS" → the town of Vacaria; "Planalto,
+ * Natal - RN" → Natal). With no place read, the words left after the username and links are tried as one
+ * ("Elias - Pará de minas MG" → Pará de Minas), so a comment that names its city doesn't land in the
+ * state's capital. A lone word with no state stays a username: it's usually one.
+ */
+export function settlePlace<T extends ParsedComment>(text: string, r: T): T {
+  if (r.login) {
+    const named = citiesNamed(r.login.replace(/-/g, " "));
+    if ((r.uf && named.some((c) => c.uf === r.uf)) || (named.length && r.place)) return { ...r, login: null, place: r.place ?? r.login };
+  }
+  if (r.place) return r;
+  const rest = text
+    .replace(/https?:\/\/\S+|(?:www\.)?github\.com\/\S+/gi, " ")
+    .replace(/@[\w.]+/g, " ")
+    .replace(r.login ? new RegExp(r.login.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi") : /$^/, " ")
+    .replace(/\b(?:user|usu[aá]rio|github|cidade)\b\s*:?/gi, " ")
+    .replace(/[-,/:|()]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  // The state written out at the end ("Bom Jesus da Lapa Bahia"): resolveCity reads only a UF there.
+  const state = r.uf ? fold(STATES.find((x) => x.uf === r.uf)!.name) : null;
+  const words = state && fold(rest).endsWith(` ${state}`) ? rest.slice(0, rest.length - state.length).trim() : rest;
+  return words && resolveCity(words, r.uf).kind === "city" ? { ...r, place: words } : r;
 }
 
 /**

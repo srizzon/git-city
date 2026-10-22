@@ -34,7 +34,7 @@ import { getSupabaseAdmin } from "../supabase";
 import { instagramCommentText, instagramComments, instagramMe, instagramThread, instagramUsernameOf, replyToComment } from "../instagram";
 import { getLeagueBySlug } from "../leagues/service";
 import { BRASIL_SLUG, importBrasilComment, type ImportResult, type ReelKind } from "./brasil-server";
-import { parseComment, parseVote, pickReading, replyFor, voteIn, voteReply, voteRoute } from "./brasil-comments";
+import { parseComment, parseVote, pickReading, replyFor, settlePlace, voteIn, voteReply, voteRoute } from "./brasil-comments";
 import { candidateByNumber, castVote } from "./brasil-election-server";
 import type { UF } from "./brasil-map";
 import { answeredCity, confirmedLogin, readComment, suggestLogin, type ThreadLine } from "./comment-ai";
@@ -324,8 +324,16 @@ export async function handleStoryMentions(stories: { sender: string; mid: string
   }
 }
 
+type Reading = { login: string | null; uf: UF | null; place: string | null; reader: "rules" | "model" | "confirm" };
+
+/** What a comment says (readComment below), its place settled (settlePlace: a city taken for a username, a city missed). */
+async function read(c: IncomingComment, own: string, loneHandle: boolean): Promise<Reading> {
+  const r = await readComment_(c, own, loneHandle);
+  return r.reader === "confirm" ? r : settlePlace(c.text, r);
+}
+
 /** What a comment says: a yes to our suggestion, the rules for a plain one-word comment, else the model (the rules if it can't). */
-async function read(c: IncomingComment, own: string, loneHandle: boolean): Promise<{ login: string | null; uf: UF | null; place: string | null; reader: "rules" | "model" | "confirm" }> {
+async function readComment_(c: IncomingComment, own: string, loneHandle: boolean): Promise<Reading> {
   const rules = { ...parseComment(c.text, { ignore: [own], reply: !!c.parentId, loneHandle }), reader: "rules" as const };
   const plain = c.text.trim().split(/\s+/).length === 1 && !c.text.includes("@");
   if (!c.parentId && plain) return rules;

@@ -34,6 +34,8 @@ export const CITIES: BrCity[] = (RAW as [number, string, string, number, number,
 
 const BY_IBGE = new Map(CITIES.map((c) => [c.ibge, c]));
 export const cityOf = (ibge: number): BrCity | undefined => BY_IBGE.get(ibge);
+/** The cities with exactly this name (any accents or case), every state's. */
+export const citiesNamed = (name: string): BrCity[] => BY_NAME.get(normalize(name)) ?? [];
 
 /** Each state's capital. */
 export const CAPITAL_OF = new Map(CITIES.filter((c) => c.capital).map((c) => [c.uf, c]));

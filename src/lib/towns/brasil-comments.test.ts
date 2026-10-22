@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseComment, parseVote, pickReading, replyFor, voteIn, voteReply, voteRoute } from "./brasil-comments";
+import { parseComment, parseVote, pickReading, settlePlace, replyFor, voteIn, voteReply, voteRoute } from "./brasil-comments";
 
 describe("parseComment", () => {
   it.each([
@@ -253,5 +253,22 @@ describe("voteReply", () => {
   });
   it("says both when one comment put them on the map and voted", () => {
     expect(voteReply("voted", 32, "gustavoguanabara", { login: "ianakiles", where: "em Manaus" })).toContain("ianakiles tá no mapa em Manaus e seu voto no 32 (gustavoguanabara)");
+  });
+});
+
+describe("settlePlace", () => {
+  it("takes a city read as a username for the place", () => {
+    expect(settlePlace("Vacaria RS", { login: "vacaria", uf: "RS", place: null })).toEqual({ login: null, uf: "RS", place: "vacaria" });
+    expect(settlePlace("Crato ce", { login: "crato", uf: "CE", place: null })).toEqual({ login: null, uf: "CE", place: "crato" });
+    expect(settlePlace("Planalto, Natal - Rio Grande do Norte", { login: "planalto", uf: "RN", place: "natal" })).toEqual({ login: null, uf: "RN", place: "natal" });
+  });
+  it("finds the city a reading missed in the words left", () => {
+    expect(settlePlace("Elias - Pará de minas MG", { login: "elias", uf: "MG", place: null }).place).toBe("Pará de minas MG");
+    expect(settlePlace("User:snoopycod cidade:Bom Jesus da lapa Bahia", { login: "snoopycod", uf: "BA", place: null }).place).toBe("Bom Jesus da lapa");
+    expect(settlePlace("Sabará Mg https://github.com/victorhrc242", { login: "victorhrc242", uf: "MG", place: null }).place).toBe("Sabará Mg");
+  });
+  it("leaves a lone username and a state alone", () => {
+    expect(settlePlace("vitoria", { login: "vitoria", uf: null, place: null })).toEqual({ login: "vitoria", uf: null, place: null });
+    expect(settlePlace("iagofroes bahia", { login: "iagofroes", uf: "BA", place: null })).toEqual({ login: "iagofroes", uf: "BA", place: null });
   });
 });
