@@ -1160,7 +1160,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
 
       {/* Over the bar: a race anyone can still join. */}
       {!inCar && !state && !focused && !panel && !picker && liveRace && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[112px]">
+        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[76px]">
           <LiveRace
             race={liveRace}
             offset={watchRace?.offset ?? 0}
@@ -1177,7 +1177,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
 
       {/* The city of the day takes the live race's spot over the bar when no race is open. */}
       {!inCar && !state && !focused && !panel && !picker && !liveRace && heist?.view && heistStep?.startsWith("card") && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[112px]">
+        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[76px]">
           <HeistCard city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onPick={() => setHeistStep(heist.view?.side === "cop" || heist.view?.resident ? "cop" : "robber")} />
         </div>
       )}

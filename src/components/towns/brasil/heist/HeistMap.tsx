@@ -16,34 +16,37 @@ import { SIDE_COLOR } from "./kit";
 
 const ROBBER = "#ff5a52";
 const COP = SIDE_COLOR.cop;
-const BTN = "flex min-h-11 items-center gap-2 px-4 text-bg shadow-[0_6px_0_rgba(0,0,0,0.35)] transition-[filter] hover:brightness-110 active:translate-y-px";
+const BTN = "flex min-h-11 items-center gap-2 max-sm:min-h-10 px-4 text-bg shadow-[0_6px_0_rgba(0,0,0,0.35)] transition-[filter] hover:brightness-110 active:translate-y-px";
 
 export function HeistCard({ city, side, resident, onPick }: { city: HeistCity; side: HeistSide | null; resident: boolean; onPick: (side: HeistSide) => void }) {
   const t = useT();
   const mine = resident ? "cop" : side;
   return (
     <div className="pointer-events-auto flex w-[min(380px,100%)] flex-col gap-1">
-      <Band className="flex-col items-start gap-1 px-4 py-3" style={{ fontSize: T.small }}>
+      <Band className="w-full flex-col items-start gap-1 px-4 py-2.5 max-sm:px-3 max-sm:py-2" style={{ fontSize: T.small }}>
         <span className="flex w-full items-center justify-between gap-2">
           <span className="flex items-center gap-2 text-lime">
             <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden /> {t("City of the day", "Cidade do dia")}
           </span>
-          <span className="text-muted">{t("until midnight", "até meia-noite")}</span>
+          {resident ? (
+            <span style={{ color: COP }}>{t("You live here", "Você mora aqui")}</span>
+          ) : (
+            <span className="text-muted max-sm:hidden">{t("until midnight", "até meia-noite")}</span>
+          )}
         </span>
-        <span className="normal-case text-cream" style={{ fontSize: T.body }}>
-          {city.name} · {city.uf}
-        </span>
-        <span className="normal-case text-muted">
-          {t(`A building pays ${HEIST.building} today`, `Prédio vale ${HEIST.building} hoje`)} · {Math.round(city.standing * 100)}% {t("standing", "de pé")}
+        <span className="flex w-full items-baseline justify-between gap-2">
+          <span className="normal-case text-cream" style={{ fontSize: T.body }}>
+            {city.name}
+          </span>
+          <span className="shrink-0 normal-case text-muted">
+            {HEIST.building} {t("a building", "por prédio")} · {Math.round(city.standing * 100)}% {t("standing", "de pé")}
+          </span>
         </span>
       </Band>
       {mine ? (
-        <button type="button" onClick={() => onPick(mine)} className={`${BTN} justify-between`} style={{ fontSize: T.body, background: mine === "cop" ? COP : ROBBER }}>
-          <span className="flex items-center gap-2">
-            <Car size={16} aria-hidden />
-            {mine === "cop" ? (resident ? t(`You defend ${city.name}`, `Você defende ${city.name}`) : t("You're a cop today", "Você é polícia hoje")) : t("You're a robber today", "Você é ladrão hoje")}
-          </span>
-          <span>{t("Drive", "Dirigir")}</span>
+        <button type="button" onClick={() => onPick(mine)} className={`${BTN} justify-center`} style={{ fontSize: T.body, background: mine === "cop" ? COP : ROBBER }}>
+          <Car size={16} aria-hidden />
+          {mine === "cop" ? t("Defend", "Defender") : t("Smash", "Derrubar")}
         </button>
       ) : (
         <div className="grid grid-cols-2 gap-1">
