@@ -53,6 +53,9 @@ interface Blast {
   buildings: Set<string>;
 }
 
+/** A failed ask to the site (not a bad token) is tried again this many times, 2 s, 4 s, 6 s apart. */
+const AUTH_RETRIES = 3;
+
 type Where = (id: string) => { x: number; z: number; speed: number; flags: number } | null;
 
 export class SmashRoom {
@@ -172,15 +175,20 @@ export class SmashRoom {
   }
 
   /** Asks the site who the token belongs to and tells the driver whether they may smash. */
-  async auth(id: string, token: string, conn: Connection) {
+  async auth(id: string, token: string, conn: Connection, attempt = 0) {
     const d = this.drivers.get(id);
     const site = this.site();
     // Once per car: each auth costs the site a token check.
     if (!d || d.authing || d.login || !site || !this.enabled) return;
     d.authing = true;
+    let retry = false;
     try {
       const res = await fetch(`${site}/api/towns/${encodeURIComponent(this.room.id)}/smash/me`, { headers: { authorization: `Bearer ${token}` } });
-      if (!res.ok) return;
+      // A bad token is final; anything else (the site busy, a deploy, the network) is tried again, a few times.
+      if (!res.ok) {
+        retry = res.status !== 401;
+        return;
+      }
       const me = (await res.json()) as { login: string; devId: number; canSmash: boolean; home: boolean; floorsToday?: number; heist?: unknown };
       d.login = me.login.toLowerCase();
       d.canSmash = me.canSmash === true && Number.isSafeInteger(me.devId) && me.devId > 0;
@@ -194,8 +202,10 @@ export class SmashRoom {
       if (Number.isSafeInteger(me.devId) && me.devId > 0) this.onAuthed?.(id, d.login, me.devId, conn);
     } catch (err) {
       console.error("[smash] auth", err);
+      retry = true;
     } finally {
       d.authing = false;
+      if (retry && attempt < AUTH_RETRIES) setTimeout(() => void this.auth(id, token, conn, attempt + 1), 2000 * (attempt + 1));
     }
   }
 
