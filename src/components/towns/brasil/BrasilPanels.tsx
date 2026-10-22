@@ -97,8 +97,12 @@ export function BrasilSearchBar({
         }}
         role="search"
         data-bwignore="true"
-        className="flex items-stretch shadow-[0_6px_0_rgba(0,0,0,0.35)]"
+        // One block with the bar above it: the search icon under its ‹, the field after it.
+        className="flex h-10 items-stretch border-[3px] border-border bg-bg/90 shadow-[0_6px_0_rgba(0,0,0,0.35)] backdrop-blur-sm focus-within:border-lime/70"
       >
+        <button type="submit" aria-label={t("Find", "Buscar")} className="flex w-9 shrink-0 items-center justify-center border-r-2 border-border text-lime hover:text-cream">
+          <Search size={16} aria-hidden />
+        </button>
         <input
           value={query}
           onChange={(e) => {
@@ -120,12 +124,8 @@ export function BrasilSearchBar({
           data-1p-ignore="true"
           data-lpignore="true"
           data-form-type="other"
-          className="h-10 min-w-0 flex-1 border-[3px] border-border bg-bg/90 px-3 [&::-webkit-search-cancel-button]:hidden text-base normal-case text-cream outline-none backdrop-blur-sm placeholder:text-dim focus:border-lime/70 sm:text-[12px]"
+          className="min-w-0 flex-1 bg-transparent px-3 [&::-webkit-search-cancel-button]:hidden text-base normal-case text-cream outline-none placeholder:text-dim sm:text-[12px]"
         />
-        <button type="submit" aria-label={t("Find", "Buscar")} className="flex items-center bg-lime px-3 text-[11px] uppercase text-bg sm:px-4">
-          <Search size={16} className="sm:hidden" aria-hidden />
-          <span className="max-sm:hidden">{t("Find", "Buscar")}</span>
-        </button>
       </form>
       {open && q && (
         <div className="absolute inset-x-0 top-full z-40 mt-1 flex max-h-[50vh] flex-col overflow-y-auto border-[3px] border-border bg-bg/95 uppercase backdrop-blur-sm">
