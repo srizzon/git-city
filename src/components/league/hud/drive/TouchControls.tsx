@@ -22,7 +22,8 @@ import type { HeistSide, KitSlot } from "@/lib/towns/heist";
 //              teammate's name when you're parked at their building (honking
 //              opens it), and BOOST (hold, big)
 //   attack     over the speed, only while you hold one; in the Brasil map's
-//              city of the day, your side's three weapons (`kit`) instead
+//              city of the day, your side's three weapons (`kit`) in a
+//              column over BOOST instead
 // The button a prompt is teaching pulses (`lesson`). Everything sits under the
 // other HUD pieces, so their buttons still take taps.
 // `mode="drift"` (the drift spots): no auto drift (a held DRIFT only, like
@@ -309,7 +310,7 @@ export default function TouchControls({
               {t("Boost", "Turbo")}
             </button>
             {kit && (
-              <div className="absolute bottom-full left-1/2 mb-3 -translate-x-1/2">
+              <div className="absolute bottom-full right-0 mb-3 flex w-16 justify-center">
                 <KitTouch kit={kit.slots} side={kit.side} />
               </div>
             )}

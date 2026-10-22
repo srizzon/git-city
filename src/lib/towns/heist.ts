@@ -30,14 +30,15 @@ export type KitItem = "missile" | "duck" | "bomb" | "magnet" | "bluescreen";
 /** One slot of a side's kit: ready, or charging with this many seconds left. */
 export interface KitSlot {
   item: KitItem;
-  key: "1" | "2" | "3";
+  /** Q and E for the side's own two, F for the missile (F is the attack key everywhere). */
+  key: "Q" | "E" | "F";
   /** 0 when ready; otherwise 0…1 of the charge still to go. */
   charging: number;
   secs: number;
 }
 
 export const KIT: Record<HeistSide, KitItem[]> = {
-  robber: ["missile", "duck", "bomb"],
+  robber: ["duck", "bomb", "missile"],
   cop: ["magnet", "bluescreen", "missile"],
 };
 

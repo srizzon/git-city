@@ -16,7 +16,7 @@ export const IN_CAR: readonly HeistStep[] = ["pick", "robber", "push", "paused",
 const CITY = { name: "Campinas", uf: "SP", buildings: 214, standing: 0.62 };
 
 function kit(side: HeistSide, charging: number): KitSlot[] {
-  return KIT[side].map((item, i) => ({ item, key: String(i + 1) as KitSlot["key"], charging: i === 1 ? charging : 0, secs: i === 1 ? 11 : 0 }));
+  return KIT[side].map((item, i) => ({ item, key: (["Q", "E", "F"] as const)[i], charging: i === 1 ? charging : 0, secs: i === 1 ? 11 : 0 }));
 }
 
 export function heistMock(step: HeistStep): { view: HeistView | null; result: HeistResult | null } {
