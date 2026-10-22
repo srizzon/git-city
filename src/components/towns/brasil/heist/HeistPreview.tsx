@@ -76,7 +76,8 @@ export function useHeistPreview(): [HeistStep | null, (s: HeistStep) => void] {
   const [step, setStep] = useState<HeistStep | null>(() => {
     if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
     const q = new URLSearchParams(window.location.search).get("heist");
-    if (q === null) return null;
+    // ?heist=debug is the real game with the cars' aims drawn (HeistMode), not the preview.
+    if (q === null || q === "debug") return null;
     return (HEIST_STEPS as readonly string[]).includes(q) ? (q as HeistStep) : "card";
   });
   return [step, setStep];
