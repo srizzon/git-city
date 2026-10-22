@@ -126,8 +126,8 @@ export function confirmedLogin(text: string, own: string, thread: ThreadLine[]):
   return YES.test(said) ? suggested.toLowerCase() : null;
 }
 
-/** Our reply asking "joao, qual Santa Rita? Tem em MA e PB...": the login and the city name it asked about. */
-export const WHICH_CITY_RE = /^([a-z0-9-]{1,39}), qual (.{2,60}?)\? Tem em/i;
+/** Our reply asking "Opa joao, qual Santa Rita? Tem em MA e PB..." (before 2026-10-22 without "Opa"): the login and the city name it asked about. */
+export const WHICH_CITY_RE = /^(?:Opa )?([a-z0-9-]{1,39}), qual (.{2,60}?)\? Tem em/i;
 
 /** An answer ("PB", "paraíba") under our "qual Santa Rita?": that login, the city's name, and the state they said. Null when it isn't one. */
 export function answeredCity(text: string, own: string, thread: ThreadLine[]): { login: string; place: string; uf: UF } | null {

@@ -190,10 +190,10 @@ export function replyFor(outcome: string, login: string | null, uf: UF | null, k
   const pick = (lines: string[]) => lines[hash % lines.length];
   const where = place?.city ? `em ${place.city}` : uf ? ptState(uf, "in") : "na ilha";
   // "É o X?" is read back by confirmedLogin (comment-ai.ts) when they answer "sim": keep the wording.
-  if (outcome === "unknown_user" && suggestion) return `Não achei o ${login} no GitHub 🤔 É o ${suggestion}? Responde "sim" que eu coloco`;
-  if (outcome === "unknown_user") return pick([`Não achei o ${login} no GitHub 😕 Confere o user e comenta de novo`, `Hmm, ${login} não existe no GitHub. Confere aí e manda de novo!`, `Não encontrei ${login} no GitHub 🤔 Vê se o user tá certinho e comenta de novo`]);
+  if (outcome === "unknown_user" && suggestion) return `Opa, não achei o ${login} no GitHub 🤔 É o ${suggestion}? Responde "sim" que eu coloco`;
+  if (outcome === "unknown_user") return pick([`Fala! Não achei o ${login} no GitHub 😕 Confere o user e comenta de novo`, `Opa, ${login} não existe no GitHub. Dá uma conferida e manda de novo 👇`, `Hmm, não encontrei ${login} no GitHub 🤔 Vê se o user tá certinho e comenta de novo`]);
   // "login, qual X? Tem em" is read back by answeredCity (comment-ai.ts): keep the wording.
-  if (outcome === "which_city" && place?.city && place.options?.length) return `${login}, qual ${place.city}? Tem em ${list(place.options)}. Responde com o estado que eu coloco 😉`;
+  if (outcome === "which_city" && place?.city && place.options?.length) return `Opa ${login}, qual ${place.city}? Tem em ${list(place.options)}. Responde com o estado que eu coloco 😉`;
   if (kind === "city") {
     if (outcome === "added") return pick([`Pronto! O prédio do ${login} já tá na Git City 🏙️ Link na bio pra ver`, `Feito! ${login} já tem prédio na cidade 🏙️ Corre no link da bio`, `Tá na mão! Prédio do ${login} subiu na Git City 🏙️ Link na bio`]);
     if (outcome === "already") return pick([`O ${login} já tinha prédio na cidade! Link na bio pra achar 🏙️`, `${login} já tá na Git City faz tempo 😎 Link na bio pra ver seu prédio`, `Esse já tava lá! Prédio do ${login} no link da bio 🏙️`]);
@@ -284,8 +284,8 @@ export function voteReply(outcome: "voted" | "unlinked" | "number" | "young" | "
   const nn = String(number).padStart(2, "0");
   if (outcome === "voted" && joined) return `Pronto! ${joined.login} tá no mapa ${joined.where} e seu voto no ${nn}${login ? ` (${login})` : ""} tá registrado 🗳️ Dá pra trocar até domingo, 21h`;
   if (outcome === "voted") return `Voto no ${nn}${login ? ` (${login})` : ""} registrado 🗳️ Dá pra trocar até domingo, 21h`;
-  if (outcome === "unlinked") return `Seu Instagram ainda não tá no mapa 😕 Responde aqui com seu user do GitHub e sua cidade (ex: seuuser Recife) que eu te coloco e conto seu voto no ${nn}`;
-  if (outcome === "number") return `Não tem candidato ${nn} 🤔 Os números tão na urna, no link da bio`;
-  if (outcome === "young") return `Sua conta do GitHub precisa ter 30 dias pra votar 😕`;
-  return `A votação não tá aberta agora`;
+  if (outcome === "unlinked") return `Opa, seu Instagram ainda não tá na Git City 😕 Responde aqui com seu user do GitHub e sua cidade (ex: seuuser Recife) que eu te coloco e conto seu voto no ${nn}`;
+  if (outcome === "number") return `Fala! Não tem candidato ${nn} 🤔 Os números tão na urna, link na bio 👇`;
+  if (outcome === "young") return `Opa, sua conta do GitHub precisa ter 30 dias pra votar 😕`;
+  return `A votação ainda não tá aberta, fica de olho 👀`;
 }

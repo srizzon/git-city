@@ -122,7 +122,7 @@ describe("replyFor with cities", () => {
   });
   it("asks which city when the name is in several states, in words answeredCity reads back", () => {
     const r = replyFor("which_city", "joao", null, "brasil", null, { city: "Santa Rita", founded: false, options: ["MA", "PB"] })!;
-    expect(r).toBe("joao, qual Santa Rita? Tem em MA e PB. Responde com o estado que eu coloco 😉");
+    expect(r).toBe("Opa joao, qual Santa Rita? Tem em MA e PB. Responde com o estado que eu coloco 😉");
     expect(r).not.toContain("@");
   });
 });
