@@ -69,13 +69,12 @@ async function graphJson<T>(path: string, body: unknown): Promise<T> {
 
 /**
  * A private reply: one DM to whoever wrote the comment, within 7 days of it (Meta allows one a comment).
- * It's a card (a generic template: title and subtitle up to 80 characters each, a button up to 20) whose
- * tap comes back to the webhook as a postback with the button's payload. Unlike quick replies, the card
- * and its button show in the requests folder and on both sides of the chat.
+ * It's a button template (text up to 640 characters with the button inside its bubble, the ManyChat look)
+ * whose tap comes back to the webhook as a postback with the button's payload. Unlike a quick reply, the
+ * button stays on the message and shows in the requests folder too.
  */
-export function privateReply(commentId: string, card: { title: string; subtitle: string; button: { title: string; payload: string } }) {
-  const element = { title: card.title, subtitle: card.subtitle, buttons: [{ type: "postback", ...card.button }] };
-  const message = { attachment: { type: "template", payload: { template_type: "generic", elements: [element] } } };
+export function privateReply(commentId: string, text: string, button: { title: string; payload: string }) {
+  const message = { attachment: { type: "template", payload: { template_type: "button", text, buttons: [{ type: "postback", ...button }] } } };
   return graphJson<{ message_id?: string }>("/me/messages", { recipient: { comment_id: commentId }, message });
 }
 

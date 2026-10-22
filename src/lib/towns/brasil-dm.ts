@@ -1,8 +1,8 @@
 // ─── Brasil town: the DM after a comment ────────────────────
 // Someone a comment put on the map gets no public reply (Instagram flagged the
 // account for automated behavior after ~3k of them, 2026-10-21): they get a
-// private reply instead, sent as the comment is read: a card "seu prédio
-// subiu" with a "Ver meu prédio" button and no link (a link in a first DM
+// private reply instead, sent as the comment is read: "seu prédio subiu"
+// with a "Ver meu prédio" button in the bubble (a button template) and no link (a link in a first DM
 // gets hidden as spam). Their tap comes back as a postback (the webhook),
 // which opens Meta's 24h window, and the link goes then. A DM from an account they don't follow lands in their
 // requests, so the comment also gets a public "te mandei na DM" while the
@@ -45,19 +45,21 @@ function speaking(): boolean {
   return process.env.VERCEL_ENV === "production";
 }
 
-/** Card titles and subtitles stop at 80 characters. */
-const CARD_MAX = 80;
-
-/** The first DM: a card with no link, a button. Wordings picked by the login, so they vary. */
-function opening(login: string, where: string | null): { title: string; subtitle: string } {
-  const titles = where
-    ? [`Pronto, ${login}! Seu prédio subiu ${where} 🏙️`, `${login}, seu prédio já tá no mapa ${where} 🇧🇷`, `Feito! ${login} agora mora ${where} 🏙️`]
-    : [`Pronto, ${login}! Seu prédio subiu na Git City 🏙️`, `${login}, seu prédio já tá na cidade 🏙️`, `Feito! Prédio do ${login} na Git City 🏙️`];
-  const subtitles = ["Toca no botão que eu te mando o link", "Quer o link pra ver? Toca no botão", "Toca aqui embaixo pra receber o link"];
+/** The first DM: no link, a button. Wordings picked by the login, so they vary. */
+function opening(login: string, where: string | null): string {
+  const lines = where
+    ? [
+        `Pronto, ${login}! Seu prédio subiu ${where} 🏙️\n\nToca no botão aqui embaixo que eu te mando o link`,
+        `${login}, seu prédio já tá no mapa ${where} 🇧🇷\n\nQuer o link pra ver? Toca no botão`,
+        `Feito! ${login} agora mora ${where} 🏙️\n\nToca aqui embaixo pra receber o link do seu prédio`,
+      ]
+    : [
+        `Pronto, ${login}! Seu prédio subiu na Git City 🏙️\n\nToca no botão aqui embaixo que eu te mando o link`,
+        `${login}, seu prédio já tá na cidade 🏙️\n\nQuer o link pra ver? Toca no botão`,
+        `Feito! Prédio do ${login} na Git City 🏙️\n\nToca aqui embaixo pra receber o link`,
+      ];
   const hash = [...login].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
-  // A long login or city: the title without the login, then without the place.
-  const title = [titles[hash % titles.length], `Seu prédio subiu ${where ?? "na Git City"} 🏙️`, "Seu prédio subiu no mapa 🏙️"].find((t) => t.length <= CARD_MAX)!;
-  return { title, subtitle: subtitles[hash % subtitles.length] };
+  return lines[hash % lines.length];
 }
 
 const NUDGES = ["Te mandei na DM 📩", "Olha a DM 👀", "Mandei o link no direct 📩", "Corre na DM que tá lá 📩", "Te chamei no direct 👀"];
@@ -86,7 +88,7 @@ async function dmOne(q: Queued, city: boolean): Promise<"sent" | "skipped" | "fa
   if (had) return "skipped";
   const where = city ? null : q.ibge !== null && cityOf(q.ibge) ? `em ${cityOf(q.ibge)!.name}` : q.uf ? ptState(q.uf as UF, "in") : "no mapa";
   try {
-    await privateReply(q.id.replace(/^ig:/, ""), { ...opening(q.github_login, where), button: { title: "Ver meu prédio 🏙️", payload: `${PAYLOAD}${q.id}` } });
+    await privateReply(q.id.replace(/^ig:/, ""), opening(q.github_login, where), { title: "Ver meu prédio 🏙️", payload: `${PAYLOAD}${q.id}` });
   } catch (err) {
     console.error("[brasil] dm", q.id, err);
     await mark("failed");
