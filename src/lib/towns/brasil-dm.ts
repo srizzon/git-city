@@ -4,7 +4,9 @@
 // them a private reply instead, "seu prédio subiu" with a "Ver meu prédio"
 // button and no link (a link in a first DM gets hidden as spam). Their tap
 // comes back as a message (the webhook), which opens Meta's 24h window, and
-// the link goes then.
+// the link goes then. A DM from an account they don't follow lands in their
+// requests, so the comment also gets a public "te mandei na DM" while the
+// hour's public replies have room (speak, brasil-instagram.ts).
 //
 // Pace: one DM an account, ever; at most DM.perHour an hour, DM.perRun a run
 // (the cron's every 5 minutes) a random 20–40 s apart. A private reply has to
@@ -17,6 +19,7 @@ import { captureServer } from "../posthog-server";
 import { cityOf } from "./br-cities";
 import { ptState, type UF } from "./brasil-map";
 import { BRASIL_SLUG } from "./brasil-server";
+import { speak } from "./brasil-instagram";
 
 export const DM = { perHour: 60, perRun: 5 } as const;
 
@@ -59,6 +62,10 @@ function opening(login: string, where: string | null): string {
   const hash = [...login].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
   return lines[hash % lines.length];
 }
+
+const NUDGES = ["Te mandei na DM 📩", "Olha a DM 👀", "Mandei o link no direct 📩", "Corre na DM que tá lá 📩", "Te chamei no direct 👀"];
+/** Public replies the nudge leaves to the ones that ask for something (a wrong username, "qual Santa Rita?"). */
+const NUDGE_RESERVE = 3;
 
 /** Sends the queue's next DMs within the pace. */
 export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; failed: number }> {
@@ -110,6 +117,10 @@ export async function sendBrasilDms(): Promise<{ sent: number; skipped: number; 
       out.sent++;
       budget--;
       await captureServer(`ig:${q.ig_user}`, "brasil_dm_sent", { kind: where ? "brasil" : "city" });
+      const nudge = NUDGES[Math.floor(Math.random() * NUDGES.length)];
+      if (await speak(q.id, { id: q.id.replace(/^ig:/, ""), mediaId: "", text: "", igUser: q.ig_user }, nudge, NUDGE_RESERVE).catch(() => false)) {
+        await captureServer(`ig:${q.ig_user}`, "brasil_dm_nudged", {});
+      }
     } catch (err) {
       console.error("[brasil] dm", q.id, err);
       await mark("failed");

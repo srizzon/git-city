@@ -26,7 +26,9 @@
 // need an answer back (a username GitHub doesn't have, "qual Santa Rita?", a
 // vote that can't count yet). Success is silent: the building is on the map.
 // At most LIMITS.repliesPerHour replies an hour for everyone, a random 3–8 min
-// apart; the rest are logged unanswered. BRASIL_IG_REPLIES=off stops them all.
+// apart; the rest are logged unanswered. Someone placed gets a DM instead
+// (brasil-dm.ts), and a public "te mandei na DM" when the hour has room left.
+// BRASIL_IG_REPLIES=off stops them all.
 
 import { getSupabaseAdmin } from "../supabase";
 import { instagramCommentText, instagramComments, instagramMe, instagramThread, instagramUsernameOf, replyToComment } from "../instagram";
@@ -269,9 +271,10 @@ async function voteByComment(
 /**
  * Answers a comment on Instagram within the limits (see the header): off by BRASIL_IG_REPLIES=off, at most
  * LIMITS.repliesPerUserHour to one person and LIMITS.repliesPerHour to everyone, a random 3–8 min after the
- * last one. True when it was sent.
+ * last one. `reserve` leaves that many of the hour's replies to others (the DM nudge leaves room for the
+ * replies that ask for something). True when it was sent.
  */
-async function speak(id: string, c: IncomingComment, reply: string): Promise<boolean> {
+export async function speak(id: string, c: IncomingComment, reply: string, reserve = 0): Promise<boolean> {
   if (process.env.BRASIL_IG_REPLIES === "off") return false;
   const sb = getSupabaseAdmin();
   if (c.igUser) {
@@ -285,7 +288,7 @@ async function speak(id: string, c: IncomingComment, reply: string): Promise<boo
     .order("replied_at", { ascending: false })
     .limit(LIMITS.repliesPerHour)
     .returns<{ replied_at: string }[]>();
-  if ((recent ?? []).length >= LIMITS.repliesPerHour) return false;
+  if ((recent ?? []).length >= LIMITS.repliesPerHour - reserve) return false;
   const gap = (3 + Math.random() * 5) * 60_000;
   if (recent?.[0] && Date.now() - new Date(recent[0].replied_at).getTime() < gap) return false;
   // Only production speaks on Instagram: local and preview runs read real comments but just log the reply.
