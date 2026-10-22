@@ -17,31 +17,56 @@ const ROBBER = "#ff5a52";
 const COP = SIDE_COLOR.cop;
 
 /** On the map: one row on top of the bar. A tap drives there; the side is picked at the ring. */
-export function HeistStrip({ city, side, resident, onGo }: { city: HeistCity; side: HeistSide | null; resident: boolean; onGo: () => void }) {
+/**
+ * On the map: one block on top of the bar, in the HUD's dark with a 3px edge.
+ * It says what's going on in words a first-timer gets (a fight over a city,
+ * double points for knocking buildings down there) and asks for a side right
+ * there; once you have one (or live there, a cop already), one button goes.
+ */
+export function HeistStrip({ city, side, resident, onPick }: { city: HeistCity; side: HeistSide | null; resident: boolean; onPick: (side: HeistSide) => void }) {
   const t = useT();
-  const mine = resident ? "cop" : side;
+  const mine: HeistSide | null = resident ? "cop" : side;
+  const title = resident
+    ? t(`${city.name} is yours: defend it`, `${city.name} é sua: defenda`)
+    : mine === "robber"
+      ? t(`${city.name}: you're a robber today`, `${city.name}: você é ladrão hoje`)
+      : mine === "cop"
+        ? t(`${city.name}: you're a cop today`, `${city.name}: você é polícia hoje`)
+        : t(`${city.name}: smash or defend`, `${city.name}: derrube ou defenda`);
+  const line =
+    mine === "robber"
+      ? t("Smash, then leave the city to keep the points", "Derrube e saia da cidade pra garantir")
+      : mine === "cop"
+        ? t("Bust whoever smashes here, points each", "Prenda quem derruba aqui, pontos por prisão")
+        : t("A building knocked down here pays double points", "Prédio derrubado aqui vale pontos em dobro");
+  const btn = "flex h-9 items-center justify-center gap-1.5 border-[3px] px-3 text-[10px] transition-colors active:translate-y-px sm:text-[11px]";
   return (
-    <button
-      type="button"
-      onClick={onGo}
-      className="pointer-events-auto flex h-10 w-full items-center gap-2 bg-[#141417] px-3 text-left font-pixel text-[10px] uppercase shadow-[0_6px_0_rgba(0,0,0,0.35)] transition-colors hover:bg-[#1c1c20] sm:text-[11px]"
-    >
-      <span className="h-1.5 w-1.5 shrink-0 animate-pulse bg-red-500" aria-hidden />
-      <span className="shrink-0 text-lime">{t("City of the day", "Cidade do dia")}</span>
-      <span className="truncate normal-case text-cream">{city.name}</span>
-      <span className="ml-auto shrink-0" style={{ color: mine === "cop" ? COP : mine === "robber" ? ROBBER : undefined }}>
-        {resident ? (
-          t("You defend it", "Você defende")
-        ) : mine === "cop" ? (
-          t("Cop today", "Polícia hoje")
-        ) : mine === "robber" ? (
-          t("Robber today", "Ladrão hoje")
-        ) : (
-          <span className="text-muted">{t(`${HEIST.building} a building`, `${HEIST.building} por prédio`)}</span>
-        )}
-      </span>
-      <ChevronRight size={14} className="shrink-0 text-lime" aria-hidden />
-    </button>
+    // No side yet: the two sides under the words, full width. A side: one button on the right.
+    <div className={`pointer-events-auto flex w-full gap-3 border-[3px] border-border bg-bg-raised px-3 py-2.5 font-pixel uppercase sm:px-4 ${mine ? "items-center" : "flex-col items-stretch gap-2.5"}`}>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <span className="flex items-center gap-1.5 text-[8px] tracking-widest text-muted sm:text-[9px]">
+          <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden />
+          {t("City of the day · until midnight", "Cidade do dia · até meia-noite")}
+        </span>
+        <span className="text-[12px] leading-tight text-cream sm:text-sm">{title}</span>
+        <span className="text-[9px] normal-case leading-snug text-muted sm:text-[10px]">{line}</span>
+      </div>
+      {mine ? (
+        <button type="button" onClick={() => onPick(mine)} className={`${btn} shrink-0 text-bg hover:brightness-110`} style={{ background: mine === "cop" ? COP : ROBBER, borderColor: mine === "cop" ? COP : ROBBER }}>
+          {mine === "cop" && resident ? t("Defend", "Defender") : t("Go", "Ir")}
+          <ChevronRight size={14} strokeWidth={3} aria-hidden />
+        </button>
+      ) : (
+        <div className="grid shrink-0 grid-cols-2 gap-1.5">
+          <button type="button" onClick={() => onPick("robber")} className={`${btn} hover:bg-[#ff5a52]/15`} style={{ borderColor: ROBBER, color: ROBBER }}>
+            {t("Smash", "Derrubar")}
+          </button>
+          <button type="button" onClick={() => onPick("cop")} className={`${btn} hover:bg-[#5aa0ff]/15`} style={{ borderColor: COP, color: COP }}>
+            {t("Defend", "Defender")}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

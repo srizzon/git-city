@@ -91,8 +91,6 @@ export interface BrasilTownProps {
   home: { city: number | null; picked: boolean } | null;
   /** Open on a state, a city (its slug) or a building. */
   startAt: { uf: string } | { city: string } | { login: string } | null;
-  /** When Brazil last grew to make room for its cities (ms), or null: the ticker says so for a day. */
-  grewAt?: number | null;
   /** ?pick=1, back from signing in after a guest's free building: open the state picker if you're not on the map. */
   startPick?: boolean;
   /** The week's points the offices come from (last closed week, or this week so far before the first one closes), and this week's. */
@@ -130,7 +128,7 @@ const HUD_BG = "bg-bg/90";
 const HUD_EDGE = "border-border";
 const HUD_SOFT = "text-muted";
 
-export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, grewAt = null, week: officeWeek, election, count = null, startVote = null, stateFounders = {}, projects = null, projectWins = {}, startProject = null, startSheet = null }: BrasilTownProps) {
+export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, week: officeWeek, election, count = null, startVote = null, stateFounders = {}, projects = null, projectWins = {}, startProject = null, startSheet = null }: BrasilTownProps) {
   const { lang, setLang, t } = useLang();
   const router = useRouter();
   const camera = useRef<CameraApi | null>(null);
@@ -267,7 +265,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const cityBySlug = new Map(allCities.filter((c) => c.slug).map((c) => [c.slug!, c]));
     const cityOfLogin = new Map(allCities.flatMap((c) => c.devs.map((d) => [d.dev.login.toLowerCase(), c] as const)));
     const week = weekCrown(layout, now);
-    // Who arrived in the last day, newest first: the ticker over the bar and the "new" name plates.
+    // Who arrived in the last day: their name plates say "new".
     const arrivals = allCities
       .flatMap((c) => c.devs.map((d) => ({ login: d.dev.login, where: c.ibge === null ? "island" : c.name, at: d.at })))
       .filter((a) => now - a.at < 86_400_000)
@@ -955,26 +953,13 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
 
   // The map with nothing open over it: what the bar's slot shows (a live race, the city of the day, who arrived).
   const mapClear = !inCar && !state && !focused && !panel && !picker;
-  const grew = grewAt !== null && now - grewAt < 86_400_000 ? { scale: layout.scale, at: grewAt } : null;
-  const arrivals = heistStep && world.arrivals.length === 0 ? [{ login: "lu_codes", where: "Campinas", at: now - 180_000 }] : world.arrivals;
-  const hasArrivals = arrivals.length > 0 || grew !== null;
-  const arrivalsProps = {
-    arrivals,
-    grew,
-    onBrazil: () => camera.current?.flyTo(null),
-    onPick: (login: string) => {
-      const b = world.placed.get(login.toLowerCase());
-      if (!b) return;
-      posthog.capture("brasil_arrival_clicked");
-      openBuilding(b);
-    },
-  };
   // The city of the day's card takes the slot unless a race is open or we're asking for your city.
   const heistCard = mapClear && !askCity && !liveRace && !!heist?.view && !!heistStep?.startsWith("card");
   const pickHeist = (step: NonNullable<typeof heistStep>) => {
     setHeistStep(step);
     if (IN_CAR.includes(step) && !inCar) startDrive();
   };
+
 
   return (
     <main className="fixed inset-0 bg-bg font-pixel uppercase text-cream">
@@ -1157,12 +1142,11 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       )}
       {!inCar && <BrasilMinimap scale={layout.scale} cities={layout.cities} island={layout.island} camera={cameraStore} cars={carSpots} track={DRIFT_TAG} />}
       {!inCar && (
-        <span className="pointer-events-none fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 max-sm:bottom-[calc(66px+env(safe-area-inset-bottom))] max-sm:max-w-[130px] max-sm:text-[8px] max-sm:leading-tight">
+        <span className={`pointer-events-none fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 max-sm:max-w-[130px] max-sm:text-[8px] max-sm:leading-tight ${heistCard ? "max-sm:hidden" : "max-sm:bottom-[calc(66px+env(safe-area-inset-bottom))]"}`}>
           {t("Map data: IBGE · Natural Earth", "Dados do mapa: IBGE · Natural Earth")}
         </span>
       )}
 
-      {mapClear && !askCity && !liveRace && !heistCard && hasArrivals && <Arrivals {...arrivalsProps} />}
 
       {/* Over the bar: a race anyone can still join. */}
       {!inCar && !state && !focused && !panel && !picker && liveRace && (
@@ -1186,13 +1170,14 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       {heistStep && <HeistPreviewStrip step={heistStep} onStep={pickHeist} />}
 
       {/* The bar: a row of words on a desktop, a tab bar of icons on a phone; Drive raised in the middle. */}
-      {/* The city of the day rides on the bar: as wide as it on a desktop, resting on the raised Drive on a phone; who just arrived goes by on top. */}
+      {/* The city of the day rides on the bar: as wide as it on a desktop, resting on the raised Drive on a phone. */}
       {!inCar && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2">
         {heistCard && heist?.view && (
           <div className="flex w-0 min-w-full flex-col gap-px max-sm:mb-[18px]">
-            {hasArrivals && <Arrivals {...arrivalsProps} docked />}
-            <HeistStrip city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onGo={() => pickHeist(heist.view?.resident || heist.view?.side === "cop" ? "cop" : heist.view?.side === "robber" ? "robber" : "pick")} />
+            {/* On a phone the map's credit moves up here, off the bar's gap the strip now fills. */}
+            <span className="mb-1 ml-1.5 text-[8px] normal-case leading-tight text-muted/60 sm:hidden">{t("Map data: IBGE · Natural Earth", "Dados do mapa: IBGE · Natural Earth")}</span>
+            <HeistStrip city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onPick={(side) => pickHeist(side)} />
           </div>
         )}
         <nav className={`pointer-events-auto relative grid ${election ? "grid-cols-5" : "grid-cols-4"} items-end gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:flex sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
@@ -1644,67 +1629,6 @@ function DriversList({
         </ul>
       )}
     </div>
-  );
-}
-
-/** "3m", "2h": how long ago, short. */
-function ago(at: number, now: number): string {
-  const m = Math.max(1, Math.round((now - at) / 60_000));
-  return m < 60 ? `${m}m` : `${Math.round(m / 60)}h`;
-}
-
-/**
- * Who just arrived, one at a time over the bar: "@login just arrived · Campinas · 3m",
- * a tap away from their building. Whoever commented on the reel opens the map
- * and sees their name go by. When Brazil grew in the last day to make room
- * for its cities, that goes by first. `docked`: a row on top of the city of
- * the day's card, as wide as it, instead of on its own over the bar.
- */
-function Arrivals({ arrivals, grew, onPick, onBrazil, docked = false }: { arrivals: { login: string; where: string; at: number }[]; grew: { scale: number; at: number } | null; onPick: (login: string) => void; onBrazil: () => void; docked?: boolean }) {
-  const tr = useT();
-  const at = docked
-    ? "w-full bg-bg/90 shadow-[0_6px_0_rgba(0,0,0,0.35)]"
-    : "absolute bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-20 max-w-[calc(100vw-24px)] -translate-x-1/2 bg-bg/90 sm:bottom-[72px]";
-  const [i, setI] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
-  const n = Math.min(arrivals.length, 12) + (grew ? 1 : 0);
-  useEffect(() => {
-    if (n < 2) return;
-    const t = setInterval(() => {
-      setI((k) => (k + 1) % n);
-      setNow(Date.now());
-    }, 4000);
-    return () => clearInterval(t);
-  }, [n]);
-  const k = i % n;
-  if (grew && k === 0)
-    return (
-      <button
-        key="grew"
-        type="button"
-        onClick={onBrazil}
-        className={`pointer-events-auto ${at} flex animate-[fade-in_0.4s_ease-out] items-center gap-2 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream`}
-      >
-        <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
-        <span className="shrink-0 text-cream">{tr("Brazil grew", "O Brasil cresceu")}</span>
-        <span className="shrink-0 text-lime">{grew.scale}x</span>
-        <span className="shrink-0">{ago(grew.at, now)}</span>
-      </button>
-    );
-  const a = arrivals[(k - (grew ? 1 : 0)) % arrivals.length];
-  return (
-    <button
-      key={a.login}
-      type="button"
-      onClick={() => onPick(a.login)}
-      className={`pointer-events-auto ${at} flex animate-[fade-in_0.4s_ease-out] items-center gap-2 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream`}
-    >
-      <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
-      <span className="truncate normal-case text-cream">@{a.login}</span>
-      <span className="shrink-0">{tr("just arrived", "acabou de chegar")}</span>
-      <span className="min-w-0 truncate text-lime">{a.where === "island" ? tr("island", "ilha") : a.where}</span>
-      <span className="shrink-0">{ago(a.at, now)}</span>
-    </button>
   );
 }
 
