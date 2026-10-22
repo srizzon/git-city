@@ -949,7 +949,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       // private mode: asked again next time
     }
   };
-  const bar = "flex min-h-[60px] flex-col items-center justify-center gap-1.5 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
+  const bar = "flex min-h-[58px] flex-col items-center justify-center gap-1.5 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
 
   // The map with nothing open over it: what the bar's slot shows (a live race, the city of the day, who arrived).
   const mapClear = !inCar && !state && !focused && !panel && !picker;
@@ -1170,17 +1170,17 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       {heistStep && <HeistPreviewStrip step={heistStep} onStep={pickHeist} />}
 
       {/* The bar: a row of words on a desktop, a tab bar of icons on a phone; Drive raised in the middle. */}
-      {/* The city of the day rides on the bar: as wide as it on a desktop; on a phone it runs into the tab bar, the raised Drive standing in its bottom padding. */}
+      {/* The city of the day rides on the bar: as wide as it on a desktop, edge to edge over the tab bar on a phone. */}
       {!inCar && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2">
         {heistCard && heist?.view && (
           <div className="flex w-0 min-w-full flex-col gap-px">
             {/* On a phone the map's credit moves up here, off the bar's gap the strip now fills. */}
             <span className="mb-1 ml-1.5 text-[8px] normal-case leading-tight text-muted/60 sm:hidden">{t("Map data: IBGE · Natural Earth", "Dados do mapa: IBGE · Natural Earth")}</span>
-            <HeistStrip city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onPick={(side) => pickHeist(side)} className="max-sm:border-b-0 max-sm:pb-[26px]" />
+            <HeistStrip city={heist.view.city} side={heist.view.side} resident={heist.view.resident} onPick={(side) => pickHeist(side)} className="max-sm:border-x-0 max-sm:border-b-0" />
           </div>
         )}
-        <nav className={`pointer-events-auto relative grid ${election ? "grid-cols-5" : "grid-cols-4"} items-end gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:flex sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
+        <nav className={`pointer-events-auto relative grid ${election ? "grid-cols-5" : "grid-cols-4"} items-stretch gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:flex sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
           <button type="button" onClick={() => openPanel("states")} className={bar}>
             <Trophy size={18} className="sm:hidden" aria-hidden />
             {t("States", "Estados")}
@@ -1199,7 +1199,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             <MapIcon size={18} className="sm:hidden" aria-hidden />
             {t("Brazil", "Brasil")}
           </button>
-          {/* Drive is the bar's middle, lime and raised over it: the one thing to do here. */}
+          {/* Drive is the bar's middle, lime: the one thing to do here. Level with the other tabs, so whatever sits on the bar meets a straight edge. */}
           <button
             type="button"
             disabled={launching || world.devs === 0}
@@ -1207,15 +1207,19 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               posthog.capture("brasil_drive_button_clicked");
               startDrive();
             }}
-            className="-mt-5 flex min-h-[80px] flex-col items-center justify-center gap-1.5 bg-lime text-[10px] text-bg shadow-[0_-6px_0_rgba(0,0,0,0.25)] transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40 sm:mt-0 sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-6 sm:text-[11px] sm:shadow-none"
+            className="flex min-h-[58px] flex-col items-center justify-center gap-1.5 bg-lime text-[9px] text-bg transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40 sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-6 sm:text-[11px]"
           >
-            <Car size={24} className="sm:size-4" aria-hidden />
+            <Car size={18} className="sm:size-4" aria-hidden />
             {t("Drive", "Dirigir")}
           </button>
           {election && (
             <button type="button" onClick={() => openVote()} className={`${bar} relative`}>
-              {election.phase === "voting" && <span className="absolute right-[30%] top-3 h-1.5 w-1.5 animate-pulse bg-red-500 sm:static sm:order-first" aria-hidden />}
-              <Landmark size={18} className="sm:hidden" aria-hidden />
+              {election.phase === "voting" && <span className="h-1.5 w-1.5 animate-pulse bg-red-500 max-sm:hidden" aria-hidden />}
+              {/* On a phone the live dot sits on the icon's corner, like Mine's state color. */}
+              <span className="relative sm:hidden" aria-hidden>
+                <Landmark size={18} />
+                {election.phase === "voting" && <span className="absolute -right-1.5 -top-0.5 h-1.5 w-1.5 animate-pulse bg-red-500" />}
+              </span>
               {t("Vote", "Votar")}
             </button>
           )}
