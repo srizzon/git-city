@@ -1497,7 +1497,12 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             { label: "+1s", value: fmt(focused.kudos_count ?? 0) },
             { label: t("Visits", "Visitas"), value: fmt(focused.visit_count ?? 0) },
           ]}
-          primary={<InviteButton login={focused.loginLower} city={world.cityOfLogin.get(focused.loginLower) ?? null} founder={!!world.ufOf.get(focused.loginLower)?.founder} townPath={`/town/${league.slug}`} onPickCity={() => openPicker(null)} />}
+          primary={
+            <>
+              <InviteButton login={focused.loginLower} city={world.cityOfLogin.get(focused.loginLower) ?? null} founder={!!world.ufOf.get(focused.loginLower)?.founder} townPath={`/town/${league.slug}`} onPickCity={() => openPicker(null)} />
+              <GroupLink />
+            </>
+          }
           onDriveTo={() => startDrive()}
           onClose={closeBuilding}
         />
@@ -1690,6 +1695,24 @@ function InviteButton({ login, city, founder, townPath, onPickCity }: { login: s
     <button type="button" onClick={invite} className="btn-press w-full bg-lime py-2 text-[10px] text-bg">
       {copied ? t("Invite copied", "Convite copiado") : t(`Invite to ${city.name}`, `Convidar pra ${city.name}`)}
     </button>
+  );
+}
+
+/** The map's WhatsApp group, under the invite on your own building. */
+const BRASIL_GROUP_URL = "https://chat.whatsapp.com/JCeLSyoG6P6JjCGNOIsvCJ";
+
+function GroupLink() {
+  const t = useT();
+  return (
+    <a
+      href={BRASIL_GROUP_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => posthog.capture("brasil_group_clicked", { from: "building" })}
+      className="btn-press w-full border-2 border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-lime/60"
+    >
+      {t("Join the WhatsApp group", "Entrar no grupo do WhatsApp")}
+    </a>
   );
 }
 
