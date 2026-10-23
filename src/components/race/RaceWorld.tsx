@@ -141,6 +141,50 @@ function Ready({ onReady }: { onReady: () => void }) {
 /** A car's heading as a spawn's rot (degrees clockwise from north). */
 const rotOf = (heading: number) => ((Math.PI - heading) * 180) / Math.PI;
 
+/**
+ * A random grid slot can be someone's already (two arrivals, a reset to the
+ * menu): for a few seconds after `since` changes, a car with another within
+ * APART meters moves to a grid slot nobody is on. A race's countdown puts
+ * everyone on their own slot anyway.
+ */
+const APART = 6;
+const APART_MS = 4000;
+function GridApart({
+  car,
+  remotes,
+  grid,
+  since,
+}: {
+  car: React.MutableRefObject<CarApi | null>;
+  remotes: React.MutableRefObject<Map<string, { buffer: { latest: { x: number; z: number } | null } }>>;
+  grid: readonly { x: number; z: number; heading: number }[];
+  since: React.MutableRefObject<number>;
+}) {
+  const moved = useRef(-1);
+  useFrame(() => {
+    const c = car.current;
+    const now = performance.now();
+    if (!c || !since.current || now - since.current > APART_MS || moved.current === since.current) return;
+    const others = [...remotes.current.values()].flatMap((r) => (r.buffer.latest ? [r.buffer.latest] : []));
+    const crowded = (x: number, z: number) => others.some((o) => Math.hypot(o.x - x, o.z - z) < APART);
+    const p = c.body.translation();
+    if (!crowded(p.x, p.z)) return;
+    const free = grid.find((g) => !crowded(g.x, g.z));
+    if (!free) return;
+    placeCar(c.body, free.x, free.z, free.heading);
+    moved.current = since.current;
+  });
+  return null;
+}
+
+/** Mounts once the world has loaded (inside the Suspense, like Ready): the car is on its first spot now. */
+function MarkSpawned({ at }: { at: React.MutableRefObject<number> }) {
+  useEffect(() => {
+    at.current = performance.now();
+  }, [at]);
+  return null;
+}
+
 function spotSpawn(x: number, z: number, heading: number): Spawn {
   return { x: x * U, z: z * U, rot: rotOf(heading) };
 }
@@ -209,6 +253,8 @@ export default function RaceWorld({
     return spotSpawn(g.x, g.z, g.heading);
   });
   const respawnAt = useRef<Spawn | null>(null);
+  /** When the car was last put on its own grid spot (GridApart checks it isn't someone else's). */
+  const spawnedAt = useRef(0);
 
   // Held on the grid until the lights go out.
   const [frozen, setFrozen] = useState(false);
@@ -451,6 +497,7 @@ export default function RaceWorld({
         placeCar(c.body, spawn.x * UNIT_TO_M, spawn.z * UNIT_TO_M, headingFromRot(spawn.rot));
         Object.assign(c.state, newCarState(), { turbo: true });
         ghostUntil.current = performance.now() + 1500;
+        spawnedAt.current = performance.now();
       }
       send({ t: "restart" });
       restartLaps(laps.current);
@@ -660,6 +707,7 @@ export default function RaceWorld({
           updatePriority={-50}
         >
           <Walls track={track} />
+          <GridApart car={car} remotes={remotes} grid={track.grid} since={spawnedAt} />
           <Car
             spawn={spawn}
             objects={NONE}
@@ -703,6 +751,7 @@ export default function RaceWorld({
           )}
           <RaceCamera mode={camera} car={car} track={track} shot={SHOTS[stage]} shotAt={stageAt} frameLeft={frameLeft} />
           <CameraKey input={input} onToggle={onCameraToggle} />
+          <MarkSpawned at={spawnedAt} />
           <Ready onReady={onReady} />
         </Physics>
       </Suspense>
