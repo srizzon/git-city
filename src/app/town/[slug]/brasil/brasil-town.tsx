@@ -998,7 +998,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             >
               <ChevronLeft size={16} aria-hidden />
             </button>
-            <p className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap px-3">
+            <p className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap px-3">
               {place ? (
                 <>
                   <span className="h-2 w-2 shrink-0 border border-border-light" style={{ background: place.uf ? swatchOf(place.uf) : LIME }} aria-hidden />
@@ -1007,8 +1007,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
                 </>
               ) : (
                 <>
-                  <span style={{ color: LIME }}>Brasil</span>
-                  <span className="text-cream">· {fmt(world.devs)} devs</span>
+                  <span className="text-cream">{fmt(world.devs)} devs</span>
                   <span className={`truncate ${HUD_SOFT} max-sm:hidden`}>· {fmt(world.founded)} {t("cities", "cidades")}</span>
                 </>
               )}
