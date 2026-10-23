@@ -57,6 +57,8 @@ export class HeistRoom {
   private pushes: HeistPushOut[] = [];
   private busts: HeistBustOut[] = [];
   private turrets: HeistTurretOut[] = [];
+  /** Blocks knocked off the city since the last save, by anyone: how much of it still stands. */
+  private knocked = 0;
 
   constructor(
     private room: Room,
@@ -115,7 +117,10 @@ export class HeistRoom {
 
   /** A robber knocked `blocks` off a building in the city: they hold them (the HUD hears the points when they change). */
   took(id: string, login: string, blocks: number, x: number, z: number) {
-    if (blocks <= 0 || this.sides.get(id) !== "robber" || !this.inCity(x, z)) return;
+    if (blocks <= 0 || !this.inCity(x, z)) return;
+    // Every block off the city counts against it, whoever knocked it.
+    this.knocked += blocks;
+    if (this.sides.get(id) !== "robber") return;
     const was = this.holding.get(login) ?? 0;
     this.holding.set(login, was + blocks);
     const n = heldPoints(was + blocks);
@@ -204,22 +209,26 @@ export class HeistRoom {
   }
 
   hasWork(): boolean {
-    return this.pushes.length > 0 || this.busts.length > 0 || this.turrets.length > 0;
+    return this.pushes.length > 0 || this.busts.length > 0 || this.turrets.length > 0 || this.knocked > 0;
   }
 
   /** What the next save carries; `undo` puts it back when the save fails. */
-  take(): { heist: HeistPushOut[]; busts: HeistBustOut[]; turrets: HeistTurretOut[]; undo: () => void } {
+  take(): { heist: HeistPushOut[]; busts: HeistBustOut[]; turrets: HeistTurretOut[]; knocked: number; undo: () => void } {
     const heist = this.pushes.splice(0);
     const busts = this.busts.splice(0);
     const turrets = this.turrets.splice(0);
+    const knocked = this.knocked;
+    this.knocked = 0;
     return {
       heist,
       busts,
       turrets,
+      knocked,
       undo: () => {
         this.pushes.unshift(...heist);
         this.busts.unshift(...busts);
         this.turrets.unshift(...turrets);
+        this.knocked += knocked;
       },
     };
   }

@@ -216,6 +216,8 @@ export interface SmashSave {
   busts?: HeistBust[];
   /** Buildings whose shot ended a robber's run (owner's login). */
   turrets?: { login: string; at: number }[];
+  /** Blocks knocked off the city of the day since the room's last save. */
+  knocked?: number;
 }
 
 const isId = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n > 0;
@@ -251,6 +253,7 @@ export function verifySmashSave(slug: string, body: string, signature: string | 
       (h) => isId(h?.attackerId) && Number.isInteger(h.pts) && h.pts > 0 && h.pts <= 500 && typeof h.at === "number" && Math.abs(now - h.at) < 86_400_000,
     ),
     turrets: (Array.isArray(save.turrets) ? save.turrets : []).filter((t) => isLogin(t?.login) && typeof t.at === "number" && Math.abs(now - t.at) < 86_400_000),
+    knocked: Number.isSafeInteger(save.knocked) && (save.knocked as number) > 0 && (save.knocked as number) <= 1_000_000 ? save.knocked : undefined,
     busts: (Array.isArray(save.busts) ? save.busts : []).filter(
       (b) => isId(b?.copId) && (b.robberId === null || (isId(b.robberId) && b.robberId !== b.copId)) && typeof b.at === "number" && Math.abs(now - b.at) < 86_400_000,
     ),

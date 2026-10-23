@@ -237,8 +237,8 @@ export function pushPoints(pts: number, paidToday: number): number {
   return Math.max(0, Math.min(pts, HEIST.dayCap - paidToday));
 }
 
-/** Share of the city standing, from its buildings and how many fell today. */
-export function standingOf(buildings: number, fell: number): number {
-  if (buildings <= 0) return 1;
-  return Math.max(0, Math.min(1, 1 - fell / buildings));
+/** Share of the city standing: its blocks against how many were knocked off it today (any floor counts, fallen or not). */
+export function standingOf(blocks: number, knocked: number): number {
+  if (blocks <= 0) return 1;
+  return Math.max(0, Math.min(1, 1 - knocked / blocks));
 }
