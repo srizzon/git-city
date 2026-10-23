@@ -162,12 +162,19 @@ export async function placeBrasilResident(
   if (city !== null && !info) throw new Error(`brasil: unknown city ${city}`);
   const { data: current } = await sb
     .from("brasil_residents")
-    .select("ibge, lx")
+    .select("ibge, lx, city_picked")
     .eq("league_id", league.id)
     .eq("developer_id", dev.id)
-    .maybeSingle<{ ibge: number | null; lx: number | null }>();
+    .maybeSingle<{ ibge: number | null; lx: number | null; city_picked: boolean }>();
   const there = !!current && current.lx !== null;
-  if (there && (cityKeyOf(current!.ibge) === cityKeyOf(city) || !allowMove)) return { status: "already", city: current!.ibge, founded: false };
+  if (there && (cityKeyOf(current!.ibge) === cityKeyOf(city) || !allowMove)) {
+    // Placed by state in its capital, now naming that same city: it's theirs, so stop asking.
+    if (cityPicked && !current!.city_picked && cityKeyOf(current!.ibge) === cityKeyOf(city)) {
+      await sb.from("brasil_residents").update({ city_picked: true }).eq("league_id", league.id).eq("developer_id", dev.id);
+      invalidateLeague(league.id);
+    }
+    return { status: "already", city: current!.ibge, founded: false };
+  }
 
   await ensureMember(league.id, dev.id, source);
   for (let attempt = 0; attempt < 5; attempt++) {

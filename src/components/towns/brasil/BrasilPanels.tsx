@@ -474,7 +474,8 @@ export function BrasilPicker({
     const here = onMap.get(c.ibge);
     const n = here?.devs.length ?? 0;
     const founder = here?.devs.find((d) => d.founder)?.dev.login;
-    const mine = current === c.ibge;
+    // Placed by state in its capital: picking that same city confirms it, so it stays clickable.
+    const mine = current === c.ibge && !firstPick;
     const now = pending?.ibge === c.ibge;
     return (
       <li key={c.ibge}>
