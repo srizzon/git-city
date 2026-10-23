@@ -13,7 +13,7 @@ import { INTERP_MS, SnapshotBuffer, emptySnapshot, type CarSnapshot, type Client
 import { carHeading } from "@/lib/league-city/drive/vehicle";
 import { COPS, COPS_BY_STARS, FlowField, newCar, roleOf, spawnSpot, stepCop, stepGang, type Car as SimCar, type CopWorld, type Quarry } from "@/lib/league-city/drive/heist-cops";
 import { LOT } from "@/lib/league-city/grid";
-import { HEIST, KIT, RULES, inRing, starsFor, stepPush, type HeistFlash, type HeistSide, type HeistView, type KitItem, type KitSlot, type Ring } from "@/lib/towns/heist";
+import { HEIST, KIT, RULES, inRing, starsFor, stepPush, type HeistFlash, type HeistNote, type HeistSide, type HeistView, type KitItem, type KitSlot, type Ring } from "@/lib/towns/heist";
 
 // ─── City of the day, in the car ────────────────────────────
 // Everything the Brasil map's cops and robbers need on your screen; the
@@ -74,6 +74,10 @@ const STUN_MS = 1500;
 const BLAST_STUN_MS = 2500;
 /** How long the HUD says what just hit you (ms). */
 const HIT_SHOWN_MS = 1300;
+/** A cop this close to a duck (m) runs into it and spins out for SPIN_MS. */
+const DUCK_TRIP = 3.5;
+const SPIN_MS = 1600;
+const NOTE_MS = 1800;
 // Takedowns (Burnout, Smashy Road): wreck a cop and it blows up in cubes.
 /** You hit a cop going this fast (m/s): it's wrecked, not you. */
 const TAKEDOWN_SPEED = 14;
@@ -98,6 +102,8 @@ interface Npc extends SimCar {
   goal?: { x: number; z: number };
   hearts?: number;
   pulledUntil?: number;
+  /** Ran into a duck: it spins on the spot. */
+  spinUntil?: number;
   lastRam: number;
   buffer: SnapshotBuffer;
 }
@@ -199,13 +205,19 @@ export default function HeistMode({
   const npcs = useRef<Npc[]>([]);
   const shots = useRef<Shot[]>([]);
   const lastShot = useRef(new Map<number, number>());
-  const duck = useRef<{ x: number; z: number; until: number; mine: boolean }[]>([]);
+  const duck = useRef<{ id: number; x: number; z: number; until: number; mine: boolean }[]>([]);
+  const note = useRef<{ n: HeistNote; until: number } | null>(null);
+  const mySpinUntil = useRef(0);
   const tether = useRef<{ from: string; until: number } | null>(null);
   const myTether = useRef<{ to: string; until: number } | null>(null);
   const lastView = useRef("");
   const lastViewAt = useRef(0);
   const needSide = useRef(false);
   const [ducks, setDucks] = useState<{ x: number; z: number; key: number }[]>([]);
+  const showDucks = () => setDucks(duck.current.filter((d) => d.until > performance.now()).map((d) => ({ x: d.x, z: d.z, key: d.id })));
+  const say = (n: HeistNote) => {
+    note.current = { n, until: performance.now() + NOTE_MS };
+  };
   const ding = useRef<Howl | null>(null);
 
   useEffect(() => {
@@ -360,6 +372,9 @@ export default function HeistMode({
     if (!item) return;
     const now = performance.now();
     if (now - (kitAt.current.get(item) ?? -Infinity) < RULES.kitMs[item]) return;
+    // The magnet and the blue screen need someone in front of you: with no one, the charge stays.
+    const tgt = item === "bomb" || item === "duck" ? null : aim(item === "missile" ? 140 : 60);
+    if (!tgt && (item === "magnet" || item === "bluescreen")) return say({ kind: "noAim" });
     kitAt.current.set(item, now);
     const p = c.body.translation();
     const h = carHeading(c.body);
@@ -371,8 +386,8 @@ export default function HeistMode({
       send({ t: "use", kit: true, item, x: p.x - fx * back, z: p.z - fz * back, dx: fx, dz: fz });
     }
     else {
-      const tgt = aim(item === "missile" ? 140 : 60);
       const real = tgt && !tgt.id.startsWith("bot:") ? tgt.id : undefined;
+      if (item === "magnet" || item === "bluescreen") say({ kind: item === "magnet" ? "pulled" : "zapped", who: real ? (remotes.current.get(real)?.name ?? null) : null });
       send({ t: "use", kit: true, item, x: p.x + fx * 3.5, z: p.z + fz * 3.5, dx: fx, dz: fz, ...(real ? { target: real } : {}) });
       // The gang lives on this screen only: the magnet and the blue screen land here.
       if (tgt && !real && (item === "magnet" || item === "bluescreen")) {
@@ -451,15 +466,23 @@ export default function HeistMode({
       else if (m.t === "heist_bust_credit") {
         busts.current += 1;
         setFlash({ kind: "bust", pts: Number(m.pts) || 0 }, 1800);
+      } else if (m.t === "gone") {
+        // A duck someone ran into: gone on every screen; yours tells you it worked.
+        const d = duck.current.find((x) => x.id === m.id);
+        if (d) {
+          duck.current = duck.current.filter((x) => x !== d);
+          showDucks();
+          if (d.mine) say({ kind: "ducked" });
+        }
       } else if (m.t === "fx") {
         const me = selfId.current;
         const target = typeof m.target === "string" ? m.target : null;
         if (m.item === "duck") {
-          duck.current.push({ x: Number(m.x), z: Number(m.z), until: now + RULES.duckMs, mine: m.from === me });
-          setDucks(duck.current.map((d, i) => ({ x: d.x, z: d.z, key: Math.round(d.until) + i })));
+          duck.current.push({ id: Number(m.id), x: Number(m.x), z: Number(m.z), until: now + RULES.duckMs, mine: m.from === me });
+          showDucks();
           setTimeout(() => {
             duck.current = duck.current.filter((d) => d.until > performance.now());
-            setDucks(duck.current.map((d, i) => ({ x: d.x, z: d.z, key: Math.round(d.until) + i })));
+            showDucks();
           }, RULES.duckMs + 50);
         } else if (target && target === me && typeof m.from === "string") {
           if (m.item === "magnet") {
@@ -635,12 +658,37 @@ export default function HeistMode({
       if (n.id.startsWith("bot:heist-cop")) {
         n.role = roleOf(n.slot, stars);
         if (stepCop(n, q, stars, world, field.current, copCars, now, dt, activeDuck)) retired.push(n);
+        if ((n.spinUntil ?? 0) > now) n.h += dt * 11;
       } else {
         if (!n.goal) n.goal = cityLot() ?? { x: P.ring.x, z: P.ring.z };
         if (stepGang(n, q, n.goal, world, field.current, gangCars, GANG_SPEED, now, dt, (n.pulledUntil ?? 0) > now)) n.goal = cityLot() ?? n.goal;
       }
       record(n, now);
     }
+    // Ducks: a cop that runs into one spins out, and the duck goes (for everyone).
+    for (const d of [...duck.current]) {
+      if (d.until <= now) continue;
+      const bot = d.mine ? npcs.current.find((n) => n.id.startsWith("bot:heist-cop") && Math.hypot(n.x - d.x, n.z - d.z) < DUCK_TRIP) : undefined;
+      const me = P.side === "cop" && !d.mine && Math.hypot(p.x - d.x, p.z - d.z) < DUCK_TRIP;
+      if (!bot && !me) continue;
+      if (bot) {
+        bot.stunUntil = bot.spinUntil = now + SPIN_MS;
+        bot.v = 0;
+        say({ kind: "ducked" });
+      } else {
+        mySpinUntil.current = now + SPIN_MS;
+        say({ kind: "tripped" });
+      }
+      duck.current = duck.current.filter((x) => x !== d);
+      showDucks();
+      send({ t: "hit", id: d.id });
+    }
+    if (mySpinUntil.current > now) {
+      const lv = c.body.linvel();
+      c.body.setLinvel({ x: lv.x * 0.9, y: lv.y, z: lv.z * 0.9 }, true);
+      c.body.setAngvel({ x: 0, y: 9, z: 0 }, true);
+    }
+
     // Stuck or left far behind: out quietly, but never in front of you (the camera looks where the car does); the spawn brings a fresh one closer.
     const inView = (n: Npc) => {
       const dx = n.x - p.x;
@@ -736,6 +784,7 @@ export default function HeistMode({
       cop: P.side === "cop" ? { busts: busts.current, target: target ? (target.id.startsWith("bot:") ? "gangue" : (remotes.current.get(target.id)?.name ?? null)) : null } : null,
       kit: kitActive() ? kitSlots(now) : null,
       flash: f,
+      note: note.current && note.current.until > now ? note.current.n : null,
     };
     const key = JSON.stringify(view);
     if (key !== lastView.current) {

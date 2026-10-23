@@ -13,6 +13,8 @@ import { WHEELS } from "@/lib/league-city/drive/vehicle";
 import type { CarApi } from "./Car";
 import CarModel from "./CarModel";
 import { LightBar, RobberMark } from "./HeistMode";
+import { SIDE_COLOR } from "@/components/towns/brasil/heist/kit";
+import { useT } from "@/lib/i18n/LangProvider";
 import Lights from "./Lights";
 import { Bursts, FIRE, type VoxelBursts } from "./Voxels";
 import type { FxSource, FxSources } from "./fx";
@@ -101,6 +103,7 @@ function RemoteCar({
   /** Whether this car can be hit right now (a race turns contact off on the grid). Default: always. */
   solid?: (id: string) => boolean;
 }) {
+  const t = useT();
   const group = useRef<THREE.Group>(null);
   const body = useRef<RapierRigidBody>(null);
   const collider = useRef<RapierCollider>(null);
@@ -325,11 +328,21 @@ function RemoteCar({
           {remote.badge === "cop" && <LightBar />}
         </CarModel>
         {remote.badge === "robber" && <RobberMark />}
-        {!remote.bot && (
+        {(!remote.bot || remote.badge) && (
           <Html position={[0, 7.5, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-            <div className="flex items-center gap-1.5 whitespace-nowrap border-2 border-border bg-bg/80 px-1.5 py-0.5 font-pixel text-[9px] uppercase text-cream">
-              <span className="h-2 w-2" style={{ background: remote.color }} aria-hidden />
-              {remote.name.startsWith("guest-") ? "guest" : `@${remote.name}`}
+            <div className="flex items-stretch whitespace-nowrap border-2 border-border bg-bg/80 font-pixel text-[9px] uppercase text-cream">
+              {/* The city of the day: whose side the car is on, in its side's color. */}
+              {remote.badge && (
+                <span className="px-1.5 py-0.5 text-bg" style={{ background: SIDE_COLOR[remote.badge] }}>
+                  {remote.badge === "cop" ? t("Cop", "Polícia") : t("Robber", "Ladrão")}
+                </span>
+              )}
+              {!remote.bot && (
+                <span className="flex items-center gap-1.5 px-1.5 py-0.5">
+                  <span className="h-2 w-2" style={{ background: remote.color }} aria-hidden />
+                  {remote.name.startsWith("guest-") ? "guest" : `@${remote.name}`}
+                </span>
+              )}
             </div>
           </Html>
         )}
