@@ -509,14 +509,14 @@ export default function DriveWorld({
     },
     onEmote: (from, e) => emoteSink.current(from, e),
     onChat: (from, login, text) => chatSink.current(from, login, text),
-    onBattle: (e) =>
-      e.t === "crown"
-        ? crownSink.current(e)
-        : e.t === "rally" || e.t === "rally_receipt"
-          ? rallySink.current(e)
-          : e.t === "fx" && kitOnly(e.item)
-            ? heistSink.current(e)
-            : battleSink.current(e),
+    onBattle: (e) => {
+      if (e.t === "crown") return crownSink.current(e);
+      if (e.t === "rally" || e.t === "rally_receipt") return rallySink.current(e);
+      if (e.t === "fx" && kitOnly(e.item)) return heistSink.current(e);
+      battleSink.current(e);
+      // A duck someone ran into is gone too (the city of the day draws those).
+      if (e.t === "gone") heistSink.current(e);
+    },
     // Smash: the room asks the site who you are, and has the last word on the floors.
     auth: smash ? smashToken : undefined,
     onOther: smash

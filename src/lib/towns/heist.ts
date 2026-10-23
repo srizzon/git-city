@@ -60,6 +60,9 @@ export interface HeistCity {
 
 export type HeistFlash = { kind: "pushed"; pts: number } | { kind: "bust"; pts: number } | { kind: "busted"; pts: number; by: string | null } | { kind: "bluescreen"; by: string | null };
 
+/** A one-line word on what your kit just did (or what a duck did), a moment under the panel. */
+export type HeistNote = { kind: "zapped" | "pulled"; who: string | null } | { kind: "noAim" } | { kind: "ducked" } | { kind: "tripped" };
+
 export interface HeistView {
   city: HeistCity;
   side: HeistSide | null;
@@ -69,6 +72,7 @@ export interface HeistView {
   cop: { busts: number; target: string | null } | null;
   kit: KitSlot[] | null;
   flash: HeistFlash | null;
+  note?: HeistNote | null;
 }
 
 export interface HeistResult {
@@ -128,7 +132,7 @@ export const RULES = {
   /** The kit works this far from the city's middle (× the ring's radius): in the city and on the way out. */
   kitReach: 2.2,
   /** Effects (ms). */
-  duckMs: 4000,
+  duckMs: 8000,
   magnetMs: 3000,
   bluescreenMs: 1500,
 } as const;

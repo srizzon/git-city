@@ -26,6 +26,7 @@ export default function HeistHud({ view }: { view: HeistView }) {
   const t = useT();
   const touch = useTouch();
   const { robber, cop, flash } = view;
+  const note = view.note ?? null;
   const push = robber?.push ?? null;
 
   if (flash?.kind === "bluescreen") return <BlueScreen by={flash.by} />;
@@ -134,10 +135,34 @@ export default function HeistHud({ view }: { view: HeistView }) {
             </Band>
           )}
 
-          {cop?.target && (
+          {cop?.target && !note && (
             <Band tone="dark" tab={COP} animate={false} className={`w-full gap-2 ${touch ? "px-2.5 py-1.5" : "px-3 py-1.5"}`} style={{ fontSize: T.small }}>
-              <span style={{ color: COP }}>{t("Magnet", "Ímã")}</span>
-              <span className="truncate normal-case">@{cop.target}</span>
+              <span style={{ color: COP }}>{t("In sight", "Na mira")}</span>
+              <span className="truncate normal-case">{cop.target === "gangue" ? t("the gang", "a gangue") : `@${cop.target}`}</span>
+            </Band>
+          )}
+
+          {/* What your kit (or a duck) just did. */}
+          {note && (
+            <Band
+              tone={note.kind === "ducked" ? "lime" : note.kind === "tripped" ? "red" : "dark"}
+              tab={note.kind === "zapped" || note.kind === "pulled" ? COP : undefined}
+              animate={false}
+              className={`w-full justify-center gap-2 ${touch ? "px-2.5 py-1.5" : "px-3 py-1.5"}`}
+              style={{ fontSize: T.small }}
+            >
+              {note.kind === "zapped" || note.kind === "pulled" ? (
+                <>
+                  <span style={{ color: COP }}>{note.kind === "zapped" ? t("Blue screen on", "Tela azul em") : t("Magnet on", "Ímã em")}</span>
+                  <span className="truncate normal-case">{note.who ? `@${note.who}` : t("the gang", "a gangue")}</span>
+                </>
+              ) : note.kind === "noAim" ? (
+                t("No one in sight", "Ninguém na mira")
+              ) : note.kind === "ducked" ? (
+                t("A cop fell for the duck", "A polícia caiu no pato")
+              ) : (
+                t("You hit the duck", "Você caiu no pato")
+              )}
             </Band>
           )}
         </div>
