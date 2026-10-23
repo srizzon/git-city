@@ -113,8 +113,8 @@ export const RULES = {
   gangBustGapMs: 20_000,
   /** Busts pay up to this a day per cop. */
   bustDayCap: 100,
-  /** Blocks (one floor of one column) knocked off in the ring per point held: a typical building (12 columns × 10 floors) is ~12. */
-  blocksPerPoint: 10,
+  /** Blocks (one floor of one column) knocked off in the ring per point held: a typical building (~200 blocks) is ~10, double a fall elsewhere. */
+  blocksPerPoint: 20,
   /** Stars by points held (1 at the first). */
   starsAt: [1, 10, 25, 50, 80],
   /** Most game cop cars after one robber. */

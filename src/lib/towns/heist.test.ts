@@ -40,8 +40,8 @@ describe("rules", () => {
     expect(starsFor(10)).toBe(2);
     expect(starsFor(79)).toBe(4);
     expect(starsFor(99)).toBe(5);
-    expect(heldPoints(9)).toBe(0);
-    expect(heldPoints(125)).toBe(12);
+    expect(heldPoints(19)).toBe(0);
+    expect(heldPoints(250)).toBe(12);
   });
 
   it("real cops take game cops' places, at most 4", () => {
