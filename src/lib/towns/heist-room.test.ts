@@ -38,6 +38,20 @@ describe("HeistRoom", () => {
     expect(last("r")).toEqual({ t: "heist_held", n: 1 });
   });
 
+  it("counts every block knocked off the city, whoever knocked it, until a save takes it", () => {
+    const { h } = setup();
+    h.setSide("r", "robber");
+    h.took("r", "robber", 30, at(50), 0);
+    h.took("x", "nobody", 12, 0, 0);
+    h.took("x", "nobody", 99, at(150), 0);
+    const first = h.take();
+    expect(first.knocked).toBe(42);
+    first.undo();
+    expect(h.take().knocked).toBe(42);
+    expect(h.take().knocked).toBe(0);
+    expect(h.hasWork()).toBe(false);
+  });
+
   it("banks a push only after the time out of the ring, with no real cop near", () => {
     const { h, pos, last } = setup();
     h.setSide("r", "robber");

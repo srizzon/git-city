@@ -1,7 +1,7 @@
 // ─── City of the day (server) ───────────────────────────────
 // The Brasil map's city of the day: picked once a day (brasil_heist_days,
 // migration 189) from the map as it stands and kept, its ring, how much of it
-// still stands, each dev's side (brasil_heist_sides: residents are cops), what
+// still stands (blocks knocked off it today against all of its blocks), each dev's side (brasil_heist_sides: residents are cops), what
 // pushes and busts pay (brasil_points), and the day's settling after midnight
 // (the cops' bonus when the city stood). Days run on Brasília time. Server only.
 
@@ -9,7 +9,8 @@ import "server-only";
 import { getSupabaseAdmin } from "../supabase";
 import { LOT } from "../league-city/grid";
 import { UNIT_TO_M } from "../league-city/drive/tuning";
-import type { HeistBust, HeistPush } from "../league-city/smash-server";
+import { getSmashTown, type HeistBust, type HeistPush } from "../league-city/smash-server";
+import { cols } from "../league-city/smash";
 import { awardPoints } from "./brasil-points-server";
 import { sendHeistTurretEmail } from "../notification-senders/brasil-heist";
 import { brasiliaToday } from "./brasil-day";
@@ -32,6 +33,10 @@ interface DayRow {
   buildings: number;
   standing: number | null;
   settled_at: string | null;
+  /** The city's blocks (floors × columns of every building), counted on the day's first ask. */
+  blocks: number | null;
+  /** Blocks knocked off it that day (the drive room's saves). */
+  knocked: number;
 }
 
 export interface HeistDay {
@@ -66,31 +71,35 @@ export async function heistDay(leagueId: string, now = Date.now(), layout?: Bras
     if (!row) return null;
   }
   const city = cityOf(map, row.city_key);
-  const fell = row.standing === null ? await fellOn(leagueId, row.day, city) : 0;
+  const blocks = row.blocks ?? (await countBlocks(leagueId, row.day, city));
   return {
     day: row.day,
     key: row.city_key,
     name: row.name,
     uf: row.uf,
     buildings: row.buildings,
-    standing: row.standing ?? standingOf(row.buildings, fell),
+    standing: row.standing ?? standingOf(blocks, row.knocked),
     ring: city ? ringOf(city.center, city.radius, LOT, UNIT_TO_M) : null,
   };
 }
 
-/** How many of the city's buildings fell that day (each counted once). */
-async function fellOn(leagueId: string, day: string, city: CityLayout | undefined): Promise<number> {
-  if (!city || city.devs.length === 0) return 0;
-  const ids = city.devs.map((d) => d.dev.id).filter((id) => id > 0);
-  const { data } = await getSupabaseAdmin()
-    .from("town_demolitions")
-    .select("victim_id")
-    .eq("league_id", leagueId)
-    .gte("fell_at", dayStart(day))
-    .lt("fell_at", dayEnd(day))
-    .in("victim_id", ids)
-    .returns<{ victim_id: number }[]>();
-  return new Set((data ?? []).map((r) => r.victim_id)).size;
+/** The city's blocks as the drive room builds it, stored on the day's row the first time. 0 when it can't be counted. */
+async function countBlocks(leagueId: string, day: string, city: CityLayout | undefined): Promise<number> {
+  if (!city) return 0;
+  const ids = new Set(city.devs.map((d) => d.dev.id));
+  const town = await getSmashTown(leagueId).catch(() => null);
+  if (!town) return 0;
+  let n = 0;
+  for (const t of town.targets) if (ids.has(town.devIds[t.login.toLowerCase()])) n += t.floors * cols(t);
+  if (n > 0) await getSupabaseAdmin().from("brasil_heist_days").update({ blocks: n }).eq("day", day).is("blocks", null);
+  return n;
+}
+
+/** Blocks the drive room saw knocked off today's city (brasil_heist_knock adds them; a settled day takes no more). */
+export async function knockHeist(n: number, now = Date.now()): Promise<void> {
+  if (n <= 0) return;
+  const { error } = await getSupabaseAdmin().rpc("brasil_heist_knock", { p_day: brasiliaToday(now), p_n: n });
+  if (error) throw error;
 }
 
 /** The dev's home city key on the map, or null off it. */
@@ -190,8 +199,8 @@ export async function settleHeistDay(leagueId: string, day: string): Promise<boo
   const sb = getSupabaseAdmin();
   const { data: row } = await sb.from("brasil_heist_days").select("*").eq("day", day).maybeSingle<DayRow>();
   if (!row || row.settled_at) return false;
-  const { layout } = await getBrasilLayout(leagueId);
-  const standing = standingOf(row.buildings, await fellOn(leagueId, day, cityOf(layout, row.city_key)));
+  const blocks = row.blocks ?? (await countBlocks(leagueId, day, cityOf((await getBrasilLayout(leagueId)).layout, row.city_key)));
+  const standing = standingOf(blocks, row.knocked);
   if (defended(standing)) {
     const { data: cops } = await sb
       .from("brasil_points")

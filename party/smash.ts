@@ -410,6 +410,7 @@ export class SmashRoom {
       ...(heist.heist.length ? { heist: heist.heist } : {}),
       ...(heist.busts.length ? { busts: heist.busts } : {}),
       ...(heist.turrets.length ? { turrets: heist.turrets } : {}),
+      ...(heist.knocked > 0 ? { knocked: heist.knocked } : {}),
     });
     try {
       const res = await fetch(`${site}/api/towns/${encodeURIComponent(this.room.id)}/smash`, {
