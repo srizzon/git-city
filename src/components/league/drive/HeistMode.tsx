@@ -718,8 +718,9 @@ export default function HeistMode({
       city: { name: P.cityName, uf: "", buildings: 0, standing: P.standing },
       side: P.side,
       resident: P.resident,
+      // Out of the city with nothing to bank, a robber is just driving: no panel.
       robber:
-        P.side === "robber"
+        P.side === "robber" && (near || held.current > 0)
           ? {
               unpushed: held.current,
               stars,

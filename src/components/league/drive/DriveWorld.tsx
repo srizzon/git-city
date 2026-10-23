@@ -21,7 +21,9 @@ import { spawnPoint, type Spawn } from "@/lib/league-city/drive/spawn";
 import type { IntroPose } from "@/lib/league-city/intro";
 import type { TouchDrive } from "@/lib/league-city/drive/touch";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
+import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
+import { LOT } from "@/lib/league-city/grid";
+import { carHeading, placeCar } from "@/lib/league-city/drive/vehicle";
 import Car, { type CarApi } from "./Car";
 import DriveCamera from "./DriveCamera";
 import Battle from "./Battle";
@@ -256,6 +258,60 @@ function DynamicProp({ spec }: { spec: ColliderSpec }) {
       </group>
     </>
   );
+}
+
+// ─── Spawning apart ──────────────────────────────────────────
+
+const APART = 6;
+const APART_MS = 4000;
+
+/**
+ * Two drivers sent to the same start (the same city, out of the drift track)
+ * would land on top of each other: for the first moments of a drive, a car
+ * with another one within APART meters moves to the nearest lot round it that
+ * has no building and no car.
+ */
+function SpawnApart({ car, remotes, objects }: { car: React.MutableRefObject<CarApi | null>; remotes: React.MutableRefObject<Map<string, { buffer: { latest: { x: number; z: number } | null } }>>; objects: CityObject[] }) {
+  const since = useRef(0);
+  const done = useRef(false);
+  const built = useMemo(() => new Set(objects.filter((o) => o.kind === "building").map((o) => `${o.x},${o.z}`)), [objects]);
+  useFrame(() => {
+    const c = car.current;
+    if (done.current || !c) return;
+    const now = performance.now();
+    if (!since.current) since.current = now;
+    if (now - since.current > APART_MS) {
+      done.current = true;
+      return;
+    }
+    const others = [...remotes.current.values()].flatMap((r) => (r.buffer.latest ? [r.buffer.latest] : []));
+    const p = c.body.translation();
+    const crowded = (x: number, z: number) => others.some((o) => Math.hypot(o.x - x, o.z - z) < APART);
+    if (!crowded(p.x, p.z)) return;
+    const lotM = LOT * UNIT_TO_M;
+    const lx = Math.round(p.x / lotM);
+    const lz = Math.round(p.z / lotM);
+    for (let r = 1; r <= 3; r++)
+      for (const [dx, dz] of [
+        [r, 0],
+        [-r, 0],
+        [0, r],
+        [0, -r],
+        [r, r],
+        [-r, -r],
+        [r, -r],
+        [-r, r],
+      ] as const) {
+        if (built.has(`${lx + dx},${lz + dz}`)) continue;
+        const x = (lx + dx) * lotM;
+        const z = (lz + dz) * lotM;
+        if (crowded(x, z)) continue;
+        placeCar(c.body, x, z, carHeading(c.body));
+        done.current = true;
+        return;
+      }
+  });
+  return null;
 }
 
 // ─── Minimap feed ────────────────────────────────────────────
@@ -696,6 +752,7 @@ export default function DriveWorld({
           />
           {!cinematic && <DriveCamera mode={camera} car={car} impact={impact} seamless={seamless} />}
           <CameraKey input={input} onToggle={onCameraToggle} />
+          {!offline && <SpawnApart car={car} remotes={remotes} objects={objects} />}
           <Ready onReady={onReady} />
         </Physics>
       </Suspense>
