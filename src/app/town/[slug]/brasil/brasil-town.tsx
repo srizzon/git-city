@@ -20,6 +20,7 @@ import { Crown as CrownIcon, Flag as FlagIcon, Map as DriftIcon } from "lucide-r
 import type { RallyState } from "@/lib/league-city/drive/rally";
 import { Band } from "@/components/games/ui";
 import { useLang, useT } from "@/lib/i18n/LangProvider";
+import { PixelSocialIcon } from "@/components/SocialIcons";
 import { T } from "@/components/games/kit";
 import { cityByKey, parseRouteKey, raceRoute, startLine } from "@/lib/towns/brasil-race";
 import type { EmoteApi } from "@/components/league/drive/EmoteBubbles";
@@ -1709,8 +1710,9 @@ function GroupLink() {
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => posthog.capture("brasil_group_clicked", { from: "building" })}
-      className="btn-press w-full border-2 border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-lime/60"
+      className="btn-press flex w-full items-center justify-center gap-2 border-2 border-border py-2 text-[10px] text-cream transition-colors hover:border-lime/60"
     >
+      <PixelSocialIcon name="whatsapp" size={12} />
       {t("Join the WhatsApp group", "Entrar no grupo do WhatsApp")}
     </a>
   );

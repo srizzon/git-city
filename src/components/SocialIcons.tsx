@@ -5,7 +5,7 @@
 
 import type { SocialPlatform } from "@/lib/social-links";
 
-type IconName = SocialPlatform | "github" | "pencil";
+type IconName = SocialPlatform | "github" | "pencil" | "whatsapp";
 
 // '#' = filled pixel. Each glyph is 12 rows x 12 cols.
 const GLYPHS: Record<IconName, string[]> = {
@@ -107,6 +107,20 @@ const GLYPHS: Record<IconName, string[]> = {
     ".#..........",
     "............",
   ],
+  whatsapp: [
+    "...######...",
+    "..#......#..",
+    ".#........#.",
+    "#..##......#",
+    "#..##......#",
+    "#..#.......#",
+    "#...#......#",
+    "#....#.##..#",
+    "#.....###..#",
+    ".#........#.",
+    "#.#......#..",
+    "##.######...",
+  ],
 };
 
 function glyphPath(rows: string[]): string {
@@ -131,6 +145,7 @@ export const SOCIAL_LABELS: Record<IconName, string> = {
   website: "Website",
   email: "Email",
   pencil: "Edit",
+  whatsapp: "WhatsApp",
 };
 
 // Tooltip text: platform name, except website/email where the actual
