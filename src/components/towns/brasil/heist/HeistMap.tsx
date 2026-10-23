@@ -24,7 +24,22 @@ const COP = SIDE_COLOR.cop;
  * (or live there, a cop already) only yours stays a button and goes there;
  * the other turns into a faded outline.
  */
-export function HeistStrip({ city, side, resident, onPick, className = "" }: { city: HeistCity; side: HeistSide | null; resident: boolean; onPick: (side: HeistSide) => void; className?: string }) {
+export function HeistStrip({
+  city,
+  side,
+  resident,
+  counts,
+  onPick,
+  className = "",
+}: {
+  city: HeistCity;
+  side: HeistSide | null;
+  resident: boolean;
+  /** How many picked each side today. */
+  counts?: Record<HeistSide, number> | null;
+  onPick: (side: HeistSide) => void;
+  className?: string;
+}) {
   const t = useT();
   const mine: HeistSide | null = resident ? "cop" : side;
   const pick = (s: HeistSide) => {
@@ -41,6 +56,11 @@ export function HeistStrip({ city, side, resident, onPick, className = "" }: { c
       >
         <Icon size={18} strokeWidth={2.5} aria-hidden />
         {s === "cop" ? t("Cop", "Polícia") : t("Robber", "Ladrão")}
+        {counts && (
+          <span className={`min-w-[22px] px-1 py-0.5 text-center tabular-nums leading-none ${off ? "border" : "bg-bg/25"}`} style={off ? { borderColor: color } : undefined} aria-label={t(`${counts[s]} today`, `${counts[s]} hoje`)}>
+            {counts[s]}
+          </span>
+        )}
       </button>
     );
   };
