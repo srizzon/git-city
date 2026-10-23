@@ -185,6 +185,22 @@ export interface SmashFall {
   attackerId: number;
   /** Epoch ms it fell (with the town and the victim, the fall's key). */
   at: number;
+  /** It stood in the Brasil map's city of the day: it pays only once a robber pushes (`heist`), never as a plain smash. */
+  day?: boolean;
+}
+
+/** A robber's push in the city of the day: the points they held, banked at once. */
+export interface HeistPush {
+  attackerId: number;
+  pts: number;
+  at: number;
+}
+
+/** A bust in the city of the day: by a cop, of a real robber (`robberId`) or a game-run one (null). */
+export interface HeistBust {
+  copId: number;
+  robberId: number | null;
+  at: number;
 }
 
 export interface SmashSave {
@@ -195,6 +211,11 @@ export interface SmashSave {
   floors?: FloorEntry[];
   /** The batch id those floors go under. A resent batch is a no-op in add_town_floors. */
   floorsBatch?: string;
+  /** The city of the day's pushes and busts (the Brasil map). */
+  heist?: HeistPush[];
+  busts?: HeistBust[];
+  /** Buildings whose shot ended a robber's run (owner's login). */
+  turrets?: { login: string; at: number }[];
 }
 
 const isId = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n > 0;
@@ -226,6 +247,13 @@ export function verifySmashSave(slug: string, body: string, signature: string | 
     demolished: falls,
     floors: cleanFloors(save.floors, now),
     floorsBatch: isUuid(save.floorsBatch) ? save.floorsBatch : undefined,
+    heist: (Array.isArray(save.heist) ? save.heist : []).filter(
+      (h) => isId(h?.attackerId) && Number.isInteger(h.pts) && h.pts > 0 && h.pts <= 500 && typeof h.at === "number" && Math.abs(now - h.at) < 86_400_000,
+    ),
+    turrets: (Array.isArray(save.turrets) ? save.turrets : []).filter((t) => isLogin(t?.login) && typeof t.at === "number" && Math.abs(now - t.at) < 86_400_000),
+    busts: (Array.isArray(save.busts) ? save.busts : []).filter(
+      (b) => isId(b?.copId) && (b.robberId === null || (isId(b.robberId) && b.robberId !== b.copId)) && typeof b.at === "number" && Math.abs(now - b.at) < 86_400_000,
+    ),
   };
 }
 
@@ -306,6 +334,8 @@ export interface RecordedFall {
   attackerId: number;
   /** When it fell (epoch ms). */
   at: number;
+  /** In the city of the day (paid by the push, not here). */
+  day: boolean;
 }
 
 /**
@@ -330,5 +360,5 @@ export async function recordFalls(leagueId: string, town: SmashTown, save: Smash
   const fresh = new Set((data ?? []).map((r) => `${r.victim_id}:${r.attacker_id}`));
   return falls
     .filter((f) => fresh.has(`${f.victimId}:${f.attackerId}`))
-    .map((f) => ({ victim: f.victim, victimId: f.victimId, attacker: f.attacker, attackerId: f.attackerId, at: f.at }));
+    .map((f) => ({ victim: f.victim, victimId: f.victimId, attacker: f.attacker, attackerId: f.attackerId, at: f.at, day: f.day === true }));
 }

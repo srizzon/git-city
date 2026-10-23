@@ -7,8 +7,8 @@ import { T } from "@/components/games/kit";
 import { useT } from "@/lib/i18n/LangProvider";
 
 // Shown from the Drive click until the car is ready (picked in the
-// 2026-10-19 phone prototype, "Live"): the scene stays sharp, and a lime
-// band at the bottom loads ("Starting your car 76%") with what's going on
+// 2026-10-19 phone prototype, "Live"): the scene stays sharp, and a dark
+// band at the bottom loads with a lime bar ("Starting your car 76%") with what's going on
 // over it ("4 driving · a race starts in 12s") when there is something. The
 // bar eases toward 90% while Rapier and the car load, fills on ready, then
 // (after at least MIN_MS) the band fades out. The controls are taught in the
@@ -78,15 +78,15 @@ export default function StartScreen({
             <span className="h-1.5 w-1.5 animate-pulse bg-red-500" aria-hidden /> {note}
           </Band>
         )}
-        <Band tone="lime" delay={60} className="flex-col items-stretch gap-2 px-4 py-3" style={{ fontSize: T.body }}>
+        <Band delay={60} className="flex-col items-stretch gap-2.5 px-4 py-3 text-cream" style={{ fontSize: T.body }}>
           <span className="flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <Car size={16} aria-hidden /> {ready ? t("Ready", "Pronto") : t("Starting your car", "Ligando seu carro")}
+              <Car size={16} className="text-lime" aria-hidden /> {ready ? t("Ready", "Pronto") : t("Starting your car", "Ligando seu carro")}
             </span>
-            <span className="tabular-nums">{Math.round(shown * 100)}%</span>
+            <span className="tabular-nums text-lime">{Math.round(shown * 100)}%</span>
           </span>
-          <span className="h-2 bg-bg/20" aria-hidden>
-            <span className="block h-full bg-bg transition-[width] duration-150" style={{ width: `${shown * 100}%` }} />
+          <span className="h-1.5 bg-border" aria-hidden>
+            <span className="block h-full bg-lime transition-[width] duration-150" style={{ width: `${shown * 100}%` }} />
           </span>
         </Band>
       </div>

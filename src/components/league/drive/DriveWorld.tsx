@@ -21,7 +21,9 @@ import { spawnPoint, type Spawn } from "@/lib/league-city/drive/spawn";
 import type { IntroPose } from "@/lib/league-city/intro";
 import type { TouchDrive } from "@/lib/league-city/drive/touch";
 import type { DriveCameraMode, DriveTelemetry } from "@/lib/league-city/drive/telemetry";
-import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN } from "@/lib/league-city/drive/tuning";
+import { CHASSIS, GRAVITY, M_TO_UNIT, RESPAWN, UNIT_TO_M } from "@/lib/league-city/drive/tuning";
+import { LOT } from "@/lib/league-city/grid";
+import { carHeading, placeCar } from "@/lib/league-city/drive/vehicle";
 import Car, { type CarApi } from "./Car";
 import DriveCamera from "./DriveCamera";
 import Battle from "./Battle";
@@ -38,7 +40,7 @@ import RemoteCars, { type BotTarget } from "./RemoteCars";
 import { useTownBots } from "./useTownBots";
 import type { FxSource } from "./fx";
 import { CameraKey, DriveAudio, LocalFx } from "./carFx";
-import { INTERP_MS, carColor, emptySnapshot, type DriverInfo } from "@/lib/league-city/drive/net";
+import { INTERP_MS, carColor, emptySnapshot, type ClientMsg, type DriverInfo } from "@/lib/league-city/drive/net";
 import { useDriveInput } from "./useDriveInput";
 import EmoteBubbles, { type EmoteApi } from "./EmoteBubbles";
 import type { EmoteLogEntry } from "@/lib/league-city/drive/emote-log";
@@ -48,6 +50,8 @@ import type { SmashStore } from "@/lib/league-city/smash";
 import { createBrowserSupabase } from "@/lib/supabase";
 import { applyRoomDamage } from "@/lib/league-city/smash-net";
 import { FLOOR_DAY_CAP } from "@/lib/league-city/smash-floors";
+import HeistMode, { LightBar, type HeistApi, type HeistDriveProps } from "./HeistMode";
+import { isSide, kitOnly, type HeistSide } from "@/lib/towns/heist";
 
 // Drive mode's physics world. Loaded with next/dynamic only when someone
 // presses Drive, so the Rapier WASM never reaches viewers or editors.
@@ -124,6 +128,8 @@ export interface DriveWorldProps {
   onTaste?: (login: string) => void;
   /** Every room message the drive doesn't handle itself, and the welcome (the Brasil map's State War listens here). */
   onRoom?: (msg: { t: string } & Record<string, unknown>) => void;
+  /** The Brasil map's city of the day (HeistMode): its ring, your side, the HUD's hooks; `token` a side the site signed mid-drive, for the room. */
+  heist?: HeistDriveProps & { token: string | null; apiRef?: React.MutableRefObject<HeistApi | null> };
 }
 
 /** Your Supabase access token for the drive room (null signed out: you drive, you don't smash). */
@@ -254,15 +260,81 @@ function DynamicProp({ spec }: { spec: ColliderSpec }) {
   );
 }
 
+// ─── Spawning apart ──────────────────────────────────────────
+
+const APART = 6;
+const APART_MS = 4000;
+
+/**
+ * Two drivers sent to the same start (the same city, out of the drift track)
+ * would land on top of each other: for the first moments of a drive, a car
+ * with another one within APART meters moves to the nearest lot round it that
+ * has no building and no car.
+ */
+function SpawnApart({ car, remotes, objects }: { car: React.MutableRefObject<CarApi | null>; remotes: React.MutableRefObject<Map<string, { buffer: { latest: { x: number; z: number } | null } }>>; objects: CityObject[] }) {
+  const since = useRef(0);
+  const done = useRef(false);
+  const built = useMemo(() => new Set(objects.filter((o) => o.kind === "building").map((o) => `${o.x},${o.z}`)), [objects]);
+  useFrame(() => {
+    const c = car.current;
+    if (done.current || !c) return;
+    const now = performance.now();
+    if (!since.current) since.current = now;
+    if (now - since.current > APART_MS) {
+      done.current = true;
+      return;
+    }
+    const others = [...remotes.current.values()].flatMap((r) => (r.buffer.latest ? [r.buffer.latest] : []));
+    const p = c.body.translation();
+    const crowded = (x: number, z: number) => others.some((o) => Math.hypot(o.x - x, o.z - z) < APART);
+    if (!crowded(p.x, p.z)) return;
+    const lotM = LOT * UNIT_TO_M;
+    const lx = Math.round(p.x / lotM);
+    const lz = Math.round(p.z / lotM);
+    for (let r = 1; r <= 3; r++)
+      for (const [dx, dz] of [
+        [r, 0],
+        [-r, 0],
+        [0, r],
+        [0, -r],
+        [r, r],
+        [-r, -r],
+        [r, -r],
+        [-r, r],
+      ] as const) {
+        if (built.has(`${lx + dx},${lz + dz}`)) continue;
+        const x = (lx + dx) * lotM;
+        const z = (lz + dz) * lotM;
+        if (crowded(x, z)) continue;
+        placeCar(c.body, x, z, carHeading(c.body));
+        done.current = true;
+        return;
+      }
+  });
+  return null;
+}
+
 // ─── Minimap feed ────────────────────────────────────────────
 
 const _fwd = new THREE.Vector3();
 
 /** Writes where you, the other cars and the bots are for the HUD's minimap. */
-function RadarFeed({ car, cars, telemetryRef }: { car: React.MutableRefObject<CarApi | null>; cars: CarFeed[]; telemetryRef: React.MutableRefObject<DriveTelemetry> }) {
+function RadarFeed({
+  car,
+  cars,
+  telemetryRef,
+  ring,
+}: {
+  car: React.MutableRefObject<CarApi | null>;
+  cars: CarFeed[];
+  telemetryRef: React.MutableRefObject<DriveTelemetry>;
+  /** The city of the day's ring (m), for the minimap. */
+  ring?: { x: number; z: number; r: number } | null;
+}) {
   const snaps = useRef<ReturnType<typeof emptySnapshot>[]>([]);
   useFrame(() => {
     const r = telemetryRef.current.radar;
+    r.heist = ring ? { x: ring.x * M_TO_UNIT, z: ring.z * M_TO_UNIT, r: ring.r * M_TO_UNIT } : null;
     const c = car.current;
     if (c) {
       r.x = c.group.position.x;
@@ -275,7 +347,7 @@ function RadarFeed({ car, cars, telemetryRef }: { car: React.MutableRefObject<Ca
     r.cars.length = 0;
     cars.forEach((f, i) => {
       const s = f.buffer.sample(t, (snaps.current[i] ??= emptySnapshot()));
-      if (s) r.cars.push({ x: s.x * M_TO_UNIT, z: s.z * M_TO_UNIT, color: f.color, bot: !!f.bot });
+      if (s) r.cars.push({ x: s.x * M_TO_UNIT, z: s.z * M_TO_UNIT, color: f.color, bot: !!f.bot, ...(f.badge ? { badge: f.badge } : {}) });
     });
   });
   return null;
@@ -318,6 +390,7 @@ export default function DriveWorld({
   onTaste,
   onRoom,
   rally,
+  heist,
 }: DriveWorldProps) {
   const onRoomRef = useRef(onRoom);
   useEffect(() => {
@@ -400,6 +473,19 @@ export default function DriveWorld({
   const crownHit = useRef<(id: string) => void>(() => {});
   const crownKnock = useRef<() => void>(() => {});
   const emoteSink = useRef<(from: string, e: number) => void>(() => {});
+  // The city of the day: every driver's side (the room's), the mode's message sink and its hooks.
+  const heistSides = useRef(new Map<string, HeistSide>());
+  const [sidesNow, setSidesNow] = useState<ReadonlyMap<string, HeistSide>>(() => new Map());
+  /** The room's `send`, for callbacks handed to the presence hook before it returns. */
+  const sendRef = useRef<(m: ClientMsg) => void>(() => {});
+  const heistSink = useRef<(e: BattleEvent | ({ t: string } & Record<string, unknown>)) => void>(() => {});
+  const ownHeistApi = useRef<HeistApi | null>(null);
+  const heistApi = heist?.apiRef ?? ownHeistApi;
+  const [heistFeeds, setHeistFeeds] = useState<CarFeed[]>([]);
+  const authed = useRef(false);
+  const heistTokenRef = useRef<string | null>(heist?.token ?? null);
+  /** The kit is live (the mode's last view had it): the battle's boxes and F step aside. */
+  const heistKitOn = useRef(false);
   const chatSink = useRef<(from: string, login: string, text: string) => void>(() => {});
   const ownEmoteApi = useRef<EmoteApi | null>(null);
   const telemetryRef = useRef(telemetry);
@@ -419,16 +505,34 @@ export default function DriveWorld({
       if (!c || performance.now() - (contacts.current.get(from) ?? 0) < BUMP_DEDUPE_MS) return;
       c.body.applyImpulse({ x: x * CHASSIS.mass, y: BUMP_HOP * CHASSIS.mass, z: z * CHASSIS.mass }, true);
       impact.current = { strength: Math.min(1, Math.hypot(x, z) / 12), at: performance.now() };
+      heistApi.current?.bumped(from);
     },
     onEmote: (from, e) => emoteSink.current(from, e),
     onChat: (from, login, text) => chatSink.current(from, login, text),
-    onBattle: (e) => (e.t === "crown" ? crownSink.current(e) : e.t === "rally" || e.t === "rally_receipt" ? rallySink.current(e) : battleSink.current(e)),
+    onBattle: (e) =>
+      e.t === "crown"
+        ? crownSink.current(e)
+        : e.t === "rally" || e.t === "rally_receipt"
+          ? rallySink.current(e)
+          : e.t === "fx" && kitOnly(e.item)
+            ? heistSink.current(e)
+            : battleSink.current(e),
     // Smash: the room asks the site who you are, and has the last word on the floors.
     auth: smash ? smashToken : undefined,
     onOther: smash
       ? (msg) => {
           onRoomRef.current?.(msg);
+          if (msg.t.startsWith("heist_")) {
+            if (msg.t === "heist_sides" && Array.isArray(msg.list)) {
+              const next = new Map<string, HeistSide>();
+              for (const row of msg.list as unknown[]) if (Array.isArray(row) && typeof row[0] === "string" && isSide(row[1])) next.set(row[0], row[1]);
+              heistSides.current = next;
+              setSidesNow(next);
+            } else heistSink.current(msg);
+          }
           if (msg.t === "smash_me") {
+            authed.current = true;
+            if (heistTokenRef.current) sendRef.current({ t: "heist_side", token: heistTokenRef.current });
             setSide(msg.can === true ? "smash" : "none");
             telemetryRef.current.floorsToday = msg.can === true && msg.home !== true ? Number(msg.floors) || 0 : null;
           }
@@ -444,14 +548,31 @@ export default function DriveWorld({
         }
       : undefined,
   });
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
+  // A side picked mid-drive: its signed token goes to the room once it knows who you are.
+  const heistToken = heist?.token ?? null;
+  useEffect(() => {
+    heistTokenRef.current = heistToken;
+    if (heistToken && authed.current) send({ t: "heist_side", token: heistToken });
+  }, [heistToken, send]);
   // Bots fill in for missing drivers (you count as one).
   const bots = useTownBots(slug, objects, drivers.length + 1);
-  const cars = [...drivers.flatMap((d) => remotes.current.get(d.id) ?? []), ...bots];
+  // The city of the day marks each driver's side on their car.
+  const badged = (r: CarFeed): CarFeed => {
+    const sd = heist ? sidesNow.get(r.id) : undefined;
+    return sd ? { ...r, badge: sd } : r;
+  };
+  const cars = [...drivers.flatMap((d) => remotes.current.get(d.id) ?? []).map(badged), ...bots, ...heistFeeds];
   const botTargets = useRef(new Map<string, BotTarget>());
   /** A blast at (x, z) meters throws every bot in reach, harder the closer. */
   const blastBots = (x: number, z: number, reach: number, power: number, fx?: { id: number; mine: boolean }) => {
     smashApi.current?.blast(x, z, reach, fx);
-    for (const t of botTargets.current.values()) {
+    // The city of the day's game cars are stunned, never thrown (they'd fly off the streets).
+    heistApi.current?.blast(x, z, reach);
+    for (const [id, t] of botTargets.current) {
+      if (id.startsWith("bot:heist")) continue;
       const p = t.pos();
       if (!p) continue;
       const d = Math.hypot(p.x - x, p.z - z);
@@ -463,6 +584,10 @@ export default function DriveWorld({
     }
   };
   const onRemoteHit = (id: string, other: RapierRigidBody) => {
+    if (id.startsWith("bot:heist")) {
+      heistApi.current?.contact(id);
+      return;
+    }
     if (id.startsWith("bot:")) {
       // Nobody to tell: the bot takes the hit here, as hard as you came in.
       const c = car.current;
@@ -518,6 +643,7 @@ export default function DriveWorld({
             respawnAt={respawnAt}
           >
             <Lights braking={() => !!car.current?.state.braking} />
+            {heist?.side === "cop" && <LightBar />}
           </Car>
           <LocalFx car={car} sources={fx} />
           {trees && <TreeBubble trees={trees.list} car={treeCar} onHidden={trees.onHidden} />}
@@ -534,7 +660,11 @@ export default function DriveWorld({
             sinkRef={battleSink}
             impactRef={impact}
             telemetryRef={telemetryRef}
-            onKnocked={() => crownKnock.current()}
+            onKnocked={() => {
+              crownKnock.current();
+              heistApi.current?.knocked();
+            }}
+            kitOn={() => !!heist?.side && !!heistKitOn.current}
             onBlast={blastBots}
             muted={muted || paused}
           />
@@ -568,6 +698,28 @@ export default function DriveWorld({
               muted={muted || paused}
             />
           )}
+          {heist && (
+            <HeistMode
+              heist={{
+                ...heist,
+                onView: (v) => {
+                  heistKitOn.current = !!v?.kit;
+                  heist.onView(v);
+                },
+              }}
+              car={car}
+              remotes={remotes}
+              sides={heistSides}
+              send={send}
+              selfId={selfId}
+              store={smash}
+              botTargets={botTargets}
+              sinkRef={heistSink}
+              apiRef={heistApi}
+              onFeeds={setHeistFeeds}
+              muted={muted || paused}
+            />
+          )}
           {smash && (
             <Smash
               ref={smashApi}
@@ -589,7 +741,7 @@ export default function DriveWorld({
           <EngineSmoke car={car} stallAt={stallRef} impact={impact} />
           <DriveAudio car={car} input={input} impact={impact} muted={muted || paused} volume={volume} />
           <EmoteBubbles carRef={car} remotes={remotes} send={send} apiRef={emoteApi ?? ownEmoteApi} sinkRef={emoteSink} chatSinkRef={chatSink} name={name} onLog={onEmoteLog} />
-          <RadarFeed car={car} cars={cars} telemetryRef={telemetryRef} />
+          <RadarFeed car={car} cars={cars} telemetryRef={telemetryRef} ring={heist?.ring ?? null} />
           <RouteArrow
             car={car}
             telemetryRef={telemetryRef}
@@ -600,6 +752,7 @@ export default function DriveWorld({
           />
           {!cinematic && <DriveCamera mode={camera} car={car} impact={impact} seamless={seamless} />}
           <CameraKey input={input} onToggle={onCameraToggle} />
+          {!offline && <SpawnApart car={car} remotes={remotes} objects={objects} />}
           <Ready onReady={onReady} />
         </Physics>
       </Suspense>

@@ -39,6 +39,8 @@ export interface CarFeed {
   color: string;
   buffer: { sample(t: number, out: CarSnapshot): CarSnapshot | null };
   bot?: boolean;
+  /** The city of the day: a cop's light bar, a robber's marker. */
+  badge?: "cop" | "robber";
 }
 
 export interface RemoteDriver extends CarFeed {

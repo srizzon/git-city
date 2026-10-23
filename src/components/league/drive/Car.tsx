@@ -198,14 +198,23 @@ export default function Car({
   });
 
   // A building landed on the car (admin edit in live view): push it to the nearest free lot.
+  // Only a building that's new where it stands counts: a page that hands the same buildings
+  // over again (the Brasil map rebuilds its list) never moves a car driving inside one to smash it.
+  const seenBuildings = useRef<Set<string> | null>(null);
   useEffect(() => {
+    const keys = new Set(buildings.map((b) => `${b.loginLower}:${b.position[0]}:${b.position[2]}`));
+    const before = seenBuildings.current;
+    seenBuildings.current = keys;
     const body = bodyRef.current;
     if (!body) return;
     const p = body.translation();
     const wx = p.x * M_TO_UNIT;
     const wz = p.z * M_TO_UNIT;
     const inside = buildings.some(
-      (b) => Math.abs(wx - b.position[0]) < b.width / 2 + 4 && Math.abs(wz - b.position[2]) < b.depth / 2 + 4,
+      (b) =>
+        (!before || !before.has(`${b.loginLower}:${b.position[0]}:${b.position[2]}`)) &&
+        Math.abs(wx - b.position[0]) < b.width / 2 + 4 &&
+        Math.abs(wz - b.position[2]) < b.depth / 2 + 4,
     );
     if (!inside) return;
     const lot = nearestFreeLot(objects, h, wx, wz);

@@ -10,8 +10,11 @@ import { LOT } from "@/lib/league-city/grid";
 // up, like GTA or Mario Kart), so left on the map is left on the road. The
 // town's roads and buildings, your building in lime, everyone driving in
 // their car color, bots dimmer, the crown during Crown Rush, and the building
-// you're driving to (Drive here). The crown, the route and other drivers past
-// the edge stick to the rim, so you always know which way to go. Drawn on a canvas from the telemetry feed, never re-renders.
+// you're driving to (Drive here). On the Brasil map's city of the day, its ring
+// as a dashed lime circle (a lime marker on the rim while it's off the map),
+// cops in blue and robbers in red, game-run ones too. The crown, the route,
+// the city and other drivers past the edge stick to the rim, so you always
+// know which way to go. Drawn on a canvas from the telemetry feed, never re-renders.
 
 /** City units from the center to the rim. */
 const RANGE = 200;
@@ -24,6 +27,8 @@ const BOT = "#8a8a96";
 const GOLD = "#ffcf33";
 const GOLD_DARK = "#c98f10";
 const CREAM = "#e8dcc8";
+/** The city of the day: cops blue, robbers red. */
+const BADGE = { cop: "#5aa0ff", robber: "#ff5a52" } as const;
 
 /** A 7×5 pixel crown, centered on (x, y), `p` px per pixel. */
 function crownIcon(ctx: CanvasRenderingContext2D, x: number, y: number, p: number) {
@@ -135,6 +140,16 @@ export default function Minimap({
         ctx.fillRect(b.x - b.w / 2, b.z - b.d / 2, b.w, b.d);
       }
       layerRef.current?.(ctx, r.x, r.z, reach);
+      // The city of the day's edge.
+      if (r.heist) {
+        ctx.strokeStyle = HOME;
+        ctx.lineWidth = 2.5 / k;
+        ctx.setLineDash([8 / k, 6 / k]);
+        ctx.beginPath();
+        ctx.arc(r.heist.x, r.heist.z, r.heist.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       // A city race's route: its gates joined up, to the finish.
       if (r.raceLine?.length) {
         ctx.strokeStyle = HOME;
@@ -147,22 +162,41 @@ export default function Minimap({
       }
       ctx.restore();
 
-      // Bots under people, people pinned to the rim when far.
+      // Bots under people, people pinned to the rim when far (game-run cops and robbers count as people).
       for (const c of r.cars) {
-        if (!c.bot) continue;
+        if (!c.bot || c.badge) continue;
         const [x, y] = toMap(c.x, c.z);
         if (Math.hypot(x, y) > R) continue;
         ctx.fillStyle = BOT;
         ctx.fillRect(R + x - 1.5, R + y - 1.5, 3, 3);
       }
       for (const c of r.cars) {
-        if (c.bot) continue;
+        if (c.bot && !c.badge) continue;
         const [x, y, far] = pin(toMap(c.x, c.z), 4);
         const s = far ? 4 : 6;
         ctx.fillStyle = BG;
         ctx.fillRect(R + x - s / 2 - 1, R + y - s / 2 - 1, s + 2, s + 2);
-        ctx.fillStyle = c.color;
+        ctx.fillStyle = c.badge ? BADGE[c.badge] : c.color;
         ctx.fillRect(R + x - s / 2, R + y - s / 2, s, s);
+      }
+      // The city of the day off the map: a lime marker on the rim pointing at it.
+      if (r.heist) {
+        const [cx, cy] = toMap(r.heist.x, r.heist.z);
+        if (Math.hypot(cx, cy) > R + r.heist.r * k) {
+          const [x, y] = pin([cx, cy], 7);
+          const pulse = 0.5 + 0.5 * Math.sin(now / 200);
+          ctx.fillStyle = `rgba(200, 230, 74, ${0.2 + pulse * 0.25})`;
+          ctx.beginPath();
+          ctx.arc(R + x, R + y, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = HOME;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([3, 2]);
+          ctx.beginPath();
+          ctx.arc(R + x, R + y, 4.5, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
       }
       const route = telemetry.route;
       if (route) {

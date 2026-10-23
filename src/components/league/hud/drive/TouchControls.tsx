@@ -7,6 +7,8 @@ import { ITEM_NAMES, ITEM_NAMES_PT, isItem, type BattleItem } from "@/lib/league
 import { useLang } from "@/lib/i18n/LangProvider";
 import { autoDrift, dragSteer, type TouchDrive } from "@/lib/league-city/drive/touch";
 import { ReactionButton } from "./Reactions";
+import { KitTouch } from "@/components/towns/brasil/heist/kit";
+import type { HeistSide, KitSlot } from "@/lib/towns/heist";
 
 // Phone controls (lib drive/touch), laid out for a phone held upright, on one
 // grid so everything lines up:
@@ -19,7 +21,9 @@ import { ReactionButton } from "./Reactions";
 //              when the HUD hands `onEmote`), HORN, which lights up with the
 //              teammate's name when you're parked at their building (honking
 //              opens it), and BOOST (hold, big)
-//   attack     over the speed, only while you hold one
+//   attack     over the speed, only while you hold one; in the Brasil map's
+//              city of the day, your side's three weapons (`kit`) in a
+//              column over BOOST instead
 // The button a prompt is teaching pulses (`lesson`). Everything sits under the
 // other HUD pieces, so their buttons still take taps.
 // `mode="drift"` (the drift spots): no auto drift (a held DRIFT only, like
@@ -58,6 +62,7 @@ export default function TouchControls({
   mode = "town",
   onEmote,
   onChat,
+  kit = null,
 }: {
   touchRef: React.MutableRefObject<TouchDrive>;
   telemetry: DriveTelemetry;
@@ -68,6 +73,8 @@ export default function TouchControls({
   onEmote?: (e: number) => void;
   /** Signed in: the reactions menu's Chat opens the field. */
   onChat?: () => void;
+  /** The city of the day: your side's weapons over the row. */
+  kit?: { slots: KitSlot[]; side: HeistSide; onUse?: (key: KitSlot["key"]) => void } | null;
 }) {
   const driftMode = mode === "drift";
   const drag = useRef<{ id: number; origin: number; x: number; y: number } | null>(null);
@@ -302,7 +309,12 @@ export default function TouchControls({
               <Zap size={22} strokeWidth={2.5} aria-hidden />
               {t("Boost", "Turbo")}
             </button>
-            {item && Icon && (
+            {kit && (
+              <div className="absolute bottom-full right-0 mb-3 flex w-16 justify-center">
+                <KitTouch kit={kit.slots} side={kit.side} onUse={kit.onUse} />
+              </div>
+            )}
+            {!kit && item && Icon && (
               <div className="absolute bottom-full left-1/2 mb-3 -translate-x-1/2">
                 <button
                   type="button"

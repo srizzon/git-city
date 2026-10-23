@@ -102,7 +102,7 @@ export default async function LeaguePage({ params, searchParams }: Props) {
   // The Brasil town is drawn as the map of Brazil: its own page.
   if (league.map === "brasil") {
     const atQuery = typeof query.at === "string" && LOGIN_RE.test(query.at.toLowerCase()) ? query.at.toLowerCase() : null;
-    const { layout, residents, grewAt } = await getBrasilLayout(league.id, atQuery);
+    const { layout, residents } = await getBrasilLayout(league.id, atQuery);
     const [cityDevs, cityNorms, week, election, count, stateFounders, projects, projectWins] = await Promise.all([
       getCityDevsByIds(residents.map((r) => r.dev.id)),
       getCityNorms(),
@@ -134,7 +134,6 @@ export default async function LeaguePage({ params, searchParams }: Props) {
         home={home ? { city: home.city, picked } : null}
         startAt={atLogin ? { login: atLogin } : cidade ? { city: cidade } : uf ? { uf } : null}
         startPick={query.pick === "1"}
-        grewAt={grewAt}
         startVote={!PRESIDENCY_ON ? null : ([query.run, query.vote].map((v) => (typeof v === "string" && /^\d{2}$/.test(v) ? Number(v) : null)).find((v) => v !== null) ?? (query.vote === "open" ? "open" : null))}
         week={week}
         election={election}

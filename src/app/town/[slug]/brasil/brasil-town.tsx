@@ -67,6 +67,12 @@ import ProjectSheet, { type ProjectView } from "@/components/towns/brasil/Projec
 import ShareProjectSheet from "@/components/towns/brasil/ShareProjectSheet";
 import AdRequestSheet from "@/components/towns/brasil/AdRequestSheet";
 import MyProjects, { ProjectWin } from "@/components/towns/brasil/MyProjects";
+import HeistHud from "@/components/towns/brasil/heist/HeistHud";
+import { HeistResultTower, HeistStrip, SideChoice } from "@/components/towns/brasil/heist/HeistMap";
+import { HeistPreviewStrip, IN_CAR, heistMock, useHeistPreview } from "@/components/towns/brasil/heist/HeistPreview";
+import { useHeist } from "@/components/towns/brasil/heist/useHeist";
+import type { HeistApi } from "@/components/league/drive/HeistMode";
+import type { HeistSide, HeistView, KitSlot } from "@/lib/towns/heist";
 
 // The Brasil town's page: the map of Brazil with the town's residents, each
 // in their city, their buildings sized like everywhere in Git City. Over it:
@@ -88,8 +94,6 @@ export interface BrasilTownProps {
   home: { city: number | null; picked: boolean } | null;
   /** Open on a state, a city (its slug) or a building. */
   startAt: { uf: string } | { city: string } | { login: string } | null;
-  /** When Brazil last grew to make room for its cities (ms), or null: the ticker says so for a day. */
-  grewAt?: number | null;
   /** ?pick=1, back from signing in after a guest's free building: open the state picker if you're not on the map. */
   startPick?: boolean;
   /** The week's points the offices come from (last closed week, or this week so far before the first one closes), and this week's. */
@@ -127,7 +131,7 @@ const HUD_BG = "bg-bg/90";
 const HUD_EDGE = "border-border";
 const HUD_SOFT = "text-muted";
 
-export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, grewAt = null, week: officeWeek, election, count = null, startVote = null, stateFounders = {}, projects = null, projectWins = {}, startProject = null, startSheet = null }: BrasilTownProps) {
+export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewerLogin, home, startAt, startPick = false, week: officeWeek, election, count = null, startVote = null, stateFounders = {}, projects = null, projectWins = {}, startProject = null, startSheet = null }: BrasilTownProps) {
   const { lang, setLang, t } = useLang();
   const router = useRouter();
   const camera = useRef<CameraApi | null>(null);
@@ -166,6 +170,41 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   /** On the drift track: the town's car is parked, a drift run is on. */
   const [drifting, setDrifting] = useState(false);
   const inCar = driving || drifting;
+  // Local only (?heist=1): made-up city-of-the-day states over the real page.
+  const [heistStep, setHeistStep] = useHeistPreview();
+  const heist = useMemo(() => (heistStep ? heistMock(heistStep) : null), [heistStep]);
+  const heistInCar = !!heistStep && IN_CAR.includes(heistStep);
+  // The city of the day for real: today's city, your side, what the car's mode tells the HUD.
+  const today = useHeist(league.slug, !!viewerLogin);
+  const [heistView, setHeistView] = useState<HeistView | null>(null);
+  const [needSide, setNeedSide] = useState(false);
+  const heistApi = useRef<HeistApi | null>(null);
+  const [resultSeen, setResultSeen] = useState(() => {
+    try {
+      return typeof window !== "undefined" && localStorage.getItem("gc:heist-result") === new Date().toISOString().slice(0, 10);
+    } catch {
+      return false;
+    }
+  });
+  // Yesterday's tower only greets you: once you've clicked or pressed anything, a late answer stays away.
+  const [touchedMap, setTouchedMap] = useState(false);
+  useEffect(() => {
+    const on = () => setTouchedMap(true);
+    window.addEventListener("pointerdown", on, { once: true });
+    window.addEventListener("keydown", on, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", on);
+      window.removeEventListener("keydown", on);
+    };
+  }, []);
+  const closeResult = () => {
+    setResultSeen(true);
+    try {
+      localStorage.setItem("gc:heist-result", new Date().toISOString().slice(0, 10));
+    } catch {
+      // shown again next visit
+    }
+  };
   /** Where the next drive starts instead of a building (to or back from the drift track: the highway by its gate). */
   const [driveSpawn, setDriveSpawn] = useState<Spawn | null>(null);
   /** Dark between the town's car and the drift run, both ways, while the next world loads. */
@@ -260,7 +299,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const cityBySlug = new Map(allCities.filter((c) => c.slug).map((c) => [c.slug!, c]));
     const cityOfLogin = new Map(allCities.flatMap((c) => c.devs.map((d) => [d.dev.login.toLowerCase(), c] as const)));
     const week = weekCrown(layout, now);
-    // Who arrived in the last day, newest first: the ticker over the bar and the "new" name plates.
+    // Who arrived in the last day: their name plates say "new".
     const arrivals = allCities
       .flatMap((c) => c.devs.map((d) => ({ login: d.dev.login, where: c.ibge === null ? "island" : c.name, at: d.at })))
       .filter((a) => now - a.at < 86_400_000)
@@ -644,8 +683,24 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       onCrown: setCrownView,
       onTaste: viewerLogin ? undefined : onTaste,
       rally: { api: rallyApi, onView: setRallyView, recordMs: raceRecordRef, startLine: raceStartLine, routeLine: raceLine },
+      heist:
+        today.day?.ring && !heistStep
+          ? {
+              ring: today.day.ring,
+              side: today.me?.side ?? null,
+              resident: today.me?.resident ?? false,
+              signedIn: !!viewerLogin,
+              busts: today.me?.busts ?? 0,
+              standing: today.day.standing,
+              cityName: today.day.name,
+              token: today.token,
+              apiRef: heistApi,
+              onView: setHeistView,
+              onNeedSide: setNeedSide,
+            }
+          : undefined,
     }),
-    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, games, raceStartLine, raceResults, raceLine],
+    [telemetry, noop, driveFrom, driveSpawn, league.slug, viewerLogin, guest, driveCamera, toggleCamera, muted, volume, emoteLog, paused, exitDrive, taste, onTaste, games, raceStartLine, raceResults, raceLine, today.day, today.me, today.token, heistStep],
   );
   /** Your state, from your city. */
   const homeCity = viewerLogin ? world.cityOfLogin.get(viewerLogin.toLowerCase()) : undefined;
@@ -944,7 +999,32 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       // private mode: asked again next time
     }
   };
-  const bar = "flex min-h-[60px] flex-col items-center justify-center gap-1.5 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
+  const bar = "flex min-h-[58px] flex-col items-center justify-center gap-1.5 bg-[#141417] py-2 text-[9px] text-cream hover:text-lime sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-0 sm:text-[11px]";
+
+  // The map with nothing open over it: what the bar's slot shows (a live race, the city of the day, who arrived).
+  const mapClear = !inCar && !state && !focused && !panel && !picker;
+  // The city of the day's card takes the slot unless a race is open or we're asking for your city.
+  // The block on the bar: the preview's made-up state, or today's real city.
+  const strip = heistStep
+    ? heistStep.startsWith("card") && heist?.view
+      ? { city: heist.view.city, side: heist.view.side, resident: heist.view.resident }
+      : null
+    : today.day
+      ? { city: { name: today.day.name, uf: today.day.uf ?? "", buildings: today.day.buildings, standing: today.day.standing }, side: today.me?.side ?? null, resident: today.me?.resident ?? false }
+      : null;
+  const heistCard = mapClear && !askCity && !liveRace && !!strip;
+  /** A side from the map's block or the ring: kept by the site; from the map, the car goes to the city. */
+  const pickSide = async (side: HeistSide) => {
+    if (!viewerLogin) return signIn();
+    const me = await today.pick(side);
+    const ring = today.day?.ring;
+    if (me?.side && ring && !inCar) startDrive({ x: ring.x * M_TO_UNIT, z: ring.z * M_TO_UNIT });
+  };
+  const pickHeist = (step: NonNullable<typeof heistStep>) => {
+    setHeistStep(step);
+    if (IN_CAR.includes(step) && !inCar) startDrive();
+  };
+
 
   return (
     <main className="fixed inset-0 bg-bg font-pixel uppercase text-cream">
@@ -1127,28 +1207,15 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
       )}
       {!inCar && <BrasilMinimap scale={layout.scale} cities={layout.cities} island={layout.island} camera={cameraStore} cars={carSpots} track={DRIFT_TAG} />}
       {!inCar && (
-        <span className="pointer-events-none fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 max-sm:bottom-[calc(66px+env(safe-area-inset-bottom))] max-sm:max-w-[130px] max-sm:text-[8px] max-sm:leading-tight">
+        <span className={`pointer-events-none fixed bottom-1 left-1.5 z-20 text-[9px] normal-case leading-none text-muted/60 max-sm:max-w-[130px] max-sm:text-[8px] max-sm:leading-tight ${heistCard ? "max-sm:hidden" : "max-sm:bottom-[calc(66px+env(safe-area-inset-bottom))]"}`}>
           {t("Map data: IBGE · Natural Earth", "Dados do mapa: IBGE · Natural Earth")}
         </span>
       )}
 
-      {!inCar && !state && !focused && !panel && !picker && !askCity && !liveRace && (world.arrivals.length > 0 || (grewAt !== null && now - grewAt < 86_400_000)) && (
-        <Arrivals
-          arrivals={world.arrivals}
-          grew={grewAt !== null && now - grewAt < 86_400_000 ? { scale: layout.scale, at: grewAt } : null}
-          onBrazil={() => camera.current?.flyTo(null)}
-          onPick={(login) => {
-            const b = world.placed.get(login.toLowerCase());
-            if (!b) return;
-            posthog.capture("brasil_arrival_clicked");
-            openBuilding(b);
-          }}
-        />
-      )}
 
       {/* Over the bar: a race anyone can still join. */}
       {!inCar && !state && !focused && !panel && !picker && liveRace && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[112px]">
+        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(108px+env(safe-area-inset-bottom))] z-20 flex justify-center px-4 sm:bottom-[76px]">
           <LiveRace
             race={liveRace}
             offset={watchRace?.offset ?? 0}
@@ -1163,9 +1230,23 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
         </div>
       )}
 
+      {/* The city of the day takes the live race's spot over the bar when no race is open. */}
+      {!inCar && heist?.result && <HeistResultTower result={heist.result} onClose={() => setHeistStep("card")} />}
+      {!inCar && !heistStep && today.result?.you && !resultSeen && !touchedMap && <HeistResultTower result={today.result} onClose={closeResult} />}
+      {heistStep && <HeistPreviewStrip step={heistStep} onStep={pickHeist} />}
+
       {/* The bar: a row of words on a desktop, a tab bar of icons on a phone; Drive raised in the middle. */}
+      {/* The city of the day rides on the bar: as wide as it on a desktop, edge to edge over the tab bar on a phone. */}
       {!inCar && (
-        <nav className={`pointer-events-auto absolute inset-x-0 bottom-0 grid ${election ? "grid-cols-5" : "grid-cols-4"} items-end gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2">
+        {heistCard && strip && (
+          <div className="flex w-0 min-w-full flex-col gap-px">
+            {/* On a phone the map's credit moves up here, off the bar's gap the strip now fills. */}
+            <span className="mb-1 ml-1.5 text-[8px] normal-case leading-tight text-muted/60 sm:hidden">{t("Map data: IBGE · Natural Earth", "Dados do mapa: IBGE · Natural Earth")}</span>
+            <HeistStrip city={strip.city} side={strip.side} resident={strip.resident} onPick={(side) => (heistStep ? pickHeist(side) : void pickSide(side))} className="max-sm:border-x-0 max-sm:border-b-0" />
+          </div>
+        )}
+        <nav className={`pointer-events-auto relative grid ${election ? "grid-cols-5" : "grid-cols-4"} items-stretch gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:flex sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>
           <button type="button" onClick={() => openPanel("states")} className={bar}>
             <Trophy size={18} className="sm:hidden" aria-hidden />
             {t("States", "Estados")}
@@ -1184,7 +1265,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             <MapIcon size={18} className="sm:hidden" aria-hidden />
             {t("Brazil", "Brasil")}
           </button>
-          {/* Drive is the bar's middle, lime and raised over it: the one thing to do here. */}
+          {/* Drive is the bar's middle, lime: the one thing to do here. Level with the other tabs, so whatever sits on the bar meets a straight edge. */}
           <button
             type="button"
             disabled={launching || world.devs === 0}
@@ -1192,15 +1273,19 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
               posthog.capture("brasil_drive_button_clicked");
               startDrive();
             }}
-            className="-mt-5 flex min-h-[80px] flex-col items-center justify-center gap-1.5 bg-lime text-[10px] text-bg shadow-[0_-6px_0_rgba(0,0,0,0.25)] transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40 sm:mt-0 sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-6 sm:text-[11px] sm:shadow-none"
+            className="flex min-h-[58px] flex-col items-center justify-center gap-1.5 bg-lime text-[9px] text-bg transition-[filter] hover:brightness-110 active:translate-y-px disabled:opacity-40 sm:h-10 sm:min-h-0 sm:flex-row sm:gap-2 sm:px-6 sm:text-[11px]"
           >
-            <Car size={24} className="sm:size-4" aria-hidden />
+            <Car size={18} className="sm:size-4" aria-hidden />
             {t("Drive", "Dirigir")}
           </button>
           {election && (
             <button type="button" onClick={() => openVote()} className={`${bar} relative`}>
-              {election.phase === "voting" && <span className="absolute right-[30%] top-3 h-1.5 w-1.5 animate-pulse bg-red-500 sm:static sm:order-first" aria-hidden />}
-              <Landmark size={18} className="sm:hidden" aria-hidden />
+              {election.phase === "voting" && <span className="h-1.5 w-1.5 animate-pulse bg-red-500 max-sm:hidden" aria-hidden />}
+              {/* On a phone the live dot sits on the icon's corner, like Mine's state color. */}
+              <span className="relative sm:hidden" aria-hidden>
+                <Landmark size={18} />
+                {election.phase === "voting" && <span className="absolute -right-1.5 -top-0.5 h-1.5 w-1.5 animate-pulse bg-red-500" />}
+              </span>
               {t("Vote", "Votar")}
             </button>
           )}
@@ -1233,6 +1318,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
             )}
           </button>
         </nav>
+        </div>
       )}
 
       {drift.overlay}
@@ -1269,7 +1355,19 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           onCamera={toggleCamera}
           onMute={toggleMute}
           onExit={exitDrive}
+          kit={
+            heistInCar && heist?.view?.kit && heist.view.side
+              ? { slots: heist.view.kit, side: heist.view.side }
+              : !heistStep && heistView?.kit && heistView.side
+                ? { slots: heistView.kit, side: heistView.side, onUse: (key: KitSlot["key"]) => heistApi.current?.use(key) }
+                : null
+          }
         >
+          {heistInCar && heist?.view && (heistStep === "pick" ? <SideChoice city={heist.view.city} onPick={(side) => setHeistStep(side === "cop" ? "cop" : "robber")} /> : <HeistHud view={heist.view} />)}
+          {!heistStep && heistView?.side && <HeistHud view={heistView} />}
+          {!heistStep && needSide && today.day && (
+            <SideChoice city={{ name: today.day.name, uf: today.day.uf ?? "", buildings: today.day.buildings, standing: today.day.standing }} onPick={(side) => void pickSide(side)} />
+          )}
           {games && (
             <GameMenu title={t(`Games · ${drivers.length + 1} driving here`, `Jogos · ${drivers.length + 1} dirigindo aqui`)} modes={gameModes} onPick={pickGame} onClose={closeGames}>
               {games.step === "race" ? (
@@ -1611,63 +1709,6 @@ function DriversList({
         </ul>
       )}
     </div>
-  );
-}
-
-/** "3m", "2h": how long ago, short. */
-function ago(at: number, now: number): string {
-  const m = Math.max(1, Math.round((now - at) / 60_000));
-  return m < 60 ? `${m}m` : `${Math.round(m / 60)}h`;
-}
-
-/**
- * Who just arrived, one at a time over the bar: "@login just arrived · Campinas · 3m",
- * a tap away from their building. Whoever commented on the reel opens the map
- * and sees their name go by. When Brazil grew in the last day to make room
- * for its cities, that goes by first.
- */
-function Arrivals({ arrivals, grew, onPick, onBrazil }: { arrivals: { login: string; where: string; at: number }[]; grew: { scale: number; at: number } | null; onPick: (login: string) => void; onBrazil: () => void }) {
-  const tr = useT();
-  const [i, setI] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
-  const n = Math.min(arrivals.length, 12) + (grew ? 1 : 0);
-  useEffect(() => {
-    if (n < 2) return;
-    const t = setInterval(() => {
-      setI((k) => (k + 1) % n);
-      setNow(Date.now());
-    }, 4000);
-    return () => clearInterval(t);
-  }, [n]);
-  const k = i % n;
-  if (grew && k === 0)
-    return (
-      <button
-        key="grew"
-        type="button"
-        onClick={onBrazil}
-        className="pointer-events-auto absolute bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream sm:bottom-[72px]"
-      >
-        <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
-        <span className="shrink-0 text-cream">{tr("Brazil grew", "O Brasil cresceu")}</span>
-        <span className="shrink-0 text-lime">{grew.scale}x</span>
-        <span className="shrink-0">{ago(grew.at, now)}</span>
-      </button>
-    );
-  const a = arrivals[(k - (grew ? 1 : 0)) % arrivals.length];
-  return (
-    <button
-      key={a.login}
-      type="button"
-      onClick={() => onPick(a.login)}
-      className="pointer-events-auto absolute bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 animate-[fade-in_0.4s_ease-out] items-center gap-2 bg-bg/90 px-3 py-1.5 font-pixel text-[10px] uppercase text-muted hover:text-cream sm:bottom-[72px]"
-    >
-      <span className="blink-dot h-1.5 w-1.5 shrink-0 bg-lime" aria-hidden />
-      <span className="truncate normal-case text-cream">@{a.login}</span>
-      <span className="shrink-0">{tr("just arrived", "acabou de chegar")}</span>
-      <span className="min-w-0 truncate text-lime">{a.where === "island" ? tr("island", "ilha") : a.where}</span>
-      <span className="shrink-0">{ago(a.at, now)}</span>
-    </button>
   );
 }
 

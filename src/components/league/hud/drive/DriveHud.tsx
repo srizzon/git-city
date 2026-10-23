@@ -10,6 +10,7 @@ import { useLang } from "@/lib/i18n/LangProvider";
 import StartScreen from "./StartScreen";
 import DrivePrompt, { type Lesson } from "./DrivePrompt";
 import Dash from "./Dash";
+import type { HeistSide, KitSlot } from "@/lib/towns/heist";
 import TouchControls from "./TouchControls";
 import type { TouchDrive } from "@/lib/league-city/drive/touch";
 import CrownPanel from "./CrownPanel";
@@ -64,6 +65,7 @@ export default function DriveHud({
   onGames,
   startNote = null,
   children,
+  kit = null,
   onVolume,
   onEmote,
   onChat,
@@ -107,6 +109,8 @@ export default function DriveHud({
   startNote?: string | null;
   /** A town's own HUD pieces (the Brasil map's races), over the rest. */
   children?: React.ReactNode;
+  /** The Brasil map's city of the day: your side's weapons in place of the ? box slot. */
+  kit?: { slots: KitSlot[]; side: HeistSide; onUse?: (key: KitSlot["key"]) => void } | null;
   onVolume: (v: number) => void;
   /** A quick reaction (lib drive/emotes slot). */
   onEmote: (e: number) => void;
@@ -191,7 +195,7 @@ export default function DriveHud({
   return (
     <div className="pointer-events-none fixed inset-0 z-30 font-pixel uppercase">
       {/* First, so every other piece of the HUD sits above the steering layer. */}
-      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} onEmote={entered ? onEmote : undefined} />}
+      {ready && loaded && touchRef && <TouchControls touchRef={touchRef} telemetry={telemetry} lesson={touchLesson} onEmote={entered ? onEmote : undefined} kit={kit} />}
 
       {ready && entered && !touch && !gameOn && (
         <div className={`${HUD_BOX} absolute left-4 top-4 flex flex-col gap-1.5 px-3 py-2 text-[9px]`} style={enter(0)}>
@@ -322,7 +326,8 @@ export default function DriveHud({
 
       {ready && entered && <SmashNotice telemetry={telemetry} touch={touch} />}
 
-      {ready && entered && !touch && <Dash telemetry={telemetry} style={enter(0.24)} />}
+      {/* After the loading band has gone: it sits where the dash comes up. */}
+      {ready && loaded && entered && !touch && <Dash telemetry={telemetry} style={enter(0.24)} kit={kit} />}
 
       {/* Phone: no minimap, others' reactions under Pause. */}
       {ready && loaded && entered && touch && (

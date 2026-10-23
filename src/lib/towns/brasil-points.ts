@@ -23,6 +23,10 @@ export const POINTS = {
   project: 100,
   /** Knocking down someone's building on the map (SMASH_DAY_CAP a day). */
   smash: 5,
+  /** The city of the day (lib/towns/heist): a pushed building, a bust, the cops' bonus when the city stood. */
+  heist: 10,
+  bust: 15,
+  heist_bonus: 30,
 } as const;
 
 /** Most smash points per dev per (Brasília) day: ten buildings. */
@@ -97,11 +101,14 @@ export interface PointsBreakdown {
   race: number;
   project: number;
   smash: number;
+  heist: number;
+  bust: number;
+  heist_bonus: number;
 }
 
-export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0, race: 0, project: 0, smash: 0 });
+export const emptyBreakdown = (): PointsBreakdown => ({ join: 0, comment: 0, invite: 0, story: 0, coded: 0, vote: 0, paint: 0, race: 0, project: 0, smash: 0, heist: 0, bust: 0, heist_bonus: 0 });
 
-export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote + b.paint + b.race + b.project + b.smash;
+export const totalOf = (b: PointsBreakdown) => b.join + b.comment + b.invite + b.story + b.coded + b.vote + b.paint + b.race + b.project + b.smash + b.heist + b.bust + b.heist_bonus;
 
 /**
  * Each dev's week: the ledger's rows plus POINTS.coded for every day they

@@ -61,6 +61,8 @@ import { raceId, signRallyReceipt } from "./rallyToken";
 import { parseSmash } from "../src/lib/league-city/smash-net";
 import { JumpWatch, seenHash } from "../src/lib/league-city/smash-floors";
 import { SmashRoom } from "./smash";
+import { verifySideToken } from "./heistToken";
+import { isKitItem, kitOnly } from "../src/lib/towns/heist";
 import { LIVE_SECRET_HEADER, createReporter, type TownLive } from "../src/lib/towns/live";
 
 // ─── League city driving ────────────────────────────────────
@@ -295,6 +297,8 @@ export class DriveServer extends PartyRoom {
       now: Date.now(),
     };
     conn.send(JSON.stringify(msg));
+    // The city of the day's sides, for the light bars and the push.
+    if (this.smash.heist.info) conn.send(this.smash.heist.sidesMsg());
   }
 
   /** GET: who's in the city right now, for /towns (cached by /api/towns/live). */
@@ -332,6 +336,7 @@ export class DriveServer extends PartyRoom {
       d.state = encodeState(s);
       if (d.jumps.see({ x: s.x, z: s.z, at: now })) this.smash.jumped(sender.id, now);
       this.rallyState(sender.id, s.x, s.z, now);
+      this.smash.heist.state(sender.id, s.x, s.z, now);
       this.room.broadcast(JSON.stringify(["s", sender.id, ...d.state]), [sender.id, ...this.watchers]);
       return;
     }
@@ -367,6 +372,24 @@ export class DriveServer extends PartyRoom {
     if (t === "smash") {
       const m = parseSmash(msg as Record<string, unknown>);
       if (m && this.drivers.has(sender.id)) this.smash.smash(sender.id, m);
+      return;
+    }
+
+    // The city of the day: a side picked mid-drive (signed by the site), the push, a bust.
+    if (t === "heist_side" || t === "heist_push" || t === "heist_bust" || t === "heist_gang_bust") {
+      if (!this.drivers.has(sender.id)) return;
+      const heist = this.smash.heist;
+      const now = Date.now();
+      if (t === "heist_side") {
+        const secret = this.room.env.FORCE_PUSH_HMAC_SECRET as string | undefined;
+        const login = this.smash.drivers.get(sender.id)?.login;
+        if (!secret || !login || !heist.info) return;
+        void verifySideToken(token, secret).then((v) => {
+          if (v && v.dln === login && v.day === heist.info?.day && this.drivers.has(sender.id)) heist.setSide(sender.id, v.side);
+        });
+      } else if (t === "heist_push") heist.push(sender.id, now);
+      else if (t === "heist_bust") heist.bust(sender.id, (msg as { by?: unknown }).by, now, (msg as { turret?: unknown }).turret);
+      else heist.gangBust(sender.id, now);
       return;
     }
 
@@ -462,12 +485,19 @@ export class DriveServer extends PartyRoom {
       }
       if (t === "use") {
         const u = validUse(x, z, dx, dz);
-        if (!u || !isItem(item) || d.held !== item || now - d.lastUse < USE_MIN_MS) return;
+        if (!u || now - d.lastUse < USE_MIN_MS) return;
+        // The city of the day's kit (its own charge, checked by the room), or what a box gave you.
+        const kit = (msg as { kit?: unknown }).kit === true;
+        if (kit) {
+          if (!isKitItem(item) || !this.smash.heist.kit(sender.id, item, now)) return;
+        } else {
+          if (!isItem(item) || d.held !== item) return;
+          d.held = null;
+        }
         d.lastUse = now;
-        d.held = null;
         const aim = typeof target === "string" && target.length <= 64 && this.drivers.has(target) ? target : undefined;
         const fx: ServerMsg = { t: "fx", id: ++this.fxSeq, from: sender.id, item, ...u, ...(aim ? { target: aim } : {}) };
-        this.smash.fired(this.fxSeq, sender.id, u.x, u.z);
+        if (!kitOnly(item)) this.smash.fired(this.fxSeq, sender.id, u.x, u.z);
         this.room.broadcast(JSON.stringify(fx));
         return;
       }
@@ -503,6 +533,7 @@ export class DriveServer extends PartyRoom {
   onClose(conn: Connection) {
     const watched = this.watchers.delete(conn.id);
     this.smash.leave(conn.id);
+    this.smash.heist.leave(conn.id);
     const at = this.where(conn.id) ?? [this.crown.x, this.crown.z];
     if (!this.drivers.delete(conn.id)) {
       if (watched) this.countChanged();

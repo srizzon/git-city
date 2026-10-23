@@ -73,7 +73,7 @@ export type ClientMsg =
   | { t: "hello"; name: string }
   | { t: "bump"; to: string; x: number; z: number }
   | { t: "take"; box: number; gen: number }
-  | { t: "use"; item: string; x: number; z: number; dx: number; dz: number; target?: string }
+  | { t: "use"; item: string; x: number; z: number; dx: number; dz: number; target?: string; kit?: boolean }
   | { t: "hit"; id: number }
   | { t: "crown_start"; x: number; z: number }
   | { t: "crown_grab" }
@@ -92,6 +92,11 @@ export type ClientMsg =
   | { t: "auth"; token: string }
   /** Rivalry smash: your car (k "car") or your blast (k "blast", fx id) took floors off columns `c` of building `b`. */
   | { t: "smash"; b: string; c: number[]; k: "car" | "blast"; fx?: number }
+  /** The city of the day (party/heist.ts): a side the site signed, the push bar filled, out of hearts (`by`: the real cop who last hit), a game-run robber busted. */
+  | { t: "heist_side"; token: string }
+  | { t: "heist_push" }
+  | { t: "heist_bust"; by?: string; turret?: string }
+  | { t: "heist_gang_bust" }
   /** Race track only (party/race.ts): in or out for the next race. */
   | { t: "ready"; on: boolean }
   | { t: "restart" }
@@ -127,6 +132,13 @@ export type ServerMsg =
   | { t: "damage"; b: string; r: number[]; by?: string | null; s?: number }
   /** Smash: every damaged building [login, rows, by, shield end], when the room loads or you arrive. */
   | { t: "damage_all"; list: [string, number[], string | null, number][] }
+  /** The city of the day: every driver's side; a building you hold (`n` held now); your push banked or refused; your bust; a bust you made. */
+  | { t: "heist_sides"; list: [string, "robber" | "cop"][] }
+  | { t: "heist_held"; n: number }
+  | { t: "heist_pushed"; n: number; pts: number }
+  | { t: "heist_push_no" }
+  | { t: "heist_busted"; lost: number }
+  | { t: "heist_bust_credit"; robber: string | null; pts: number }
   | ["s", string, ...number[]];
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
