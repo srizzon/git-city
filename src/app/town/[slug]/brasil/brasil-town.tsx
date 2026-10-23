@@ -940,9 +940,9 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   const crownBusy = !!crownView && (crownView.crown.phase === "countdown" || crownView.crown.phase === "live");
   // The loading band's live line: a race still taking racers, else how many drive here.
   const startNote = liveRace?.route
-    ? t(`${here} driving · race to ${cityByKey(layout, liveRace.route.to)?.name ?? "?"} open`, `${here} dirigindo · corrida pra ${cityByKey(layout, liveRace.route.to)?.name ?? "?"} aberta`)
-    : here > 1
-      ? t(`${here} driving here now`, `${here} dirigindo aqui agora`)
+    ? t(`${drivingNow} driving · race to ${cityByKey(layout, liveRace.route.to)?.name ?? "?"} open`, `${drivingNow} dirigindo · corrida pra ${cityByKey(layout, liveRace.route.to)?.name ?? "?"} aberta`)
+    : drivingNow > 0
+      ? t(`${drivingNow} driving here now`, `${drivingNow} dirigindo aqui agora`)
       : null;
   const gameModes: GameMode[] = [
     {
