@@ -1007,10 +1007,10 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
   // The block on the bar: the preview's made-up state, or today's real city.
   const strip = heistStep
     ? heistStep.startsWith("card") && heist?.view
-      ? { city: heist.view.city, side: heist.view.side, resident: heist.view.resident }
+      ? { city: heist.view.city, side: heist.view.side, resident: heist.view.resident, counts: { robber: 7, cop: 9 } }
       : null
     : today.day
-      ? { city: { name: today.day.name, uf: today.day.uf ?? "", buildings: today.day.buildings, standing: today.day.standing }, side: today.me?.side ?? null, resident: today.me?.resident ?? false }
+      ? { city: { name: today.day.name, uf: today.day.uf ?? "", buildings: today.day.buildings, standing: today.day.standing }, side: today.me?.side ?? null, resident: today.me?.resident ?? false, counts: today.sides }
       : null;
   const heistCard = mapClear && !askCity && !liveRace && !!strip;
   /** A side from the map's block or the ring: kept by the site; from the map, the car goes to the city. */
@@ -1243,7 +1243,7 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
           <div className="flex w-0 min-w-full flex-col gap-px">
             {/* On a phone the map's credit moves up here, off the bar's gap the strip now fills. */}
             <span className="mb-1 ml-1.5 text-[8px] normal-case leading-tight text-muted/60 sm:hidden">{t("Map data: IBGE · Natural Earth", "Dados do mapa: IBGE · Natural Earth")}</span>
-            <HeistStrip city={strip.city} side={strip.side} resident={strip.resident} onPick={(side) => (heistStep ? pickHeist(side) : void pickSide(side))} className="max-sm:border-x-0 max-sm:border-b-0" />
+            <HeistStrip city={strip.city} side={strip.side} resident={strip.resident} counts={strip.counts} onPick={(side) => (heistStep ? pickHeist(side) : void pickSide(side))} className="max-sm:border-x-0 max-sm:border-b-0" />
           </div>
         )}
         <nav className={`pointer-events-auto relative grid ${election ? "grid-cols-5" : "grid-cols-4"} items-stretch gap-px border-t-2 border-border bg-border pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_0_rgba(0,0,0,0.25)] sm:flex sm:items-end sm:border-t-0 sm:bg-transparent sm:pb-0 sm:shadow-[0_6px_0_rgba(0,0,0,0.35)]`}>

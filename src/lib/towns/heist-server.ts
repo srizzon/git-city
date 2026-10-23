@@ -95,6 +95,14 @@ async function countBlocks(leagueId: string, day: string, city: CityLayout | und
   return n;
 }
 
+/** How many picked each side for the day (residents who never picked aren't counted). */
+export async function heistSideCounts(day: string): Promise<Record<HeistSide, number>> {
+  const sb = getSupabaseAdmin();
+  const count = async (side: HeistSide) => (await sb.from("brasil_heist_sides").select("developer_id", { count: "exact", head: true }).eq("day", day).eq("side", side)).count ?? 0;
+  const [robber, cop] = await Promise.all([count("robber"), count("cop")]);
+  return { robber, cop };
+}
+
 /** Blocks the drive room saw knocked off today's city (brasil_heist_knock adds them; a settled day takes no more). */
 export async function knockHeist(n: number, now = Date.now()): Promise<void> {
   if (n <= 0) return;
