@@ -178,10 +178,8 @@ function GridApart({
 }
 
 /** Mounts once the world has loaded (inside the Suspense, like Ready): the car is on its first spot now. */
-function MarkSpawned({ at }: { at: React.MutableRefObject<number> }) {
-  useEffect(() => {
-    at.current = performance.now();
-  }, [at]);
+function MarkSpawned({ onMount }: { onMount: () => void }) {
+  useEffect(() => onMount(), [onMount]);
   return null;
 }
 
@@ -255,6 +253,9 @@ export default function RaceWorld({
   const respawnAt = useRef<Spawn | null>(null);
   /** When the car was last put on its own grid spot (GridApart checks it isn't someone else's). */
   const spawnedAt = useRef(0);
+  const markSpawned = useCallback(() => {
+    spawnedAt.current = performance.now();
+  }, []);
 
   // Held on the grid until the lights go out.
   const [frozen, setFrozen] = useState(false);
@@ -751,7 +752,7 @@ export default function RaceWorld({
           )}
           <RaceCamera mode={camera} car={car} track={track} shot={SHOTS[stage]} shotAt={stageAt} frameLeft={frameLeft} />
           <CameraKey input={input} onToggle={onCameraToggle} />
-          <MarkSpawned at={spawnedAt} />
+          <MarkSpawned onMount={markSpawned} />
           <Ready onReady={onReady} />
         </Physics>
       </Suspense>
