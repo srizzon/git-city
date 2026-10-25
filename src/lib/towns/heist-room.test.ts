@@ -30,20 +30,20 @@ describe("HeistRoom", () => {
     h.setSide("r", "robber");
     expect(h.inCity(at(50), 0)).toBe(true);
     expect(h.inCity(at(150), 0)).toBe(false);
-    h.took("r", "robber", RULES.blocksPerPoint - 1, at(50), 0);
+    h.took("r", "robber", RULES.blocksPerPoint - 1, at(50), 0, "t1", RULES.blocksPerPoint - 1);
     expect(last("r")).toBeNull();
-    h.took("r", "robber", 1, at(50), 0);
+    h.took("r", "robber", 1, at(50), 0, "t2", 1);
     expect(last("r")).toEqual({ t: "heist_held", n: 1 });
-    h.took("r", "robber", 50, at(150), 0);
+    h.took("r", "robber", 50, at(150), 0, "t3", 50);
     expect(last("r")).toEqual({ t: "heist_held", n: 1 });
   });
 
-  it("counts every block knocked off the city, whoever knocked it, until a save takes it", () => {
+  it("counts each building's worst moment of the day, whoever knocked it, until a save takes it", () => {
     const { h } = setup();
     h.setSide("r", "robber");
-    h.took("r", "robber", 30, at(50), 0);
-    h.took("x", "nobody", 12, 0, 0);
-    h.took("x", "nobody", 99, at(150), 0);
+    h.took("r", "robber", 30, at(50), 0, "a", 30);
+    h.took("x", "nobody", 12, 0, 0, "b", 12);
+    h.took("x", "nobody", 99, at(150), 0, "c", 99);
     const first = h.take();
     expect(first.knocked).toBe(42);
     first.undo();
@@ -52,12 +52,25 @@ describe("HeistRoom", () => {
     expect(h.hasWork()).toBe(false);
   });
 
+  it("doesn't count floors that grew back and fell again, nor damage from before today", () => {
+    const { h } = setup();
+    h.took("x", "nobody", 40, 0, 0, "a", 40);
+    // Grew back to 10 missing, knocked to 30 missing: still under its worst.
+    h.took("x", "nobody", 20, 0, 0, "a", 30);
+    expect(h.take().knocked).toBe(40);
+    h.took("x", "nobody", 20, 0, 0, "a", 50);
+    expect(h.take().knocked).toBe(10);
+    // Already missing 100 when first hit today: only the 5 count.
+    h.took("x", "nobody", 5, 0, 0, "b", 105);
+    expect(h.take().knocked).toBe(5);
+  });
+
   it("banks a push only after the time out of the ring, with no real cop near", () => {
     const { h, pos, last } = setup();
     h.setSide("r", "robber");
     h.setSide("c", "cop");
-    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
-    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0, "t4", RULES.blocksPerPoint);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0, "t5", RULES.blocksPerPoint);
     pos.set("r", { x: 150, z: 0 });
     pos.set("c", { x: 500, z: 0 });
     h.state("r", 50, 0, 0);
@@ -78,14 +91,14 @@ describe("HeistRoom", () => {
     h.setSide("r", "robber");
     h.setSide("c", "cop");
     h.setSide("c2", "cop");
-    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0, "t6", RULES.blocksPerPoint);
     pos.set("r", { x: 0, z: 0 });
     pos.set("c", { x: 10, z: 0 });
     pos.set("c2", { x: 900, z: 0 });
     h.bust("r", "c2", 5);
     expect(last("r")).toEqual({ t: "heist_busted", lost: 1 });
     expect(h.take().busts).toEqual([]);
-    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0, "t7", RULES.blocksPerPoint);
     h.bust("r", "c", 6);
     expect(last("c")?.t).toBe("heist_bust_credit");
     expect(h.take().busts).toEqual([{ copId: 2, robberId: 1, at: 6 }]);
@@ -99,7 +112,7 @@ describe("HeistRoom", () => {
     h.setSide("r", "robber");
     h.bust("r", undefined, 1, "dev-a");
     expect(h.take().turrets).toEqual([]);
-    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0, "t8", RULES.blocksPerPoint);
     h.bust("r", undefined, 2, "dev-a");
     expect(h.take().turrets).toEqual([{ login: "dev-a", at: 2 }]);
   });
@@ -132,7 +145,7 @@ describe("HeistRoom", () => {
   it("a new day forgets yesterday's sides and holdings", () => {
     const { h, pos, last } = setup();
     h.setSide("r", "robber");
-    h.took("r", "robber", RULES.blocksPerPoint, 0, 0);
+    h.took("r", "robber", RULES.blocksPerPoint, 0, 0, "t9", RULES.blocksPerPoint);
     h.setDay({ day: "2026-10-23", key: "1", ring: { x: 0, z: 0, r: 100 } });
     expect(h.side("r")).toBeNull();
     h.setSide("r", "robber");

@@ -59,6 +59,8 @@ export class HeistRoom {
   private turrets: HeistTurretOut[] = [];
   /** Blocks knocked off the city since the last save, by anyone: how much of it still stands. */
   private knocked = 0;
+  /** The most blocks each building (owner's login) has been missing today: floors that grow back and fall again don't count twice. */
+  private worst = new Map<string, number>();
 
   constructor(
     private room: Room,
@@ -71,6 +73,7 @@ export class HeistRoom {
       // A new day: yesterday's sides and holdings don't carry over.
       this.sides.clear();
       this.holding.clear();
+      this.worst.clear();
       this.broadcastSides();
     }
     this.info = info;
@@ -115,11 +118,20 @@ export class HeistRoom {
     return !!this.info && inRing(this.info.ring, x * UNIT_TO_M, z * UNIT_TO_M);
   }
 
-  /** A robber knocked `blocks` off a building in the city: they hold them (the HUD hears the points when they change). */
-  took(id: string, login: string, blocks: number, x: number, z: number) {
+  /**
+   * Someone knocked `blocks` off `building` in the city, which is now missing
+   * `missing` blocks. The city counts each building's worst moment of the day
+   * (whoever knocked it), so it never loses more than it has. A robber holds
+   * every block they knock (the HUD hears the points when they change).
+   */
+  took(id: string, login: string, blocks: number, x: number, z: number, building: string, missing: number) {
     if (blocks <= 0 || !this.inCity(x, z)) return;
-    // Every block off the city counts against it, whoever knocked it.
-    this.knocked += blocks;
+    // First hit today (or since the room woke): what was already missing isn't today's.
+    const worst = this.worst.get(building) ?? Math.max(0, missing - blocks);
+    if (missing > worst) {
+      this.knocked += missing - worst;
+      this.worst.set(building, missing);
+    } else if (!this.worst.has(building)) this.worst.set(building, worst);
     if (this.sides.get(id) !== "robber") return;
     const was = this.holding.get(login) ?? 0;
     this.holding.set(login, was + blocks);
