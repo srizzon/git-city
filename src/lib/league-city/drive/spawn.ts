@@ -52,6 +52,18 @@ export function spawnPoint(objects: readonly Obj[], viewerDevId: number | null, 
       const z = mine.z + dz;
       if (roads.has(lotKey(x, z))) return at(x, z, roadHeading(roads, x, z));
     }
+    // A lot in the middle of its block (the Brasil map): the road nearest it, not the entrance.
+    let near: [number, number] | null = null;
+    let nearD = Infinity;
+    for (const key of roads) {
+      const [x, z] = key.split(",").map(Number);
+      const d = (x - mine.x) ** 2 + (z - mine.z) ** 2;
+      if (d < nearD) {
+        nearD = d;
+        near = [x, z];
+      }
+    }
+    if (near) return at(near[0], near[1], roadHeading(roads, near[0], near[1]));
   }
 
   if (roads.has(lotKey(0, 0))) return { ...ENTRANCE_SPAWN };
