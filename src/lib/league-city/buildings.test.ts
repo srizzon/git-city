@@ -14,6 +14,8 @@ const obj = (developer_id: number, x: number, z: number, rot: 0 | 90 | 180 | 270
   developer_id,
   x,
   z,
+  px: null,
+  pz: null,
   rot,
   is_new: false,
 });
