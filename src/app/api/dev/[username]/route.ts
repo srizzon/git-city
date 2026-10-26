@@ -352,6 +352,8 @@ async function refreshDeveloper(
       active_days_last_year: expanded.active_days_last_year,
       language_diversity: uniqueLanguages.size,
       current_week_contributions: expanded.current_week_contributions,
+      contributions_cy: expanded.contributions_cy,
+      contributions_cy_year: expanded.contributions_cy_year,
     } : {}),
   };
 

@@ -35,6 +35,10 @@ export interface ExpandedGitHubData {
   longest_streak: number;
   active_days_last_year: number;
   current_week_contributions: number;
+  // Current calendar year's slice of contributions_total. The refresh cron
+  // swaps it for a fresh count, so it must always match the total it came with.
+  contributions_cy: number;
+  contributions_cy_year: number;
 }
 
 function buildYearAliases(): string {
@@ -148,6 +152,7 @@ export async function fetchExpandedGitHubData(login: string): Promise<ExpandedGi
     const currentYear = new Date().getFullYear();
     let contributions_total = 0;
     const contribution_years: number[] = [];
+    const contributions_cy = user[`y${currentYear}`]?.contributionCalendar?.totalContributions ?? 0;
     for (let y = currentYear; y >= currentYear - 9; y--) {
       const yearData = user[`y${y}`];
       const yearContribs = yearData?.contributionCalendar?.totalContributions ?? 0;
@@ -188,6 +193,8 @@ export async function fetchExpandedGitHubData(login: string): Promise<ExpandedGi
       account_created_at: user.createdAt ?? null,
       ...streaks,
       current_week_contributions,
+      contributions_cy,
+      contributions_cy_year: currentYear,
     };
   } catch {
     return null;
@@ -427,6 +434,8 @@ export interface GitHubDeveloperData {
   active_days_last_year?: number;
   language_diversity?: number;
   current_week_contributions?: number;
+  contributions_cy?: number;
+  contributions_cy_year?: number;
 }
 
 /**
@@ -533,6 +542,8 @@ export async function fetchGitHubDeveloperData(
       active_days_last_year: expanded.active_days_last_year,
       language_diversity: uniqueLanguages.size,
       current_week_contributions: expanded.current_week_contributions,
+      contributions_cy: expanded.contributions_cy,
+      contributions_cy_year: expanded.contributions_cy_year,
     } : {}),
   };
 }
