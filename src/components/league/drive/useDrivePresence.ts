@@ -58,6 +58,31 @@ export function partyHost(): string {
 
 const _snap: CarSnapshot = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, speed: 0, steer: 0, slip: 0, flags: 0 };
 
+/**
+ * True once the tab has sat in the background a minute: the room lets go of
+ * it (each open socket keeps the room's Durable Object awake, and billed, and a
+ * car left there stands still on everyone's map). Back in front, false again,
+ * and the reconnect's welcome brings everyone back.
+ */
+export function useAway(graceMs = 60_000): boolean {
+  const [away, setAway] = useState(false);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const on = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      if (document.hidden) timer = setTimeout(() => setAway(true), graceMs);
+      else setAway(false);
+    };
+    document.addEventListener("visibilitychange", on);
+    return () => {
+      document.removeEventListener("visibilitychange", on);
+      if (timer) clearTimeout(timer);
+    };
+  }, [graceMs]);
+  return away;
+}
+
 export function useDrivePresence({
   slug,
   name,
@@ -114,11 +139,17 @@ export function useDrivePresence({
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
   const socket = useRef<PartySocket | null>(null);
   const lastSend = useRef(0);
+  const away = useAway();
 
   useEffect(() => {
     if (offline) return;
     const map = remotes.current;
     const publish = () => setDrivers([...map.values()].map(({ id, name: n }) => ({ id, name: n })));
+    if (away) {
+      map.clear();
+      publish();
+      return;
+    }
     const add = (id: string, n: string) => {
       if (!map.has(id)) map.set(id, { id, name: n, color: carColor(n), buffer: new SnapshotBuffer() });
     };
@@ -188,7 +219,7 @@ export function useDrivePresence({
       ws.close();
       map.clear();
     };
-  }, [slug, name, party, offline, seat]);
+  }, [slug, name, party, offline, seat, away]);
 
   // Stream your car.
   useFrame(() => {

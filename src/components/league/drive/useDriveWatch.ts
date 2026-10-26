@@ -3,14 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import PartySocket from "partysocket";
 import { SnapshotBuffer, carColor, decodeState, type DriverInfo, type ServerMsg } from "@/lib/league-city/drive/net";
-import { partyHost, type RemoteDriver } from "./useDrivePresence";
+import { partyHost, useAway, type RemoteDriver } from "./useDrivePresence";
 import { syncBotClock } from "@/lib/league-city/drive/bots";
 
 // Watches the league city's drive room without driving (?watch=1): who's in
 // the car right now and where, batched by the server a few times a second.
 // Opens only while `enabled` (view mode); the drive room takes over in the car.
-
-const HIDDEN_GRACE_MS = 60_000;
 
 export function useDriveWatch(
   slug: string,
@@ -25,24 +23,8 @@ export function useDriveWatch(
   });
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
 
-  // A tab left in the background lets go of the room after a minute (each open
-  // socket keeps the room's Durable Object awake, and billed); back in front,
-  // it reconnects and the welcome brings everyone back.
-  const [away, setAway] = useState(false);
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const on = () => {
-      if (timer) clearTimeout(timer);
-      timer = null;
-      if (document.hidden) timer = setTimeout(() => setAway(true), HIDDEN_GRACE_MS);
-      else setAway(false);
-    };
-    document.addEventListener("visibilitychange", on);
-    return () => {
-      document.removeEventListener("visibilitychange", on);
-      if (timer) clearTimeout(timer);
-    };
-  }, []);
+  // A tab left in the background lets go of the room after a minute.
+  const away = useAway();
 
   useEffect(() => {
     const map = remotes.current;
