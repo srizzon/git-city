@@ -12,7 +12,7 @@ describe("pixelize", () => {
       const meta = await sharp(out).metadata();
       expect(meta.format).toBe("png");
       expect([meta.width, meta.height]).toEqual([64, 64]);
-      expect(meta.paletteBitDepth ?? meta.isPalette).toBeTruthy();
+      expect(meta.isPalette).toBe(true);
     }
   });
 
