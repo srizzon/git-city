@@ -5,7 +5,7 @@ import { Check, ChevronDown, ChevronUp, Maximize2 } from "lucide-react";
 import Panel from "@/components/league/hud/Panel";
 import { fmt } from "@/components/league/hud/shared";
 import type { Count, CountRow } from "@/lib/towns/brasil-election-server";
-import { ballot } from "@/lib/towns/brasil-election";
+import { ballot, term } from "@/lib/towns/brasil-election";
 import { useLang, useT } from "@/lib/i18n/LangProvider";
 import type { Lang } from "@/lib/i18n/lang";
 
@@ -15,7 +15,8 @@ import type { Lang } from "@/lib/i18n/lang";
 // pill under the search that opens the sheet. Vote is always one tap away,
 // and tapping a candidate opens the voting machine with their number typed.
 // Read again every 15 seconds while the vote is open. Before the vote it says
-// when it opens; after, who was elected.
+// when it opens. After it, the card is the president's: face, share, term,
+// the final count, and the next election (the machine waits for its vote).
 
 const POLL_MS = 15_000;
 
@@ -94,6 +95,61 @@ export default function ApuracaoWidget({
   }, [c.mode, slug]);
 
   const lead = c.rows[0];
+
+  // After the vote: the president's card, not the machine (the next vote is weeks away).
+  const president = c.mode === "final" && c.elected ? c.rows.find((r) => r.login === c.elected) : undefined;
+  if (president) {
+    const until = term(c.term).end;
+    const nextVote = term(c.term + 1).opens;
+    const day = (ms: number) => new Date(ms).toLocaleDateString(lang === "pt" ? "pt-BR" : "en-GB", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+    const share = `${pctText(president.votes, c.total)} · ${fmt(president.votes)} ${t("votes", "votos")}`;
+    if (!wide) {
+      return (
+        <a
+          href={`/town/${slug}/apuracao`}
+          aria-label={t(`President @${president.login}`, `Presidente @${president.login}`)}
+          className="pointer-events-auto absolute left-3 top-[104px] z-20 flex h-12 w-[calc(50%-16px)] items-center gap-2 border-[3px] border-border bg-bg/90 px-2.5 font-pixel text-[9px] uppercase backdrop-blur-sm"
+        >
+          <Face src={president.avatar_url} size={26} />
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="text-[8px] text-lime">{t("President", "Presidente")}</span>
+            <span className="truncate normal-case text-cream">@{president.login}</span>
+          </span>
+        </a>
+      );
+    }
+    return (
+      <section aria-label={t("President", "Presidente")} className="pointer-events-auto absolute left-4 top-4 z-20 w-[272px] border-[3px] border-border bg-bg/90 font-pixel uppercase backdrop-blur-sm">
+        <div className="border-b-2 border-border px-3 py-2 text-[10px]">
+          <span className="text-lime">{t("President", "Presidente")}</span>
+          <span className="text-muted"> · {t("elected", "eleito")}</span>
+        </div>
+        <div className="flex flex-col gap-3 px-3 py-3">
+          <div className="flex items-center gap-3">
+            <Face src={president.avatar_url} size={44} />
+            <span className="flex min-w-0 flex-col gap-1.5">
+              <span className="truncate text-[11px] normal-case text-cream">@{president.login}</span>
+              <span className="text-[9px] normal-case tabular-nums text-muted">{share}</span>
+              <span className="text-[9px] normal-case text-muted">
+                {t("Term until", "Mandato até")} {day(until)}
+              </span>
+            </span>
+          </div>
+          <a href={`/town/${slug}/apuracao`} className="btn-press flex min-h-9 items-center justify-center border-2 border-border text-[10px] text-cream hover:border-lime/60">
+            {t("See the count", "Ver apuração")}
+          </a>
+          <p className="flex items-center justify-between gap-2 text-[9px] normal-case text-muted">
+            <span>
+              {t("Next election", "Próxima eleição")} {day(nextVote)}
+            </span>
+            <button type="button" onClick={() => onVote()} className="shrink-0 text-cream underline hover:text-lime">
+              {t("Run", "Me candidatar")}
+            </button>
+          </p>
+        </div>
+      </section>
+    );
+  }
   const voted = c.mode === "live" && myVote !== null;
   // Vote, or (once you have) your vote, still a tap from changing it.
   const voteButton = (extra: string) =>
