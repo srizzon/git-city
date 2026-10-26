@@ -192,11 +192,24 @@ export function formatEvent(e: FeedEvent, viewerLogin?: string | null): string {
   const meta = e.metadata ?? {};
   const viewer = viewerLogin?.toLowerCase() ?? null;
 
+  const isYou = (login: string | null | undefined): boolean =>
+    !!viewer && !!login && login.toLowerCase() === viewer;
+
   const who = (login: string | null | undefined, fallback = "someone"): string => {
     if (!login) return fallback;
-    if (viewer && login.toLowerCase() === viewer) return "you";
-    return `@${login}`;
+    return isYou(login) ? "you" : `@${login}`;
   };
+
+  // Verb agreement: "you" takes the plural form ("you are"), a handle the singular.
+  const verb = (login: string | null | undefined, you: string, other: string): string =>
+    isYou(login) ? you : other;
+
+  // "<subject>'s building" reads "your building" for the viewer, never "you's".
+  const owner = (login: string | null | undefined): string =>
+    isYou(login) ? "your" : `${who(login)}'s`;
+
+  // "their" is the third-person form; the viewer's own things are "your".
+  const their = (login: string | null | undefined): string => (isYou(login) ? "your" : "their");
 
   const actor = actorLogin(e);
   const target = targetLogin(e);
@@ -209,7 +222,7 @@ export function formatEvent(e: FeedEvent, viewerLogin?: string | null): string {
       else line = `${who(actor)} unlocked "${meta.achievement_name ?? "an achievement"}"`;
       break;
     case "building_claimed":
-      line = `${who(actor)} claimed their building`;
+      line = `${who(actor)} claimed ${their(actor)} building`;
       break;
     case "item_purchased":
       line = `${who(actor)} bought ${meta.item_id ?? "an item"}`;
@@ -227,7 +240,7 @@ export function formatEvent(e: FeedEvent, viewerLogin?: string | null): string {
       line = `${who(actor)} joined the city`;
       break;
     case "visit_milestone":
-      line = `${who(target ?? actor)}'s building got ${meta.visit_count ?? "many"} visits today`;
+      line = `${owner(target ?? actor)} building got ${meta.visit_count ?? "many"} visits today`;
       break;
     case "item_equipped":
       line = `${who(actor)} equipped ${meta.item_id ?? "an item"}`;
@@ -239,7 +252,7 @@ export function formatEvent(e: FeedEvent, viewerLogin?: string | null): string {
       line = `${who(actor)} entered the top ${meta.position ?? 3}`;
       break;
     case "raid_success":
-      line = `${who(actor)} raided ${who(target)}'s building`;
+      line = `${who(actor)} raided ${owner(target)} building`;
       break;
     case "raid_failed":
       line = `${who(target)} defended against ${who(actor)}`;
@@ -258,32 +271,34 @@ export function formatEvent(e: FeedEvent, viewerLogin?: string | null): string {
       break;
     case "dev_highlight": {
       const subject = who(actor);
+      const be = verb(actor, "are", "is");
+      const have = verb(actor, "have", "has");
       switch (meta.highlight) {
         case "contributions":
-          line = `${subject} has ${Number(meta.value).toLocaleString()} contributions`;
+          line = `${subject} ${have} ${Number(meta.value).toLocaleString()} contributions`;
           break;
         case "stars":
-          line = `${subject} has ${Number(meta.value).toLocaleString()} stars across their repos`;
+          line = `${subject} ${have} ${Number(meta.value).toLocaleString()} stars across ${their(actor)} repos`;
           break;
         case "rank":
           line = `${subject} ranked #${meta.value} in the city`;
           break;
         case "streak":
-          line = `${subject} is on a ${meta.value}-day commit streak`;
+          line = `${subject} ${be} on a ${meta.value}-day commit streak`;
           break;
         case "language":
-          line = `${subject} builds with ${meta.value}`;
+          line = `${subject} ${verb(actor, "build", "builds")} with ${meta.value}`;
           break;
         case "repos":
-          line = `${subject} has ${meta.value} public repos`;
+          line = `${subject} ${have} ${meta.value} public repos`;
           break;
         default:
-          line = `${subject} is in the city`;
+          line = `${subject} ${be} in the city`;
       }
       break;
     }
     default:
-      line = `${who(actor)} is active in the city`;
+      line = `${who(actor)} ${verb(actor, "are", "is")} active in the city`;
   }
 
   return capitalize(line);
