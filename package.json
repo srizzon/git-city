@@ -56,7 +56,7 @@
     "glin-profanity": "^3.3.0",
     "howler": "^2.2.4",
     "lucide-react": "^0.577.0",
-    "next": "16.4.3",
+    "next": "16.2.3",
     "partyserver": "^0.5.10",
     "partysocket": "^1.1.16",
     "posthog-js": "^1.386.8",
