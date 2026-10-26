@@ -29,6 +29,7 @@ import { createEmoteLog } from "@/lib/league-city/drive/emote-log";
 import { createTouch, type TouchDrive } from "@/lib/league-city/drive/touch";
 import { loadVolume, saveVolume } from "@/lib/league-city/drive/volume";
 import { M_TO_UNIT } from "@/lib/league-city/drive/tuning";
+import { STALE_CAR_MS } from "@/lib/league-city/drive/net";
 import { useDriveWatch } from "@/components/league/drive/useDriveWatch";
 import { useTownsLive } from "@/components/towns/live";
 import { applyRoomDamage } from "@/lib/league-city/smash-net";
@@ -424,11 +425,13 @@ export default function BrasilTown({ league, layout, cityDevs, cityNorms, viewer
     const t = setTimeout(() => setJoinRace(null), 20_000);
     return () => clearTimeout(t);
   }, [joinRace, rallyView]);
-  // Where each driver is now (units), from the room's latest state of their car.
+  // Where each driver is now (units), from the room's latest state of their car; nowhere when it stopped coming (a tab in the background).
   const driverAt = useCallback(
     (id: string) => {
-      const s = watch.remotes.current.get(id)?.buffer.latest;
-      return s ? { x: s.x * M_TO_UNIT, z: s.z * M_TO_UNIT } : null;
+      const b = watch.remotes.current.get(id)?.buffer;
+      const s = b?.latest;
+      const at = b?.latestAt;
+      return s && at != null && performance.now() - at < STALE_CAR_MS ? { x: s.x * M_TO_UNIT, z: s.z * M_TO_UNIT } : null;
     },
     [watch.remotes],
   );

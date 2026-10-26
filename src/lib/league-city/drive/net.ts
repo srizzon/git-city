@@ -5,6 +5,8 @@
 // time, interpolating between the two snapshots around that moment.
 
 export const SEND_MS = 66;
+/** A car whose state stopped coming this long ago (ms; a tab in the background) is off the map. */
+export const STALE_CAR_MS = 15_000;
 export const INTERP_MS = 110;
 /**
  * Spectators (the city in view mode, ?watch=1) get every car in one message
@@ -210,6 +212,11 @@ export class SnapshotBuffer {
 
   get latest(): CarSnapshot | null {
     return this.items[this.items.length - 1]?.s ?? null;
+  }
+
+  /** Local time the latest snapshot arrived, or null before any. */
+  get latestAt(): number | null {
+    return this.items[this.items.length - 1]?.t ?? null;
   }
 
   /** The car at local time `t` (already delayed by the caller). Holds the ends. */

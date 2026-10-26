@@ -6,6 +6,7 @@ import {
   MAX_ROUTE_BYTES,
   MAX_MESSAGE_BYTES,
   SEND_MS,
+  STALE_CAR_MS,
   WATCH_MS,
   BUMP_MIN_MS,
   decodeState,
@@ -145,7 +146,9 @@ export class DriveServer extends PartyRoom {
         return;
       }
       const cars: [string, ...number[]][] = [];
-      for (const [id, d] of this.drivers) if (d.state) cars.push([id, ...d.state]);
+      const now = Date.now();
+      // A car that stopped reporting (its tab in the background) drops off the map.
+      for (const [id, d] of this.drivers) if (d.state && now - d.lastState < STALE_CAR_MS) cars.push([id, ...d.state]);
       if (cars.length === 0) return;
       const msg = JSON.stringify({ t: "cars", cars } satisfies ServerMsg);
       for (const id of this.watchers) this.room.getConnection(id)?.send(msg);
@@ -290,7 +293,7 @@ export class DriveServer extends PartyRoom {
     const msg: ServerMsg = {
       t: "welcome",
       you: conn.id,
-      drivers: [...this.drivers.entries()].map(([id, d]) => ({ id, name: d.name, s: d.state })),
+      drivers: [...this.drivers.entries()].map(([id, d]) => ({ id, name: d.name, s: Date.now() - d.lastState < STALE_CAR_MS ? d.state : null })),
       boxes: this.boxStates(Date.now()),
       crown: this.crown,
       rally: this.rally,
