@@ -81,6 +81,8 @@ export async function handleBrasilComments(comments: IncomingComment[]): Promise
   let fresh = 0;
   for (const c of comments) {
     if (c.igUser === own) continue;
+    // A sticker or GIF comment comes with no text: nothing to read in it.
+    if (!c.text) continue;
     const id = `ig:${c.id}`;
     const credit = () => creditComment(league.id, { id, igUser: c.igUser, text: c.text }, own).catch((err) => console.error("[brasil] comment points", c.id, err));
     const w = watched.get(c.mediaId);
