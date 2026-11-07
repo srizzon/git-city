@@ -396,7 +396,12 @@ export async function syncBrasilReels(ownUserId: string | null): Promise<{ reels
   const own = { id: ownUserId ?? me?.user_id ?? null, username: me?.username?.toLowerCase() ?? null };
   let fresh = 0;
   for (const { media_id } of reels) {
-    const all = await instagramComments(media_id);
+    // A watched post Instagram took down answers with an error: skip it, so it doesn't stop every other reel's sync.
+    const all = await instagramComments(media_id).catch((err) => {
+      console.error("[brasil] reel comments", media_id, err instanceof Error ? err.message : err);
+      return null;
+    });
+    if (!all) continue;
     // Replies come twice: under their comment (often without who wrote them) and in the list on their own
     // (with who, but not what they answer). One of each, with both.
     const parentOf = new Map(all.flatMap((c) => (c.replies?.data ?? []).map((r) => [r.id, c.id] as const)));
