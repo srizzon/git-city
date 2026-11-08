@@ -22,8 +22,10 @@ const PAYLOAD = "kw:";
 const WEEK_MS = 7 * 24 * 3_600_000;
 
 interface Campaign {
-  /** The word to comment, matched as a whole word, any case, accents ignored. */
+  /** The campaign's id and the word the Reel asks for. */
   word: string;
+  /** Any word of the comment that counts, after folding case and accents ("HACK", "Hack!", "#hack", "hackk", "hak", "hackathon"). */
+  matches: RegExp;
   url: string;
   utm: { source: string; medium: string; campaign: string };
   button: string;
@@ -34,6 +36,7 @@ interface Campaign {
 const CAMPAIGNS: Campaign[] = [
   {
     word: "hack",
+    matches: /^h+a+c*k+/,
     url: "https://hackbrasil.com/",
     utm: { source: "instagram", medium: "dm", campaign: "hackbrasil-reel" },
     button: "Quero o link 🚀",
@@ -51,8 +54,8 @@ const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 
 /** The campaign a comment's text asks for, if any. */
 export function campaignOf(text: string): Campaign | null {
-  const words = new Set(fold(text).split(/[^a-z0-9]+/).filter(Boolean));
-  return CAMPAIGNS.find((c) => words.has(c.word)) ?? null;
+  const words = fold(text).split(/[^a-z0-9]+/).filter(Boolean);
+  return CAMPAIGNS.find((c) => words.some((w) => c.matches.test(w))) ?? null;
 }
 
 function withUtm(c: Campaign, mediaId: string): string {
