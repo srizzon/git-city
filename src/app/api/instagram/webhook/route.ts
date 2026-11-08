@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { validInstagramSignature } from "@/lib/instagram";
 import { handleBrasilComments, handleStoryMentions, type IncomingComment } from "@/lib/towns/brasil-instagram";
 import { handleBrasilTaps } from "@/lib/towns/brasil-dm";
+import { handleKeywordComments, handleKeywordTaps, isKeywordTap } from "@/lib/ig-keyword-dm";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -65,7 +66,12 @@ export async function POST(req: Request) {
     }),
   );
   if (comments.length) after(() => handleBrasilComments(comments));
-  if (taps.length) after(() => handleBrasilTaps(taps));
+  // A campaign's word ("hack") gets its link by DM (ig-keyword-dm.ts), on any of the account's posts.
+  if (comments.length) after(() => handleKeywordComments(comments));
+  const keywordTaps = taps.filter((t) => isKeywordTap(t.payload));
+  const brasilTaps = taps.filter((t) => !isKeywordTap(t.payload));
+  if (keywordTaps.length) after(() => handleKeywordTaps(keywordTaps));
+  if (brasilTaps.length) after(() => handleBrasilTaps(brasilTaps));
   if (stories.length) after(() => handleStoryMentions(stories));
   return NextResponse.json({ ok: true });
 }
