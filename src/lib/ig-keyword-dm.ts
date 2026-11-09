@@ -13,11 +13,12 @@
 // Server only.
 
 import { getSupabaseAdmin } from "./supabase";
-import { privateReply, sendMessage } from "./instagram";
+import { privateReply, replyToComment, sendMessage } from "./instagram";
 import { captureServer } from "./posthog-server";
 import { guarded, mayTalk } from "./towns/brasil-breaker";
 
-export const DM = { perHour: 60, perRun: 5 } as const;
+/** `publicPerHour`: the hour's first DMs also get a public "te mandei o link no direct" under their comment (public replies in bulk got the account flagged, 2026-10-21). */
+export const DM = { perHour: 60, perRun: 5, publicPerHour: 10 } as const;
 const PAYLOAD = "kw:";
 const WEEK_MS = 7 * 24 * 3_600_000;
 
@@ -134,6 +135,10 @@ async function dmOne(row: Row): Promise<"sent" | "skipped" | "failed"> {
   }
   await done("sent");
   await captureServer(`ig:${row.ig_user ?? row.comment_id}`, "ig_keyword_dm_sent", { keyword: row.keyword, media_id: row.media_id });
+  // A DM from an account they don't follow lands in their requests: the comment says where to look.
+  if (row.ig_user && (await sentLastHour()) <= DM.publicPerHour) {
+    await guarded(() => replyToComment(row.comment_id, `@${row.ig_user} te mandei o link no direct`)).catch((err) => console.error("[keyword-dm] reply", row.comment_id, err));
+  }
   return "sent";
 }
 
