@@ -48,6 +48,20 @@ const CAMPAIGNS: Campaign[] = [
     link: (url) =>
       `Tá aqui 👇\n${url}\n\nÉ de graça, sem seleção, e as inscrições vão até 30/11.\n\nE segunda às 19h tem minha live lá no YouTube do Hack Brasil, contando como um hackathon me levou pra gringa 🙌`,
   },
+  {
+    word: "granola",
+    matches: /^g+r+a+n+o+l+a*s?$/,
+    url: "https://www.granola.ai/voice-typing",
+    utm: { source: "instagram", medium: "dm", campaign: "granola-reel" },
+    button: "Quero o link 🎙️",
+    opening: [
+      "Fala {at}! Bora parar de digitar? 🎙️\n\nClica no botão que eu te mando o link do Granola 👇",
+      "Opa {at}, o link do ditado do Granola tá separado pra você 😎\n\nToca aqui embaixo pra receber 👇",
+      "Fala {at}! Quer o Granola pra digitar falando? 🎙️\n\nClica no botão aqui embaixo 👇",
+    ],
+    link: (url) =>
+      `Tá aqui 👇\n${url}\n\nPra ativar: abre o Granola, vai em configurações, aperta Command + K, digita "voice typing" e ativa.\n\nÉ de graça e sem limite, mas por enquanto só funciona no Mac.`,
+  },
 ];
 
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
