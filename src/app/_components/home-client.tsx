@@ -2077,13 +2077,15 @@ function HomeContent({ serverIsAdmin, townOfWeek }: HomeContentProps) {
     // Building already in city — check if claimed status needs refresh
     const existing = buildings.find(b => b.login.toLowerCase() === authLogin);
     if (existing) {
-      // Refresh claimed status once per session (snapshot may be stale after login)
-      if (!existing.claimed && !refreshedClaimedStatus.current) {
+      // Once per session: refreshes claimed status (the snapshot may be stale
+      // after login) and makes the server re-sync your own commits from GitHub,
+      // so a player who opens the city sees today's count on the next load.
+      if (!refreshedClaimedStatus.current) {
         refreshedClaimedStatus.current = true;
         fetch(`/api/dev/${encodeURIComponent(authLogin)}`)
           .then(r => r.ok ? r.json() : null)
           .then(devData => {
-            if (!devData || devData.exists === false || !devData.claimed) return;
+            if (existing.claimed || !devData || devData.exists === false || !devData.claimed) return;
             setBuildings(prev => prev.map(b =>
               b.login.toLowerCase() === authLogin ? { ...b, claimed: true } : b
             ));
