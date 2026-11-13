@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import CommitsInfo from "@/components/CommitsInfo";
 import LeaderboardTracker from "@/components/LeaderboardTracker";
 import LeaderboardYouBadge, { LeaderboardAuthProvider } from "@/components/LeaderboardYouBadge";
 import LeaderboardUserPosition from "@/components/LeaderboardUserPosition";
@@ -326,7 +327,10 @@ export default async function LeaderboardPage({
                 <span className="w-10 text-center">#</span>
                 <span className="flex-1">Developer</span>
                 <span className="hidden w-24 text-right sm:block">{activeDevTab === "xp" ? "Rank" : "Language"}</span>
-                <span className="w-28 text-right">{metricLabel}</span>
+                <span className="flex w-auto shrink-0 items-center sm:w-36 justify-end gap-1.5">
+                  {metricLabel}
+                  {activeDevTab === "contributors" && <CommitsInfo />}
+                </span>
               </div>
 
               {/* Rows */}
@@ -387,7 +391,7 @@ export default async function LeaderboardPage({
                         : (dev.primary_language ?? "\u2014")}
                     </span>
 
-                    <span className="w-28 text-right text-sm" style={{ color: activeDevTab === "xp" ? tierFromLevel(dev.xp_level ?? 1).color : ACCENT }}>
+                    <span className="w-24 shrink-0 text-right text-sm sm:w-36" style={{ color: activeDevTab === "xp" ? tierFromLevel(dev.xp_level ?? 1).color : ACCENT }}>
                       {getMetricValue(dev)}
                     </span>
                   </Link>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLeaderboardAuth } from "./LeaderboardYouBadge";
+import CommitsInfo from "./CommitsInfo";
 
 const ACCENT = "#c8e64a";
 
@@ -56,6 +57,7 @@ export default function LeaderboardYouVsNext({
       <div className="flex items-center justify-between gap-2 text-[10px]">
         <span className="text-cream normal-case">
           You: <span style={{ color: ACCENT }}>#{position}</span> &middot; {user.value.toLocaleString()}
+          {label === "contributions" && <CommitsInfo login={authLogin} className="ml-1.5" />}
         </span>
         <span className="text-muted normal-case">
           Next: <span className="text-cream">#{position - 1}</span> &middot; {next.value.toLocaleString()}

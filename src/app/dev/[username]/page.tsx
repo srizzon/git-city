@@ -249,6 +249,7 @@ export default async function DevPage({ params }: Props) {
           </div>
           <div className="lg:col-start-3 lg:row-start-1">
             <ProfileStats
+              login={dev.github_login}
               contributions={contributions}
               repos={dev.public_repos}
               stars={dev.total_stars}

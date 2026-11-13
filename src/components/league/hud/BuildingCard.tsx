@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import CommitsInfo from "@/components/CommitsInfo";
 import type { CityBuilding } from "@/lib/github";
 import type { LeaguePageData } from "@/lib/leagues/queries";
 import { levelProgress, rankFromLevel, tierFromLevel, xpForLevel } from "@/lib/xp";
@@ -219,7 +220,10 @@ export default function BuildingCard({
             ]).map((s) => (
               <div key={s.label} className="bg-bg-card p-2 text-center">
                 <div className="text-xs text-lime">{s.value}</div>
-                <div className="mt-0.5 text-[8px] text-muted">{s.label}</div>
+                <div className="mt-0.5 flex items-center justify-center gap-1 text-[8px] text-muted">
+                  {s.label}
+                  {s.label === "Contribs" && <CommitsInfo login={b.login} />}
+                </div>
               </div>
             ))}
           </div>

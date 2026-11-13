@@ -1,4 +1,7 @@
+import CommitsInfo from "@/components/CommitsInfo";
+
 interface Props {
+  login: string;
   contributions: number;
   repos: number;
   stars: number;
@@ -9,6 +12,7 @@ interface Props {
 }
 
 export default function ProfileStats({
+  login,
   contributions,
   repos,
   stars,
@@ -36,7 +40,10 @@ export default function ProfileStats({
           <div className="text-base" style={{ color: accent }}>
             {stat.value.toLocaleString()}
           </div>
-          <div className="mt-1 text-[8px] text-muted">{stat.label}</div>
+          <div className="mt-1 flex items-center justify-center gap-1 text-[8px] text-muted">
+            {stat.label}
+            {stat.label === "Contributions" && <CommitsInfo login={login} accent={accent} />}
+          </div>
         </div>
       ))}
     </section>

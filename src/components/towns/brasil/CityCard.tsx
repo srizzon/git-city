@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CommitsInfo from "@/components/CommitsInfo";
 import posthog from "posthog-js";
 import type { CityBuilding } from "@/lib/github";
 import { fmt } from "@/components/league/hud/shared";
@@ -130,7 +131,7 @@ export default function CityCard({
         )}
 
         {top.length > 0 && (
-          <Section title={t("Biggest buildings", "Maiores prédios")} note={t("commits, all time", "commits, desde sempre")}>
+          <Section title={t("Biggest buildings", "Maiores prédios")} note={t("commits, all time", "commits, desde sempre")} info={<CommitsInfo accent="#c8e64a" />}>
             {top.map((login, i) => {
               const b = byLogin.get(login.toLowerCase());
               return <Row key={login} role={`#${i + 1}`} login={login} avatar={b?.avatar_url ?? null} value={fmt(b?.contributions ?? 0)} onPick={onPickDev} />;

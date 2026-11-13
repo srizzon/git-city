@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CommitsInfo from "@/components/CommitsInfo";
 import posthog from "posthog-js";
 import type { CityBuilding } from "@/lib/github";
 import { Avatar, fmt } from "@/components/league/hud/shared";
@@ -102,7 +103,7 @@ export default function StateCard({
         )}
 
         {s.top.length > 0 && (
-          <Section title={t("Biggest buildings", "Maiores prédios")} note={t("commits, all time", "commits, desde sempre")}>
+          <Section title={t("Biggest buildings", "Maiores prédios")} note={t("commits, all time", "commits, desde sempre")} info={<CommitsInfo accent="#c8e64a" />}>
             {s.top.map((login, i) => (
               <Row key={login} role={`#${i + 1}`} login={login} avatar={avatar(login)} value={fmt(byLogin.get(login.toLowerCase())?.contributions ?? 0)} onPick={onPickDev} />
             ))}
@@ -137,12 +138,17 @@ export function StateFlag({ uf, className = "" }: { uf: StateStats["uf"]; classN
   );
 }
 
-export function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+export function Section({ title, note, info, children }: { title: string; note?: string; info?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="mx-4 mb-4">
       <p className="mb-1 flex items-baseline justify-between border-b border-border pb-1 text-[8px] text-muted">
         <span className="text-cream-dark">{title}</span>
-        {note && <span>{note}</span>}
+        {(note || info) && (
+          <span className="flex items-center gap-1.5">
+            {note}
+            {info}
+          </span>
+        )}
       </p>
       <ul className="flex flex-col">{children}</ul>
     </div>

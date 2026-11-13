@@ -82,6 +82,7 @@ import posthog from "posthog-js";
 import { SHOW_TOWNS, TOWNS_LAUNCH_LABEL } from "@/lib/towns/visibility";
 import TownMonument, { MONUMENT_VARIANT } from "@/components/towns/TownMonument";
 import type { TownOfWeek } from "@/lib/towns/weekly";
+import CommitsInfo from "@/components/CommitsInfo";
 
 const CityCanvas = dynamic(() => import("@/components/CityCanvas"), {
   ssr: false,
@@ -486,6 +487,7 @@ function MiniLeaderboard({ buildings, accent }: { buildings: CityBuilding[]; acc
         >
           {cat.label}
         </button>
+        {cat.key === "contributions" && <CommitsInfo accent={accent} className="mr-auto ml-1.5" />}
         <a
           href={`/leaderboard?tab=${cat.tab}`}
           className="text-[9px] text-muted transition-colors hover:text-cream normal-case"
@@ -4806,7 +4808,16 @@ function HomeContent({ serverIsAdmin, townOfWeek }: HomeContentProps) {
                 ].map((s) => (
                   <div key={s.label} className="bg-bg-card p-2 text-center">
                     <div className="text-xs" style={{ color: theme.accent }}>{s.value}</div>
-                    <div className="text-[8px] text-muted mt-0.5">{s.label}</div>
+                    <div className="text-[8px] text-muted mt-0.5 flex items-center justify-center gap-1">
+                      {s.label}
+                      {s.label === "Contribs" && (
+                        <CommitsInfo
+                          login={selectedBuilding.login}
+                          accent={theme.accent}
+                          onRefreshed={(n) => setSelectedBuilding((b) => (b && b.login === selectedBuilding.login ? { ...b, contributions: n } : b))}
+                        />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -5406,8 +5417,9 @@ function HomeContent({ serverIsAdmin, townOfWeek }: HomeContentProps) {
                       >
                         {s.key === "rank" ? (s.a > 0 ? `#${s.a}` : "-") : s.a.toLocaleString()}
                       </span>
-                      <span className="flex-1 text-center text-[8px] text-muted uppercase tracking-wider">
+                      <span className="flex flex-1 items-center justify-center gap-1 text-center text-[8px] text-muted uppercase tracking-wider">
                         {s.label}
+                        {s.key === "contributions" && <CommitsInfo accent={theme.accent} />}
                       </span>
                       <span
                         className="w-[72px] text-left text-[11px] tabular-nums"
