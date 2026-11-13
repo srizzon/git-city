@@ -276,14 +276,21 @@ async function refreshDeveloper(
   const login = ghUser?.login ?? cached.github_login;
 
   const [expanded, reposPage1Res] = await Promise.all([
-    fetchExpandedGitHubData(login),
+    fetchExpandedGitHubData(login, {
+      contributions_total: cached.contributions_total ?? null,
+      contributions_cy: cached.contributions_cy ?? null,
+      contributions_cy_year: cached.contributions_cy_year ?? null,
+      contribution_years: cached.contribution_years ?? null,
+    }),
     fetch(
       `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=1`,
       { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
     ),
   ]);
 
-  const contributions = expanded?.contributions ?? 0;
+  // GitHub's contribution query failed: keep what the row has instead of
+  // writing 0 over a real count.
+  const contributions: number = expanded ? expanded.contributions_total : (cached.contributions ?? 0);
   const publicRepos = ghUser?.public_repos ?? cached.public_repos;
 
   let repos: RepoItem[] = reposPage1Res.ok ? await reposPage1Res.json() : [];
@@ -335,7 +342,9 @@ async function refreshDeveloper(
     primary_language: primaryLanguage,
     top_repos: topRepos,
     github_etag: (profileNotModified ? cached.github_etag : userRes.headers.get("etag")) ?? null,
-    fetched_at: new Date().toISOString(),
+    // Only a successful contribution fetch counts as fresh, so a failed one
+    // leaves the building at the front of the refresh cron's queue.
+    fetched_at: expanded ? new Date().toISOString() : cached.fetched_at,
     ...(expanded ? {
       contributions_total: expanded.contributions_total,
       contribution_years: expanded.contribution_years,
@@ -371,7 +380,7 @@ async function refreshDeveloper(
   const devId = upserted?.id;
   if (devId) {
     const newGithubXp = calculateGithubXp({
-      contributions: expanded?.contributions_total ?? contributions,
+      contributions,
       total_stars: totalStars,
       public_repos: publicRepos,
       total_prs: expanded?.total_prs ?? 0,

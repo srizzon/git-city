@@ -41,10 +41,11 @@ export interface ExpandedGitHubData {
   contributions_cy_year: number;
 }
 
-function buildYearAliases(): string {
+function buildYearAliases(onlyCurrentYear = false): string {
   const currentYear = new Date().getFullYear();
   const lines: string[] = [];
-  for (let y = currentYear; y >= currentYear - 9; y--) {
+  const lastYear = onlyCurrentYear ? currentYear : currentYear - 9;
+  for (let y = currentYear; y >= lastYear; y--) {
     lines.push(`y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { contributionCalendar { totalContributions } }`);
   }
   return lines.join("\n    ");
@@ -95,11 +96,30 @@ function computeStreaks(weeks: Array<{ contributionDays: Array<{ contributionCou
   return { current_streak, longest_streak, active_days_last_year };
 }
 
-export async function fetchExpandedGitHubData(login: string): Promise<ExpandedGitHubData | null> {
+/**
+ * What the row already knows about its contributions. When its current-year
+ * slice is for this calendar year, past years are settled, so the fetch asks
+ * GitHub for this year only (the 10-year query is heavy and times out for
+ * long histories) and the total becomes `total - cy + fresh`.
+ */
+export interface KnownContributionSplit {
+  contributions_total: number | null;
+  contributions_cy: number | null;
+  contributions_cy_year: number | null;
+  contribution_years: number[] | null;
+}
+
+export async function fetchExpandedGitHubData(
+  login: string,
+  known?: KnownContributionSplit,
+): Promise<ExpandedGitHubData | null> {
   const token = process.env.GITHUB_TOKEN;
   if (!token) return null;
 
-  const yearAliases = buildYearAliases();
+  const currentYear = new Date().getFullYear();
+  const incremental =
+    !!known && known.contributions_cy_year === currentYear && known.contributions_total != null;
+  const yearAliases = buildYearAliases(incremental);
 
   const query = `
     query($login: String!) {
@@ -149,16 +169,22 @@ export async function fetchExpandedGitHubData(login: string): Promise<ExpandedGi
     const currentCollection = user.current;
     const contributions = currentCollection?.contributionCalendar?.totalContributions ?? 0;
 
-    const currentYear = new Date().getFullYear();
     let contributions_total = 0;
-    const contribution_years: number[] = [];
+    let contribution_years: number[] = [];
     const contributions_cy = user[`y${currentYear}`]?.contributionCalendar?.totalContributions ?? 0;
-    for (let y = currentYear; y >= currentYear - 9; y--) {
-      const yearData = user[`y${y}`];
-      const yearContribs = yearData?.contributionCalendar?.totalContributions ?? 0;
-      if (yearContribs > 0) {
-        contributions_total += yearContribs;
-        contribution_years.push(y);
+    if (incremental && known) {
+      const prior = (known.contributions_total ?? 0) - (known.contributions_cy ?? 0);
+      contributions_total = Math.max(0, prior + contributions_cy);
+      const past = (known.contribution_years ?? []).filter((y) => y !== currentYear);
+      contribution_years = contributions_cy > 0 ? [currentYear, ...past] : past;
+    } else {
+      for (let y = currentYear; y >= currentYear - 9; y--) {
+        const yearData = user[`y${y}`];
+        const yearContribs = yearData?.contributionCalendar?.totalContributions ?? 0;
+        if (yearContribs > 0) {
+          contributions_total += yearContribs;
+          contribution_years.push(y);
+        }
       }
     }
 
@@ -286,10 +312,14 @@ export async function fetchFullContributions(login: string): Promise<FullContrib
 export async function fetchCurrentYearBatch(logins: string[]): Promise<{
   results: Map<string, number>;
   rateLimit: { remaining: number; resetAt: string } | null;
+  // The request itself failed (timeout, 5xx, rate limit): absent logins are
+  // unknown, not missing, so the caller must not treat them as refreshed.
+  failed: boolean;
 }> {
   const token = process.env.GITHUB_TOKEN;
-  const empty = { results: new Map<string, number>(), rateLimit: null };
-  if (!token) return empty;
+  const empty = { results: new Map<string, number>(), rateLimit: null, failed: false };
+  const failed = { ...empty, failed: true };
+  if (!token) return failed;
 
   const valid = logins.filter((l) => LOGIN_RE.test(l));
   if (valid.length === 0) return empty;
@@ -310,10 +340,10 @@ export async function fetchCurrentYearBatch(logins: string[]): Promise<{
       body: JSON.stringify({ query }),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return empty;
+    if (!res.ok) return failed;
     const json = await res.json();
     const data = json?.data;
-    if (!data) return empty;
+    if (!data) return failed;
 
     const results = new Map<string, number>();
     for (let i = 0; i < valid.length; i++) {
@@ -324,9 +354,9 @@ export async function fetchCurrentYearBatch(logins: string[]): Promise<{
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rl = data.rateLimit as any;
-    return { results, rateLimit: rl ? { remaining: rl.remaining, resetAt: rl.resetAt } : null };
+    return { results, rateLimit: rl ? { remaining: rl.remaining, resetAt: rl.resetAt } : null, failed: false };
   } catch {
-    return empty;
+    return failed;
   }
 }
 
@@ -520,7 +550,9 @@ export async function fetchGitHubDeveloperData(
     name: ghUser.name,
     avatar_url: ghUser.avatar_url,
     bio: ghUser.bio,
-    contributions,
+    // `contributions` is the rank key and always holds the all-years total,
+    // like every other writer; the 12-month count only gates `no_activity`.
+    contributions: expanded?.contributions_total ?? contributions,
     public_repos: publicRepos,
     total_stars: totalStars,
     primary_language: primaryLanguage,
