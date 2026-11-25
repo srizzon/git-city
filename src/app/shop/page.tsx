@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { queryCatalog, listSets, getCosmeticsByIds, encodeCursor } from "@/lib/cosmetics/catalog";
 import { getViewerCosmeticContext } from "@/lib/cosmetics/viewer";
 import ShopExperience from "@/components/cosmetics/ShopExperience";
+import ShopVisitTracker from "@/components/ShopVisitTracker";
 
 export const metadata: Metadata = {
   title: "Shop - Git City",
@@ -39,6 +40,8 @@ export default async function ShopPage() {
           ownedLookCosmetics={ownedForLook}
         />
       </div>
+      {/* Counts for the "Window shopper" daily; only a claimed player can have it */}
+      {viewer?.claimed && <ShopVisitTracker />}
     </main>
   );
 }
