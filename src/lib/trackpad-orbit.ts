@@ -33,7 +33,17 @@ export function attachTrackpadOrbit(el: HTMLElement, getControls: () => OrbitCon
     // A swipe's momentum tail keeps the verdict of its first event.
     if (sameGesture) return lastWasTrackpad;
     const legacy = (e as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY;
-    lastWasTrackpad = e.deltaMode === 0 && (
+    // Mouse-wheel signatures first (Mapbox GL's rules): line/page deltas, Mac
+    // Chrome/Safari notches in multiples of 4.000244140625px, and legacy
+    // wheelDelta in whole 120 notches. A vertical-only event matching any of
+    // them is a wheel, so it zooms instead of tilting.
+    const mouseNotch =
+      e.deltaMode !== 0 ||
+      (e.deltaX === 0 && e.deltaY !== 0 && (
+        e.deltaY % 4.000244140625 === 0 ||
+        (legacy !== undefined && legacy !== 0 && legacy % 120 === 0)
+      ));
+    lastWasTrackpad = !mouseNotch && (
       e.deltaX !== 0 ||
       (legacy !== undefined && legacy !== 0 ? legacy === -3 * e.deltaY : !Number.isInteger(e.deltaY))
     );
